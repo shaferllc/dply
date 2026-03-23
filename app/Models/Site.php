@@ -68,6 +68,7 @@ class Site extends Model
             'webhook_secret' => 'encrypted',
             'env_file_content' => 'encrypted',
             'meta' => 'array',
+            'laravel_scheduler' => 'boolean',
             'nginx_installed_at' => 'datetime',
             'ssl_installed_at' => 'datetime',
             'last_deploy_at' => 'datetime',
@@ -132,6 +133,11 @@ class Site extends Model
     public function deployHooks(): HasMany
     {
         return $this->hasMany(SiteDeployHook::class)->orderBy('sort_order');
+    }
+
+    public function deploySteps(): HasMany
+    {
+        return $this->hasMany(SiteDeployStep::class)->orderBy('sort_order');
     }
 
     public function primaryDomain(): ?SiteDomain

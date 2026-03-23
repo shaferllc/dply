@@ -7,9 +7,15 @@ use App\Jobs\IssueSiteSslJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteDomain;
+use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
+use App\Models\SiteDomain;
+use App\Models\SiteEnvironmentVariable;
+use App\Models\SiteDeployStep;
+use App\Models\SiteRedirect;
+use App\Models\SiteRelease;
 use App\Services\Sites\SiteEnvPusher;
+use App\Services\Sites\SiteReleaseRollback;
 use App\Support\SiteDeployKeyGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
@@ -39,6 +45,42 @@ class Show extends Component
 
     public ?string $revealed_webhook_secret = null;
 
+    public string $deploy_strategy = 'simple';
+
+    public int $releases_to_keep = 5;
+
+    public string $nginx_extra_raw = '';
+
+    public string $octane_port = '';
+
+    public bool $laravel_scheduler = false;
+
+    public string $deployment_environment = 'production';
+
+    public string $php_fpm_user = '';
+
+    public string $new_env_key = '';
+
+    public string $new_env_value = '';
+
+    public string $new_env_environment = 'production';
+
+    public string $new_redirect_from = '';
+
+    public string $new_redirect_to = '';
+
+    public int $new_redirect_code = 301;
+
+    public string $new_hook_phase = 'after_clone';
+
+    public string $new_hook_script = '';
+
+    public int $new_hook_order = 0;
+
+    public string $new_deploy_step_type = SiteDeployStep::TYPE_COMPOSER_INSTALL;
+
+    public string $new_deploy_step_command = '';
+
     public function mount(Server $server, Site $site): void
     {
         if ($site->server_id !== $server->id) {
@@ -61,6 +103,13 @@ class Show extends Component
         $this->git_branch = (string) ($this->site->git_branch ?: 'main');
         $this->post_deploy_command = (string) ($this->site->post_deploy_command ?? '');
         $this->env_file_content = (string) ($this->site->env_file_content ?? '');
+        $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
+        $this->releases_to_keep = (int) ($this->site->releases_to_keep ?? 5);
+        $this->nginx_extra_raw = (string) ($this->site->nginx_extra_raw ?? '');
+        $this->octane_port = $this->site->octane_port !== null ? (string) $this->site->octane_port : '';
+        $this->laravel_scheduler = (bool) $this->site->laravel_scheduler;
+        $this->deployment_environment = (string) ($this->site->deployment_environment ?? 'production');
+        $this->php_fpm_user = (string) ($this->site->php_fpm_user ?? '');
     }
 
     public function installNginx(): void
@@ -179,6 +228,169 @@ class Show extends Component
         }
     }
 
+    public function saveDeploymentSettings(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'deploy_strategy' => 'required|in:simple,atomic',
+            'releases_to_keep' => 'required|integer|min:1|max:50',
+            'nginx_extra_raw' => 'nullable|string|max:16000',
+            'octane_port' => 'nullable|integer|min:1|max:65535',
+            'laravel_scheduler' => 'boolean',
+            'deployment_environment' => 'required|string|max:32',
+            'php_fpm_user' => 'nullable|string|max:64',
+        ]);
+        $this->site->update([
+            'deploy_strategy' => $this->deploy_strategy,
+            'releases_to_keep' => $this->releases_to_keep,
+            'nginx_extra_raw' => $this->nginx_extra_raw !== '' ? $this->nginx_extra_raw : null,
+            'octane_port' => $this->octane_port !== '' ? (int) $this->octane_port : null,
+            'laravel_scheduler' => $this->laravel_scheduler,
+            'deployment_environment' => $this->deployment_environment,
+            'php_fpm_user' => $this->php_fpm_user !== '' ? $this->php_fpm_user : null,
+        ]);
+        $this->flash_success = 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler.';
+        $this->flash_error = null;
+    }
+
+    public function addEnvironmentVariable(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'new_env_key' => 'required|string|max:128|regex:/^[A-Za-z_][A-Za-z0-9_]*$/',
+            'new_env_value' => 'nullable|string|max:20000',
+            'new_env_environment' => 'required|string|max:32',
+        ]);
+        SiteEnvironmentVariable::query()->updateOrCreate(
+            [
+                'site_id' => $this->site->id,
+                'env_key' => $this->new_env_key,
+                'environment' => $this->new_env_environment,
+            ],
+            ['env_value' => $this->new_env_value]
+        );
+        $this->new_env_key = '';
+        $this->new_env_value = '';
+        $this->flash_success = 'Environment variable saved.';
+        $this->flash_error = null;
+    }
+
+    public function deleteEnvironmentVariable(int $id): void
+    {
+        $this->authorize('update', $this->site);
+        SiteEnvironmentVariable::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
+        $this->flash_success = 'Variable removed.';
+        $this->flash_error = null;
+    }
+
+    public function addRedirectRule(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'new_redirect_from' => 'required|string|max:512',
+            'new_redirect_to' => 'required|string|max:1024',
+            'new_redirect_code' => 'required|integer|in:301,302,307,308',
+        ]);
+        SiteRedirect::query()->create([
+            'site_id' => $this->site->id,
+            'from_path' => $this->new_redirect_from,
+            'to_url' => $this->new_redirect_to,
+            'status_code' => $this->new_redirect_code,
+            'sort_order' => (int) ($this->site->redirects()->max('sort_order') ?? 0) + 1,
+        ]);
+        $this->new_redirect_from = '';
+        $this->new_redirect_to = '';
+        $this->new_redirect_code = 301;
+        $this->flash_success = 'Redirect added. Re-run Install Nginx to apply.';
+        $this->flash_error = null;
+    }
+
+    public function deleteRedirectRule(int $id): void
+    {
+        $this->authorize('update', $this->site);
+        SiteRedirect::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
+        $this->flash_success = 'Redirect removed. Re-run Install Nginx.';
+        $this->flash_error = null;
+    }
+
+    public function addDeployHook(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'new_hook_phase' => 'required|in:before_clone,after_clone,after_activate',
+            'new_hook_script' => 'required|string|max:16000',
+            'new_hook_order' => 'integer|min:0|max:999',
+        ]);
+        SiteDeployHook::query()->create([
+            'site_id' => $this->site->id,
+            'phase' => $this->new_hook_phase,
+            'script' => $this->new_hook_script,
+            'sort_order' => $this->new_hook_order,
+        ]);
+        $this->new_hook_script = '';
+        $this->new_hook_order = 0;
+        $this->flash_success = 'Deploy hook added.';
+        $this->flash_error = null;
+    }
+
+    public function deleteDeployHook(int $id): void
+    {
+        $this->authorize('update', $this->site);
+        SiteDeployHook::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
+        $this->flash_success = 'Hook removed.';
+        $this->flash_error = null;
+    }
+
+    public function addDeployPipelineStep(): void
+    {
+        $this->authorize('update', $this->site);
+        $types = array_keys(SiteDeployStep::typeLabels());
+        $this->validate([
+            'new_deploy_step_type' => 'required|string|in:'.implode(',', $types),
+            'new_deploy_step_command' => 'nullable|string|max:4000',
+        ]);
+        $needsCustom = in_array($this->new_deploy_step_type, [
+            SiteDeployStep::TYPE_NPM_RUN,
+            SiteDeployStep::TYPE_CUSTOM,
+        ], true);
+        if ($needsCustom && trim($this->new_deploy_step_command) === '') {
+            $this->addError('new_deploy_step_command', 'This step type needs a value in the command field.');
+
+            return;
+        }
+        SiteDeployStep::query()->create([
+            'site_id' => $this->site->id,
+            'sort_order' => (int) ($this->site->deploySteps()->max('sort_order') ?? 0) + 1,
+            'step_type' => $this->new_deploy_step_type,
+            'custom_command' => trim($this->new_deploy_step_command) !== '' ? trim($this->new_deploy_step_command) : null,
+        ]);
+        $this->new_deploy_step_command = '';
+        $this->flash_success = 'Deploy pipeline step added. Runs after git, before the post-deploy command.';
+        $this->flash_error = null;
+    }
+
+    public function deleteDeployPipelineStep(int $id): void
+    {
+        $this->authorize('update', $this->site);
+        SiteDeployStep::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
+        $this->flash_success = 'Pipeline step removed.';
+        $this->flash_error = null;
+    }
+
+    public function rollbackRelease(int $releaseId, SiteReleaseRollback $rollback): void
+    {
+        $this->authorize('update', $this->site);
+        $this->flash_error = null;
+        try {
+            $release = SiteRelease::query()->where('site_id', $this->site->id)->findOrFail($releaseId);
+            $rollback->rollbackTo($this->site, $release);
+            $this->site->refresh();
+            $this->flash_success = 'Rolled back active release symlink. Re-install Nginx if document root changed.';
+        } catch (\Throwable $e) {
+            $this->flash_error = $e->getMessage();
+        }
+    }
+
     public function addDomain(): void
     {
         $this->authorize('update', $this->site);
@@ -225,7 +437,15 @@ class Show extends Component
 
     public function render(): View
     {
-        $this->site->load(['domains', 'deployments' => fn ($q) => $q->limit(25)]);
+        $this->site->load([
+            'domains',
+            'deployments' => fn ($q) => $q->limit(25),
+            'environmentVariables',
+            'redirects',
+            'deployHooks',
+            'deploySteps',
+            'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
+        ]);
 
         return view('livewire.sites.show', [
             'deployHookUrl' => $this->site->deployHookUrl(),

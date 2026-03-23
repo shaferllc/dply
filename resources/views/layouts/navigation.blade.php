@@ -21,9 +21,11 @@
                     <x-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
                         {{ __('Sites') }}
                     </x-nav-link>
-                    <x-nav-link :href="route('credentials.index')" :active="request()->routeIs('credentials.*')">
-                        {{ __('Credentials') }}
-                    </x-nav-link>
+                    @can('viewAny', App\Models\ProviderCredential::class)
+                        <x-nav-link :href="route('credentials.index')" :active="request()->routeIs('credentials.*')">
+                            {{ __('Credentials') }}
+                        </x-nav-link>
+                    @endcan
                     <x-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">
                         {{ __('Organizations') }}
                     </x-nav-link>
@@ -95,9 +97,11 @@
             <x-responsive-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
                 {{ __('Sites') }}
             </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('credentials.index')" :active="request()->routeIs('credentials.*')">
-                {{ __('Credentials') }}
-            </x-responsive-nav-link>
+            @can('viewAny', App\Models\ProviderCredential::class)
+                <x-responsive-nav-link :href="route('credentials.index')" :active="request()->routeIs('credentials.*')">
+                    {{ __('Credentials') }}
+                </x-responsive-nav-link>
+            @endcan
             <x-responsive-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">
                 {{ __('Organizations') }}
             </x-responsive-nav-link>

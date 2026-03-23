@@ -122,6 +122,9 @@
                                             @if ($apiToken->expires_at)
                                                 <span class="text-slate-400 text-xs ml-2">Expires {{ $apiToken->expires_at->format('M j, Y') }}</span>
                                             @endif
+                                            @if ($apiToken->abilities)
+                                                <p class="text-xs text-slate-500 mt-1 font-mono">{{ implode(', ', $apiToken->abilities) }}</p>
+                                            @endif
                                         </div>
                                         <button type="button" wire:click="revokeApiToken({{ $apiToken->id }})" wire:confirm="Revoke this token? It will stop working immediately." class="text-red-600 hover:underline text-sm">Revoke</button>
                                     </li>

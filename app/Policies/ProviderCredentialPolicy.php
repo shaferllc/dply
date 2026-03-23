@@ -9,6 +9,11 @@ class ProviderCredentialPolicy
 {
     public function viewAny(User $user): bool
     {
+        $org = $user->currentOrganization();
+        if ($org && $org->userIsDeployer($user)) {
+            return false;
+        }
+
         return true;
     }
 
@@ -18,7 +23,7 @@ class ProviderCredentialPolicy
             return true;
         }
         if ($providerCredential->organization_id && $providerCredential->organization->hasMember($user)) {
-            return true;
+            return ! $providerCredential->organization->userIsDeployer($user);
         }
 
         return false;
@@ -26,7 +31,15 @@ class ProviderCredentialPolicy
 
     public function create(User $user): bool
     {
-        return $user->currentOrganization() !== null;
+        $org = $user->currentOrganization();
+        if (! $org) {
+            return false;
+        }
+        if ($org->userIsDeployer($user)) {
+            return false;
+        }
+
+        return true;
     }
 
     public function delete(User $user, ProviderCredential $providerCredential): bool

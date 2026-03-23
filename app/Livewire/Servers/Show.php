@@ -2,23 +2,30 @@
 
 namespace App\Livewire\Servers;
 
-use App\Jobs\CheckServerHealthJob;
 use App\Enums\ServerProvider;
+use App\Jobs\CheckServerHealthJob;
 use App\Models\Server;
+use App\Models\ServerAuthorizedKey;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
-use App\Services\DigitalOceanService;
-use App\Services\HetznerService;
+use App\Models\ServerFirewallRule;
+use App\Models\ServerRecipe;
+use App\Models\SupervisorProgram;
 use App\Services\AwsEc2Service;
+use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
+use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\ScalewayService;
-use App\Services\UpCloudService;
-use App\Services\VultrService;
+use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
 use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Services\Servers\ServerFirewallProvisioner;
+use App\Services\Servers\SupervisorProvisioner;
 use App\Services\SshConnection;
+use App\Services\UpCloudService;
+use App\Services\VultrService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -59,6 +66,30 @@ class Show extends Component
     public string $new_cron_command = '';
 
     public string $new_cron_user = 'root';
+
+    public string $new_sv_slug = '';
+
+    public string $new_sv_type = 'queue';
+
+    public string $new_sv_command = 'php artisan queue:work --sleep=3 --tries=3';
+
+    public string $new_sv_directory = '';
+
+    public string $new_sv_user = 'www-data';
+
+    public int $new_sv_numprocs = 1;
+
+    public int $new_fw_port = 80;
+
+    public string $new_fw_protocol = 'tcp';
+
+    public string $new_auth_name = '';
+
+    public string $new_auth_key = '';
+
+    public string $new_recipe_name = '';
+
+    public string $new_recipe_script = '';
 
     public function mount(Server $server): void
     {
@@ -152,6 +183,185 @@ class Show extends Component
         }
     }
 
+    public function addSupervisorProgram(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->validate([
+            'new_sv_slug' => 'required|string|max:64|regex:/^[a-z0-9\-]+$/',
+            'new_sv_type' => 'required|string|max:32',
+            'new_sv_command' => 'required|string|max:2000',
+            'new_sv_directory' => 'required|string|max:512',
+            'new_sv_user' => 'required|string|max:64',
+            'new_sv_numprocs' => 'required|integer|min:1|max:32',
+        ]);
+        SupervisorProgram::query()->create([
+            'server_id' => $this->server->id,
+            'site_id' => null,
+            'slug' => $this->new_sv_slug,
+            'program_type' => $this->new_sv_type,
+            'command' => $this->new_sv_command,
+            'directory' => $this->new_sv_directory,
+            'user' => $this->new_sv_user,
+            'numprocs' => $this->new_sv_numprocs,
+            'is_active' => true,
+        ]);
+        $this->new_sv_slug = '';
+        $this->flash_success = 'Supervisor program saved. Click “Sync Supervisor”.';
+        $this->flash_error = null;
+    }
+
+    public function deleteSupervisorProgram(int $id, SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->server);
+        $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
+        if ($prog) {
+            $provisioner->deleteConfigFile($this->server, $prog->id);
+            $prog->delete();
+        }
+        $this->flash_success = 'Removed. Sync Supervisor to reload on the server.';
+        $this->flash_error = null;
+    }
+
+    public function syncSupervisor(SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->server);
+        $this->flash_success = null;
+        $this->flash_error = null;
+        try {
+            $this->server->refresh();
+            $out = $provisioner->sync($this->server);
+            $this->flash_success = 'Supervisor: '.Str::limit(trim($out), 1200);
+        } catch (\Throwable $e) {
+            $this->flash_error = $e->getMessage();
+        }
+    }
+
+    public function addFirewallRule(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->validate([
+            'new_fw_port' => 'required|integer|min:1|max:65535',
+            'new_fw_protocol' => 'required|in:tcp,udp',
+        ]);
+        ServerFirewallRule::query()->create([
+            'server_id' => $this->server->id,
+            'port' => $this->new_fw_port,
+            'protocol' => $this->new_fw_protocol,
+            'action' => 'allow',
+            'sort_order' => (int) ($this->server->firewallRules()->max('sort_order') ?? 0) + 1,
+        ]);
+        $this->flash_success = 'Rule saved. Click “Apply UFW rules”. Ensure SSH is allowed before enabling UFW.';
+        $this->flash_error = null;
+    }
+
+    public function deleteFirewallRule(int $id): void
+    {
+        $this->authorize('update', $this->server);
+        ServerFirewallRule::query()->where('server_id', $this->server->id)->whereKey($id)->delete();
+        $this->flash_success = 'Rule removed.';
+        $this->flash_error = null;
+    }
+
+    public function applyFirewall(ServerFirewallProvisioner $firewall): void
+    {
+        $this->authorize('update', $this->server);
+        $this->flash_success = null;
+        $this->flash_error = null;
+        try {
+            $this->server->refresh();
+            $out = $firewall->apply($this->server);
+            $this->flash_success = 'UFW: '.Str::limit(trim($out), 1200);
+        } catch (\Throwable $e) {
+            $this->flash_error = $e->getMessage();
+        }
+    }
+
+    public function addAuthorizedKey(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->validate([
+            'new_auth_name' => 'required|string|max:120',
+            'new_auth_key' => 'required|string|max:4000',
+        ]);
+        ServerAuthorizedKey::query()->create([
+            'server_id' => $this->server->id,
+            'name' => $this->new_auth_name,
+            'public_key' => trim($this->new_auth_key),
+        ]);
+        $this->new_auth_name = '';
+        $this->new_auth_key = '';
+        $this->flash_success = 'Key stored. Click “Sync authorized_keys”.';
+        $this->flash_error = null;
+    }
+
+    public function deleteAuthorizedKey(int $id): void
+    {
+        $this->authorize('update', $this->server);
+        ServerAuthorizedKey::query()->where('server_id', $this->server->id)->whereKey($id)->delete();
+        $this->flash_success = 'Key removed. Sync again to update server.';
+        $this->flash_error = null;
+    }
+
+    public function syncAuthorizedKeys(ServerAuthorizedKeysSynchronizer $sync): void
+    {
+        $this->authorize('update', $this->server);
+        $this->flash_success = null;
+        $this->flash_error = null;
+        try {
+            $this->server->refresh();
+            $out = $sync->sync($this->server);
+            $this->flash_success = 'authorized_keys updated. '.$out;
+        } catch (\Throwable $e) {
+            $this->flash_error = $e->getMessage();
+        }
+    }
+
+    public function addRecipe(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->validate([
+            'new_recipe_name' => 'required|string|max:160',
+            'new_recipe_script' => 'required|string|max:32000',
+        ]);
+        ServerRecipe::query()->create([
+            'server_id' => $this->server->id,
+            'user_id' => auth()->id(),
+            'name' => $this->new_recipe_name,
+            'script' => $this->new_recipe_script,
+        ]);
+        $this->new_recipe_name = '';
+        $this->new_recipe_script = '';
+        $this->flash_success = 'Recipe saved.';
+        $this->flash_error = null;
+    }
+
+    public function deleteRecipe(int $id): void
+    {
+        $this->authorize('update', $this->server);
+        ServerRecipe::query()->where('server_id', $this->server->id)->whereKey($id)->delete();
+        $this->flash_success = 'Recipe removed.';
+        $this->flash_error = null;
+    }
+
+    public function runRecipe(int $id): void
+    {
+        $this->authorize('update', $this->server);
+        $recipe = ServerRecipe::query()->where('server_id', $this->server->id)->findOrFail($id);
+        $this->command_output = null;
+        $this->command_error = null;
+        try {
+            $ssh = new SshConnection($this->server);
+            $b64 = base64_encode($recipe->script);
+            $this->command_output = $ssh->exec(
+                'echo '.escapeshellarg($b64).' | base64 -d | /usr/bin/env bash 2>&1',
+                900
+            );
+            $this->flash_success = 'Recipe ran. See command output below if shown.';
+        } catch (\Throwable $e) {
+            $this->command_error = $e->getMessage();
+        }
+    }
+
     public function runCommand(): void
     {
         $this->authorize('view', $this->server);
@@ -174,6 +384,7 @@ class Show extends Component
         $cmd = $this->server->deploy_command;
         if (empty(trim((string) $cmd))) {
             $this->flash_error = 'Set a deploy command first. Use "Edit deploy command" below.';
+
             return;
         }
         $this->command_output = null;
@@ -400,7 +611,15 @@ class Show extends Component
     public function render(): View
     {
         $this->server->refresh();
-        $this->server->load(['sites.domains', 'serverDatabases', 'cronJobs']);
+        $this->server->load([
+            'sites.domains',
+            'serverDatabases',
+            'cronJobs',
+            'supervisorPrograms',
+            'firewallRules',
+            'authorizedKeys',
+            'recipes',
+        ]);
 
         return view('livewire.servers.show');
     }

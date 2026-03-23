@@ -26,7 +26,9 @@ class ServerPolicy
 
     public function create(User $user): bool
     {
-        return $user->currentOrganization() !== null;
+        $org = $user->currentOrganization();
+
+        return $org !== null && ! $org->userIsDeployer($user);
     }
 
     public function update(User $user, Server $server): bool
@@ -36,6 +38,14 @@ class ServerPolicy
 
     public function delete(User $user, Server $server): bool
     {
-        return $this->view($user, $server);
+        if (! $this->view($user, $server)) {
+            return false;
+        }
+
+        if ($server->organization_id) {
+            return $server->organization->hasAdminAccess($user);
+        }
+
+        return $server->user_id === $user->id;
     }
 }

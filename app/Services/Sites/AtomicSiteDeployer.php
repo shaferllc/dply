@@ -10,7 +10,8 @@ use App\Services\SshConnection;
 class AtomicSiteDeployer
 {
     public function __construct(
-        protected DeployHookRunner $hookRunner
+        protected DeployHookRunner $hookRunner,
+        protected SiteDeployPipelineRunner $pipelineRunner
     ) {}
 
     public function deploy(Site $site): array
@@ -68,6 +69,8 @@ class AtomicSiteDeployer
 
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $newRelease);
         $this->hookRunner->assertHooksSucceeded($log, 'after_clone');
+
+        $log .= $this->pipelineRunner->run($ssh, $site, $newRelease);
 
         $post = trim((string) $site->post_deploy_command);
         if ($post !== '') {

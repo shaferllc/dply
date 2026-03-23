@@ -16,7 +16,7 @@
         @livewireStyles
         <style>[x-cloak]{display:none!important}</style>
     </head>
-    <body class="font-sans antialiased bg-slate-50 text-slate-900" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
+    <body class="font-sans antialiased bg-brand-cream text-brand-ink" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
         <div class="min-h-screen">
             @livewire('layout.navigation')
 
@@ -36,7 +36,7 @@
 
             <!-- Page Heading -->
             @isset($header)
-                <header class="border-b border-slate-200 bg-white">
+                <header class="border-b border-brand-ink/10 bg-white">
                     <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                         {{ $header }}
                     </div>
@@ -57,7 +57,7 @@
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 translate-y-2"
                     x-transition:enter-end="opacity-100 translate-y-0"
-                    :class="toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-800 text-white'"
+                    :class="toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-brand-ink text-brand-cream'"
                     class="rounded-lg border px-4 py-3 shadow-lg text-sm flex items-center gap-3 min-w-[200px]"
                 >
                     <span x-text="toast.message"></span>

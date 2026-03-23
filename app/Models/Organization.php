@@ -81,6 +81,13 @@ class Organization extends Model
         return $pivot && in_array($pivot->role, ['owner', 'admin'], true);
     }
 
+    public function userIsDeployer(User $user): bool
+    {
+        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
+
+        return $pivot && $pivot->role === 'deployer';
+    }
+
     /**
      * Maximum number of servers allowed for this organization based on subscription.
      * Free/Starter (no active subscription or non-Pro plan): config subscription.limits.servers_free (default 3).

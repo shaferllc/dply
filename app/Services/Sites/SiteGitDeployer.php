@@ -3,10 +3,16 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Models\SiteDeployHook;
 use App\Services\SshConnection;
 
 class SiteGitDeployer
 {
+    public function __construct(
+        protected DeployHookRunner $hookRunner,
+        protected SiteDeployPipelineRunner $pipelineRunner
+    ) {}
+
     public function run(Site $site): array
     {
         if (($site->deploy_strategy ?? 'simple') === 'atomic') {
@@ -23,7 +29,7 @@ class SiteGitDeployer
             throw new \InvalidArgumentException('Set a Git repository URL first.');
         }
 
-        $path = $site->effectiveRepositoryPath();
+        $path = rtrim($site->effectiveRepositoryPath(), '/');
         $branch = $site->git_branch ?: 'main';
         $ssh = new SshConnection($server);
 
@@ -47,6 +53,9 @@ class SiteGitDeployer
             sprintf('mkdir -p %s', $pathEsc),
             60
         );
+
+        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $path);
+        $this->hookRunner->assertHooksSucceeded($log, 'before_clone');
 
         $checkGit = trim($ssh->exec(sprintf('if [ -d %1$s/.git ]; then echo yes; else echo no; fi', $pathEsc), 30));
 
@@ -76,6 +85,11 @@ class SiteGitDeployer
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $pathEsc), 30));
 
+        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $path);
+        $this->hookRunner->assertHooksSucceeded($log, 'after_clone');
+
+        $log .= $this->pipelineRunner->run($ssh, $site, $path);
+
         $post = trim((string) $site->post_deploy_command);
         if ($post !== '') {
             $log .= "\n--- post deploy ---\n";
@@ -84,6 +98,9 @@ class SiteGitDeployer
                 900
             );
         }
+
+        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $path);
+        $this->hookRunner->assertHooksSucceeded($log, 'after_activate');
 
         return ['output' => $log, 'sha' => $sha !== '' ? $sha : null];
     }

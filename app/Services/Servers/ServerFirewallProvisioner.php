@@ -13,10 +13,15 @@ class ServerFirewallProvisioner
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
+        $rules = $server->firewallRules()->orderBy('sort_order')->get();
+        if ($rules->isEmpty()) {
+            return 'No firewall rules to apply.';
+        }
+
         $ssh = new SshConnection($server);
         $log = "Applying UFW rules (ensure SSH port 22 is allowed before enabling UFW).\n";
 
-        foreach ($server->firewallRules()->orderBy('sort_order')->get() as $rule) {
+        foreach ($rules as $rule) {
             if ($rule->action !== 'allow') {
                 continue;
             }

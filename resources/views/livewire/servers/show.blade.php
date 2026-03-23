@@ -181,6 +181,113 @@
                         <x-primary-button type="submit">Add entry</x-primary-button>
                     </form>
                     <button type="button" wire:click="syncCronJobs" class="inline-flex items-center px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-800 bg-white hover:bg-slate-50">Sync crontab on server</button>
+                    <p class="text-xs text-slate-500 mt-2">Crontab sync also writes the <strong>Laravel scheduler</strong> block for any site with “Laravel scheduler” enabled.</p>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 space-y-4">
+                    <h3 class="font-medium text-slate-900">Supervisor (daemons)</h3>
+                    <p class="text-sm text-slate-600">Writes <code class="text-xs bg-slate-100 px-1">/etc/supervisor/conf.d/dply-sv-*.conf</code> and runs <code class="text-xs bg-slate-100 px-1">supervisorctl reread/update</code>. Use for Horizon, queue workers, Octane, etc.</p>
+                    @if ($server->supervisorPrograms->isNotEmpty())
+                        <ul class="text-sm space-y-2">
+                            @foreach ($server->supervisorPrograms as $sp)
+                                <li class="flex justify-between gap-2 border border-slate-100 rounded px-3 py-2">
+                                    <div>
+                                        <span class="font-mono font-medium">{{ $sp->slug }}</span>
+                                        <span class="text-slate-500 text-xs">({{ $sp->program_type }})</span>
+                                        <p class="font-mono text-xs text-slate-600 break-all">{{ $sp->command }}</p>
+                                        <p class="text-xs text-slate-500">{{ $sp->directory }} · user {{ $sp->user }}</p>
+                                    </div>
+                                    <button type="button" wire:click="deleteSupervisorProgram({{ $sp->id }})" class="text-red-600 text-xs hover:underline shrink-0">Remove</button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    <form wire:submit="addSupervisorProgram" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <x-text-input wire:model="new_sv_slug" placeholder="slug (e.g. horizon)" class="font-mono" />
+                        <select wire:model="new_sv_type" class="rounded-md border-slate-300">
+                            <option value="horizon">horizon</option>
+                            <option value="queue">queue</option>
+                            <option value="octane">octane</option>
+                            <option value="custom">custom</option>
+                        </select>
+                        <x-text-input wire:model="new_sv_command" placeholder="php artisan horizon" class="sm:col-span-2 font-mono text-xs" />
+                        <x-text-input wire:model="new_sv_directory" placeholder="/var/www/app/current" class="sm:col-span-2 font-mono text-xs" />
+                        <x-text-input wire:model="new_sv_user" placeholder="www-data" />
+                        <x-text-input type="number" wire:model="new_sv_numprocs" class="w-20" min="1" max="32" />
+                        <div class="sm:col-span-2 flex gap-2">
+                            <x-primary-button type="submit" class="!py-2 text-sm">Add program</x-primary-button>
+                            <button type="button" wire:click="syncSupervisor" class="px-4 py-2 border border-slate-300 rounded-md text-sm">Sync Supervisor</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 space-y-4">
+                    <h3 class="font-medium text-slate-900">Firewall (UFW allow)</h3>
+                    <p class="text-sm text-amber-800">Runs <code class="text-xs bg-slate-100 px-1">ufw allow port/proto</code> for each rule. Confirm SSH access before relying on UFW.</p>
+                    @if ($server->firewallRules->isNotEmpty())
+                        <ul class="text-sm space-y-1">
+                            @foreach ($server->firewallRules as $fr)
+                                <li class="flex justify-between">
+                                    <span>Allow {{ $fr->port }}/{{ $fr->protocol }}</span>
+                                    <button type="button" wire:click="deleteFirewallRule({{ $fr->id }})" class="text-red-600 text-xs hover:underline">Remove</button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    <form wire:submit="addFirewallRule" class="flex flex-wrap gap-2 items-end">
+                        <x-text-input type="number" wire:model="new_fw_port" class="w-24" />
+                        <select wire:model="new_fw_protocol" class="rounded-md border-slate-300 text-sm">
+                            <option value="tcp">tcp</option>
+                            <option value="udp">udp</option>
+                        </select>
+                        <x-primary-button type="submit" class="!py-2 text-sm">Add rule</x-primary-button>
+                        <button type="button" wire:click="applyFirewall" class="px-4 py-2 border border-slate-300 rounded-md text-sm">Apply UFW rules</button>
+                    </form>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 space-y-4">
+                    <h3 class="font-medium text-slate-900">Extra SSH public keys</h3>
+                    <p class="text-sm text-slate-600">Merges into the SSH user’s <code class="text-xs bg-slate-100 px-1">~/.ssh/authorized_keys</code> (same user as the server’s Dply SSH key).</p>
+                    @if ($server->authorizedKeys->isNotEmpty())
+                        <ul class="text-sm space-y-1">
+                            @foreach ($server->authorizedKeys as $ak)
+                                <li class="flex justify-between gap-2">
+                                    <span>{{ $ak->name }}</span>
+                                    <button type="button" wire:click="deleteAuthorizedKey({{ $ak->id }})" class="text-red-600 text-xs hover:underline">Remove</button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    <form wire:submit="addAuthorizedKey" class="space-y-2">
+                        <x-text-input wire:model="new_auth_name" placeholder="Label (e.g. Alice laptop)" />
+                        <textarea wire:model="new_auth_key" rows="3" class="w-full rounded-md border-slate-300 font-mono text-xs" placeholder="ssh-ed25519 AAAA…"></textarea>
+                        <div class="flex gap-2">
+                            <x-primary-button type="submit" class="!py-2 text-sm">Save key</x-primary-button>
+                            <button type="button" wire:click="syncAuthorizedKeys" class="px-4 py-2 border border-slate-300 rounded-md text-sm">Sync authorized_keys</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 space-y-4">
+                    <h3 class="font-medium text-slate-900">Recipes (saved bash)</h3>
+                    @if ($server->recipes->isNotEmpty())
+                        <ul class="text-sm space-y-2">
+                            @foreach ($server->recipes as $rec)
+                                <li class="flex justify-between items-center border border-slate-100 rounded px-3 py-2">
+                                    <span class="font-medium">{{ $rec->name }}</span>
+                                    <span class="flex gap-2">
+                                        <button type="button" wire:click="runRecipe({{ $rec->id }})" class="text-slate-800 text-xs hover:underline">Run</button>
+                                        <button type="button" wire:click="deleteRecipe({{ $rec->id }})" wire:confirm="Delete recipe?" class="text-red-600 text-xs hover:underline">Delete</button>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    <form wire:submit="addRecipe" class="space-y-2">
+                        <x-text-input wire:model="new_recipe_name" placeholder="Recipe name" />
+                        <textarea wire:model="new_recipe_script" rows="6" class="w-full rounded-md border-slate-300 font-mono text-xs"></textarea>
+                        <x-primary-button type="submit" class="!py-2 text-sm">Save recipe</x-primary-button>
+                    </form>
                 </div>
 
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">

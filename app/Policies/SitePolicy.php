@@ -29,6 +29,6 @@ class SitePolicy
 
     public function delete(User $user, Site $site): bool
     {
-        return $user->can('delete', $site->server);
+        return $user->can('update', $site->server);
     }
 }
