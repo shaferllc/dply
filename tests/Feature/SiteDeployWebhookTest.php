@@ -7,6 +7,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\WebhookDeliveryLog;
+use Dply\Core\Security\WebhookSignature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -57,7 +58,7 @@ class SiteDeployWebhookTest extends TestCase
         Queue::fake();
         $site = $this->makeSiteWithSecret('plain_secret');
         $body = '';
-        $sig = 'sha256='.hash_hmac('sha256', $body, 'plain_secret');
+        $sig = WebhookSignature::expectedLegacyHeader('plain_secret', $body);
 
         $this->call('POST', route('hooks.site.deploy', $site), [], [], [], [
             'HTTP_X_DPLY_SIGNATURE' => $sig,
@@ -72,7 +73,7 @@ class SiteDeployWebhookTest extends TestCase
         $site = $this->makeSiteWithSecret('plain_secret');
         $body = '{"ref":"main"}';
         $ts = time();
-        $sig = 'sha256='.hash_hmac('sha256', $ts.'.'.$body, 'plain_secret');
+        $sig = WebhookSignature::expectedTimestampedHeader('plain_secret', $ts, $body);
 
         $this->call('POST', route('hooks.site.deploy', $site), [], [], [], [
             'CONTENT_TYPE' => 'application/json',
@@ -89,7 +90,7 @@ class SiteDeployWebhookTest extends TestCase
         $site->update(['webhook_allowed_ips' => ['203.0.113.50']]);
 
         $body = '';
-        $sig = 'sha256='.hash_hmac('sha256', $body, 'plain_secret');
+        $sig = WebhookSignature::expectedLegacyHeader('plain_secret', $body);
 
         $this->call('POST', route('hooks.site.deploy', $site), [], [], [], [
             'HTTP_X_DPLY_SIGNATURE' => $sig,

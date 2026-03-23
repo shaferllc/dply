@@ -1,8 +1,13 @@
 <?php
 
-namespace App\Support;
+declare(strict_types=1);
 
-class IpAllowList
+namespace Dply\Core\Net;
+
+/**
+ * IPv4 exact match and CIDR checks for allow lists (webhooks, API tokens, etc.).
+ */
+final class IpAllowList
 {
     /**
      * @param  array<int, string>  $allowed
@@ -27,7 +32,7 @@ class IpAllowList
         return false;
     }
 
-    protected static function ipInCidr(string $ip, string $cidr): bool
+    private static function ipInCidr(string $ip, string $cidr): bool
     {
         if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
             return false;

@@ -6,8 +6,9 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Notifications\SiteDeploymentCompletedNotification;
+use App\Services\Deploy\ByoDeployContext;
+use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Integrations\DeployIntegrationDispatcher;
-use App\Services\Sites\SiteGitDeployer;
 use App\Support\DeployLogRedactor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,10 +34,18 @@ class RunSiteDeploymentJob implements ShouldQueue
         public ?int $auditUserId = null,
     ) {}
 
-    public function handle(SiteGitDeployer $deployer, DeployIntegrationDispatcher $integrationDispatcher): void
+    public function handle(DeployEngineResolver $deployEngineResolver, DeployIntegrationDispatcher $integrationDispatcher): void
     {
         $this->site = $this->site->fresh();
         if (! $this->site) {
+            $this->clearIdempotencyInflight();
+
+            return;
+        }
+
+        $this->site->loadMissing('project');
+        if ($this->site->project === null) {
+            Log::error('RunSiteDeploymentJob: site has no project', ['site_id' => $this->site->id]);
             $this->clearIdempotencyInflight();
 
             return;
@@ -48,6 +57,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (! $lock->get()) {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
                 'exit_code' => null,
@@ -71,6 +81,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         try {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_RUNNING,
                 'started_at' => now(),
@@ -82,7 +93,13 @@ class RunSiteDeploymentJob implements ShouldQueue
             ], $this->timeout + 120);
 
             try {
-                $result = $deployer->run($this->site);
+                $engine = $deployEngineResolver->forProject($this->site->project);
+                $result = $engine->run(new ByoDeployContext(
+                    project: $this->site->project,
+                    trigger: $this->trigger,
+                    apiIdempotencyHash: $this->apiIdempotencyHash,
+                    auditUserId: $this->auditUserId,
+                ));
                 $redacted = DeployLogRedactor::redact($result['output']);
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_SUCCESS,

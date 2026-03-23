@@ -5,8 +5,15 @@
     "description": "The skeleton application for the Laravel framework.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./packages/dply-core"
+        }
+    ],
     "require": {
         "php": "^8.3",
+        "shaferllc/dply-core": "^0.1",
         "aws/aws-sdk-php": "^3.373",
         "bacon/bacon-qr-code": "^3.0",
         "laravel/cashier": "^16.5",
@@ -18,6 +25,7 @@
         "pragmarx/google2fa": "^9.0"
     },
     "require-dev": {
+        "doctrine/dbal": "^4.0",
         "fakerphp/faker": "^1.23",
         "laravel/breeze": "^2.4",
         "laravel/pail": "^1.2.5",

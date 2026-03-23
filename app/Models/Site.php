@@ -89,6 +89,29 @@ class Site extends Model
                     $site->organization_id = $server->organization_id;
                 }
             }
+            if ($site->project_id === null) {
+                $project = Project::query()->create([
+                    'organization_id' => $site->organization_id,
+                    'user_id' => $site->user_id,
+                    'name' => $site->name ?: 'Site',
+                    'slug' => 'tmp-'.Str::lower(Str::random(20)),
+                    'kind' => Project::KIND_BYO_SITE,
+                ]);
+                $site->project_id = $project->id;
+            }
+        });
+
+        static::created(function (Site $site): void {
+            $site->project()->update([
+                'slug' => $site->slug.'-'.$site->id,
+                'name' => $site->name,
+            ]);
+        });
+
+        static::deleted(function (Site $site): void {
+            if ($site->project_id) {
+                Project::query()->whereKey($site->project_id)->delete();
+            }
         });
     }
 
@@ -105,6 +128,11 @@ class Site extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public function domains(): HasMany

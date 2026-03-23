@@ -49,6 +49,11 @@ class Organization extends Model
         return $this->hasMany(Site::class);
     }
 
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
+    }
+
     public function providerCredentials(): HasMany
     {
         return $this->hasMany(ProviderCredential::class);

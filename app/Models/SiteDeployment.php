@@ -25,6 +25,7 @@ class SiteDeployment extends Model
 
     protected $fillable = [
         'site_id',
+        'project_id',
         'idempotency_key',
         'trigger',
         'status',
@@ -46,5 +47,10 @@ class SiteDeployment extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 }

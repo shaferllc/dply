@@ -4,7 +4,8 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\WebhookDeliveryLog;
-use App\Support\IpAllowList;
+use Dply\Core\Net\IpAllowList;
+use Dply\Core\Security\WebhookSignature;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -45,6 +46,7 @@ class SiteWebhookSignatureValidator
 
         $valid = false;
         $timestampHeader = $request->header('X-Dply-Timestamp');
+        $ts = null;
         if ($timestampHeader !== null && $timestampHeader !== '') {
             $ts = (int) $timestampHeader;
             $skew = (int) config('sites.webhook_timestamp_tolerance', 300);
@@ -57,29 +59,23 @@ class SiteWebhookSignatureValidator
                     'message' => 'Stale or invalid timestamp.',
                 ];
             }
-
-            $signedPayload = $ts.'.'.$payload;
-            $expected = hash_hmac('sha256', $signedPayload, $secret);
-            if ($sigHeader !== '' && hash_equals('sha256='.$expected, $sigHeader)) {
-                $replayKey = 'webhook-replay:'.$site->id.':'.$ts.':'.hash('sha256', $payload);
-                if (! Cache::add($replayKey, 1, now()->addMinutes(15))) {
-                    return [
-                        'ok' => false,
-                        'status' => 409,
-                        'outcome' => WebhookDeliveryLog::OUTCOME_REJECTED,
-                        'detail' => 'duplicate_delivery',
-                        'message' => 'Duplicate webhook delivery.',
-                    ];
-                }
-                $valid = true;
-            }
         }
 
-        if (! $valid) {
-            $expectedLegacy = hash_hmac('sha256', $payload, $secret);
-            if ($sigHeader !== '' && hash_equals('sha256='.$expectedLegacy, $sigHeader)) {
-                $valid = true;
+        $mode = WebhookSignature::verify($secret, $payload, $sigHeader, $ts);
+        if ($mode === 'timestamped') {
+            $replayKey = 'webhook-replay:'.$site->id.':'.$ts.':'.hash('sha256', $payload);
+            if (! Cache::add($replayKey, 1, now()->addMinutes(15))) {
+                return [
+                    'ok' => false,
+                    'status' => 409,
+                    'outcome' => WebhookDeliveryLog::OUTCOME_REJECTED,
+                    'detail' => 'duplicate_delivery',
+                    'message' => 'Duplicate webhook delivery.',
+                ];
             }
+            $valid = true;
+        } elseif ($mode === 'legacy') {
+            $valid = true;
         }
 
         if (! $valid) {

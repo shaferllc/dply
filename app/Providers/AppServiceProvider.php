@@ -14,6 +14,8 @@ use App\Policies\ProviderCredentialPolicy;
 use App\Policies\ServerPolicy;
 use App\Policies\SitePolicy;
 use App\Policies\TeamPolicy;
+use App\Services\Deploy\ByoServerDeployEngine;
+use App\Services\Deploy\DeployEngineResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -28,7 +30,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ByoServerDeployEngine::class);
+        $this->app->singleton(DeployEngineResolver::class, function ($app) {
+            return new DeployEngineResolver($app->make(ByoServerDeployEngine::class));
+        });
     }
 
     /**
