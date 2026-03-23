@@ -47,12 +47,14 @@ class Page extends Component
     public function getIsManageModeProperty(): bool
     {
         $user = auth()->user();
+
         return ! empty($user->two_factor_confirmed_at);
     }
 
     public function getNeedsStartProperty(): bool
     {
         $user = auth()->user();
+
         return empty($user->two_factor_secret) && ! $user->hasTwoFactorEnabled();
     }
 
@@ -72,6 +74,7 @@ class Page extends Component
             $user->email,
             $secret
         );
+
         return app(TwoFactorQrCodeService::class)->svg($otpauthUrl);
     }
 
@@ -96,6 +99,7 @@ class Page extends Component
 
         Session::flash('recovery_codes', $recoveryCodes);
         Session::flash('status', 'two-factor-enabled');
+
         return $this->redirect(route('profile.edit'), navigate: true);
     }
 
@@ -127,6 +131,7 @@ class Page extends Component
         ])->save();
 
         Session::flash('status', 'two-factor-disabled');
+
         return $this->redirect(route('profile.edit'), navigate: true);
     }
 
@@ -136,6 +141,7 @@ class Page extends Component
         for ($i = 0; $i < $count; $i++) {
             $codes[] = strtoupper(bin2hex(random_bytes(4)));
         }
+
         return $codes;
     }
 
@@ -151,6 +157,7 @@ class Page extends Component
                 $user->forceFill([
                     'two_factor_recovery_codes' => encrypt(json_encode(array_values($stored))),
                 ])->save();
+
                 return;
             }
         }

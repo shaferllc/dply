@@ -6,6 +6,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\WebhookDeliveryLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -39,6 +40,7 @@ class SiteDeployWebhookTest extends TestCase
         ]);
 
         $this->postJson(route('hooks.site.deploy', $site))->assertStatus(400);
+        $this->assertSame(1, WebhookDeliveryLog::query()->where('site_id', $site->id)->count());
     }
 
     public function test_rejects_invalid_signature(): void

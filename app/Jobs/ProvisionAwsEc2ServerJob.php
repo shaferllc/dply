@@ -22,6 +22,7 @@ class ProvisionAwsEc2ServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'aws') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

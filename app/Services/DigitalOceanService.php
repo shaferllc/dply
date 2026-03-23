@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ProviderCredential;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class DigitalOceanService
@@ -226,7 +227,7 @@ class DigitalOceanService
         $this->assertSuccess($response, 'delete droplet');
     }
 
-    protected function request(string $method, string $path, array $bodyOrQuery = []): \Illuminate\Http\Client\Response
+    protected function request(string $method, string $path, array $bodyOrQuery = []): Response
     {
         $url = $this->baseUrl.$path;
         $request = Http::withToken($this->token)
@@ -247,7 +248,7 @@ class DigitalOceanService
         throw new \InvalidArgumentException("Unsupported method: {$method}");
     }
 
-    protected function assertSuccess(\Illuminate\Http\Client\Response $response, string $action): void
+    protected function assertSuccess(Response $response, string $action): void
     {
         if ($response->successful()) {
             return;

@@ -23,6 +23,7 @@ class ProvisionVultrServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'vultr') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

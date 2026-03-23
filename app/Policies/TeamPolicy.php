@@ -2,12 +2,13 @@
 
 namespace App\Policies;
 
+use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
 
 class TeamPolicy
 {
-    public function viewAny(User $user, ?\App\Models\Organization $organization = null): bool
+    public function viewAny(User $user, ?Organization $organization = null): bool
     {
         return $organization ? $organization->hasMember($user) : true;
     }
@@ -17,7 +18,7 @@ class TeamPolicy
         return $team->organization->hasMember($user);
     }
 
-    public function create(User $user, \App\Models\Organization $organization): bool
+    public function create(User $user, Organization $organization): bool
     {
         return $organization->hasAdminAccess($user);
     }

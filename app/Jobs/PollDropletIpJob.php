@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\DigitalOceanService;
-use App\Jobs\RunSetupScriptJob;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -25,6 +24,7 @@ class PollDropletIpJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

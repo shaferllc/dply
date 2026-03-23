@@ -22,6 +22,7 @@ class ProvisionFlyIoServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'fly_io') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

@@ -21,6 +21,7 @@ class TwoFactorChallenge extends Component
         if (! session()->has('login.id')) {
             return $this->redirect(route('login'), navigate: true);
         }
+
         return null;
     }
 

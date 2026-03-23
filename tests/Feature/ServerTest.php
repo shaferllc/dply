@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Livewire\Servers\Create as ServersCreate;
+use App\Livewire\Servers\Show;
 use App\Models\Organization;
-use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -144,7 +144,7 @@ class ServerTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test(\App\Livewire\Servers\Show::class, ['server' => $server])
+            ->test(Show::class, ['server' => $server])
             ->call('destroy')
             ->assertRedirect(route('servers.index'));
 

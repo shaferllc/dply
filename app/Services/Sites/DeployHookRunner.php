@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Contracts\RemoteShell;
 use App\Models\Site;
+use App\Models\SiteDeployHook;
 use Illuminate\Support\Collection;
 
 class DeployHookRunner
@@ -11,7 +12,7 @@ class DeployHookRunner
     public function runPhase(RemoteShell $ssh, Site $site, string $phase, string $workingDirectory): string
     {
         $site->loadMissing('deployHooks');
-        /** @var Collection<int, \App\Models\SiteDeployHook> $hooks */
+        /** @var Collection<int, SiteDeployHook> $hooks */
         $hooks = $site->deployHooks->where('phase', $phase)->sortBy('sort_order')->values();
         $log = '';
         foreach ($hooks as $hook) {

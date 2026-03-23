@@ -5,10 +5,10 @@ namespace App\Livewire\Profile;
 use App\Http\Controllers\SessionController;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rules\Password;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -96,11 +96,12 @@ class Edit extends Component
         }
         if ($sessionId === session()->getId()) {
             $this->addError('session', __('You cannot revoke your current session.'));
+
             return;
         }
 
         $table = config('session.table', 'sessions');
-        $deleted = \Illuminate\Support\Facades\DB::table($table)
+        $deleted = DB::table($table)
             ->where('id', $sessionId)
             ->where('user_id', $userId)
             ->delete();
@@ -120,7 +121,7 @@ class Edit extends Component
         }
 
         $table = config('session.table', 'sessions');
-        \Illuminate\Support\Facades\DB::table($table)
+        DB::table($table)
             ->where('user_id', $userId)
             ->where('id', '!=', session()->getId())
             ->delete();

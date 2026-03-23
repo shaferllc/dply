@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ProviderCredential;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class UpCloudService
@@ -175,7 +176,7 @@ class UpCloudService
         $this->request('get', '/zone');
     }
 
-    protected function request(string $method, string $path, array $body = []): \Illuminate\Http\Client\Response
+    protected function request(string $method, string $path, array $body = []): Response
     {
         $url = $this->baseUrl.$path;
         $request = Http::withBasicAuth($this->username, $this->password)
@@ -198,7 +199,7 @@ class UpCloudService
         throw new \InvalidArgumentException("Unsupported method: {$method}");
     }
 
-    protected function assertSuccess(\Illuminate\Http\Client\Response $response, string $action): void
+    protected function assertSuccess(Response $response, string $action): void
     {
         if ($response->successful()) {
             return;

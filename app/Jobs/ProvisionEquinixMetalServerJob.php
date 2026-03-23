@@ -23,6 +23,7 @@ class ProvisionEquinixMetalServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'equinix_metal') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

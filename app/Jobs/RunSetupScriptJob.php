@@ -29,6 +29,7 @@ class RunSetupScriptJob implements ShouldQueue
         $script = $scripts[$server->setup_script_key] ?? null;
         if (! $script || empty($script['commands'])) {
             $server->update(['setup_status' => Server::SETUP_STATUS_FAILED]);
+
             return;
         }
 
@@ -39,6 +40,7 @@ class RunSetupScriptJob implements ShouldQueue
             $ssh = new SshConnection($server);
             if (! $ssh->connect($timeout + 5)) {
                 $server->update(['setup_status' => Server::SETUP_STATUS_FAILED]);
+
                 return;
             }
 

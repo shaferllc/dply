@@ -6,7 +6,6 @@ use App\Models\Server;
 use App\Services\HetznerService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Str;
 use phpseclib3\Crypt\RSA;
 
 class ProvisionHetznerServerJob implements ShouldQueue
@@ -24,6 +23,7 @@ class ProvisionHetznerServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'hetzner') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

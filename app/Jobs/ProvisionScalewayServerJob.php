@@ -23,6 +23,7 @@ class ProvisionScalewayServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'scaleway') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

@@ -44,6 +44,7 @@ class ProviderCredential extends Model
     public function getApiToken(): ?string
     {
         $creds = $this->credentials;
+
         return $creds['api_token'] ?? $creds['token'] ?? null;
     }
 }

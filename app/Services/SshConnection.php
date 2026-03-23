@@ -39,6 +39,7 @@ class SshConnection implements RemoteShell
             $key = PublicKeyLoader::load($this->server->ssh_private_key);
             if (! $this->ssh->login($user, $key)) {
                 $this->ssh = null;
+
                 return false;
             }
         } else {
@@ -101,6 +102,7 @@ class SshConnection implements RemoteShell
         foreach ($commands as $cmd) {
             $results[] = $this->exec($cmd);
         }
+
         return $results;
     }
 

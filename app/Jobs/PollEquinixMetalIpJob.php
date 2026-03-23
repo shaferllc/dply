@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 use App\Services\EquinixMetalService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -25,6 +24,7 @@ class PollEquinixMetalIpJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

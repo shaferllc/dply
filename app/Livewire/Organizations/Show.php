@@ -162,26 +162,32 @@ class Show extends Component
         $this->validate([
             'token_name' => 'required|string|max:255',
             'token_expires_at' => 'nullable|date|after:today',
+            'token_allowed_ips_text' => 'nullable|string|max:4000',
         ]);
 
         $expiresAt = $this->token_expires_at ? Carbon::parse($this->token_expires_at) : null;
+        if ($expiresAt === null && $this->token_scope === 'deploy') {
+            $expiresAt = now()->addDays((int) config('dply.api_token_deploy_default_ttl_days', 14));
+        }
         $abilities = match ($this->token_scope) {
             'read' => ['servers.read', 'sites.read'],
             'deploy' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy'],
             'ops' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy', 'commands.run'],
             default => ['*'],
         };
+        $allowedIps = $this->parseTokenAllowedIps($this->token_allowed_ips_text);
         ['token' => $token, 'plaintext' => $plaintext] = ApiToken::createToken(
             auth()->user(),
             $this->organization,
             $this->token_name,
             $expiresAt,
-            $abilities
+            $abilities,
+            $allowedIps
         );
 
         $this->new_token_plaintext = $plaintext;
         $this->new_token_name = $token->name;
-        $this->reset(['token_name', 'token_expires_at']);
+        $this->reset(['token_name', 'token_expires_at', 'token_allowed_ips_text']);
         $this->refreshOrganization();
     }
 
@@ -294,6 +300,101 @@ class Show extends Component
 
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Member removed from team.');
+    }
+
+    public function saveOutboundIntegration(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->validate([
+            'int_hook_name' => 'required|string|max:120',
+            'int_hook_driver' => 'required|string|in:slack,discord,teams',
+            'int_hook_url' => 'required|string|url|max:2000',
+            'int_hook_site_id' => 'nullable',
+        ]);
+
+        $siteId = $this->int_hook_site_id ? (int) $this->int_hook_site_id : null;
+        if ($siteId && ! $this->organization->sites()->whereKey($siteId)->exists()) {
+            throw ValidationException::withMessages(['int_hook_site_id' => 'Invalid site for this organization.']);
+        }
+
+        $events = [];
+        if ($this->int_evt_success) {
+            $events[] = 'deploy_success';
+        }
+        if ($this->int_evt_failed) {
+            $events[] = 'deploy_failed';
+        }
+        if ($this->int_evt_skipped) {
+            $events[] = 'deploy_skipped';
+        }
+
+        IntegrationOutboundWebhook::query()->create([
+            'organization_id' => $this->organization->id,
+            'site_id' => $siteId,
+            'name' => $this->int_hook_name,
+            'driver' => $this->int_hook_driver,
+            'webhook_url' => $this->int_hook_url,
+            'events' => $events !== [] ? $events : null,
+            'enabled' => true,
+        ]);
+
+        $this->reset(['int_hook_name', 'int_hook_url', 'int_hook_site_id']);
+        $this->int_hook_driver = IntegrationOutboundWebhook::DRIVER_SLACK;
+        $this->int_evt_success = true;
+        $this->int_evt_failed = true;
+        $this->int_evt_skipped = true;
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Integration webhook saved.');
+    }
+
+    public function deleteOutboundIntegration(int $id): void
+    {
+        $this->authorize('update', $this->organization);
+        $hook = $this->organization->integrationOutboundWebhooks()->whereKey($id)->firstOrFail();
+        $hook->delete();
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Integration removed.');
+    }
+
+    public function toggleOutboundIntegration(int $id): void
+    {
+        $this->authorize('update', $this->organization);
+        $hook = $this->organization->integrationOutboundWebhooks()->whereKey($id)->firstOrFail();
+        $hook->update(['enabled' => ! $hook->enabled]);
+        $this->refreshOrganization();
+    }
+
+    /**
+     * @return array<int, string>|null
+     */
+    protected function parseTokenAllowedIps(string $raw): ?array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+        $clean = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            if (! $this->validIpOrCidrForToken($line)) {
+                throw ValidationException::withMessages([
+                    'token_allowed_ips_text' => 'Invalid IP or CIDR: '.$line,
+                ]);
+            }
+            $clean[] = $line;
+        }
+
+        return $clean !== [] ? $clean : null;
+    }
+
+    protected function validIpOrCidrForToken(string $value): bool
+    {
+        if (str_contains($value, '/')) {
+            return (bool) preg_match('#^(\d{1,3}\.){3}\d{1,3}/(3[0-2]|[12]?\d)$#', $value);
+        }
+
+        return (bool) filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6);
     }
 
     public function render(): View

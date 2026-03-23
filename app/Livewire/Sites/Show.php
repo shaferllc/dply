@@ -18,6 +18,7 @@ use App\Services\Sites\SiteEnvPusher;
 use App\Services\Sites\SiteReleaseRollback;
 use App\Support\SiteDeployKeyGenerator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -76,6 +77,8 @@ class Show extends Component
     public string $new_hook_script = '';
 
     public int $new_hook_order = 0;
+
+    public int $new_hook_timeout_seconds = 900;
 
     public string $new_deploy_step_type = SiteDeployStep::TYPE_COMPOSER_INSTALL;
 
@@ -204,7 +207,21 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
-        $this->flash_success = 'Deployment queued. Refresh deployments below in a moment.';
+        $this->flash_success = 'Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.';
+        $this->flash_error = null;
+    }
+
+    public function getDeployLockInfoProperty(): ?array
+    {
+        return Cache::get('site-deploy-active:'.$this->site->id);
+    }
+
+    public function releaseDeployLock(): void
+    {
+        $this->authorize('update', $this->site);
+        Cache::lock('site-deploy:'.$this->site->id)->forceRelease();
+        Cache::forget('site-deploy-active:'.$this->site->id);
+        $this->flash_success = 'Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.';
         $this->flash_error = null;
     }
 
@@ -365,15 +382,18 @@ class Show extends Component
             'new_hook_phase' => 'required|in:before_clone,after_clone,after_activate',
             'new_hook_script' => 'required|string|max:16000',
             'new_hook_order' => 'integer|min:0|max:999',
+            'new_hook_timeout_seconds' => 'required|integer|min:30|max:3600',
         ]);
         SiteDeployHook::query()->create([
             'site_id' => $this->site->id,
             'phase' => $this->new_hook_phase,
             'script' => $this->new_hook_script,
             'sort_order' => $this->new_hook_order,
+            'timeout_seconds' => $this->new_hook_timeout_seconds,
         ]);
         $this->new_hook_script = '';
         $this->new_hook_order = 0;
+        $this->new_hook_timeout_seconds = 900;
         $this->flash_success = 'Deploy hook added.';
         $this->flash_error = null;
     }
@@ -520,6 +540,7 @@ class Show extends Component
         $this->site->load([
             'domains',
             'deployments' => fn ($q) => $q->limit(25),
+            'webhookDeliveryLogs' => fn ($q) => $q->limit(30),
             'environmentVariables',
             'redirects',
             'deployHooks',

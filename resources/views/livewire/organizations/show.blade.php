@@ -107,6 +107,14 @@
                                 </div>
                                 <x-primary-button type="submit" class="!text-sm">Create token</x-primary-button>
                             </form>
+                            <div class="px-6 pb-4">
+                                <label for="token_allowed_ips_text" class="block text-xs font-medium text-slate-600 mb-1">Optional API token IP allow list (one IPv4/IPv6 or IPv4 CIDR per line)</label>
+                                <textarea id="token_allowed_ips_text" wire:model="token_allowed_ips_text" rows="3" class="w-full max-w-xl rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="Leave empty to allow any IP"></textarea>
+                                @error('token_allowed_ips_text')
+                                    <span class="text-red-600 text-xs">{{ $message }}</span>
+                                @enderror
+                                <p class="text-xs text-slate-500 mt-1">Deploy scope defaults to a short expiry ({{ config('dply.api_token_deploy_default_ttl_days', 14) }} days) if you leave “Expires” blank.</p>
+                            </div>
                         </div>
                         @if ($organization->apiTokens->isEmpty())
                             <div class="px-6 py-6 text-slate-500 text-sm">No API tokens yet. Create one above to use the API from CI/CD.</div>
@@ -126,12 +134,72 @@
                                             @if ($apiToken->abilities)
                                                 <p class="text-xs text-slate-500 mt-1 font-mono">{{ implode(', ', $apiToken->abilities) }}</p>
                                             @endif
+                                            @if ($apiToken->allowed_ips)
+                                                <p class="text-xs text-slate-500 mt-1">IPs: {{ implode(', ', $apiToken->allowed_ips) }}</p>
+                                            @endif
                                         </div>
                                         <button type="button" wire:click="revokeApiToken({{ $apiToken->id }})" wire:confirm="Revoke this token? It will stop working immediately." class="text-red-600 hover:underline text-sm">Revoke</button>
                                     </li>
                                 @endforeach
                             </ul>
                         @endif
+                    </section>
+
+                    <section class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="px-6 py-4 border-b border-slate-200">
+                            <h3 class="font-medium text-slate-900">Deploy integrations (Slack / Discord / Teams)</h3>
+                            <p class="text-sm text-slate-500 mt-1">POSTs a short text payload on deploy finished (success, failed, or skipped). Org-wide hooks fire for every site; site-specific hooks only when that site deploys.</p>
+                        </div>
+                        <div class="px-6 py-4 space-y-4">
+                            <form wire:submit="saveOutboundIntegration" class="flex flex-col gap-3 max-w-2xl">
+                                <div class="flex flex-wrap gap-2">
+                                    <input type="text" wire:model="int_hook_name" placeholder="Name" required class="rounded-md border-slate-300 shadow-sm text-sm flex-1 min-w-[140px]">
+                                    <select wire:model="int_hook_driver" class="rounded-md border-slate-300 shadow-sm text-sm">
+                                        <option value="slack">Slack</option>
+                                        <option value="discord">Discord</option>
+                                        <option value="teams">Microsoft Teams</option>
+                                    </select>
+                                </div>
+                                <input type="url" wire:model="int_hook_url" placeholder="Incoming webhook URL" required class="rounded-md border-slate-300 shadow-sm text-sm w-full font-mono text-xs">
+                                <div>
+                                    <label for="int_hook_site_id" class="block text-xs font-medium text-slate-600 mb-1">Limit to site (optional)</label>
+                                    <select id="int_hook_site_id" wire:model="int_hook_site_id" class="rounded-md border-slate-300 shadow-sm text-sm w-full max-w-md">
+                                        <option value="">All sites in this org</option>
+                                        @foreach ($organization->sites as $s)
+                                            <option value="{{ $s->id }}">{{ $s->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="flex flex-wrap gap-4 text-sm text-slate-700">
+                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_success" class="rounded border-slate-300"> Success</label>
+                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_failed" class="rounded border-slate-300"> Failed</label>
+                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_skipped" class="rounded border-slate-300"> Skipped</label>
+                                </div>
+                                <x-primary-button type="submit" class="!text-sm w-fit">Add integration</x-primary-button>
+                            </form>
+                            @if ($organization->integrationOutboundWebhooks->isEmpty())
+                                <p class="text-sm text-slate-500">No integrations yet.</p>
+                            @else
+                                <ul class="divide-y divide-slate-100 border border-slate-100 rounded-md">
+                                    @foreach ($organization->integrationOutboundWebhooks as $hook)
+                                        <li class="px-4 py-3 flex flex-wrap justify-between gap-2 text-sm">
+                                            <div>
+                                                <span class="font-medium">{{ $hook->name }}</span>
+                                                <span class="text-slate-500 ml-2">{{ $hook->driver }}</span>
+                                                @if ($hook->site_id)
+                                                    <span class="text-slate-400 text-xs ml-2">site #{{ $hook->site_id }}</span>
+                                                @endif
+                                                <span class="text-xs ml-2 {{ $hook->enabled ? 'text-green-600' : 'text-slate-400' }}">{{ $hook->enabled ? 'on' : 'off' }}</span>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button type="button" wire:click="toggleOutboundIntegration({{ $hook->id }})" class="text-slate-600 hover:underline text-xs">Toggle</button>
+                                                <button type="button" wire:click="deleteOutboundIntegration({{ $hook->id }})" wire:confirm="Remove this integration?" class="text-red-600 hover:underline text-xs">Remove</button>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
                     </section>
                 @endif
 

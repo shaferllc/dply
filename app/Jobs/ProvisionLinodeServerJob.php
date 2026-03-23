@@ -23,6 +23,7 @@ class ProvisionLinodeServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || ! in_array($credential->provider, ['linode', 'akamai'], true)) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

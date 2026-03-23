@@ -24,6 +24,7 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'digitalocean') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 
@@ -39,6 +40,7 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
         $sshKeyId = $doKey['id'] ?? $doKey['fingerprint'] ?? null;
         if ($sshKeyId === null) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
             return;
         }
 

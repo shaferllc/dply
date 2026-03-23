@@ -4,11 +4,11 @@ namespace App\Livewire\Servers;
 
 use App\Enums\ServerProvider;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
-use App\Services\HetznerService;
 use App\Services\AwsEc2Service;
+use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
+use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;

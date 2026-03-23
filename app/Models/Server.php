@@ -13,17 +13,25 @@ class Server extends Model
     use HasFactory;
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_PROVISIONING = 'provisioning';
+
     public const STATUS_READY = 'ready';
+
     public const STATUS_ERROR = 'error';
+
     public const STATUS_DISCONNECTED = 'disconnected';
 
     public const HEALTH_REACHABLE = 'reachable';
+
     public const HEALTH_UNREACHABLE = 'unreachable';
 
     public const SETUP_STATUS_PENDING = 'pending';
+
     public const SETUP_STATUS_RUNNING = 'running';
+
     public const SETUP_STATUS_DONE = 'done';
+
     public const SETUP_STATUS_FAILED = 'failed';
 
     protected $fillable = [

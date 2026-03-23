@@ -14,6 +14,7 @@ class VerifyEmail extends Component
         if (auth()->user()->hasVerifiedEmail()) {
             return $this->redirect(route('dashboard'), navigate: true);
         }
+
         return null;
     }
 
@@ -21,6 +22,7 @@ class VerifyEmail extends Component
     {
         if (auth()->user()->hasVerifiedEmail()) {
             $this->redirect(route('dashboard'), navigate: true);
+
             return;
         }
         auth()->user()->sendEmailVerificationNotification();

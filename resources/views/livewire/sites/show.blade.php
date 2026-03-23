@@ -17,6 +17,17 @@
                 <div class="p-4 rounded-md bg-red-50 text-red-800">{{ $flash_error }}</div>
             @endif
 
+            @if ($this->deployLockInfo)
+                <div class="p-4 rounded-md bg-amber-50 text-amber-900 text-sm border border-amber-200" wire:poll.5s>
+                    <strong>Deployment in progress</strong>
+                    @if (! empty($this->deployLockInfo['deployment_id']))
+                        <span class="text-amber-800">· run #{{ $this->deployLockInfo['deployment_id'] }}</span>
+                    @endif
+                    <p class="mt-1 text-amber-800">Queued deploys may appear as <span class="font-medium">skipped</span> until this run finishes.</p>
+                    <button type="button" wire:click="releaseDeployLock" wire:confirm="Force-clear the deploy lock? Only if no worker is actually deploying." class="mt-2 text-sm text-amber-900 underline">Clear lock</button>
+                </div>
+            @endif
+
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
                 <h3 class="font-medium text-slate-900 mb-3">Status</h3>
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -273,7 +284,7 @@
                         @foreach ($site->deployHooks as $h)
                             <li class="border border-slate-100 rounded p-2">
                                 <div class="flex justify-between mb-1">
-                                    <span class="font-medium">{{ $h->phase }} #{{ $h->sort_order }}</span>
+                                    <span class="font-medium">{{ $h->phase }} #{{ $h->sort_order }} <span class="text-slate-500 font-normal">· {{ (int) ($h->timeout_seconds ?? config('dply.default_deploy_hook_timeout_seconds', 900)) }}s</span></span>
                                     <button type="button" wire:click="deleteDeployHook({{ $h->id }})" class="text-red-600 text-xs hover:underline">Remove</button>
                                 </div>
                                 <pre class="text-xs bg-slate-900 text-green-400 p-2 rounded overflow-x-auto whitespace-pre-wrap">{{ \Illuminate\Support\Str::limit($h->script, 500) }}</pre>
@@ -287,7 +298,13 @@
                         <option value="after_clone">after_clone</option>
                         <option value="after_activate">after_activate</option>
                     </select>
-                    <x-text-input type="number" wire:model="new_hook_order" class="w-24 text-sm" title="sort order" />
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <x-text-input type="number" wire:model="new_hook_order" class="w-24 text-sm" title="sort order" />
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-0.5">Timeout (s)</label>
+                            <input type="number" wire:model="new_hook_timeout_seconds" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
+                        </div>
+                    </div>
                     <textarea wire:model="new_hook_script" rows="4" class="w-full rounded-md border-slate-300 font-mono text-xs" placeholder="#!/usr/bin/env bash"></textarea>
                     <x-primary-button type="submit" class="!py-2">Add hook</x-primary-button>
                 </form>
@@ -336,6 +353,27 @@
                 </form>
             </div>
 
+            <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
+                <h3 class="font-medium text-slate-900">Webhook delivery log</h3>
+                <p class="text-sm text-slate-600">Recent inbound deploy webhook attempts (signature checks, IP allow list, etc.).</p>
+                @if ($site->webhookDeliveryLogs->isEmpty())
+                    <p class="text-sm text-slate-500">No deliveries recorded yet.</p>
+                @else
+                    <ul class="text-xs font-mono space-y-1 border border-slate-100 rounded-md divide-y divide-slate-100">
+                        @foreach ($site->webhookDeliveryLogs as $log)
+                            <li class="px-3 py-2 flex flex-wrap gap-2 justify-between">
+                                <span>{{ $log->created_at->diffForHumans() }}</span>
+                                <span class="text-slate-600">{{ $log->request_ip ?? '—' }}</span>
+                                <span class="text-slate-800">{{ $log->http_status }} · {{ $log->outcome }}</span>
+                                @if ($log->detail)
+                                    <span class="text-slate-500 w-full">{{ $log->detail }}</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
+
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3" wire:poll.10s>
                 <h3 class="font-medium text-slate-900">Deployment log</h3>
                 @if ($site->deployments->isEmpty())
@@ -345,7 +383,17 @@
                         @foreach ($site->deployments as $dep)
                             <li class="border border-slate-200 rounded-md p-3 text-sm">
                                 <div class="flex flex-wrap justify-between gap-2 mb-2">
-                                    <span class="font-medium capitalize">{{ $dep->trigger }} · {{ $dep->status }}</span>
+                                    @php
+                                        $st = $dep->status;
+                                        $cls = match ($st) {
+                                            'success' => 'text-green-700',
+                                            'failed' => 'text-red-700',
+                                            'skipped' => 'text-amber-700',
+                                            'running' => 'text-blue-700',
+                                            default => 'text-slate-700',
+                                        };
+                                    @endphp
+                                    <span class="font-medium capitalize">{{ $dep->trigger }} · <span class="{{ $cls }}">{{ $st }}</span></span>
                                     <span class="text-slate-500 text-xs">{{ $dep->created_at->diffForHumans() }}</span>
                                 </div>
                                 @if ($dep->git_sha)
@@ -374,7 +422,7 @@
             </div>
 
             <div class="flex justify-between items-center">
-                <button type="button" wire:click="deleteSite" wire:confirm="Delete this site from Dply? Nginx files on the server are not removed automatically." class="text-red-600 hover:underline text-sm">Delete site</button>
+                <button type="button" wire:click="deleteSite" wire:confirm="Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab." class="text-red-600 hover:underline text-sm">Delete site</button>
             </div>
         </div>
     </div>

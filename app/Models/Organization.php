@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\AuditLog;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -83,6 +82,7 @@ class Organization extends Model
     public function hasAdminAccess(User $user): bool
     {
         $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
+
         return $pivot && in_array($pivot->role, ['owner', 'admin'], true);
     }
 

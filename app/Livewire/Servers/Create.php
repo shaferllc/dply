@@ -2,23 +2,23 @@
 
 namespace App\Livewire\Servers;
 
+use App\Enums\ServerProvider;
 use App\Jobs\ProvisionAwsEc2ServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
-use App\Jobs\ProvisionHetznerServerJob;
 use App\Jobs\ProvisionEquinixMetalServerJob;
 use App\Jobs\ProvisionFlyIoServerJob;
+use App\Jobs\ProvisionHetznerServerJob;
 use App\Jobs\ProvisionLinodeServerJob;
 use App\Jobs\ProvisionScalewayServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
-use App\Enums\ServerProvider;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Services\AwsEc2Service;
 use App\Services\DigitalOceanService;
-use App\Services\HetznerService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
+use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
@@ -65,10 +65,12 @@ class Create extends Component
         $org = $user->currentOrganization();
         if (! $org) {
             $this->addError('org', 'Select or create an organization first.');
+
             return null;
         }
         if (! $org->canCreateServer()) {
             $this->addError('org', 'Server limit reached for your plan. Upgrade to add more.');
+
             return null;
         }
 
@@ -105,6 +107,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Server is being created. This usually takes 1–2 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -140,6 +143,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Server is being created. This usually takes 1–2 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -175,6 +179,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Server is being created. This usually takes 1–2 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -210,6 +215,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Server is being created. This usually takes 1–2 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -245,6 +251,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Server is being created. This usually takes 1–2 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -280,6 +287,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Server is being created. This usually takes 1–2 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -315,6 +323,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Server is being created. This usually takes 1–2 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -350,6 +359,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Server is being created. Bare metal can take 5–10 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -385,6 +395,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'Fly.io machine is being created.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -420,6 +431,7 @@ class Create extends Component
             audit_log($org, $user, 'server.created', $server);
 
             Session::flash('success', 'AWS EC2 instance is being created. This usually takes 1–2 minutes.');
+
             return $this->redirect(route('servers.show', $server), navigate: true);
         }
 
@@ -446,12 +458,13 @@ class Create extends Component
         audit_log($org, $user, 'server.created', $server);
 
         Session::flash('success', 'Server added.');
+
         return $this->redirect(route('servers.show', $server), navigate: true);
     }
 
     public function render(): View
     {
-        $this->authorize('create', \App\Models\Server::class);
+        $this->authorize('create', Server::class);
 
         $org = auth()->user()->currentOrganization();
         $credentials = $org

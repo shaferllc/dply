@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -18,7 +19,7 @@ class ServerFactory extends Factory
         return [
             'user_id' => User::factory(),
             'name' => fake()->slug(2),
-            'provider' => \App\Enums\ServerProvider::Custom,
+            'provider' => ServerProvider::Custom,
             'ip_address' => fake()->ipv4(),
             'ssh_port' => 22,
             'ssh_user' => 'root',
@@ -39,7 +40,7 @@ class ServerFactory extends Factory
     public function digitalOcean(): static
     {
         return $this->state(fn (array $attributes) => [
-            'provider' => \App\Enums\ServerProvider::DigitalOcean,
+            'provider' => ServerProvider::DigitalOcean,
             'region' => 'nyc1',
             'size' => 's-1vcpu-1gb',
         ]);

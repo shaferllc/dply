@@ -8,14 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 if (! function_exists('audit_log')) {
     /**
      * Log an action to the organization audit log.
-     *
-     * @param  \App\Models\Organization  $organization
-     * @param  \App\Models\User|null  $user
-     * @param  string  $action
-     * @param  \Illuminate\Database\Eloquent\Model|null  $subject
-     * @param  array|null  $oldValues
-     * @param  array|null  $newValues
-     * @return \App\Models\AuditLog
      */
     function audit_log(
         Organization $organization,

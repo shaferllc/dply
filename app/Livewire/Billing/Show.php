@@ -4,6 +4,7 @@ namespace App\Livewire\Billing;
 
 use App\Models\Organization;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -26,6 +27,7 @@ class Show extends Component
     public function getStatusProperty(): ?string
     {
         $sub = $this->getSubscriptionProperty();
+
         return $sub ? $sub->stripe_status : null;
     }
 
@@ -45,6 +47,7 @@ class Show extends Component
                 return $plan['name'] ?? $priceId;
             }
         }
+
         return $priceId;
     }
 
@@ -61,10 +64,11 @@ class Show extends Component
                 return '•••• '.$pm->card->last4;
             }
         }
+
         return 'No payment method';
     }
 
-    public function getPlansProperty(): \Illuminate\Support\Collection
+    public function getPlansProperty(): Collection
     {
         return collect(config('subscription.plans', []))->filter(fn ($p) => ! empty($p['price_id']));
     }
@@ -82,6 +86,7 @@ class Show extends Component
         $planConfig = $plans[$plan] ?? null;
         if (! $planConfig || empty($planConfig['price_id'])) {
             $this->addError('plan', 'Invalid or missing plan.');
+
             return null;
         }
 
@@ -103,6 +108,7 @@ class Show extends Component
 
         if (! $this->organization->hasStripeId()) {
             $this->addError('billing', 'No billing account yet. Subscribe to a plan first.');
+
             return null;
         }
 

@@ -1,9 +1,9 @@
 <?php
 
+use App\Console\Commands\FlushDeployDigestCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\SetCurrentOrganization;
-use App\Console\Commands\FlushDeployDigestCommand;
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\CheckSiteUrlHealthJob;
 use App\Models\Server;
