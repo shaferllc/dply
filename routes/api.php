@@ -11,4 +11,6 @@ Route::prefix('v1')->middleware(['auth.api', 'throttle:api'])->group(function ()
 
     Route::get('/sites', [SiteController::class, 'index'])->middleware('ability:sites.read');
     Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->middleware('ability:sites.deploy');
+    Route::get('/sites/{site}/deployments', [SiteController::class, 'deployments'])->middleware('ability:sites.read');
+    Route::get('/sites/{site}/deployments/{deployment}', [SiteController::class, 'showDeployment'])->middleware('ability:sites.read');
 });

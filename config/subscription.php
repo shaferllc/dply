@@ -37,5 +37,12 @@ return [
             'interval' => 'year',
             'description' => 'Pro plan billed yearly.',
         ],
+        /*
+         * Optional per-seat add-on price. When present on the subscription, member
+         * cap uses this line item's quantity (see Organization::seatCapFromSubscription).
+         */
+        'seat' => [
+            'price_id' => env('STRIPE_PRICE_SEAT', ''),
+        ],
     ],
 ];

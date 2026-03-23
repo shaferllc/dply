@@ -28,7 +28,7 @@
                     <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
                         <div>
                             <h3 class="font-medium text-slate-900">Members</h3>
-                            <p class="text-sm text-slate-500">Users who can access this organization's servers and credentials.</p>
+                            <p class="text-sm text-slate-500">Members and deployers can use servers and sites. Deployers cannot manage provider credentials, billing, or delete servers.</p>
                         </div>
                         @if ($organization->hasAdminAccess(auth()->user()))
                             <form wire:submit="inviteMember" class="flex gap-2 items-end flex-wrap">
@@ -44,6 +44,7 @@
                                     <select id="invite_role" wire:model="invite_role" class="rounded-md border-slate-300 shadow-sm text-sm">
                                         <option value="member">Member</option>
                                         <option value="admin">Admin</option>
+                                        <option value="deployer">Deployer</option>
                                     </select>
                                 </div>
                                 <x-primary-button type="submit" class="!text-sm">Invite</x-primary-button>

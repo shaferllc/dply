@@ -6,6 +6,7 @@ use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -39,6 +40,18 @@ class CredentialTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Cloud credentials');
+    }
+
+    public function test_credentials_index_forbidden_for_deployer(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'deployer']);
+        session(['current_organization_id' => $org->id]);
+
+        $response = $this->actingAs($user)->get(route('credentials.index'));
+
+        $response->assertForbidden();
     }
 
     public function test_credentials_store_validates_required_fields(): void
@@ -96,7 +109,7 @@ class CredentialTest extends TestCase
             Livewire::actingAs($user)
                 ->test(CredentialsIndex::class)
                 ->call('destroy', $cred->id);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             $this->addToAssertionCount(1);
 
             return;

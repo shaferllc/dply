@@ -4,13 +4,14 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
-use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
 
 class SiteGitDeployer
 {
     public function __construct(
         protected DeployHookRunner $hookRunner,
-        protected SiteDeployPipelineRunner $pipelineRunner
+        protected SiteDeployPipelineRunner $pipelineRunner,
+        protected SshConnectionFactory $sshFactory
     ) {}
 
     public function run(Site $site): array
@@ -31,7 +32,7 @@ class SiteGitDeployer
 
         $path = rtrim($site->effectiveRepositoryPath(), '/');
         $branch = $site->git_branch ?: 'main';
-        $ssh = new SshConnection($server);
+        $ssh = $this->sshFactory->forServer($server);
 
         $keyPath = '/root/.ssh/dply_site_'.$site->id.'_deploy';
         $privateKey = $site->git_deploy_key_private;

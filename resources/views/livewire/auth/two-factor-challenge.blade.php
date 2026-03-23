@@ -1,15 +1,18 @@
 <div>
     <x-livewire-validation-errors />
-    <p class="mb-5 text-sm text-stone-600">
-        {{ __('Please enter the code from your authenticator app, or one of your recovery codes.') }}
-    </p>
+    <div class="mb-6 flex gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm text-brand-moss">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-brand-sage shadow-sm ring-1 ring-brand-ink/5" aria-hidden="true">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        </span>
+        <p class="leading-relaxed">{{ __('Enter the code from your authenticator app, or one of your recovery codes.') }}</p>
+    </div>
     <form wire:submit="submit" class="space-y-5">
         <div>
             <x-input-label for="code" :value="__('Code')" />
             <x-text-input
                 id="code"
                 wire:model="code"
-                class="block w-full mt-1 font-mono text-lg tracking-widest"
+                class="block w-full mt-1 font-mono text-lg tracking-[0.2em] text-center sm:text-start"
                 type="text"
                 inputmode="numeric"
                 autocomplete="one-time-code"
@@ -18,8 +21,8 @@
             />
             <x-input-error :messages="$errors->get('code')" class="mt-2" />
         </div>
-        <div class="pt-1">
-            <x-primary-button class="w-full sm:w-auto" wire:loading.attr="disabled">
+        <div class="pt-2 border-t border-brand-ink/10">
+            <x-primary-button class="w-full sm:w-auto min-w-[8rem]" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="submit">{{ __('Continue') }}</span>
                 <span wire:loading wire:target="submit">{{ __('Verifying…') }}</span>
             </x-primary-button>

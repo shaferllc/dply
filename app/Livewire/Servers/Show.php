@@ -183,6 +183,44 @@ class Show extends Component
         }
     }
 
+    public function applySupervisorPreset(string $preset): void
+    {
+        $this->authorize('update', $this->server);
+        match ($preset) {
+            'laravel-queue' => $this->applySupervisorPresetValues(
+                'laravel-queue',
+                'queue',
+                'php artisan queue:work --sleep=3 --tries=3 --max-time=3600',
+                '/var/www/app/current'
+            ),
+            'laravel-horizon' => $this->applySupervisorPresetValues(
+                'laravel-horizon',
+                'horizon',
+                'php artisan horizon',
+                '/var/www/app/current'
+            ),
+            'reverb' => $this->applySupervisorPresetValues(
+                'laravel-reverb',
+                'custom',
+                'php artisan reverb:start',
+                '/var/www/app/current'
+            ),
+            default => null,
+        };
+        $this->flash_success = 'Preset loaded — adjust directory if needed, then “Add program”.';
+        $this->flash_error = null;
+    }
+
+    protected function applySupervisorPresetValues(string $slug, string $type, string $command, string $directory): void
+    {
+        $this->new_sv_slug = $slug;
+        $this->new_sv_type = $type;
+        $this->new_sv_command = $command;
+        $this->new_sv_directory = $directory;
+        $this->new_sv_user = 'www-data';
+        $this->new_sv_numprocs = 1;
+    }
+
     public function addSupervisorProgram(): void
     {
         $this->authorize('update', $this->server);
@@ -346,6 +384,11 @@ class Show extends Component
     public function runRecipe(int $id): void
     {
         $this->authorize('update', $this->server);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->command_error = 'Deployers cannot run server recipes or arbitrary shell commands.';
+
+            return;
+        }
         $recipe = ServerRecipe::query()->where('server_id', $this->server->id)->findOrFail($id);
         $this->command_output = null;
         $this->command_error = null;
@@ -365,6 +408,11 @@ class Show extends Component
     public function runCommand(): void
     {
         $this->authorize('view', $this->server);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->command_error = 'Deployers cannot run arbitrary shell commands on servers.';
+
+            return;
+        }
         $this->validate(['command' => 'required|string|max:1000']);
         $this->command_output = null;
         $this->command_error = null;

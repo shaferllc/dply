@@ -18,7 +18,7 @@
     </head>
     <body class="font-sans antialiased bg-brand-cream text-brand-ink" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
         <div class="min-h-screen">
-            @livewire('layout.navigation')
+            <x-site-header />
 
             {{-- Global flash messages --}}
             @if (session('success'))
@@ -36,7 +36,7 @@
 
             <!-- Page Heading -->
             @isset($header)
-                <header class="border-b border-brand-ink/10 bg-white">
+                <header class="border-b border-brand-ink/10 bg-brand-cream/90 backdrop-blur-sm">
                     <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                         {{ $header }}
                     </div>

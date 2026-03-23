@@ -2,13 +2,13 @@
 
 namespace App\Services\Sites;
 
+use App\Contracts\RemoteShell;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-use App\Services\SshConnection;
 
 class SiteDeployPipelineRunner
 {
-    public function run(SshConnection $ssh, Site $site, string $workingDirectory): string
+    public function run(RemoteShell $ssh, Site $site, string $workingDirectory): string
     {
         $site->loadMissing('deploySteps');
         $cwd = escapeshellarg($workingDirectory);
@@ -20,8 +20,9 @@ class SiteDeployPipelineRunner
             if ($cmd === null || $cmd === '') {
                 continue;
             }
+            $timeout = max(30, min(3600, (int) ($step->timeout_seconds ?? 900)));
             $log .= "\n--- pipeline: {$step->step_type} ---\n";
-            $log .= $ssh->exec("cd {$cwd} && ({$cmd}) 2>&1", 900);
+            $log .= $ssh->exec("cd {$cwd} && ({$cmd}) 2>&1", $timeout);
         }
 
         return $log;

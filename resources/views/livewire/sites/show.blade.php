@@ -26,6 +26,16 @@
                     <div><dt class="text-slate-500">Deploy path</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveRepositoryPath() }}</dd></div>
                     <div><dt class="text-slate-500">Nginx web root</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveDocumentRootForNginx() }}</dd></div>
                     <div><dt class="text-slate-500">Deploy strategy</dt><dd class="font-medium">{{ $site->deploy_strategy }}</dd></div>
+                    @if (!empty($site->meta['site_health_last_check_at']))
+                        <div><dt class="text-slate-500">URL health (scheduler)</dt><dd class="font-medium">
+                            @if (!empty($site->meta['site_health_last_ok']))
+                                <span class="text-green-700">OK</span>
+                            @else
+                                <span class="text-red-700">Failed</span>
+                            @endif
+                            <span class="text-slate-500 text-xs font-normal"> · {{ $site->meta['site_health_last_check_at'] ?? '' }}</span>
+                        </dd></div>
+                    @endif
                 </dl>
             </div>
 
@@ -87,7 +97,7 @@
                         <x-text-input id="git_branch" wire:model="git_branch" class="mt-1 block w-full w-48" />
                     </div>
                     <div>
-                        <x-input-label for="post_deploy_command" value="Post-deploy command (run after git pull)" />
+                        <x-input-label for="post_deploy_command" value="Post-deploy command (after pipeline steps below)" />
                         <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="composer install --no-dev && php artisan migrate --force"></textarea>
                     </div>
                     <div class="flex flex-wrap gap-2">
@@ -95,6 +105,51 @@
                         <button type="button" wire:click="generateDeployKey" class="px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50">Generate deploy key</button>
                     </div>
                 </form>
+
+                <div class="border-t border-slate-100 pt-4 mt-4 space-y-3">
+                    <h4 class="text-sm font-medium text-slate-900">Deploy pipeline</h4>
+                    <p class="text-sm text-slate-600">Optional ordered steps run on the server after the <code class="text-xs bg-slate-100 px-1 rounded">after_clone</code> hooks and before the post-deploy command. On <strong>atomic</strong> deploys they run in the new release directory before the <code class="text-xs bg-slate-100 px-1 rounded">current</code> symlink is updated.</p>
+                    @if ($site->deploySteps->isNotEmpty())
+                        <ol class="list-decimal list-inside text-sm space-y-2 text-slate-800">
+                            @foreach ($site->deploySteps->sortBy('sort_order') as $step)
+                                <li class="flex flex-wrap justify-between gap-2 items-start border-b border-slate-50 pb-2">
+                                    <span>
+                                        <span class="font-mono text-xs">{{ $step->step_type }}</span>
+                                        <span class="text-slate-400 text-xs"> · {{ (int) ($step->timeout_seconds ?? 900) }}s</span>
+                                        @if ($step->custom_command)
+                                            <span class="text-slate-500"> — {{ \Illuminate\Support\Str::limit($step->custom_command, 80) }}</span>
+                                        @endif
+                                    </span>
+                                    <span class="flex gap-2 shrink-0">
+                                        <button type="button" wire:click="moveDeployStepUp({{ $step->id }})" class="text-slate-600 text-xs hover:underline">Up</button>
+                                        <button type="button" wire:click="moveDeployStepDown({{ $step->id }})" class="text-slate-600 text-xs hover:underline">Down</button>
+                                        <button type="button" wire:click="deleteDeployPipelineStep({{ $step->id }})" class="text-red-600 text-xs hover:underline">Remove</button>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ol>
+                    @endif
+                    <form wire:submit="addDeployPipelineStep" class="flex flex-wrap gap-2 items-end">
+                        <div>
+                            <label for="new_deploy_step_type" class="block text-xs font-medium text-slate-600 mb-1">Step</label>
+                            <select id="new_deploy_step_type" wire:model="new_deploy_step_type" class="rounded-md border-slate-300 shadow-sm text-sm min-w-[200px]">
+                                @foreach (\App\Models\SiteDeployStep::typeLabels() as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="flex-1 min-w-[180px]">
+                            <label for="new_deploy_step_command" class="block text-xs font-medium text-slate-600 mb-1">npm script / custom (if needed)</label>
+                            <input type="text" id="new_deploy_step_command" wire:model="new_deploy_step_command" class="w-full rounded-md border-slate-300 shadow-sm text-sm font-mono" placeholder="build or full shell for custom" />
+                            <x-input-error :messages="$errors->get('new_deploy_step_command')" class="mt-1" />
+                        </div>
+                        <div>
+                            <label for="new_deploy_step_timeout" class="block text-xs font-medium text-slate-600 mb-1">Timeout (s)</label>
+                            <input type="number" id="new_deploy_step_timeout" wire:model="new_deploy_step_timeout" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
+                        </div>
+                        <x-primary-button type="submit" class="!py-2">Add step</x-primary-button>
+                    </form>
+                </div>
                 @if ($site->git_deploy_key_public)
                     <div>
                         <p class="text-sm text-slate-600 mb-1">Public key (add to GitHub / GitLab deploy keys):</p>
@@ -264,7 +319,7 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
                 <h3 class="font-medium text-slate-900">Deploy webhook</h3>
-                <p class="text-sm text-slate-600">POST JSON (or empty body) with header <code class="bg-slate-100 px-1 rounded text-xs">X-Dply-Signature: sha256=&lt;hmac&gt;</code> where <code class="bg-slate-100 px-1 rounded text-xs">hmac</code> is <code class="bg-slate-100 px-1 rounded text-xs">hash_hmac('sha256', raw_body, secret)</code>.</p>
+                <p class="text-sm text-slate-600"><strong>Recommended:</strong> send <code class="text-xs bg-slate-100 px-1 rounded">X-Dply-Timestamp</code> (unix seconds) and <code class="text-xs bg-slate-100 px-1 rounded">X-Dply-Signature: sha256=&lt;hmac&gt;</code> where HMAC is <code class="text-xs bg-slate-100 px-1 rounded">hash_hmac('sha256', "{timestamp}." . raw_body, secret)</code>. Replays of the same payload within 15 minutes return <code class="text-xs">409</code>. <strong>Legacy:</strong> signature over raw body only (no timestamp) is still accepted.</p>
                 <p class="text-sm font-mono break-all bg-slate-50 p-2 rounded">{{ $deployHookUrl }}</p>
                 @if ($revealed_webhook_secret)
                     <p class="text-sm text-amber-800 font-medium">Copy your new secret now:</p>
@@ -273,6 +328,12 @@
                     <p class="text-sm text-slate-500">Secret is stored encrypted. Rotate to see a new one.</p>
                 @endif
                 <button type="button" wire:click="regenerateWebhookSecret" class="text-sm text-slate-700 underline">Rotate webhook secret</button>
+                <form wire:submit="saveWebhookSecurity" class="space-y-2 border-t border-slate-100 pt-4 mt-4">
+                    <x-input-label for="webhook_allowed_ips_text" value="Optional IP allow list (one IPv4/IPv6 or IPv4 CIDR per line)" />
+                    <textarea id="webhook_allowed_ips_text" wire:model="webhook_allowed_ips_text" rows="4" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="203.0.113.10&#10;192.0.2.0/24"></textarea>
+                    <x-input-error :messages="$errors->get('webhook_allowed_ips_text')" class="mt-1" />
+                    <x-primary-button type="submit" class="!py-2 text-sm">Save allow list</x-primary-button>
+                </form>
             </div>
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3" wire:poll.10s>

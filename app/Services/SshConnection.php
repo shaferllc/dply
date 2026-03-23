@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
+use App\Contracts\RemoteShell;
 use App\Models\Server;
 use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Net\SFTP;
 use phpseclib3\Net\SSH2;
 
-class SshConnection
+class SshConnection implements RemoteShell
 {
     protected ?SSH2 $ssh = null;
 

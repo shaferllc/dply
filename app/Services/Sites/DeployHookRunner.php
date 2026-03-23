@@ -2,13 +2,13 @@
 
 namespace App\Services\Sites;
 
+use App\Contracts\RemoteShell;
 use App\Models\Site;
-use App\Services\SshConnection;
 use Illuminate\Support\Collection;
 
 class DeployHookRunner
 {
-    public function runPhase(SshConnection $ssh, Site $site, string $phase, string $workingDirectory): string
+    public function runPhase(RemoteShell $ssh, Site $site, string $phase, string $workingDirectory): string
     {
         $site->loadMissing('deployHooks');
         /** @var Collection<int, \App\Models\SiteDeployHook> $hooks */
@@ -19,14 +19,16 @@ class DeployHookRunner
             if ($script === '') {
                 continue;
             }
+            $default = (int) config('dply.default_deploy_hook_timeout_seconds', 900);
+            $timeout = max(30, min(3600, (int) ($hook->timeout_seconds ?? $default)));
             $log .= "\n--- hook {$phase} #{$hook->id} ---\n";
-            $log .= $this->runScript($ssh, $workingDirectory, $script);
+            $log .= $this->runScript($ssh, $workingDirectory, $script, $timeout);
         }
 
         return $log;
     }
 
-    protected function runScript(SshConnection $ssh, string $cwd, string $script): string
+    protected function runScript(RemoteShell $ssh, string $cwd, string $script, int $timeoutSeconds): string
     {
         $b64 = base64_encode($script);
 
@@ -36,7 +38,7 @@ class DeployHookRunner
                 escapeshellarg($cwd),
                 escapeshellarg($b64)
             ),
-            900
+            $timeoutSeconds
         );
     }
 

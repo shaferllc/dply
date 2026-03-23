@@ -70,6 +70,11 @@ class Organization extends Model
         return $this->hasMany(ApiToken::class);
     }
 
+    public function integrationOutboundWebhooks(): HasMany
+    {
+        return $this->hasMany(IntegrationOutboundWebhook::class);
+    }
+
     public function hasMember(User $user): bool
     {
         return $this->users()->where('user_id', $user->id)->exists();
@@ -118,5 +123,76 @@ class Organization extends Model
     public function canCreateServer(): bool
     {
         return $this->servers()->count() < $this->maxServers();
+    }
+
+    public function onProSubscription(): bool
+    {
+        $subscription = $this->subscription('default');
+        if (! $subscription || ! $subscription->valid()) {
+            return false;
+        }
+        $plans = config('subscription.plans', []);
+        $proPriceIds = array_filter([
+            $plans['pro_monthly']['price_id'] ?? null,
+            $plans['pro_yearly']['price_id'] ?? null,
+        ]);
+        foreach ($proPriceIds as $priceId) {
+            if ($priceId && $subscription->hasPrice($priceId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Seat count from Stripe when seat billing is configured; null if not on Pro / not applicable.
+     */
+    public function seatCapFromSubscription(): ?int
+    {
+        if (! $this->onProSubscription()) {
+            return null;
+        }
+        $sub = $this->subscription('default');
+        if (! $sub) {
+            return null;
+        }
+        $seatPriceId = trim((string) (config('subscription.plans.seat.price_id') ?? ''));
+        if ($seatPriceId !== '' && $sub->hasPrice($seatPriceId)) {
+            try {
+                return max(1, (int) $sub->findItemOrFail($seatPriceId)->quantity);
+            } catch (\Throwable) {
+                return 1;
+            }
+        }
+        foreach (['pro_monthly', 'pro_yearly'] as $key) {
+            $pid = config("subscription.plans.{$key}.price_id");
+            if (! $pid || ! $sub->hasPrice($pid)) {
+                continue;
+            }
+            if ($sub->hasMultiplePrices()) {
+                $item = $sub->items->firstWhere('stripe_price', $pid);
+
+                return max(1, (int) ($item?->quantity ?? 1));
+            }
+
+            return max(1, (int) ($sub->quantity ?? 1));
+        }
+
+        return null;
+    }
+
+    /**
+     * Maximum members + pending invites; null means unlimited.
+     */
+    public function effectiveMemberSeatCap(): ?int
+    {
+        $env = config('dply.max_organization_members');
+        $stripeCap = $this->seatCapFromSubscription();
+        if ($stripeCap !== null && $env !== null) {
+            return min($env, $stripeCap);
+        }
+
+        return $stripeCap ?? $env;
     }
 }

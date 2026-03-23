@@ -17,7 +17,7 @@
     <div class="fixed inset-0 -z-10 bg-mesh-brand"></div>
     <div class="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_100%_80%_at_50%_-30%,rgba(205,169,66,0.08),transparent_55%)]"></div>
 
-    <x-marketing-nav active="home" />
+    <x-site-header active="home" />
 
     <main>
         {{-- Hero --}}
@@ -57,6 +57,9 @@
                                 class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl border-2 border-brand-ink/15 bg-white/70 text-brand-ink text-sm font-semibold hover:border-brand-sage/40 hover:bg-white transition-colors"
                             >View pricing</a>
                         </div>
+                        <p class="mt-5 text-center lg:text-left">
+                            <a href="{{ route('features') }}" class="text-sm font-semibold text-brand-sage hover:text-brand-forest transition-colors">Full platform tour →</a>
+                        </p>
                         <dl class="mt-12 grid grid-cols-3 gap-6 max-w-md mx-auto lg:mx-0 border-t border-brand-ink/10 pt-10">
                             <div>
                                 <dt class="text-xs font-medium uppercase tracking-wider text-brand-mist">Model</dt>

@@ -15,4 +15,12 @@ return [
 
     'supervisor_conf_d' => env('DPLY_SUPERVISOR_CONF_D', '/etc/supervisor/conf.d'),
 
+    /*
+    | Webhook signing: preferred format uses X-Dply-Timestamp (unix seconds) + body signed as
+    | HMAC-SHA256 of "{timestamp}.{rawBody}". Legacy body-only HMAC is still accepted.
+    */
+    'webhook_timestamp_tolerance' => (int) env('DPLY_WEBHOOK_TIMESTAMP_TOLERANCE', 300),
+
+    'webhook_max_attempts_per_minute' => (int) env('DPLY_WEBHOOK_MAX_ATTEMPTS_PER_MINUTE', 30),
+
 ];

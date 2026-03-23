@@ -133,3 +133,51 @@ curl -s -X POST \
 - **401 Unauthorized** – Missing or invalid token.
 - **403 Forbidden** – Token valid but not allowed for this resource (e.g. server in another org).
 - **429 Too Many Requests** – Rate limit exceeded (60/min per token).
+
+## Sites
+
+### List sites
+
+```http
+GET /api/v1/sites
+Authorization: Bearer <token>
+```
+
+Requires `sites.read`. Returns sites for servers in the token’s organization.
+
+### Trigger site deploy (Git)
+
+```http
+POST /api/v1/sites/{site_id}/deploy
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Optional JSON body:
+
+- `sync` (boolean) – run deploy synchronously in the HTTP request (long timeout).
+- Header **`Idempotency-Key`** (optional) – same key within 24 hours returns the cached JSON result (`200`) after the first run completes; concurrent duplicate keys get `409` while a deploy is in flight.
+
+**Deployer role:** organization members with the **deployer** role may use deploy/read abilities only; they cannot use `commands.run` even if the token lists `*`.
+
+### List recent deployments
+
+```http
+GET /api/v1/sites/{site_id}/deployments?limit=20
+Authorization: Bearer <token>
+```
+
+Requires `sites.read`.
+
+### Get one deployment
+
+```http
+GET /api/v1/sites/{site_id}/deployments/{deployment_id}
+Authorization: Bearer <token>
+```
+
+Requires `sites.read`. Includes `log_output` (may be redacted for obvious secret patterns).
+
+## Deploy webhook (HTTP, not under `/api/v1`)
+
+`POST /hooks/sites/{site_id}/deploy` — no API token; authenticate with HMAC (see [DEPLOYMENT_FLOW.md](./DEPLOYMENT_FLOW.md)). Per-site rate limit: `DPLY_WEBHOOK_MAX_ATTEMPTS_PER_MINUTE` (default 30/min).

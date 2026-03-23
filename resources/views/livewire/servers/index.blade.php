@@ -3,9 +3,11 @@
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center">
                 <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ __('Servers') }}</h2>
-                <a href="{{ route('servers.create') }}" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700">
-                    {{ __('Add Server') }}
-                </a>
+                @can('create', App\Models\Server::class)
+                    <a href="{{ route('servers.create') }}" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700">
+                        {{ __('Add Server') }}
+                    </a>
+                @endcan
             </div>
         </div>
     </header>
@@ -17,7 +19,9 @@
             @if ($servers->isEmpty())
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8 text-center text-slate-500">
                     <p class="mb-4">No servers yet. Connect DigitalOcean or add an existing server.</p>
-                    <a href="{{ route('servers.create') }}" class="text-slate-700 hover:underline">Add your first server</a>
+                    @can('create', App\Models\Server::class)
+                        <a href="{{ route('servers.create') }}" class="text-slate-700 hover:underline">Add your first server</a>
+                    @endcan
                 </div>
             @else
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
@@ -46,7 +50,9 @@
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <a href="{{ route('servers.show', $server) }}" class="text-slate-600 hover:underline text-sm">Manage</a>
-                                    <button type="button" wire:click="destroy({{ $server->id }})" wire:confirm="Remove this server? Cloud instances will be destroyed." class="text-red-600 hover:underline text-sm">Remove</button>
+                                    @can('delete', $server)
+                                        <button type="button" wire:click="destroy({{ $server->id }})" wire:confirm="Remove this server? Cloud instances will be destroyed." class="text-red-600 hover:underline text-sm">Remove</button>
+                                    @endcan
                                 </div>
                             </li>
                         @endforeach

@@ -44,13 +44,6 @@ class AuditLog extends Model
 
     /**
      * Create an audit log entry.
-     *
-     * @param  \App\Models\Organization  $organization
-     * @param  \App\Models\User|null  $user
-     * @param  string  $action
-     * @param  \Illuminate\Database\Eloquent\Model|null  $subject
-     * @param  array|null  $oldValues
-     * @param  array|null  $newValues
      */
     public static function log(
         Organization $organization,
@@ -90,15 +83,19 @@ class AuditLog extends Model
                 Server::class => $subject->name,
                 Team::class => $subject->name,
                 OrganizationInvitation::class => $subject->email,
+                Site::class => $subject->name,
+                SiteDeployment::class => 'deployment #'.$subject->getKey(),
                 default => null,
             }
-            : ($this->old_values['name'] ?? $this->new_values['name'] ?? null);
+        : ($this->old_values['name'] ?? $this->new_values['name'] ?? null);
 
         if ($name !== null) {
             $label = match ($this->subject_type) {
                 Server::class => 'Server',
                 Team::class => 'Team',
                 OrganizationInvitation::class => 'Invitation',
+                Site::class => 'Site',
+                SiteDeployment::class => 'Deployment',
                 default => class_basename($this->subject_type ?? ''),
             };
 

@@ -15,7 +15,7 @@
     <div class="fixed inset-0 -z-20 bg-brand-cream"></div>
     <div class="fixed inset-0 -z-10 bg-mesh-brand"></div>
 
-    <x-marketing-nav active="pricing" />
+    <x-site-header active="pricing" />
 
     <main class="flex-1">
         <section class="pt-16 pb-12 px-4 sm:px-6 lg:px-8">

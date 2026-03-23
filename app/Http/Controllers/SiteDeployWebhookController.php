@@ -5,27 +5,36 @@ namespace App\Http\Controllers;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\WebhookDeliveryLog;
+use App\Services\Sites\SiteWebhookSignatureValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SiteDeployWebhookController extends Controller
 {
-    public function __invoke(Request $request, Site $site): JsonResponse
+    public function __invoke(Request $request, Site $site, SiteWebhookSignatureValidator $validator): JsonResponse
     {
-        $secret = $site->webhook_secret;
-        if ($secret === null || $secret === '') {
-            return response()->json(['message' => 'Webhook secret not configured.'], 400);
+        $result = $validator->validateForWebhook($request, $site);
+        WebhookDeliveryLog::query()->create([
+            'site_id' => $site->id,
+            'request_ip' => $request->ip(),
+            'http_status' => $result['status'],
+            'outcome' => $result['outcome'],
+            'detail' => $result['detail'],
+        ]);
+        if (! $result['ok']) {
+            return response()->json(['message' => $result['message']], $result['status']);
         }
 
-        $payload = $request->getContent();
-        $sig = (string) $request->header('X-Dply-Signature', '');
-        $expected = hash_hmac('sha256', $payload, $secret);
-        if ($sig === '' || ! hash_equals('sha256='.$expected, $sig)) {
-            return response()->json(['message' => 'Invalid signature.'], 401);
+        $site->loadMissing('organization');
+        if ($site->organization) {
+            audit_log($site->organization, null, 'site.deploy.webhook_queued', $site, null, [
+                'site' => $site->name,
+            ]);
         }
 
         RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_WEBHOOK);
 
-        return response()->json(['message' => 'Deployment queued.'], 202);
+        return response()->json(['message' => $result['message']], 202);
     }
 }

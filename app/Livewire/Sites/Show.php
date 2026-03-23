@@ -9,9 +9,9 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
+use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
 use App\Models\SiteEnvironmentVariable;
-use App\Models\SiteDeployStep;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
 use App\Services\Sites\SiteEnvPusher;
@@ -81,6 +81,10 @@ class Show extends Component
 
     public string $new_deploy_step_command = '';
 
+    public int $new_deploy_step_timeout = 900;
+
+    public string $webhook_allowed_ips_text = '';
+
     public function mount(Server $server, Site $site): void
     {
         if ($site->server_id !== $server->id) {
@@ -110,6 +114,47 @@ class Show extends Component
         $this->laravel_scheduler = (bool) $this->site->laravel_scheduler;
         $this->deployment_environment = (string) ($this->site->deployment_environment ?? 'production');
         $this->php_fpm_user = (string) ($this->site->php_fpm_user ?? '');
+        $ips = $this->site->webhook_allowed_ips;
+        $this->webhook_allowed_ips_text = is_array($ips) && $ips !== []
+            ? implode("\n", $ips)
+            : '';
+    }
+
+    public function saveWebhookSecurity(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'webhook_allowed_ips_text' => 'nullable|string|max:4000',
+        ]);
+        $lines = preg_split('/\r\n|\r|\n/', $this->webhook_allowed_ips_text) ?: [];
+        $clean = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            if (! $this->validIpOrCidr($line)) {
+                $this->addError('webhook_allowed_ips_text', 'Invalid IP or CIDR: '.$line);
+
+                return;
+            }
+            $clean[] = $line;
+        }
+        $this->site->update([
+            'webhook_allowed_ips' => $clean !== [] ? $clean : null,
+        ]);
+        $this->flash_success = 'Webhook IP allow list saved. Leave empty to allow any source (signature still required).';
+        $this->flash_error = null;
+        $this->syncFormFromSite();
+    }
+
+    protected function validIpOrCidr(string $value): bool
+    {
+        if (str_contains($value, '/')) {
+            return (bool) preg_match('#^(\d{1,3}\.){3}\d{1,3}/(3[0-2]|[12]?\d)$#', $value);
+        }
+
+        return (bool) filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6);
     }
 
     public function installNginx(): void
@@ -348,6 +393,7 @@ class Show extends Component
         $this->validate([
             'new_deploy_step_type' => 'required|string|in:'.implode(',', $types),
             'new_deploy_step_command' => 'nullable|string|max:4000',
+            'new_deploy_step_timeout' => 'required|integer|min:30|max:3600',
         ]);
         $needsCustom = in_array($this->new_deploy_step_type, [
             SiteDeployStep::TYPE_NPM_RUN,
@@ -363,8 +409,10 @@ class Show extends Component
             'sort_order' => (int) ($this->site->deploySteps()->max('sort_order') ?? 0) + 1,
             'step_type' => $this->new_deploy_step_type,
             'custom_command' => trim($this->new_deploy_step_command) !== '' ? trim($this->new_deploy_step_command) : null,
+            'timeout_seconds' => $this->new_deploy_step_timeout,
         ]);
         $this->new_deploy_step_command = '';
+        $this->new_deploy_step_timeout = 900;
         $this->flash_success = 'Deploy pipeline step added. Runs after git, before the post-deploy command.';
         $this->flash_error = null;
     }
@@ -374,6 +422,38 @@ class Show extends Component
         $this->authorize('update', $this->site);
         SiteDeployStep::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
         $this->flash_success = 'Pipeline step removed.';
+        $this->flash_error = null;
+    }
+
+    public function moveDeployStepUp(int $id): void
+    {
+        $this->authorize('update', $this->site);
+        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order')->pluck('id')->all();
+        $pos = array_search($id, $ids, true);
+        if ($pos === false || $pos === 0) {
+            return;
+        }
+        [$ids[$pos - 1], $ids[$pos]] = [$ids[$pos], $ids[$pos - 1]];
+        foreach ($ids as $i => $stepId) {
+            SiteDeployStep::query()->whereKey($stepId)->update(['sort_order' => $i + 1]);
+        }
+        $this->flash_success = 'Pipeline order updated.';
+        $this->flash_error = null;
+    }
+
+    public function moveDeployStepDown(int $id): void
+    {
+        $this->authorize('update', $this->site);
+        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order')->pluck('id')->all();
+        $pos = array_search($id, $ids, true);
+        if ($pos === false || $pos >= count($ids) - 1) {
+            return;
+        }
+        [$ids[$pos + 1], $ids[$pos]] = [$ids[$pos], $ids[$pos + 1]];
+        foreach ($ids as $i => $stepId) {
+            SiteDeployStep::query()->whereKey($stepId)->update(['sort_order' => $i + 1]);
+        }
+        $this->flash_success = 'Pipeline order updated.';
         $this->flash_error = null;
     }
 

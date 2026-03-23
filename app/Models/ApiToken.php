@@ -18,6 +18,7 @@ class ApiToken extends Model
         'last_used_at',
         'expires_at',
         'abilities',
+        'allowed_ips',
     ];
 
     protected function casts(): array
@@ -26,6 +27,7 @@ class ApiToken extends Model
             'last_used_at' => 'datetime',
             'expires_at' => 'datetime',
             'abilities' => 'array',
+            'allowed_ips' => 'array',
         ];
     }
 
@@ -47,7 +49,8 @@ class ApiToken extends Model
         Organization $organization,
         string $name,
         ?\DateTimeInterface $expiresAt = null,
-        ?array $abilities = null
+        ?array $abilities = null,
+        ?array $allowedIps = null
     ): array {
         $plaintext = 'dply_'.Str::random(64);
         $prefix = substr($plaintext, 0, 16);
@@ -60,6 +63,7 @@ class ApiToken extends Model
             'token_hash' => bcrypt($plaintext),
             'expires_at' => $expiresAt,
             'abilities' => $abilities,
+            'allowed_ips' => $allowedIps,
         ]);
 
         return ['token' => $token, 'plaintext' => $plaintext];
@@ -79,6 +83,29 @@ class ApiToken extends Model
      */
     public function allows(?string $ability = null): bool
     {
+        if ($ability === null || $ability === '') {
+            return false;
+        }
+
+        if (! $this->tokenAllowsAbility($ability)) {
+            return false;
+        }
+
+        $this->loadMissing('user', 'organization');
+        if ($this->user && $this->organization?->userIsDeployer($this->user)) {
+            return in_array($ability, [
+                'servers.read',
+                'sites.read',
+                'servers.deploy',
+                'sites.deploy',
+            ], true);
+        }
+
+        return true;
+    }
+
+    protected function tokenAllowsAbility(string $ability): bool
+    {
         $abilities = $this->abilities;
 
         if ($abilities === null || $abilities === []) {
@@ -87,10 +114,6 @@ class ApiToken extends Model
 
         if (in_array('*', $abilities, true)) {
             return true;
-        }
-
-        if ($ability === null || $ability === '') {
-            return false;
         }
 
         if (in_array($ability, $abilities, true)) {

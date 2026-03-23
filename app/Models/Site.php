@@ -48,6 +48,7 @@ class Site extends Model
         'git_deploy_key_private',
         'git_deploy_key_public',
         'webhook_secret',
+        'webhook_allowed_ips',
         'post_deploy_command',
         'deploy_strategy',
         'releases_to_keep',
@@ -66,6 +67,7 @@ class Site extends Model
             'type' => SiteType::class,
             'git_deploy_key_private' => 'encrypted',
             'webhook_secret' => 'encrypted',
+            'webhook_allowed_ips' => 'array',
             'env_file_content' => 'encrypted',
             'meta' => 'array',
             'laravel_scheduler' => 'boolean',
@@ -113,6 +115,11 @@ class Site extends Model
     public function deployments(): HasMany
     {
         return $this->hasMany(SiteDeployment::class)->orderByDesc('id');
+    }
+
+    public function webhookDeliveryLogs(): HasMany
+    {
+        return $this->hasMany(WebhookDeliveryLog::class)->orderByDesc('id');
     }
 
     public function releases(): HasMany

@@ -21,8 +21,11 @@ class SiteDeployment extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    public const STATUS_SKIPPED = 'skipped';
+
     protected $fillable = [
         'site_id',
+        'idempotency_key',
         'trigger',
         'status',
         'git_sha',

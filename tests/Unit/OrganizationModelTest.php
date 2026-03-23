@@ -54,4 +54,15 @@ class OrganizationModelTest extends TestCase
 
         $this->assertFalse($org->hasAdminAccess($user));
     }
+
+    public function test_user_is_deployer(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'deployer']);
+
+        $this->assertTrue($org->userIsDeployer($user));
+        $this->assertTrue($org->hasMember($user));
+        $this->assertFalse($org->hasAdminAccess($user));
+    }
 }

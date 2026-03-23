@@ -32,6 +32,7 @@ class SiteDeployStep extends Model
         'sort_order',
         'step_type',
         'custom_command',
+        'timeout_seconds',
     ];
 
     public function site(): BelongsTo

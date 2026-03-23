@@ -3,12 +3,17 @@
 namespace App\Livewire\Organizations;
 
 use App\Models\ApiToken;
+use App\Models\IntegrationOutboundWebhook;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
 use App\Models\Team;
+use App\Models\User;
 use App\Notifications\OrganizationInvitationNotification;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -28,6 +33,22 @@ class Show extends Component
 
     /** full | read | deploy | ops — maps to API abilities */
     public string $token_scope = 'full';
+
+    public string $token_allowed_ips_text = '';
+
+    public string $int_hook_name = '';
+
+    public string $int_hook_driver = IntegrationOutboundWebhook::DRIVER_SLACK;
+
+    public string $int_hook_url = '';
+
+    public ?int $int_hook_site_id = null;
+
+    public bool $int_evt_success = true;
+
+    public bool $int_evt_failed = true;
+
+    public bool $int_evt_skipped = true;
 
     public string $team_name = '';
 
@@ -55,6 +76,8 @@ class Show extends Component
             'teams' => fn ($q) => $q->withCount('users')->with('users'),
             'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
             'apiTokens',
+            'integrationOutboundWebhooks',
+            'sites' => fn ($q) => $q->orderBy('name'),
         ]);
         $this->syncTeamNames();
     }
@@ -64,7 +87,7 @@ class Show extends Component
         $this->teamNames = $this->organization->teams->keyBy('id')->map(fn ($t) => $t->name)->all();
     }
 
-    public function getAuditLogsProperty(): \Illuminate\Database\Eloquent\Collection
+    public function getAuditLogsProperty(): Collection
     {
         if (! $this->organization->hasAdminAccess(auth()->user())) {
             return collect();
@@ -83,7 +106,7 @@ class Show extends Component
 
         $this->validate([
             'invite_email' => 'required|email',
-            'invite_role' => 'nullable|string|in:admin,member',
+            'invite_role' => 'nullable|string|in:admin,member,deployer',
         ]);
 
         $email = strtolower($this->invite_email);
@@ -92,6 +115,17 @@ class Show extends Component
         }
         if ($this->organization->invitations()->where('email', $email)->where('expires_at', '>', now())->exists()) {
             throw ValidationException::withMessages(['invite_email' => 'An invitation has already been sent to that address.']);
+        }
+
+        $maxMembers = $this->organization->effectiveMemberSeatCap();
+        if ($maxMembers !== null) {
+            $current = $this->organization->users()->count();
+            $pending = $this->organization->invitations()->where('expires_at', '>', now())->count();
+            if ($current + $pending >= $maxMembers) {
+                throw ValidationException::withMessages([
+                    'invite_email' => 'This organization has reached its member limit ('.$maxMembers.').',
+                ]);
+            }
         }
 
         $invitation = OrganizationInvitation::createFor(
@@ -130,7 +164,7 @@ class Show extends Component
             'token_expires_at' => 'nullable|date|after:today',
         ]);
 
-        $expiresAt = $this->token_expires_at ? \Carbon\Carbon::parse($this->token_expires_at) : null;
+        $expiresAt = $this->token_expires_at ? Carbon::parse($this->token_expires_at) : null;
         $abilities = match ($this->token_scope) {
             'read' => ['servers.read', 'sites.read'],
             'deploy' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy'],
@@ -176,7 +210,7 @@ class Show extends Component
 
         $this->authorize('create', [Team::class, $this->organization]);
 
-        $slug = \Illuminate\Support\Str::slug(\Illuminate\Support\Str::limit($this->team_name, 50));
+        $slug = Str::slug(Str::limit($this->team_name, 50));
         $base = $slug;
         $i = 0;
         while (Team::where('organization_id', $this->organization->id)->where('slug', $slug)->exists()) {
@@ -232,14 +266,17 @@ class Show extends Component
         $userId = (int) ($this->addMemberSelected[$teamId] ?? 0);
         if (! $userId) {
             $this->addError('team_'.$teamId, 'Select a user to add.');
+
             return;
         }
-        if (! $team->organization->hasMember(\App\Models\User::find($userId))) {
+        if (! $team->organization->hasMember(User::find($userId))) {
             $this->addError('team_'.$teamId, 'User must be an organization member first.');
+
             return;
         }
         if ($team->users()->where('user_id', $userId)->exists()) {
             $this->addError('team_'.$teamId, 'User is already on this team.');
+
             return;
         }
         $team->users()->attach($userId, ['role' => 'member']);

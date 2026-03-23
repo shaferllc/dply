@@ -98,6 +98,7 @@
             @if ($server->isReady() && $server->ssh_private_key)
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 space-y-4">
                     <h3 class="font-medium text-slate-900">Databases (MySQL / Postgres)</h3>
+                    <p class="text-sm text-slate-600">Dply stores credentials for your records. Create the database and user on the server (e.g. <code class="text-xs bg-slate-100 px-1 rounded">mysql -e &quot;CREATE DATABASE …; CREATE USER …;&quot;</code> or <code class="text-xs bg-slate-100 px-1 rounded">createuser</code>/<code class="text-xs bg-slate-100 px-1 rounded">createdb</code> for Postgres), then add the same details here for documentation and future automation.</p>
                     <p class="text-sm text-slate-600">Creates a DB and user on the server via SSH (requires <code class="bg-slate-100 px-1 rounded text-xs">mysql</code> or <code class="bg-slate-100 px-1 rounded text-xs">psql</code> as appropriate). MySQL uses passwordless <code class="bg-slate-100 px-1 rounded text-xs">root</code> over the socket — typical on Ubuntu cloud images after <code class="bg-slate-100 px-1 rounded text-xs">mysql-server</code>.</p>
                     @if ($server->serverDatabases->isNotEmpty())
                         <ul class="text-sm space-y-2">
@@ -187,6 +188,11 @@
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 space-y-4">
                     <h3 class="font-medium text-slate-900">Supervisor (daemons)</h3>
                     <p class="text-sm text-slate-600">Writes <code class="text-xs bg-slate-100 px-1">/etc/supervisor/conf.d/dply-sv-*.conf</code> and runs <code class="text-xs bg-slate-100 px-1">supervisorctl reread/update</code>. Use for Horizon, queue workers, Octane, etc.</p>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <button type="button" wire:click="applySupervisorPreset('laravel-queue')" class="px-2 py-1 border border-slate-200 rounded bg-white hover:bg-slate-50">Preset: queue worker</button>
+                        <button type="button" wire:click="applySupervisorPreset('laravel-horizon')" class="px-2 py-1 border border-slate-200 rounded bg-white hover:bg-slate-50">Preset: Horizon</button>
+                        <button type="button" wire:click="applySupervisorPreset('reverb')" class="px-2 py-1 border border-slate-200 rounded bg-white hover:bg-slate-50">Preset: Reverb</button>
+                    </div>
                     @if ($server->supervisorPrograms->isNotEmpty())
                         <ul class="text-sm space-y-2">
                             @foreach ($server->supervisorPrograms as $sp)
@@ -328,9 +334,11 @@
                     </form>
                 </div>
             @endif
-            <div class="flex justify-between items-center">
-                <button type="button" wire:click="destroy" wire:confirm="Remove this server? Cloud instances (DigitalOcean/Hetzner) will be destroyed." class="text-red-600 hover:underline text-sm">Remove server from Dply</button>
-            </div>
+            @can('delete', $server)
+                <div class="flex justify-between items-center">
+                    <button type="button" wire:click="destroy" wire:confirm="Remove this server? Cloud instances (DigitalOcean/Hetzner) will be destroyed." class="text-red-600 hover:underline text-sm">Remove server from Dply</button>
+                </div>
+            @endcan
         </div>
     </div>
 </div>

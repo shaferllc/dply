@@ -5,9 +5,9 @@ namespace App\Livewire\Credentials;
 use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
 use App\Services\DigitalOceanService;
+use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
 use App\Services\HetznerService;
-use App\Services\EquinixMetalService;
 use App\Services\LinodeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
@@ -113,6 +113,11 @@ class Index extends Component
 
     public ?string $flash_error = null;
 
+    public function mount(): void
+    {
+        $this->authorize('viewAny', ProviderCredential::class);
+    }
+
     public function storeDigitalOcean(): void
     {
         $this->validate([
@@ -187,6 +192,7 @@ class Index extends Component
         $org = auth()->user()->currentOrganization();
         if (! $org) {
             $this->flash_error = 'Select or create an organization first.';
+
             return;
         }
         $credential = auth()->user()->providerCredentials()->create([
@@ -205,6 +211,7 @@ class Index extends Component
             $credential->delete();
             $this->flash_error = 'Invalid token/project or API error: '.$e->getMessage();
             $this->addError('equinix_metal_api_token', $this->flash_error);
+
             return;
         }
         $this->flash_success = 'Provider connected.';
@@ -226,6 +233,7 @@ class Index extends Component
         $org = auth()->user()->currentOrganization();
         if (! $org) {
             $this->flash_error = 'Select or create an organization first.';
+
             return;
         }
         $credential = auth()->user()->providerCredentials()->create([
@@ -244,6 +252,7 @@ class Index extends Component
             $credential->delete();
             $this->flash_error = 'Invalid credentials or API error: '.$e->getMessage();
             $this->addError('upcloud_username', $this->flash_error);
+
             return;
         }
         $this->flash_success = 'Provider connected.';
@@ -265,6 +274,7 @@ class Index extends Component
         $org = auth()->user()->currentOrganization();
         if (! $org) {
             $this->flash_error = 'Select or create an organization first.';
+
             return;
         }
         $credential = auth()->user()->providerCredentials()->create([
@@ -283,6 +293,7 @@ class Index extends Component
             $credential->delete();
             $this->flash_error = 'Invalid token/project or API error: '.$e->getMessage();
             $this->addError('scaleway_api_token', $this->flash_error);
+
             return;
         }
         $this->flash_success = 'Provider connected.';
@@ -328,6 +339,7 @@ class Index extends Component
         $org = auth()->user()->currentOrganization();
         if (! $org) {
             $this->flash_error = 'Select or create an organization first.';
+
             return;
         }
         $credential = auth()->user()->providerCredentials()->create([
@@ -346,6 +358,7 @@ class Index extends Component
             $credential->delete();
             $this->flash_error = 'Invalid token or API error: '.$e->getMessage();
             $this->addError('fly_io_api_token', $this->flash_error);
+
             return;
         }
         $this->flash_success = 'Provider connected.';
@@ -382,6 +395,7 @@ class Index extends Component
         $org = auth()->user()->currentOrganization();
         if (! $org) {
             $this->flash_error = 'Select or create an organization first.';
+
             return;
         }
         auth()->user()->providerCredentials()->create([
@@ -406,6 +420,7 @@ class Index extends Component
         $org = auth()->user()->currentOrganization();
         if (! $org) {
             $this->flash_error = 'Select or create an organization first.';
+
             return;
         }
         auth()->user()->providerCredentials()->create([
@@ -430,6 +445,7 @@ class Index extends Component
         $org = auth()->user()->currentOrganization();
         if (! $org) {
             $this->flash_error = 'Select or create an organization first.';
+
             return;
         }
         $credential = auth()->user()->providerCredentials()->create([
@@ -445,6 +461,7 @@ class Index extends Component
             $credential->delete();
             $this->flash_error = 'Invalid credentials or API error: '.$e->getMessage();
             $this->addError('aws_access_key_id', $this->flash_error);
+
             return;
         }
         $this->flash_success = 'Provider connected.';
@@ -486,6 +503,7 @@ class Index extends Component
         $org = auth()->user()->currentOrganization();
         if (! $org) {
             $this->flash_error = 'Select or create an organization first.';
+
             return;
         }
 
@@ -523,6 +541,7 @@ class Index extends Component
             $credential->delete();
             $this->flash_error = 'Invalid token or API error: '.$e->getMessage();
             $this->addError($tokenErrorKey, $this->flash_error);
+
             return;
         }
 

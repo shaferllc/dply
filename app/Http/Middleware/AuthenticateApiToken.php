@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\ApiToken;
+use App\Support\IpAllowList;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,6 +26,14 @@ class AuthenticateApiToken
 
         if (! $token->isValid()) {
             return response()->json(['message' => 'Token expired or invalid'], 401);
+        }
+
+        $allowed = $token->allowed_ips;
+        if (is_array($allowed) && $allowed !== []) {
+            $ip = (string) $request->ip();
+            if (! IpAllowList::contains($ip, $allowed)) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
         }
 
         $token->touchLastUsed();

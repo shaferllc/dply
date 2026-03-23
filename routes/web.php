@@ -1,10 +1,11 @@
 <?php
 
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\SiteDeployWebhookController;
 use App\Livewire\Billing\Show as BillingShow;
-use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Livewire\Organizations\Show as OrganizationsShow;
@@ -16,11 +17,10 @@ use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Show as SitesShow;
 use App\Livewire\TwoFactor\Page as TwoFactorPage;
-use App\Http\Controllers\SiteDeployWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/hooks/sites/{site}/deploy', SiteDeployWebhookController::class)
-    ->middleware('throttle:120,1')
+    ->middleware(['throttle:site-webhook'])
     ->name('hooks.site.deploy');
 
 Route::get('/', function () {
@@ -30,6 +30,10 @@ Route::get('/', function () {
 Route::get('/pricing', function () {
     return view('pricing');
 })->name('pricing');
+
+Route::get('/features', function () {
+    return view('features');
+})->name('features');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');

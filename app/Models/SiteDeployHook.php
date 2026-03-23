@@ -18,6 +18,7 @@ class SiteDeployHook extends Model
         'sort_order',
         'phase',
         'script',
+        'timeout_seconds',
     ];
 
     public function site(): BelongsTo
