@@ -1,0 +1,84 @@
+# Bref + Serverless Framework — deploy the dply-serverless control plane to AWS Lambda.
+# Prerequisites: AWS credentials, Serverless CLI (`npm i -g serverless`), `composer install`, real APP_KEY at deploy.
+# Queue: SQS + worker Lambda (Bref QueueHandler) so HTTP Lambda can dispatch jobs (e.g. RunServerlessFunctionDeploymentJob).
+# Docs: apps/dply-serverless/docs/BREF_LAMBDA_QUEUE.md · https://bref.sh/docs/laravel/queues
+
+service: dply-serverless
+
+provider:
+    name: aws
+    region: us-east-1
+    iam:
+        role:
+            statements:
+                - Effect: Allow
+                  Action:
+                      - sqs:SendMessage
+                  Resource:
+                      Fn::GetAtt:
+                          - JobsQueue
+                          - Arn
+    environment:
+        APP_ENV: production
+        APP_DEBUG: '0'
+        # Export APP_KEY before deploy, or use ${env:APP_KEY, '...'} default only for `sls print`
+        APP_KEY: ${env:APP_KEY, 'base64:replace-with-php-artisan-key-generate-output'}
+        LOG_CHANNEL: stderr
+        LOG_STDERR_FORMATTER: Bref\Monolog\CloudWatchFormatter
+        SESSION_DRIVER: cookie
+        QUEUE_CONNECTION: sqs
+        SQS_PREFIX: ''
+        SQS_QUEUE:
+            Ref: JobsQueue
+        # DB_* / SERVERLESS_* / AWS keys — set via CI secrets or SSM as needed
+
+functions:
+    web:
+        handler: public/index.php
+        runtime: php-83-fpm
+        timeout: 28
+        events:
+            - httpApi: '*'
+
+    worker:
+        handler: Bref\LaravelBridge\Queue\QueueHandler
+        runtime: php-83
+        timeout: 300
+        reservedConcurrency: 10
+        events:
+            - sqs:
+                  arn:
+                      Fn::GetAtt:
+                          - JobsQueue
+                          - Arn
+                  batchSize: 1
+
+    artisan:
+        handler: artisan
+        runtime: php-83-console
+        timeout: 720
+
+resources:
+    Resources:
+        JobsQueue:
+            Type: AWS::SQS::Queue
+            Properties:
+                QueueName: ${self:service}-${sls:stage}-jobs
+                VisibilityTimeout: 360
+                MessageRetentionPeriod: 1209600
+
+package:
+    patterns:
+        - '!.env'
+        - '!node_modules/**'
+        - '!public/storage'
+        - '!resources/css/**'
+        - '!resources/js/**'
+        - '!storage/**'
+        - '!tests/**'
+        - '!database/*.sqlite'
+        - '!public/build/**'
+        - 'public/build/manifest.json'
+
+plugins:
+    - ./vendor/bref/bref

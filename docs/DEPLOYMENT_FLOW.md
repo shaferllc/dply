@@ -1,5 +1,7 @@
 # Deployment flow (Dply)
 
+For **organization roles, deployer restrictions, and Free vs Pro server/site limits**, see **[ORG_ROLES_AND_LIMITS.md](./ORG_ROLES_AND_LIMITS.md)** (also available in-app under **Docs → Roles & plan limits**).
+
 Order of operations for a **simple** deploy (git directly in the deploy path):
 
 1. **`before_clone` hooks** — run in the deploy directory (after `mkdir -p`).
@@ -50,3 +52,5 @@ When a site is deleted in Dply, a queued job removes the Nginx vhost file and en
 | `DPLY_MAX_ORG_MEMBERS` | Hard cap on members + pending invites (null = unlimited). |
 | `DPLY_SITE_HEALTH_CHECK` | Enable scheduled HTTPS/HTTP checks for nginx-active sites with domains. |
 | `DPLY_DEPLOY_NOTIFICATIONS` | Email site owner + org admins on deploy success/failure/skip. |
+| `SUBSCRIPTION_SERVERS_FREE_LIMIT` | Max servers per org on Free (default 3). Pro = unlimited. |
+| `SUBSCRIPTION_SITES_FREE_LIMIT` | Max sites per org on Free (default 10). Pro = unlimited. |

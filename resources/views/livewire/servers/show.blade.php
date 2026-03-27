@@ -77,8 +77,10 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-medium text-slate-900">Sites</h3>
-                    @if ($server->isReady())
+                    @if ($this->canAddSite)
                         <a href="{{ route('sites.create', $server) }}" class="text-sm font-medium text-slate-800 hover:underline">+ New site</a>
+                    @elseif ($server->isReady())
+                        <span class="text-sm text-slate-500" title="Requires owner/admin (not deployer-only), and room under your plan’s site limit—or upgrade to Pro.">Cannot add site</span>
                     @endif
                 </div>
                 @if ($server->sites->isEmpty())

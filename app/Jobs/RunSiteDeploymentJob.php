@@ -222,7 +222,11 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         $users = User::query()->whereIn('id', $userIds->unique()->all())->get();
-        if ($users->isNotEmpty()) {
+        $sendDeployEmail = true;
+        if ($org && ! $org->wantsDeployEmailNotifications()) {
+            $sendDeployEmail = false;
+        }
+        if ($sendDeployEmail && $users->isNotEmpty()) {
             Notification::send($users, new SiteDeploymentCompletedNotification($deployment->fresh()));
         }
 

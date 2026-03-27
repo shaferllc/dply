@@ -31,11 +31,9 @@ This note applies to **`apps/dply-serverless`**: where and how we run **our** co
 
 ## Laravel 13 in this monorepo
 
-`apps/dply-serverless` tracks **`laravel/framework` ^13**. Before `composer require bref/bref bref/laravel-bridge`:
+`apps/dply-serverless` tracks **`laravel/framework` ^13** and **already requires** **`bref/bref`** + **`bref/laravel-bridge`** (^3) for Lambda deployability. **`laravel/octane`** is pulled in by the bridge—review Octane/Bref docs if you customize workers.
 
-1. Confirm **`bref/laravel-bridge`** stable (or acceptable pre-release) supports **^13** on [Packagist](https://packagist.org/packages/bref/laravel-bridge).
-2. Expect **`laravel/octane`** as a bridge dependency—review Octane config and worker model.
-3. **`shaferllc/dply-core`** is wired as a **path** repository only (`../../packages/dply-core`) in `apps/dply-serverless/composer.json` — no VCS fallback until you opt in.
+**`shaferllc/dply-core`** is wired as a **path** repository only (`../../packages/dply-core`) in `apps/dply-serverless/composer.json` — no VCS fallback until you opt in.
 
 ## Related
 

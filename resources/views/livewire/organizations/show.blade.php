@@ -23,12 +23,76 @@
                 </div>
             @endif
             <div class="space-y-8">
+                {{-- Plan & usage (all members) --}}
+                <section class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="px-6 py-4 border-b border-slate-200 flex flex-wrap justify-between gap-3 items-start">
+                        <div>
+                            <h3 class="font-medium text-slate-900">Plan &amp; usage</h3>
+                            <p class="text-sm text-slate-500 mt-1">Limits apply to this entire organization. Upgrade on Billing to unlock unlimited servers and sites on Pro.</p>
+                        </div>
+                        @if ($organization->hasAdminAccess(auth()->user()))
+                            <a href="{{ route('billing.show', $organization) }}" class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800">Manage billing →</a>
+                        @endif
+                    </div>
+                    <div class="px-6 py-4">
+                        <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                            <div class="rounded-md border border-slate-100 bg-slate-50/80 p-4">
+                                <dt class="text-slate-500 font-medium">Plan</dt>
+                                <dd class="mt-1 text-slate-900 font-semibold">{{ $organization->planTierLabel() }}</dd>
+                            </div>
+                            <div class="rounded-md border border-slate-100 bg-slate-50/80 p-4">
+                                <dt class="text-slate-500 font-medium">Servers</dt>
+                                <dd class="mt-1 text-slate-900 font-semibold">
+                                    <span class="tabular-nums">{{ $organization->servers_count }}</span>
+                                    @if ($organization->maxServers() >= PHP_INT_MAX)
+                                        <span class="text-slate-600 font-normal"> (unlimited)</span>
+                                    @else
+                                        <span class="text-slate-600 font-normal"> of {{ $organization->maxServersDisplay() }}</span>
+                                    @endif
+                                </dd>
+                            </div>
+                            <div class="rounded-md border border-slate-100 bg-slate-50/80 p-4">
+                                <dt class="text-slate-500 font-medium">Sites</dt>
+                                <dd class="mt-1 text-slate-900 font-semibold">
+                                    <span class="tabular-nums">{{ $organization->sites_count }}</span>
+                                    @if ($organization->maxSites() >= PHP_INT_MAX)
+                                        <span class="text-slate-600 font-normal"> (unlimited)</span>
+                                    @else
+                                        <span class="text-slate-600 font-normal"> of {{ $organization->maxSitesDisplay() }}</span>
+                                    @endif
+                                </dd>
+                            </div>
+                        </dl>
+                        <p class="mt-4 text-xs text-slate-500">
+                            <strong class="text-slate-700">Roles:</strong> Deployers cannot add servers or sites or use credentials. Only owners and admins can delete sites.
+                            <a href="{{ route('docs.org-roles-and-limits') }}" class="text-indigo-600 hover:text-indigo-800 underline ml-1">Full details</a>
+                        </p>
+                    </div>
+                </section>
+
+                @if ($organization->hasAdminAccess(auth()->user()))
+                    <section class="bg-white overflow-hidden shadow-sm sm:rounded-lg" id="notification-settings">
+                        <div class="px-6 py-4 border-b border-slate-200">
+                            <h3 class="font-medium text-slate-900">Deploy email notifications</h3>
+                            <p class="text-sm text-slate-500 mt-1">
+                                When enabled, site owners and org owners/admins receive email when a deploy finishes (or digest mail if <code class="text-xs bg-slate-100 px-1 rounded">DPLY_DEPLOY_DIGEST_HOURS</code> is set). Outbound integration webhooks are unchanged.
+                            </p>
+                        </div>
+                        <div class="px-6 py-4">
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" wire:model.live="deploy_email_notifications_enabled" class="rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                <span class="text-sm text-slate-700">Send deploy emails for sites in this organization</span>
+                            </label>
+                        </div>
+                    </section>
+                @endif
+
                 {{-- Members + Invite --}}
                 <section class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
                         <div>
                             <h3 class="font-medium text-slate-900">Members</h3>
-                            <p class="text-sm text-slate-500">Members and deployers can use servers and sites. Deployers cannot manage provider credentials, billing, or delete servers.</p>
+                            <p class="text-sm text-slate-500">Members can add servers and sites within plan limits. Deployers can deploy but cannot add servers/sites, open credentials, or billing. Only owners and admins can delete sites.</p>
                         </div>
                         @if ($organization->hasAdminAccess(auth()->user()))
                             <form wire:submit="inviteMember" class="flex gap-2 items-end flex-wrap">

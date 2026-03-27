@@ -5,8 +5,10 @@ namespace App\Livewire\Billing;
 use App\Models\Organization;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Laravel\Cashier\Invoice;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Throwable;
 
 #[Layout('layouts.app')]
 class Show extends Component
@@ -76,6 +78,22 @@ class Show extends Component
     public function getCanManageBillingProperty(): bool
     {
         return $this->organization->hasStripeId();
+    }
+
+    /**
+     * @return Collection<int, Invoice>
+     */
+    public function getInvoicesProperty(): Collection
+    {
+        if (! $this->organization->hasStripeId()) {
+            return collect();
+        }
+
+        try {
+            return $this->organization->invoices(false, ['limit' => 12]);
+        } catch (Throwable) {
+            return collect();
+        }
     }
 
     public function checkout(string $plan): mixed

@@ -3,6 +3,7 @@
 namespace App\Serverless\Stub;
 
 use App\Contracts\ServerlessFunctionProvisioner;
+use App\Serverless\Support\ProvisionerConfigReport;
 
 /**
  * No cloud calls — proves the seam until AWS/DO adapters land.
@@ -17,7 +18,7 @@ final class LocalStubProvisioner implements ServerlessFunctionProvisioner
             'provider' => 'local',
             'runtime' => $runtime,
             'artifact_path' => $artifactPath,
-            'config_keys' => array_keys($config),
+            'config_keys' => ProvisionerConfigReport::safeConfigKeys($config),
         ];
     }
 }

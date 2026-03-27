@@ -13,6 +13,7 @@ use App\Livewire\Profile\Edit as ProfileEdit;
 use App\Livewire\Servers\Create as ServersCreate;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\Show as ServersShow;
+use App\Livewire\Settings\Hub as SettingsHub;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Show as SitesShow;
@@ -42,6 +43,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/docs', [DocsController::class, 'index'])->name('docs.index');
     Route::get('/docs/connect-provider', [DocsController::class, 'connectProvider'])->name('docs.connect-provider');
     Route::get('/docs/create-first-server', [DocsController::class, 'createFirstServer'])->name('docs.create-first-server');
+    Route::get('/docs/org-roles-and-limits', [DocsController::class, 'orgRolesAndLimits'])->name('docs.org-roles-and-limits');
+    Route::get('/docs/source-control', [DocsController::class, 'sourceControl'])->name('docs.source-control');
+
+    Route::livewire('/settings', SettingsHub::class)->name('settings.index');
 
     Route::livewire('/profile', ProfileEdit::class)->name('profile.edit');
 

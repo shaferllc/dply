@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Features – {{ config('app.name') }}</title>
-    <meta name="description" content="Organizations, cloud credentials, servers, sites, deploy webhooks, and day-two operations—how {{ config('app.name') }} fits together for your team.">
+    <meta name="description" content="Organizations, billing for every site under one plan, personal 2FA and OAuth, cloud credentials, servers, deploy webhooks, and day-two operations—how {{ config('app.name') }} fits together for your team.">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -33,6 +33,7 @@
                     <a href="#credentials" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Credentials</a>
                     <a href="#servers" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Servers</a>
                     <a href="#sites" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Sites &amp; deploy</a>
+                    <a href="#plans-and-account" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Plans &amp; account</a>
                     <a href="#security" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Security</a>
                 </nav>
             </div>
@@ -47,7 +48,7 @@
                 <ol class="mt-16 grid gap-8 lg:grid-cols-5 lg:gap-4 relative">
                     @php
                         $steps = [
-                            ['n' => '1', 'title' => 'Organization', 'body' => 'Every resource belongs to an org. Switch context, invite people, and align billing to the team that owns the infrastructure.'],
+                            ['n' => '1', 'title' => 'Organization', 'body' => 'Every resource belongs to an org. Switch context, invite people, and align billing to the team that owns the infrastructure—one subscription covers every server and every site in that org.'],
                             ['n' => '2', 'title' => 'Credentials', 'body' => 'Cloud API tokens live in the vault, scoped to the org. Members run workflows without copying secrets into local env files.'],
                             ['n' => '3', 'title' => 'Servers', 'body' => 'Provision from supported clouds, or register any box over SSH. One inventory for commands, health checks, databases, cron, processes, and firewall rules.'],
                             ['n' => '4', 'title' => 'Sites', 'body' => 'Map domains to runtimes (PHP, Node, or static). Nginx, TLS, git remotes, env files, and deploy automation stay attached to the server they run on.'],
@@ -97,7 +98,7 @@
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage font-semibold text-sm">C</span>
                         <div>
                             <h3 class="font-semibold text-brand-ink">Billing per organization</h3>
-                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Plans attach to the org, which keeps finance and engineering ownership aligned as you grow.</p>
+                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Plans attach to the org. Subscription limits apply <strong class="text-brand-forest font-medium">organization-wide</strong>—every server and <strong class="text-brand-forest font-medium">every site</strong> under that org shares the same plan. There is no separate per-site product line on your invoice.</p>
                         </div>
                     </li>
                     <li class="flex gap-4">
@@ -107,7 +108,21 @@
                             <p class="mt-1 text-sm text-brand-moss leading-relaxed">Review recent organization audit entries—who did what—so changes to infrastructure are easier to trace.</p>
                         </div>
                     </li>
+                    <li class="flex gap-4">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage font-semibold text-sm">E</span>
+                        <div>
+                            <h3 class="font-semibold text-brand-ink">Your account follows you</h3>
+                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Profile, password, verified email, <strong class="text-brand-forest font-medium">two-factor authentication</strong>, and <strong class="text-brand-forest font-medium">OAuth</strong> sign-in (e.g. GitHub, GitLab, Bitbucket when enabled) live on <strong class="text-brand-forest font-medium">your user</strong>—not on each organization or site. The same settings apply everywhere you have access.</p>
+                        </div>
+                    </li>
                 </ul>
+
+                <div id="plans-and-account" class="mt-12 scroll-mt-24 rounded-2xl border border-brand-gold/35 bg-gradient-to-br from-brand-gold/10 to-brand-sand/20 px-6 py-8 sm:px-10">
+                    <h3 class="text-lg font-semibold text-brand-ink">Plans cover the whole organization</h3>
+                    <p class="mt-2 text-sm text-brand-moss leading-relaxed max-w-3xl">Usage limits we enforce from your plan (for example, how many <strong class="text-brand-forest font-medium">servers</strong> you can connect, and how many <strong class="text-brand-forest font-medium">sites</strong> the org may create on those servers before upgrading to Pro) are counted for the <strong class="text-brand-forest font-medium">entire org</strong>. Billing is not split per application or hostname.</p>
+                    <h3 class="mt-8 text-lg font-semibold text-brand-ink">Profile, 2FA, and OAuth are personal</h3>
+                    <p class="mt-2 text-sm text-brand-moss leading-relaxed max-w-3xl">You sign in as a person. Hardening your account with 2FA, linking an OAuth provider, or updating your profile applies to <strong class="text-brand-forest font-medium">all organizations</strong> you belong to and <strong class="text-brand-forest font-medium">every site</strong> you can reach through those memberships—without reconfiguring security per team.</p>
+                </div>
             </div>
         </section>
 
@@ -206,18 +221,22 @@
             <div class="max-w-6xl mx-auto">
                 <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Security &amp; account hygiene</h2>
                 <p class="mt-4 text-brand-sand/85 max-w-3xl">Enterprise-style products need more than a password—here is how {{ config('app.name') }} keeps keys and sessions under control.</p>
-                <ul class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <ul class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-2">
                     <li class="rounded-xl border border-white/10 bg-white/5 p-6">
                         <h3 class="font-semibold text-brand-cream">Encrypted secrets</h3>
                         <p class="mt-2 text-sm text-brand-mist leading-relaxed">Sensitive fields (deploy keys, webhook secrets, env payloads) are encrypted at rest so the database alone is never enough to impersonate your infrastructure.</p>
                     </li>
                     <li class="rounded-xl border border-white/10 bg-white/5 p-6">
                         <h3 class="font-semibold text-brand-cream">Two-factor authentication</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Users can harden their accounts with 2FA from profile settings—reducing risk when laptops walk off.</p>
+                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Turn on 2FA once in your profile—it protects your login across <strong class="text-brand-cream font-medium">every organization and site</strong> you can access, not just one workspace.</p>
                     </li>
                     <li class="rounded-xl border border-white/10 bg-white/5 p-6">
-                        <h3 class="font-semibold text-brand-cream">Verified email</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Access to the dashboard requires a verified address, which keeps invitations and notifications anchored to real inboxes.</p>
+                        <h3 class="font-semibold text-brand-cream">OAuth sign-in</h3>
+                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Link GitHub, GitLab, or Bitbucket (when your app enables them) to your user account. The same identity signs you in everywhere; <strong class="text-brand-cream font-medium">org roles</strong> still decide what you are allowed to change.</p>
+                    </li>
+                    <li class="rounded-xl border border-white/10 bg-white/5 p-6">
+                        <h3 class="font-semibold text-brand-cream">Verified email &amp; profile</h3>
+                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">A verified address is required for dashboard access. Name and profile settings live on your user—they do not reset when you switch org context.</p>
                     </li>
                 </ul>
             </div>

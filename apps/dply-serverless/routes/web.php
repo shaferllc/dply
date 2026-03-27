@@ -1,5 +1,6 @@
 <?php
 
+use App\Features\ServerlessFeature;
 use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Deploy\ServerlessDeployContext;
 use Dply\Core\Security\WebhookSignature;
@@ -9,7 +10,10 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-/** Monorepo spike: dply-core + DeployEngine → stub provisioner (remove or protect before production). */
+Route::view('/serverless', 'serverless.overview')
+    ->middleware('pennant.feature:'.ServerlessFeature::PUBLIC_DASHBOARD);
+
+/** Monorepo spike: dply-core + DeployEngine → stub provisioner (gated by Pennant; off in production unless env set). */
 Route::get('/internal/spike', function (DeployEngineResolver $deployEngineResolver) {
     $result = $deployEngineResolver->default()->run(new ServerlessDeployContext(
         functionName: 'spike-fn',
@@ -28,4 +32,4 @@ Route::get('/internal/spike', function (DeployEngineResolver $deployEngineResolv
             'sha' => $result['sha'],
         ],
     ]);
-});
+})->middleware('pennant.feature:'.ServerlessFeature::INTERNAL_SPIKE);

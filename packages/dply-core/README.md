@@ -2,6 +2,8 @@
 
 Small, framework-light primitives shared across dply product apps. Boundaries: see `docs/adr/0001-dply-core-boundaries.md` in the main dply BYO application repository.
 
+In the monorepo, consumers use a **Composer path** to this directory; see **[docs/MONOREPO_AND_APPS.md](../../docs/MONOREPO_AND_APPS.md)** in the BYO repo for how the root app and `apps/*` pull in `dply-core`.
+
 **Current surface (0.1.x)**
 
 - `Dply\Core\Security\WebhookSignature` — HMAC-SHA256 `X-Dply-Signature` (timestamped + legacy body).

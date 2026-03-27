@@ -18,13 +18,24 @@ class Organization extends Model
         'name',
         'slug',
         'email',
+        'deploy_email_notifications_enabled',
     ];
 
     protected function casts(): array
     {
         return [
             'trial_ends_at' => 'datetime',
+            'deploy_email_notifications_enabled' => 'boolean',
         ];
+    }
+
+    /**
+     * Whether deploy-related email (immediate or digest) should go to org stakeholders.
+     * Global app config still disables all deploy notifications when off.
+     */
+    public function wantsDeployEmailNotifications(): bool
+    {
+        return (bool) $this->deploy_email_notifications_enabled;
     }
 
     public function users(): BelongsToMany
@@ -123,11 +134,67 @@ class Organization extends Model
     }
 
     /**
+     * Maximum sites allowed for this organization (count includes all servers).
+     * Pro: unlimited. Otherwise {@see config('subscription.limits.sites_free')}.
+     */
+    public function maxSites(): int
+    {
+        $subscription = $this->subscription('default');
+        if ($subscription && $subscription->valid()) {
+            $plans = config('subscription.plans', []);
+            $proPriceIds = array_filter([
+                $plans['pro_monthly']['price_id'] ?? null,
+                $plans['pro_yearly']['price_id'] ?? null,
+            ]);
+            foreach ($proPriceIds as $priceId) {
+                if ($priceId && $subscription->hasPrice($priceId)) {
+                    return PHP_INT_MAX;
+                }
+            }
+        }
+
+        return max(0, config('subscription.limits.sites_free', 10));
+    }
+
+    /**
      * Whether the organization can create another server (under limit).
      */
     public function canCreateServer(): bool
     {
         return $this->servers()->count() < $this->maxServers();
+    }
+
+    /**
+     * Whether the organization can create another site (under {@see maxSites()}).
+     */
+    public function canCreateSite(): bool
+    {
+        return $this->sites()->count() < $this->maxSites();
+    }
+
+    /**
+     * Human-readable server cap for the current plan (e.g. "3", "Unlimited").
+     */
+    public function maxServersDisplay(): string
+    {
+        $m = $this->maxServers();
+
+        return $m >= PHP_INT_MAX ? 'Unlimited' : (string) $m;
+    }
+
+    /**
+     * Human-readable site cap for the current plan (e.g. "10", "Unlimited").
+     */
+    public function maxSitesDisplay(): string
+    {
+        $m = $this->maxSites();
+
+        return $m >= PHP_INT_MAX ? 'Unlimited' : (string) $m;
+    }
+
+    public function planTierLabel(): string
+    {
+        return $this->onProSubscription() ? 'Pro' : 'Free';
     }
 
     public function onProSubscription(): bool

@@ -1,0 +1,63 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: BYO
+            directory: .
+          - name: dply-serverless
+            directory: apps/dply-serverless
+          - name: dply-cloud
+            directory: apps/dply-cloud
+          - name: dply-wordpress
+            directory: apps/dply-wordpress
+          - name: dply-edge
+            directory: apps/dply-edge
+          - name: dply-core
+            directory: packages/dply-core
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, bcmath
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare Laravel application
+        if: matrix.directory != 'packages/dply-core'
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Run tests (Laravel)
+        if: matrix.directory != 'packages/dply-core'
+        run: php artisan test
+
+      - name: Run tests (dply-core)
+        if: matrix.directory == 'packages/dply-core'
+        run: vendor/bin/phpunit

@@ -37,6 +37,20 @@ class OrganizationModelTest extends TestCase
         $this->assertTrue($org->hasAdminAccess($user));
     }
 
+    public function test_wants_deploy_email_notifications_defaults_true(): void
+    {
+        $org = Organization::factory()->create();
+
+        $this->assertTrue($org->fresh()->wantsDeployEmailNotifications());
+    }
+
+    public function test_wants_deploy_email_notifications_respects_disabled_column(): void
+    {
+        $org = Organization::factory()->create(['deploy_email_notifications_enabled' => false]);
+
+        $this->assertFalse($org->wantsDeployEmailNotifications());
+    }
+
     public function test_has_admin_access_returns_true_for_admin(): void
     {
         $user = User::factory()->create();

@@ -50,6 +50,8 @@ class Show extends Component
 
     public bool $int_evt_skipped = true;
 
+    public bool $deploy_email_notifications_enabled = true;
+
     public string $team_name = '';
 
     public ?string $new_token_plaintext = null;
@@ -66,20 +68,36 @@ class Show extends Component
     {
         $this->authorize('view', $organization);
         $this->refreshOrganization();
-        $this->syncTeamNames();
     }
 
     protected function refreshOrganization(): void
     {
-        $this->organization = $this->organization->fresh()->load([
-            'users',
-            'teams' => fn ($q) => $q->withCount('users')->with('users'),
-            'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
-            'apiTokens',
-            'integrationOutboundWebhooks',
-            'sites' => fn ($q) => $q->orderBy('name'),
-        ]);
+        $this->organization = $this->organization->fresh()
+            ->loadCount(['servers', 'sites'])
+            ->load([
+                'users',
+                'teams' => fn ($q) => $q->withCount('users')->with('users'),
+                'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
+                'apiTokens',
+                'integrationOutboundWebhooks',
+                'sites' => fn ($q) => $q->orderBy('name'),
+            ]);
+        $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
         $this->syncTeamNames();
+    }
+
+    public function updatedDeployEmailNotificationsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'deploy_email_notifications_enabled' => $this->deploy_email_notifications_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.deploy_email_notifications_updated', null, null, [
+            'enabled' => $this->deploy_email_notifications_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Deploy email preferences updated.');
     }
 
     protected function syncTeamNames(): void

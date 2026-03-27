@@ -13,13 +13,16 @@
     ],
     "require": {
         "php": "^8.3",
+        "aws/aws-sdk-php": "^3.335",
+        "bref/bref": "^3.0",
+        "bref/laravel-bridge": "^3.0",
         "laravel/framework": "^13.0",
+        "laravel/pennant": "^1.18",
         "laravel/tinker": "^3.0",
         "shaferllc/dply-core": "^0.1"
     },
     "suggest": {
-        "bref/bref": "Host this Laravel app on AWS Lambda (open source) — see docs/serverless-laravel-aws-hosting.md",
-        "bref/laravel-bridge": "Laravel integration for Bref; v3 targets Laravel 10–13 (check Packagist before pinning)"
+        "serverless": "Install Serverless Framework globally (`npm i -g serverless`) to run `serverless deploy` with `serverless.yml` + Bref"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

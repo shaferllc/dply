@@ -37,12 +37,14 @@ class Create extends Component
         if ($server->organization_id !== auth()->user()->currentOrganization()?->id) {
             abort(404);
         }
+        $this->authorize('create', Site::class);
         $this->server = $server;
     }
 
     public function store(): mixed
     {
         $this->authorize('update', $this->server);
+        $this->authorize('create', Site::class);
 
         $this->validate([
             'name' => 'required|string|max:120',

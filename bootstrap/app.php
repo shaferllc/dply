@@ -4,6 +4,7 @@ use App\Console\Commands\FlushDeployDigestCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\SetCurrentOrganization;
+use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\CheckSiteUrlHealthJob;
 use App\Models\Server;
@@ -48,6 +49,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'org' => SetCurrentOrganization::class,
             'auth.api' => AuthenticateApiToken::class,
             'ability' => EnsureApiTokenAbility::class,
+            'fleet.operator' => ValidateFleetOperatorToken::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             'hooks/*',

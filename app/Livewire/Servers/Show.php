@@ -10,6 +10,7 @@ use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\ServerFirewallRule;
 use App\Models\ServerRecipe;
+use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Services\AwsEc2Service;
 use App\Services\DigitalOceanService;
@@ -27,8 +28,10 @@ use App\Services\SshConnection;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -90,6 +93,16 @@ class Show extends Component
     public string $new_recipe_name = '';
 
     public string $new_recipe_script = '';
+
+    #[Computed]
+    public function canAddSite(): bool
+    {
+        if (! $this->server->isReady()) {
+            return false;
+        }
+
+        return Gate::forUser(auth()->user())->allows('create', Site::class);
+    }
 
     public function mount(Server $server): void
     {

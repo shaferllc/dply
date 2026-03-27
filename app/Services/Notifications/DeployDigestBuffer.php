@@ -45,7 +45,7 @@ class DeployDigestBuffer
                 continue;
             }
             $org = Organization::query()->find($id);
-            if (! $org) {
+            if (! $org || ! $org->wantsDeployEmailNotifications()) {
                 continue;
             }
             $recipients = $org->users()

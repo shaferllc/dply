@@ -26,8 +26,13 @@ class SiteDeploymentCompletedNotification extends Notification implements Should
      */
     public function via(object $notifiable): array
     {
-        $this->deployment->loadMissing('site');
-        $orgId = $this->deployment->site?->organization_id;
+        $this->deployment->loadMissing('site.organization');
+        $site = $this->deployment->site;
+        $org = $site?->organization;
+        if ($org && ! $org->wantsDeployEmailNotifications()) {
+            return [];
+        }
+        $orgId = $site?->organization_id;
         if ($orgId && (int) config('dply.deploy_digest_hours', 0) > 0) {
             $site = $this->deployment->site;
             $line = sprintf(

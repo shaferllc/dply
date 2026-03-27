@@ -3,6 +3,7 @@
 namespace App\Serverless\Stub;
 
 use App\Contracts\ServerlessFunctionProvisioner;
+use App\Serverless\Support\ProvisionerConfigReport;
 
 /**
  * No AWS API calls — placeholder until a Lambda SDK adapter is wired.
@@ -17,7 +18,7 @@ final class AwsLambdaStubProvisioner implements ServerlessFunctionProvisioner
             'provider' => 'aws',
             'runtime' => $runtime,
             'artifact_path' => $artifactPath,
-            'config_keys' => array_keys($config),
+            'config_keys' => ProvisionerConfigReport::safeConfigKeys($config),
         ];
     }
 }

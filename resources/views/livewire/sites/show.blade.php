@@ -421,9 +421,11 @@
                 </div>
             </div>
 
-            <div class="flex justify-between items-center">
-                <button type="button" wire:click="deleteSite" wire:confirm="Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab." class="text-red-600 hover:underline text-sm">Delete site</button>
-            </div>
+            @can('delete', $site)
+                <div class="flex justify-between items-center">
+                    <button type="button" wire:click="deleteSite" wire:confirm="Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab." class="text-red-600 hover:underline text-sm">Delete site</button>
+                </div>
+            @endcan
         </div>
     </div>
 </div>

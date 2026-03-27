@@ -12,7 +12,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use PragmaRX\Google2FA\Google2FA;
 
-#[Layout('layouts.app')]
+#[Layout('layouts.settings')]
 class Page extends Component
 {
     public string $code = '';

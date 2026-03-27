@@ -12,7 +12,7 @@ use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-#[Layout('layouts.app')]
+#[Layout('layouts.settings')]
 class Edit extends Component
 {
     public string $name = '';
