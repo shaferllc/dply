@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Models\Server;
 use App\Services\AwsEc2Service;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -9,6 +10,7 @@ use Illuminate\Foundation\Queue\Queueable;
 
 class PollAwsEc2IpJob implements ShouldQueue
 {
+    use DispatchesServerProvisionJob;
     use Queueable;
 
     public int $tries = 60;
@@ -39,9 +41,7 @@ class PollAwsEc2IpJob implements ShouldQueue
                 'status' => Server::STATUS_READY,
             ]);
 
-            if ($this->server->setup_script_key && $this->server->setup_script_key !== 'none') {
-                RunSetupScriptJob::dispatch($this->server->fresh());
-            }
+            $this->dispatchServerProvisionIfNeeded($this->server);
 
             return;
         }

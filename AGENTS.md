@@ -2,11 +2,14 @@
 
 - Use Tailwind CSS v4 with CSS-first configuration (`@import "tailwindcss"`, `@theme`, and related v4 patterns) for new and updated styling.
 - Use one shared site header across marketing and authenticated app layouts; only the navigation should differ for guests versus signed-in users.
+- Prefer **[Blade UI Kit Blade Icons](https://blade-ui-kit.com/blade-icons)** for **header and primary navigation** icons; avoid an overcrowded top bar by moving **overflow links into dropdowns**.
 - Keep the header logo visually prominent (larger than a minimal favicon-scale mark).
+- Use a **shared global footer** (the same **`x-marketing-footer`** component or equivalent) on **app**, **settings**, and **public status** layouts so the footer matches marketing and guest pages and stays visually anchored on short pages.
 - Auth screens should pair the form with supporting layout: short value props, icons, or similar context—not a bare form only.
 - Aim for an enterprise-ready SaaS look and feel consistent with the product logo and brand colors.
 - Include a **features** (or equivalent) page that explains **how product capabilities connect**, not only isolated feature lists.
 - For BYO, surface **subscription and plan limits** in the product UI and keep them aligned with **docs** (roles, quotas, gates).
+- Prefer **Livewire v3 `Form` objects** (or equivalent form components) for forms with **about four or more** fields, instead of many separate `wire:model` properties on the component.
 
 ## Learned Workspace Facts
 
@@ -17,6 +20,8 @@
 - Control-plane schema changes such as introducing **`projects`** and migrating from **`sites`** are scoped to the **BYO app database** until other product apps and databases exist (see ADR-003).
 - Reduce **engine leakage** (e.g. SSH-shaped code in non-BYO workers) with **separate queues or worker pools per product**, **adapter-only provider code**, and review discipline.
 - Keep **`dply-core`** (or the shared package equivalent) to a **small, stable surface**; expand it deliberately and record boundaries in ADRs when needed. In this monorepo, consume **`shaferllc/dply-core`** via **Composer path** to **`packages/dply-core`** unless a deploy target intentionally uses a **published Git** dependency instead.
-- BYO exposes **`/settings`** as a **hub with a shared settings layout** (profile, two-factor, organizations, billing, credentials, docs links). **Per-organization deploy-finish email** can be disabled without affecting **outbound integration webhooks** (separate controls).
+- BYO exposes **`/settings`** as a **hub with a shared settings layout** (profile, two-factor, organizations, billing, docs links). **Source control** (`/profile/source-control`) is **Git providers only** (OAuth to GitHub, GitLab, Bitbucket). **Server provider** API tokens for provisioning infrastructure live under the org **`/credentials`** route (settings sidebar: **Server providers**), not mixed with Git. **Per-organization deploy-finish email** can be disabled without affecting **outbound integration webhooks** (separate controls).
+- **Profile → SSH keys** (`/profile/ssh-keys`) and **HTTP API keys** (`/profile/api-keys`): **user**, **organization**, and **team** **SSH** public keys (where enabled) support optional **provision on new servers** and **deploy** to existing servers via the same **`server_authorized_keys`** sync as server pages. **API** tokens are **organization-scoped** with granular abilities from `config/api_token_permissions.php`; optional **`DPLY_API_TOKENS_REQUIRE_PAID_PLAN`** gates **creating** new tokens on **Pro**; **deployer** org members get a reduced ability set when creating tokens.
+- **Notification channels** and routing of events can be configured at **organization**, **user**, and **team** levels, with **bulk assignment** of notification types where the UI supports it.
 - **Organization** subscription and plan limits apply to **all servers and all sites** in that org (one envelope, not per-site SKUs unless deliberately introduced). **Profile, 2FA, and OAuth-linked accounts** stay **user-scoped** across orgs and sites.
 - Deploying a monorepo app behind nginx: set **`root`** to that app’s **`public/`** (e.g. `apps/dply-cloud/public` in a checkout, or the released app tree’s `public`). **Independent deploys do not require separate Git repositories** if each product has its own env, database, and build or deploy target (see `docs/MONOREPO_AND_APPS.md`).

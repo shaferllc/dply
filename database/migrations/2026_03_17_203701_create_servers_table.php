@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('servers', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('provider_credential_id')->nullable()->constrained()->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('provider_credential_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name');
             $table->string('provider')->default('digitalocean'); // digitalocean, custom
             $table->string('provider_id')->nullable(); // droplet id, etc.

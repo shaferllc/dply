@@ -21,7 +21,7 @@ class SettingsAndNotificationsTest extends TestCase
         $this->actingAs($user)
             ->get(route('settings.index'))
             ->assertOk()
-            ->assertSee('Account & organization');
+            ->assertSee('Your profile tab stores personal preferences', false);
     }
 
     public function test_settings_hub_livewire_renders(): void

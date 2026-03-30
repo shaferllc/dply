@@ -1,0 +1,9 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\TaskRunner\Task;
+
+class {{ class }} extends Task
+{
+}

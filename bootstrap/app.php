@@ -2,6 +2,7 @@
 
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
@@ -45,6 +47,14 @@ return Application::configure(basePath: dirname(__DIR__))
             ->when(fn (): bool => (int) config('dply.deploy_digest_hours', 0) > 0);
     })
     ->withMiddleware(function (Middleware $middleware): void {
+        $trustedProxies = trim((string) env('TRUSTED_PROXIES', ''));
+        if ($trustedProxies !== '') {
+            $at = $trustedProxies === '*'
+                ? '*'
+                : array_values(array_filter(array_map('trim', explode(',', $trustedProxies))));
+            $middleware->trustProxies(at: $at);
+        }
+
         $middleware->alias([
             'org' => SetCurrentOrganization::class,
             'auth.api' => AuthenticateApiToken::class,
@@ -53,6 +63,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->validateCsrfTokens(except: [
             'hooks/*',
+            'webhook/*',
+        ]);
+
+        $middleware->appendToGroup('web', [
+            CaptureReferralCode::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

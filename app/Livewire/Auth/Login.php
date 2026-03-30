@@ -24,9 +24,16 @@ class Login extends Component
 
     public function mount(): void
     {
-        if (auth()->check()) {
-            $this->redirect(route('dashboard'), navigate: true);
+        if (! auth()->check()) {
+            return;
         }
+
+        $this->redirect(
+            auth()->user()->hasVerifiedEmail()
+                ? route('dashboard')
+                : route('verification.notice'),
+            navigate: true
+        );
     }
 
     public function submit(): mixed
@@ -66,6 +73,10 @@ class Login extends Component
 
         Auth::login($user, $this->remember);
         session()->regenerate();
+
+        if (! $user->hasVerifiedEmail()) {
+            return $this->redirect(route('verification.notice'), navigate: true);
+        }
 
         return $this->redirectIntended(route('dashboard', absolute: false), navigate: true);
     }

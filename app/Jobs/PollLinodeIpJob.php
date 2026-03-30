@@ -38,9 +38,7 @@ class PollLinodeIpJob implements ShouldQueue
                 'status' => Server::STATUS_READY,
             ]);
 
-            if ($this->server->setup_script_key && $this->server->setup_script_key !== 'none') {
-                RunSetupScriptJob::dispatch($this->server->fresh());
-            }
+            $this->dispatchServerProvisionIfNeeded($this->server);
 
             return;
         }

@@ -1,0 +1,83 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Modules\TaskRunner\Enums\CallbackType;
+use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::prefix('tasks')->group(function () {
+        Route::get('/', function () {
+            return view('task-runner::task-dashboard');
+        })->name('tasks.dashboard');
+
+        Route::get('/execute', function () {
+            return view('task-runner::task-execute');
+        })->name('tasks.execute');
+
+        Route::get('/list', function () {
+            return view('task-runner::task-list');
+        })->name('tasks.list');
+
+        Route::get('/monitor', function () {
+            return view('task-runner::monitor', ['showAllTasks' => true]);
+        })->name('tasks.monitor');
+
+        Route::get('/name/{taskName}', function (string $taskName) {
+            return view('task-runner::monitor', ['taskName' => $taskName]);
+        })->name('tasks.monitor.name');
+
+        Route::get('/id/{taskId}', function (string $taskId) {
+            return view('task-runner::monitor', ['taskId' => $taskId]);
+        })->name('tasks.monitor.id');
+    });
+});
+
+Route::middleware(['web', 'signed'])->prefix('webhook')->name('webhook.')->group(function () {
+    Route::post('/task/callback/{task}', function (Task $task, Request $request) {
+        $task->handleCallback($request, CallbackType::Finished);
+
+        return response()->json(['status' => 'success']);
+    })->name('task.callback');
+
+    Route::post('/task/mark-as-finished/{task}', function (Task $task, Request $request) {
+        $task->handleCallback($request, CallbackType::Finished);
+
+        return response()->json(['status' => 'success']);
+    })->name('task.mark-as-finished');
+
+    Route::post('/task/mark-as-failed/{task}', function (Task $task, Request $request) {
+        $task->handleCallback($request, CallbackType::Failed);
+
+        return response()->json(['status' => 'success']);
+    })->name('task.mark-as-failed');
+
+    Route::post('/task/mark-as-timed-out/{task}', function (Task $task, Request $request) {
+        $task->handleCallback($request, CallbackType::Timeout);
+
+        return response()->json(['status' => 'success']);
+    })->name('task.mark-as-timed-out');
+
+    Route::post('/task/update-output/{task}', function (Task $task, Request $request) {
+        $output = $request->input('output', '');
+        $scriptContent = $request->input('script_content', '');
+
+        $updateData = [];
+
+        if (! empty($output)) {
+            $updateData['output'] = $output;
+        }
+
+        if (! empty($scriptContent)) {
+            $updateData['script_content'] = $scriptContent;
+        }
+
+        if (! empty($updateData)) {
+            $task->update($updateData);
+        }
+
+        return response()->json(['status' => 'success']);
+    })->name('task.update-output');
+});

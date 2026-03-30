@@ -64,6 +64,11 @@
                     <div class="mt-4 space-y-2">
                         <button type="button" wire:click="checkHealth" class="text-sm text-slate-600 hover:text-slate-800 underline">Check health now</button>
                         <div class="pt-2 border-t border-slate-100">
+                            <p class="text-sm text-slate-500 mb-2">
+                                {{ __('Add this server to a') }}
+                                <a href="{{ route('status-pages.index') }}" class="text-slate-700 font-medium hover:underline">{{ __('status page') }}</a>
+                                {{ __('to show reachability on your public status URL.') }}
+                            </p>
                             <p class="text-sm text-slate-500 mb-1">Optional: use an HTTP URL for health (e.g. <code class="bg-slate-100 px-1 rounded">https://yoursite.com/up</code>). If set, 2xx = reachable; otherwise SSH port is checked.</p>
                             <form wire:submit="saveHealthCheckUrl" class="flex gap-2 items-center">
                                 <input type="url" wire:model="health_check_url" placeholder="https://…" class="flex-1 max-w-md rounded-md border-slate-300 shadow-sm text-sm">
@@ -127,12 +132,12 @@
                         </div>
                         <div>
                             <x-input-label for="new_db_username" value="Username" />
-                            <x-text-input id="new_db_username" wire:model="new_db_username" class="mt-1 block w-full font-mono text-sm" />
+                            <x-text-input id="new_db_username" wire:model="new_db_username" autocomplete="username" class="mt-1 block w-full font-mono text-sm" />
                             <x-input-error :messages="$errors->get('new_db_username')" class="mt-1" />
                         </div>
                         <div>
                             <x-input-label for="new_db_password" value="Password" />
-                            <x-text-input id="new_db_password" type="password" wire:model="new_db_password" class="mt-1 block w-full text-sm" />
+                            <x-text-input id="new_db_password" type="password" wire:model="new_db_password" autocomplete="new-password" class="mt-1 block w-full text-sm" />
                             <x-input-error :messages="$errors->get('new_db_password')" class="mt-1" />
                         </div>
                         <div class="sm:col-span-2">

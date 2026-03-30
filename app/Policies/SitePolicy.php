@@ -21,12 +21,12 @@ class SitePolicy
     {
         $org = $user->currentOrganization();
 
-        if ($org !== null && $org->userIsDeployer($user)) {
+        if ($org === null) {
             return false;
         }
 
-        if ($org === null) {
-            return true;
+        if ($org->userIsDeployer($user)) {
+            return false;
         }
 
         return $org->canCreateSite();

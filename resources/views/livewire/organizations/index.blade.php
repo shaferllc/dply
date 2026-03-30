@@ -34,7 +34,7 @@
                                     @if (session('current_organization_id') == $org->id)
                                         <span class="text-xs text-slate-500 font-medium">Current</span>
                                     @else
-                                        <button type="button" wire:click="switchOrganization({{ $org->id }})" class="text-slate-600 hover:underline text-sm">Switch</button>
+                                        <button type="button" wire:click="switchOrganization('{{ $org->id }}')" class="text-slate-600 hover:underline text-sm">Switch</button>
                                     @endif
                                     <a href="{{ route('organizations.show', $org) }}" class="text-slate-600 hover:underline text-sm">Manage</a>
                                 </div>

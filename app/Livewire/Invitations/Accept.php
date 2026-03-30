@@ -52,6 +52,7 @@ class Accept extends Component
         if ($this->invitation->organization->hasMember($user)) {
             $this->invitation->delete();
             Session::put('current_organization_id', $this->invitation->organization_id);
+            Session::forget('current_team_id');
             Session::flash('success', 'You are already a member of this organization.');
 
             return $this->redirect(route('organizations.show', $this->invitation->organization), navigate: true);
@@ -71,6 +72,7 @@ class Accept extends Component
         $org = $this->invitation->organization;
         $this->invitation->delete();
         Session::put('current_organization_id', $org->id);
+        Session::forget('current_team_id');
         Session::flash('success', 'You have joined '.$org->name.'.');
 
         return $this->redirect(route('organizations.show', $org), navigate: true);

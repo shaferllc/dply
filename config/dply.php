@@ -4,6 +4,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Require verified email (dashboard and gated actions)
+    |--------------------------------------------------------------------------
+    | When false, unverified users are treated as verified for access control.
+    | Defaults to off in the local environment; set DPLY_REQUIRE_EMAIL_VERIFICATION
+    | to override explicitly (e.g. true locally to match production behavior).
+    */
+    'require_email_verification' => env('DPLY_REQUIRE_EMAIL_VERIFICATION') !== null
+        ? filter_var(env('DPLY_REQUIRE_EMAIL_VERIFICATION'), FILTER_VALIDATE_BOOL)
+        : env('APP_ENV', 'production') !== 'local',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Community / docs links (optional)
+    |--------------------------------------------------------------------------
+    | Used on profile for “contribute a translation” style links.
+    */
+    'community_github_url' => env('DPLY_COMMUNITY_GITHUB_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Organization member cap (null = unlimited)
     |--------------------------------------------------------------------------
     | Counts active members plus non-expired pending invitations.
@@ -52,5 +72,30 @@ return [
     |--------------------------------------------------------------------------
     */
     'api_token_deploy_default_ttl_days' => max(1, min(365, (int) env('DPLY_API_TOKEN_DEPLOY_TTL_DAYS', 14))),
+
+    /*
+    |--------------------------------------------------------------------------
+    | API tokens: require Pro subscription to create (profile / granular UI)
+    |--------------------------------------------------------------------------
+    | When true, only organizations on an active Pro Stripe price may create
+    | new tokens from Settings → API keys. Revoking still works.
+    */
+    'api_tokens_require_paid_plan' => filter_var(env('DPLY_API_TOKENS_REQUIRE_PAID_PLAN', false), FILTER_VALIDATE_BOOL),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Demo DigitalOcean flow (php artisan dply:demo-do-server)
+    |--------------------------------------------------------------------------
+    | Token is never stored here — use --token or DPLY_DEMO_DO_TOKEN / DIGITALOCEAN_TOKEN.
+    |
+    | Provisioning runs as demo_user_email and attaches the droplet to that user’s first
+    | organization (by membership created_at), so you can watch the same org in the UI.
+    | demo_org_slug is only used when --org-slug is omitted and the user belongs to no org yet
+    | (e.g. CI), or when you pass --org-slug explicitly.
+    */
+    'demo_user_email' => env('DPLY_DEMO_USER_EMAIL', 'tom.shafer@gmail.com'),
+    'demo_org_slug' => env('DPLY_DEMO_ORG_SLUG', 'dply-automated-demo'),
+    'demo_do_region' => env('DPLY_DEMO_DO_REGION', 'nyc1'),
+    'demo_do_size' => env('DPLY_DEMO_DO_SIZE', 's-1vcpu-1gb'),
 
 ];

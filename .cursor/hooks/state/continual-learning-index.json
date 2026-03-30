@@ -1,17 +1,66 @@
 {
   "version": 1,
-  "transcripts": {
-    "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/458fa6c5-3b65-4bae-8bad-1a8539807ac7/458fa6c5-3b65-4bae-8bad-1a8539807ac7.jsonl": {
-      "mtimeMs": 1774244926000,
-      "lastProcessedAt": "2026-03-24T16:11:10.000Z"
+  "lastUpdated": "2026-03-30T20:43:03Z",
+  "transcripts": [
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/389000c2-801e-4236-acf6-fd446a1daf7a/389000c2-801e-4236-acf6-fd446a1daf7a.jsonl",
+      "mtimeMs": 1774900183916,
+      "lastProcessedAt": "2026-03-30T20:43:03Z"
     },
-    "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/64465490-d988-4352-9e7b-6024cd3df095/64465490-d988-4352-9e7b-6024cd3df095.jsonl": {
-      "mtimeMs": 1774244459000,
-      "lastProcessedAt": "2026-03-24T16:11:10.000Z"
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/458fa6c5-3b65-4bae-8bad-1a8539807ac7/458fa6c5-3b65-4bae-8bad-1a8539807ac7.jsonl",
+      "mtimeMs": 1774244926184,
+      "lastProcessedAt": "2026-03-30T18:08:09Z"
     },
-    "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/b17576da-b26b-49cc-a387-7a7b473922e0/b17576da-b26b-49cc-a387-7a7b473922e0.jsonl": {
-      "mtimeMs": 1774398161000,
-      "lastProcessedAt": "2026-03-25T00:28:24.000Z"
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/4d9d30f5-3568-4b48-8fe4-b9adaff6009c/4d9d30f5-3568-4b48-8fe4-b9adaff6009c.jsonl",
+      "mtimeMs": 1774903312513,
+      "lastProcessedAt": "2026-03-30T20:43:03Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/4d9d30f5-3568-4b48-8fe4-b9adaff6009c/subagents/85758e5d-7882-478f-85b1-ea22dbe70125.jsonl",
+      "mtimeMs": 1774903331737,
+      "lastProcessedAt": "2026-03-30T20:43:03Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/5fe08658-fc1d-4774-9764-ff6f2dc67547/5fe08658-fc1d-4774-9764-ff6f2dc67547.jsonl",
+      "mtimeMs": 1774898103413,
+      "lastProcessedAt": "2026-03-30T20:43:03Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/5fe08658-fc1d-4774-9764-ff6f2dc67547/subagents/b8799dec-cc93-4375-820e-936aeb440160.jsonl",
+      "mtimeMs": 1774894121998,
+      "lastProcessedAt": "2026-03-30T20:43:03Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/64465490-d988-4352-9e7b-6024cd3df095/64465490-d988-4352-9e7b-6024cd3df095.jsonl",
+      "mtimeMs": 1774244459377,
+      "lastProcessedAt": "2026-03-30T18:08:09Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/7a57984e-aa19-45bc-a6c9-cc0d73d602c7/7a57984e-aa19-45bc-a6c9-cc0d73d602c7.jsonl",
+      "mtimeMs": 1774903067072,
+      "lastProcessedAt": "2026-03-30T20:43:03Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/87662b93-d2e6-4784-88aa-c4a17ad42b92/87662b93-d2e6-4784-88aa-c4a17ad42b92.jsonl",
+      "mtimeMs": 1774889770848,
+      "lastProcessedAt": "2026-03-30T18:08:09Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/b17576da-b26b-49cc-a387-7a7b473922e0/b17576da-b26b-49cc-a387-7a7b473922e0.jsonl",
+      "mtimeMs": 1774401571625,
+      "lastProcessedAt": "2026-03-30T18:08:09Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/d3b36ce8-08ea-4591-ae0c-02df9aca7298/d3b36ce8-08ea-4591-ae0c-02df9aca7298.jsonl",
+      "mtimeMs": 1774898144581,
+      "lastProcessedAt": "2026-03-30T20:43:03Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/f49eb80f-1c11-4948-94c8-b2bda25f6094/f49eb80f-1c11-4948-94c8-b2bda25f6094.jsonl",
+      "mtimeMs": 1774888753737,
+      "lastProcessedAt": "2026-03-30T18:08:09Z"
     }
-  }
+  ]
 }

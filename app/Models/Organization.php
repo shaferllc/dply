@@ -3,22 +3,28 @@
 namespace App\Models;
 
 use Database\Factories\OrganizationFactory;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
-    use Billable, HasFactory;
+    use Billable, HasFactory, HasUlids;
 
     protected $fillable = [
         'name',
         'slug',
         'email',
         'deploy_email_notifications_enabled',
+        'server_site_preferences',
+        'default_site_script_id',
     ];
 
     protected function casts(): array
@@ -26,7 +32,67 @@ class Organization extends Model
         return [
             'trial_ends_at' => 'datetime',
             'deploy_email_notifications_enabled' => 'boolean',
+            'server_site_preferences' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (Organization $organization): void {
+            $organization->createDefaultTeamIfMissing();
+        });
+    }
+
+    /**
+     * Ensure a first team exists (idempotent). Used when model events are disabled (e.g. seeders) and after legacy org rows.
+     */
+    public function createDefaultTeamIfMissing(): Team
+    {
+        $existing = $this->teams()->orderBy('created_at')->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $base = Str::slug(__('general'));
+        $slug = $base;
+        $i = 0;
+        while ($this->teams()->where('slug', $slug)->exists()) {
+            $slug = $base.'-'.(++$i);
+        }
+
+        return $this->teams()->create([
+            'name' => __('General'),
+            'slug' => $slug,
+        ]);
+    }
+
+    /**
+     * Add an organization member to the default (first) team as team admin when not already present.
+     */
+    public function attachUserToDefaultTeam(User $user, string $teamRole = 'admin'): void
+    {
+        if (! $this->hasMember($user)) {
+            return;
+        }
+
+        $team = $this->createDefaultTeamIfMissing();
+        if ($team->users()->where('user_id', $user->id)->exists()) {
+            return;
+        }
+
+        $team->users()->attach($user->id, ['role' => $teamRole]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mergedServerSitePreferences(): array
+    {
+        $defaults = config('user_preferences.organization_server_site_defaults', []);
+        $keys = array_keys($defaults);
+        $stored = $this->server_site_preferences ?? [];
+
+        return array_merge($defaults, array_intersect_key($stored, array_flip($keys)));
     }
 
     /**
@@ -50,9 +116,19 @@ class Organization extends Model
         return $this->hasMany(Team::class);
     }
 
+    public function webserverTemplates(): HasMany
+    {
+        return $this->hasMany(WebserverTemplate::class);
+    }
+
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class);
+    }
+
+    public function organizationSshKeys(): HasMany
+    {
+        return $this->hasMany(OrganizationSshKey::class);
     }
 
     public function sites(): HasMany
@@ -60,9 +136,29 @@ class Organization extends Model
         return $this->hasMany(Site::class);
     }
 
+    public function scripts(): HasMany
+    {
+        return $this->hasMany(Script::class);
+    }
+
+    public function defaultSiteScript(): BelongsTo
+    {
+        return $this->belongsTo(Script::class, 'default_site_script_id');
+    }
+
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
+    }
+
+    public function workspaces(): HasMany
+    {
+        return $this->hasMany(Workspace::class);
+    }
+
+    public function statusPages(): HasMany
+    {
+        return $this->hasMany(StatusPage::class);
     }
 
     public function providerCredentials(): HasMany
@@ -88,6 +184,11 @@ class Organization extends Model
     public function integrationOutboundWebhooks(): HasMany
     {
         return $this->hasMany(IntegrationOutboundWebhook::class);
+    }
+
+    public function notificationChannels(): MorphMany
+    {
+        return $this->morphMany(NotificationChannel::class, 'owner');
     }
 
     public function hasMember(User $user): bool

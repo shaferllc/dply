@@ -100,7 +100,7 @@ class Page extends Component
         Session::flash('recovery_codes', $recoveryCodes);
         Session::flash('status', 'two-factor-enabled');
 
-        return $this->redirect(route('profile.edit'), navigate: true);
+        return $this->redirect(route('profile.security'), navigate: true);
     }
 
     public function disable(): mixed
@@ -132,7 +132,7 @@ class Page extends Component
 
         Session::flash('status', 'two-factor-disabled');
 
-        return $this->redirect(route('profile.edit'), navigate: true);
+        return $this->redirect(route('profile.security'), navigate: true);
     }
 
     protected function generateRecoveryCodes(int $count = 8): array

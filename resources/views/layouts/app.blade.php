@@ -16,9 +16,21 @@
         @livewireStyles
         <style>[x-cloak]{display:none!important}</style>
     </head>
-    <body class="font-sans antialiased bg-brand-cream text-brand-ink" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
-        <div class="min-h-screen">
+    <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
+        <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
+
+            @auth
+                @if (auth()->user()->organizations()->exists())
+                    <livewire:layout.context-breadcrumb />
+                @endif
+                <div
+                    id="dply-broadcast-context"
+                    class="hidden"
+                    aria-hidden="true"
+                    data-organization-id="{{ auth()->user()->currentOrganization()?->id }}"
+                ></div>
+            @endauth
 
             {{-- Global flash messages --}}
             @if (session('success'))
@@ -44,10 +56,12 @@
             @endisset
 
             <!-- Page Content -->
-            <main>
+            <main class="flex-1 w-full">
                 {{ $slot }}
             </main>
         </div>
+
+        <x-marketing-footer />
 
         {{-- Toasts (from Livewire dispatch('notify')) --}}
         <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2" aria-live="polite">

@@ -59,6 +59,10 @@ Run migrations:
 php artisan migrate
 ```
 
+The migration `migrate_local_dev_organization_to_workspace` renames the old seeded organization whose slug was `local-dev` (display name “Local Dev”) to a normal workspace name and an email-based slug, so it no longer appears as a throwaway dev org.
+
+In **`APP_ENV=local`**, `php artisan db:seed` also ensures the usual local admin user (`tj@tjshafer.com` / `password` per `DatabaseSeeder`) has that workspace as **owner**, then runs **`LocalDemoServersSeeder`**: demo teams, **Custom**-provider servers (no cloud `provider_id`), sites with varying counts, and a **fake** DigitalOcean credential row for credentials UI testing. Re-seeding skips creating duplicate demo servers when rows tagged with `meta.local_demo` already exist. Demo servers are safe to remove from the **Servers** index; they do not call cloud teardown APIs.
+
 ### MySQL or PostgreSQL
 
 Set `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` in `.env`, create an empty database, then:
@@ -100,6 +104,35 @@ Use `redis` or another driver in production if you prefer; the important part is
 
 ---
 
+## 5b. Expose (public HTTPS for the control plane)
+
+**Provisioning a cloud server (e.g. DigitalOcean droplet)** uses your app’s **outbound** API calls and **queued polling jobs** (`ProvisionDigitalOceanDropletJob`, `PollDropletIpJob`, etc.). DigitalOcean does **not** call back into dply when the droplet is ready, so you do **not** need a public URL on your laptop **just to create a server**, as long as you have a valid API token or OAuth flow that works.
+
+Where a **public `APP_URL`** matters for **server workflows**:
+
+- **DigitalOcean OAuth** (“Continue with DigitalOcean” under **Server providers**): the redirect URI registered in the DigitalOcean OAuth app must match how the browser reaches your app. On localhost, use a tunnel.
+- **Git OAuth** (profile / source control): same idea.
+
+Recommended tunnel: **[Expose](https://expose.dev)** (Beyond Code). Typical flow:
+
+1. The repo includes **Expose** as a Composer **dev** dependency (`beyondcode/expose`). After `composer install`, Solo runs `php vendor/bin/expose share …` so you do not need a global `expose` binary on `PATH`. Authenticate per [Expose’s docs](https://expose.dev); share your local app, e.g. the URL you use for Valet or `php artisan serve`. If you use **Solo** (`php artisan solo`), start the **Expose** pane (lazy) and set **`SOLO_EXPOSE_SHARE_URL`** in `.env`. To use a global CLI instead, set **`SOLO_EXPOSE_COMMAND=expose`**.
+2. Set **`APP_URL`** (and **`ASSET_URL`** if you rely on it) to the **https** URL Expose prints (no trailing slash).
+3. If you set **`DIGITALOCEAN_OAUTH_REDIRECT_URI`**, make it exactly  
+   `{APP_URL}/credentials/oauth/digitalocean/callback`  
+   and register that same URL in the DigitalOcean OAuth application. If you leave it unset, Laravel builds the callback from **`APP_URL`**.
+4. Set **`TRUSTED_PROXIES=*`** in `.env` so Laravel trusts `X-Forwarded-*` from the tunnel and generates `https://` URLs correctly.
+
+**Vite (CSS/JS) and a tunnel:** `@vite` in dev mode reads **`public/hot`**, which **`npm run dev`** fills with the dev server URL. If that URL is `http://127.0.0.1:5173`, browsers that opened your site via the **tunnel** will still request `127.0.0.1` on **their** machine and assets will fail (or look “wrong”). You have two practical options:
+
+- **Simplest:** Stop `npm run dev`, remove **`public/hot`** if it exists, run **`npm run build`**, then use the tunnel. Built assets are served under **`/build`** on the same origin as **`APP_URL`**—no second tunnel.
+- **Hot reload through the tunnel:** Share **port 5173** with a **second** Expose (or equivalent), set **`VITE_DEV_SERVER_URL`** in `.env` to that **https** origin (no trailing slash; paste from the address bar or plain text, not colored terminal output), restart **`npm run dev`**. The Laravel Vite plugin will write that origin into **`public/hot`**.
+
+If asset URLs look like random digits and `m` characters, **`public/hot`** or an env value likely contains **ANSI escape sequences** from a copied terminal line—delete **`public/hot`**, fix the env value, and restart Vite.
+
+**Site deploy webhooks** (`/hooks/sites/...`) are separate: they only need a public URL if **git hosts or CI** must reach your dply instance. You can use Expose for the **app** first to unblock **credentials + server create** without tunneling each site.
+
+---
+
 ## 6. Run the application
 
 ```bash
@@ -114,7 +147,27 @@ Open the URL shown (default `http://127.0.0.1:8000`).
 
 ---
 
-## 7. Optional configuration
+## 7. Optional SSH test target (Docker Compose)
+
+For **real** SSH connectivity (health checks, deploy scripts, integration tests), database seeding alone is not enough—you need a reachable `sshd`. For localhost workflows, **Docker Compose** is the default choice (lighter than Vagrant or Kubernetes for a single box).
+
+From the repository root:
+
+```bash
+docker compose -f docker-compose.ssh-dev.yml up -d
+```
+
+This exposes **`127.0.0.1:2222`** (linuxserver OpenSSH image). Default user/password in that compose file are for **local development only** (`dplytest` / `dplylocal`). In BYO, add an **existing server** (Custom) with that host, port, and credentials—or generate an SSH key pair, mount `authorized_keys` per the image’s docs, and use key-based auth instead.
+
+To stop and remove the container:
+
+```bash
+docker compose -f docker-compose.ssh-dev.yml down
+```
+
+---
+
+## 8. Optional configuration
 
 | Concern | Notes |
 | ------- | ----- |
@@ -125,7 +178,7 @@ Open the URL shown (default `http://127.0.0.1:8000`).
 
 ---
 
-## 8. Verify the install
+## 9. Verify the install
 
 - [ ] `php artisan migrate` completes with no errors.
 - [ ] `npm run build` completes.
@@ -141,7 +194,7 @@ php artisan test
 
 ---
 
-## 9. Monorepo: what to ignore for BYO-only work
+## 10. Monorepo: what to ignore for BYO-only work
 
 For a **full map** of the repo (all apps, `dply-core`, install commands per app), read **[MONOREPO_AND_APPS.md](MONOREPO_AND_APPS.md)**.
 
@@ -169,4 +222,7 @@ For a **full map** of the repo (all apps, `dply-core`, install commands per app)
 | Date | Change |
 | ---- | ------ |
 | 2026-03-23 | Initial BYO-first local setup guide; other product apps explicitly out of scope for default onboarding. |
-| 2026-03-23 | Link to [MONOREPO_AND_APPS.md](MONOREPO_AND_APPS.md) from §9 and further reading. |
+| 2026-03-23 | Link to [MONOREPO_AND_APPS.md](MONOREPO_AND_APPS.md) from §10 and further reading. |
+| 2026-03-30 | Local demo servers seeder; optional `docker-compose.ssh-dev.yml` and SSH test-target notes (§7). Renumbered later sections. |
+| 2026-03-31 | §5b: Expose / public `APP_URL` for OAuth; clarify droplet provisioning uses polling, not inbound callbacks. `.env.example` `TRUSTED_PROXIES` note. |
+| 2026-03-31 | Solo `Expose` command + `SOLO_EXPOSE_SHARE_URL` in `config/solo.php` and `.env.example`. |

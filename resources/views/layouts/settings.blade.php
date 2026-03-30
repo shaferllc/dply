@@ -14,8 +14,8 @@
         @livewireStyles
         <style>[x-cloak]{display:none!important}</style>
     </head>
-    <body class="font-sans antialiased bg-brand-cream text-brand-ink" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
-        <div class="min-h-screen">
+    <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
+        <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
 
             @if (session('success'))
@@ -31,7 +31,7 @@
                 </div>
             @endif
 
-            <main>
+            <main class="flex-1 w-full">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
                         <aside class="lg:col-span-3 mb-8 lg:mb-0">
@@ -45,6 +45,8 @@
                 </div>
             </main>
         </div>
+
+        <x-marketing-footer />
 
         <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2" aria-live="polite">
             <template x-for="toast in toasts" :key="toast.id">

@@ -45,7 +45,7 @@ class SupervisorProvisioner
     public function removeOrphanConfigsForServer(SshConnection $ssh, Server $server, ?string $confDir = null): string
     {
         $dir = $confDir ?? rtrim(config('sites.supervisor_conf_d'), '/');
-        $validIds = $server->supervisorPrograms()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $validIds = $server->supervisorPrograms()->pluck('id')->map(fn ($id) => (string) $id)->all();
         $validSpace = implode(' ', $validIds);
         $dirEsc = escapeshellarg($dir);
 
@@ -61,7 +61,7 @@ class SupervisorProvisioner
         return $out !== '' ? $out."\n" : '';
     }
 
-    public function deleteConfigFile(Server $server, int $programId): void
+    public function deleteConfigFile(Server $server, string $programId): void
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
             return;

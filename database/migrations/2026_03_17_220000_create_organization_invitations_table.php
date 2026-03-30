@@ -9,12 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('organization_invitations', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('organization_id')->constrained()->cascadeOnDelete();
             $table->string('email');
             $table->string('role')->default('member');
             $table->string('token', 64)->unique();
-            $table->foreignId('invited_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignUlid('invited_by')->constrained('users')->cascadeOnDelete();
             $table->timestamp('expires_at');
             $table->timestamps();
 

@@ -72,18 +72,18 @@ class BillingController extends Controller
         $plans = config('subscription.plans', []);
         $plan = $plans[$validated['plan']] ?? null;
         if (! $plan || empty($plan['price_id'])) {
-            return redirect()->route('billing.show', $organization)
+            return redirect()->route('subscription.show', $organization)
                 ->with('error', 'Invalid or missing plan.');
         }
 
         audit_log($organization, $request->user(), 'billing.checkout_started', null, null, ['plan' => $validated['plan']]);
 
-        $billingUrl = route('billing.show', $organization);
+        $subscriptionUrl = route('subscription.show', $organization);
 
         $checkout = $organization->newSubscription('default', $plan['price_id'])
             ->checkout([
-                'success_url' => $billingUrl.'?checkout=success',
-                'cancel_url' => $billingUrl.'?checkout=cancelled',
+                'success_url' => $subscriptionUrl.'?checkout=success',
+                'cancel_url' => $subscriptionUrl.'?checkout=cancelled',
             ], []);
 
         return $checkout->redirect();
@@ -97,13 +97,13 @@ class BillingController extends Controller
         $this->authorize('update', $organization);
 
         if (! $organization->hasStripeId()) {
-            return redirect()->route('billing.show', $organization)
+            return redirect()->route('subscription.show', $organization)
                 ->with('error', 'No billing account yet. Subscribe to a plan first.');
         }
 
         audit_log($organization, $request->user(), 'billing.portal_accessed');
 
-        $returnUrl = route('billing.show', $organization);
+        $returnUrl = route('subscription.show', $organization);
 
         return $organization->redirectToBillingPortal($returnUrl);
     }

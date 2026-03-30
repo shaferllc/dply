@@ -9,12 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('servers', function (Blueprint $table) {
-            $table->foreignId('organization_id')->nullable()->after('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('team_id')->nullable()->after('organization_id')->constrained()->nullOnDelete();
+            $table->foreignUlid('organization_id')->nullable()->after('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('team_id')->nullable()->after('organization_id')->constrained()->nullOnDelete();
         });
 
         Schema::table('provider_credentials', function (Blueprint $table) {
-            $table->foreignId('organization_id')->nullable()->after('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('organization_id')->nullable()->after('user_id')->constrained()->cascadeOnDelete();
         });
     }
 

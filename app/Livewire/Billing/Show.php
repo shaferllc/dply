@@ -110,11 +110,11 @@ class Show extends Component
 
         audit_log($this->organization, auth()->user(), 'billing.checkout_started', null, null, ['plan' => $plan]);
 
-        $billingUrl = route('billing.show', $this->organization);
+        $subscriptionUrl = route('subscription.show', $this->organization);
         $checkout = $this->organization->newSubscription('default', $planConfig['price_id'])
             ->checkout([
-                'success_url' => $billingUrl.'?checkout=success',
-                'cancel_url' => $billingUrl.'?checkout=cancelled',
+                'success_url' => $subscriptionUrl.'?checkout=success',
+                'cancel_url' => $subscriptionUrl.'?checkout=cancelled',
             ], []);
 
         return $checkout->redirect();
@@ -132,7 +132,7 @@ class Show extends Component
 
         audit_log($this->organization, auth()->user(), 'billing.portal_accessed');
 
-        return $this->organization->redirectToBillingPortal(route('billing.show', $this->organization));
+        return $this->organization->redirectToBillingPortal(route('subscription.show', $this->organization));
     }
 
     public function render(): View

@@ -30,6 +30,10 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
                 <h3 class="font-medium text-slate-900 mb-3">Status</h3>
+                <p class="text-sm text-slate-600 mb-3">
+                    {{ __('Show this site on a public') }}
+                    <a href="{{ route('status-pages.index') }}" class="text-slate-800 font-medium hover:underline">{{ __('status page') }}</a>.
+                </p>
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div><dt class="text-slate-500">Provisioning</dt><dd class="font-medium capitalize">{{ str_replace('_', ' ', $site->status) }}</dd></div>
                     <div><dt class="text-slate-500">SSL</dt><dd class="font-medium capitalize">{{ $site->ssl_status }}</dd></div>

@@ -9,7 +9,7 @@
                 <li>
                     <a href="{{ route('docs.connect-provider') }}" class="block p-4 rounded-lg border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 transition">
                         <span class="font-medium text-slate-900">Connect a cloud provider</span>
-                        <p class="text-sm text-slate-500 mt-1">Get an API token from DigitalOcean or Hetzner and add it in Credentials.</p>
+                        <p class="text-sm text-slate-500 mt-1">Get an API token from DigitalOcean or Hetzner and add it under Server providers.</p>
                     </a>
                 </li>
                 <li>

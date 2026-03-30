@@ -12,13 +12,13 @@ use App\Livewire\Auth\TwoFactorChallenge;
 use App\Livewire\Auth\VerifyEmail;
 use Illuminate\Support\Facades\Route;
 
+Route::get('auth/{provider}/redirect', [OAuthController::class, 'redirect'])->name('oauth.redirect');
+Route::get('auth/{provider}/callback', [OAuthController::class, 'callback'])->name('oauth.callback');
+
 Route::middleware('guest')->group(function () {
     Route::livewire('register', Register::class)->name('register');
     Route::livewire('login', Login::class)->name('login');
     Route::livewire('two-factor-challenge', TwoFactorChallenge::class)->name('two-factor.login');
-
-    Route::get('auth/{provider}/redirect', [OAuthController::class, 'redirect'])->name('oauth.redirect');
-    Route::get('auth/{provider}/callback', [OAuthController::class, 'callback'])->name('oauth.callback');
 
     Route::livewire('forgot-password', ForgotPassword::class)->name('password.request');
     Route::livewire('reset-password/{token}', ResetPassword::class)->name('password.reset');

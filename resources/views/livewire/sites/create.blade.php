@@ -10,17 +10,17 @@
             <form wire:submit="store" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-6">
                 <div>
                     <x-input-label for="name" value="Site name" />
-                    <x-text-input id="name" wire:model="name" class="mt-1 block w-full" required />
-                    <x-input-error :messages="$errors->get('name')" class="mt-1" />
+                    <x-text-input id="name" wire:model="form.name" class="mt-1 block w-full" required />
+                    <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
                 </div>
                 <div>
                     <x-input-label for="primary_hostname" value="Primary domain (DNS must point to this server)" />
-                    <x-text-input id="primary_hostname" wire:model="primary_hostname" placeholder="app.example.com" class="mt-1 block w-full font-mono text-sm" required />
-                    <x-input-error :messages="$errors->get('primary_hostname')" class="mt-1" />
+                    <x-text-input id="primary_hostname" wire:model="form.primary_hostname" placeholder="app.example.com" class="mt-1 block w-full font-mono text-sm" required />
+                    <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-1" />
                 </div>
                 <div>
                     <x-input-label for="type" value="Stack" />
-                    <select id="type" wire:model.live="type" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm">
+                    <select id="type" wire:model.live="form.type" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm">
                         <option value="php">PHP (PHP-FPM + Nginx)</option>
                         <option value="static">Static files</option>
                         <option value="node">Node (Nginx → reverse proxy)</option>
@@ -28,26 +28,26 @@
                 </div>
                 <div>
                     <x-input-label for="document_root" value="Document root (on server)" />
-                    <x-text-input id="document_root" wire:model="document_root" class="mt-1 block w-full font-mono text-sm" required />
+                    <x-text-input id="document_root" wire:model="form.document_root" class="mt-1 block w-full font-mono text-sm" required />
                     <p class="mt-1 text-sm text-slate-500">For Laravel use the <code class="bg-slate-100 px-1 rounded">public</code> directory.</p>
-                    <x-input-error :messages="$errors->get('document_root')" class="mt-1" />
+                    <x-input-error :messages="$errors->get('form.document_root')" class="mt-1" />
                 </div>
                 <div>
                     <x-input-label for="repository_path" value="Git / deploy path (optional)" />
-                    <x-text-input id="repository_path" wire:model="repository_path" class="mt-1 block w-full font-mono text-sm" />
+                    <x-text-input id="repository_path" wire:model="form.repository_path" class="mt-1 block w-full font-mono text-sm" />
                     <p class="mt-1 text-sm text-slate-500">Where <code class="bg-slate-100 px-1 rounded">git pull</code> runs; defaults to document root if empty.</p>
                 </div>
-                @if ($type === 'php')
+                @if ($form->type === 'php')
                     <div>
                         <x-input-label for="php_version" value="PHP-FPM version (socket path)" />
-                        <x-text-input id="php_version" wire:model="php_version" class="mt-1 block w-full w-32" />
+                        <x-text-input id="php_version" wire:model="form.php_version" class="mt-1 block w-full w-32" />
                         <p class="mt-1 text-sm text-slate-500">Matches <code class="bg-slate-100 px-1 rounded">/run/php/php{version}-fpm.sock</code> on Ubuntu.</p>
                     </div>
                 @endif
-                @if ($type === 'node')
+                @if ($form->type === 'node')
                     <div>
                         <x-input-label for="app_port" value="App listens on (localhost)" />
-                        <x-text-input id="app_port" type="number" wire:model="app_port" class="mt-1 block w-full w-32" />
+                        <x-text-input id="app_port" type="number" wire:model="form.app_port" class="mt-1 block w-full w-32" />
                     </div>
                 @endif
                 <div class="flex gap-3">

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Servers\Create as ServersCreate;
+use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\Show;
 use App\Models\Organization;
 use App\Models\Server;
@@ -58,6 +59,86 @@ class ServerTest extends TestCase
         $response->assertSee('My Server');
     }
 
+    public function test_servers_index_search_filters_by_name(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'demo-alpha-unique-xyz',
+        ]);
+        Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'demo-beta-unique-xyz',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersIndex::class)
+            ->set('search', 'alpha-unique')
+            ->assertSee('demo-alpha-unique-xyz')
+            ->assertDontSee('demo-beta-unique-xyz');
+    }
+
+    public function test_servers_index_status_filter_limits_rows(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'srv-ready-filter-xyz',
+            'status' => Server::STATUS_READY,
+        ]);
+        Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'srv-error-filter-xyz',
+            'status' => Server::STATUS_ERROR,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersIndex::class)
+            ->set('statusFilter', Server::STATUS_ERROR)
+            ->assertSee('srv-error-filter-xyz')
+            ->assertDontSee('srv-ready-filter-xyz');
+    }
+
+    public function test_servers_index_reset_filters_clears_state(): void
+    {
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(ServersIndex::class)
+            ->set('search', 'anything')
+            ->set('statusFilter', Server::STATUS_READY)
+            ->set('sort', 'name')
+            ->set('viewMode', 'grid')
+            ->call('resetFilters')
+            ->assertSet('search', '')
+            ->assertSet('statusFilter', '')
+            ->assertSet('sort', 'created_at')
+            ->assertSet('viewMode', 'list');
+    }
+
+    public function test_servers_index_destroy_accepts_string_ulid_and_deletes(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $id = (string) $server->getKey();
+
+        Livewire::actingAs($user)
+            ->test(ServersIndex::class)
+            ->call('destroy', $id);
+
+        $this->assertModelMissing($server);
+    }
+
     public function test_servers_create_requires_organization(): void
     {
         $user = User::factory()->create();
@@ -75,7 +156,7 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.create'));
 
         $response->assertOk();
-        $response->assertSee('Add Server');
+        $response->assertSee('Create server');
     }
 
     public function test_servers_can_be_stored_as_custom(): void
@@ -85,12 +166,12 @@ class ServerTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(ServersCreate::class)
-            ->set('type', 'custom')
-            ->set('name', 'Custom Box')
-            ->set('ip_address', '192.168.1.1')
-            ->set('ssh_port', '22')
-            ->set('ssh_user', 'root')
-            ->set('ssh_private_key', "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----")
+            ->set('form.type', 'custom')
+            ->set('form.name', 'Custom Box')
+            ->set('form.ip_address', '192.168.1.1')
+            ->set('form.ssh_port', '22')
+            ->set('form.ssh_user', 'root')
+            ->set('form.ssh_private_key', "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----")
             ->call('store')
             ->assertRedirect();
 

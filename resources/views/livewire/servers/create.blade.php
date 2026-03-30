@@ -1,604 +1,327 @@
 <div>
-    <header class="border-b border-slate-200 bg-white">
-        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ __('Add Server') }}</h2>
+    <div class="border-b border-slate-200 bg-white">
+        <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            <a href="{{ route('servers.index') }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('← Cancel') }}</a>
+            <h1 class="mt-4 text-2xl font-semibold tracking-tight text-slate-900">{{ __('Create server') }}</h1>
+            <p class="mt-2 max-w-2xl text-sm text-slate-600">
+                {{ __('Choose a cloud provider and API credentials from Server providers, or connect your own VPS. Region and plan options are loaded from the provider for the account you select.') }}
+            </p>
         </div>
-    </header>
-    <div class="py-12">
-        <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
+    </div>
+
+    <div class="py-10">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <x-livewire-validation-errors />
             @if (session('error'))
-                <div class="mb-4 p-4 rounded-md bg-red-50 text-red-800">{{ session('error') }}</div>
+                <div class="mb-4 p-4 rounded-lg bg-red-50 text-red-800">{{ session('error') }}</div>
             @endif
             @error('org')
-                <div class="mb-4 p-4 rounded-md bg-red-50 text-red-800">{{ $message }}</div>
+                <div class="mb-4 p-4 rounded-lg bg-red-50 text-red-800">{{ $message }}</div>
             @enderror
+
+            @env('local')
+                <div class="mb-6 rounded-xl border border-sky-200 bg-sky-50/90 px-4 py-3 text-sm text-sky-950">
+                    <p class="font-medium">{{ __('Local dev: finish provisioning') }}</p>
+                    <p class="mt-1 text-sky-900/90">
+                        {{ __('Run :queue in another terminal. Cloud APIs are called from this app; droplet readiness is polled — no inbound callback.', ['queue' => 'php artisan queue:work']) }}
+                        {{ __('Link Server providers (API token or OAuth). OAuth needs a public :app (e.g. via Expose); see :doc.', ['app' => 'APP_URL', 'doc' => 'docs/BYO_LOCAL_SETUP.md']) }}
+                    </p>
+                </div>
+            @endenv
+
             @if (!$canCreateServer && $billingUrl)
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-6 text-amber-800">
-                    <p class="font-medium">Server limit reached for your plan.</p>
-                    <p class="mt-1 text-sm">Upgrade to Pro to add more servers.</p>
-                    <a href="{{ $billingUrl }}" class="mt-4 inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-md font-semibold text-xs uppercase tracking-widest hover:bg-amber-700">Go to Billing</a>
+                <div class="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-6 text-amber-900">
+                    <p class="font-medium">{{ __('Server limit reached for your plan.') }}</p>
+                    <p class="mt-1 text-sm">{{ __('Upgrade to add more servers.') }}</p>
+                    <a href="{{ $billingUrl }}" class="mt-4 inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-lg font-medium text-sm hover:bg-amber-700">{{ __('Go to billing') }}</a>
                 </div>
             @endif
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 @if(!$canCreateServer) opacity-60 pointer-events-none @endif" x-data="{ tab: $wire.entangle('type') }">
-                <ul class="flex border-b border-slate-200 mb-6">
-                    <li><button type="button" @click="tab = 'digitalocean'" :class="tab === 'digitalocean' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">DigitalOcean</button></li>
-                    <li><button type="button" @click="tab = 'hetzner'" :class="tab === 'hetzner' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">Hetzner</button></li>
-                    <li><button type="button" @click="tab = 'linode'" :class="tab === 'linode' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">Linode</button></li>
-                    <li><button type="button" @click="tab = 'vultr'" :class="tab === 'vultr' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">Vultr</button></li>
-                    <li><button type="button" @click="tab = 'akamai'" :class="tab === 'akamai' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">Akamai</button></li>
-                    <li><button type="button" @click="tab = 'scaleway'" :class="tab === 'scaleway' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">Scaleway</button></li>
-                    <li><button type="button" @click="tab = 'upcloud'" :class="tab === 'upcloud' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">UpCloud</button></li>
-                    <li><button type="button" @click="tab = 'equinix_metal'" :class="tab === 'equinix_metal' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">Equinix Metal</button></li>
-                    <li><button type="button" @click="tab = 'fly_io'" :class="tab === 'fly_io' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">Fly.io</button></li>
-                    <li><button type="button" @click="tab = 'aws'" :class="tab === 'aws' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">AWS EC2</button></li>
-                    <li><button type="button" @click="tab = 'custom'" :class="tab === 'custom' ? 'border-b-2 border-slate-800 text-slate-900' : 'text-slate-500'" class="px-4 py-2">Connect existing server</button></li>
-                </ul>
-                <form wire:submit="store">
-                    <div x-show="tab === 'digitalocean'">
-                        @if ($credentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add a DigitalOcean API token in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a> · <a href="{{ route('docs.connect-provider') }}" class="underline font-medium">Connect a cloud provider (guide)</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
+
+            <div class="@if(!$canCreateServer) opacity-60 pointer-events-none @endif space-y-10">
+                <section aria-labelledby="provider-heading">
+                    <h2 id="provider-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('1. Select provider') }}</h2>
+                    <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        @foreach ($providerCards as $card)
+                            <button
+                                type="button"
+                                wire:click="$set('form.type', '{{ $card['id'] }}')"
+                                class="relative flex flex-col items-start rounded-xl border-2 p-4 text-left transition
+                                    {{ $form->type === $card['id'] ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
+                            >
+                                <span class="font-medium text-slate-900">{{ $card['label'] }}</span>
+                                @if (!$card['linked'] && $card['id'] !== 'custom')
+                                    <span class="mt-1 text-xs text-amber-700">{{ __('No credentials') }}</span>
+                                @endif
+                            </button>
+                        @endforeach
+                    </div>
+                    <p class="mt-4 text-sm text-slate-600">
+                        <a href="{{ route('credentials.index') }}" wire:navigate class="font-medium text-sky-700 hover:text-sky-900">{{ __('Add a new provider') }}</a>
+                        <span class="text-slate-400"> · </span>
+                        <a href="{{ route('docs.connect-provider') }}" wire:navigate class="text-sky-700 hover:text-sky-900">{{ __('Connection guide') }}</a>
+                    </p>
+                </section>
+
+                <section aria-labelledby="details-heading">
+                    <h2 id="details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('2. Details') }}</h2>
+
+                    <form wire:submit="store" class="mt-4 space-y-6">
+                        @if ($form->type !== 'custom')
+                            @php
+                                $digitalOceanEnvCatalog = $form->type === 'digitalocean' && filled(config('services.digitalocean.token'));
+                                $showCloudStackFields = $form->provider_credential_id !== '' || $digitalOceanEnvCatalog;
+                                if ($form->type === 'fly_io') {
+                                    $regionSizePickReady = $catalog['credentials']->isNotEmpty();
+                                } elseif ($form->type === 'digitalocean') {
+                                    $regionSizePickReady = $digitalOceanEnvCatalog || $form->provider_credential_id !== '';
+                                } else {
+                                    $regionSizePickReady = $catalog['credentials']->isNotEmpty() && $form->provider_credential_id !== '';
+                                }
+                            @endphp
+                            @if ($catalog['credentials']->isEmpty())
+                                @if ($digitalOceanEnvCatalog)
+                                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-950">
+                                        <p class="font-medium">{{ __('No linked DigitalOcean account') }}</p>
+                                        <p class="mt-1 text-sm">
+                                            {{ __('Regions and sizes below are loaded using DIGITALOCEAN_TOKEN. Add a credential under Server providers to create a droplet.') }}
+                                            <a href="{{ route('credentials.index') }}" wire:navigate class="underline font-medium">{{ __('Go to Server providers') }}</a>
+                                        </p>
+                                    </div>
+                                @else
+                                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+                                        <p class="font-medium">{{ __('Add a credential first') }}</p>
+                                        <p class="mt-1 text-sm">
+                                            {{ __('Save an API token for this provider under Server providers, then return here.') }}
+                                            <a href="{{ route('credentials.index') }}" wire:navigate class="underline font-medium">{{ __('Go to Server providers') }}</a>
+                                        </p>
+                                    </div>
+                                @endif
+                            @endif
+
                             <div>
-                                <x-input-label for="provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" required x-bind:disabled="tab !== 'digitalocean'">
-                                    <option value="">Select account</option>
-                                    @foreach ($credentials as $c)
+                                <x-input-label for="provider_credential_id" :value="__('Credentials')" />
+                                <select
+                                    wire:model.live="form.provider_credential_id"
+                                    id="provider_credential_id"
+                                    class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                    @if($catalog['credentials']->isEmpty()) disabled @endif
+                                >
+                                    <option value="">{{ __('Select account') }}</option>
+                                    @foreach ($catalog['credentials'] as $c)
                                         <option value="{{ $c->id }}">{{ $c->name }}</option>
                                     @endforeach
                                 </select>
                                 <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
                             </div>
+
+                            @if ($catalog['credentials']->isNotEmpty() && $form->provider_credential_id === '')
+                                <p class="text-sm text-slate-600">{{ __('Choose an account above to configure your server.') }}</p>
+                            @endif
+
+                            @if ($showCloudStackFields)
                             <div>
-                                <x-input-label for="name" value="Server name" />
-                                <x-text-input id="name" wire:model="name" type="text" class="mt-1 block w-full" required x-bind:disabled="tab !== 'digitalocean'" />
+                                <x-input-label for="server_name" :value="__('Server name')" />
+                                <x-text-input id="server_name" wire:model="form.name" type="text" class="mt-1 block w-full" required placeholder="crunchy-salamander" autocomplete="off" />
                                 <x-input-error :messages="$errors->get('name')" class="mt-1" />
                             </div>
+
                             <div>
-                                <x-input-label for="region" value="Region" />
-                                <select wire:model="region" id="region" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" required x-bind:disabled="tab !== 'digitalocean'">
-                                    @foreach ($regions as $r)
-                                        <option value="{{ $r['slug'] ?? $r['id'] ?? '' }}">{{ $r['name'] ?? $r['slug'] ?? '' }} ({{ $r['slug'] ?? $r['id'] ?? '' }})</option>
+                                <x-input-label for="server_role" :value="__('Server type')" />
+                                <select wire:model.live="form.server_role" id="server_role" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                    @foreach ($provisionOptions['server_roles'] ?? [] as $role)
+                                        <option value="{{ $role['id'] }}">{{ $role['label'] }}</option>
                                     @endforeach
                                 </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
+                                @php
+                                    $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
+                                @endphp
+                                @if ($selectedServerRole && ! empty($selectedServerRole['detail'] ?? null))
+                                    <p class="mt-1 text-xs text-slate-600 font-mono leading-relaxed"><span class="text-slate-400 select-none" aria-hidden="true">└─</span> {{ $selectedServerRole['detail'] }}</p>
+                                @endif
+                                <p class="mt-1 text-xs text-slate-500">
+                                    {{ __('Preferences are stored on the server record for setup scripts. Instance size and region still come from your cloud provider.') }}
+                                </p>
+                                <x-input-error :messages="$errors->get('server_role')" class="mt-1" />
                             </div>
+
                             <div>
-                                <x-input-label for="size" value="Size" />
-                                <select wire:model="size" id="size" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" required x-bind:disabled="tab !== 'digitalocean'">
-                                    @foreach ($sizes as $s)
-                                        <option value="{{ $s['slug'] ?? $s['id'] ?? '' }}">{{ $s['slug'] ?? $s['id'] ?? '' }} — {{ $s['memory'] ?? 0 }}MB / {{ $s['vcpus'] ?? 0 }} vCPU</option>
+                                <x-input-label for="cache_service" :value="__('Cache service')" />
+                                <select wire:model="form.cache_service" id="cache_service" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                    @foreach ($provisionOptions['cache_services'] ?? [] as $opt)
+                                        <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
                                     @endforeach
                                 </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
+                                <p class="mt-1 text-xs text-slate-500">{{ __('Select which cache service to install during setup (when your setup script supports it).') }}</p>
+                                <x-input-error :messages="$errors->get('cache_service')" class="mt-1" />
                             </div>
+
+                            <div class="grid gap-4 sm:grid-cols-3" wire:key="provision-stack-{{ $form->server_role }}">
+                                <div>
+                                    <x-input-label for="webserver" :value="__('Web server')" />
+                                    <select wire:model="form.webserver" id="webserver" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                        @foreach ($provisionOptions['webservers'] ?? [] as $opt)
+                                            <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('webserver')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="php_version" :value="__('PHP version')" />
+                                    <select wire:model="form.php_version" id="php_version" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                        @foreach ($provisionOptions['php_versions'] ?? [] as $opt)
+                                            <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('php_version')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="database" :value="__('Database')" />
+                                    <select wire:model="form.database" id="database" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                        @foreach ($provisionOptions['databases'] ?? [] as $opt)
+                                            <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('database')" class="mt-1" />
+                                </div>
+                            </div>
+
+                            <div
+                                class="grid gap-4 sm:grid-cols-2"
+                                wire:key="catalog-{{ $form->type }}-{{ $form->provider_credential_id }}-{{ $form->region }}"
+                            >
+                                <div>
+                                    <x-input-label for="form_region" :value="$catalog['region_label']" />
+                                    <select
+                                        wire:model.live="form.region"
+                                        id="form_region"
+                                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        @if(! $regionSizePickReady) disabled @endif
+                                    >
+                                        <option value="">{{ __('Select options') }}</option>
+                                        @foreach ($catalog['regions'] as $opt)
+                                            <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('region')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="form_size" :value="$catalog['size_label']" />
+                                    <select
+                                        wire:model="form.size"
+                                        id="form_size"
+                                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        @if(! $regionSizePickReady) disabled @endif
+                                    >
+                                        <option value="">{{ __('Select options') }}</option>
+                                        @foreach ($catalog['sizes'] as $opt)
+                                            <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('size')" class="mt-1" />
+                                </div>
+                            </div>
+                            @if ($form->type === 'scaleway')
+                                <p class="text-xs text-slate-500">{{ __('Choose a zone first; instance types load for that zone.') }}</p>
+                            @endif
+
                             <div>
-                                <x-input-label for="setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'digitalocean'">
-                                    <option value="">None</option>
+                                <x-input-label for="setup_script_key" :value="__('Setup script (optional)')" />
+                                <select wire:model="form.setup_script_key" id="setup_script_key" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                    <option value="">{{ __('None') }}</option>
                                     @foreach ($setupScripts as $key => $script)
                                         <option value="{{ $key }}">{{ $script['name'] }}</option>
                                     @endforeach
                                 </select>
                                 <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
                             </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'hetzner'" style="display: none;" x-cloak>
-                        @if ($hetznerCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add a Hetzner API token in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a> · <a href="{{ route('docs.connect-provider') }}" class="underline font-medium">Connect a cloud provider (guide)</a></p>
+
+                            @if ($form->type === 'digitalocean')
+                                <div class="rounded-xl border border-slate-200 bg-slate-50/90 p-4 space-y-4">
+                                    <div>
+                                        <p class="text-sm font-medium text-slate-900">{{ __('Droplet options') }}</p>
+                                        <p class="mt-0.5 text-xs text-slate-600">{{ __('These map to DigitalOcean’s create-droplet API (IPv6, backups, monitoring, VPC, tags, cloud-init).') }}</p>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <label class="flex gap-3 items-start cursor-pointer">
+                                            <input type="checkbox" wire:model="form.do_ipv6" class="mt-1 rounded border-slate-300 text-sky-600 shadow-sm focus:ring-sky-500" />
+                                            <span>
+                                                <span class="block text-sm font-medium text-slate-800">{{ __('Enable IPv6') }}</span>
+                                                <span class="block text-xs text-slate-600">{{ __('Assign a public IPv6 address in addition to IPv4.') }}</span>
+                                            </span>
+                                        </label>
+                                        <label class="flex gap-3 items-start cursor-pointer">
+                                            <input type="checkbox" wire:model="form.do_backups" class="mt-1 rounded border-slate-300 text-sky-600 shadow-sm focus:ring-sky-500" />
+                                            <span>
+                                                <span class="block text-sm font-medium text-slate-800">{{ __('Enable backups') }}</span>
+                                                <span class="block text-xs text-slate-600">{{ __('Weekly droplet backups (billed by DigitalOcean).') }}</span>
+                                            </span>
+                                        </label>
+                                        <label class="flex gap-3 items-start cursor-pointer">
+                                            <input type="checkbox" wire:model="form.do_monitoring" class="mt-1 rounded border-slate-300 text-sky-600 shadow-sm focus:ring-sky-500" />
+                                            <span>
+                                                <span class="block text-sm font-medium text-slate-800">{{ __('Enable monitoring') }}</span>
+                                                <span class="block text-xs text-slate-600">{{ __('Install the DigitalOcean metrics agent (free graphs in the control panel).') }}</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <x-input-label for="do_vpc_uuid" :value="__('VPC UUID (optional)')" />
+                                        <x-text-input id="do_vpc_uuid" wire:model="form.do_vpc_uuid" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="00000000-0000-0000-0000-000000000000" autocomplete="off" />
+                                        <p class="mt-1 text-xs text-slate-500">{{ __('Leave empty to use the default VPC for the region.') }}</p>
+                                        <x-input-error :messages="$errors->get('do_vpc_uuid')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="do_tags" :value="__('Tags (optional)')" />
+                                        <x-text-input id="do_tags" wire:model="form.do_tags" type="text" class="mt-1 block w-full" placeholder="env:production, app:api" autocomplete="off" />
+                                        <p class="mt-1 text-xs text-slate-500">{{ __('Comma-separated. Letters, numbers, underscores, periods, colons, hyphens only (max 25 tags).') }}</p>
+                                        <x-input-error :messages="$errors->get('do_tags')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="do_user_data" :value="__('Cloud-init user data (optional)')" />
+                                        <textarea id="do_user_data" wire:model="form.do_user_data" rows="5" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm font-mono text-sm focus:border-sky-500 focus:ring-sky-500" placeholder="#cloud-config"></textarea>
+                                        <x-input-error :messages="$errors->get('do_user_data')" class="mt-1" />
+                                    </div>
+                                </div>
+                            @endif
+                            @endif
+                        @else
+                            <div class="space-y-4">
+                                <div>
+                                    <x-input-label for="custom_name" :value="__('Server name')" />
+                                    <x-text-input id="custom_name" wire:model="form.name" type="text" class="mt-1 block w-full" required />
+                                    <x-input-error :messages="$errors->get('name')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="ip_address" :value="__('IP address')" />
+                                    <x-text-input id="ip_address" wire:model="form.ip_address" type="text" class="mt-1 block w-full" />
+                                    <x-input-error :messages="$errors->get('ip_address')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="ssh_port" :value="__('SSH port')" />
+                                    <x-text-input id="ssh_port" wire:model="form.ssh_port" type="number" class="mt-1 block w-full" />
+                                    <x-input-error :messages="$errors->get('ssh_port')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="ssh_user" :value="__('SSH user')" />
+                                    <x-text-input id="ssh_user" wire:model="form.ssh_user" type="text" class="mt-1 block w-full" />
+                                    <x-input-error :messages="$errors->get('ssh_user')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="ssh_private_key" :value="__('SSH private key (PEM / OpenSSH)')" />
+                                    <textarea id="ssh_private_key" wire:model="form.ssh_private_key" rows="6" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm font-mono text-sm focus:border-sky-500 focus:ring-sky-500"></textarea>
+                                    <x-input-error :messages="$errors->get('ssh_private_key')" class="mt-1" />
+                                </div>
                             </div>
                         @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="hetzner_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="hetzner_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'hetzner'">
-                                    <option value="">Select account</option>
-                                    @foreach ($hetznerCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="hetzner_name" value="Server name" />
-                                <x-text-input id="hetzner_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'hetzner'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="hetzner_region" value="Location" />
-                                <select wire:model="region" id="hetzner_region" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'hetzner'">
-                                    @foreach ($hetznerLocations as $loc)
-                                        <option value="{{ $loc['name'] ?? $loc['id'] ?? '' }}">{{ $loc['description'] ?? $loc['name'] ?? $loc['id'] }} ({{ $loc['name'] ?? $loc['id'] }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="hetzner_size" value="Server type" />
-                                <select wire:model="size" id="hetzner_size" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'hetzner'">
-                                    @foreach ($hetznerSizes as $st)
-                                        <option value="{{ $st['name'] ?? '' }}">{{ $st['name'] ?? '' }} — {{ $st['memory'] ?? 0 }}GB / {{ $st['cores'] ?? 0 }} vCPU</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="hetzner_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="hetzner_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'hetzner'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
+
+                        <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
+                            <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg font-medium text-sm text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Cancel') }}</a>
+                            @if ($form->type === 'custom' || $form->provider_credential_id !== '')
+                                <x-primary-button type="submit">{{ __('Create server') }}</x-primary-button>
+                            @endif
                         </div>
-                    </div>
-                    <div x-show="tab === 'linode'" style="display: none;" x-cloak>
-                        @if ($linodeCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add a Linode API token in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="linode_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="linode_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'linode'">
-                                    <option value="">Select account</option>
-                                    @foreach ($linodeCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="linode_name" value="Server name" />
-                                <x-text-input id="linode_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'linode'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="linode_region" value="Region" />
-                                <select wire:model="region" id="linode_region" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'linode'">
-                                    @foreach ($linodeRegions as $reg)
-                                        <option value="{{ $reg['id'] ?? '' }}">{{ $reg['label'] ?? $reg['id'] ?? '' }} ({{ $reg['id'] ?? '' }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="linode_size" value="Type" />
-                                <select wire:model="size" id="linode_size" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'linode'">
-                                    @foreach ($linodeTypes as $t)
-                                        <option value="{{ $t['id'] ?? '' }}">{{ $t['label'] ?? $t['id'] ?? '' }} — {{ ($t['memory'] ?? 0) / 1024 }}GB / {{ $t['vcpus'] ?? 0 }} vCPU</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="linode_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="linode_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'linode'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'vultr'" style="display: none;" x-cloak>
-                        @if ($vultrCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add a Vultr API token in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="vultr_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="vultr_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'vultr'">
-                                    <option value="">Select account</option>
-                                    @foreach ($vultrCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="vultr_name" value="Server name" />
-                                <x-text-input id="vultr_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'vultr'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="vultr_region" value="Region" />
-                                <select wire:model="region" id="vultr_region" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'vultr'">
-                                    @foreach ($vultrRegions as $reg)
-                                        <option value="{{ $reg['id'] ?? '' }}">{{ $reg['city'] ?? $reg['id'] ?? '' }} ({{ $reg['id'] ?? '' }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="vultr_size" value="Plan" />
-                                <select wire:model="size" id="vultr_size" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'vultr'">
-                                    @foreach ($vultrPlans as $p)
-                                        <option value="{{ $p['id'] ?? '' }}">{{ $p['id'] ?? '' }} — {{ ($p['ram'] ?? 0) }}MB / {{ $p['vcpu_count'] ?? 0 }} vCPU</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="vultr_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="vultr_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'vultr'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'akamai'" style="display: none;" x-cloak>
-                        @if ($akamaiCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add an Akamai (Linode API) token in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="akamai_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="akamai_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'akamai'">
-                                    <option value="">Select account</option>
-                                    @foreach ($akamaiCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="akamai_name" value="Server name" />
-                                <x-text-input id="akamai_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'akamai'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="akamai_region" value="Region" />
-                                <select wire:model="region" id="akamai_region" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'akamai'">
-                                    @foreach ($akamaiRegions as $reg)
-                                        <option value="{{ $reg['id'] ?? '' }}">{{ $reg['label'] ?? $reg['id'] ?? '' }} ({{ $reg['id'] ?? '' }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="akamai_size" value="Type" />
-                                <select wire:model="size" id="akamai_size" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'akamai'">
-                                    @foreach ($akamaiTypes as $t)
-                                        <option value="{{ $t['id'] ?? '' }}">{{ $t['label'] ?? $t['id'] ?? '' }} — {{ ($t['memory'] ?? 0) / 1024 }}GB / {{ $t['vcpus'] ?? 0 }} vCPU</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="akamai_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="akamai_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'akamai'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'scaleway'" style="display: none;" x-cloak>
-                        @if ($scalewayCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add a Scaleway secret key and Project ID in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="scaleway_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="scaleway_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'scaleway'">
-                                    <option value="">Select account</option>
-                                    @foreach ($scalewayCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="scaleway_name" value="Server name" />
-                                <x-text-input id="scaleway_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'scaleway'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="scaleway_zone" value="Zone" />
-                                <select wire:model="region" id="scaleway_zone" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'scaleway'">
-                                    @foreach ($scalewayZones as $z)
-                                        <option value="{{ $z['id'] ?? '' }}">{{ $z['name'] ?? $z['id'] ?? '' }} ({{ $z['id'] ?? '' }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="scaleway_type" value="Type" />
-                                <select wire:model="size" id="scaleway_type" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'scaleway'">
-                                    @foreach ($scalewayTypes as $t)
-                                        <option value="{{ $t['name'] ?? $t['id'] ?? '' }}">{{ $t['name'] ?? $t['id'] ?? '' }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="scaleway_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="scaleway_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'scaleway'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'upcloud'" style="display: none;" x-cloak>
-                        @if ($upcloudCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add UpCloud API username and password in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="upcloud_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="upcloud_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'upcloud'">
-                                    <option value="">Select account</option>
-                                    @foreach ($upcloudCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="upcloud_name" value="Server name" />
-                                <x-text-input id="upcloud_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'upcloud'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="upcloud_zone" value="Zone" />
-                                <select wire:model="region" id="upcloud_zone" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'upcloud'">
-                                    @foreach ($upcloudZones as $z)
-                                        <option value="{{ $z['id'] ?? '' }}">{{ $z['description'] ?? $z['id'] ?? '' }} ({{ $z['id'] ?? '' }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="upcloud_plan" value="Plan" />
-                                <select wire:model="size" id="upcloud_plan" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'upcloud'">
-                                    @foreach ($upcloudPlans as $p)
-                                        <option value="{{ $p['name'] ?? '' }}">{{ $p['name'] ?? '' }} — {{ $p['core_number'] ?? 0 }} CPU / {{ $p['memory_amount'] ?? 0 }}MB</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="upcloud_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="upcloud_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'upcloud'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'equinix_metal'" style="display: none;" x-cloak>
-                        @if ($equinixMetalCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add an Equinix Metal API token and Project ID in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="equinix_metal_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="equinix_metal_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'equinix_metal'">
-                                    <option value="">Select account</option>
-                                    @foreach ($equinixMetalCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="equinix_metal_name" value="Server name" />
-                                <x-text-input id="equinix_metal_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'equinix_metal'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="equinix_metal_metro" value="Metro" />
-                                <select wire:model="region" id="equinix_metal_metro" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'equinix_metal'">
-                                    @foreach ($equinixMetalMetros as $m)
-                                        <option value="{{ $m['code'] ?? $m['id'] ?? '' }}">{{ $m['name'] ?? $m['code'] ?? '' }} ({{ $m['code'] ?? $m['id'] ?? '' }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="equinix_metal_plan" value="Plan" />
-                                <select wire:model="size" id="equinix_metal_plan" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'equinix_metal'">
-                                    @foreach ($equinixMetalPlans as $p)
-                                        <option value="{{ $p['slug'] ?? $p['id'] ?? '' }}">{{ $p['name'] ?? $p['slug'] ?? '' }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="equinix_metal_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="equinix_metal_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'equinix_metal'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'fly_io'" style="display: none;" x-cloak>
-                        @if ($flyIoCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add a Fly.io API token and org slug in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="fly_io_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="fly_io_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'fly_io'">
-                                    <option value="">Select account</option>
-                                    @foreach ($flyIoCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="fly_io_name" value="Machine name" />
-                                <x-text-input id="fly_io_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'fly_io'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="fly_io_region" value="Region" />
-                                <select wire:model="region" id="fly_io_region" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'fly_io'">
-                                    @foreach ($flyIoRegions as $r)
-                                        <option value="{{ $r['id'] }}">{{ $r['name'] }} ({{ $r['id'] }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="fly_io_size" value="VM size" />
-                                <select wire:model="size" id="fly_io_size" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'fly_io'">
-                                    @foreach ($flyIoVmSizes as $s)
-                                        <option value="{{ $s['id'] }}">{{ $s['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="fly_io_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="fly_io_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'fly_io'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'aws'" style="display: none;" x-cloak>
-                        @if ($awsCredentials->isEmpty())
-                            <div class="text-amber-800 bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                                <p class="font-medium">Add a credential first.</p>
-                                <p class="mt-1 text-sm">Add AWS access key and secret in Credentials, then return here. <a href="{{ route('credentials.index') }}" class="underline font-medium">Go to Credentials</a></p>
-                            </div>
-                        @endif
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="aws_provider_credential_id" value="Account" />
-                                <select wire:model="provider_credential_id" id="aws_provider_credential_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'aws'">
-                                    <option value="">Select account</option>
-                                    @foreach ($awsCredentials as $c)
-                                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="aws_name" value="Server name" />
-                                <x-text-input id="aws_name" wire:model="name" type="text" class="mt-1 block w-full" x-bind:disabled="tab !== 'aws'" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="aws_region" value="Region" />
-                                <select wire:model="region" id="aws_region" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'aws'">
-                                    @foreach ($awsRegions as $r)
-                                        <option value="{{ $r['id'] }}">{{ $r['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="aws_size" value="Instance type" />
-                                <select wire:model="size" id="aws_size" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'aws'">
-                                    @foreach ($awsInstanceTypes as $s)
-                                        <option value="{{ $s['id'] }}">{{ $s['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('size')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="aws_setup_script_key" value="Setup script (optional)" />
-                                <select wire:model="setup_script_key" id="aws_setup_script_key" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm" x-bind:disabled="tab !== 'aws'">
-                                    <option value="">None</option>
-                                    @foreach ($setupScripts as $key => $script)
-                                        <option value="{{ $key }}">{{ $script['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('setup_script_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div x-show="tab === 'custom'" style="display: none;" x-cloak>
-                        <div class="space-y-4">
-                            <div>
-                                <x-input-label for="custom_name" value="Server name" />
-                                <x-text-input id="custom_name" wire:model="name" type="text" class="mt-1 block w-full" />
-                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="ip_address" value="IP address" />
-                                <x-text-input id="ip_address" wire:model="ip_address" type="text" class="mt-1 block w-full" />
-                                <x-input-error :messages="$errors->get('ip_address')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="ssh_port" value="SSH port" />
-                                <x-text-input id="ssh_port" wire:model="ssh_port" type="number" class="mt-1 block w-full" />
-                                <x-input-error :messages="$errors->get('ssh_port')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="ssh_user" value="SSH user" />
-                                <x-text-input id="ssh_user" wire:model="ssh_user" type="text" class="mt-1 block w-full" />
-                                <x-input-error :messages="$errors->get('ssh_user')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="ssh_private_key" value="SSH private key (PEM / OpenSSH)" />
-                                <textarea id="ssh_private_key" wire:model="ssh_private_key" rows="6" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm font-mono text-sm"></textarea>
-                                <x-input-error :messages="$errors->get('ssh_private_key')" class="mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-6 flex gap-3">
-                        <x-primary-button type="submit">Add server</x-primary-button>
-                        <a href="{{ route('servers.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-md font-semibold text-xs text-slate-700 uppercase tracking-widest shadow-sm hover:bg-slate-50">Cancel</a>
-                    </div>
-                </form>
+                    </form>
+                </section>
             </div>
         </div>
     </div>

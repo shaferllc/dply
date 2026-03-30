@@ -49,6 +49,10 @@ class BackfillOrganizationMemberships extends Command
     {
         if ($user->organizations()->exists()) {
             $firstOrg = $user->organizations()->first();
+            if (! $dryRun) {
+                $firstOrg->createDefaultTeamIfMissing();
+                $firstOrg->attachUserToDefaultTeam($user);
+            }
             $this->assignServersAndCredentialsToOrg($user, $firstOrg, $dryRun);
 
             return;
@@ -69,6 +73,7 @@ class BackfillOrganizationMemberships extends Command
                 'email' => $user->email,
             ]);
             $org->users()->attach($user->id, ['role' => 'owner']);
+            $org->attachUserToDefaultTeam($user);
             $this->assignServersAndCredentialsToOrg($user, $org, false);
             $this->line("  Created org \"{$name}\" and assigned user as owner.");
         } else {

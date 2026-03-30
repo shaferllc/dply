@@ -6,7 +6,19 @@
         </span>
         <p class="leading-relaxed">{{ __('This is a secure area of the application. Please confirm your password before continuing.') }}</p>
     </div>
-    <form wire:submit="submit" class="space-y-5">
+    <form wire:submit="submit" class="space-y-5" autocomplete="on">
+        <div class="sr-only">
+            <label for="confirm_area_username">{{ __('Account email') }}</label>
+            <input
+                id="confirm_area_username"
+                type="email"
+                name="username"
+                autocomplete="username"
+                value="{{ auth()->user()->email }}"
+                readonly
+                tabindex="-1"
+            />
+        </div>
         <div>
             <x-input-label for="password" :value="__('Password')" />
             <x-text-input id="password" wire:model="password" class="block w-full mt-1" type="password" required autocomplete="current-password" />

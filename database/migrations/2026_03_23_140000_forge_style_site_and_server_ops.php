@@ -19,8 +19,8 @@ return new class extends Migration
         });
 
         Schema::create('site_releases', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_id')->constrained('sites')->cascadeOnDelete();
             $table->string('folder', 32);
             $table->string('git_sha', 64)->nullable();
             $table->boolean('is_active')->default(false);
@@ -31,8 +31,8 @@ return new class extends Migration
         });
 
         Schema::create('site_environment_variables', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_id')->constrained('sites')->cascadeOnDelete();
             $table->string('env_key', 128);
             $table->text('env_value')->nullable();
             $table->string('environment', 32)->default('production');
@@ -42,8 +42,8 @@ return new class extends Migration
         });
 
         Schema::create('site_redirects', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_id')->constrained('sites')->cascadeOnDelete();
             $table->string('from_path', 512);
             $table->string('to_url', 1024);
             $table->unsignedSmallInteger('status_code')->default(301);
@@ -52,8 +52,8 @@ return new class extends Migration
         });
 
         Schema::create('site_deploy_hooks', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_id')->constrained('sites')->cascadeOnDelete();
             $table->unsignedInteger('sort_order')->default(0);
             $table->string('phase', 32);
             $table->text('script');
@@ -61,9 +61,9 @@ return new class extends Migration
         });
 
         Schema::create('supervisor_programs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('server_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('site_id')->nullable()->constrained('sites')->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('server_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('site_id')->nullable()->constrained('sites')->nullOnDelete();
             $table->string('slug', 64);
             $table->string('program_type', 32);
             $table->text('command');
@@ -77,8 +77,8 @@ return new class extends Migration
         });
 
         Schema::create('server_firewall_rules', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('server_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('server_id')->constrained()->cascadeOnDelete();
             $table->unsignedSmallInteger('port');
             $table->string('protocol', 8)->default('tcp');
             $table->string('action', 8)->default('allow');
@@ -87,8 +87,8 @@ return new class extends Migration
         });
 
         Schema::create('server_authorized_keys', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('server_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('server_id')->constrained()->cascadeOnDelete();
             $table->string('name', 120);
             $table->text('public_key');
             $table->timestamp('synced_at')->nullable();
@@ -96,9 +96,9 @@ return new class extends Migration
         });
 
         Schema::create('server_recipes', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('server_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('server_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
             $table->string('name', 160);
             $table->longText('script');
             $table->timestamps();

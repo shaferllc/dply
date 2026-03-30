@@ -1,19 +1,12 @@
 <div>
-    <header class="border-b border-slate-200 bg-white">
-        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center flex-wrap gap-2">
-                <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ $organization->name }}</h2>
-                <div class="flex items-center gap-3">
-                    @if ($organization->hasAdminAccess(auth()->user()))
-                        <a href="{{ route('billing.show', $organization) }}" class="text-slate-600 hover:text-slate-900 text-sm">Billing</a>
-                    @endif
-                    <a href="{{ route('organizations.index') }}" class="text-slate-600 hover:text-slate-900 text-sm">← Organizations</a>
-                </div>
-            </div>
-        </div>
-    </header>
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <x-organization-shell :organization="$organization" section="overview">
+            <div>
+                <header class="mb-8">
+                    <h1 class="text-2xl font-semibold text-slate-800">{{ __('Overview') }}</h1>
+                    <p class="mt-1 text-sm text-slate-600">{{ __('Members, teams, API tokens, and activity for :name.', ['name' => $organization->name]) }}</p>
+                </header>
+
             @if ($new_token_plaintext)
                 <div class="mb-4 p-4 rounded-md bg-amber-50 border border-amber-200">
                     <p class="font-medium text-amber-900 mb-1">API token created: {{ $new_token_name }}</p>
@@ -25,14 +18,9 @@
             <div class="space-y-8">
                 {{-- Plan & usage (all members) --}}
                 <section class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="px-6 py-4 border-b border-slate-200 flex flex-wrap justify-between gap-3 items-start">
-                        <div>
-                            <h3 class="font-medium text-slate-900">Plan &amp; usage</h3>
-                            <p class="text-sm text-slate-500 mt-1">Limits apply to this entire organization. Upgrade on Billing to unlock unlimited servers and sites on Pro.</p>
-                        </div>
-                        @if ($organization->hasAdminAccess(auth()->user()))
-                            <a href="{{ route('billing.show', $organization) }}" class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800">Manage billing →</a>
-                        @endif
+                    <div class="px-6 py-4 border-b border-slate-200">
+                        <h3 class="font-medium text-slate-900">Plan &amp; usage</h3>
+                        <p class="text-sm text-slate-500 mt-1">{{ __('Limits apply to this entire organization. Admins can change plans under Billing & plan in the sidebar.') }}</p>
                     </div>
                     <div class="px-6 py-4">
                         <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
@@ -257,7 +245,7 @@
                                             </div>
                                             <div class="flex gap-2">
                                                 <button type="button" wire:click="toggleOutboundIntegration({{ $hook->id }})" class="text-slate-600 hover:underline text-xs">Toggle</button>
-                                                <button type="button" wire:click="deleteOutboundIntegration({{ $hook->id }})" wire:confirm="Remove this integration?" class="text-red-600 hover:underline text-xs">Remove</button>
+                                                <button type="button" wire:click="deleteOutboundIntegration(@js($hook->id))" wire:confirm="Remove this integration?" class="text-red-600 hover:underline text-xs">Remove</button>
                                             </div>
                                         </li>
                                     @endforeach
@@ -294,6 +282,9 @@
                                                 <span class="text-red-600 text-xs">{{ $message }}</span>
                                             @enderror
                                             <p class="text-slate-500 text-sm mt-1">{{ $team->users->count() }} members</p>
+                                            <p class="mt-2">
+                                                <a href="{{ route('teams.notification-channels', [$organization, $team]) }}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">{{ __('Team notification channels') }} →</a>
+                                            </p>
                                         </div>
                                         @if ($organization->hasAdminAccess(auth()->user()))
                                             <div class="flex gap-2 shrink-0">
@@ -364,6 +355,7 @@
                     </section>
                 @endif
             </div>
-        </div>
+            </div>
+        </x-organization-shell>
     </div>
 </div>

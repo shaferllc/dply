@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -110,6 +111,24 @@ class Show extends Component
         $this->server = $server;
         $this->deploy_command = $server->deploy_command ?? '';
         $this->health_check_url = (string) ($server->meta['health_check_url'] ?? '');
+    }
+
+    #[On('server-state-updated')]
+    public function onServerStateUpdated(string $organizationId, string $action, ?string $serverId = null, ?array $server = null): void
+    {
+        if ($this->server->organization_id !== $organizationId) {
+            return;
+        }
+
+        if ($action === 'deleted' && $serverId === $this->server->id) {
+            $this->redirect(route('servers.index'), navigate: true);
+
+            return;
+        }
+
+        if ($serverId === $this->server->id || ($server['id'] ?? null) === $this->server->id) {
+            $this->server->refresh();
+        }
     }
 
     public function createDatabase(ServerDatabaseProvisioner $provisioner): void

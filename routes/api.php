@@ -12,14 +12,16 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/operator/readme', [OperatorReadmeController::class, 'show']);
     });
 
-    Route::middleware(['auth.api', 'throttle:api'])->group(function (): void {
-        Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:servers.read');
-        Route::post('/servers/{server}/deploy', [ServerController::class, 'deploy'])->middleware('ability:servers.deploy');
-        Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:commands.run');
+    $apiAbilities = config('api_token_permissions.http_route_abilities', []);
 
-        Route::get('/sites', [SiteController::class, 'index'])->middleware('ability:sites.read');
-        Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->middleware('ability:sites.deploy');
-        Route::get('/sites/{site}/deployments', [SiteController::class, 'deployments'])->middleware('ability:sites.read');
-        Route::get('/sites/{site}/deployments/{deployment}', [SiteController::class, 'showDeployment'])->middleware('ability:sites.read');
+    Route::middleware(['auth.api', 'throttle:api'])->group(function () use ($apiAbilities): void {
+        Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:'.$apiAbilities['servers.index']);
+        Route::post('/servers/{server}/deploy', [ServerController::class, 'deploy'])->middleware('ability:'.$apiAbilities['servers.deploy']);
+        Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:'.$apiAbilities['servers.run_command']);
+
+        Route::get('/sites', [SiteController::class, 'index'])->middleware('ability:'.$apiAbilities['sites.index']);
+        Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->middleware('ability:'.$apiAbilities['sites.deploy']);
+        Route::get('/sites/{site}/deployments', [SiteController::class, 'deployments'])->middleware('ability:'.$apiAbilities['sites.deployments']);
+        Route::get('/sites/{site}/deployments/{deployment}', [SiteController::class, 'showDeployment'])->middleware('ability:'.$apiAbilities['sites.deployment_show']);
     });
 });

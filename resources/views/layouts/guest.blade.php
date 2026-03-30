@@ -11,6 +11,7 @@
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @livewireStyles
     <style>[x-cloak]{display:none!important}</style>
 </head>
 <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;">
@@ -51,5 +52,6 @@
     </main>
 
     <x-marketing-footer />
+    @livewireScripts
 </body>
 </html>

@@ -8,7 +8,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="mb-6 flex gap-4">
                 <a href="{{ route('credentials.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-slate-200 rounded-lg font-medium text-sm text-slate-700 shadow-sm hover:bg-slate-50">
-                    {{ __('Cloud credentials') }}
+                    {{ __('Provider credentials') }}
                 </a>
                 <a href="{{ route('servers.create') }}" class="inline-flex items-center px-4 py-2 bg-slate-900 border border-transparent rounded-lg font-medium text-sm text-white hover:bg-slate-800">
                     {{ __('Add server') }}

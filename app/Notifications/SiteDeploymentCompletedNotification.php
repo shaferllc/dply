@@ -41,7 +41,7 @@ class SiteDeploymentCompletedNotification extends Notification implements Should
                 strtoupper($this->deployment->status),
                 $this->deployment->trigger
             );
-            DeployDigestBuffer::record($orgId, $line);
+            DeployDigestBuffer::record((string) $orgId, $line);
 
             return [];
         }

@@ -18,6 +18,7 @@ use App\Services\ScalewayService;
 use App\Services\SshConnection;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
+use App\Support\ServerProviderGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -86,6 +87,10 @@ class ServerController extends Controller
         }
 
         $type = $request->input('type', 'digitalocean');
+
+        if (! ServerProviderGate::enabled($type)) {
+            return redirect()->back()->withInput()->with('error', __('This server provider is not available yet.'));
+        }
 
         if ($type === 'digitalocean') {
             $scriptKeys = array_keys(config('setup_scripts.scripts', []));

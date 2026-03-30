@@ -4,13 +4,21 @@
     $featuresActive = $active === 'features' || request()->routeIs('features');
     $pricingActive = $active === 'pricing' || request()->routeIs('pricing');
     $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));
-    $headerCurrentOrg = auth()->check() ? auth()->user()->currentOrganization() : null;
+    $hi = 'h-5 w-5 shrink-0';
+    $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
+    $moreMenuActive = request()->routeIs('status-pages.*')
+        || request()->routeIs('marketplace.index')
+        || request()->routeIs('backups.*')
+        || request()->routeIs('scripts.*')
+        || $featuresActive
+        || $pricingActive
+        || request()->routeIs('docs.*');
 @endphp
 
 <header x-data="{ open: false }" class="border-b border-brand-ink/10 bg-brand-cream/85 backdrop-blur-xl sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-wrap items-center justify-between gap-y-3 py-3 sm:py-3 sm:min-h-[5.75rem] lg:min-h-28">
-            <div class="flex items-center justify-between w-full sm:w-auto sm:justify-start gap-4 min-w-0">
+        <div class="flex items-center justify-between gap-3 py-2.5 sm:py-3">
+            <div class="flex items-center justify-between sm:justify-start gap-3 min-w-0 shrink-0 w-full sm:w-auto">
                 <a
                     href="{{ auth()->check() ? route('dashboard') : url('/') }}"
                     class="flex items-center gap-3 group shrink-0"
@@ -18,7 +26,7 @@
                     <img
                         src="{{ asset('images/dply-logo.svg') }}"
                         alt="{{ config('app.name') }}"
-                        class="h-16 w-auto sm:h-20 lg:h-24 shrink-0 transition-transform duration-300 group-hover:scale-[1.02]"
+                        class="h-14 w-auto sm:h-16 lg:h-[4.25rem] shrink-0 transition-transform duration-300 group-hover:scale-[1.02]"
                         width="120"
                         height="136"
                     />
@@ -32,10 +40,10 @@
                         :aria-expanded="open"
                         aria-label="Toggle navigation"
                     >
-                        <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                            <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                            <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <span class="relative block h-6 w-6 shrink-0" aria-hidden="true">
+                            <x-heroicon-o-bars-3 class="absolute inset-0 h-6 w-6 text-current" x-show="! open" />
+                            <x-heroicon-o-x-mark class="absolute inset-0 h-6 w-6 text-current" x-show="open" x-cloak />
+                        </span>
                     </button>
                 @endauth
             </div>
@@ -44,70 +52,172 @@
                 <nav class="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 sm:gap-6 lg:gap-8 text-sm font-medium w-full sm:w-auto" aria-label="Primary">
                     <a
                         href="{{ url('/') }}"
-                        class="{{ $homeActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >Home</a>
+                        class="inline-flex items-center gap-1.5 {{ $homeActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
+                    >
+                        <x-heroicon-o-home class="{{ $hiGuest }}" />
+                        {{ __('Home') }}
+                    </a>
                     <a
                         href="{{ route('features') }}"
-                        class="{{ $featuresActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >Features</a>
+                        class="inline-flex items-center gap-1.5 {{ $featuresActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
+                    >
+                        <x-heroicon-o-sparkles class="{{ $hiGuest }}" />
+                        {{ __('Features') }}
+                    </a>
                     <a
                         href="{{ route('pricing') }}"
-                        class="{{ $pricingActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >Pricing</a>
-                    <a href="{{ route('login') }}" class="text-brand-moss hover:text-brand-ink transition-colors">Log in</a>
+                        class="inline-flex items-center gap-1.5 {{ $pricingActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
+                    >
+                        <x-heroicon-o-credit-card class="{{ $hiGuest }}" />
+                        {{ __('Pricing') }}
+                    </a>
+                    <a href="{{ route('login') }}" class="inline-flex items-center gap-1.5 text-brand-moss hover:text-brand-ink transition-colors">
+                        <x-heroicon-o-arrow-right-end-on-rectangle class="{{ $hiGuest }}" />
+                        {{ __('Log in') }}
+                    </a>
                     <a
                         href="{{ route('register') }}"
-                        class="inline-flex items-center px-4 py-2.5 rounded-lg bg-brand-ink text-brand-cream text-sm font-semibold shadow-sm shadow-brand-ink/10 hover:bg-brand-forest transition-colors"
-                    >Get started</a>
+                        class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-brand-ink text-brand-cream text-sm font-semibold shadow-sm shadow-brand-ink/10 hover:bg-brand-forest transition-colors"
+                    >
+                        <x-heroicon-o-rocket-launch class="{{ $hiGuest }}" />
+                        {{ __('Get started') }}
+                    </a>
                 </nav>
             @endguest
 
             @auth
-                <nav class="hidden sm:flex flex-wrap items-center justify-end gap-x-5 lg:gap-8 text-sm font-medium" aria-label="Primary">
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">{{ __('Dashboard') }}</x-nav-link>
-                    <x-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">{{ __('Servers') }}</x-nav-link>
-                    <x-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">{{ __('Sites') }}</x-nav-link>
-                    <x-nav-link :href="route('credentials.index')" :active="request()->routeIs('credentials.*')">{{ __('Credentials') }}</x-nav-link>
-                    <x-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">{{ __('Organizations') }}</x-nav-link>
-                    @if ($headerCurrentOrg)
-                        <span class="text-sm text-brand-moss hidden lg:inline">
-                            <a href="{{ route('organizations.show', $headerCurrentOrg) }}" class="hover:text-brand-ink">{{ $headerCurrentOrg->name }}</a>
-                        </span>
-                    @endif
-                    <a
-                        href="{{ route('features') }}"
-                        class="{{ $featuresActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >Features</a>
-                    <a
-                        href="{{ route('pricing') }}"
-                        class="{{ $pricingActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >Pricing</a>
-                    <x-nav-link :href="route('docs.index')" :active="request()->routeIs('docs.*')">{{ __('Docs') }}</x-nav-link>
-                    <div class="flex items-center ps-2 border-l border-brand-ink/10">
-                        <x-dropdown align="right" width="48">
+                <div class="hidden sm:flex flex-1 min-w-0 items-center justify-end gap-1 ms-2 lg:ms-4">
+                    <div class="min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [scrollbar-color:rgba(55_65_50/0.35)_transparent]">
+                        <nav class="flex h-full min-h-[2.75rem] flex-nowrap items-center justify-end gap-x-0.5 lg:gap-x-1 pe-2 text-sm font-medium" aria-label="{{ __('App') }}">
+                            <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
+                                <x-slot name="icon">
+                                    <x-heroicon-o-squares-2x2 class="{{ $hi }}" />
+                                </x-slot>
+                                {{ __('Dashboard') }}
+                            </x-nav-link>
+                            <x-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">
+                                <x-slot name="icon">
+                                    <x-heroicon-o-server class="{{ $hi }}" />
+                                </x-slot>
+                                {{ __('Servers') }}
+                            </x-nav-link>
+                            <x-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
+                                <x-slot name="icon">
+                                    <x-heroicon-o-globe-alt class="{{ $hi }}" />
+                                </x-slot>
+                                {{ __('Sites') }}
+                            </x-nav-link>
+                            <x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                                <x-slot name="icon">
+                                    <x-heroicon-o-rectangle-stack class="{{ $hi }}" />
+                                </x-slot>
+                                {{ __('Projects') }}
+                            </x-nav-link>
+                            <x-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">
+                                <x-slot name="icon">
+                                    <x-heroicon-o-building-office-2 class="{{ $hi }}" />
+                                </x-slot>
+                                {{ __('Organizations') }}
+                            </x-nav-link>
+                        </nav>
+                    </div>
+                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('More navigation') }}">
+                        <x-dropdown align="right" width="w-56" contentClasses="py-1 bg-white">
                             <x-slot name="trigger">
-                                <button type="button" class="inline-flex items-center px-3 py-2 border border-brand-ink/10 text-sm leading-4 font-medium rounded-lg text-brand-moss bg-white/80 hover:text-brand-ink focus:outline-none transition ease-in-out duration-150">
-                                    <span>{{ Auth::user()->name }}</span>
-                                    <span class="ms-1">
-                                        <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" aria-hidden="true">
-                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                        </svg>
-                                    </span>
+                                <button
+                                    type="button"
+                                    class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $moreMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
+                                    aria-haspopup="menu"
+                                >
+                                    <x-heroicon-o-ellipsis-horizontal class="h-5 w-5 shrink-0 opacity-90" />
+                                    <span>{{ __('More') }}</span>
+                                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                <x-dropdown-link :href="route('settings.index')">{{ __('Settings') }}</x-dropdown-link>
-                                <x-dropdown-link :href="route('profile.edit')">{{ __('Profile') }}</x-dropdown-link>
+                                <x-dropdown-link :href="route('status-pages.index')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-check-circle class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Status') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('marketplace.index')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-squares-plus class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Marketplace') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('backups.databases')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-archive-box class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Backups') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('scripts.index')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-code-bracket-square class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Scripts') }}
+                                </x-dropdown-link>
+                                <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
+                                <x-dropdown-link :href="route('features')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-sparkles class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Features') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('pricing')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-credit-card class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Pricing') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('docs.index')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-book-open class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Docs') }}
+                                </x-dropdown-link>
+                            </x-slot>
+                        </x-dropdown>
+                    </div>
+                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('Account') }}">
+                        <x-dropdown align="right" width="48">
+                            <x-slot name="trigger">
+                                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white/90 px-2.5 py-2 text-sm font-medium text-brand-ink shadow-sm shadow-brand-ink/5 transition hover:border-brand-ink/20 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sand/50 text-brand-forest ring-1 ring-brand-ink/5" aria-hidden="true">
+                                        <x-heroicon-o-user-circle class="h-4 w-4 shrink-0" />
+                                    </span>
+                                    <span class="max-w-[10rem] truncate text-left leading-tight text-brand-moss">{{ Auth::user()->name }}</span>
+                                    <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 text-brand-moss" />
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link :href="route('settings.index')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-cog-8-tooth class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Settings') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('profile.edit')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-user class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Profile') }}
+                                </x-dropdown-link>
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
                                     <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-arrow-right-start-on-rectangle class="{{ $hi }}" />
+                                        </x-slot>
                                         {{ __('Log Out') }}
                                     </x-dropdown-link>
                                 </form>
                             </x-slot>
                         </x-dropdown>
                     </div>
-                </nav>
+                </div>
             @endauth
         </div>
     </div>
@@ -121,26 +231,98 @@
             id="site-header-mobile-menu"
         >
             <div class="px-4 pt-2 pb-4 space-y-1 max-w-7xl mx-auto">
-                <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">{{ __('Dashboard') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">{{ __('Servers') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">{{ __('Sites') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('credentials.index')" :active="request()->routeIs('credentials.*')">{{ __('Credentials') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">{{ __('Organizations') }}</x-responsive-nav-link>
-                @if ($headerCurrentOrg)
-                    <a href="{{ route('organizations.show', $headerCurrentOrg) }}" class="block border-l-4 border-transparent py-2 ps-4 pe-4 text-sm text-brand-moss hover:bg-brand-sand/30">Current: {{ $headerCurrentOrg->name }}</a>
-                @endif
-                <a href="{{ route('features') }}" class="block border-l-4 {{ $featuresActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-4 pe-4 text-base font-medium">Features</a>
-                <a href="{{ route('pricing') }}" class="block border-l-4 {{ $pricingActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-4 pe-4 text-base font-medium">Pricing</a>
-                <x-responsive-nav-link :href="route('docs.index')" :active="request()->routeIs('docs.*')">{{ __('Docs') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-squares-2x2 class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Dashboard') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-server class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Servers') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-globe-alt class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Sites') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-rectangle-stack class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Projects') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('status-pages.index')" :active="request()->routeIs('status-pages.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-check-circle class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Status') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('marketplace.index')" :active="request()->routeIs('marketplace.index')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-squares-plus class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Marketplace') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('backups.databases')" :active="request()->routeIs('backups.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-archive-box class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Backups') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('scripts.index')" :active="request()->routeIs('scripts.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-code-bracket-square class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Scripts') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-building-office-2 class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Organizations') }}
+                </x-responsive-nav-link>
+                <a href="{{ route('features') }}" class="flex items-center gap-2.5 border-l-4 {{ $featuresActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
+                    <x-heroicon-o-sparkles class="h-5 w-5 shrink-0 opacity-90" />
+                    {{ __('Features') }}
+                </a>
+                <a href="{{ route('pricing') }}" class="flex items-center gap-2.5 border-l-4 {{ $pricingActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
+                    <x-heroicon-o-credit-card class="h-5 w-5 shrink-0 opacity-90" />
+                    {{ __('Pricing') }}
+                </a>
+                <x-responsive-nav-link :href="route('docs.index')" :active="request()->routeIs('docs.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-book-open class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Docs') }}
+                </x-responsive-nav-link>
                 <div class="pt-4 mt-2 border-t border-brand-ink/10">
                     <p class="px-4 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ Auth::user()->name }}</p>
                     <p class="px-4 text-sm text-brand-moss">{{ Auth::user()->email }}</p>
                     <div class="mt-2 space-y-1">
-                        <x-responsive-nav-link :href="route('settings.index')">{{ __('Settings') }}</x-responsive-nav-link>
-                        <x-responsive-nav-link :href="route('profile.edit')">{{ __('Profile') }}</x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('settings.index')">
+                            <x-slot name="icon">
+                                <x-heroicon-o-cog-8-tooth class="{{ $hi }}" />
+                            </x-slot>
+                            {{ __('Settings') }}
+                        </x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('profile.edit')">
+                            <x-slot name="icon">
+                                <x-heroicon-o-user class="{{ $hi }}" />
+                            </x-slot>
+                            {{ __('Profile') }}
+                        </x-responsive-nav-link>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <x-responsive-nav-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">{{ __('Log Out') }}</x-responsive-nav-link>
+                            <x-responsive-nav-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">
+                                <x-slot name="icon">
+                                    <x-heroicon-o-arrow-right-start-on-rectangle class="{{ $hi }}" />
+                                </x-slot>
+                                {{ __('Log Out') }}
+                            </x-responsive-nav-link>
                         </form>
                     </div>
                 </div>

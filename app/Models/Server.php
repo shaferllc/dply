@@ -3,14 +3,19 @@
 namespace App\Models;
 
 use App\Enums\ServerProvider;
+use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use phpseclib3\Crypt\Common\PrivateKey;
+use phpseclib3\Crypt\PublicKeyLoader;
 
 class Server extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUlids;
 
     public const STATUS_PENDING = 'pending';
 
@@ -37,6 +42,7 @@ class Server extends Model
     protected $fillable = [
         'user_id',
         'organization_id',
+        'workspace_id',
         'team_id',
         'provider_credential_id',
         'name',
@@ -75,6 +81,11 @@ class Server extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
     }
 
     public function team(): BelongsTo
@@ -122,9 +133,36 @@ class Server extends Model
         return $this->hasMany(ServerRecipe::class);
     }
 
+    public function notificationSubscriptions(): MorphMany
+    {
+        return $this->morphMany(NotificationSubscription::class, 'subscribable');
+    }
+
     public function isReady(): bool
     {
         return $this->status === self::STATUS_READY;
+    }
+
+    /**
+     * OpenSSH one-line public key derived from the stored provisioned private key.
+     */
+    public function openSshPublicKeyFromPrivate(): ?string
+    {
+        $priv = $this->ssh_private_key;
+        if (! is_string($priv) || trim($priv) === '') {
+            return null;
+        }
+
+        try {
+            $key = PublicKeyLoader::load($priv);
+            if (! $key instanceof PrivateKey) {
+                return null;
+            }
+
+            return trim($key->getPublicKey()->toString('OpenSSH'));
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function getSshConnectionString(): string
@@ -134,5 +172,46 @@ class Server extends Model
             $this->ssh_user,
             $this->ip_address ?? '0.0.0.0'
         );
+    }
+
+    /**
+     * SSH connection for TaskRunner remote execution as the server's deploy user.
+     */
+    public function connectionAsUser(): TaskRunnerConnection
+    {
+        $user = trim((string) $this->ssh_user);
+        if ($user === '') {
+            throw new \RuntimeException('Server has no SSH user configured.');
+        }
+
+        return $this->taskRunnerConnectionAs($user);
+    }
+
+    /**
+     * SSH connection for TaskRunner remote execution as root.
+     */
+    public function connectionAsRoot(): TaskRunnerConnection
+    {
+        return $this->taskRunnerConnectionAs('root');
+    }
+
+    protected function taskRunnerConnectionAs(string $username): TaskRunnerConnection
+    {
+        $key = $this->ssh_private_key;
+        if ($key === null || trim((string) $key) === '') {
+            throw new \RuntimeException('Server has no SSH private key configured.');
+        }
+
+        $host = trim((string) $this->ip_address);
+        if ($host === '') {
+            throw new \RuntimeException('Server has no IP address.');
+        }
+
+        return TaskRunnerConnection::fromArray([
+            'host' => $host,
+            'port' => (int) ($this->ssh_port ?: 22),
+            'username' => $username,
+            'private_key' => $key,
+        ]);
     }
 }

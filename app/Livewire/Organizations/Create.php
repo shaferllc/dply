@@ -38,7 +38,9 @@ class Create extends Component
             'slug' => $slug,
         ]);
         $org->users()->attach(auth()->id(), ['role' => 'owner']);
+        $org->attachUserToDefaultTeam(auth()->user());
         session(['current_organization_id' => $org->id]);
+        Session::forget('current_team_id');
 
         Session::flash('success', 'Organization created.');
 

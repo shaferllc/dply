@@ -22,6 +22,21 @@ class SiteCreationGateTest extends TestCase
         session(['current_organization_id' => $org->id]);
     }
 
+    public function test_site_create_forbidden_when_server_has_no_organization(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => null,
+        ]);
+
+        $this->actingInOrg($user, $org);
+
+        $this->get(route('sites.create', $server))->assertForbidden();
+    }
+
     public function test_deployer_cannot_open_site_create_form(): void
     {
         $user = User::factory()->create();

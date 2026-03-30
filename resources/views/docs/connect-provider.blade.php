@@ -7,7 +7,7 @@
     </x-slot>
     <div class="py-12">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 prose prose-slate max-w-none">
-            <p class="text-slate-600">To create servers in dply, you add a cloud provider API token as a <strong>credential</strong>. dply supports <strong>DigitalOcean</strong> and <strong>Hetzner</strong>.</p>
+            <p class="text-slate-600">To create servers in dply, you add a <strong>server provider</strong> API token (stored as an encrypted credential). This is separate from <strong>Git</strong> (source control). dply supports <strong>DigitalOcean</strong> and <strong>Hetzner</strong>, among others.</p>
 
             <h3 class="text-lg font-semibold text-slate-900 mt-8">1. Get an API token</h3>
 
@@ -25,15 +25,15 @@
                 <li>Create a token with Read & Write. Copy it; it’s shown only once.</li>
             </ol>
 
-            <h3 class="text-lg font-semibold text-slate-900 mt-8">2. Add the credential in dply</h3>
+            <h3 class="text-lg font-semibold text-slate-900 mt-8">2. Add the token in dply</h3>
             <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                <li>In dply, open <a href="{{ route('credentials.index') }}" class="text-slate-900 underline font-medium">Credentials</a> (in the main menu).</li>
+                <li>In dply, open <a href="{{ route('credentials.index') }}" class="text-slate-900 underline font-medium">Server providers</a> (settings sidebar under your current organization).</li>
                 <li>Under “Add DigitalOcean” or “Add Hetzner”, paste your API token.</li>
                 <li>Give it a <strong>label</strong> (e.g. “Personal” or “Production”) so you can pick it when creating servers.</li>
                 <li>Click <strong>Connect</strong>.</li>
             </ol>
 
-            <p class="text-slate-600 mt-6">Once saved, the credential appears in “Your credentials”. You can add more than one (e.g. different DO or Hetzner accounts). When you <a href="{{ route('docs.create-first-server') }}" class="text-slate-900 underline">create a server</a>, you choose which credential to use.</p>
+            <p class="text-slate-600 mt-6">Once saved, it appears in the saved list on that page. You can add more than one (e.g. different DO or Hetzner accounts). When you <a href="{{ route('docs.create-first-server') }}" class="text-slate-900 underline">create a server</a>, you choose which account to use.</p>
         </div>
     </div>
 </x-app-layout>

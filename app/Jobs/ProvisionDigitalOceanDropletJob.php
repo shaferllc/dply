@@ -46,14 +46,25 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
 
         $image = config('services.digitalocean.default_image', 'ubuntu-24-04-x64');
 
+        $meta = $this->server->meta ?? [];
+        $doOpts = is_array($meta['digitalocean'] ?? null) ? $meta['digitalocean'] : [];
+
         $droplet = $do->createDroplet(
             name: $this->server->name,
             region: $this->server->region,
             size: $this->server->size,
             image: $image,
             sshKeyIds: [$sshKeyId],
-            ipv6: false,
-            userData: ''
+            options: [
+                'ipv6' => (bool) ($doOpts['ipv6'] ?? false),
+                'backups' => (bool) ($doOpts['backups'] ?? false),
+                'monitoring' => (bool) ($doOpts['monitoring'] ?? false),
+                'vpc_uuid' => isset($doOpts['vpc_uuid']) && is_string($doOpts['vpc_uuid']) && $doOpts['vpc_uuid'] !== ''
+                    ? $doOpts['vpc_uuid']
+                    : null,
+                'tags' => isset($doOpts['tags']) && is_array($doOpts['tags']) ? $doOpts['tags'] : [],
+                'user_data' => isset($doOpts['user_data']) && is_string($doOpts['user_data']) ? $doOpts['user_data'] : '',
+            ],
         );
 
         $this->server->update([

@@ -21,12 +21,12 @@ class RegistrationTest extends TestCase
     public function test_new_users_can_register(): void
     {
         Livewire::test(Register::class)
-            ->set('name', 'Test User')
-            ->set('email', 'test@example.com')
-            ->set('password', 'password')
-            ->set('password_confirmation', 'password')
+            ->set('form.name', 'Test User')
+            ->set('form.email', 'test@example.com')
+            ->set('form.password', 'password')
+            ->set('form.password_confirmation', 'password')
             ->call('submit')
-            ->assertRedirect(route('dashboard', absolute: false));
+            ->assertRedirect(route('verification.notice', absolute: false));
 
         $this->assertAuthenticated();
     }

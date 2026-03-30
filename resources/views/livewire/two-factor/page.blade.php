@@ -15,7 +15,19 @@
                     <p class="text-sm text-gray-600 mb-6">
                         {{ __('Two-factor authentication is enabled. Enter your password and a code from your authenticator app (or a recovery code) to disable it.') }}
                     </p>
-                    <form wire:submit="disable" class="space-y-6">
+                    <form wire:submit="disable" class="space-y-6" autocomplete="on">
+                        <div class="sr-only">
+                            <label for="two_factor_disable_username">{{ __('Account email') }}</label>
+                            <input
+                                id="two_factor_disable_username"
+                                type="email"
+                                name="username"
+                                autocomplete="username"
+                                value="{{ auth()->user()->email }}"
+                                readonly
+                                tabindex="-1"
+                            />
+                        </div>
                         <div>
                             <x-input-label for="password" :value="__('Password')" />
                             <x-text-input id="password" wire:model="password" type="password" class="mt-1 block w-full" autocomplete="current-password" />
@@ -28,7 +40,7 @@
                         </div>
                         <div class="flex items-center gap-4">
                             <x-danger-button type="submit">{{ __('Disable two-factor') }}</x-danger-button>
-                            <a href="{{ route('profile.edit') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
+                            <a href="{{ route('profile.security') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
                         </div>
                     </form>
                 @elseif ($this->needsStart)
@@ -39,7 +51,7 @@
                         {{ __('Enable two-factor authentication') }}
                     </button>
                     <div class="mt-4">
-                        <a href="{{ route('profile.edit') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
+                        <a href="{{ route('profile.security') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
                     </div>
                 @else
                     <p class="text-sm text-gray-600 mb-6">
@@ -60,7 +72,7 @@
                         </div>
                         <div class="flex items-center gap-4">
                             <x-primary-button type="submit">{{ __('Confirm') }}</x-primary-button>
-                            <a href="{{ route('profile.edit') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
+                            <a href="{{ route('profile.security') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
                         </div>
                     </form>
                 @endif

@@ -14,16 +14,51 @@ use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class Index extends Component
 {
-    public function destroy(int $serverId): void
+    public string $search = '';
+
+    public string $sort = 'created_at';
+
+    /** @var string all|pending|provisioning|ready|error|disconnected */
+    public string $statusFilter = '';
+
+    /** @var string list|grid */
+    public string $viewMode = 'list';
+
+    /** Bumped when Reverb pushes server updates so the list re-queries from the database. */
+    public int $serverListEpoch = 0;
+
+    public function resetFilters(): void
     {
-        $server = Server::findOrFail($serverId);
+        $this->search = '';
+        $this->sort = 'created_at';
+        $this->statusFilter = '';
+        $this->viewMode = 'list';
+    }
+
+    #[On('server-state-updated')]
+    public function onServerStateUpdated(string $organizationId): void
+    {
+        $org = auth()->user()->currentOrganization();
+        if (! $org || $org->id !== $organizationId) {
+            return;
+        }
+
+        $this->serverListEpoch++;
+    }
+
+    public function destroy(string $serverId): void
+    {
+        $server = Server::query()->findOrFail($serverId);
         $this->authorize('delete', $server);
 
         $org = $server->organization;
@@ -152,19 +187,94 @@ class Index extends Component
         $server->delete();
     }
 
-    public function render(): View
+    /**
+     * @return Collection<string, Collection<int, Server>>
+     */
+    protected function groupedServers(Collection $servers): Collection
+    {
+        return $servers
+            ->groupBy(function (Server $server): string {
+                if ($server->team_id !== null && $server->relationLoaded('team') && $server->team !== null) {
+                    return $server->team->name;
+                }
+                if ($server->organization_id !== null && $server->relationLoaded('organization') && $server->organization !== null) {
+                    return $server->organization->name;
+                }
+
+                return __('Personal');
+            })
+            ->sortKeys();
+    }
+
+    protected function baseQuery(): ?Builder
     {
         $org = auth()->user()->currentOrganization();
-        $servers = $org
-            ? Server::query()
-                ->where(function ($q) use ($org) {
-                    $q->where('organization_id', $org->id)
-                        ->orWhere(fn ($q2) => $q2->whereNull('organization_id')->where('user_id', auth()->id()));
-                })
-                ->latest()
-                ->get()
+        if (! $org) {
+            return null;
+        }
+
+        $query = Server::query()
+            ->with(['sites', 'organization', 'team'])
+            ->withCount('sites')
+            ->where(function (Builder $q) use ($org) {
+                $q->where('organization_id', $org->id)
+                    ->orWhere(fn (Builder $q2) => $q2->whereNull('organization_id')->where('user_id', auth()->id()));
+            });
+
+        $team = auth()->user()->currentTeam();
+        if ($team) {
+            $query->where('team_id', $team->id);
+        }
+
+        return $query;
+    }
+
+    protected function applyFilters(Builder $query): Builder
+    {
+        $term = trim($this->search);
+        if ($term !== '') {
+            $like = '%'.$term.'%';
+            $query->where(function (Builder $q) use ($like) {
+                $q->where('name', 'like', $like)
+                    ->orWhere('ip_address', 'like', $like)
+                    ->orWhere('provider', 'like', $like);
+            });
+        }
+
+        if ($this->statusFilter !== '') {
+            $query->where('status', $this->statusFilter);
+        }
+
+        return match ($this->sort) {
+            'name' => $query->orderBy('name'),
+            'status' => $query->orderBy('status')->orderBy('name'),
+            default => $query->orderByDesc('created_at'),
+        };
+    }
+
+    public function render(): View
+    {
+        $base = $this->baseQuery();
+        $hasServersInScope = $base !== null && (clone $base)->exists();
+        $servers = $base
+            ? $this->applyFilters(clone $base)->get()
             : collect();
 
-        return view('livewire.servers.index', ['servers' => $servers]);
+        $groupedServers = $this->groupedServers($servers);
+
+        return view('livewire.servers.index', [
+            'hasServersInScope' => $hasServersInScope,
+            'servers' => $servers,
+            'groupedServers' => $groupedServers,
+            'sortOptions' => config('user_preferences.server_sort_options', []),
+            'statusOptions' => [
+                '' => __('All statuses'),
+                Server::STATUS_PENDING => __('Pending'),
+                Server::STATUS_PROVISIONING => __('Provisioning'),
+                Server::STATUS_READY => __('Ready'),
+                Server::STATUS_ERROR => __('Error'),
+                Server::STATUS_DISCONNECTED => __('Disconnected'),
+            ],
+        ]);
     }
 }

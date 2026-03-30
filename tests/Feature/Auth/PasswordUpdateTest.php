@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
-use App\Livewire\Profile\Edit as ProfileEdit;
+use App\Livewire\Settings\Security as SettingsSecurity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -18,7 +18,7 @@ class PasswordUpdateTest extends TestCase
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
-            ->test(ProfileEdit::class)
+            ->test(SettingsSecurity::class)
             ->set('current_password', 'password')
             ->set('password', 'new-password')
             ->set('password_confirmation', 'new-password')
@@ -32,7 +32,7 @@ class PasswordUpdateTest extends TestCase
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
-            ->test(ProfileEdit::class)
+            ->test(SettingsSecurity::class)
             ->set('current_password', 'wrong-password')
             ->set('password', 'new-password')
             ->set('password_confirmation', 'new-password')
