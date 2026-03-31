@@ -39,6 +39,10 @@ class Server extends Model
 
     public const SETUP_STATUS_FAILED = 'failed';
 
+    public const SUPERVISOR_PACKAGE_INSTALLED = 'installed';
+
+    public const SUPERVISOR_PACKAGE_MISSING = 'missing';
+
     protected $fillable = [
         'user_id',
         'organization_id',
@@ -58,9 +62,11 @@ class Server extends Model
         'setup_script_key',
         'setup_status',
         'meta',
+        'supervisor_package_status',
         'deploy_command',
         'last_health_check_at',
         'health_status',
+        'scheduled_deletion_at',
     ];
 
     protected function casts(): array
@@ -70,6 +76,7 @@ class Server extends Model
             'ssh_private_key' => 'encrypted',
             'meta' => 'array',
             'last_health_check_at' => 'datetime',
+            'scheduled_deletion_at' => 'datetime',
         ];
     }
 

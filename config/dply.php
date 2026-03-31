@@ -98,4 +98,53 @@ return [
     'demo_do_region' => env('DPLY_DEMO_DO_REGION', 'nyc1'),
     'demo_do_size' => env('DPLY_DEMO_DO_SIZE', 's-1vcpu-1gb'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Public control-plane URL for TaskRunner signed webhooks
+    |--------------------------------------------------------------------------
+    | When workers or cloud VMs must POST to your app (e.g. stack provision
+    | callbacks) but APP_URL is internal (http://127.0.0.1), set this to the
+    | HTTPS URL the machine can reach (tunnel, load balancer, etc.). Signed
+    | webhook routes are generated with this root when set.
+    */
+    'public_app_url' => env('DPLY_PUBLIC_APP_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Server removal: default scheduled deletion day offset
+    |--------------------------------------------------------------------------
+    | When scheduling server removal from the UI, the date picker defaults to
+    | today plus this many days (user can change the date).
+    */
+    'server_scheduled_deletion_default_days' => max(1, min(365, (int) env('DPLY_SERVER_SCHEDULED_DELETION_DEFAULT_DAYS', 7))),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Server removal: notify organization owners and admins
+    |--------------------------------------------------------------------------
+    | When true, scheduling or completing server removal sends mail to org
+    | members with owner or admin roles (see DeleteServerAction and Livewire
+    | server removal flows).
+    */
+    'server_deletion_notify_org_admins' => filter_var(env('DPLY_SERVER_DELETION_NOTIFY_ADMINS', true), FILTER_VALIDATE_BOOL),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Server removal: optional documentation URL (checklist in remove modal)
+    |--------------------------------------------------------------------------
+    */
+    'server_deletion_docs_url' => env('DPLY_SERVER_DELETION_DOCS_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Supervisor (Daemons): scheduled health checks
+    |--------------------------------------------------------------------------
+    | When enabled, `dply:supervisor-check-health` SSHes to ready servers that
+    | have active programs and stores a snapshot in `servers.meta.supervisor_health`.
+    | Org owners/admins can receive mail when managed programs look unhealthy.
+    */
+    'supervisor_health_check_enabled' => filter_var(env('DPLY_SUPERVISOR_HEALTH_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),
+
+    'supervisor_health_notify_org_admins' => filter_var(env('DPLY_SUPERVISOR_HEALTH_NOTIFY_ADMINS', true), FILTER_VALIDATE_BOOL),
+
 ];

@@ -25,6 +25,8 @@ class Organization extends Model
         'deploy_email_notifications_enabled',
         'server_site_preferences',
         'default_site_script_id',
+        'cron_maintenance_until',
+        'cron_maintenance_note',
     ];
 
     protected function casts(): array
@@ -33,6 +35,7 @@ class Organization extends Model
             'trial_ends_at' => 'datetime',
             'deploy_email_notifications_enabled' => 'boolean',
             'server_site_preferences' => 'array',
+            'cron_maintenance_until' => 'datetime',
         ];
     }
 
@@ -139,6 +142,16 @@ class Organization extends Model
     public function scripts(): HasMany
     {
         return $this->hasMany(Script::class);
+    }
+
+    public function cronJobTemplates(): HasMany
+    {
+        return $this->hasMany(OrganizationCronJobTemplate::class);
+    }
+
+    public function supervisorProgramTemplates(): HasMany
+    {
+        return $this->hasMany(OrganizationSupervisorProgramTemplate::class);
     }
 
     public function defaultSiteScript(): BelongsTo

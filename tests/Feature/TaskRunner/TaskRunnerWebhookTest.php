@@ -7,6 +7,7 @@ namespace Tests\Feature\TaskRunner;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
@@ -60,5 +61,22 @@ class TaskRunnerWebhookTest extends TestCase
         $this->postJson($url, [])
             ->assertOk()
             ->assertJson(['status' => 'success']);
+    }
+
+    public function test_webhook_url_uses_dply_public_app_url_when_configured(): void
+    {
+        Config::set('app.url', 'http://127.0.0.1');
+        Config::set('dply.public_app_url', 'https://tunnel.example.test');
+
+        $task = Task::query()->create([
+            'name' => 'URL probe',
+            'action' => 'probe',
+            'status' => TaskStatus::Running,
+        ]);
+
+        $url = $task->webhookUrl('updateOutput');
+
+        $this->assertStringStartsWith('https://tunnel.example.test/', $url);
+        $this->assertStringContainsString('/webhook/task/update-output/'.$task->id, $url);
     }
 }

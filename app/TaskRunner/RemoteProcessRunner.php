@@ -7,7 +7,6 @@ namespace App\Modules\TaskRunner;
 use App\Modules\TaskRunner\Exceptions\CouldNotCreateScriptDirectoryException;
 use App\Modules\TaskRunner\Exceptions\CouldNotUploadFileException;
 use Illuminate\Support\Facades\Process as FacadesProcess;
-use Illuminate\Support\Str;
 
 class RemoteProcessRunner
 {
@@ -66,7 +65,7 @@ class RemoteProcessRunner
     public function sshOptions(): array
     {
         $options = [
-            // '-o LogLevel=error', // Only log errors
+            '-o LogLevel=ERROR', // Suppress "Permanently added … known hosts" on stderr (still logs real errors)
             '-o IdentitiesOnly=yes', // Only use the configured public key
             '-o UserKnownHostsFile=/dev/null', // Don't use known hosts
             '-o StrictHostKeyChecking=no', // Disable host key checking
@@ -132,10 +131,8 @@ class RemoteProcessRunner
     public function cleanupOutput(ProcessOutput $processOutput): ProcessOutput
     {
         $buffer = $processOutput->getBuffer();
-
-        if (Str::startsWith($buffer, 'Warning: Permanently added')) {
-            $buffer = Str::after($buffer, "\n");
-        }
+        // Strip known-hosts chatter if it still appears (e.g. older OpenSSH); may span multiple lines.
+        $buffer = (string) preg_replace('/^Warning: Permanently added[^\n]*\R?/m', '', $buffer);
 
         return ProcessOutput::make(trim($buffer))
             ->setExitCode($processOutput->getExitCode())

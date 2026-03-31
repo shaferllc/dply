@@ -13,8 +13,23 @@ class SshConnection implements RemoteShell
     protected ?SSH2 $ssh = null;
 
     public function __construct(
-        protected Server $server
+        protected Server $server,
+        protected ?string $loginUsername = null,
     ) {}
+
+    /**
+     * SSH username for this connection (override or server default).
+     */
+    public function effectiveUsername(): string
+    {
+        if ($this->loginUsername !== null && trim($this->loginUsername) !== '') {
+            return trim($this->loginUsername);
+        }
+
+        $u = trim((string) $this->server->ssh_user);
+
+        return $u !== '' ? $u : 'root';
+    }
 
     /**
      * Connect to the server via SSH (key or password).
@@ -27,7 +42,7 @@ class SshConnection implements RemoteShell
 
         $host = $this->server->ip_address;
         $port = (int) $this->server->ssh_port;
-        $user = $this->server->ssh_user;
+        $user = $this->effectiveUsername();
 
         if (empty($host) || $host === '0.0.0.0') {
             return false;
@@ -65,13 +80,66 @@ class SshConnection implements RemoteShell
     }
 
     /**
+     * Exit status of the last {@see exec()} or {@see execWithCallback()} (SSH channel close).
+     */
+    public function lastExecExitCode(): ?int
+    {
+        if ($this->ssh === null) {
+            return null;
+        }
+
+        $s = $this->ssh->getExitStatus();
+
+        return $s === false ? null : $s;
+    }
+
+    /**
+     * Run a command and invoke the callback for each output chunk (phpseclib channel packets).
+     *
+     * @param  callable(string):void  $chunkCallback
+     */
+    public function execWithCallback(string $command, callable $chunkCallback, int $timeoutSeconds = 120): string
+    {
+        if ($this->ssh === null && ! $this->connect()) {
+            throw new \RuntimeException('SSH connection failed for server: '.$this->server->name);
+        }
+
+        $this->ssh->setTimeout($timeoutSeconds);
+        $buffer = '';
+        $result = $this->ssh->exec($command, function (string $chunk) use ($chunkCallback, &$buffer): void {
+            $buffer .= $chunk;
+            $chunkCallback($chunk);
+        });
+
+        if ($result === false) {
+            throw new \RuntimeException('SSH exec failed for server: '.$this->server->name);
+        }
+
+        return $buffer;
+    }
+
+    /**
+     * Same as {@see execWithCallback} but returns output and exit code together.
+     *
+     * @param  callable(string):void  $chunkCallback
+     * @return array{0: string, 1: ?int}
+     */
+    public function execWithCallbackAndExit(string $command, callable $chunkCallback, int $timeoutSeconds = 120): array
+    {
+        $out = $this->execWithCallback($command, $chunkCallback, $timeoutSeconds);
+        $exit = $this->lastExecExitCode();
+
+        return [$out, $exit];
+    }
+
+    /**
      * Upload file contents to a remote path (recursive mkdir). Uses SFTP.
      */
     public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
     {
         $host = $this->server->ip_address;
         $port = (int) $this->server->ssh_port;
-        $user = $this->server->ssh_user;
+        $user = $this->effectiveUsername();
 
         if (empty($host) || $host === '0.0.0.0' || ! $this->server->ssh_private_key) {
             throw new \RuntimeException('SSH connection failed for server: '.$this->server->name);

@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "build:fresh": "rm -rf public/build && vite build",
         "dev": "vite"
     },
     "devDependencies": {

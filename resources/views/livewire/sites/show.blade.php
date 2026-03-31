@@ -80,9 +80,12 @@
                 <h3 class="font-medium text-slate-900">Nginx (HTTP)</h3>
                 <p class="text-sm text-slate-600">Writes a vhost under <code class="bg-slate-100 px-1 rounded text-xs">sites-available</code>, symlinks to <code class="bg-slate-100 px-1 rounded text-xs">sites-enabled</code>, runs <code class="bg-slate-100 px-1 rounded text-xs">nginx -t</code> and reloads. Server must have Nginx installed; PHP sites need matching PHP-FPM.</p>
                 @if ($server->isReady() && $server->ssh_private_key)
-                    <button type="button" wire:click="installNginx" wire:loading.attr="disabled" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
+                    <button type="button" wire:click="installNginx" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
                         <span wire:loading.remove wire:target="installNginx">Install / update Nginx site</span>
-                        <span wire:loading wire:target="installNginx">Working…</span>
+                        <span wire:loading wire:target="installNginx" class="inline-flex items-center gap-2">
+                            <x-spinner variant="white" size="sm" />
+                            Working…
+                        </span>
                     </button>
                 @else
                     <p class="text-sm text-amber-700">SSH key required on the server record.</p>
@@ -93,9 +96,12 @@
                 <h3 class="font-medium text-slate-900">Let’s Encrypt (Certbot)</h3>
                 <p class="text-sm text-slate-600">Run after HTTP vhost works and DNS points here. Uses <code class="bg-slate-100 px-1 rounded text-xs">certbot --nginx</code>. Set <code class="bg-slate-100 px-1 rounded text-xs">DPLY_CERTBOT_EMAIL</code> in <code class="bg-slate-100 px-1 rounded text-xs">.env</code> or ensure your user/org has an email.</p>
                 @if ($server->isReady() && $server->ssh_private_key)
-                    <button type="button" wire:click="issueSsl" wire:loading.attr="disabled" class="inline-flex items-center px-4 py-2 bg-emerald-800 text-white text-sm font-medium rounded-md hover:bg-emerald-900 disabled:opacity-50">
+                    <button type="button" wire:click="issueSsl" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-800 text-white text-sm font-medium rounded-md hover:bg-emerald-900 disabled:opacity-50">
                         <span wire:loading.remove wire:target="issueSsl">Issue / renew SSL</span>
-                        <span wire:loading wire:target="issueSsl">Certbot…</span>
+                        <span wire:loading wire:target="issueSsl" class="inline-flex items-center gap-2">
+                            <x-spinner variant="white" size="sm" />
+                            Certbot…
+                        </span>
                     </button>
                 @endif
             </div>
@@ -172,9 +178,12 @@
                     </div>
                 @endif
                 <div class="flex flex-wrap gap-2 pt-2">
-                    <button type="button" wire:click="deployNow" wire:loading.attr="disabled" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
+                    <button type="button" wire:click="deployNow" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
                         <span wire:loading.remove wire:target="deployNow">Deploy now (sync)</span>
-                        <span wire:loading wire:target="deployNow">Deploying…</span>
+                        <span wire:loading wire:target="deployNow" class="inline-flex items-center gap-2">
+                            <x-spinner variant="white" size="sm" />
+                            Deploying…
+                        </span>
                     </button>
                     <button type="button" wire:click="queueDeploy" class="px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50">Queue deploy (queue worker)</button>
                 </div>
@@ -212,6 +221,10 @@
                     <label class="flex items-center gap-2 text-sm text-slate-700">
                         <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-slate-300">
                         Laravel scheduler (<code class="text-xs bg-slate-100 px-1">schedule:run</code> every minute via server crontab)
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="rounded border-slate-300">
+                        Restart Supervisor programs after successful deploy (programs linked to this site or server-wide on the same machine)
                     </label>
                     <div>
                         <x-input-label for="nginx_extra_raw" value="Extra Nginx inside server block (advanced)" />
@@ -418,9 +431,12 @@
                 <textarea wire:model="env_file_content" rows="8" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="APP_NAME=…"></textarea>
                 <div class="flex flex-wrap gap-2">
                     <button type="button" wire:click="saveEnvDraft" class="px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50">Save draft in Dply</button>
-                    <button type="button" wire:click="pushEnvToServer" wire:loading.attr="disabled" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
+                    <button type="button" wire:click="pushEnvToServer" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
                         <span wire:loading.remove wire:target="pushEnvToServer">Push .env to server</span>
-                        <span wire:loading wire:target="pushEnvToServer">Pushing…</span>
+                        <span wire:loading wire:target="pushEnvToServer" class="inline-flex items-center gap-2">
+                            <x-spinner variant="white" size="sm" />
+                            Pushing…
+                        </span>
                     </button>
                 </div>
             </div>

@@ -431,8 +431,21 @@ class Task extends Model
     public function webhookUrl(string $name): string
     {
         $name = Str::kebab($name);
+        $routeName = 'webhook.task.'.$name;
 
-        return URL::signedRoute('webhook.task.'.$name, ['task' => $this->id]);
+        $publicRoot = config('dply.public_app_url');
+        if (is_string($publicRoot) && $publicRoot !== '') {
+            $publicRoot = rtrim($publicRoot, '/');
+            $restoreRoot = rtrim((string) config('app.url'), '/');
+            URL::forceRootUrl($publicRoot);
+            try {
+                return URL::signedRoute($routeName, ['task' => $this->id]);
+            } finally {
+                URL::forceRootUrl($restoreRoot !== '' ? $restoreRoot : null);
+            }
+        }
+
+        return URL::signedRoute($routeName, ['task' => $this->id]);
     }
 
     /**

@@ -34,8 +34,12 @@
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Run as:') }} <code class="text-brand-ink">{{ $preset['run_as_user'] }}</code></p>
                     @endif
                     <div class="mt-4 flex-grow"></div>
-                    <button type="button" wire:click="clonePreset('{{ $preset['key'] }}')" wire:loading.attr="disabled" class="mt-4 w-full inline-flex justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
-                        {{ __('Add to organization') }}
+                    <button type="button" wire:click="clonePreset('{{ $preset['key'] }}')" wire:loading.attr="disabled" wire:target="clonePreset('{{ $preset['key'] }}')" class="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-50">
+                        <span wire:loading.remove wire:target="clonePreset('{{ $preset['key'] }}')">{{ __('Add to organization') }}</span>
+                        <span wire:loading wire:target="clonePreset('{{ $preset['key'] }}')" class="inline-flex items-center gap-2">
+                            <x-spinner variant="cream" size="sm" />
+                            {{ __('Adding…') }}
+                        </span>
                     </button>
                 </div>
             @endforeach

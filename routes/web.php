@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
 use App\Livewire\Billing\Invoices as BillingInvoices;
@@ -12,6 +14,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
+use App\Livewire\Organizations\Daemons as OrganizationsDaemons;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Livewire\Organizations\Show as OrganizationsShow;
@@ -26,7 +29,18 @@ use App\Livewire\Scripts\Index as ScriptsIndex;
 use App\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Livewire\Servers\Create as ServersCreate;
 use App\Livewire\Servers\Index as ServersIndex;
-use App\Livewire\Servers\Show as ServersShow;
+use App\Livewire\Servers\WorkspaceCron;
+use App\Livewire\Servers\WorkspaceDaemons;
+use App\Livewire\Servers\WorkspaceDatabases;
+use App\Livewire\Servers\WorkspaceDeploy;
+use App\Livewire\Servers\WorkspaceFirewall;
+use App\Livewire\Servers\WorkspaceLogs;
+use App\Livewire\Servers\WorkspaceManage;
+use App\Livewire\Servers\WorkspaceOverview;
+use App\Livewire\Servers\WorkspaceRecipes;
+use App\Livewire\Servers\WorkspaceSettings;
+use App\Livewire\Servers\WorkspaceSites;
+use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
 use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
@@ -44,7 +58,9 @@ use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Livewire\StatusPages\Manage as StatusPagesManage;
 use App\Livewire\Teams\NotificationChannels as TeamsNotificationChannels;
 use App\Livewire\TwoFactor\Page as TwoFactorPage;
+use App\Models\Server;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 Broadcast::routes(['middleware' => ['web', 'auth']]);
@@ -72,6 +88,9 @@ Route::livewire('/status/{statusPage}', StatusPublicPage::class)
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
+    Route::livewire('/admin', AdminDashboard::class)
+        ->middleware('can:viewPlatformAdmin')
+        ->name('admin.dashboard');
     Route::livewire('/marketplace', MarketplaceIndex::class)->name('marketplace.index');
 
     Route::get('/docs', [DocsController::class, 'index'])->name('docs.index');
@@ -97,6 +116,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
     Route::livewire('organizations', OrganizationsIndex::class)->name('organizations.index');
     Route::livewire('organizations/create', OrganizationsCreate::class)->name('organizations.create');
+    Route::livewire('organizations/{organization}/daemons', OrganizationsDaemons::class)->name('organizations.daemons');
     Route::livewire('organizations/{organization}', OrganizationsShow::class)->name('organizations.show');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
@@ -121,9 +141,26 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
     Route::livewire('servers/create', ServersCreate::class)->name('servers.create');
-    Route::livewire('servers/{server}', ServersShow::class)->name('servers.show');
+    Route::get('servers/{server}', function (Server $server) {
+        Gate::authorize('view', $server);
+
+        return redirect()->route('servers.sites', $server);
+    })->name('servers.show');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
     Route::livewire('servers/{server}/sites/{site}', SitesShow::class)->name('sites.show');
+    Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
+    Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
+    Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
+    Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
+    Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->name('servers.daemons');
+    Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
+    Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
+    Route::livewire('servers/{server}/recipes', WorkspaceRecipes::class)->name('servers.recipes');
+    Route::livewire('servers/{server}/deploy', WorkspaceDeploy::class)->name('servers.deploy');
+    Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
+    Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
+    Route::livewire('servers/{server}/manage', WorkspaceManage::class)->name('servers.manage');
+    Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
 
     Route::livewire('credentials', CredentialsIndex::class)->name('credentials.index');
     Route::get('credentials/oauth/digitalocean', [ProviderOAuthController::class, 'redirectDigitalOcean'])

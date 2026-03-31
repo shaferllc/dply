@@ -1,6 +1,9 @@
 <?php
 
+use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
+use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
+use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnsureApiTokenAbility;
@@ -45,6 +48,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()
             ->when(fn (): bool => (int) config('dply.deploy_digest_hours', 0) > 0);
+
+        $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
+
+        $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
+
+        $schedule->command(CheckSupervisorHealthCommand::class)
+            ->everyFifteenMinutes()
+            ->when(fn (): bool => (bool) config('dply.supervisor_health_check_enabled', true));
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = trim((string) env('TRUSTED_PROXIES', ''));

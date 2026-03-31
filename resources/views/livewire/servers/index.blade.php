@@ -1,5 +1,8 @@
 @php
     $stripe = function (\App\Models\Server $server): string {
+        if ($server->scheduled_deletion_at) {
+            return 'bg-orange-500';
+        }
         if ($server->status === \App\Models\Server::STATUS_READY) {
             if ($server->health_status === \App\Models\Server::HEALTH_REACHABLE) {
                 return 'bg-emerald-500';
@@ -134,6 +137,12 @@
                                                 <div class="min-w-0">
                                                     <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-semibold text-brand-ink hover:text-brand-sage truncate block">{{ $server->name }}</a>
                                                     <p class="mt-1 font-mono text-sm text-brand-moss truncate">{{ $server->ip_address ?? __('Provisioning…') }}</p>
+                                                    @if ($server->scheduled_deletion_at)
+                                                        <p class="mt-1 text-xs font-medium text-amber-800">
+                                                            {{ __('Removal scheduled :date', ['date' => $server->scheduled_deletion_at->timezone(config('app.timezone'))->toFormattedDateString()]) }}
+                                                            <button type="button" wire:click="cancelScheduledServerRemoval(@js($server->id))" class="ml-1 font-semibold underline hover:no-underline">{{ __('Cancel') }}</button>
+                                                        </p>
+                                                    @endif
                                                 </div>
                                                 <p class="text-xs text-brand-moss leading-relaxed">
                                                     {{ trans_choice(':count site|:count sites', $server->sites_count, ['count' => $server->sites_count]) }}
@@ -147,7 +156,7 @@
                                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/></svg>
                                                     </a>
                                                     @can('delete', $server)
-                                                        <button type="button" wire:click="destroy(@js($server->id))" wire:confirm="{{ __('Remove this server? Cloud instances will be destroyed.') }}" class="text-xs font-semibold text-red-600 hover:text-red-800">
+                                                        <button type="button" wire:click="openRemoveServerModal(@js($server->id))" class="text-xs font-semibold text-red-600 hover:text-red-800">
                                                             {{ __('Remove') }}
                                                         </button>
                                                     @endcan
@@ -190,6 +199,10 @@
                                                         {{ $server->provider->label() }}
                                                         <span class="text-brand-mist"> · </span>
                                                         {{ $server->status }}
+                                                        @if ($server->scheduled_deletion_at)
+                                                            <span class="text-brand-mist"> · </span>
+                                                            <span class="text-amber-800 font-medium">{{ __('Removal :date', ['date' => $server->scheduled_deletion_at->timezone(config('app.timezone'))->toFormattedDateString()]) }}</span>
+                                                        @endif
                                                         @if ($server->status === 'ready')
                                                             @if ($server->health_status === 'reachable')
                                                                 <span class="text-emerald-600"> · {{ __('Reachable') }}</span>
@@ -204,7 +217,7 @@
                                                         {{ __('Manage') }}
                                                     </a>
                                                     @can('delete', $server)
-                                                        <button type="button" wire:click="destroy(@js($server->id))" wire:confirm="{{ __('Remove this server? Cloud instances will be destroyed.') }}" class="text-xs font-semibold text-red-600 hover:text-red-800 px-2 py-2">
+                                                        <button type="button" wire:click="openRemoveServerModal(@js($server->id))" class="text-xs font-semibold text-red-600 hover:text-red-800 px-2 py-2">
                                                             {{ __('Remove') }}
                                                         </button>
                                                     @endcan
@@ -220,4 +233,11 @@
             </div>
         @endif
     </div>
+
+    @include('livewire.servers.partials.remove-server-modal', [
+        'open' => $deleteModalServerId !== null && $deleteModalServer,
+        'serverName' => $deleteModalServer?->name ?? '',
+        'serverId' => (string) ($deleteModalServer?->id ?? ''),
+        'deletionSummary' => $deletionSummary,
+    ])
 </div>

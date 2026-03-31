@@ -57,6 +57,11 @@ return [
         'Dumps' => Command::from('php artisan solo:dumps')->lazy(),
         'Reverb' => Command::from('php artisan reverb:start --debug')->lazy(),
         'Pint' => Command::from('./vendor/bin/pint --ansi')->lazy(),
+        /*
+         * Redis queues + Horizon (set QUEUE_CONNECTION=redis; run redis-server). Replaces queue:work
+         * for metrics UI at /horizon. Use “Queue” for database-backed workers without Redis.
+         */
+        'Horizon' => Command::from('php artisan horizon')->lazy(),
         'Queue' => Command::from('php artisan queue:work')->lazy(),
         /*
          * Beyond Code Expose — uses project binary (beyondcode/expose) so Solo’s shell does not

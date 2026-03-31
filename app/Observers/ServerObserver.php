@@ -22,6 +22,7 @@ class ServerObserver
         'health_status',
         'last_health_check_at',
         'team_id',
+        'scheduled_deletion_at',
     ];
 
     public function created(Server $server): void
@@ -71,6 +72,7 @@ class ServerObserver
             'provider' => $provider instanceof \BackedEnum ? $provider->value : $provider,
             'team_id' => $server->team_id,
             'health_status' => $server->health_status,
+            'scheduled_deletion_at' => $server->scheduled_deletion_at?->toIso8601String(),
         ];
     }
 }

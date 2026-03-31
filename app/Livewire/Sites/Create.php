@@ -33,6 +33,18 @@ class Create extends Component
 
         $this->authorize('create', Site::class);
         $this->server = $server;
+
+        $hostname = request()->query('hostname');
+        if (is_string($hostname) && $hostname !== '') {
+            $hostname = strtolower(trim($hostname));
+            if (preg_match('/^[a-zA-Z0-9\.\-]+$/', $hostname)) {
+                $this->form->primary_hostname = $hostname;
+                if ($this->form->name === '') {
+                    $label = explode('.', $hostname, 2)[0];
+                    $this->form->name = $label !== '' ? $label : $hostname;
+                }
+            }
+        }
     }
 
     public function store(): mixed
@@ -89,6 +101,9 @@ class Create extends Component
 
     public function render(): View
     {
+        $this->server->refresh();
+        $this->server->loadCount('sites');
+
         return view('livewire.sites.create');
     }
 }

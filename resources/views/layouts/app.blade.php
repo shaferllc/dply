@@ -7,12 +7,36 @@
 
         <title>@yield('title', config('app.name', 'Laravel'))</title>
 
+        @if (filled(config('broadcasting.connections.reverb.key')))
+            {{-- Echo reads this at runtime (bypasses stale Vite env in public/build). Meta is fallback if window is cleared. --}}
+            @php
+                $reverbOpts = config('broadcasting.connections.reverb.options', []);
+                $reverbScheme = $reverbOpts['scheme'] ?? 'http';
+                $reverbClient = [
+                    'key' => config('broadcasting.connections.reverb.key'),
+                    'host' => filled($reverbOpts['host'] ?? null) ? $reverbOpts['host'] : null,
+                    'port' => (int) ($reverbOpts['port'] ?? ($reverbScheme === 'https' ? 443 : 8080)),
+                    'scheme' => $reverbScheme,
+                    'enabled' => (bool) config('broadcasting.echo_client_enabled', true),
+                    'bypass_local_guard' => (bool) config('broadcasting.reverb_bypass_local_guard', false),
+                ];
+            @endphp
+            <meta name="dply-reverb-config" content="{{ e(json_encode($reverbClient)) }}">
+            <script>
+                window.__DPLY_REVERB__ = @json($reverbClient);
+            </script>
+        @endif
+
         <!-- Fonts (Shipwell-inspired: Instrument Sans) -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @if (filled(config('broadcasting.connections.reverb.key')))
+            {{-- After Vite so a stale app-*.js that still bundled Echo cannot overwrite this. --}}
+            @include('partials.reverb-echo-module')
+        @endif
         @livewireStyles
         <style>[x-cloak]{display:none!important}</style>
     </head>

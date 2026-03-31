@@ -5,6 +5,7 @@ namespace App\Services\Sites;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteRelease;
+use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnectionFactory;
 
 class AtomicSiteDeployer
@@ -84,6 +85,8 @@ class AtomicSiteDeployer
 
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $base.'/current');
         $this->hookRunner->assertHooksSucceeded($log, 'after_activate');
+
+        $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $newEsc), 30));
 

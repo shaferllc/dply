@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Organization;
+use App\Models\Server;
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
@@ -14,4 +15,21 @@ Broadcast::channel('organization.{organizationId}', function ($user, string $org
     }
 
     return ['id' => $organization->id, 'name' => $organization->name];
+});
+
+/**
+ * Server workspace log snapshots (Reverb). Deployers are excluded so SSH log payloads are not
+ * delivered to members who cannot fetch those logs themselves.
+ */
+Broadcast::channel('server.{serverId}', function ($user, string $serverId) {
+    $server = Server::query()->find($serverId);
+    if ($server === null || ! $user->can('view', $server)) {
+        return false;
+    }
+
+    if ($server->organization_id && $server->organization?->userIsDeployer($user)) {
+        return false;
+    }
+
+    return ['id' => $user->id];
 });

@@ -47,4 +47,16 @@ return [
 
     'install_fail2ban' => true,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Supervisor (process manager)
+    |--------------------------------------------------------------------------
+    |
+    | When true (default), the stack provision script installs Supervisor during
+    | initial setup. Set DPLY_INSTALL_SUPERVISOR_ON_PROVISION=false to skip (then use
+    | Server → Daemons → “Install Supervisor” if you add programs later).
+    |
+    */
+    'install_supervisor_on_provision' => (bool) env('DPLY_INSTALL_SUPERVISOR_ON_PROVISION', true),
+
 ];

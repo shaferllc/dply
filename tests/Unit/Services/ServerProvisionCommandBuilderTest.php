@@ -28,6 +28,8 @@ class ServerProvisionCommandBuilderTest extends TestCase
 
     public function test_build_application_stack_includes_nginx_php_and_mysql_packages(): void
     {
+        config(['server_provision.install_supervisor_on_provision' => false]);
+
         $server = Server::factory()->create([
             'provider' => ServerProvider::DigitalOcean,
             'meta' => [
@@ -47,6 +49,29 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('php8.3-fpm', $joined);
         $this->assertStringContainsString('mysql-server', $joined);
         $this->assertStringContainsString('redis-server', $joined);
+        $this->assertStringNotContainsString('apt-get install -y --no-install-recommends supervisor', $joined);
+    }
+
+    public function test_build_application_stack_installs_supervisor_when_provision_flag_enabled(): void
+    {
+        config(['server_provision.install_supervisor_on_provision' => true]);
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $commands = app(ServerProvisionCommandBuilder::class)->build($server);
+        $joined = implode("\n", $commands);
+
+        $this->assertStringContainsString('apt-get install -y --no-install-recommends supervisor', $joined);
+        $this->assertStringContainsString('systemctl enable --now supervisor', $joined);
     }
 
     public function test_build_load_balancer_installs_haproxy(): void

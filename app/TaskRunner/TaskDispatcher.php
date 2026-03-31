@@ -360,9 +360,10 @@ class TaskDispatcher implements TaskDispatcherInterface
     }
 
     /**
-     * Wrap a task with TrackTaskInBackground to enable callbacks.
+     * Wrap a task with TrackTaskInBackground so remote execution uses shell HTTP callbacks
+     * (update-output, mark-as-finished, etc.).
      */
-    protected function wrapWithTrackTaskInBackground(Task $task, TaskModel $taskModel): TrackTaskInBackground
+    public function wrapWithTrackTaskInBackground(Task $task, TaskModel $taskModel): TrackTaskInBackground
     {
         // Generate webhook URLs for the task
         $finishedUrl = $taskModel->webhookUrl('markAsFinished');

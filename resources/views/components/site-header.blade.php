@@ -13,6 +13,13 @@
         || $featuresActive
         || $pricingActive
         || request()->routeIs('docs.*');
+    $adminMenuActive = auth()->check()
+        && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
+        && (
+            request()->routeIs('admin.dashboard')
+            || request()->is('horizon*')
+            || request()->is('pulse*')
+        );
 @endphp
 
 <header x-data="{ open: false }" class="border-b border-brand-ink/10 bg-brand-cream/85 backdrop-blur-xl sticky top-0 z-30">
@@ -121,6 +128,51 @@
                             </x-nav-link>
                         </nav>
                     </div>
+                    @can('viewPlatformAdmin')
+                        <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('Platform admin') }}">
+                            <x-dropdown align="right" width="w-64" contentClasses="py-1 bg-white">
+                                <x-slot name="trigger">
+                                    <button
+                                        type="button"
+                                        class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $adminMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
+                                        aria-haspopup="menu"
+                                    >
+                                        <x-heroicon-o-shield-check class="h-5 w-5 shrink-0 opacity-90" />
+                                        <span>{{ __('Admin') }}</span>
+                                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
+                                    </button>
+                                </x-slot>
+                                <x-slot name="content">
+                                    <x-dropdown-link :href="route('admin.dashboard')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-squares-2x2 class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Platform overview') }}
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('horizon.index')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-queue-list class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Horizon') }}
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('pulse')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-chart-bar class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Laravel Pulse') }}
+                                    </x-dropdown-link>
+                                    @if (reverb_health_check_url())
+                                        <x-dropdown-link :href="reverb_health_check_url()" target="_blank" rel="noopener noreferrer">
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-signal class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Reverb health') }}
+                                        </x-dropdown-link>
+                                    @endif
+                                </x-slot>
+                            </x-dropdown>
+                        </div>
+                    @endcan
                     <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('More navigation') }}">
                         <x-dropdown align="right" width="w-56" contentClasses="py-1 bg-white">
                             <x-slot name="trigger">
@@ -285,6 +337,40 @@
                     </x-slot>
                     {{ __('Organizations') }}
                 </x-responsive-nav-link>
+                @can('viewPlatformAdmin')
+                    <div class="border-t border-brand-ink/10 pt-2 mt-2">
+                        <p class="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Admin') }}</p>
+                        <x-responsive-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
+                            <x-slot name="icon">
+                                <x-heroicon-o-shield-check class="{{ $hi }}" />
+                            </x-slot>
+                            {{ __('Platform overview') }}
+                        </x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('horizon.index')" :active="request()->is('horizon*')">
+                            <x-slot name="icon">
+                                <x-heroicon-o-queue-list class="{{ $hi }}" />
+                            </x-slot>
+                            {{ __('Horizon') }}
+                        </x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('pulse')" :active="request()->is('pulse*')">
+                            <x-slot name="icon">
+                                <x-heroicon-o-chart-bar class="{{ $hi }}" />
+                            </x-slot>
+                            {{ __('Laravel Pulse') }}
+                        </x-responsive-nav-link>
+                        @if (reverb_health_check_url())
+                            <a
+                                href="{{ reverb_health_check_url() }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="flex items-center gap-2.5 border-l-4 border-transparent py-2 ps-3 pe-4 text-base font-medium text-brand-moss hover:bg-brand-sand/30"
+                            >
+                                <x-heroicon-o-signal class="{{ $hi }}" />
+                                {{ __('Reverb health') }}
+                            </a>
+                        @endif
+                    </div>
+                @endcan
                 <a href="{{ route('features') }}" class="flex items-center gap-2.5 border-l-4 {{ $featuresActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
                     <x-heroicon-o-sparkles class="h-5 w-5 shrink-0 opacity-90" />
                     {{ __('Features') }}

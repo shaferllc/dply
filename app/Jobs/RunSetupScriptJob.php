@@ -6,12 +6,11 @@ use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Enums\TaskStatus;
-use App\Modules\TaskRunner\Events\TaskCompleted;
-use App\Modules\TaskRunner\Events\TaskFailed;
-use App\Modules\TaskRunner\Events\TaskStarted;
 use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTaskModel;
 use App\Modules\TaskRunner\TaskDispatcher;
+use App\Modules\TaskRunner\TrackTaskInBackground;
+use App\Observers\TaskRunnerTaskObserver;
 use App\Services\Servers\ServerProvisionCommandBuilder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -20,11 +19,10 @@ use Illuminate\Support\Facades\Log;
 /**
  * Runs stack provisioning from servers.meta (wizard choices), then optional setup_scripts recipes.
  *
- * Uses TaskRunner ({@see TaskDispatcher::runWithModel}) so execution goes through the same SSH
- * upload/run path as other remote tasks, persists a {@see TaskRunnerTaskModel} row, and emits
- * TaskRunner events ({@see TaskStarted},
- * {@see TaskCompleted},
- * {@see TaskFailed}) for listeners and callbacks.
+ * Uses TaskRunner {@see TaskDispatcher::runInBackgroundWithModel} with {@see TrackTaskInBackground}
+ * so the remote wrapper can POST signed webhooks (update-output, mark-as-finished, …). Completion
+ * is applied to {@see Server} when the task row moves to a terminal status
+ * ({@see TaskRunnerTaskObserver}).
  */
 class RunSetupScriptJob implements ShouldQueue
 {
@@ -35,6 +33,32 @@ class RunSetupScriptJob implements ShouldQueue
     public function __construct(
         public Server $server
     ) {}
+
+    /**
+     * Apply provision outcome to the server (setup_status, optional deploy ssh_user).
+     */
+    public static function applyProvisionOutcomeToServer(Server $server, bool $success): void
+    {
+        $server->refresh();
+
+        if ($success) {
+            $updates = [
+                'setup_status' => Server::SETUP_STATUS_DONE,
+            ];
+            if ($server->openSshPublicKeyFromPrivate() !== null) {
+                $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
+                if ($deployUser !== '' && $deployUser !== 'root'
+                    && preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $deployUser)) {
+                    $updates['ssh_user'] = $deployUser;
+                }
+            }
+            $server->update($updates);
+
+            return;
+        }
+
+        $server->update(['setup_status' => Server::SETUP_STATUS_FAILED]);
+    }
 
     public static function shouldDispatch(Server $server): bool
     {
@@ -114,21 +138,25 @@ class RunSetupScriptJob implements ShouldQueue
         ]);
 
         try {
-            $output = $dispatcher->runWithModel($task, $taskModel);
+            $task->setTaskModel($taskModel);
 
-            $server->refresh();
-            $success = $output !== null && $output->isSuccessful();
-            $updates = [
-                'setup_status' => $success ? Server::SETUP_STATUS_DONE : Server::SETUP_STATUS_FAILED,
-            ];
-            if ($success && $server->openSshPublicKeyFromPrivate() !== null) {
-                $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
-                if ($deployUser !== '' && $deployUser !== 'root'
-                    && preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $deployUser)) {
-                    $updates['ssh_user'] = $deployUser;
-                }
+            $tracked = $dispatcher->wrapWithTrackTaskInBackground($task, $taskModel);
+            $tracked->setTaskModel($taskModel);
+
+            $taskModel->update([
+                'instance' => serialize($tracked),
+            ]);
+
+            $output = $dispatcher->runInBackgroundWithModel($tracked, $taskModel);
+
+            if ($output === null || ! $output->isSuccessful()) {
+                $taskModel->update([
+                    'status' => TaskStatus::Failed,
+                    'completed_at' => now(),
+                    'output' => $output !== null ? $output->getBuffer() : 'Background start returned no output.',
+                ]);
+                static::applyProvisionOutcomeToServer($server, false);
             }
-            $server->update($updates);
         } catch (TaskExecutionException $e) {
             Log::warning('Server provision / setup script failed (TaskRunner).', [
                 'server_id' => $server->id,
@@ -137,7 +165,13 @@ class RunSetupScriptJob implements ShouldQueue
                 'error' => $e->getMessage(),
                 'caused_by' => $e->getPrevious()?->getMessage(),
             ]);
-            $server->update(['setup_status' => Server::SETUP_STATUS_FAILED]);
+            $taskModel->update([
+                'status' => TaskStatus::Failed,
+                'exit_code' => null,
+                'output' => $e->getMessage(),
+                'completed_at' => now(),
+            ]);
+            static::applyProvisionOutcomeToServer($server, false);
         } catch (\Throwable $e) {
             Log::warning('Server provision / setup script failed.', [
                 'server_id' => $server->id,
@@ -145,7 +179,13 @@ class RunSetupScriptJob implements ShouldQueue
                 'setup_script_key' => $server->setup_script_key,
                 'error' => $e->getMessage(),
             ]);
-            $server->update(['setup_status' => Server::SETUP_STATUS_FAILED]);
+            $taskModel->update([
+                'status' => TaskStatus::Failed,
+                'exit_code' => null,
+                'output' => $e->getMessage(),
+                'completed_at' => now(),
+            ]);
+            static::applyProvisionOutcomeToServer($server, false);
         }
     }
 }

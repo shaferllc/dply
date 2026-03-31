@@ -20,12 +20,22 @@ class SupervisorProgram extends Model
         'user',
         'numprocs',
         'is_active',
+        'env_vars',
+        'stdout_logfile',
+        'priority',
+        'startsecs',
+        'stopwaitsecs',
+        'autorestart',
+        'redirect_stderr',
+        'stderr_logfile',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'redirect_stderr' => 'boolean',
+            'env_vars' => 'encrypted:array',
         ];
     }
 

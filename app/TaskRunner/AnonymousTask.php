@@ -71,6 +71,19 @@ class AnonymousTask extends Task
     }
 
     /**
+     * Expose the model callback URL for shell wrappers (e.g. TrackTaskInBackground) even though
+     * this task is not HasCallbacks — the Eloquent model still receives signed webhooks.
+     */
+    public function callbackUrl(): ?string
+    {
+        if ($this->taskModel === null || $this->taskModel->id === null) {
+            return null;
+        }
+
+        return $this->taskModel->callbackUrl();
+    }
+
+    /**
      * Get the task name.
      */
     public function getName(): string

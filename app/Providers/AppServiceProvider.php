@@ -19,7 +19,10 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSshKey;
 use App\Models\Workspace;
+use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
 use App\Observers\ServerObserver;
+use App\Observers\SupervisorProgramObserver;
+use App\Observers\TaskRunnerTaskObserver;
 use App\Policies\BackupConfigurationPolicy;
 use App\Policies\IncidentPolicy;
 use App\Policies\NotificationChannelPolicy;
@@ -98,7 +101,38 @@ class AppServiceProvider extends ServiceProvider
             };
         });
 
+        Gate::define('viewPlatformAdmin', function (?User $user): bool {
+            if ($user === null) {
+                return false;
+            }
+
+            if (app()->environment(['local', 'testing'])) {
+                return true;
+            }
+
+            $raw = (string) config('admin.allowed_emails', '');
+            $allowed = array_values(array_filter(array_map('trim', explode(',', $raw))));
+
+            if ($allowed === []) {
+                return false;
+            }
+
+            return in_array($user->email, $allowed, true);
+        });
+
+        /*
+         * Laravel Pulse registers viewPulse as local-only; override after all providers so
+         * platform admins match Horizon /admin access (see config/admin.php).
+         */
+        $this->app->booted(function (): void {
+            Gate::define('viewPulse', function (?User $user): bool {
+                return $user !== null && Gate::forUser($user)->allows('viewPlatformAdmin');
+            });
+        });
+
         Server::observe(ServerObserver::class);
+        SupervisorProgram::observe(SupervisorProgramObserver::class);
+        TaskRunnerTask::observe(TaskRunnerTaskObserver::class);
 
         Server::created(function (Server $server): void {
             if ($server->status === Server::STATUS_READY && ! empty($server->ssh_private_key)) {

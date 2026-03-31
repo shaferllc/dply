@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\ReverbClientConfig;
+
 return [
 
     /*
@@ -32,6 +34,7 @@ return [
             'host' => env('REVERB_SERVER_HOST', '0.0.0.0'),
             'port' => env('REVERB_SERVER_PORT', 8080),
             'path' => env('REVERB_SERVER_PATH', ''),
+            // When set to your *.test host, Reverb enables TLS automatically if Valet/Herd certs exist (no nginx).
             'hostname' => env('REVERB_HOST'),
             'options' => [
                 'tls' => [],
@@ -78,7 +81,12 @@ return [
                 'app_id' => env('REVERB_APP_ID'),
                 'options' => [
                     'host' => env('REVERB_HOST'),
-                    'port' => env('REVERB_PORT', 443),
+                    'port' => ReverbClientConfig::browserPort(
+                        env('REVERB_PORT'),
+                        (string) env('REVERB_SCHEME', 'https'),
+                        env('REVERB_SERVER_PORT'),
+                        (string) config('app.env'),
+                    ),
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
                 ],

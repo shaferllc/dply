@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\ReverbClientConfig;
+
 return [
 
     /*
@@ -16,6 +18,20 @@ return [
     */
 
     'default' => env('BROADCAST_CONNECTION', 'null'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Browser Echo (Reverb)
+    |--------------------------------------------------------------------------
+    |
+    | Mirrors VITE_REVERB_ENABLED so Blade can expose Reverb to the client when
+    | frontend assets are built without Vite env (see window.__DPLY_REVERB__).
+    |
+    */
+
+    'echo_client_enabled' => env('VITE_REVERB_ENABLED', 'true') !== 'false',
+
+    'reverb_bypass_local_guard' => env('VITE_REVERB_BYPASS_LOCAL_GUARD') === 'true',
 
     /*
     |--------------------------------------------------------------------------
@@ -37,9 +53,19 @@ return [
             'app_id' => env('REVERB_APP_ID'),
             'options' => [
                 'host' => env('REVERB_HOST'),
-                'port' => env('REVERB_PORT', 443),
-                'scheme' => env('REVERB_SCHEME', 'https'),
-                'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+                /*
+                 * Browser port: REVERB_PORT when set. Otherwise, for https outside production, use
+                 * REVERB_SERVER_PORT so wss:// hits Reverb TLS (Valet/Herd) without nginx on 443.
+                 * Production https defaults to 443 (reverse proxy). Staging behind nginx: set REVERB_PORT=443.
+                 */
+                'port' => ReverbClientConfig::browserPort(
+                    env('REVERB_PORT'),
+                    (string) env('REVERB_SCHEME', 'http'),
+                    env('REVERB_SERVER_PORT'),
+                    (string) config('app.env'),
+                ),
+                'scheme' => env('REVERB_SCHEME', 'http'),
+                'useTLS' => env('REVERB_SCHEME', 'http') === 'https',
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html

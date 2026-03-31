@@ -19,6 +19,8 @@
         "blade-ui-kit/blade-icons": "^1.9",
         "laravel/cashier": "^16.5",
         "laravel/framework": "^13.0",
+        "laravel/horizon": "^5.45",
+        "laravel/pulse": "^1.7",
         "laravel/reverb": "^1.9",
         "laravel/socialite": "^5.25",
         "laravel/tinker": "^3.0",
@@ -68,6 +70,10 @@
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"npm run dev\" \"php artisan reverb:start\" --names=server,queue,logs,vite,reverb --kill-others"
+        ],
+        "dev:horizon": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399\" \"php artisan serve\" \"php artisan horizon\" \"php artisan pail --timeout=0\" \"npm run dev\" \"php artisan reverb:start\" --names=server,horizon,logs,vite,reverb --kill-others"
         ],
         "test": [
             "@php artisan config:clear --ansi",

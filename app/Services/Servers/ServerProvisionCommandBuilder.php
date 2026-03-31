@@ -124,8 +124,7 @@ final class ServerProvisionCommandBuilder
         $lines = array_merge($lines, $this->installPhpIfNeeded($web, $php, $database));
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
         $lines = array_merge($lines, $this->installAppCache($cache));
-        $lines[] = 'apt-get install -y --no-install-recommends supervisor';
-        $lines[] = 'systemctl enable --now supervisor';
+        $lines = array_merge($lines, $this->maybeInstallSupervisor());
 
         if (config('server_provision.install_composer', true) && $php !== 'none') {
             $lines[] = 'curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer';
@@ -154,8 +153,7 @@ final class ServerProvisionCommandBuilder
         $lines = array_merge($lines, $this->ufwSsh());
         $lines = array_merge($lines, $this->installPhpIfNeeded('none', $php, $database));
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
-        $lines[] = 'apt-get install -y --no-install-recommends supervisor';
-        $lines[] = 'systemctl enable --now supervisor';
+        $lines = array_merge($lines, $this->maybeInstallSupervisor());
 
         return $lines;
     }
@@ -208,10 +206,24 @@ final class ServerProvisionCommandBuilder
     private function rolePlain(): array
     {
         $lines = $this->ufwSsh();
-        $lines[] = 'apt-get install -y --no-install-recommends supervisor';
-        $lines[] = 'systemctl enable --now supervisor';
+        $lines = array_merge($lines, $this->maybeInstallSupervisor());
 
         return $lines;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function maybeInstallSupervisor(): array
+    {
+        if (! config('server_provision.install_supervisor_on_provision', false)) {
+            return [];
+        }
+
+        return [
+            'apt-get install -y --no-install-recommends supervisor',
+            'systemctl enable --now supervisor',
+        ];
     }
 
     /** @return list<string> */
