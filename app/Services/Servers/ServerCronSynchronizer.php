@@ -33,10 +33,28 @@ class ServerCronSynchronizer
         $before = $this->stripManagedBlock($before, $schedBegin, $schedEnd);
         $before = rtrim($before)."\n\n";
 
+        $builder = app(ServerCronCommandBuilder::class);
+
+        $server->loadMissing('organization');
+        $maintenanceUntil = $server->organization?->cron_maintenance_until;
+
         $block = $markerBegin."\n";
-        foreach ($jobs as $job) {
-            /** @var ServerCronJob $job */
-            $block .= $job->cron_expression.' '.$job->command."\n";
+        if ($maintenanceUntil !== null && now()->lt($maintenanceUntil)) {
+            $note = trim((string) $server->organization?->cron_maintenance_note);
+            $block .= '# DPLY: cron jobs paused until '.$maintenanceUntil->toIso8601String()
+                .($note !== '' ? ' — '.$note : '')."\n";
+        } else {
+            foreach ($jobs as $job) {
+                /** @var ServerCronJob $job */
+                if (! $job->enabled) {
+                    continue;
+                }
+                $segment = $builder->crontabCommandSegment($server, $job);
+                if ($segment === '') {
+                    continue;
+                }
+                $block .= trim($job->cron_expression).' '.$segment."\n";
+            }
         }
         $block .= $markerEnd."\n";
 

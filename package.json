@@ -4,18 +4,24 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "build:fresh": "rm -rf public/build && vite build",
         "dev": "vite"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.11",
         "@tailwindcss/vite": "^4.2.2",
-        "alpinejs": "^3.4.2",
         "autoprefixer": "^10.4.2",
         "axios": "^1.11.0",
+        "chokidar": "^5.0.0",
         "concurrently": "^9.0.1",
+        "laravel-echo": "^2.3.1",
         "laravel-vite-plugin": "^2.0.0",
         "postcss": "^8.4.31",
+        "pusher-js": "^8.4.3",
         "tailwindcss": "^4.2.2",
         "vite": "^7.0.7"
+    },
+    "dependencies": {
+        "plotly.js-dist-min": "^3.4.0"
     }
 }

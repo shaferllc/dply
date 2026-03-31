@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SiteDeployStep extends Model
 {
+    use HasUlids;
+
     public const TYPE_COMPOSER_INSTALL = 'composer_install';
 
     public const TYPE_NPM_CI = 'npm_ci';

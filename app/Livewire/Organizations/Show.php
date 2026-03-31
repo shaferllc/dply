@@ -42,13 +42,19 @@ class Show extends Component
 
     public string $int_hook_url = '';
 
-    public ?int $int_hook_site_id = null;
+    public ?string $int_hook_site_id = null;
 
     public bool $int_evt_success = true;
 
     public bool $int_evt_failed = true;
 
     public bool $int_evt_skipped = true;
+
+    public bool $int_evt_insight_opened = false;
+
+    public bool $int_evt_insight_resolved = false;
+
+    public bool $deploy_email_notifications_enabled = true;
 
     public string $team_name = '';
 
@@ -66,20 +72,36 @@ class Show extends Component
     {
         $this->authorize('view', $organization);
         $this->refreshOrganization();
-        $this->syncTeamNames();
     }
 
     protected function refreshOrganization(): void
     {
-        $this->organization = $this->organization->fresh()->load([
-            'users',
-            'teams' => fn ($q) => $q->withCount('users')->with('users'),
-            'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
-            'apiTokens',
-            'integrationOutboundWebhooks',
-            'sites' => fn ($q) => $q->orderBy('name'),
-        ]);
+        $this->organization = $this->organization->fresh()
+            ->loadCount(['servers', 'sites'])
+            ->load([
+                'users',
+                'teams' => fn ($q) => $q->withCount('users')->with('users'),
+                'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
+                'apiTokens',
+                'integrationOutboundWebhooks',
+                'sites' => fn ($q) => $q->orderBy('name'),
+            ]);
+        $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
         $this->syncTeamNames();
+    }
+
+    public function updatedDeployEmailNotificationsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'deploy_email_notifications_enabled' => $this->deploy_email_notifications_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.deploy_email_notifications_updated', null, null, [
+            'enabled' => $this->deploy_email_notifications_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Deploy email preferences updated.');
     }
 
     protected function syncTeamNames(): void
@@ -169,11 +191,12 @@ class Show extends Component
         if ($expiresAt === null && $this->token_scope === 'deploy') {
             $expiresAt = now()->addDays((int) config('dply.api_token_deploy_default_ttl_days', 14));
         }
+        $presets = config('api_token_permissions.presets', []);
         $abilities = match ($this->token_scope) {
-            'read' => ['servers.read', 'sites.read'],
-            'deploy' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy'],
-            'ops' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy', 'commands.run'],
-            default => ['*'],
+            'read' => $presets['read'] ?? [],
+            'deploy' => $presets['deploy'] ?? [],
+            'ops' => $presets['ops'] ?? [],
+            default => $presets['full'] ?? ['*'],
         };
         $allowedIps = $this->parseTokenAllowedIps($this->token_allowed_ips_text);
         ['token' => $token, 'plaintext' => $plaintext] = ApiToken::createToken(
@@ -313,7 +336,9 @@ class Show extends Component
             'int_hook_site_id' => 'nullable',
         ]);
 
-        $siteId = $this->int_hook_site_id ? (int) $this->int_hook_site_id : null;
+        $siteId = $this->int_hook_site_id !== null && $this->int_hook_site_id !== ''
+            ? (string) $this->int_hook_site_id
+            : null;
         if ($siteId && ! $this->organization->sites()->whereKey($siteId)->exists()) {
             throw ValidationException::withMessages(['int_hook_site_id' => 'Invalid site for this organization.']);
         }
@@ -327,6 +352,12 @@ class Show extends Component
         }
         if ($this->int_evt_skipped) {
             $events[] = 'deploy_skipped';
+        }
+        if ($this->int_evt_insight_opened) {
+            $events[] = 'insight_opened';
+        }
+        if ($this->int_evt_insight_resolved) {
+            $events[] = 'insight_resolved';
         }
 
         IntegrationOutboundWebhook::query()->create([
@@ -344,11 +375,13 @@ class Show extends Component
         $this->int_evt_success = true;
         $this->int_evt_failed = true;
         $this->int_evt_skipped = true;
+        $this->int_evt_insight_opened = false;
+        $this->int_evt_insight_resolved = false;
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Integration webhook saved.');
     }
 
-    public function deleteOutboundIntegration(int $id): void
+    public function deleteOutboundIntegration(string $id): void
     {
         $this->authorize('update', $this->organization);
         $hook = $this->organization->integrationOutboundWebhooks()->whereKey($id)->firstOrFail();
@@ -370,31 +403,7 @@ class Show extends Component
      */
     protected function parseTokenAllowedIps(string $raw): ?array
     {
-        $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
-        $clean = [];
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '') {
-                continue;
-            }
-            if (! $this->validIpOrCidrForToken($line)) {
-                throw ValidationException::withMessages([
-                    'token_allowed_ips_text' => 'Invalid IP or CIDR: '.$line,
-                ]);
-            }
-            $clean[] = $line;
-        }
-
-        return $clean !== [] ? $clean : null;
-    }
-
-    protected function validIpOrCidrForToken(string $value): bool
-    {
-        if (str_contains($value, '/')) {
-            return (bool) preg_match('#^(\d{1,3}\.){3}\d{1,3}/(3[0-2]|[12]?\d)$#', $value);
-        }
-
-        return (bool) filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6);
+        return ApiToken::parseAllowedIpsInput($raw, 'token_allowed_ips_text');
     }
 
     public function render(): View

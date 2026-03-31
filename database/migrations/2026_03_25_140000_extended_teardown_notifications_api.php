@@ -13,8 +13,8 @@ return new class extends Migration
         });
 
         Schema::create('webhook_delivery_logs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_id')->constrained('sites')->cascadeOnDelete();
             $table->string('request_ip', 45)->nullable();
             $table->unsignedSmallInteger('http_status')->nullable();
             $table->string('outcome', 32);
@@ -25,9 +25,9 @@ return new class extends Migration
         });
 
         Schema::create('integration_outbound_webhooks', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('site_id')->nullable()->constrained('sites')->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('organization_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('site_id')->nullable()->constrained('sites')->nullOnDelete();
             $table->string('name', 120);
             $table->string('driver', 24);
             $table->text('webhook_url');

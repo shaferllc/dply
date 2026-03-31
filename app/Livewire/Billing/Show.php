@@ -5,8 +5,10 @@ namespace App\Livewire\Billing;
 use App\Models\Organization;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Laravel\Cashier\Invoice;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Throwable;
 
 #[Layout('layouts.app')]
 class Show extends Component
@@ -78,6 +80,22 @@ class Show extends Component
         return $this->organization->hasStripeId();
     }
 
+    /**
+     * @return Collection<int, Invoice>
+     */
+    public function getInvoicesProperty(): Collection
+    {
+        if (! $this->organization->hasStripeId()) {
+            return collect();
+        }
+
+        try {
+            return $this->organization->invoices(false, ['limit' => 12]);
+        } catch (Throwable) {
+            return collect();
+        }
+    }
+
     public function checkout(string $plan): mixed
     {
         $this->authorize('update', $this->organization);
@@ -92,11 +110,11 @@ class Show extends Component
 
         audit_log($this->organization, auth()->user(), 'billing.checkout_started', null, null, ['plan' => $plan]);
 
-        $billingUrl = route('billing.show', $this->organization);
+        $subscriptionUrl = route('subscription.show', $this->organization);
         $checkout = $this->organization->newSubscription('default', $planConfig['price_id'])
             ->checkout([
-                'success_url' => $billingUrl.'?checkout=success',
-                'cancel_url' => $billingUrl.'?checkout=cancelled',
+                'success_url' => $subscriptionUrl.'?checkout=success',
+                'cancel_url' => $subscriptionUrl.'?checkout=cancelled',
             ], []);
 
         return $checkout->redirect();
@@ -114,7 +132,7 @@ class Show extends Component
 
         audit_log($this->organization, auth()->user(), 'billing.portal_accessed');
 
-        return $this->organization->redirectToBillingPortal(route('billing.show', $this->organization));
+        return $this->organization->redirectToBillingPortal(route('subscription.show', $this->organization));
     }
 
     public function render(): View

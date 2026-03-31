@@ -19,11 +19,16 @@ class Index extends Component
 
         $this->authorize('viewAny', Site::class);
 
-        $serverIds = $org->servers()->pluck('id');
+        $serversQuery = $org->servers();
+        $team = auth()->user()->currentTeam();
+        if ($team) {
+            $serversQuery->where('team_id', $team->id);
+        }
+        $serverIds = $serversQuery->pluck('id');
 
         $sites = Site::query()
             ->whereIn('server_id', $serverIds)
-            ->with(['server', 'domains'])
+            ->with(['server', 'domains', 'workspace'])
             ->orderByDesc('id')
             ->get();
 

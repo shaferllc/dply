@@ -3,15 +3,18 @@
 namespace App\Models;
 
 use App\Enums\SiteType;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Str;
 
 class Site extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUlids;
 
     public const STATUS_PENDING = 'pending';
 
@@ -31,6 +34,7 @@ class Site extends Model
         'server_id',
         'user_id',
         'organization_id',
+        'workspace_id',
         'name',
         'slug',
         'type',
@@ -50,11 +54,13 @@ class Site extends Model
         'webhook_secret',
         'webhook_allowed_ips',
         'post_deploy_command',
+        'deploy_script_id',
         'deploy_strategy',
         'releases_to_keep',
         'nginx_extra_raw',
         'octane_port',
         'laravel_scheduler',
+        'restart_supervisor_programs_after_deploy',
         'deployment_environment',
         'php_fpm_user',
         'env_file_content',
@@ -71,6 +77,7 @@ class Site extends Model
             'env_file_content' => 'encrypted',
             'meta' => 'array',
             'laravel_scheduler' => 'boolean',
+            'restart_supervisor_programs_after_deploy' => 'boolean',
             'nginx_installed_at' => 'datetime',
             'ssl_installed_at' => 'datetime',
             'last_deploy_at' => 'datetime',
@@ -87,6 +94,12 @@ class Site extends Model
                 $server = Server::query()->find($site->server_id);
                 if ($server) {
                     $site->organization_id = $server->organization_id;
+                }
+            }
+            if ($site->workspace_id === null && $site->server_id) {
+                $server = Server::query()->find($site->server_id);
+                if ($server?->workspace_id) {
+                    $site->workspace_id = $server->workspace_id;
                 }
             }
             if ($site->project_id === null) {
@@ -128,6 +141,16 @@ class Site extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
+    public function deployScript(): BelongsTo
+    {
+        return $this->belongsTo(Script::class, 'deploy_script_id');
     }
 
     public function project(): BelongsTo
@@ -225,6 +248,21 @@ class Site extends Model
     public function deployHookUrl(): string
     {
         return route('hooks.site.deploy', ['site' => $this->id]);
+    }
+
+    public function notificationSubscriptions(): MorphMany
+    {
+        return $this->morphMany(NotificationSubscription::class, 'subscribable');
+    }
+
+    public function insightSetting(): MorphOne
+    {
+        return $this->morphOne(InsightSetting::class, 'settingsable');
+    }
+
+    public function insightFindings(): HasMany
+    {
+        return $this->hasMany(InsightFinding::class)->orderByDesc('detected_at');
     }
 
     public function ensureUniqueSlug(): void

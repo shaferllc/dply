@@ -19,6 +19,8 @@ Send your API token on every request using either header:
 
 Create and revoke tokens in **Organization settings → API tokens** (org admins only). The full token is shown only once when you create it.
 
+**Roles and plan limits** (who can create servers/sites, deployer restrictions, Free tier caps) are documented in **[ORG_ROLES_AND_LIMITS.md](./ORG_ROLES_AND_LIMITS.md)**.
+
 ## Rate limit
 
 API routes are limited to **60 requests per minute per token**. Exceeding the limit returns `429 Too Many Requests`.

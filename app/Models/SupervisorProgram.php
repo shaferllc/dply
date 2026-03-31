@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SupervisorProgram extends Model
 {
+    use HasUlids;
+
     protected $fillable = [
         'server_id',
         'site_id',
@@ -17,12 +20,22 @@ class SupervisorProgram extends Model
         'user',
         'numprocs',
         'is_active',
+        'env_vars',
+        'stdout_logfile',
+        'priority',
+        'startsecs',
+        'stopwaitsecs',
+        'autorestart',
+        'redirect_stderr',
+        'stderr_logfile',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'redirect_stderr' => 'boolean',
+            'env_vars' => 'encrypted:array',
         ];
     }
 

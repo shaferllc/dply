@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('site_deploy_steps', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_id')->constrained('sites')->cascadeOnDelete();
             $table->unsignedInteger('sort_order')->default(0);
             $table->string('step_type', 64);
             $table->text('custom_command')->nullable();

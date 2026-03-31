@@ -12,7 +12,7 @@ class DeployDigestBuffer
 {
     protected const CACHE_PREFIX = 'deploy-digest-lines:';
 
-    public static function record(int $organizationId, string $line): void
+    public static function record(string $organizationId, string $line): void
     {
         $key = self::CACHE_PREFIX.$organizationId;
         $lines = Cache::get($key, []);
@@ -23,7 +23,7 @@ class DeployDigestBuffer
     /**
      * @return array<int, string>
      */
-    public static function pull(int $organizationId): array
+    public static function pull(string $organizationId): array
     {
         $key = self::CACHE_PREFIX.$organizationId;
         $lines = Cache::pull($key, []);
@@ -40,12 +40,12 @@ class DeployDigestBuffer
 
         $orgIds = Organization::query()->pluck('id');
         foreach ($orgIds as $id) {
-            $lines = self::pull((int) $id);
+            $lines = self::pull((string) $id);
             if ($lines === []) {
                 continue;
             }
             $org = Organization::query()->find($id);
-            if (! $org) {
+            if (! $org || ! $org->wantsDeployEmailNotifications()) {
                 continue;
             }
             $recipients = $org->users()

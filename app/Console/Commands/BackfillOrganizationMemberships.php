@@ -2,19 +2,19 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Organizations\EnsureUserHasWorkspaceOrganization;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
 
 class BackfillOrganizationMemberships extends Command
 {
     protected $signature = 'dply:backfill-organizations
                             {--dry-run : Show what would be done without making changes}';
 
-    protected $description = 'Create a default organization for each user with unassigned servers/credentials and assign them.';
+    protected $description = 'Create a default workspace for users missing an organization and assign any unowned records.';
 
     public function handle(): int
     {
@@ -25,13 +25,14 @@ class BackfillOrganizationMemberships extends Command
 
         $usersNeedingOrg = User::query()
             ->where(function ($q) {
-                $q->whereHas('servers', fn ($q2) => $q2->whereNull('organization_id'))
+                $q->whereDoesntHave('organizations')
+                    ->orWhereHas('servers', fn ($q2) => $q2->whereNull('organization_id'))
                     ->orWhereHas('providerCredentials', fn ($q2) => $q2->whereNull('organization_id'));
             })
             ->get();
 
         if ($usersNeedingOrg->isEmpty()) {
-            $this->info('No users with unassigned servers or credentials.');
+            $this->info('No users need organization backfill.');
 
             return self::SUCCESS;
         }
@@ -47,33 +48,24 @@ class BackfillOrganizationMemberships extends Command
 
     private function backfillUser(User $user, bool $dryRun): void
     {
-        if ($user->organizations()->exists()) {
-            $firstOrg = $user->organizations()->first();
-            $this->assignServersAndCredentialsToOrg($user, $firstOrg, $dryRun);
+        $existingOrg = $user->organizations()->orderByPivot('created_at')->orderBy('organizations.id')->first();
+        $org = $existingOrg;
+
+        if (! $org && $dryRun) {
+            $this->line('  Would create workspace "'.EnsureUserHasWorkspaceOrganization::workspaceNameFor($user).'" and assign records.');
 
             return;
         }
 
-        $name = $user->name."'s Organization";
-        $slug = Str::slug(Str::limit($user->name, 30)).'-'.Str::random(4);
-        $base = Str::beforeLast($slug, '-');
-        $i = 0;
-        while (Organization::where('slug', $slug)->exists()) {
-            $slug = $base.'-'.(++$i);
+        if (! $org) {
+            $org = EnsureUserHasWorkspaceOrganization::run($user);
+            $this->line('  Created workspace "'.$org->name.'" and assigned user as owner.');
+        } else {
+            $org->createDefaultTeamIfMissing();
+            $org->attachUserToDefaultTeam($user);
         }
 
-        if (! $dryRun) {
-            $org = Organization::create([
-                'name' => $name,
-                'slug' => $slug,
-                'email' => $user->email,
-            ]);
-            $org->users()->attach($user->id, ['role' => 'owner']);
-            $this->assignServersAndCredentialsToOrg($user, $org, false);
-            $this->line("  Created org \"{$name}\" and assigned user as owner.");
-        } else {
-            $this->line("  Would create org \"{$name}\" and assign servers/credentials.");
-        }
+        $this->assignServersAndCredentialsToOrg($user, $org, $dryRun);
     }
 
     private function assignServersAndCredentialsToOrg(User $user, Organization $org, bool $dryRun): void

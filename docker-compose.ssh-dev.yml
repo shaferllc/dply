@@ -1,0 +1,23 @@
+# Optional local SSH target for health checks, deploy smoke tests, and integration work.
+# Start: docker compose -f docker-compose.ssh-dev.yml up -d
+# SSH: ssh -p 2222 dplytest@127.0.0.1  (password: dplylocal — local only; prefer keys in real tests)
+# Add a Custom server in BYO: host 127.0.0.1, port 2222, user dplytest, paste a private key if you switch to key auth.
+services:
+  ssh-dev:
+    image: lscr.io/linuxserver/openssh-server:latest
+    container_name: dply-ssh-dev
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      TZ: Etc/UTC
+      USER_NAME: dplytest
+      USER_PASSWORD: dplylocal
+      PASSWORD_ACCESS: 'true'
+    volumes:
+      - ssh-dev-config:/config
+    ports:
+      - '127.0.0.1:2222:2222'
+    restart: unless-stopped
+
+volumes:
+  ssh-dev-config:

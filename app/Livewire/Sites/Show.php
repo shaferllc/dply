@@ -5,6 +5,7 @@ namespace App\Livewire\Sites;
 use App\Jobs\InstallSiteNginxJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
@@ -55,6 +56,8 @@ class Show extends Component
     public string $octane_port = '';
 
     public bool $laravel_scheduler = false;
+
+    public bool $restart_supervisor_programs_after_deploy = false;
 
     public string $deployment_environment = 'production';
 
@@ -115,6 +118,7 @@ class Show extends Component
         $this->nginx_extra_raw = (string) ($this->site->nginx_extra_raw ?? '');
         $this->octane_port = $this->site->octane_port !== null ? (string) $this->site->octane_port : '';
         $this->laravel_scheduler = (bool) $this->site->laravel_scheduler;
+        $this->restart_supervisor_programs_after_deploy = (bool) ($this->site->restart_supervisor_programs_after_deploy ?? false);
         $this->deployment_environment = (string) ($this->site->deployment_environment ?? 'production');
         $this->php_fpm_user = (string) ($this->site->php_fpm_user ?? '');
         $ips = $this->site->webhook_allowed_ips;
@@ -197,7 +201,9 @@ class Show extends Component
         try {
             RunSiteDeploymentJob::dispatchSync($this->site, SiteDeployment::TRIGGER_MANUAL);
             $this->site->refresh();
-            $this->flash_success = 'Deployment finished.';
+            $this->flash_success = config('insights.queue_after_deploy', true)
+                ? __('Deployment finished. Server and site insight runs have been queued.')
+                : __('Deployment finished.');
         } catch (\Throwable $e) {
             $this->flash_error = $e->getMessage();
         }
@@ -207,7 +213,10 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
-        $this->flash_success = 'Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.';
+        $base = __('Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.');
+        $this->flash_success = config('insights.queue_after_deploy', true)
+            ? $base.' '.__('After a successful deploy, server and site insight runs are queued automatically.')
+            : $base;
         $this->flash_error = null;
     }
 
@@ -299,6 +308,7 @@ class Show extends Component
             'nginx_extra_raw' => 'nullable|string|max:16000',
             'octane_port' => 'nullable|integer|min:1|max:65535',
             'laravel_scheduler' => 'boolean',
+            'restart_supervisor_programs_after_deploy' => 'boolean',
             'deployment_environment' => 'required|string|max:32',
             'php_fpm_user' => 'nullable|string|max:64',
         ]);
@@ -308,10 +318,11 @@ class Show extends Component
             'nginx_extra_raw' => $this->nginx_extra_raw !== '' ? $this->nginx_extra_raw : null,
             'octane_port' => $this->octane_port !== '' ? (int) $this->octane_port : null,
             'laravel_scheduler' => $this->laravel_scheduler,
+            'restart_supervisor_programs_after_deploy' => $this->restart_supervisor_programs_after_deploy,
             'deployment_environment' => $this->deployment_environment,
             'php_fpm_user' => $this->php_fpm_user !== '' ? $this->php_fpm_user : null,
         ]);
-        $this->flash_success = 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler.';
+        $this->flash_success = 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.';
         $this->flash_error = null;
     }
 
@@ -548,8 +559,14 @@ class Show extends Component
             'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
         ]);
 
+        $openSiteInsightsCount = InsightFinding::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->count();
+
         return view('livewire.sites.show', [
             'deployHookUrl' => $this->site->deployHookUrl(),
+            'openSiteInsightsCount' => $openSiteInsightsCount,
         ]);
     }
 }

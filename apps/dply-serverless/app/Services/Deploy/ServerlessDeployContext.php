@@ -3,11 +3,13 @@
 namespace App\Services\Deploy;
 
 use App\Contracts\DeployEngine;
+use App\Models\ServerlessProject;
 
 /**
  * Input for {@see DeployEngine} in the Serverless app.
  *
- * Until `projects` / deployments exist here, this carries function identity + artifact path only.
+ * {@see RunServerlessFunctionDeploymentJob} fills providerConfig from the linked {@see ServerlessProject}
+ * when present: public project metadata under project, decrypted credentials under credentials (never echoed in provisioner_output keys).
  */
 final class ServerlessDeployContext
 {

@@ -38,6 +38,24 @@ return [
     'digitalocean' => [
         'default_image' => env('DIGITALOCEAN_DEFAULT_IMAGE', 'ubuntu-24-04-x64'),
         'ssh_user' => env('DIGITALOCEAN_SSH_USER', 'root'),
+        /*
+         * Optional personal access token for listing regions & sizes on the server create
+         * wizard when no org credential is selected (read-only catalog). Provisioning still
+         * uses the selected ProviderCredential.
+         */
+        'token' => env('DIGITALOCEAN_TOKEN'),
+    ],
+
+    /*
+    | Optional OAuth app for Server providers → DigitalOcean (separate from Git OAuth).
+    | Register at https://cloud.digitalocean.com/account/api/applications
+    | Redirect URI must match DIGITALOCEAN_OAUTH_REDIRECT_URI, or if unset,
+    | route('credentials.oauth.digitalocean.callback') using APP_URL (use your Expose URL locally).
+    */
+    'digitalocean_oauth' => [
+        'client_id' => env('DIGITALOCEAN_OAUTH_CLIENT_ID'),
+        'client_secret' => env('DIGITALOCEAN_OAUTH_CLIENT_SECRET'),
+        'redirect' => env('DIGITALOCEAN_OAUTH_REDIRECT_URI'),
     ],
 
     'hetzner' => [

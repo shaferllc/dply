@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\Servers\ServerCronSynchronizer;
+use App\Services\Servers\SupervisorProvisioner;
 use App\Services\SshConnectionFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -34,7 +35,7 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
         public array $payload
     ) {}
 
-    public function handle(SshConnectionFactory $sshFactory, ServerCronSynchronizer $cronSync): void
+    public function handle(SshConnectionFactory $sshFactory, ServerCronSynchronizer $cronSync, SupervisorProvisioner $supervisorProvisioner): void
     {
         $server = Server::query()->find($this->payload['server_id'] ?? 0);
         if (! $server || ! $server->isReady() || empty($server->ssh_private_key)) {
@@ -60,7 +61,7 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
             $log .= $ssh->exec('rm -f '.escapeshellarg($path).' 2>&1', 30);
         }
         if ($svIds !== []) {
-            $log .= $ssh->exec('supervisorctl reread 2>&1; supervisorctl update 2>&1; printf "\nDPLY_SV_CLEAN_EXIT:%s" "$?"', 180);
+            $log .= $ssh->exec($supervisorProvisioner->supervisorRereadUpdateExecLine($server, 'DPLY_SV_CLEAN_EXIT'), 180);
         }
 
         if ($basename !== '') {

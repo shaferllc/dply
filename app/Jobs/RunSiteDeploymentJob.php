@@ -31,7 +31,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         public Site $site,
         public string $trigger = SiteDeployment::TRIGGER_MANUAL,
         public ?string $apiIdempotencyHash = null,
-        public ?int $auditUserId = null,
+        public ?string $auditUserId = null,
     ) {}
 
     public function handle(DeployEngineResolver $deployEngineResolver, DeployIntegrationDispatcher $integrationDispatcher): void
@@ -110,6 +110,10 @@ class RunSiteDeploymentJob implements ShouldQueue
                 ]);
                 $this->site->update(['last_deploy_at' => now()]);
                 $this->cacheIdempotencySuccess($deployment);
+                if (config('insights.queue_after_deploy', true)) {
+                    RunServerInsightsJob::dispatch($this->site->server_id);
+                    RunSiteInsightsJob::dispatch($this->site->id);
+                }
             } catch (\Throwable $e) {
                 $msg = DeployLogRedactor::redact($e->getMessage());
                 $deployment->update([
@@ -222,7 +226,11 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         $users = User::query()->whereIn('id', $userIds->unique()->all())->get();
-        if ($users->isNotEmpty()) {
+        $sendDeployEmail = true;
+        if ($org && ! $org->wantsDeployEmailNotifications()) {
+            $sendDeployEmail = false;
+        }
+        if ($sendDeployEmail && $users->isNotEmpty()) {
             Notification::send($users, new SiteDeploymentCompletedNotification($deployment->fresh()));
         }
 

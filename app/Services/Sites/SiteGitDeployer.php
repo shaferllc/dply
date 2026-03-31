@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
+use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnectionFactory;
 
 class SiteGitDeployer
@@ -102,6 +103,8 @@ class SiteGitDeployer
 
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $path);
         $this->hookRunner->assertHooksSucceeded($log, 'after_activate');
+
+        $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
 
         return ['output' => $log, 'sha' => $sha !== '' ? $sha : null];
     }

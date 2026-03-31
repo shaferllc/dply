@@ -24,16 +24,25 @@ class Login extends Component
 
     public function mount(): void
     {
-        if (auth()->check()) {
-            $this->redirect(route('dashboard'), navigate: true);
+        if (! auth()->check()) {
+            return;
         }
+
+        $this->redirect(
+            auth()->user()->hasVerifiedEmail()
+                ? route('dashboard')
+                : route('verification.notice'),
+            navigate: true
+        );
     }
 
     public function submit(): mixed
     {
         $this->validate([
             'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
+            'password' => $this->canUsePasswordlessLocalLogin()
+                ? ['nullable', 'string']
+                : ['required', 'string'],
         ]);
 
         $key = Str::transliterate(Str::lower($this->email).'|'.request()->ip());
@@ -48,7 +57,7 @@ class Login extends Component
         }
 
         $user = User::where('email', $this->email)->first();
-        if (! $user || ! Hash::check($this->password, $user->password)) {
+        if (! $user || (! $this->canUsePasswordlessLocalLogin() && ! Hash::check($this->password, $user->password))) {
             RateLimiter::hit($key);
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
@@ -67,13 +76,42 @@ class Login extends Component
         Auth::login($user, $this->remember);
         session()->regenerate();
 
+        if (! $user->hasVerifiedEmail()) {
+            return $this->redirect(route('verification.notice'), navigate: true);
+        }
+
         return $this->redirectIntended(route('dashboard', absolute: false), navigate: true);
+    }
+
+    public function quickLogin(): mixed
+    {
+        if (! $this->canUseQuickLoginButton()) {
+            abort(404);
+        }
+
+        $this->email = 'tj@tjshafer.com';
+        $this->password = '';
+        $this->remember = true;
+
+        return $this->submit();
     }
 
     public function render(): View
     {
         return view('livewire.auth.login', [
             'oauthProviders' => OAuthController::getEnabledProviders(),
+            'showQuickLoginButton' => $this->canUseQuickLoginButton(),
         ])->layout('layouts.guest-livewire', ['title' => $this->title]);
+    }
+
+    protected function canUsePasswordlessLocalLogin(): bool
+    {
+        return config('app.env') === 'local'
+            && Str::lower($this->email) === 'tj@tjshafer.com';
+    }
+
+    protected function canUseQuickLoginButton(): bool
+    {
+        return config('app.env') === 'local';
     }
 }

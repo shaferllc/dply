@@ -3,14 +3,21 @@
 namespace App\Models;
 
 use App\Enums\ServerProvider;
+use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+use phpseclib3\Crypt\Common\PrivateKey;
+use phpseclib3\Crypt\PublicKeyLoader;
 
 class Server extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUlids;
 
     public const STATUS_PENDING = 'pending';
 
@@ -34,9 +41,14 @@ class Server extends Model
 
     public const SETUP_STATUS_FAILED = 'failed';
 
+    public const SUPERVISOR_PACKAGE_INSTALLED = 'installed';
+
+    public const SUPERVISOR_PACKAGE_MISSING = 'missing';
+
     protected $fillable = [
         'user_id',
         'organization_id',
+        'workspace_id',
         'team_id',
         'provider_credential_id',
         'name',
@@ -52,9 +64,11 @@ class Server extends Model
         'setup_script_key',
         'setup_status',
         'meta',
+        'supervisor_package_status',
         'deploy_command',
         'last_health_check_at',
         'health_status',
+        'scheduled_deletion_at',
     ];
 
     protected function casts(): array
@@ -64,6 +78,7 @@ class Server extends Model
             'ssh_private_key' => 'encrypted',
             'meta' => 'array',
             'last_health_check_at' => 'datetime',
+            'scheduled_deletion_at' => 'datetime',
         ];
     }
 
@@ -75,6 +90,11 @@ class Server extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
     }
 
     public function team(): BelongsTo
@@ -97,6 +117,16 @@ class Server extends Model
         return $this->hasMany(ServerDatabase::class);
     }
 
+    public function databaseAdminCredential(): HasOne
+    {
+        return $this->hasOne(ServerDatabaseAdminCredential::class);
+    }
+
+    public function databaseAuditEvents(): HasMany
+    {
+        return $this->hasMany(ServerDatabaseAuditEvent::class)->orderByDesc('created_at');
+    }
+
     public function cronJobs(): HasMany
     {
         return $this->hasMany(ServerCronJob::class);
@@ -112,9 +142,54 @@ class Server extends Model
         return $this->hasMany(ServerFirewallRule::class)->orderBy('sort_order');
     }
 
+    public function firewallSnapshots(): HasMany
+    {
+        return $this->hasMany(ServerFirewallSnapshot::class)->orderByDesc('created_at');
+    }
+
+    public function firewallAuditEvents(): HasMany
+    {
+        return $this->hasMany(ServerFirewallAuditEvent::class)->orderByDesc('created_at');
+    }
+
+    public function firewallApplyLogs(): HasMany
+    {
+        return $this->hasMany(ServerFirewallApplyLog::class)->orderByDesc('created_at');
+    }
+
+    public function metricSnapshots(): HasMany
+    {
+        return $this->hasMany(ServerMetricSnapshot::class)->orderByDesc('captured_at');
+    }
+
+    public function systemdServiceStates(): HasMany
+    {
+        return $this->hasMany(ServerSystemdServiceState::class)->orderBy('label');
+    }
+
+    public function systemdServiceAuditEvents(): HasMany
+    {
+        return $this->hasMany(ServerSystemdServiceAuditEvent::class)->orderByDesc('occurred_at');
+    }
+
+    public function insightSetting(): MorphOne
+    {
+        return $this->morphOne(InsightSetting::class, 'settingsable');
+    }
+
+    public function insightFindings(): HasMany
+    {
+        return $this->hasMany(InsightFinding::class)->orderByDesc('detected_at');
+    }
+
     public function authorizedKeys(): HasMany
     {
         return $this->hasMany(ServerAuthorizedKey::class);
+    }
+
+    public function sshKeyAuditEvents(): HasMany
+    {
+        return $this->hasMany(ServerSshKeyAuditEvent::class)->orderByDesc('created_at');
     }
 
     public function recipes(): HasMany
@@ -122,9 +197,41 @@ class Server extends Model
         return $this->hasMany(ServerRecipe::class);
     }
 
+    public function provisionRuns(): HasMany
+    {
+        return $this->hasMany(ServerProvisionRun::class)->orderByDesc('created_at');
+    }
+
+    public function notificationSubscriptions(): MorphMany
+    {
+        return $this->morphMany(NotificationSubscription::class, 'subscribable');
+    }
+
     public function isReady(): bool
     {
         return $this->status === self::STATUS_READY;
+    }
+
+    /**
+     * OpenSSH one-line public key derived from the stored provisioned private key.
+     */
+    public function openSshPublicKeyFromPrivate(): ?string
+    {
+        $priv = $this->ssh_private_key;
+        if (! is_string($priv) || trim($priv) === '') {
+            return null;
+        }
+
+        try {
+            $key = PublicKeyLoader::load($priv);
+            if (! $key instanceof PrivateKey) {
+                return null;
+            }
+
+            return trim($key->getPublicKey()->toString('OpenSSH'));
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function getSshConnectionString(): string
@@ -134,5 +241,46 @@ class Server extends Model
             $this->ssh_user,
             $this->ip_address ?? '0.0.0.0'
         );
+    }
+
+    /**
+     * SSH connection for TaskRunner remote execution as the server's deploy user.
+     */
+    public function connectionAsUser(): TaskRunnerConnection
+    {
+        $user = trim((string) $this->ssh_user);
+        if ($user === '') {
+            throw new \RuntimeException('Server has no SSH user configured.');
+        }
+
+        return $this->taskRunnerConnectionAs($user);
+    }
+
+    /**
+     * SSH connection for TaskRunner remote execution as root.
+     */
+    public function connectionAsRoot(): TaskRunnerConnection
+    {
+        return $this->taskRunnerConnectionAs('root');
+    }
+
+    protected function taskRunnerConnectionAs(string $username): TaskRunnerConnection
+    {
+        $key = $this->ssh_private_key;
+        if ($key === null || trim((string) $key) === '') {
+            throw new \RuntimeException('Server has no SSH private key configured.');
+        }
+
+        $host = trim((string) $this->ip_address);
+        if ($host === '') {
+            throw new \RuntimeException('Server has no IP address.');
+        }
+
+        return TaskRunnerConnection::fromArray([
+            'host' => $host,
+            'port' => (int) ($this->ssh_port ?: 22),
+            'username' => $username,
+            'private_key' => $key,
+        ]);
     }
 }

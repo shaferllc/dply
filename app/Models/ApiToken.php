@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class ApiToken extends Model
 {
+    use HasUlids;
+
     protected $fillable = [
         'user_id',
         'organization_id',
@@ -42,6 +47,115 @@ class ApiToken extends Model
     }
 
     /**
+     * All ability strings defined in config/api_token_permissions.php (for validation).
+     *
+     * @return list<string>
+     */
+    public static function catalogAbilities(): array
+    {
+        $out = [];
+        foreach (config('api_token_permissions.categories', []) as $cat) {
+            foreach ($cat['permissions'] ?? [] as $p) {
+                if (! empty($p['ability'])) {
+                    $out[] = (string) $p['ability'];
+                }
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Abilities the deployer org role may use when calling the HTTP API (subset of catalog).
+     *
+     * @return list<string>
+     */
+    public static function deployerApiAllowlist(): array
+    {
+        return array_values(config('api_token_permissions.deployer_api_allowlist', []));
+    }
+
+    /**
+     * Whether a string may be stored on api_tokens.abilities (concrete catalog entry, full access, or prefix wildcard).
+     */
+    public static function abilityIsAllowedForStorage(string $ability): bool
+    {
+        if ($ability === '*') {
+            return true;
+        }
+
+        if (in_array($ability, self::catalogAbilities(), true)) {
+            return true;
+        }
+
+        if (preg_match('/^([a-z0-9_]+)\.\*$/', $ability, $m)) {
+            $prefix = $m[1];
+            foreach (self::catalogAbilities() as $a) {
+                if (str_starts_with($a, $prefix.'.')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<string>|null  $abilities  null or [] means unrestricted (legacy).
+     *
+     * @throws InvalidArgumentException
+     */
+    public static function assertAbilitiesValidForStorage(?array $abilities): void
+    {
+        if ($abilities === null || $abilities === []) {
+            return;
+        }
+
+        foreach ($abilities as $ab) {
+            if (! is_string($ab) || $ab === '') {
+                throw new InvalidArgumentException(__('API token abilities must be non-empty strings.'));
+            }
+            if (! self::abilityIsAllowedForStorage($ab)) {
+                throw new InvalidArgumentException(__('Invalid API token ability: :ability', ['ability' => $ab]));
+            }
+        }
+    }
+
+    /**
+     * Parse IP allow list from textarea (newlines) or comma-separated input.
+     *
+     * @return list<string>|null
+     */
+    public static function parseAllowedIpsInput(string $raw, string $errorKey = 'allowed_ips'): ?array
+    {
+        $parts = preg_split('/[\r\n,;]+/', $raw) ?: [];
+        $clean = [];
+        foreach ($parts as $part) {
+            $line = trim((string) $part);
+            if ($line === '') {
+                continue;
+            }
+            if (! self::ipOrCidrIsValid($line)) {
+                throw ValidationException::withMessages([
+                    $errorKey => __('Invalid IP or CIDR: :value', ['value' => $line]),
+                ]);
+            }
+            $clean[] = $line;
+        }
+
+        return $clean !== [] ? $clean : null;
+    }
+
+    public static function ipOrCidrIsValid(string $value): bool
+    {
+        if (str_contains($value, '/')) {
+            return (bool) preg_match('#^(\d{1,3}\.){3}\d{1,3}/(3[0-2]|[12]?\d)$#', $value);
+        }
+
+        return (bool) filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6);
+    }
+
+    /**
      * Create a new token and return the plaintext value (only time it is visible).
      */
     public static function createToken(
@@ -52,6 +166,8 @@ class ApiToken extends Model
         ?array $abilities = null,
         ?array $allowedIps = null
     ): array {
+        self::assertAbilitiesValidForStorage($abilities);
+
         $plaintext = 'dply_'.Str::random(64);
         $prefix = substr($plaintext, 0, 16);
 
@@ -93,12 +209,7 @@ class ApiToken extends Model
 
         $this->loadMissing('user', 'organization');
         if ($this->user && $this->organization?->userIsDeployer($this->user)) {
-            return in_array($ability, [
-                'servers.read',
-                'sites.read',
-                'servers.deploy',
-                'sites.deploy',
-            ], true);
+            return in_array($ability, self::deployerApiAllowlist(), true);
         }
 
         return true;

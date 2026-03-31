@@ -20,7 +20,10 @@
             </a>
             <x-primary-button class="w-full sm:w-auto min-w-[8rem]" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="submit">{{ __('Email Password Reset Link') }}</span>
-                <span wire:loading wire:target="submit">{{ __('Sending…') }}</span>
+                <span wire:loading wire:target="submit" class="inline-flex items-center justify-center gap-2">
+                    <x-spinner variant="cream" />
+                    {{ __('Sending…') }}
+                </span>
             </x-primary-button>
         </div>
     </form>

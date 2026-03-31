@@ -18,19 +18,25 @@
                             type="button"
                             wire:click="accept"
                             wire:loading.attr="disabled"
-                            class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 disabled:opacity-70"
+                            class="inline-flex min-w-[7rem] items-center justify-center gap-2 px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 disabled:opacity-70"
                         >
                             <span wire:loading.remove wire:target="accept">Accept</span>
-                            <span wire:loading wire:target="accept">Accepting…</span>
+                            <span wire:loading wire:target="accept" class="inline-flex items-center gap-2">
+                                <x-spinner variant="white" size="sm" />
+                                Accepting…
+                            </span>
                         </button>
                         <button
                             type="button"
                             wire:click="decline"
                             wire:loading.attr="disabled"
-                            class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-md font-semibold text-xs text-slate-700 uppercase tracking-widest hover:bg-slate-50 disabled:opacity-70"
+                            class="inline-flex min-w-[7rem] items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-md font-semibold text-xs text-slate-700 uppercase tracking-widest hover:bg-slate-50 disabled:opacity-70"
                         >
                             <span wire:loading.remove wire:target="decline">Decline</span>
-                            <span wire:loading wire:target="decline">Declining…</span>
+                            <span wire:loading wire:target="decline" class="inline-flex items-center gap-2">
+                                <x-spinner variant="forest" size="sm" />
+                                Declining…
+                            </span>
                         </button>
                     </div>
                 </div>

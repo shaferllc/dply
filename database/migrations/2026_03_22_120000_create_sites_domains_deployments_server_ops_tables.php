@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sites', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('server_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('organization_id')->nullable()->constrained()->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('server_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('organization_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name');
             $table->string('slug');
             $table->string('type')->default('php'); // php, static, node
@@ -39,8 +39,8 @@ return new class extends Migration
         });
 
         Schema::create('site_domains', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_id')->constrained('sites')->cascadeOnDelete();
             $table->string('hostname');
             $table->boolean('is_primary')->default(false);
             $table->boolean('www_redirect')->default(false);
@@ -50,8 +50,8 @@ return new class extends Migration
         });
 
         Schema::create('site_deployments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_id')->constrained('sites')->cascadeOnDelete();
             $table->string('trigger'); // manual, webhook, api
             $table->string('status'); // running, success, failed
             $table->string('git_sha', 64)->nullable();
@@ -65,8 +65,8 @@ return new class extends Migration
         });
 
         Schema::create('server_databases', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('server_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('server_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('engine')->default('mysql'); // mysql, postgres
             $table->string('username');
@@ -78,8 +78,8 @@ return new class extends Migration
         });
 
         Schema::create('server_cron_jobs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('server_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('server_id')->constrained()->cascadeOnDelete();
             $table->string('cron_expression', 64);
             $table->text('command');
             $table->string('user')->default('root');

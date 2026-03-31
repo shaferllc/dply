@@ -8,6 +8,7 @@ use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\VultrService;
+use App\Support\ServerProviderGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -34,8 +35,18 @@ class ProviderCredentialController extends Controller
             return redirect()->route('credentials.index')->with('error', 'Select or create an organization first.');
         }
 
+        $allowedProviders = array_values(array_filter(
+            ServerProvider::valuesForCredentials(),
+            static fn (string $value) => ServerProviderGate::enabled($value)
+        ));
+
+        if ($allowedProviders === []) {
+            return redirect()->route('credentials.index')
+                ->with('error', __('No server providers are enabled for this application.'));
+        }
+
         $validated = $request->validate([
-            'provider' => ['required', Rule::in(ServerProvider::valuesForCredentials())],
+            'provider' => ['required', Rule::in($allowedProviders)],
             'name' => 'nullable|string|max:255',
             'api_token' => 'required|string',
         ]);

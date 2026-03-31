@@ -7,18 +7,54 @@
 
         <title>@yield('title', config('app.name', 'Laravel'))</title>
 
+        @if (filled(config('broadcasting.connections.reverb.key')))
+            {{-- Echo reads this at runtime (bypasses stale Vite env in public/build). Meta is fallback if window is cleared. --}}
+            @php
+                $reverbOpts = config('broadcasting.connections.reverb.options', []);
+                $reverbScheme = $reverbOpts['scheme'] ?? 'http';
+                $reverbClient = [
+                    'key' => config('broadcasting.connections.reverb.key'),
+                    'host' => filled($reverbOpts['host'] ?? null) ? $reverbOpts['host'] : null,
+                    'port' => (int) ($reverbOpts['port'] ?? ($reverbScheme === 'https' ? 443 : 8080)),
+                    'scheme' => $reverbScheme,
+                    'enabled' => (bool) config('broadcasting.echo_client_enabled', true),
+                    'bypass_local_guard' => (bool) config('broadcasting.reverb_bypass_local_guard', false),
+                ];
+            @endphp
+            <meta name="dply-reverb-config" content="{{ e(json_encode($reverbClient)) }}">
+            <script>
+                window.__DPLY_REVERB__ = @json($reverbClient);
+            </script>
+        @endif
+
         <!-- Fonts (Shipwell-inspired: Instrument Sans) -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @if (filled(config('broadcasting.connections.reverb.key')))
+            {{-- After Vite so a stale app-*.js that still bundled Echo cannot overwrite this. --}}
+            @include('partials.reverb-echo-module')
+        @endif
         @livewireStyles
         <style>[x-cloak]{display:none!important}</style>
     </head>
-    <body class="font-sans antialiased bg-brand-cream text-brand-ink" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
-        <div class="min-h-screen">
+    <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore()">
+        <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
+
+            @auth
+                @if (auth()->user()->organizations()->exists())
+                    <livewire:layout.context-breadcrumb />
+                @endif
+                <div
+                    id="dply-broadcast-context"
+                    class="hidden"
+                    aria-hidden="true"
+                    data-organization-id="{{ auth()->user()->currentOrganization()?->id }}"
+                ></div>
+            @endauth
 
             {{-- Global flash messages --}}
             @if (session('success'))
@@ -44,10 +80,12 @@
             @endisset
 
             <!-- Page Content -->
-            <main>
+            <main class="flex-1 w-full">
                 {{ $slot }}
             </main>
         </div>
+
+        <x-marketing-footer />
 
         {{-- Toasts (from Livewire dispatch('notify')) --}}
         <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2" aria-live="polite">
@@ -73,6 +111,21 @@
                     window.dispatchEvent(new CustomEvent('toast', {
                         detail: { message: e.message ?? e.detail?.message ?? 'Done', type: e.type ?? e.detail?.type ?? 'success' }
                     }));
+                });
+
+                Livewire.on('provision-journey-complete', (e) => {
+                    const url = e.url ?? e.detail?.url;
+
+                    // #region agent log
+                    fetch('http://127.0.0.1:7652/ingest/ff63025e-790d-4d37-ad99-1fc12ab824d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'182f08'},body:JSON.stringify({sessionId:'182f08',runId:'pre-fix',hypothesisId:'H3',location:'resources/views/layouts/app.blade.php:116',message:'Received provision completion browser event',data:{url:url ?? null,href:window.location.href,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
+
+                    if (url) {
+                        // #region agent log
+                        fetch('http://127.0.0.1:7652/ingest/ff63025e-790d-4d37-ad99-1fc12ab824d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'182f08'},body:JSON.stringify({sessionId:'182f08',runId:'pre-fix',hypothesisId:'H5',location:'resources/views/layouts/app.blade.php:120',message:'About to navigate after provision completion event',data:{url,href:window.location.href},timestamp:Date.now()})}).catch(()=>{});
+                        // #endregion
+                        window.location.assign(url);
+                    }
                 });
             });
         </script>

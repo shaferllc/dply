@@ -3,9 +3,33 @@
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center flex-wrap gap-2">
             <div>
                 <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ $site->name }}</h2>
-                <p class="text-sm text-slate-500">{{ $server->name }} · {{ $site->type->label() }}</p>
+                <p class="text-sm text-slate-500">
+                    {{ $server->name }} · {{ $site->type->label() }}
+                    @if ($site->workspace)
+                        · {{ __('Project:') }}
+                        <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-slate-700 hover:text-slate-900">
+                            {{ $site->workspace->name }}
+                        </a>
+                    @endif
+                </p>
             </div>
-            <a href="{{ route('servers.show', $server) }}" class="text-slate-500 hover:text-slate-700 text-sm">← Server</a>
+            <div class="flex items-center gap-4">
+                @if ($site->workspace)
+                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                        {{ __('Project') }}
+                    </a>
+                    <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                        {{ __('Project delivery') }}
+                    </a>
+                @endif
+                <a href="{{ route('sites.insights', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                    {{ __('Insights') }}
+                    @if ($openSiteInsightsCount > 0)
+                        <span class="inline-flex min-w-[1.25rem] justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" title="{{ trans_choice(':count open finding|:count open findings', $openSiteInsightsCount, ['count' => $openSiteInsightsCount]) }}">{{ $openSiteInsightsCount }}</span>
+                    @endif
+                </a>
+                <a href="{{ route('servers.show', $server) }}" class="text-slate-500 hover:text-slate-700 text-sm">← Server</a>
+            </div>
         </div>
     </header>
     <div class="py-12">
@@ -30,6 +54,22 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
                 <h3 class="font-medium text-slate-900 mb-3">Status</h3>
+                @if ($site->workspace)
+                    <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <p class="font-medium text-slate-900">{{ __('Project context') }}</p>
+                        <p class="mt-1">
+                            {{ __('This site rolls up into the :project project.', ['project' => $site->workspace->name]) }}
+                            <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project operations') }}</a>
+                            {{ __('for grouped health and activity, or') }}
+                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('open project delivery') }}</a>
+                            {{ __('to coordinate releases and shared variables.') }}
+                        </p>
+                    </div>
+                @endif
+                <p class="text-sm text-slate-600 mb-3">
+                    {{ __('Show this site on a public') }}
+                    <a href="{{ route('status-pages.index') }}" class="text-slate-800 font-medium hover:underline">{{ __('status page') }}</a>.
+                </p>
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div><dt class="text-slate-500">Provisioning</dt><dd class="font-medium capitalize">{{ str_replace('_', ' ', $site->status) }}</dd></div>
                     <div><dt class="text-slate-500">SSL</dt><dd class="font-medium capitalize">{{ $site->ssl_status }}</dd></div>
@@ -76,9 +116,12 @@
                 <h3 class="font-medium text-slate-900">Nginx (HTTP)</h3>
                 <p class="text-sm text-slate-600">Writes a vhost under <code class="bg-slate-100 px-1 rounded text-xs">sites-available</code>, symlinks to <code class="bg-slate-100 px-1 rounded text-xs">sites-enabled</code>, runs <code class="bg-slate-100 px-1 rounded text-xs">nginx -t</code> and reloads. Server must have Nginx installed; PHP sites need matching PHP-FPM.</p>
                 @if ($server->isReady() && $server->ssh_private_key)
-                    <button type="button" wire:click="installNginx" wire:loading.attr="disabled" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
+                    <button type="button" wire:click="installNginx" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
                         <span wire:loading.remove wire:target="installNginx">Install / update Nginx site</span>
-                        <span wire:loading wire:target="installNginx">Working…</span>
+                        <span wire:loading wire:target="installNginx" class="inline-flex items-center gap-2">
+                            <x-spinner variant="white" size="sm" />
+                            Working…
+                        </span>
                     </button>
                 @else
                     <p class="text-sm text-amber-700">SSH key required on the server record.</p>
@@ -89,9 +132,12 @@
                 <h3 class="font-medium text-slate-900">Let’s Encrypt (Certbot)</h3>
                 <p class="text-sm text-slate-600">Run after HTTP vhost works and DNS points here. Uses <code class="bg-slate-100 px-1 rounded text-xs">certbot --nginx</code>. Set <code class="bg-slate-100 px-1 rounded text-xs">DPLY_CERTBOT_EMAIL</code> in <code class="bg-slate-100 px-1 rounded text-xs">.env</code> or ensure your user/org has an email.</p>
                 @if ($server->isReady() && $server->ssh_private_key)
-                    <button type="button" wire:click="issueSsl" wire:loading.attr="disabled" class="inline-flex items-center px-4 py-2 bg-emerald-800 text-white text-sm font-medium rounded-md hover:bg-emerald-900 disabled:opacity-50">
+                    <button type="button" wire:click="issueSsl" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-800 text-white text-sm font-medium rounded-md hover:bg-emerald-900 disabled:opacity-50">
                         <span wire:loading.remove wire:target="issueSsl">Issue / renew SSL</span>
-                        <span wire:loading wire:target="issueSsl">Certbot…</span>
+                        <span wire:loading wire:target="issueSsl" class="inline-flex items-center gap-2">
+                            <x-spinner variant="white" size="sm" />
+                            Certbot…
+                        </span>
                     </button>
                 @endif
             </div>
@@ -168,9 +214,12 @@
                     </div>
                 @endif
                 <div class="flex flex-wrap gap-2 pt-2">
-                    <button type="button" wire:click="deployNow" wire:loading.attr="disabled" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
+                    <button type="button" wire:click="deployNow" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
                         <span wire:loading.remove wire:target="deployNow">Deploy now (sync)</span>
-                        <span wire:loading wire:target="deployNow">Deploying…</span>
+                        <span wire:loading wire:target="deployNow" class="inline-flex items-center gap-2">
+                            <x-spinner variant="white" size="sm" />
+                            Deploying…
+                        </span>
                     </button>
                     <button type="button" wire:click="queueDeploy" class="px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50">Queue deploy (queue worker)</button>
                 </div>
@@ -179,6 +228,16 @@
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
                 <h3 class="font-medium text-slate-900">Deployment &amp; Nginx tuning</h3>
                 <p class="text-sm text-slate-600"><strong>Atomic</strong> deploys clone into <code class="text-xs bg-slate-100 px-1 rounded">releases/&lt;timestamp&gt;</code> and flip a <code class="text-xs bg-slate-100 px-1 rounded">current</code> symlink. Nginx web root becomes <code class="text-xs bg-slate-100 px-1 rounded">…/current/public</code>. Enable Laravel scheduler here, then sync crontab on the server page.</p>
+                @if ($site->workspace)
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <p class="font-medium text-slate-900">{{ __('Project delivery context') }}</p>
+                        <p class="mt-1">
+                            {{ __('This site belongs to the :project project.', ['project' => $site->workspace->name]) }}
+                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project delivery') }}</a>
+                            {{ __('to review shared variables, coordinated deploy batches, and delivery notes before changing this site.') }}
+                        </p>
+                    </div>
+                @endif
                 <form wire:submit="saveDeploymentSettings" class="space-y-3">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -209,6 +268,10 @@
                         <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-slate-300">
                         Laravel scheduler (<code class="text-xs bg-slate-100 px-1">schedule:run</code> every minute via server crontab)
                     </label>
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="rounded border-slate-300">
+                        Restart Supervisor programs after successful deploy (programs linked to this site or server-wide on the same machine)
+                    </label>
                     <div>
                         <x-input-label for="nginx_extra_raw" value="Extra Nginx inside server block (advanced)" />
                         <textarea id="nginx_extra_raw" wire:model="nginx_extra_raw" rows="4" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="# location /foo { ... }"></textarea>
@@ -219,7 +282,25 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
                 <h3 class="font-medium text-slate-900">Environment variables (key / value)</h3>
-                <p class="text-sm text-slate-600">Merged with the raw .env draft below for the selected environment. Values are encrypted in Dply.</p>
+                <p class="text-sm text-slate-600">Merged with project-level variables and the raw .env draft below for the selected environment. Values are encrypted in Dply.</p>
+                @if ($site->workspace && $site->workspace->variables->isNotEmpty())
+                    <div class="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                        <p class="font-medium">{{ __('Inherited project variables') }}</p>
+                        <p class="mt-1 text-sky-900">{{ __('These values are merged into the final .env for this site. Keep shared values on the project, then add a site variable only when this site needs an override.') }}</p>
+                        <ul class="mt-3 space-y-1">
+                            @foreach ($site->workspace->variables as $projectVariable)
+                                <li>
+                                    <span class="font-mono text-xs">{{ $projectVariable->env_key }}</span>
+                                    <span class="text-sky-800">·</span>
+                                    <span>{{ $projectVariable->is_secret ? __('secret') : __('shared value') }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                        <p class="mt-3">
+                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-sky-950 hover:underline">{{ __('Manage project variables') }}</a>
+                        </p>
+                    </div>
+                @endif
                 @if ($site->environmentVariables->isNotEmpty())
                     <ul class="divide-y divide-slate-100 text-sm">
                         @foreach ($site->environmentVariables as $ev)
@@ -376,6 +457,16 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3" wire:poll.10s>
                 <h3 class="font-medium text-slate-900">Deployment log</h3>
+                @if ($site->workspace)
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <p class="font-medium text-slate-900">{{ __('Project delivery context') }}</p>
+                        <p class="mt-1">
+                            {{ __('Use this log for site-specific output, then') }}
+                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('open project delivery') }}</a>
+                            {{ __('to coordinate shared deploy batches, compare related site rollouts, and review project-level delivery notes for :project.', ['project' => $site->workspace->name]) }}
+                        </p>
+                    </div>
+                @endif
                 @if ($site->deployments->isEmpty())
                     <p class="text-sm text-slate-500">No deployments yet.</p>
                 @else
@@ -410,20 +501,31 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
                 <h3 class="font-medium text-slate-900">Environment (.env)</h3>
-                <p class="text-sm text-slate-600">Draft is stored encrypted. Push merges <strong>key/value variables</strong> (for <code class="text-xs bg-slate-100 px-1">{{ $site->deployment_environment }}</code>) with this draft and writes <code class="text-xs bg-slate-100 px-1">{{ $site->effectiveEnvDirectory() }}/.env</code>.</p>
+                <p class="text-sm text-slate-600">Draft is stored encrypted. Push merges <strong>project variables</strong>, then <strong>site key/value variables</strong> (for <code class="text-xs bg-slate-100 px-1">{{ $site->deployment_environment }}</code>) with this draft and writes <code class="text-xs bg-slate-100 px-1">{{ $site->effectiveEnvDirectory() }}/.env</code>.</p>
+                @if ($site->workspace)
+                    <p class="text-sm text-slate-500">
+                        {{ __('For shared settings across multiple sites in this project, prefer storing them at the project level first.') }}
+                        <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-700 hover:text-slate-900">{{ __('Open project delivery') }}</a>
+                    </p>
+                @endif
                 <textarea wire:model="env_file_content" rows="8" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="APP_NAME=…"></textarea>
                 <div class="flex flex-wrap gap-2">
                     <button type="button" wire:click="saveEnvDraft" class="px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50">Save draft in Dply</button>
-                    <button type="button" wire:click="pushEnvToServer" wire:loading.attr="disabled" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
+                    <button type="button" wire:click="pushEnvToServer" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
                         <span wire:loading.remove wire:target="pushEnvToServer">Push .env to server</span>
-                        <span wire:loading wire:target="pushEnvToServer">Pushing…</span>
+                        <span wire:loading wire:target="pushEnvToServer" class="inline-flex items-center gap-2">
+                            <x-spinner variant="white" size="sm" />
+                            Pushing…
+                        </span>
                     </button>
                 </div>
             </div>
 
-            <div class="flex justify-between items-center">
-                <button type="button" wire:click="deleteSite" wire:confirm="Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab." class="text-red-600 hover:underline text-sm">Delete site</button>
-            </div>
+            @can('delete', $site)
+                <div class="flex justify-between items-center">
+                    <button type="button" wire:click="deleteSite" wire:confirm="Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab." class="text-red-600 hover:underline text-sm">Delete site</button>
+                </div>
+            @endcan
         </div>
     </div>
 </div>

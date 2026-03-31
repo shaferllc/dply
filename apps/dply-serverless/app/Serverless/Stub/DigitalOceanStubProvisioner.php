@@ -3,6 +3,7 @@
 namespace App\Serverless\Stub;
 
 use App\Contracts\ServerlessFunctionProvisioner;
+use App\Serverless\Support\ProvisionerConfigReport;
 
 /**
  * No DigitalOcean API calls — placeholder until DO Functions adapter is wired.
@@ -17,7 +18,7 @@ final class DigitalOceanStubProvisioner implements ServerlessFunctionProvisioner
             'provider' => 'digitalocean',
             'runtime' => $runtime,
             'artifact_path' => $artifactPath,
-            'config_keys' => array_keys($config),
+            'config_keys' => ProvisionerConfigReport::safeConfigKeys($config),
         ];
     }
 }

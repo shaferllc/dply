@@ -19,16 +19,42 @@ class SitePolicy
 
     public function create(User $user): bool
     {
-        return $user->currentOrganization() !== null;
+        $org = $user->currentOrganization();
+
+        if ($org === null) {
+            return false;
+        }
+
+        if ($org->userIsDeployer($user)) {
+            return false;
+        }
+
+        return $org->canCreateSite();
     }
 
     public function update(User $user, Site $site): bool
     {
+        if ($site->workspace_id && $site->workspace) {
+            if (! $site->workspace->userCanView($user)) {
+                return false;
+            }
+
+            return $site->workspace->userCanUpdate($user);
+        }
+
         return $user->can('update', $site->server);
     }
 
     public function delete(User $user, Site $site): bool
     {
-        return $user->can('update', $site->server);
+        if (! $user->can('view', $site->server)) {
+            return false;
+        }
+
+        if ($site->organization_id !== null) {
+            return $site->organization->hasAdminAccess($user);
+        }
+
+        return $site->user_id === $user->id;
     }
 }

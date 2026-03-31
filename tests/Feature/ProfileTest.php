@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Profile\DeleteAccount;
 use App\Livewire\Profile\Edit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,14 +24,24 @@ class ProfileTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_security_page_is_displayed(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/profile/security')
+            ->assertOk()
+            ->assertSee('Security', false);
+    }
+
     public function test_profile_information_can_be_updated(): void
     {
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
             ->test(Edit::class)
-            ->set('name', 'Test User')
-            ->set('email', 'test@example.com')
+            ->set('profileForm.name', 'Test User')
+            ->set('profileForm.email', 'test@example.com')
             ->call('updateProfile')
             ->assertHasNoErrors();
 
@@ -47,12 +58,49 @@ class ProfileTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Edit::class)
-            ->set('name', 'Test User')
-            ->set('email', $user->email)
+            ->set('profileForm.name', 'Test User')
+            ->set('profileForm.email', $user->email)
             ->call('updateProfile')
             ->assertHasNoErrors();
 
         $this->assertNotNull($user->refresh()->email_verified_at);
+    }
+
+    public function test_billing_details_can_be_updated(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(Edit::class)
+            ->set('billingForm.invoice_email', 'billing@example.com')
+            ->set('billingForm.vat_number', 'NL123456789B01')
+            ->set('billingForm.billing_currency', 'EUR')
+            ->set('billingForm.billing_details', "Acme Co.\n123 Main St")
+            ->call('updateBilling')
+            ->assertHasNoErrors();
+
+        $user->refresh();
+
+        $this->assertSame('billing@example.com', $user->invoice_email);
+        $this->assertSame('NL123456789B01', $user->vat_number);
+        $this->assertSame('EUR', $user->billing_currency);
+        $this->assertSame("Acme Co.\n123 Main St", $user->billing_details);
+    }
+
+    public function test_delete_account_page_is_displayed_for_authenticated_user(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/profile/delete-account');
+
+        $response->assertOk();
+    }
+
+    public function test_delete_account_page_redirects_guests(): void
+    {
+        $response = $this->get('/profile/delete-account');
+
+        $response->assertRedirect(route('login', absolute: false));
     }
 
     public function test_user_can_delete_their_account(): void
@@ -60,7 +108,7 @@ class ProfileTest extends TestCase
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
-            ->test(Edit::class)
+            ->test(DeleteAccount::class)
             ->set('delete_password', 'password')
             ->call('deleteAccount')
             ->assertRedirect('/');
@@ -74,7 +122,7 @@ class ProfileTest extends TestCase
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
-            ->test(Edit::class)
+            ->test(DeleteAccount::class)
             ->set('delete_password', 'wrong-password')
             ->call('deleteAccount')
             ->assertHasErrors(['delete_password']);

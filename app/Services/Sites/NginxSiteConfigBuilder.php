@@ -70,6 +70,8 @@ server {
     server_name {$serverNames};
     root {$root};
     index index.php index.html;
+    access_log /var/log/nginx/{$basename}-access.log;
+    error_log /var/log/nginx/{$basename}-error.log;
 {$poolNote}{$redirectBlock}
     location / {
         try_files \$uri @octane;
@@ -99,6 +101,8 @@ server {
     server_name {$serverNames};
     root {$root};
     index index.php index.html;
+    access_log /var/log/nginx/{$basename}-access.log;
+    error_log /var/log/nginx/{$basename}-error.log;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -135,6 +139,8 @@ server {
     server_name {$serverNames};
     root {$root};
     index index.html;
+    access_log /var/log/nginx/{$basename}-access.log;
+    error_log /var/log/nginx/{$basename}-error.log;
 {$redirectBlock}
     location / {
         try_files \$uri \$uri/ =404;
@@ -161,6 +167,8 @@ server {
     listen 80;
     listen [::]:80;
     server_name {$serverNames};
+    access_log /var/log/nginx/{$basename}-access.log;
+    error_log /var/log/nginx/{$basename}-error.log;
 {$redirectBlock}
     location / {
         proxy_pass http://127.0.0.1:{$port};

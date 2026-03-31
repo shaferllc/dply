@@ -12,10 +12,16 @@ class DigitalOceanService
 
     protected string $token;
 
-    public function __construct(ProviderCredential $credential)
+    /**
+     * @param  ProviderCredential|non-empty-string  $credentialOrToken  Saved credential or a raw API token string.
+     */
+    public function __construct(ProviderCredential|string $credentialOrToken)
     {
-        $token = $credential->getApiToken();
-        if (empty($token)) {
+        $token = $credentialOrToken instanceof ProviderCredential
+            ? $credentialOrToken->getApiToken()
+            : $credentialOrToken;
+        $token = is_string($token) ? trim($token) : '';
+        if ($token === '') {
             throw new \InvalidArgumentException('DigitalOcean API token is required.');
         }
         $this->token = $token;
@@ -59,6 +65,14 @@ class DigitalOceanService
      * Create a new droplet. Returns droplet array (IP may not be available immediately).
      *
      * @param  array<int|string>  $sshKeyIds  Optional DO SSH key IDs or fingerprints
+     * @param  array{
+     *     ipv6?: bool,
+     *     backups?: bool,
+     *     monitoring?: bool,
+     *     vpc_uuid?: string|null,
+     *     tags?: list<string>,
+     *     user_data?: string
+     * }  $options  Matches DigitalOcean create-droplet request body (subset).
      */
     public function createDroplet(
         string $name,
@@ -66,23 +80,37 @@ class DigitalOceanService
         string $size,
         string|int $image,
         array $sshKeyIds = [],
-        bool $ipv6 = false,
-        string $userData = ''
+        array $options = []
     ): array {
+        $ipv6 = (bool) ($options['ipv6'] ?? false);
+        $backups = (bool) ($options['backups'] ?? false);
+        $monitoring = (bool) ($options['monitoring'] ?? false);
+        $userData = (string) ($options['user_data'] ?? '');
+        $rawVpc = $options['vpc_uuid'] ?? null;
+        $vpcUuid = is_string($rawVpc) ? trim($rawVpc) : '';
+        $tags = $options['tags'] ?? [];
+        $tags = is_array($tags) ? array_values(array_filter($tags, static fn ($t) => is_string($t) && $t !== '')) : [];
+
         $body = [
             'name' => $name,
             'region' => $region,
             'size' => $size,
             'image' => is_numeric($image) ? (int) $image : (string) $image,
-            'backups' => false,
+            'backups' => $backups,
             'ipv6' => $ipv6,
-            'monitoring' => false,
+            'monitoring' => $monitoring,
         ];
         if ($sshKeyIds !== []) {
             $body['ssh_keys'] = $sshKeyIds;
         }
         if ($userData !== '') {
             $body['user_data'] = $userData;
+        }
+        if ($vpcUuid !== '') {
+            $body['vpc_uuid'] = $vpcUuid;
+        }
+        if ($tags !== []) {
+            $body['tags'] = $tags;
         }
 
         $response = $this->request('post', '/droplets', $body);
@@ -165,6 +193,15 @@ class DigitalOceanService
         $sizes = $data['sizes'] ?? $data['data'] ?? [];
 
         return is_array($sizes) ? $sizes : [];
+    }
+
+    /**
+     * Validate token with a lightweight account endpoint.
+     */
+    public function validateToken(): void
+    {
+        $response = $this->request('get', '/account');
+        $this->assertSuccess($response, 'validate token');
     }
 
     /**

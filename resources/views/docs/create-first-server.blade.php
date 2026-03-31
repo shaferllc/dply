@@ -13,7 +13,7 @@
             <p class="text-slate-700">Go to <strong>Servers</strong> → <strong>Add server</strong>, or use the “Add server” button on the dashboard.</p>
 
             <h3 class="text-lg font-semibold text-slate-900 mt-8">2. Choose provider and credential</h3>
-            <p class="text-slate-700">Pick the tab: <strong>Create with DigitalOcean</strong>, <strong>Create with Hetzner</strong>, or <strong>Connect existing server</strong>. For DO or Hetzner, select the <strong>Account</strong> (credential) you added in Credentials.</p>
+            <p class="text-slate-700">Pick the tab: <strong>Create with DigitalOcean</strong>, <strong>Create with Hetzner</strong>, or <strong>Connect existing server</strong>. For DO or Hetzner, select the <strong>Account</strong> (credential) you added under Server providers.</p>
 
             <h3 class="text-lg font-semibold text-slate-900 mt-8">3. Name, region, and size</h3>
             <ul class="list-disc list-inside space-y-1 text-slate-700">

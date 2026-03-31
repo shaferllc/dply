@@ -39,7 +39,7 @@ class CredentialTest extends TestCase
         $response = $this->actingAs($user)->get(route('credentials.index'));
 
         $response->assertOk();
-        $response->assertSee('Cloud credentials');
+        $response->assertSee('Provider credentials');
     }
 
     public function test_credentials_index_forbidden_for_deployer(): void

@@ -1,0 +1,23 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('edge_projects', function (Blueprint $table) {
+            $table->json('settings')->nullable()->after('slug');
+            $table->text('credentials')->nullable()->after('settings');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('edge_projects', function (Blueprint $table) {
+            $table->dropColumn(['settings', 'credentials']);
+        });
+    }
+};

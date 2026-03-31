@@ -14,12 +14,14 @@
  *
  * Limits (free/Starter tier = no active subscription or non-Pro plan):
  *   servers_free: max servers allowed when not on a Pro plan (default 3).
- * Pro (pro_monthly or pro_yearly) has unlimited servers.
+ *   sites_free: max sites per organization when not on Pro (default 10).
+ * Pro (pro_monthly or pro_yearly) has unlimited servers and unlimited sites.
  */
 
 return [
     'limits' => [
         'servers_free' => (int) env('SUBSCRIPTION_SERVERS_FREE_LIMIT', 3),
+        'sites_free' => (int) env('SUBSCRIPTION_SITES_FREE_LIMIT', 10),
     ],
 
     'plans' => [

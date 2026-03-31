@@ -31,23 +31,23 @@
     <form wire:submit="submit" class="space-y-5">
         <div>
             <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" wire:model="name" class="block w-full mt-1" type="text" required autofocus autocomplete="name" />
-            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+            <x-text-input id="name" wire:model="form.name" class="block w-full mt-1" type="text" required autofocus autocomplete="name" />
+            <x-input-error :messages="$errors->get('form.name')" class="mt-2" />
         </div>
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" wire:model="email" class="block w-full mt-1" type="email" required autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+            <x-text-input id="email" wire:model="form.email" class="block w-full mt-1" type="email" required autocomplete="username" />
+            <x-input-error :messages="$errors->get('form.email')" class="mt-2" />
         </div>
         <div>
             <x-input-label for="password" :value="__('Password')" />
-            <x-text-input id="password" wire:model="password" class="block w-full mt-1" type="password" required autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+            <x-text-input id="password" wire:model="form.password" class="block w-full mt-1" type="password" required autocomplete="new-password" />
+            <x-input-error :messages="$errors->get('form.password')" class="mt-2" />
         </div>
         <div>
             <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
-            <x-text-input id="password_confirmation" wire:model="password_confirmation" class="block w-full mt-1" type="password" required autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
+            <x-text-input id="password_confirmation" wire:model="form.password_confirmation" class="block w-full mt-1" type="password" required autocomplete="new-password" />
+            <x-input-error :messages="$errors->get('form.password_confirmation')" class="mt-2" />
         </div>
         <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 pt-2 border-t border-brand-ink/10">
             <a href="{{ route('login') }}" class="inline-flex items-center justify-center gap-2 text-sm font-medium text-brand-moss hover:text-brand-ink text-center sm:text-left">
@@ -56,7 +56,10 @@
             </a>
             <x-primary-button class="w-full sm:w-auto min-w-[8rem]" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="submit">{{ __('Register') }}</span>
-                <span wire:loading wire:target="submit">{{ __('Creating account…') }}</span>
+                <span wire:loading wire:target="submit" class="inline-flex items-center justify-center gap-2">
+                    <x-spinner variant="cream" />
+                    {{ __('Creating account…') }}
+                </span>
             </x-primary-button>
         </div>
     </form>

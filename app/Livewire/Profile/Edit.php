@@ -3,39 +3,40 @@
 namespace App\Livewire\Profile;
 
 use App\Http\Controllers\SessionController;
+use App\Livewire\Forms\ProfileBillingForm;
+use App\Livewire\Forms\ProfileGeneralForm;
+use DateTimeZone;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Session;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-#[Layout('layouts.app')]
+#[Layout('layouts.settings')]
 class Edit extends Component
 {
-    public string $name = '';
+    public ProfileGeneralForm $profileForm;
 
-    public string $email = '';
-
-    public string $current_password = '';
-
-    public string $password = '';
-
-    public string $password_confirmation = '';
-
-    public string $delete_password = '';
-
-    public bool $showDeleteModal = false;
+    public ProfileBillingForm $billingForm;
 
     public bool $verificationLinkSent = false;
 
     public function mount(): void
     {
         $user = $this->user();
-        $this->name = $user->name;
-        $this->email = $user->email;
+        $this->profileForm->fill([
+            'name' => $user->name,
+            'email' => $user->email,
+            'country_code' => $user->country_code ?? '',
+            'locale' => $user->locale ?? config('app.locale'),
+            'timezone' => $user->timezone ?? config('app.timezone'),
+        ]);
+        $this->billingForm->fill([
+            'invoice_email' => $user->invoice_email ?? '',
+            'vat_number' => $user->vat_number ?? '',
+            'billing_currency' => $user->billing_currency ?? '',
+            'billing_details' => $user->billing_details ?? '',
+        ]);
     }
 
     protected function user()
@@ -53,15 +54,44 @@ class Edit extends Component
         return SessionController::listSessionsForUser($user->id, session()->getId());
     }
 
+    public function getGravatarUrlProperty(): string
+    {
+        $email = strtolower(trim($this->profileForm->email));
+
+        return 'https://www.gravatar.com/avatar/'.md5($email).'?s=128&d=mp';
+    }
+
+    public function getTimezonesProperty(): array
+    {
+        return collect(DateTimeZone::listIdentifiers(DateTimeZone::ALL))
+            ->sort()
+            ->values()
+            ->all();
+    }
+
     public function updateProfile(): void
     {
         $user = $this->user();
-        $this->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,'.$user->id],
-        ]);
 
-        $user->fill(['name' => $this->name, 'email' => $this->email]);
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'locale' => ['required', 'string', Rule::in(array_keys(config('profile_options.locales')))],
+            'timezone' => ['required', 'string', Rule::in(DateTimeZone::listIdentifiers(DateTimeZone::ALL))],
+        ];
+        $rules['country_code'] = $this->profileForm->country_code === ''
+            ? ['nullable']
+            : ['string', 'size:2', Rule::in(array_keys(config('profile_options.countries')))];
+
+        $this->profileForm->validate($rules);
+
+        $user->fill([
+            'name' => $this->profileForm->name,
+            'email' => $this->profileForm->email,
+            'country_code' => $this->profileForm->country_code === '' ? null : $this->profileForm->country_code,
+            'locale' => $this->profileForm->locale,
+            'timezone' => $this->profileForm->timezone,
+        ]);
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
@@ -70,22 +100,27 @@ class Edit extends Component
         $this->dispatch('profile-updated');
     }
 
-    public function updatePassword(): void
+    public function updateBilling(): void
     {
-        $this->validate([
-            'current_password' => ['required', 'current_password'],
-            'password' => ['required', Password::defaults(), 'confirmed'],
-        ], [], [
-            'current_password' => __('current password'),
-            'password' => __('new password'),
-        ]);
+        $rules = [
+            'invoice_email' => ['nullable', 'string', 'email', 'max:255'],
+            'vat_number' => ['nullable', 'string', 'max:64'],
+            'billing_details' => ['nullable', 'string', 'max:5000'],
+        ];
+        $rules['billing_currency'] = $this->billingForm->billing_currency === ''
+            ? ['nullable']
+            : ['string', 'size:3', Rule::in(array_keys(config('profile_options.currencies')))];
+
+        $this->billingForm->validate($rules);
 
         $this->user()->update([
-            'password' => Hash::make($this->password),
+            'invoice_email' => $this->billingForm->invoice_email !== '' ? $this->billingForm->invoice_email : null,
+            'vat_number' => $this->billingForm->vat_number !== '' ? $this->billingForm->vat_number : null,
+            'billing_currency' => $this->billingForm->billing_currency === '' ? null : $this->billingForm->billing_currency,
+            'billing_details' => $this->billingForm->billing_details !== '' ? $this->billingForm->billing_details : null,
         ]);
 
-        $this->reset(['current_password', 'password', 'password_confirmation']);
-        $this->dispatch('password-updated');
+        $this->dispatch('billing-updated');
     }
 
     public function revokeSession(string $sessionId): void
@@ -127,34 +162,6 @@ class Edit extends Component
             ->delete();
 
         $this->dispatch('sessions-revoked');
-    }
-
-    public function deleteAccount(): void
-    {
-        $this->validate([
-            'delete_password' => ['required', 'current_password'],
-        ], [], ['delete_password' => __('password')]);
-
-        $user = $this->user();
-        Auth::logout();
-        $user->delete();
-        Session::invalidate();
-        Session::regenerateToken();
-
-        $this->redirect('/', navigate: true);
-    }
-
-    public function openDeleteModal(): void
-    {
-        $this->resetValidation();
-        $this->delete_password = '';
-        $this->showDeleteModal = true;
-    }
-
-    public function closeDeleteModal(): void
-    {
-        $this->showDeleteModal = false;
-        $this->reset(['delete_password']);
     }
 
     public function sendVerificationEmail(): void

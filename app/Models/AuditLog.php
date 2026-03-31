@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class AuditLog extends Model
 {
+    use HasUlids;
+
     protected $fillable = [
         'organization_id',
         'user_id',
@@ -85,6 +88,7 @@ class AuditLog extends Model
                 OrganizationInvitation::class => $subject->email,
                 Site::class => $subject->name,
                 SiteDeployment::class => 'deployment #'.$subject->getKey(),
+                Workspace::class => $subject->name,
                 default => null,
             }
         : ($this->old_values['name'] ?? $this->new_values['name'] ?? null);
@@ -96,6 +100,7 @@ class AuditLog extends Model
                 OrganizationInvitation::class => 'Invitation',
                 Site::class => 'Site',
                 SiteDeployment::class => 'Deployment',
+                Workspace::class => 'Project',
                 default => class_basename($this->subject_type ?? ''),
             };
 
@@ -107,5 +112,27 @@ class AuditLog extends Model
         }
 
         return null;
+    }
+
+    public function getActionSummaryAttribute(): string
+    {
+        return match ($this->action) {
+            'project.updated' => 'Project details updated',
+            'project.server_attached' => 'Server added to project',
+            'project.server_detached' => 'Server removed from project',
+            'project.site_attached' => 'Site added to project',
+            'project.site_detached' => 'Site removed from project',
+            'project.member_updated' => 'Project member role updated',
+            'project.member_removed' => 'Project member removed',
+            'project.environment_added' => 'Environment added',
+            'project.environment_removed' => 'Environment removed',
+            'project.deploy.queued' => 'Project deploy queued',
+            'project.deploy.success' => 'Project deploy finished successfully',
+            'project.deploy.failed' => 'Project deploy failed',
+            default => str($this->action)
+                ->replace(['.', '_'], ' ')
+                ->title()
+                ->toString(),
+        };
     }
 }

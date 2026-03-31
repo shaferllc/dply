@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Models\Server;
 use App\Services\ScalewayService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -9,6 +10,7 @@ use Illuminate\Foundation\Queue\Queueable;
 
 class PollScalewayIpJob implements ShouldQueue
 {
+    use DispatchesServerProvisionJob;
     use Queueable;
 
     public int $tries = 60;
@@ -38,9 +40,7 @@ class PollScalewayIpJob implements ShouldQueue
                 'status' => Server::STATUS_READY,
             ]);
 
-            if ($this->server->setup_script_key && $this->server->setup_script_key !== 'none') {
-                RunSetupScriptJob::dispatch($this->server->fresh());
-            }
+            $this->dispatchServerProvisionIfNeeded($this->server);
 
             return;
         }
