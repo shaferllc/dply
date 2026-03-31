@@ -42,6 +42,7 @@ use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
+use App\Livewire\Servers\WorkspacePhp;
 use App\Livewire\Servers\WorkspaceRecipes;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
@@ -181,6 +182,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
     Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
+    Route::livewire('servers/{server}/php', WorkspacePhp::class)->name('servers.php');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->name('servers.daemons');

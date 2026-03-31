@@ -15,6 +15,7 @@ use App\Models\SiteDomain;
 use App\Models\SiteEnvironmentVariable;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
+use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteEnvPusher;
 use App\Services\Sites\SiteReleaseRollback;
 use App\Support\SiteDeployKeyGenerator;
@@ -62,6 +63,14 @@ class Show extends Component
     public string $deployment_environment = 'production';
 
     public string $php_fpm_user = '';
+
+    public string $php_version = '';
+
+    public string $php_memory_limit = '';
+
+    public string $php_upload_max_filesize = '';
+
+    public string $php_max_execution_time = '';
 
     public string $new_env_key = '';
 
@@ -121,10 +130,61 @@ class Show extends Component
         $this->restart_supervisor_programs_after_deploy = (bool) ($this->site->restart_supervisor_programs_after_deploy ?? false);
         $this->deployment_environment = (string) ($this->site->deployment_environment ?? 'production');
         $this->php_fpm_user = (string) ($this->site->php_fpm_user ?? '');
+        $this->php_version = (string) ($this->site->php_version ?? '');
+        $phpRuntime = is_array($this->site->meta['php_runtime'] ?? null) ? $this->site->meta['php_runtime'] : [];
+        $this->php_memory_limit = (string) ($phpRuntime['memory_limit'] ?? '');
+        $this->php_upload_max_filesize = (string) ($phpRuntime['upload_max_filesize'] ?? '');
+        $this->php_max_execution_time = (string) ($phpRuntime['max_execution_time'] ?? '');
         $ips = $this->site->webhook_allowed_ips;
         $this->webhook_allowed_ips_text = is_array($ips) && $ips !== []
             ? implode("\n", $ips)
             : '';
+    }
+
+    public function savePhpSettings(ServerPhpManager $phpManager): void
+    {
+        $this->authorize('update', $this->site);
+
+        $phpData = $phpManager->sitePhpData($this->server->fresh(), $this->site->fresh());
+        $installedVersions = collect($phpData['installed_versions'] ?? [])
+            ->filter(fn (mixed $version): bool => is_array($version) && (bool) ($version['is_supported'] ?? false))
+            ->pluck('id')
+            ->filter(fn (mixed $id): bool => is_string($id) && $id !== '')
+            ->values()
+            ->all();
+
+        $rules = [
+            'php_version' => ['required', 'string'],
+            'php_memory_limit' => ['nullable', 'string', 'max:32', 'regex:/^\d+[KMG]?$/i'],
+            'php_upload_max_filesize' => ['nullable', 'string', 'max:32', 'regex:/^\d+[KMG]?$/i'],
+            'php_max_execution_time' => ['nullable', 'integer', 'min:1', 'max:3600'],
+        ];
+
+        if ($installedVersions !== []) {
+            $rules['php_version'][] = 'in:'.implode(',', $installedVersions);
+        }
+
+        $validated = $this->validate($rules, [
+            'php_version.in' => __('Choose a PHP version that is currently installed on this server.'),
+            'php_memory_limit.regex' => __('Use a PHP size like 256M or 1G.'),
+            'php_upload_max_filesize.regex' => __('Use a PHP size like 64M or 1G.'),
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['php_runtime'] = [
+            'memory_limit' => $validated['php_memory_limit'] !== '' ? $validated['php_memory_limit'] : null,
+            'upload_max_filesize' => $validated['php_upload_max_filesize'] !== '' ? $validated['php_upload_max_filesize'] : null,
+            'max_execution_time' => $validated['php_max_execution_time'] !== '' ? (string) $validated['php_max_execution_time'] : null,
+        ];
+
+        $this->site->update([
+            'php_version' => $validated['php_version'],
+            'meta' => $meta,
+        ]);
+
+        $this->flash_success = 'PHP settings saved.';
+        $this->flash_error = null;
+        $this->syncFormFromSite();
     }
 
     public function saveWebhookSecurity(): void
@@ -567,6 +627,7 @@ class Show extends Component
         return view('livewire.sites.show', [
             'deployHookUrl' => $this->site->deployHookUrl(),
             'openSiteInsightsCount' => $openSiteInsightsCount,
+            'sitePhpData' => app(ServerPhpManager::class)->sitePhpData($this->server, $this->site),
         ]);
     }
 }

@@ -90,6 +90,97 @@
                 </dl>
             </div>
 
+            @php
+                $supportedInstalledPhpVersions = collect($sitePhpData['installed_versions'])
+                    ->filter(fn (array $version) => (bool) ($version['is_supported'] ?? false))
+                    ->values();
+            @endphp
+
+            <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h3 class="font-medium text-slate-900">PHP</h3>
+                        <p class="mt-1 text-sm text-slate-600">Choose a site PHP version from the supported versions currently installed on this server and keep site-owned runtime limits here. OPcache, Composer auth, and extension management stay shared and server-owned on the server PHP workspace.</p>
+                    </div>
+                    <a href="{{ $sitePhpData['server_php_workspace_url'] }}" wire:navigate class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900">
+                        {{ __('Open server PHP workspace') }}
+                    </a>
+                </div>
+
+                @if ($sitePhpData['mismatch_version'])
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        <p class="font-medium">{{ __('PHP version mismatch') }}</p>
+                        <p class="mt-1 text-amber-800">{{ __('This site references PHP :version, but that version is not currently installed on this server.', ['version' => $sitePhpData['mismatch_version']]) }}</p>
+                        <p class="mt-2">
+                            <a href="{{ $sitePhpData['server_php_workspace_url'] }}" wire:navigate class="font-medium text-amber-900 underline">
+                                {{ __('Install or switch versions on the server PHP page') }}
+                            </a>
+                        </p>
+                    </div>
+                @endif
+
+                <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <dt class="text-slate-500">Current site version</dt>
+                        <dd class="mt-1 font-medium text-slate-900">{{ $sitePhpData['current_version_label'] ?? 'Not set' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Installed on this server</dt>
+                        <dd class="mt-1 font-medium text-slate-900">
+                            @if ($supportedInstalledPhpVersions->isNotEmpty())
+                                {{ $supportedInstalledPhpVersions->pluck('label')->implode(', ') }}
+                            @else
+                                {{ __('No supported installed versions recorded yet') }}
+                            @endif
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">OPcache</dt>
+                        <dd class="mt-1 font-medium text-slate-900">{{ __('Shared at the server level; review runtime config on the server PHP workspace.') }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Composer auth</dt>
+                        <dd class="mt-1 font-medium text-slate-900">{{ __('Shared Composer credentials are managed from the server PHP workspace.') }}</dd>
+                    </div>
+                </dl>
+
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <p class="font-medium text-slate-900">{{ __('Extensions') }}</p>
+                    <p class="mt-1">{{ __('Extensions are server-owned and shared across sites on this machine. Use the server PHP workspace to review versions and extension entry points.') }}</p>
+                </div>
+
+                <form wire:submit="savePhpSettings" class="space-y-4">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div>
+                            <x-input-label for="php_version" value="PHP version" />
+                            <select id="php_version" wire:model="php_version" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                @foreach ($supportedInstalledPhpVersions as $version)
+                                    <option value="{{ $version['id'] }}">{{ $version['label'] }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('php_version')" class="mt-1" />
+                        </div>
+                        <div>
+                            <x-input-label for="php_memory_limit" value="Memory limit" />
+                            <x-text-input id="php_memory_limit" wire:model="php_memory_limit" class="mt-1 block w-full font-mono text-sm" placeholder="512M" />
+                            <x-input-error :messages="$errors->get('php_memory_limit')" class="mt-1" />
+                        </div>
+                        <div>
+                            <x-input-label for="php_upload_max_filesize" value="Upload max filesize" />
+                            <x-text-input id="php_upload_max_filesize" wire:model="php_upload_max_filesize" class="mt-1 block w-full font-mono text-sm" placeholder="64M" />
+                            <x-input-error :messages="$errors->get('php_upload_max_filesize')" class="mt-1" />
+                        </div>
+                        <div>
+                            <x-input-label for="php_max_execution_time" value="Max execution time" />
+                            <x-text-input id="php_max_execution_time" wire:model="php_max_execution_time" class="mt-1 block w-full font-mono text-sm" placeholder="120" />
+                            <x-input-error :messages="$errors->get('php_max_execution_time')" class="mt-1" />
+                        </div>
+                    </div>
+
+                    <x-primary-button type="submit">Save PHP settings</x-primary-button>
+                </form>
+            </div>
+
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
                 <h3 class="font-medium text-slate-900 mb-3">Domains</h3>
                 <ul class="divide-y divide-slate-100 mb-4">
