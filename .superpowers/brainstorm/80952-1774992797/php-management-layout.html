@@ -1,0 +1,84 @@
+<h2>PHP Management Layout Options</h2>
+<p class="subtitle">Goal: manage installed PHP versions at the server level, then handle runtime settings and selected PHP version per site.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Option A: Dedicated PHP Workspace Page</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Overview | Sites | Databases | Services | Logs | PHP | Settings</div>
+          <div style="padding: 14px 0;">
+            <div class="label">Server level</div>
+            <div class="placeholder" style="margin-bottom:10px;">Installed versions list, install/uninstall, set default CLI, set default for new sites</div>
+            <div class="label">Site level</div>
+            <div class="placeholder" style="margin-bottom:10px;">Table of sites with current PHP version and quick "Change version" action</div>
+            <div class="label">Site settings</div>
+            <div class="placeholder">Per-site limits, OPcache, Composer auth, extensions entry point</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Dedicated `PHP` page</h3>
+      <p>Keeps everything PHP-related in one workspace area. Best if PHP should feel like a first-class operations surface beside Services and Sites.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Option B: Server PHP + Site PHP Split</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Overview | Sites | Databases | Services | Logs | Settings</div>
+          <div class="split" style="margin-top:12px;">
+            <div class="mockup">
+              <div class="mockup-header">Server PHP page/tab</div>
+              <div class="mockup-body">
+                <div class="placeholder">Installed versions</div>
+                <div class="placeholder">Default CLI + new-site default</div>
+              </div>
+            </div>
+            <div class="mockup">
+              <div class="mockup-header">Site page</div>
+              <div class="mockup-body">
+                <div class="placeholder">PHP version for this site</div>
+                <div class="placeholder">Memory/upload/timeout</div>
+                <div class="placeholder">OPcache and Composer auth</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Split by ownership</h3>
+      <p>Server page owns packages and defaults. Each site owns runtime and PHP selection. Best if site configuration should stay close to site deploy settings.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Option C: Settings Tab Expansion</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Connection | Keys | Alerts | Inventory | PHP | Notes | Export | Danger</div>
+          <div style="padding: 14px 0;">
+            <div class="placeholder" style="margin-bottom:10px;">Top card: installed PHP versions and default version controls</div>
+            <div class="placeholder" style="margin-bottom:10px;">Middle card: site mapping table and change actions</div>
+            <div class="placeholder">Bottom cards: OPcache, extensions, Composer auth, template settings</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>`Settings` sub-tab</h3>
+      <p>Fastest to fit into the current structure, but risks burying an operationally important area inside the settings section.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Recommendation</h3>
+  <p>I’d lean toward <strong>Option B</strong>: a server-level PHP management area for installed versions and defaults, with site-specific PHP version and runtime settings on each site. It matches the boundary you described and avoids one large page doing two different jobs.</p>
+</div>

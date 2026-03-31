@@ -42,11 +42,12 @@ return [
     | Guest → app HTTP push (continuous monitoring)
     |--------------------------------------------------------------------------
     |
-    | After “Install monitoring” (or the first successful SSH collect), a per-server
-    | token is created and DeployGuestMetricsCallbackEnvJob writes
-    | ~/.dply/metrics-callback.env and installs a user crontab block that runs
-    | python3 ~/.dply/bin/server-metrics-snapshot.py on a schedule (guest push).
-    | Requires APP_URL reachable from the server (HTTPS). Disable if unused.
+    | After “Install monitoring”, a per-server token is created and
+    | DeployGuestMetricsCallbackEnvJob writes ~/.dply/metrics-callback.env and
+    | installs a user crontab block that runs python3 ~/.dply/bin/server-metrics-
+    | snapshot.py on a schedule. The callback URL uses the unified /api/metrics
+    | endpoint, preferring server_metrics.ingest.url, then dply.public_app_url,
+    | then app.url.
     |
     */
 
@@ -55,7 +56,7 @@ return [
         'deploy_queue' => env('SERVER_METRICS_GUEST_PUSH_DEPLOY_QUEUE'),
 
         /** Five-field cron expression for the guest user crontab (path uses $HOME). */
-        'cron_expression' => env('DPLY_METRICS_GUEST_PUSH_CRON', '*/5 * * * *'),
+        'cron_expression' => env('DPLY_METRICS_GUEST_PUSH_CRON', '* * * * *'),
     ],
 
     /*

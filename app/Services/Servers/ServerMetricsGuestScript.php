@@ -82,22 +82,26 @@ BASH;
         $payload = (string) file_get_contents($local);
         $b64 = base64_encode($payload);
         $b64Lines = rtrim(chunk_split($b64, 76, "\n"));
+        $expectedSha = $this->bundledSha256();
 
         $deploy = <<<'BASH'
 mkdir -p "$HOME/.dply/bin"
 TMP_B64="$(mktemp)"
 cat <<'DPLY_B64_FILE' > "$TMP_B64"
 BASH;
-        $deploy .= $b64Lines."\n";
+        $deploy .= "\n".$b64Lines."\n";
         $deploy .= <<<'BASH'
 DPLY_B64_FILE
 base64 -d "$TMP_B64" > "$HOME/.dply/bin/server-metrics-snapshot.py" || { rm -f "$TMP_B64"; exit 1; }
 chmod 755 "$HOME/.dply/bin/server-metrics-snapshot.py"
+test -s "$HOME/.dply/bin/server-metrics-snapshot.py" || { echo "guest metrics script is empty after deploy"; rm -f "$TMP_B64"; exit 1; }
+ACTUAL_SHA="$(sha256sum "$HOME/.dply/bin/server-metrics-snapshot.py" | awk '{print $1}')"
+test "$ACTUAL_SHA" = "__EXPECTED_SHA__" || { echo "guest metrics script sha mismatch: $ACTUAL_SHA"; rm -f "$TMP_B64"; exit 1; }
 rm -f "$TMP_B64"
 echo "Installed Dply metrics script at $HOME/.dply/bin/server-metrics-snapshot.py"
 BASH;
 
-        return str_replace("\r\n", "\n", $deploy);
+        return str_replace("\r\n", "\n", str_replace('__EXPECTED_SHA__', $expectedSha, $deploy));
     }
 
     /**

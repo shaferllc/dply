@@ -2,19 +2,25 @@
     'server',
     /** @var string|null Active server panel key (sites, overview, …) for nav highlight */
     'active' => null,
+    'showNavigation' => null,
 ])
 
 @php
     $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
     $navLink = 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors';
     $workspaceNav = config('server_workspace.nav', []);
+    $showNavigation = $showNavigation ?? ($server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE);
 @endphp
 
 <div
     class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
     x-data="{ copiedIp: false }"
 >
-    <div class="lg:grid lg:grid-cols-12 lg:gap-10">
+    <div @class([
+        'lg:grid lg:gap-10' => $showNavigation,
+        'lg:grid-cols-12' => $showNavigation,
+    ])>
+        @if ($showNavigation)
         <aside class="lg:col-span-3 mb-8 lg:mb-0">
             <h2 class="text-xs font-semibold uppercase tracking-wider text-brand-mist mb-3">{{ __('Server') }}</h2>
             <div class="{{ $card }}">
@@ -129,8 +135,12 @@
                 </div>
             </div>
         </aside>
+        @endif
 
-        <div class="lg:col-span-9 min-w-0">
+        <div @class([
+            'min-w-0',
+            'lg:col-span-9' => $showNavigation,
+        ])>
             {{ $slot }}
         </div>
     </div>

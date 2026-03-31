@@ -24,6 +24,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Task model for storing task execution data.
@@ -117,6 +118,11 @@ class Task extends Model
      */
     public function outputLogPath(): string
     {
+        $persistedPath = trim((string) ($this->options['remote_output_path'] ?? ''));
+        if ($persistedPath !== '') {
+            return $persistedPath;
+        }
+
         if (! $this->server) {
             return '';
         }
@@ -489,10 +495,37 @@ class Task extends Model
             return;
         }
 
-        $instance = unserialize($this->instance);
-        if ($instance && $instance instanceof HasCallbacks) {
+        try {
+            $instance = static::restoreStoredInstance($this->instance);
+        } catch (Throwable $e) {
+            Log::warning('Failed to restore task callback instance', [
+                'task_id' => $this->id,
+                'task_action' => $this->action,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        if ($instance instanceof HasCallbacks) {
             $instance->handleCallback($this, $request, $type);
         }
+    }
+
+    public static function storeInstance(object $instance): string
+    {
+        return base64_encode(serialize($instance));
+    }
+
+    public static function restoreStoredInstance(string $storedInstance): mixed
+    {
+        $decoded = base64_decode($storedInstance, true);
+
+        if ($decoded !== false) {
+            return unserialize($decoded);
+        }
+
+        return unserialize($storedInstance);
     }
 
     /**

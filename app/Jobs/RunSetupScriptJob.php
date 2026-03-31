@@ -2,8 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Actions\Servers\CreateServerProvisionRun;
+use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Enums\ServerProvider;
 use App\Models\Server;
+use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
@@ -83,6 +86,8 @@ class RunSetupScriptJob implements ShouldQueue
 
     public function handle(
         ServerProvisionCommandBuilder $builder,
+        CreateServerProvisionRun $createProvisionRun,
+        UpsertServerProvisionArtifact $upsertProvisionArtifact,
         TaskDispatcher $dispatcher,
     ): void {
         $server = $this->server->fresh();
@@ -109,13 +114,10 @@ class RunSetupScriptJob implements ShouldQueue
 
         $timeout = (int) config('server_provision.remote_script_timeout_seconds', 3600);
 
-        $body = "#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\n";
+        $body = '';
         foreach ($commands as $line) {
             $body .= rtrim($line)."\n";
         }
-
-        $task = AnonymousTask::script('Server stack provision', $body, ['timeout' => $timeout]);
-        $task->setUser('root');
 
         $taskModel = new TaskRunnerTaskModel([
             'name' => 'Server stack provision',
@@ -130,8 +132,27 @@ class RunSetupScriptJob implements ShouldQueue
         ]);
         $taskModel->save();
 
+        $run = $createProvisionRun->handle($server, $taskModel);
+        foreach ($builder->buildArtifacts($server) as $artifact) {
+            $upsertProvisionArtifact->handle(
+                $run,
+                $artifact['type'],
+                $artifact['label'],
+                $artifact['content'],
+                $artifact['metadata'],
+                $artifact['key'],
+            );
+        }
+
+        $body = $this->provisionScriptPreamble($taskModel->id, $run).$body;
+        $taskModel->update(['script_content' => $body]);
+
+        $task = AnonymousTask::script('Server stack provision', $body, ['timeout' => $timeout]);
+        $task->setUser('root');
+
         $meta = $server->meta ?? [];
         $meta['provision_task_id'] = (string) $taskModel->id;
+        $meta['provision_run_id'] = (string) $run->id;
         $server->update([
             'setup_status' => Server::SETUP_STATUS_RUNNING,
             'meta' => $meta,
@@ -144,7 +165,7 @@ class RunSetupScriptJob implements ShouldQueue
             $tracked->setTaskModel($taskModel);
 
             $taskModel->update([
-                'instance' => serialize($tracked),
+                'instance' => TaskRunnerTaskModel::storeInstance($tracked),
             ]);
 
             $output = $dispatcher->runInBackgroundWithModel($tracked, $taskModel);
@@ -187,5 +208,61 @@ class RunSetupScriptJob implements ShouldQueue
             ]);
             static::applyProvisionOutcomeToServer($server, false);
         }
+    }
+
+    private function provisionScriptPreamble(string $taskId, ServerProvisionRun $run): string
+    {
+        $runId = (string) $run->id;
+
+        return <<<BASH
+#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+DPLY_PROVISION_ROOT=/var/lib/dply/provision/{$runId}
+DPLY_PROVISION_BACKUPS="\${DPLY_PROVISION_ROOT}/backups"
+mkdir -p "\${DPLY_PROVISION_BACKUPS}"
+echo "[dply] provision run {$runId} task {$taskId}"
+
+dply_restore_backups() {
+  if [ ! -d "\${DPLY_PROVISION_BACKUPS}" ]; then
+    return 0
+  fi
+
+  while IFS= read -r statefile; do
+    rel="\${statefile#\${DPLY_PROVISION_BACKUPS}/}"
+    rel="\${rel%.state}"
+    target="/\${rel}"
+    state=\$(cat "\${statefile}")
+    if [ "\${state}" = "exists" ] && [ -f "\${DPLY_PROVISION_BACKUPS}/\${rel}.bak" ]; then
+      mkdir -p "\$(dirname "\${target}")"
+      cp -a "\${DPLY_PROVISION_BACKUPS}/\${rel}.bak" "\${target}"
+      echo "[dply-rollback] \${rel} :: restored :: Previous config restored"
+    elif [ "\${state}" = "missing" ]; then
+      rm -f "\${target}"
+      echo "[dply-rollback] \${rel} :: removed :: New config removed"
+    fi
+  done < <(find "\${DPLY_PROVISION_BACKUPS}" -name '*.state' -type f 2>/dev/null)
+}
+
+dply_write_file() {
+  target=\$(printf '%s' "\$1" | base64 -d)
+  payload=\$(printf '%s' "\$2" | base64 -d)
+  rel="\${target#/}"
+  statefile="\${DPLY_PROVISION_BACKUPS}/\${rel}.state"
+  backupfile="\${DPLY_PROVISION_BACKUPS}/\${rel}.bak"
+  mkdir -p "\$(dirname "\${statefile}")" "\$(dirname "\${target}")"
+  if [ -f "\${target}" ]; then
+    cp -a "\${target}" "\${backupfile}"
+    printf 'exists' > "\${statefile}"
+  else
+    printf 'missing' > "\${statefile}"
+  fi
+  printf '%s' "\${payload}" > "\${target}"
+  echo "[dply-rollback] \${rel} :: checkpoint :: Backup recorded"
+}
+
+trap 'status=$?; echo "[dply-rollback] automatic :: started :: Provision failed, attempting safe rollback"; dply_restore_backups || true; exit $status' ERR
+
+BASH;
     }
 }

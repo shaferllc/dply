@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
+use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -103,5 +105,42 @@ class ServerScheduledDeletionTest extends TestCase
             ->call('cancelScheduledServerRemoval');
 
         $this->assertNull($server->fresh()->scheduled_deletion_at);
+    }
+
+    public function test_rerun_setup_queues_fresh_setup_attempt_for_existing_server(): void
+    {
+        Queue::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ip_address' => '203.0.113.10',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_FAILED,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+                'provision_task_id' => 'old-task-id',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceOverview::class, ['server' => $server])
+            ->call('rerunSetup')
+            ->assertRedirect(route('servers.journey', $server));
+
+        $server->refresh();
+
+        $this->assertSame(Server::SETUP_STATUS_PENDING, $server->setup_status);
+        $this->assertArrayNotHasKey('provision_task_id', $server->meta ?? []);
+
+        Queue::assertPushed(WaitForServerSshReadyJob::class, function (WaitForServerSshReadyJob $job) use ($server) {
+            return $job->server->is($server);
+        });
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\TaskRunner\Services;
 
+use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
@@ -429,10 +430,19 @@ class TaskRunnerService
             ];
         }
 
-        // Update task status
+        $task->refresh();
+
+        if ($task->server) {
+            $remoteCancellation = $this->cancelRemoteTaskExecution($task);
+
+            if (! $remoteCancellation['success']) {
+                return $remoteCancellation;
+            }
+        }
+
         $task->update([
-            'status' => TaskStatus::Failed,
-            'output' => 'Task cancelled by user',
+            'status' => TaskStatus::Cancelled,
+            'output' => $this->appendCancellationMessage($task->output),
             'completed_at' => now(),
         ]);
 
@@ -440,6 +450,125 @@ class TaskRunnerService
             'success' => true,
             'task' => $task->fresh(),
         ];
+    }
+
+    /**
+     * @return array{success:bool,error?:string}
+     */
+    private function cancelRemoteTaskExecution(TaskModel $task): array
+    {
+        if (! $task->server) {
+            return ['success' => true];
+        }
+
+        $script = $this->buildRemoteCancellationScript($task);
+        if ($script === null) {
+            return ['success' => true];
+        }
+
+        $output = $this->dispatcher->run(
+            AnonymousTask::command('Cancel Task Process', $script)
+                ->pending()
+                ->onConnection($task->server->connectionAsRoot())
+        );
+
+        if (! $output || ! $output->isSuccessful()) {
+            return [
+                'success' => false,
+                'error' => 'Could not cancel the remote task process.',
+            ];
+        }
+
+        return ['success' => true];
+    }
+
+    private function appendCancellationMessage(?string $output): string
+    {
+        $existingOutput = trim((string) $output);
+
+        if ($existingOutput === '') {
+            return 'Task cancelled by user';
+        }
+
+        return $existingOutput."\nTask cancelled by user";
+    }
+
+    private function buildRemoteCancellationScript(TaskModel $task): ?string
+    {
+        $options = is_array($task->options) ? $task->options : [];
+
+        $wrapperScriptPath = trim((string) ($options['remote_wrapper_script_path'] ?? $options['remote_script_path'] ?? ''));
+        $actualScriptPath = trim((string) ($options['remote_script_path'] ?? ''));
+        $wrapperPidPath = trim((string) ($options['remote_pid_path'] ?? ''));
+        $childPidPath = trim((string) ($options['remote_child_pid_path'] ?? ''));
+
+        if ($wrapperScriptPath === '' && $actualScriptPath === '' && $wrapperPidPath === '' && $childPidPath === '') {
+            return null;
+        }
+
+        $quotedWrapperScriptPath = escapeshellarg($wrapperScriptPath);
+        $quotedActualScriptPath = escapeshellarg($actualScriptPath);
+        $quotedWrapperPidPath = escapeshellarg($wrapperPidPath);
+        $quotedChildPidPath = escapeshellarg($childPidPath);
+
+        return strtr(<<<'BASH'
+set -eu
+
+current_pid=$$
+
+collect_pid() {
+    pid_file="$1"
+
+    if [ -n "$pid_file" ] && [ -f "$pid_file" ]; then
+        pid=$(cat "$pid_file" 2>/dev/null || true)
+        if [ -n "$pid" ]; then
+            printf '%s\n' "$pid"
+        fi
+    fi
+}
+
+collect_matching_pids() {
+    path="$1"
+
+    if [ -z "$path" ]; then
+        return
+    fi
+
+    ps -eo pid=,command= | awk -v path="$path" -v current_pid="$current_pid" 'index($0, path) > 0 && $1 != current_pid { print $1 }'
+}
+
+pids=$(
+    {
+        collect_pid __CHILD_PID_PATH__
+        collect_pid __WRAPPER_PID_PATH__
+        collect_matching_pids __ACTUAL_SCRIPT_PATH__
+        collect_matching_pids __WRAPPER_SCRIPT_PATH__
+    } | awk 'NF && !seen[$1]++'
+)
+
+if [ -z "$pids" ]; then
+    exit 0
+fi
+
+for pid in $pids; do
+    kill -TERM "$pid" 2>/dev/null || true
+done
+
+sleep 2
+
+for pid in $pids; do
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+    fi
+done
+
+rm -f __CHILD_PID_PATH__ __WRAPPER_PID_PATH__
+BASH, [
+            '__CHILD_PID_PATH__' => $quotedChildPidPath,
+            '__WRAPPER_PID_PATH__' => $quotedWrapperPidPath,
+            '__ACTUAL_SCRIPT_PATH__' => $quotedActualScriptPath,
+            '__WRAPPER_SCRIPT_PATH__' => $quotedWrapperScriptPath,
+        ]);
     }
 
     /**

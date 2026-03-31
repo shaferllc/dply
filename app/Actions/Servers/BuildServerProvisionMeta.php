@@ -17,6 +17,7 @@ final class BuildServerProvisionMeta
      * @return array<string, string>
      */
     public function handle(
+        string $installProfile,
         string $serverRole,
         string $cacheService,
         string $webserver,
@@ -24,6 +25,7 @@ final class BuildServerProvisionMeta
         string $database,
     ): array {
         return [
+            'install_profile' => $installProfile,
             'server_role' => $serverRole,
             'cache_service' => $cacheService,
             'webserver' => $webserver,

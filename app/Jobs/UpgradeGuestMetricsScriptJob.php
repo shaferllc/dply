@@ -85,6 +85,7 @@ class UpgradeGuestMetricsScriptJob implements ShouldBeUnique, ShouldQueue
             }
 
             $meta = $server->meta ?? [];
+            $meta['monitoring_guest_script_sha'] = $this->expectedBundledSha256;
             $meta['monitoring_guest_script_sha256'] = $this->expectedBundledSha256;
             $meta['monitoring_guest_script_upgraded_at'] = now()->toIso8601String();
             $server->forceFill(['meta' => $meta])->saveQuietly();

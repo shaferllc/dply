@@ -91,7 +91,10 @@ class TaskViewRenderer
      */
     protected function prepareViewData(): array
     {
-        $data = $this->task->getData();
+        $data = array_filter(
+            $this->task->getData(),
+            fn ($value) => ! $value instanceof \Closure
+        );
 
         // Add task metadata
         $data['_task'] = [

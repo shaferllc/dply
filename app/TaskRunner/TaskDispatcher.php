@@ -299,6 +299,7 @@ class TaskDispatcher implements TaskDispatcherInterface
     {
         // Create pending task
         $pendingTask = $task->pending()->inBackground();
+        $pendingTask->withId('task-'.$taskModel->id);
 
         // Set timeout if specified
         if ($task->getTimeout()) {
@@ -312,6 +313,22 @@ class TaskDispatcher implements TaskDispatcherInterface
 
         $pendingTask->onConnection($connection);
 
+        $options = is_array($taskModel->options) ? $taskModel->options : [];
+        if ($task instanceof TrackTaskInBackground) {
+            $wrapperScriptPath = $connection->scriptPath.'/task-'.$taskModel->id.self::SCRIPT_EXTENSION;
+            $actualScriptPath = $connection->scriptPath.'/task-'.$taskModel->id.'-original'.self::SCRIPT_EXTENSION;
+            $options['remote_wrapper_script_path'] = $wrapperScriptPath;
+            $options['remote_script_path'] = $actualScriptPath;
+            $options['remote_output_path'] = $actualScriptPath.self::LOG_EXTENSION;
+            $options['remote_pid_path'] = $wrapperScriptPath.'.pid';
+            $options['remote_child_pid_path'] = $actualScriptPath.'.pid';
+        } else {
+            $options['remote_script_path'] = $connection->scriptPath.'/task-'.$taskModel->id.self::SCRIPT_EXTENSION;
+            $options['remote_output_path'] = $connection->scriptPath.'/task-'.$taskModel->id.self::LOG_EXTENSION;
+            $options['remote_pid_path'] = $options['remote_script_path'].'.pid';
+        }
+        $taskModel->update(['options' => $options]);
+
         // Dispatch task started event
         event(new TaskStarted($task, $pendingTask, [
             'task_model_id' => $taskModel->id,
@@ -320,8 +337,8 @@ class TaskDispatcher implements TaskDispatcherInterface
             'background' => true,
         ]));
 
-        // Run the task in background
-        $output = $this->runInBackground($pendingTask);
+        // Run the task in background on the configured remote connection
+        $output = $this->runOnConnection($pendingTask);
 
         // Start background output monitoring
         $this->startBackgroundMonitoring($task, $taskModel);
@@ -389,6 +406,10 @@ class TaskDispatcher implements TaskDispatcherInterface
      */
     protected function startBackgroundMonitoring(Task $task, TaskModel $taskModel): void
     {
+        if ($task instanceof TrackTaskInBackground) {
+            return;
+        }
+
         // Dispatch a job to monitor the task output (every 15 seconds)
         UpdateTaskOutput::dispatch($taskModel, 15)
             ->onQueue('task-output');
@@ -664,6 +685,15 @@ SCRIPT;
         $scriptFile = $id.self::SCRIPT_EXTENSION;
         $logFile = $id.self::LOG_EXTENSION;
         $timeout = $pendingTask->task->getTimeout() ?? $this->defaultTimeout ?? 0;
+        $remoteScriptPath = $runner->path($scriptFile);
+        $remoteOutputPath = $runner->path($logFile);
+
+        if ($taskModel = $pendingTask->task->getTaskModel()) {
+            $options = is_array($taskModel->options) ? $taskModel->options : [];
+            $options['remote_script_path'] = $remoteScriptPath;
+            $options['remote_output_path'] = $remoteOutputPath;
+            $taskModel->update(['options' => $options]);
+        }
 
         $runner->verifyScriptDirectoryExists()
             ->upload($scriptFile, $pendingTask->task->getScript());

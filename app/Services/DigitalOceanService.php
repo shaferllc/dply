@@ -196,6 +196,15 @@ class DigitalOceanService
     }
 
     /**
+     * Validate token with a lightweight account endpoint.
+     */
+    public function validateToken(): void
+    {
+        $response = $this->request('get', '/account');
+        $this->assertSuccess($response, 'validate token');
+    }
+
+    /**
      * Get available images (distributions, snapshots).
      *
      * @return array<int, array<string, mixed>>

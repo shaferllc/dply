@@ -3,6 +3,8 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\CheckServerHealthJob;
+use App\Jobs\RunSetupScriptJob;
+use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
@@ -45,6 +47,30 @@ class WorkspaceOverview extends Component
         }
         $this->server->update(['meta' => $meta]);
         $this->flash_success = 'Health check URL updated.';
+    }
+
+    public function rerunSetup(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $server = $this->server->fresh();
+        if (! $server || ! RunSetupScriptJob::shouldDispatch($server)) {
+            $this->flash_error = 'This server is not ready for a setup re-run yet.';
+
+            return;
+        }
+
+        $meta = $server->meta ?? [];
+        unset($meta['provision_task_id']);
+
+        $server->update([
+            'setup_status' => Server::SETUP_STATUS_PENDING,
+            'meta' => $meta,
+        ]);
+
+        WaitForServerSshReadyJob::dispatch($server->fresh());
+
+        $this->redirectRoute('servers.journey', $server, navigate: true);
     }
 
     public function render(): View

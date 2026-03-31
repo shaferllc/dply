@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Models\Server;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
@@ -98,7 +101,38 @@ it('cancel task stops execution', function () {
     $result = $this->service->cancelTask($task->id);
 
     expect($result['success'])->toBeTrue()
-        ->and($task->fresh()->status)->toBe(TaskStatus::Failed);
+        ->and($task->fresh()->status)->toBe(TaskStatus::Cancelled);
+});
+
+it('cancel task stops remote process and marks task cancelled', function () {
+    $server = Server::factory()->create([
+        'ssh_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+    ]);
+
+    $task = Task::factory()->create([
+        'server_id' => $server->id,
+        'status' => TaskStatus::Running,
+        'options' => [
+            'remote_wrapper_script_path' => "/root/.dply-task-runner/task-{$server->id}.sh",
+            'remote_script_path' => "/root/.dply-task-runner/task-{$server->id}-original.sh",
+            'remote_pid_path' => "/root/.dply-task-runner/task-{$server->id}.pid",
+            'remote_child_pid_path' => "/root/.dply-task-runner/task-{$server->id}-child.pid",
+        ],
+    ]);
+
+    $dispatcher = \Mockery::mock(TaskDispatcher::class);
+    $dispatcher->shouldReceive('run')
+        ->once()
+        ->andReturn(new ProcessOutput('cancelled remote task', 0, true));
+    app()->instance(TaskDispatcher::class, $dispatcher);
+
+    $service = app(TaskRunnerService::class);
+
+    $result = $service->cancelTask($task->id);
+
+    expect($result['success'])->toBeTrue()
+        ->and($task->fresh()->status)->toBe(TaskStatus::Cancelled)
+        ->and($task->fresh()->completed_at)->not->toBeNull();
 });
 
 it('cancel task validates status', function () {

@@ -161,7 +161,8 @@ class ScalewayService
     {
         $zones = $this->getZones();
         $zone = $zones[0]['id'] ?? 'fr-par-1';
-        $this->request('get', "/zones/{$zone}/servers", ['per_page' => 1]);
+        $response = $this->request('get', "/zones/{$zone}/servers", ['per_page' => 1]);
+        $this->assertSuccess($response, 'validate token');
     }
 
     protected function request(string $method, string $path, array $body = []): Response
