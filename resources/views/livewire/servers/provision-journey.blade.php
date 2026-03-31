@@ -100,6 +100,16 @@
                         </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
+                        @if ($canCancelProvision)
+                            <button
+                                type="button"
+                                wire:click="openCancelProvisionModal"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
+                            >
+                                <x-heroicon-o-x-circle class="h-4 w-4" />
+                                {{ __('Cancel build') }}
+                            </button>
+                        @endif
                         @if (\App\Jobs\RunSetupScriptJob::shouldDispatch($server) && $server->setup_status !== \App\Models\Server::SETUP_STATUS_RUNNING)
                             <button
                                 type="button"
@@ -293,7 +303,115 @@
                         </div>
                     </section>
                 @endif
+
+                @if ($run)
+                    <section class="{{ $card }} p-6">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Provision run') }}</h3>
+                        <div class="mt-4 space-y-3 text-sm">
+                            <p class="text-brand-moss">{{ __('Attempt') }}: <span class="font-medium text-brand-ink">#{{ $run->attempt }}</span></p>
+                            <p class="text-brand-moss">{{ __('Run status') }}: <span class="font-medium text-brand-ink">{{ ucfirst($run->status) }}</span></p>
+                            @if ($run->rollback_status)
+                                <p class="text-brand-moss">{{ __('Rollback') }}: <span class="font-medium text-brand-ink">{{ str_replace('_', ' ', ucfirst($run->rollback_status)) }}</span></p>
+                            @endif
+                            @if ($run->summary)
+                                <p class="rounded-xl bg-brand-sand/20 p-4 text-brand-ink">{{ $run->summary }}</p>
+                            @endif
+                        </div>
+                    </section>
+                @endif
+
+                @if ($artifacts->isNotEmpty())
+                    <section class="{{ $card }} p-6">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Provision artifacts') }}</h3>
+                        <div class="mt-4 space-y-4">
+                            @foreach ($artifacts as $artifact)
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-4">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ $artifact->label }}</p>
+                                        <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ str_replace('_', ' ', $artifact->type) }}</span>
+                                    </div>
+                                    @if ($artifact->content)
+                                        <pre class="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-brand-ink">{{ $artifact->content }}</pre>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
             </aside>
         </div>
+
+        <x-slot name="modals">
+            @if ($showCancelProvisionModal)
+                <div
+                    class="fixed inset-0 z-50 overflow-y-auto"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="cancel-provision-title"
+                >
+                    <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeCancelProvisionModal"></div>
+                    <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
+                        <div class="w-full max-w-xl rounded-2xl border border-brand-ink/10 bg-white shadow-xl" @click.stop>
+                            <div class="border-b border-zinc-100 px-6 py-6 sm:px-8 sm:py-7">
+                                <h2 id="cancel-provision-title" class="text-lg font-semibold text-brand-ink">{{ __('Cancel server build') }}</h2>
+                                <p class="mt-3 text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Stop the current server build if it is still running. You can keep the server for another attempt, or continue into the remove flow if you want to delete the server entirely.') }}
+                                </p>
+                            </div>
+                            <div class="space-y-5 px-6 py-7 sm:px-8 sm:py-8">
+                                <div class="rounded-xl border border-zinc-200 bg-zinc-50/80 p-5 text-sm text-brand-moss">
+                                    <p class="font-medium text-brand-ink">{{ __('Current status') }}</p>
+                                    <p class="mt-2">{{ __('Server') }}: <span class="font-medium text-brand-ink">{{ ucfirst($server->status) }}</span></p>
+                                    <p class="mt-1">{{ __('Setup') }}: <span class="font-medium text-brand-ink">{{ ucfirst($server->setup_status) }}</span></p>
+                                    @if ($task)
+                                        <p class="mt-1">{{ __('Task') }}: <span class="font-medium text-brand-ink">{{ ucfirst($task->status->value) }}</span></p>
+                                    @endif
+                                </div>
+
+                                @if ($task && $task->status->isActive())
+                                    <button
+                                        type="button"
+                                        wire:click="cancelProvision"
+                                        class="flex w-full items-start justify-between rounded-2xl border border-brand-ink/10 bg-white px-5 py-4 text-left shadow-sm transition-colors hover:border-brand-sage hover:bg-brand-sand/20"
+                                    >
+                                        <span>
+                                            <span class="block text-sm font-semibold text-brand-ink">{{ __('Cancel build and keep server') }}</span>
+                                            <span class="mt-1 block text-sm text-brand-moss">{{ __('Stop the active provisioning task and leave the server in place so you can inspect it or rerun setup later.') }}</span>
+                                        </span>
+                                        <x-heroicon-o-pause-circle class="mt-0.5 h-5 w-5 shrink-0 text-brand-ink" />
+                                    </button>
+                                @endif
+
+                                @can('delete', $server)
+                                    <button
+                                        type="button"
+                                        wire:click="cancelProvisionAndOpenDelete"
+                                        class="flex w-full items-start justify-between rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-left shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
+                                    >
+                                        <span>
+                                            <span class="block text-sm font-semibold text-red-900">{{ __('Cancel build and remove server') }}</span>
+                                            <span class="mt-1 block text-sm text-red-800">{{ __('Stop the build first, then continue into the existing removal confirmation flow to delete the server and any linked provider resource.') }}</span>
+                                        </span>
+                                        <x-heroicon-o-trash class="mt-0.5 h-5 w-5 shrink-0 text-red-800" />
+                                    </button>
+                                @endcan
+                            </div>
+                            <div class="flex justify-end border-t border-zinc-100 bg-zinc-50/80 px-6 py-5 sm:px-8 sm:py-6">
+                                <button type="button" wire:click="closeCancelProvisionModal" class="inline-flex justify-center rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-brand-ink hover:bg-zinc-50 sm:px-6">
+                                    {{ __('Close') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @include('livewire.servers.partials.remove-server-modal', [
+                'open' => $showRemoveServerModal,
+                'serverName' => $server->name,
+                'serverId' => $server->id,
+                'deletionSummary' => $deletionSummary,
+            ])
+        </x-slot>
     </x-server-workspace-layout>
 </div>

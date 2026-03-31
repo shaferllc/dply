@@ -7,6 +7,7 @@ use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Log;
 
 Route::middleware(['web', 'auth'])->group(function () {
     Route::prefix('tasks')->group(function () {
@@ -40,7 +41,13 @@ Route::middleware(['web', 'signed'])->prefix('webhook')->name('webhook.')->group
     $finalizeTask = function (Task $task, TaskStatus $status, int $defaultExitCode, Request $request): void {
         $task->refresh();
 
-        if (in_array($task->status, [TaskStatus::Finished, TaskStatus::Failed, TaskStatus::Timeout], true)) {
+        if (in_array($task->status, [TaskStatus::Finished, TaskStatus::Failed, TaskStatus::Timeout, TaskStatus::Cancelled], true)) {
+            Log::info('Task webhook finalize skipped for terminal task', [
+                'task_id' => $task->id,
+                'current_status' => $task->status->value,
+                'requested_status' => $status->value,
+            ]);
+
             return;
         }
 
@@ -48,6 +55,12 @@ Route::middleware(['web', 'signed'])->prefix('webhook')->name('webhook.')->group
             'status' => $status,
             'exit_code' => (int) $request->input('exit_code', $defaultExitCode),
             'completed_at' => now(),
+        ]);
+
+        Log::info('Task webhook finalized task', [
+            'task_id' => $task->id,
+            'status' => $status->value,
+            'exit_code' => (int) $request->input('exit_code', $defaultExitCode),
         ]);
     };
 
@@ -59,6 +72,12 @@ Route::middleware(['web', 'signed'])->prefix('webhook')->name('webhook.')->group
     })->name('task.callback');
 
     Route::post('/task/mark-as-finished/{task}', function (Task $task, Request $request) use ($finalizeTask) {
+        Log::info('Task finish webhook received', [
+            'task_id' => $task->id,
+            'current_status' => $task->status->value,
+            'exit_code' => (int) $request->input('exit_code', 0),
+        ]);
+
         $task->handleCallback($request, CallbackType::Finished);
         $finalizeTask($task, TaskStatus::Finished, 0, $request);
 
@@ -80,6 +99,10 @@ Route::middleware(['web', 'signed'])->prefix('webhook')->name('webhook.')->group
     })->name('task.mark-as-timed-out');
 
     Route::post('/task/update-output/{task}', function (Task $task, Request $request) {
+        if (! $task->status->isActive()) {
+            return response()->json(['status' => 'ignored']);
+        }
+
         $output = $request->input('output', '');
         $scriptContent = $request->input('script_content', '');
         $appendNewline = $request->boolean('append_newline');

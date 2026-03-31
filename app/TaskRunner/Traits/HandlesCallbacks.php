@@ -191,8 +191,6 @@ trait HandlesCallbacks
             'exit_code' => 124,
             'completed_at' => now(),
         ]);
-
-        $this->sendTimeoutCallback();
     }
 
     /**
@@ -207,8 +205,6 @@ trait HandlesCallbacks
             'exit_code' => $exitCode,
             'completed_at' => now(),
         ]);
-
-        $this->sendFailedCallback();
     }
 
     /**
@@ -223,8 +219,6 @@ trait HandlesCallbacks
             'exit_code' => $exitCode,
             'completed_at' => now(),
         ]);
-
-        $this->sendFinishedCallback();
     }
 
     /**

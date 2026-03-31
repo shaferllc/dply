@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Servers;
 
+use App\Actions\Servers\BuildProviderCredentialHealth;
+use App\Actions\Servers\BuildServerCreatePreflight;
 use App\Actions\Servers\FilterServerProvisionOptionsForCreateForm;
 use App\Actions\Servers\GetProviderCredentialsForServerType;
 use App\Actions\Servers\ListServerProviderCards;
+use App\Actions\Servers\RecommendServerCreateSizes;
 use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Actions\Servers\StoreServerFromCreateForm;
 use App\Livewire\Concerns\ManagesProviderCredentials;
@@ -12,10 +15,12 @@ use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Services\SshConnection;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -28,6 +33,14 @@ class Create extends Component
     public ServerCreateForm $form;
 
     public string $active_provider = 'digitalocean';
+
+    public string $customConnectionTestState = 'idle';
+
+    public string $customConnectionTestMessage = '';
+
+    public ?string $customConnectionTestedAt = null;
+
+    public ?string $customConnectionTestSignature = null;
 
     public function mount(): void
     {
@@ -84,6 +97,11 @@ class Create extends Component
         $this->applyCloudDefaults($provider);
     }
 
+    public function updatedFormInstallProfile(): void
+    {
+        $this->applyInstallProfile();
+    }
+
     public function store(): mixed
     {
         $user = auth()->user();
@@ -106,6 +124,18 @@ class Create extends Component
             return null;
         }
 
+        $preflight = $this->buildPreflightContext($org);
+        if (! $preflight['preflight']['can_submit']) {
+            foreach ($preflight['preflight']['blocking_fields'] as $field => $message) {
+                $this->addError($field, $message);
+            }
+            if ($preflight['preflight']['blocking_fields'] === []) {
+                $this->addError('org', $preflight['preflight']['summary']);
+            }
+
+            return null;
+        }
+
         try {
             $server = StoreServerFromCreateForm::run($user, $org, $this->form);
         } catch (ValidationException $e) {
@@ -124,6 +154,7 @@ class Create extends Component
         $this->form->provider_credential_id = '';
         $this->form->region = '';
         $this->form->size = '';
+        $this->resetCustomConnectionTestState();
 
         $org = auth()->user()?->currentOrganization();
         if (! $org || $this->form->type === 'custom') {
@@ -157,51 +188,114 @@ class Create extends Component
         }
     }
 
+    public function updatedFormIpAddress(): void
+    {
+        $this->resetCustomConnectionTestState();
+    }
+
+    public function updatedFormSshPort(): void
+    {
+        $this->resetCustomConnectionTestState();
+    }
+
+    public function updatedFormSshUser(): void
+    {
+        $this->resetCustomConnectionTestState();
+    }
+
+    public function updatedFormSshPrivateKey(): void
+    {
+        $this->resetCustomConnectionTestState();
+    }
+
+    public function testCustomConnection(): void
+    {
+        $this->resetErrorBag([
+            'ip_address',
+            'ssh_port',
+            'ssh_user',
+            'ssh_private_key',
+        ]);
+
+        try {
+            Validator::make(
+                [
+                    'ip_address' => $this->form->ip_address,
+                    'ssh_port' => $this->form->ssh_port,
+                    'ssh_user' => $this->form->ssh_user,
+                    'ssh_private_key' => $this->form->ssh_private_key,
+                ],
+                [
+                    'ip_address' => 'required|string|max:255',
+                    'ssh_port' => 'nullable|integer|min:1|max:65535',
+                    'ssh_user' => 'required|string|max:255',
+                    'ssh_private_key' => 'required|string',
+                ]
+            )->validate();
+        } catch (ValidationException $e) {
+            $this->mergeValidationException($e);
+            $this->customConnectionTestState = 'error';
+            $this->customConnectionTestMessage = __('Fill in the required SSH fields before testing the connection.');
+
+            return;
+        }
+
+        $server = new Server([
+            'name' => $this->form->name !== '' ? $this->form->name : 'custom-server-test',
+            'ip_address' => $this->form->ip_address,
+            'ssh_port' => (int) ($this->form->ssh_port !== '' ? $this->form->ssh_port : '22'),
+            'ssh_user' => $this->form->ssh_user,
+            'ssh_private_key' => $this->form->ssh_private_key,
+        ]);
+
+        try {
+            $ssh = new SshConnection($server);
+            if (! $ssh->connect(8)) {
+                throw new \RuntimeException('SSH authentication failed.');
+            }
+
+            $user = trim($ssh->exec('whoami', 8));
+
+            $this->customConnectionTestState = 'success';
+            $this->customConnectionTestMessage = $user !== ''
+                ? __('SSH connection verified as :user.', ['user' => $user])
+                : __('SSH connection verified successfully.');
+            $this->customConnectionTestedAt = now()->toIso8601String();
+            $this->customConnectionTestSignature = $this->currentCustomConnectionSignature();
+        } catch (\Throwable $e) {
+            $message = strtolower($e->getMessage());
+            $this->customConnectionTestState = str_contains($message, 'auth') || str_contains($message, 'permission')
+                ? 'error'
+                : 'warning';
+            $this->customConnectionTestMessage = __('SSH test failed: :message', ['message' => $e->getMessage()]);
+            $this->customConnectionTestedAt = now()->toIso8601String();
+            $this->customConnectionTestSignature = $this->currentCustomConnectionSignature();
+        }
+    }
+
     public function render(): View
     {
         $this->authorize('create', Server::class);
 
         $org = auth()->user()->currentOrganization();
-
-        $catalog = $org
-            ? ResolveServerCreateCatalog::run(
-                $org,
-                $this->form->type,
-                $this->form->provider_credential_id,
-                $this->form->region,
-            )
-            : [
-                'credentials' => collect(),
-                'regions' => [],
-                'sizes' => [],
-                'region_label' => __('Region'),
-                'size_label' => __('Plan / size'),
-            ];
-
-        $canCreateServer = $org ? $org->canCreateServer() : false;
+        $context = $this->buildPreflightContext($org);
+        $catalog = $context['catalog'];
+        $canCreateServer = $context['canCreateServer'];
         $billingUrl = $org ? route('subscription.show', $org) : null;
         $setupScripts = config('setup_scripts.scripts', []);
-        $hasAnyProviderCredentials = $org
-            ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
-            : false;
-        $hasLinkedCredential = $org
-            ? GetProviderCredentialsForServerType::run($org, $this->form->type)->isNotEmpty()
-            : false;
-        $provisionOptions = FilterServerProvisionOptionsForCreateForm::run(
-            $this->form->type,
-            $hasLinkedCredential,
-            $this->form->server_role,
-        );
+        $installProfiles = config('server_provision_options.install_profiles', []);
 
         return view('livewire.servers.create', [
             'catalog' => $catalog,
             'providerCards' => ListServerProviderCards::run($org),
             'providerNav' => CredentialsIndex::credentialProviderNav(),
             'setupScripts' => $setupScripts,
-            'provisionOptions' => $provisionOptions,
+            'installProfiles' => $installProfiles,
+            'provisionOptions' => $context['provisionOptions'],
+            'preflight' => $context['preflight'],
             'canCreateServer' => $canCreateServer,
             'billingUrl' => $billingUrl,
-            'hasAnyProviderCredentials' => $hasAnyProviderCredentials,
+            'hasAnyProviderCredentials' => $context['hasAnyProviderCredentials'],
             'credentials' => $org
                 ? ProviderCredential::where('organization_id', $org->id)->latest()->get()
                 : collect(),
@@ -256,6 +350,8 @@ class Create extends Component
                 $this->form->{$prop} = $ids[0];
             }
         }
+
+        $this->ensureInstallProfileMatchesCurrentSelections();
     }
 
     protected function applyCloudDefaults(?string $preferredType = null): void
@@ -284,6 +380,7 @@ class Create extends Component
         $this->form->type = $type;
         $this->form->provider_credential_id = (string) $credential->id;
         $this->active_provider = $type;
+        $this->applyInstallProfile();
         $this->syncProvisionPreferenceFields();
 
         $catalog = ResolveServerCreateCatalog::run(
@@ -302,7 +399,7 @@ class Create extends Component
             $this->form->region,
         );
 
-        $this->form->size = $this->smallestSizeValue($catalog['sizes'] ?? []);
+        $this->form->size = $this->recommendedSizeValue($catalog['sizes'] ?? [], $this->form->server_role);
     }
 
     protected function preferredRegionValue(array $regions): string
@@ -358,6 +455,19 @@ class Create extends Component
         return (string) ($sizes[0]['value'] ?? '');
     }
 
+    protected function recommendedSizeValue(array $sizes, string $serverRole): string
+    {
+        $recommendations = RecommendServerCreateSizes::run($serverRole, $sizes);
+        foreach ($sizes as $size) {
+            $value = (string) ($size['value'] ?? '');
+            if (($recommendations[$value]['state'] ?? null) === 'good_starting_point') {
+                return $value;
+            }
+        }
+
+        return $this->smallestSizeValue($sizes);
+    }
+
     protected function sizeWeight(array $size): array
     {
         $label = strtolower((string) ($size['label'] ?? ''));
@@ -384,6 +494,140 @@ class Create extends Component
         }
 
         return [$memoryMb, $cpuCount, $diskGb, $monthly];
+    }
+
+    /**
+     * @return array{
+     *     catalog: array<string, mixed>,
+     *     provisionOptions: array<string, mixed>,
+     *     preflight: array<string, mixed>,
+     *     canCreateServer: bool,
+     *     hasAnyProviderCredentials: bool,
+     *     hasLinkedCredential: bool
+     * }
+     */
+    protected function buildPreflightContext($org): array
+    {
+        $catalog = $org
+            ? ResolveServerCreateCatalog::run(
+                $org,
+                $this->form->type,
+                $this->form->provider_credential_id,
+                $this->form->region,
+            )
+            : [
+                'credentials' => collect(),
+                'regions' => [],
+                'sizes' => [],
+                'region_label' => __('Region'),
+                'size_label' => __('Plan / size'),
+            ];
+
+        $canCreateServer = $org ? $org->canCreateServer() : false;
+        $hasAnyProviderCredentials = $org
+            ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
+            : false;
+        $hasLinkedCredential = $org
+            ? GetProviderCredentialsForServerType::run($org, $this->form->type)->isNotEmpty()
+            : false;
+        $provisionOptions = FilterServerProvisionOptionsForCreateForm::run(
+            $this->form->type,
+            $hasLinkedCredential,
+            $this->form->server_role,
+        );
+        $sizeRecommendations = RecommendServerCreateSizes::run($this->form->server_role, $catalog['sizes'] ?? []);
+        if (($catalog['sizes'] ?? []) !== []) {
+            $catalog['sizes'] = array_map(function (array $size) use ($sizeRecommendations): array {
+                $value = (string) ($size['value'] ?? '');
+                if ($value !== '' && isset($sizeRecommendations[$value])) {
+                    $size['recommendation'] = $sizeRecommendations[$value];
+                }
+
+                return $size;
+            }, $catalog['sizes']);
+        }
+        $selectedCredential = $catalog['credentials'] instanceof \Illuminate\Support\Collection
+            ? $catalog['credentials']->firstWhere('id', $this->form->provider_credential_id)
+            : null;
+        $providerHealth = $this->form->type !== 'custom' && $this->form->provider_credential_id !== '' && $selectedCredential instanceof ProviderCredential
+            ? BuildProviderCredentialHealth::run($this->form->type, $selectedCredential)
+            : null;
+
+        return [
+            'catalog' => $catalog,
+            'provisionOptions' => $provisionOptions,
+            'preflight' => BuildServerCreatePreflight::run(
+                $this->form,
+                $catalog,
+                $provisionOptions,
+                $canCreateServer,
+                $hasAnyProviderCredentials,
+                $hasLinkedCredential,
+                $providerHealth,
+                [
+                    'state' => $this->customConnectionTestState,
+                    'message' => $this->customConnectionTestMessage,
+                    'tested_at' => $this->customConnectionTestedAt,
+                    'matches_current_form' => $this->customConnectionTestSignature !== null
+                        && $this->customConnectionTestSignature === $this->currentCustomConnectionSignature(),
+                ],
+                $sizeRecommendations,
+            ),
+            'canCreateServer' => $canCreateServer,
+            'hasAnyProviderCredentials' => $hasAnyProviderCredentials,
+            'hasLinkedCredential' => $hasLinkedCredential,
+        ];
+    }
+
+    protected function applyInstallProfile(): void
+    {
+        $profile = collect(config('server_provision_options.install_profiles', []))
+            ->firstWhere('id', $this->form->install_profile);
+
+        if (! is_array($profile)) {
+            return;
+        }
+
+        foreach (['server_role', 'cache_service', 'webserver', 'php_version', 'database', 'setup_script_key'] as $field) {
+            if (array_key_exists($field, $profile) && is_string($profile[$field])) {
+                $this->form->{$field} = $profile[$field];
+            }
+        }
+
+        $this->syncProvisionPreferenceFields();
+    }
+
+    protected function ensureInstallProfileMatchesCurrentSelections(): void
+    {
+        $matching = collect(config('server_provision_options.install_profiles', []))->first(function (array $profile): bool {
+            return ($profile['server_role'] ?? null) === $this->form->server_role
+                && ($profile['cache_service'] ?? null) === $this->form->cache_service
+                && ($profile['webserver'] ?? null) === $this->form->webserver
+                && ($profile['php_version'] ?? null) === $this->form->php_version
+                && ($profile['database'] ?? null) === $this->form->database;
+        });
+
+        $this->form->install_profile = is_array($matching)
+            ? (string) $matching['id']
+            : '';
+    }
+
+    protected function resetCustomConnectionTestState(): void
+    {
+        $this->customConnectionTestState = 'idle';
+        $this->customConnectionTestMessage = '';
+        $this->customConnectionTestedAt = null;
+        $this->customConnectionTestSignature = null;
+    }
+
+    protected function currentCustomConnectionSignature(): string
+    {
+        return sha1(implode('|', [
+            $this->form->ip_address,
+            $this->form->ssh_port,
+            $this->form->ssh_user,
+            $this->form->ssh_private_key,
+        ]));
     }
 
     protected function mergeValidationException(ValidationException $e): void

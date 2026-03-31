@@ -197,6 +197,11 @@ class Server extends Model
         return $this->hasMany(ServerRecipe::class);
     }
 
+    public function provisionRuns(): HasMany
+    {
+        return $this->hasMany(ServerProvisionRun::class)->orderByDesc('created_at');
+    }
+
     public function notificationSubscriptions(): MorphMany
     {
         return $this->morphMany(NotificationSubscription::class, 'subscribable');

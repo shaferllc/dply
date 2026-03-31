@@ -320,9 +320,12 @@ class TaskDispatcher implements TaskDispatcherInterface
             $options['remote_wrapper_script_path'] = $wrapperScriptPath;
             $options['remote_script_path'] = $actualScriptPath;
             $options['remote_output_path'] = $actualScriptPath.self::LOG_EXTENSION;
+            $options['remote_pid_path'] = $wrapperScriptPath.'.pid';
+            $options['remote_child_pid_path'] = $actualScriptPath.'.pid';
         } else {
             $options['remote_script_path'] = $connection->scriptPath.'/task-'.$taskModel->id.self::SCRIPT_EXTENSION;
             $options['remote_output_path'] = $connection->scriptPath.'/task-'.$taskModel->id.self::LOG_EXTENSION;
+            $options['remote_pid_path'] = $options['remote_script_path'].'.pid';
         }
         $taskModel->update(['options' => $options]);
 

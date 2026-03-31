@@ -15,14 +15,17 @@ use App\Models\LogViewerShare;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\ServerProvisionRun;
 use App\Models\Site;
 use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use App\Modules\TaskRunner\Services\TaskRunnerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Mockery;
 use Tests\TestCase;
 
 class ServerTest extends TestCase
@@ -300,7 +303,7 @@ class ServerTest extends TestCase
             ->assertSet('active_provider', 'digitalocean')
             ->assertSet('form.provider_credential_id', (string) $credential->id)
             ->assertSet('form.region', 'nyc3')
-            ->assertSet('form.size', 's-1vcpu-1gb');
+            ->assertSet('form.size', 's-2vcpu-4gb');
     }
 
     public function test_servers_create_renders_plan_picker_columns_for_cloud_sizes(): void
@@ -340,7 +343,7 @@ class ServerTest extends TestCase
         $response->assertSee('Disk');
         $response->assertSee('s-1vcpu-1gb');
         $response->assertSee('$6');
-        $response->assertSee('Recommended');
+        $response->assertSee('Good starting point');
     }
 
     public function test_servers_create_renders_digitalocean_region_picker_map_and_list(): void
@@ -383,6 +386,147 @@ class ServerTest extends TestCase
         $response->assertSee('Frankfurt 1');
     }
 
+    public function test_servers_create_shows_preflight_cost_preview_for_catalog_pricing(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
+            'https://api.digitalocean.com/v2/regions' => Http::response([
+                'regions' => [
+                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
+                ],
+            ]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response([
+                'sizes' => [
+                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'price_hourly' => 0.00893, 'available' => true],
+                ],
+            ]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('Preflight and cost preview');
+        $response->assertSee('$6.00/mo');
+        $response->assertSee('Hourly: $0.0089/hr');
+        $response->assertSee('Provider Catalog');
+    }
+
+    public function test_servers_create_shows_provider_health_failure_when_credential_is_rejected(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account' => Http::response(['message' => 'Forbidden'], 403),
+            'https://api.digitalocean.com/v2/regions' => Http::response([
+                'regions' => [
+                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
+                ],
+            ]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response([
+                'sizes' => [
+                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
+                ],
+            ]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('Credential health');
+        $response->assertSee('Credential lacks required access');
+        $response->assertSee('Blocked');
+    }
+
+    public function test_servers_create_install_profile_updates_stack_defaults(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+            'https://api.digitalocean.com/v2/regions' => Http::response(['regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]]]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response(['sizes' => [['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true]]]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.install_profile', 'queue_worker')
+            ->assertSet('form.server_role', 'worker')
+            ->assertSet('form.webserver', 'none')
+            ->assertSet('form.database', 'none');
+    }
+
+    public function test_servers_create_blocks_store_when_preflight_finds_missing_size(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
+            'https://api.digitalocean.com/v2/regions' => Http::response([
+                'regions' => [
+                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
+                ],
+            ]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response([
+                'sizes' => [
+                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
+                ],
+            ]),
+        ]);
+
+        Queue::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.name', 'Blocked Box')
+            ->set('form.region', 'nyc3')
+            ->set('form.size', '')
+            ->call('store')
+            ->assertHasErrors(['size']);
+
+        $this->assertDatabaseMissing('servers', [
+            'organization_id' => $org->id,
+            'name' => 'Blocked Box',
+        ]);
+    }
+
     public function test_servers_can_be_stored_as_custom(): void
     {
         $user = $this->userWithOrganization();
@@ -405,6 +549,76 @@ class ServerTest extends TestCase
             'provider' => 'custom',
             'status' => 'ready',
         ]);
+    }
+
+    public function test_servers_create_custom_path_shows_warning_preflight_and_unavailable_cost(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('Preflight and cost preview');
+        $response->assertSee('SSH reachability is not verified yet');
+        $response->assertSee('Dply cannot estimate pricing for your own VPS.');
+        $response->assertSee('Unavailable');
+    }
+
+    public function test_servers_create_custom_connection_test_can_report_success(): void
+    {
+        $sshMock = Mockery::mock('overload:App\Services\SshConnection');
+        $sshMock->shouldReceive('connect')->once()->with(8)->andReturn(true);
+        $sshMock->shouldReceive('exec')->once()->with('whoami', 8)->andReturn('root');
+
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.type', 'custom')
+            ->set('form.ip_address', '203.0.113.10')
+            ->set('form.ssh_port', '22')
+            ->set('form.ssh_user', 'root')
+            ->set('form.ssh_private_key', "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----")
+            ->call('testCustomConnection')
+            ->assertSet('customConnectionTestState', 'success')
+            ->assertSee('SSH connection verified as root.');
+    }
+
+    public function test_servers_create_renders_role_aware_size_recommendations(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+            'https://api.digitalocean.com/v2/regions' => Http::response([
+                'regions' => [
+                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
+                ],
+            ]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response([
+                'sizes' => [
+                    ['slug' => 'tiny', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
+                    ['slug' => 'balanced', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true],
+                    ['slug' => 'huge', 'memory' => 16384, 'vcpus' => 8, 'disk' => 320, 'price_monthly' => 96, 'available' => true],
+                ],
+            ]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('Good starting point');
+        $response->assertSee('Too small');
+        $response->assertSee('Overkill');
     }
 
     public function test_servers_show_routes_provisioning_server_to_journey_page(): void
@@ -608,6 +822,106 @@ class ServerTest extends TestCase
         $response->assertSee('Granting sudo access');
     }
 
+    public function test_servers_journey_page_marks_skipped_install_step_as_skipped(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+            'ip_address' => '203.0.113.10',
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'script_content' => implode("\n", [
+                "echo '[dply-step] Installing Redis'",
+                "echo '[dply-step] Finalizing server'",
+            ]),
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Running,
+            'output' => implode("\n", [
+                '[dply-step] Finalizing server',
+                'Firewall is active and enabled on system startup',
+            ]),
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subSeconds(21),
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], [
+                'provision_task_id' => (string) $task->id,
+                'provision_step_snapshots' => [
+                    'script_'.md5('Installing Redis') => [
+                        'label' => 'Installing Redis',
+                        'output' => '[dply] redis-server already installed; skipping package install.',
+                    ],
+                ],
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Installing Redis');
+        $response->assertSee('Skipped because the required software was already installed.');
+        $response->assertSee('already installed; skipping package install.');
+    }
+
+    public function test_servers_journey_page_marks_persisted_skipped_steps_as_completed(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $phpStepKey = 'script_'.md5('Installing PHP 8.3');
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_PENDING,
+            'meta' => [
+                'provision_step_snapshots' => [
+                    $phpStepKey => [
+                        'label' => 'Installing PHP 8.3',
+                        'output' => '[dply] php already installed; skipping package install.',
+                    ],
+                ],
+            ],
+        ]);
+
+        $task = Task::query()->create([
+            'id' => (string) \Illuminate\Support\Str::ulid(),
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'script_content' => implode("\n", [
+                'echo "[dply-step] Installing system updates"',
+                'echo "[dply-step] Installing PHP 8.3"',
+                'echo "[dply-step] Installing MySQL"',
+            ]),
+            'output' => '',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Pending,
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+        ]);
+
+        $meta = $server->meta ?? [];
+        $meta['provision_task_id'] = $task->id;
+        $server->update(['meta' => $meta]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Completed tasks');
+        $response->assertSee('Installing PHP 8.3');
+        $response->assertSee('Skipped because the required software was already installed.');
+    }
+
     public function test_servers_journey_page_renders_pending_state_copy(): void
     {
         $user = $this->userWithOrganization();
@@ -648,6 +962,63 @@ class ServerTest extends TestCase
         $response->assertSee('The server setup task failed before finishing.');
     }
 
+    public function test_servers_journey_page_shows_provision_run_artifacts(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_FAILED,
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Failed,
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subMinute(),
+            'completed_at' => now(),
+        ]);
+
+        $run = ServerProvisionRun::query()->create([
+            'server_id' => $server->id,
+            'task_id' => $task->id,
+            'attempt' => 2,
+            'status' => 'failed',
+            'rollback_status' => 'attempted',
+            'summary' => 'Provisioning failed after attempting safe rollback.',
+            'started_at' => now()->subMinutes(2),
+            'completed_at' => now(),
+        ]);
+
+        $run->artifacts()->create([
+            'type' => 'verification_report',
+            'key' => 'verification-report',
+            'label' => 'Verification report',
+            'content' => '[{"key":"nginx","status":"ok"}]',
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], [
+                'provision_task_id' => (string) $task->id,
+                'provision_run_id' => (string) $run->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Provision run');
+        $response->assertSee('#2');
+        $response->assertSee('Rollback');
+        $response->assertSee('Verification report');
+    }
+
     public function test_servers_journey_can_restart_install(): void
     {
         Queue::fake();
@@ -685,8 +1056,109 @@ class ServerTest extends TestCase
         });
     }
 
+    public function test_servers_journey_shows_cancel_build_actions_for_active_task(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+            'meta' => [
+                'server_role' => 'application',
+            ],
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Running,
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subMinute(),
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], [
+                'provision_task_id' => (string) $task->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Cancel build');
+
+        Livewire::actingAs($user)
+            ->test(ProvisionJourney::class, ['server' => $server])
+            ->call('openCancelProvisionModal')
+            ->assertSee('Cancel build and remove server');
+    }
+
+    public function test_servers_journey_can_cancel_active_provision_task(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+            'meta' => [
+                'server_role' => 'application',
+            ],
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Running,
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subMinute(),
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], [
+                'provision_task_id' => (string) $task->id,
+            ]),
+        ]);
+
+        $taskRunner = \Mockery::mock(TaskRunnerService::class);
+        $taskRunner->shouldReceive('cancelTask')
+            ->once()
+            ->with((string) $task->id)
+            ->andReturnUsing(function () use ($task, $server) {
+                $task->update([
+                    'status' => TaskStatus::Cancelled,
+                    'completed_at' => now(),
+                ]);
+                $server->update([
+                    'setup_status' => Server::SETUP_STATUS_FAILED,
+                ]);
+
+                return ['success' => true];
+            });
+        $this->app->instance(TaskRunnerService::class, $taskRunner);
+
+        Livewire::actingAs($user)
+            ->test(ProvisionJourney::class, ['server' => $server])
+            ->call('cancelProvision')
+            ->assertSet('showCancelProvisionModal', false);
+
+        $this->assertSame(TaskStatus::Cancelled, $task->fresh()->status);
+        $this->assertSame(Server::SETUP_STATUS_FAILED, $server->fresh()->setup_status);
+    }
+
     public function test_servers_journey_redirects_to_server_overview_once_setup_finishes(): void
     {
+        config()->set('app.env', 'production');
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -698,6 +1170,23 @@ class ServerTest extends TestCase
         Livewire::actingAs($user)
             ->test(ProvisionJourney::class, ['server' => $server])
             ->assertRedirect(route('servers.overview', $server));
+    }
+
+    public function test_servers_journey_stays_open_locally_after_setup_finishes(): void
+    {
+        config()->set('app.env', 'local');
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_DONE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ProvisionJourney::class, ['server' => $server])
+            ->assertNoRedirect();
     }
 
     public function test_servers_show_is_displayed_for_owner(): void
@@ -715,6 +1204,33 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.overview', $server));
         $response->assertOk();
         $response->assertSee('Test Server');
+    }
+
+    public function test_servers_overview_links_to_setup_journey_when_provisioning_can_be_rerun(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ip_address' => '203.0.113.10',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_DONE,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        $response->assertSee('Provisioning');
+        $response->assertSee('Open setup journey');
+        $response->assertSee(route('servers.journey', $server), false);
     }
 
     public function test_server_show_logs_tab_renders(): void

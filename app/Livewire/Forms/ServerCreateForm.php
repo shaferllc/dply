@@ -36,6 +36,8 @@ class ServerCreateForm extends Form
 
     public string $database = 'mysql84';
 
+    public string $install_profile = 'laravel_app';
+
     /** @see https://docs.digitalocean.com/reference/api/api-reference/#operation/droplets_create */
     public bool $do_ipv6 = false;
 

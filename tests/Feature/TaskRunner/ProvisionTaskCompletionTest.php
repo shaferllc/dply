@@ -6,6 +6,7 @@ namespace Tests\Feature\TaskRunner;
 
 use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
+use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -122,6 +123,55 @@ class ProvisionTaskCompletionTest extends TestCase
             'Granting sudo access',
         ]), $snapshots['script_'.md5('Creating server user')]['output'] ?? null);
         $this->assertSame('Reading package lists', $snapshots['script_'.md5('Installing nginx')]['output'] ?? null);
+    }
+
+    public function test_observer_persists_verification_and_rollback_artifacts_for_provision_run(): void
+    {
+        $server = Server::factory()->create([
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'status' => TaskStatus::Running,
+            'server_id' => $server->id,
+            'script' => 'x',
+            'timeout' => 300,
+            'user' => 'root',
+        ]);
+
+        $run = ServerProvisionRun::query()->create([
+            'server_id' => $server->id,
+            'task_id' => $task->id,
+            'attempt' => 1,
+            'status' => 'running',
+            'started_at' => now(),
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], [
+                'provision_task_id' => (string) $task->id,
+                'provision_run_id' => (string) $run->id,
+            ]),
+        ]);
+
+        $task->update([
+            'output' => implode("\n", [
+                '[dply-verify] nginx :: ok :: Check passed',
+                '[dply-verify] php :: failed :: Check failed',
+                '[dply-rollback] etc/nginx/sites-available/dply :: restored :: Previous config restored',
+            ]),
+            'status' => TaskStatus::Failed,
+            'completed_at' => now(),
+        ]);
+
+        $run->refresh();
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('attempted', $run->rollback_status);
+        $this->assertNotNull($run->artifacts()->where('type', 'verification_report')->first());
+        $this->assertNotNull($run->artifacts()->where('type', 'rollback_report')->first());
     }
 
     public function test_apply_provision_outcome_sets_deploy_ssh_user_when_key_present(): void

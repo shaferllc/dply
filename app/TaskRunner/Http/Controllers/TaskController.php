@@ -9,6 +9,7 @@ use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Facades\TaskRunner;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\ParallelTaskExecutor;
+use App\Modules\TaskRunner\Services\TaskRunnerService;
 use App\Modules\TaskRunner\TaskChain;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -290,7 +291,7 @@ class TaskController extends Controller
     /**
      * Cancel a running task.
      */
-    public function cancel(string $task): JsonResponse
+    public function cancel(string $task, TaskRunnerService $taskRunner): JsonResponse
     {
         $taskModel = Task::find($task);
 
@@ -306,11 +307,11 @@ class TaskController extends Controller
             return response()->json(['error' => 'Task is not running'], 400);
         }
 
-        // In a real implementation, you'd cancel the actual process
-        $taskModel->update([
-            'status' => TaskStatus::Cancelled,
-            'completed_at' => now(),
-        ]);
+        $result = $taskRunner->cancelTask((string) $taskModel->id);
+
+        if (! ($result['success'] ?? false)) {
+            return response()->json(['error' => $result['error'] ?? 'Could not cancel task'], 422);
+        }
 
         return response()->json([
             'data' => [

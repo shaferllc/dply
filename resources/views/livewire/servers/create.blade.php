@@ -149,6 +149,20 @@
                                     $regionSizePickReady = $catalog['credentials']->isNotEmpty() && $form->provider_credential_id !== '';
                                 }
                             @endphp
+                            @php
+                                $preflightBadgeClasses = match ($preflight['status']) {
+                                    'ready' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                    'warning' => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                    default => 'bg-rose-50 text-rose-700 ring-rose-200',
+                                };
+                                $preflightItemClasses = static function (string $severity): string {
+                                    return match ($severity) {
+                                        'info' => 'border-emerald-200 bg-emerald-50/70 text-emerald-900',
+                                        'warning' => 'border-amber-200 bg-amber-50 text-amber-900',
+                                        default => 'border-rose-200 bg-rose-50 text-rose-900',
+                                    };
+                                };
+                            @endphp
                             <div class="rounded-2xl border border-slate-200 bg-white p-5">
                                 <h3 class="text-base font-semibold text-slate-900">{{ __('Choose provider') }}</h3>
                                 <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -211,6 +225,23 @@
                                 @if ($catalog['credentials']->isNotEmpty() && $form->provider_credential_id === '')
                                     <p class="text-sm text-slate-600">{{ __('Choose an account above to continue with cloud provisioning.') }}</p>
                                 @endif
+
+                                @if ($preflight['provider_health'])
+                                    <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($preflight['provider_health']['severity']) }}">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p class="text-sm font-semibold">{{ __('Credential health') }}</p>
+                                                <p class="mt-1 text-sm leading-6">{{ $preflight['provider_health']['detail'] }}</p>
+                                                @if ($preflight['provider_health']['provider_message'])
+                                                    <p class="mt-2 text-xs opacity-80">{{ $preflight['provider_health']['provider_message'] }}</p>
+                                                @endif
+                                            </div>
+                                            <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                                                {{ str((string) $preflight['provider_health']['status'])->replace('_', ' ')->title() }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
 
                             @if ($showCloudStackFields)
@@ -243,6 +274,7 @@
                                     </div>
 
                                     @php
+                                        $selectedInstallProfile = collect($installProfiles ?? [])->firstWhere('id', $form->install_profile);
                                         $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
                                         $serverRoleInstalls = collect($selectedServerRole['installs'] ?? [])
                                             ->filter(fn ($item) => filled($item))
@@ -251,6 +283,34 @@
                                     @endphp
 
                                     <section class="space-y-4">
+                                        <div>
+                                            <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('0. Choose an install profile') }}</h4>
+                                            <p class="mt-1 text-sm text-slate-600">{{ __('Start with a preset and then fine-tune anything in advanced options.') }}</p>
+                                            <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+                                                <div>
+                                                    <x-input-label for="install_profile" :value="__('Install profile')" />
+                                                    <select wire:model.live="form.install_profile" id="install_profile" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                        @foreach ($installProfiles ?? [] as $profile)
+                                                            <option value="{{ $profile['id'] }}">{{ $profile['label'] }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                @if ($selectedInstallProfile)
+                                                    <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                                                        <div class="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p class="text-sm font-semibold text-slate-900">{{ $selectedInstallProfile['label'] }}</p>
+                                                                <p class="mt-1 text-sm leading-6 text-slate-600">{{ $selectedInstallProfile['summary'] ?? '' }}</p>
+                                                            </div>
+                                                            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
+                                                                {{ __('Preset') }}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+
                                         <div class="flex items-center justify-between gap-3">
                                             <div>
                                                 <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('1. Choose the server role') }}</h4>
@@ -675,9 +735,14 @@
                                                                             <span>{{ $selectedSizeCard['price'] }}</span>
                                                                         @endif
                                                                     </div>
-                                                                    @if ($recommendedSizeCard && $selectedSizeCard['value'] === $recommendedSizeCard['value'])
+                                                                    @php
+                                                                        $selectedRecommendation = $selectedSizeCard
+                                                                            ? collect($catalog['sizes'] ?? [])->firstWhere('value', $selectedSizeCard['value'])
+                                                                            : null;
+                                                                    @endphp
+                                                                    @if (($selectedRecommendation['recommendation']['state'] ?? null) === 'good_starting_point')
                                                                         <div class="mt-2 text-[11px] font-medium text-emerald-700">
-                                                                            {{ __('Auto-selected as the leanest starting plan.') }}
+                                                                            {{ $selectedRecommendation['recommendation']['detail'] ?? __('Balanced starting size for the selected install profile.') }}
                                                                         </div>
                                                                     @endif
                                                                 @else
@@ -722,10 +787,15 @@
                                                                         <div class="min-w-0 flex-1">
                                                                             <div class="flex flex-wrap items-center gap-2">
                                                                                 <div class="truncate text-sm font-semibold text-slate-900">{{ $sizeCard['name'] }}</div>
-                                                                                @if ($recommendedSizeCard && $sizeCard['value'] === $recommendedSizeCard['value'])
-                                                                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">
-                                                                                        {{ __('Recommended') }}
-                                                                                    </span>
+                                                                                @php
+                                                                                    $rawSize = collect($catalog['sizes'] ?? [])->firstWhere('value', $sizeCard['value']);
+                                                                                @endphp
+                                                                                @if (($rawSize['recommendation']['state'] ?? null) === 'good_starting_point')
+                                                                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">{{ __('Good starting point') }}</span>
+                                                                                @elseif (($rawSize['recommendation']['state'] ?? null) === 'too_small')
+                                                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700 ring-1 ring-amber-200">{{ __('Too small') }}</span>
+                                                                                @elseif (($rawSize['recommendation']['state'] ?? null) === 'overkill')
+                                                                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-700 ring-1 ring-slate-200">{{ __('Overkill') }}</span>
                                                                                 @endif
                                                                             </div>
                                                                             <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
@@ -754,6 +824,112 @@
                                     @if ($form->type === 'scaleway')
                                         <p class="text-xs text-slate-500">{{ __('Choose a zone first; instance types load for that zone.') }}</p>
                                     @endif
+                                </div>
+
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-4">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <h3 class="text-base font-semibold text-slate-900">{{ __('Preflight and cost preview') }}</h3>
+                                            <p class="mt-1 text-sm text-slate-600">{{ $preflight['summary'] }}</p>
+                                        </div>
+                                        <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $preflightBadgeClasses }}">
+                                            {{ match($preflight['status']) {
+                                                'ready' => __('Ready'),
+                                                'warning' => __('Needs review'),
+                                                default => __('Blocked'),
+                                            } }}
+                                        </span>
+                                    </div>
+
+                                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.85fr)]">
+                                        <div class="space-y-4">
+                                            @foreach ($preflight['groups'] as $groupKey => $groupChecks)
+                                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                        {{ match($groupKey) {
+                                                            'account_readiness' => __('Account readiness'),
+                                                            'infrastructure_selection' => __('Infrastructure selection'),
+                                                            'stack_readiness' => __('Stack readiness'),
+                                                            'verification' => __('Verification'),
+                                                            default => __('Cost clarity'),
+                                                        } }}
+                                                    </p>
+                                                    <div class="mt-3 space-y-3">
+                                                        @foreach ($groupChecks as $check)
+                                                            <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($check['severity']) }}">
+                                                                <div class="flex items-start justify-between gap-3">
+                                                                    <div>
+                                                                        <p class="text-sm font-semibold">{{ $check['label'] }}</p>
+                                                                        <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+                                                                    </div>
+                                                                    <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                                                                        {{ $check['blocking'] ? __('Blocking') : match($check['severity']) {
+                                                                            'warning' => __('Warning'),
+                                                                            default => __('Ready'),
+                                                                        } }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Estimated provider cost') }}</p>
+                                            <div class="mt-3 space-y-3">
+                                                <div>
+                                                    <p class="text-sm font-medium text-slate-900">{{ __('Provider') }}</p>
+                                                    <p class="mt-1 text-sm text-slate-600">{{ str($preflight['cost_preview']['provider'])->replace('_', ' ')->title() }}</p>
+                                                </div>
+                                                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                                                    <div>
+                                                        <p class="text-sm font-medium text-slate-900">{{ __('Region') }}</p>
+                                                        <p class="mt-1 text-sm text-slate-600">{{ $preflight['cost_preview']['region'] ?? __('Not selected') }}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-sm font-medium text-slate-900">{{ __('Size') }}</p>
+                                                        <p class="mt-1 text-sm text-slate-600">{{ $preflight['cost_preview']['size'] ?? __('Not selected') }}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Estimate') }}</p>
+                                                    <p class="mt-1 text-lg font-semibold text-slate-900">{{ $preflight['cost_preview']['formatted_price'] ?? __('Unavailable') }}</p>
+                                                    <p class="mt-2 text-sm leading-6 text-slate-600">{{ $preflight['cost_preview']['detail'] }}</p>
+                                                </div>
+                                                @if (($preflight['cost_preview']['extras'] ?? []) !== [])
+                                                    <div class="space-y-2">
+                                                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Known extras') }}</p>
+                                                        @foreach ($preflight['cost_preview']['extras'] as $extra)
+                                                            <div class="rounded-xl border border-slate-200 px-3 py-2">
+                                                                <div class="flex items-center justify-between gap-3">
+                                                                    <p class="text-sm font-medium text-slate-900">{{ $extra['label'] }}</p>
+                                                                    <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ str((string) $extra['state'])->replace('_', ' ')->title() }}</span>
+                                                                </div>
+                                                                <p class="mt-1 text-sm text-slate-600">{{ $extra['detail'] }}</p>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 font-semibold uppercase tracking-[0.16em] text-slate-600">
+                                                        {{ $preflight['cost_preview']['source'] ? str((string) $preflight['cost_preview']['source'])->replace('_', ' ')->title() : __('No price source') }}
+                                                    </span>
+                                                    @if ($preflight['cost_preview']['price_hourly'] !== null)
+                                                        <span>{{ __('Hourly: $:amount/hr', ['amount' => number_format((float) $preflight['cost_preview']['price_hourly'], 4)]) }}</span>
+                                                    @endif
+                                                </div>
+                                                @if (($preflight['cost_preview']['notes'] ?? []) !== [])
+                                                    <div class="space-y-1 text-xs text-slate-500">
+                                                        @foreach ($preflight['cost_preview']['notes'] as $note)
+                                                            <p>{{ $note }}</p>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <details class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
@@ -867,9 +1043,13 @@
                             @endif
                             <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
                                 <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg font-medium text-sm text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Cancel') }}</a>
-                                @if ($form->provider_credential_id !== '')
-                                    <x-primary-button type="submit">{{ __('Create server') }}</x-primary-button>
-                                @endif
+                                <button
+                                    type="submit"
+                                    @disabled(! $preflight['can_submit'])
+                                    class="inline-flex items-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
+                                >
+                                    {{ __('Create server') }}
+                                </button>
                             </div>
                         </form>
                     </section>
@@ -913,11 +1093,104 @@
                                     <textarea id="ssh_private_key" wire:model="form.ssh_private_key" rows="6" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm font-mono text-sm focus:border-sky-500 focus:ring-sky-500"></textarea>
                                     <x-input-error :messages="$errors->get('ssh_private_key')" class="mt-1" />
                                 </div>
+                                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">{{ __('Test connection') }}</p>
+                                            <p class="mt-1 text-sm text-slate-600">{{ __('Verify the current host, username, and private key before saving this custom server.') }}</p>
+                                        </div>
+                                        <button type="button" wire:click="testCustomConnection" class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
+                                            {{ __('Test connection') }}
+                                        </button>
+                                    </div>
+                                    @if ($customConnectionTestMessage !== '')
+                                        <p class="mt-3 text-sm {{ $customConnectionTestState === 'success' ? 'text-emerald-700' : ($customConnectionTestState === 'error' ? 'text-rose-700' : 'text-amber-700') }}">
+                                            {{ $customConnectionTestMessage }}
+                                        </p>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @php
+                                $preflightBadgeClasses = match ($preflight['status']) {
+                                    'ready' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                    'warning' => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                    default => 'bg-rose-50 text-rose-700 ring-rose-200',
+                                };
+                                $preflightItemClasses = static function (string $severity): string {
+                                    return match ($severity) {
+                                        'info' => 'border-emerald-200 bg-emerald-50/70 text-emerald-900',
+                                        'warning' => 'border-amber-200 bg-amber-50 text-amber-900',
+                                        default => 'border-rose-200 bg-rose-50 text-rose-900',
+                                    };
+                                };
+                            @endphp
+
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-base font-semibold text-slate-900">{{ __('Preflight and cost preview') }}</h3>
+                                        <p class="mt-1 text-sm text-slate-600">{{ $preflight['summary'] }}</p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $preflightBadgeClasses }}">
+                                        {{ match($preflight['status']) {
+                                            'ready' => __('Ready'),
+                                            'warning' => __('Needs review'),
+                                            default => __('Blocked'),
+                                        } }}
+                                    </span>
+                                </div>
+
+                                <div class="space-y-4">
+                                    @foreach ($preflight['groups'] as $groupKey => $groupChecks)
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                {{ match($groupKey) {
+                                                    'account_readiness' => __('Account readiness'),
+                                                    'infrastructure_selection' => __('Infrastructure selection'),
+                                                    'stack_readiness' => __('Stack readiness'),
+                                                    'verification' => __('Verification'),
+                                                    default => __('Cost clarity'),
+                                                } }}
+                                            </p>
+                                            <div class="mt-3 space-y-3">
+                                                @foreach ($groupChecks as $check)
+                                                    <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($check['severity']) }}">
+                                                        <div class="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p class="text-sm font-semibold">{{ $check['label'] }}</p>
+                                                                <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+                                                            </div>
+                                                            <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                                                                {{ $check['blocking'] ? __('Blocking') : match($check['severity']) {
+                                                                    'warning' => __('Warning'),
+                                                                    default => __('Ready'),
+                                                                } }}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+
+                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Estimated provider cost') }}</p>
+                                    <p class="mt-2 text-lg font-semibold text-slate-900">{{ $preflight['cost_preview']['formatted_price'] ?? __('Unavailable') }}</p>
+                                    <p class="mt-2 text-sm leading-6 text-slate-600">{{ $preflight['cost_preview']['detail'] }}</p>
+                                </div>
                             </div>
 
                             <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
                                 <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg font-medium text-sm text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Cancel') }}</a>
-                                <x-primary-button type="submit">{{ __('Create server') }}</x-primary-button>
+                                <button
+                                    type="submit"
+                                    @disabled(! $preflight['can_submit'])
+                                    class="inline-flex items-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
+                                >
+                                    {{ __('Create server') }}
+                                </button>
                             </div>
                         </form>
                     </section>

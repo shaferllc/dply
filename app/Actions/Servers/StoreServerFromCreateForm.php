@@ -78,6 +78,7 @@ final class StoreServerFromCreateForm
     private function meta(ServerCreateForm $form): array
     {
         return BuildServerProvisionMeta::run(
+            $form->install_profile,
             $form->server_role,
             $form->cache_service,
             $form->webserver,

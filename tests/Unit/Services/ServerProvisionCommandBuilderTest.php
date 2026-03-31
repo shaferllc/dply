@@ -126,6 +126,11 @@ class ServerProvisionCommandBuilderTest extends TestCase
 
     public function test_build_emits_repeat_safe_install_checks_for_reruns(): void
     {
+        config([
+            'server_provision.force_reinstall' => false,
+            'server_provision.install_supervisor_on_provision' => false,
+        ]);
+
         $server = Server::factory()->create([
             'provider' => ServerProvider::DigitalOcean,
             'meta' => [
@@ -140,13 +145,47 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $commands = app(ServerProvisionCommandBuilder::class)->build($server);
         $joined = implode("\n", $commands);
 
-        $this->assertStringContainsString("dpkg -s 'nginx'", $joined);
         $this->assertStringContainsString('[dply] nginx already installed; skipping package install.', $joined);
-        $this->assertStringContainsString("dpkg -s 'mysql-server'", $joined);
         $this->assertStringContainsString('[dply] mysql-server already installed; skipping package install.', $joined);
-        $this->assertStringContainsString("dpkg -s 'redis-server'", $joined);
         $this->assertStringContainsString('[dply] redis-server already installed; skipping package install.', $joined);
+        $this->assertStringContainsString('grep -RqsE', $joined);
+        $this->assertStringContainsString('ondrej-ubuntu-php|ppa\\.launchpadcontent\\.net/ondrej/php', $joined);
+        $this->assertStringContainsString('[dply] ondrej/php repository already installed; skipping repository setup.', $joined);
+        $this->assertStringContainsString('timeout 120s add-apt-repository -y ppa:ondrej/php', $joined);
+        $this->assertStringContainsString('timeout 300s apt-get update -y', $joined);
+        $this->assertStringNotContainsString('rg -l "ondrej-ubuntu-php|ppa.launchpadcontent.net/ondrej/php"', $joined);
         $this->assertStringContainsString('command -v composer >/dev/null 2>&1', $joined);
         $this->assertStringContainsString('[dply] composer already installed; skipping installer.', $joined);
+    }
+
+    public function test_build_can_force_reinstall_via_config(): void
+    {
+        config([
+            'server_provision.force_reinstall' => true,
+            'server_provision.install_supervisor_on_provision' => true,
+        ]);
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $commands = app(ServerProvisionCommandBuilder::class)->build($server);
+        $joined = implode("\n", $commands);
+
+        $this->assertStringContainsString('apt-get install -y --no-install-recommends nginx', $joined);
+        $this->assertStringContainsString('apt-get install -y --no-install-recommends mysql-server', $joined);
+        $this->assertStringContainsString('apt-get install -y --no-install-recommends redis-server', $joined);
+        $this->assertStringContainsString('add-apt-repository -y ppa:ondrej/php', $joined);
+        $this->assertStringContainsString('curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer', $joined);
+        $this->assertStringNotContainsString('already installed; skipping package install.', $joined);
+        $this->assertStringNotContainsString('already installed; skipping repository setup.', $joined);
+        $this->assertStringNotContainsString('already installed; skipping installer.', $joined);
     }
 }

@@ -173,7 +173,8 @@ class UpCloudService
      */
     public function validateToken(): void
     {
-        $this->request('get', '/zone');
+        $response = $this->request('get', '/zone');
+        $this->assertSuccess($response, 'validate credentials');
     }
 
     protected function request(string $method, string $path, array $body = []): Response

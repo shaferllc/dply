@@ -4,9 +4,13 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
+use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
+use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Models\Task;
+use App\Modules\TaskRunner\Services\TaskRunnerService;
+use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ProvisionStepSnapshots;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
@@ -16,7 +20,10 @@ use Livewire\Livewire;
 #[Layout('layouts.app')]
 class ProvisionJourney extends Component
 {
+    use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+
+    public bool $showCancelProvisionModal = false;
 
     public function mount(Server $server): void
     {
@@ -56,12 +63,15 @@ class ProvisionJourney extends Component
         }
 
         $task = $this->provisionTask();
+        $run = $this->provisionRun();
         $steps = $this->steps($task);
         $completedCount = collect($steps)->where('state', 'completed')->count();
         $shouldPoll = $this->shouldPoll();
 
         return view('livewire.servers.provision-journey', [
             'task' => $task,
+            'run' => $run,
+            'artifacts' => $run?->artifacts()->get() ?? collect(),
             'steps' => $steps,
             'completedCount' => $completedCount,
             'totalCount' => count($steps),
@@ -70,7 +80,67 @@ class ProvisionJourney extends Component
             'completedSteps' => collect($steps)->where('state', 'completed')->values(),
             'failedStep' => collect($steps)->firstWhere('state', 'failed'),
             'shouldPoll' => $shouldPoll,
+            'canCancelProvision' => $this->canCancelProvision($task),
+            'deletionSummary' => $this->showRemoveServerModal
+                ? ServerRemovalAdvisor::summary($this->server->fresh())
+                : null,
         ]);
+    }
+
+    public function openCancelProvisionModal(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->showCancelProvisionModal = true;
+    }
+
+    public function closeCancelProvisionModal(): void
+    {
+        $this->showCancelProvisionModal = false;
+    }
+
+    public function cancelProvision(TaskRunnerService $taskRunner): void
+    {
+        $this->authorize('update', $this->server);
+
+        $task = $this->activeProvisionTask();
+        if (! $task) {
+            $this->flash_error = __('There is no active build task to cancel right now.');
+            $this->showCancelProvisionModal = false;
+
+            return;
+        }
+
+        $result = $taskRunner->cancelTask((string) $task->id);
+
+        if (! ($result['success'] ?? false)) {
+            $this->flash_error = (string) ($result['error'] ?? __('Could not cancel the build task.'));
+
+            return;
+        }
+
+        $this->server->refresh();
+        $this->showCancelProvisionModal = false;
+        session()->flash('success', __('Build cancelled. You can keep this server or remove it.'));
+    }
+
+    public function cancelProvisionAndOpenDelete(TaskRunnerService $taskRunner): void
+    {
+        $this->authorize('delete', $this->server);
+
+        $task = $this->activeProvisionTask();
+        if ($task) {
+            $result = $taskRunner->cancelTask((string) $task->id);
+
+            if (! ($result['success'] ?? false)) {
+                $this->flash_error = (string) ($result['error'] ?? __('Could not cancel the build task.'));
+
+                return;
+            }
+        }
+
+        $this->server->refresh();
+        $this->showCancelProvisionModal = false;
+        $this->openRemoveServerModal();
     }
 
     protected function shouldPoll(): bool
@@ -80,6 +150,10 @@ class ProvisionJourney extends Component
 
     protected function shouldRedirectToServerOverview(): bool
     {
+        if (app()->environment('local')) {
+            return false;
+        }
+
         return $this->server->status === Server::STATUS_READY
             && $this->server->setup_status === Server::SETUP_STATUS_DONE;
     }
@@ -117,6 +191,41 @@ class ProvisionJourney extends Component
         }
 
         return Task::query()->find($taskId);
+    }
+
+    protected function provisionRun(): ?ServerProvisionRun
+    {
+        $runId = (string) ($this->server->meta['provision_run_id'] ?? '');
+        if ($runId !== '') {
+            return ServerProvisionRun::query()->with('artifacts')->find($runId);
+        }
+
+        $task = $this->provisionTask();
+
+        return ServerProvisionRun::query()
+            ->with('artifacts')
+            ->when($task, fn ($query) => $query->where('task_id', $task->id))
+            ->where('server_id', $this->server->id)
+            ->latest('created_at')
+            ->first();
+    }
+
+    protected function activeProvisionTask(): ?Task
+    {
+        $task = $this->provisionTask();
+
+        if (! $task || ! $task->status->isActive()) {
+            return null;
+        }
+
+        return $task;
+    }
+
+    protected function canCancelProvision(?Task $task): bool
+    {
+        return $task?->status->isActive() === true
+            || in_array($this->server->status, [Server::STATUS_PENDING, Server::STATUS_PROVISIONING], true)
+            || $this->server->setup_status === Server::SETUP_STATUS_RUNNING;
     }
 
     /**
@@ -180,6 +289,10 @@ class ProvisionJourney extends Component
                 $state = 'active';
             }
 
+            if ($state === 'pending' && $this->stepHasPersistedSnapshot($server, $step['key'])) {
+                $state = 'completed';
+            }
+
             return [
                 'key' => $step['key'],
                 'label' => $step['label'],
@@ -195,10 +308,14 @@ class ProvisionJourney extends Component
     {
         $scriptLabel = $this->scriptStepLabelForKey($task, $key);
         if ($scriptLabel !== null) {
+            $stepOutput = $this->persistedStepOutput($server, $key) ?? $this->scriptStepOutput($task, $scriptLabel);
+
             return match ($state) {
                 'active' => $this->scriptStepOutputTail($task, $scriptLabel) ?: __('This setup step is currently running.'),
                 'failed' => __('This setup step failed before finishing.'),
-                'completed' => __('Completed during server setup.'),
+                'completed' => $this->stepWasSkipped($stepOutput)
+                    ? __('Skipped because the required software was already installed.')
+                    : __('Completed during server setup.'),
                 default => null,
             };
         }
@@ -367,5 +484,21 @@ class ProvisionJourney extends Component
         $output = is_array($snapshot) ? trim((string) ($snapshot['output'] ?? '')) : '';
 
         return $output !== '' ? $output : null;
+    }
+
+    protected function stepHasPersistedSnapshot(Server $server, string $key): bool
+    {
+        return $this->persistedStepOutput($server, $key) !== null;
+    }
+
+    protected function stepWasSkipped(?string $output): bool
+    {
+        if (! is_string($output) || trim($output) === '') {
+            return false;
+        }
+
+        return str_contains($output, 'already installed; skipping package install.')
+            || str_contains($output, 'already installed; skipping installer.')
+            || str_contains($output, 'already installed; skipping package setup.');
     }
 }

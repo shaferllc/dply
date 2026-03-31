@@ -49,6 +49,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Local retest override
+    |--------------------------------------------------------------------------
+    |
+    | Set this to true in local development when you want provisioning to
+    | reinstall packages even if the server already has them. Production
+    | should normally leave this off so reruns stay idempotent.
+    |
+    */
+    'force_reinstall' => (bool) env('DPLY_SERVER_PROVISION_FORCE_REINSTALL', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Supervisor (process manager)
     |--------------------------------------------------------------------------
     |

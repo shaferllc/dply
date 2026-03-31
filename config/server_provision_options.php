@@ -21,6 +21,59 @@ return [
     | PHP 7.5 was never released; the oldest supported 7.x option here is 7.4.
     |
     */
+    'install_profiles' => [
+        [
+            'id' => 'laravel_app',
+            'label' => 'Laravel app',
+            'summary' => 'Balanced Laravel application server with NGINX, PHP, Redis, and MySQL.',
+            'server_role' => 'application',
+            'cache_service' => 'redis',
+            'webserver' => 'nginx',
+            'php_version' => '8.3',
+            'database' => 'mysql84',
+        ],
+        [
+            'id' => 'php_api',
+            'label' => 'PHP API',
+            'summary' => 'Lean PHP API server with NGINX, PHP, and PostgreSQL.',
+            'server_role' => 'application',
+            'cache_service' => 'redis',
+            'webserver' => 'nginx',
+            'php_version' => '8.3',
+            'database' => 'postgres17',
+        ],
+        [
+            'id' => 'queue_worker',
+            'label' => 'Queue worker',
+            'summary' => 'Background worker host focused on queues and scheduled jobs.',
+            'server_role' => 'worker',
+            'cache_service' => 'redis',
+            'webserver' => 'none',
+            'php_version' => '8.3',
+            'database' => 'none',
+        ],
+        [
+            'id' => 'database_node',
+            'label' => 'Database node',
+            'summary' => 'Dedicated database host with no web stack.',
+            'server_role' => 'database',
+            'cache_service' => 'redis',
+            'webserver' => 'none',
+            'php_version' => 'none',
+            'database' => 'mysql84',
+        ],
+        [
+            'id' => 'static_app_host',
+            'label' => 'Static app host',
+            'summary' => 'Minimal host for static sites, proxies, or simple edge delivery.',
+            'server_role' => 'plain',
+            'cache_service' => 'redis',
+            'webserver' => 'none',
+            'php_version' => 'none',
+            'database' => 'none',
+        ],
+    ],
+
     'server_roles' => [
         [
             'id' => 'application',
