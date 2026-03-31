@@ -86,4 +86,32 @@ class GuestMetricsPushTest extends TestCase
             'metrics' => ['cpu_pct' => 1],
         ])->assertForbidden();
     }
+
+    public function test_guest_push_normalizes_offsetless_timestamp_using_server_timezone(): void
+    {
+        config([
+            'server_metrics.guest_push.enabled' => true,
+            'server_metrics.ingest.enabled' => false,
+        ]);
+
+        $server = Server::factory()->create();
+
+        $plain = 'test-plain-token-for-guest-push';
+        $meta = $server->meta ?? [];
+        $meta['monitoring_guest_push_token_hash'] = hash('sha256', $plain);
+        $meta['monitoring_guest_push_cipher'] = encrypt($plain);
+        $meta['timezone'] = 'America/Los_Angeles';
+        $server->forceFill(['meta' => $meta])->saveQuietly();
+
+        $this->postJson('/api/metrics', [
+            'server_id' => $server->id,
+            'token' => $plain,
+            'metrics' => ['cpu_pct' => 10.5],
+            'captured_at' => '2026-03-30 12:00:00',
+        ])->assertAccepted()->assertJson(['ok' => true]);
+
+        $snap = ServerMetricSnapshot::query()->where('server_id', $server->id)->firstOrFail();
+
+        $this->assertSame('2026-03-30T19:00:00+00:00', $snap->captured_at->utc()->toIso8601String());
+    }
 }

@@ -586,7 +586,9 @@ BASH);
             ? $this->summarizeLatestPayload($latest->payload ?? [])
             : [];
         $deploymentContext = $this->deploymentContext($this->server);
-        $sampleAgeMinutes = $latest?->captured_at?->diffInMinutes(now());
+        $sampleAgeMinutesRaw = $latest?->captured_at?->diffInMinutes(now(), false);
+        $sampleAgeMinutes = $sampleAgeMinutesRaw !== null ? abs((int) ceil($sampleAgeMinutesRaw)) : null;
+        $sampleTimestampInFuture = $sampleAgeMinutesRaw !== null && $sampleAgeMinutesRaw < 0;
         $workspace = $this->server->workspace;
         $routingSummary = [
             'server_routes' => NotificationSubscription::query()
@@ -623,6 +625,7 @@ BASH);
             'latestPayloadSummary' => $latestPayloadSummary,
             'deploymentContext' => $deploymentContext,
             'sampleAgeMinutes' => $sampleAgeMinutes,
+            'sampleTimestampInFuture' => $sampleTimestampInFuture,
             'routingSummary' => $routingSummary,
         ]);
     }

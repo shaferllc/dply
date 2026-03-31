@@ -215,7 +215,11 @@
                     </dd>
                     <dd class="mt-1 text-xs text-brand-mist">
                         @if ($sampleAgeMinutes !== null)
-                            {{ trans_choice('Age: :minutes minute|Age: :minutes minutes', $sampleAgeMinutes, ['minutes' => $sampleAgeMinutes]) }}
+                            @if ($sampleTimestampInFuture)
+                                {{ __('Clock skew detected between this server and Dply.') }}
+                            @else
+                                {{ trans_choice('Age: :minutes minute|Age: :minutes minutes', $sampleAgeMinutes, ['minutes' => $sampleAgeMinutes]) }}
+                            @endif
                         @else
                             {{ __('Freshness updates after the first callback arrives.') }}
                         @endif
@@ -251,6 +255,8 @@
                     <p class="mt-2 text-sm font-semibold text-brand-ink">
                         @if ($sampleAgeMinutes === null)
                             {{ __('Waiting for first callback') }}
+                        @elseif ($sampleTimestampInFuture)
+                            {{ __('Clock skew detected') }}
                         @elseif ($sampleAgeMinutes <= 2)
                             {{ __('Fresh') }}
                         @elseif ($sampleAgeMinutes <= 10)
@@ -262,6 +268,8 @@
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         @if ($sampleAgeMinutes === null)
                             {{ __('No server sample has been stored yet.') }}
+                        @elseif ($sampleTimestampInFuture)
+                            {{ __('The latest sample timestamp is ahead of Dply. Check the server timezone or clock sync, then let a new sample arrive.') }}
                         @else
                             {{ trans_choice('Latest metric sample is :minutes minute old.|Latest metric sample is :minutes minutes old.', $sampleAgeMinutes, ['minutes' => $sampleAgeMinutes]) }}
                         @endif
