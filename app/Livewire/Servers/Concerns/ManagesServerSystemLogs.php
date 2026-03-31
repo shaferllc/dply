@@ -4,13 +4,9 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Events\Servers\ServerWorkspaceLogSnapshotBroadcast;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
-use App\Models\LogViewerShare;
-use App\Models\ServerLogPin;
-use App\Services\Servers\LogViewerLineAnalyzer;
 use App\Services\Servers\ServerSystemLogReader;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
 trait ManagesServerSystemLogs
 {
@@ -64,15 +60,6 @@ trait ManagesServerSystemLogs
 
     /** null = no time filter; 5 / 15 / 60 = minutes */
     public ?int $logTimeRangeMinutes = null;
-
-    /** @var array{http_5xx: int, http_4xx: int, http_2xx_3xx: int, error_keywords: int, warn_keywords: int, lines: int} */
-    public array $logLineSummary = [];
-
-    public bool $logDarkMode = false;
-
-    public bool $logHighContrast = false;
-
-    public string $newPresetName = '';
 
     /**
      * @return array<string, array<string, mixed>>
@@ -204,7 +191,6 @@ trait ManagesServerSystemLogs
         $this->logLastFetchRawBytes = 0;
         $this->logPollBackoffUntil = null;
         $this->logPollFailureStreak = 0;
-        $this->logLineSummary = [];
         $this->resetRemoteSshStreamTargets();
     }
 
@@ -229,8 +215,6 @@ trait ManagesServerSystemLogs
         $meta['log_ui_auto_refresh'] = $this->logAutoRefresh;
         $meta['log_ui_auto_refresh_seconds'] = $refreshSeconds;
         $meta['log_ui_time_range_minutes'] = $this->logTimeRangeMinutes;
-        $meta['log_ui_dark'] = $this->logDarkMode;
-        $meta['log_ui_high_contrast'] = $this->logHighContrast;
         $this->server->update(['meta' => $meta]);
 
         $this->logPollBackoffUntil = null;
@@ -323,6 +307,7 @@ trait ManagesServerSystemLogs
                 $this->logTailLines,
                 $this->logTimeRangeMinutes,
             );
+
             $raw = (string) ($result['output'] ?? '');
             $maxStored = (int) config('server_system_logs.max_stored_bytes', 524288);
             $truncated = false;
@@ -331,12 +316,12 @@ trait ManagesServerSystemLogs
                 $raw = substr($raw, 0, $maxStored);
                 $raw = '[dply] '.__('Output truncated for the UI.')."\n\n".$raw;
             }
+
             $this->remoteLogRaw = $raw;
             $this->remoteLogError = $result['error'] ?? null;
             $this->logLastFetchTruncated = $truncated;
             $this->logLastFetchRawBytes = strlen($this->remoteLogRaw ?? '');
             $this->logLastFetchedAt = now()->toIso8601String();
-            $this->logLineSummary = LogViewerLineAnalyzer::analyze((string) ($this->remoteLogRaw ?? ''));
             $this->applyLogFilterToOutput();
             $this->dispatch('log-viewer-output-updated');
             $this->broadcastLogSnapshotToPeers();
@@ -349,7 +334,6 @@ trait ManagesServerSystemLogs
             $this->remoteLogOutput = '';
             $this->remoteLogError = $e->getMessage();
             $this->logLastFetchedAt = now()->toIso8601String();
-            $this->logLineSummary = [];
             $this->broadcastLogSnapshotToPeers();
             if ($fromPoll) {
                 $this->registerLogPollResult(false);
@@ -423,9 +407,6 @@ trait ManagesServerSystemLogs
         } else {
             $this->logTimeRangeMinutes = null;
         }
-
-        $this->logDarkMode = (bool) ($meta['log_ui_dark'] ?? false);
-        $this->logHighContrast = (bool) ($meta['log_ui_high_contrast'] ?? false);
     }
 
     public function setLogTimeRange(?int $minutes): void
@@ -455,183 +436,6 @@ trait ManagesServerSystemLogs
         };
 
         $this->setLogTimeRange($minutes);
-    }
-
-    public function saveLogPreset(): void
-    {
-        $this->authorize('update', $this->server);
-
-        $name = trim($this->newPresetName);
-        if ($name === '' || mb_strlen($name) > 80) {
-            return;
-        }
-
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $presets = $meta['log_ui_presets'] ?? [];
-        if (! is_array($presets)) {
-            $presets = [];
-        }
-
-        $id = (string) Str::ulid();
-        $presets[$id] = [
-            'name' => $name,
-            'log_key' => $this->logKey,
-            'log_tail_lines' => $this->logTailLines,
-            'log_display_lines' => $this->logDisplayLines,
-            'log_filter' => $this->logFilter,
-            'log_filter_use_regex' => $this->logFilterUseRegex,
-            'log_filter_invert' => $this->logFilterInvert,
-            'log_time_range_minutes' => $this->logTimeRangeMinutes,
-        ];
-
-        if (count($presets) > 15) {
-            $presets = array_slice($presets, -15, null, true);
-        }
-
-        $meta['log_ui_presets'] = $presets;
-        $this->server->update(['meta' => $meta]);
-        $this->newPresetName = '';
-    }
-
-    public function loadLogPreset(string $id): void
-    {
-        $this->authorize('view', $this->server);
-
-        $meta = $this->server->meta ?? [];
-        $presets = $meta['log_ui_presets'] ?? [];
-        if (! is_array($presets) || ! isset($presets[$id]) || ! is_array($presets[$id])) {
-            return;
-        }
-
-        $p = $presets[$id];
-        $keys = array_keys($this->availableLogSources());
-        $key = (string) ($p['log_key'] ?? '');
-        if (in_array($key, $keys, true)) {
-            $this->logKey = $key;
-        }
-
-        if (isset($p['log_tail_lines']) && is_numeric($p['log_tail_lines'])) {
-            $this->logTailLines = max(50, min(5000, (int) $p['log_tail_lines']));
-        }
-        if (isset($p['log_display_lines']) && is_numeric($p['log_display_lines'])) {
-            $this->logDisplayLines = max(2, min(50, (int) $p['log_display_lines']));
-        }
-        $this->logFilter = (string) ($p['log_filter'] ?? '');
-        $this->logFilterUseRegex = (bool) ($p['log_filter_use_regex'] ?? false);
-        $this->logFilterInvert = (bool) ($p['log_filter_invert'] ?? false);
-
-        $tr = $p['log_time_range_minutes'] ?? null;
-        if ($tr === null || $tr === 'all') {
-            $this->logTimeRangeMinutes = null;
-        } elseif (is_numeric($tr) && in_array((int) $tr, [5, 15, 60], true)) {
-            $this->logTimeRangeMinutes = (int) $tr;
-        }
-
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $meta['log_ui_tail_lines'] = $this->logTailLines;
-        $meta['log_ui_display_lines'] = $this->logDisplayLines;
-        $meta['log_ui_time_range_minutes'] = $this->logTimeRangeMinutes;
-        $this->server->update(['meta' => $meta]);
-
-        $this->loadSystemLog();
-    }
-
-    public function deleteLogPreset(string $id): void
-    {
-        $this->authorize('update', $this->server);
-
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $presets = $meta['log_ui_presets'] ?? [];
-        if (! is_array($presets)) {
-            return;
-        }
-
-        unset($presets[$id]);
-        $meta['log_ui_presets'] = $presets;
-        $this->server->update(['meta' => $meta]);
-    }
-
-    public function logPresetsList(): array
-    {
-        $meta = $this->server->meta ?? [];
-        $presets = $meta['log_ui_presets'] ?? [];
-
-        return is_array($presets) ? $presets : [];
-    }
-
-    public function pinLogLine(string $fingerprint, string $note = ''): void
-    {
-        $this->authorize('view', $this->server);
-
-        if (strlen($fingerprint) !== 64 || ! ctype_xdigit($fingerprint)) {
-            return;
-        }
-
-        ServerLogPin::query()->updateOrCreate(
-            [
-                'server_id' => $this->server->id,
-                'user_id' => auth()->id(),
-                'log_key' => $this->logKey,
-                'line_fingerprint' => $fingerprint,
-            ],
-            ['note' => trim($note) !== '' ? trim($note) : null]
-        );
-    }
-
-    public function unpinLogLine(string $pinId): void
-    {
-        $this->authorize('view', $this->server);
-
-        $pin = ServerLogPin::query()
-            ->whereKey($pinId)
-            ->where('user_id', auth()->id())
-            ->where('server_id', $this->server->id)
-            ->first();
-
-        if ($pin !== null) {
-            $pin->delete();
-        }
-    }
-
-    public function createLogShareLink(): void
-    {
-        $this->authorize('view', $this->server);
-
-        $raw = (string) ($this->remoteLogRaw ?? '');
-        $max = (int) config('server_system_logs.max_share_bytes', 524288);
-        if (strlen($raw) > $max) {
-            $raw = substr($raw, 0, $max)."\n[dply] ".__('Truncated for share link.');
-        }
-
-        $share = LogViewerShare::query()->create([
-            'server_id' => $this->server->id,
-            'user_id' => auth()->id(),
-            'token' => Str::random(64),
-            'log_key' => $this->logKey,
-            'content' => $raw,
-            'expires_at' => now()->addHours(72),
-        ]);
-
-        $url = route('log-viewer-shares.show', ['token' => $share->token]);
-        session()->flash('success', __('Share link (72h): :url', ['url' => $url]));
-    }
-
-    public function toggleLogDarkMode(): void
-    {
-        $this->authorize('update', $this->server);
-        $this->logDarkMode = ! $this->logDarkMode;
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $meta['log_ui_dark'] = $this->logDarkMode;
-        $this->server->update(['meta' => $meta]);
-    }
-
-    public function toggleLogHighContrast(): void
-    {
-        $this->authorize('update', $this->server);
-        $this->logHighContrast = ! $this->logHighContrast;
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $meta['log_ui_high_contrast'] = $this->logHighContrast;
-        $this->server->update(['meta' => $meta]);
     }
 
     protected function registerLogPollResult(bool $success): void
@@ -690,7 +494,6 @@ trait ManagesServerSystemLogs
             $this->logLastFetchTruncated = true;
         }
 
-        $this->logLineSummary = LogViewerLineAnalyzer::analyze((string) ($this->remoteLogRaw ?? ''));
         $this->applyLogFilterToOutput();
         $this->dispatch('log-viewer-output-updated');
     }
