@@ -1384,7 +1384,7 @@ class ServerTest extends TestCase
             ->call('toggleLogOptionsMenu')
             ->assertSee(__('Lines to tail'))
             ->assertSee(__('Lines visible'))
-            ->assertSee(__('Auto-refresh (poll)'))
+            ->assertSee(__('Auto-refresh'))
             ->assertSee(__('Reset filter'))
             ->assertSee(__('Clear display'));
     }

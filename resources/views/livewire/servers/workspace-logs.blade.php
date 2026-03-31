@@ -220,84 +220,90 @@
                             @if ($logOptionsMenuOpen)
                                 <div
                                     wire:transition
-                                    class="absolute end-0 z-50 mt-2 w-[min(calc(100vw-2rem),19rem)] rounded-xl border border-brand-ink/10 bg-white p-4 shadow-lg shadow-brand-ink/10"
+                                    class="absolute end-0 z-50 mt-2 w-[min(calc(100vw-2rem),32rem)] rounded-xl border border-brand-ink/10 bg-white p-4 shadow-lg shadow-brand-ink/10"
                                     @click.stop
                                 >
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Fetch & display') }}</p>
-                                    <div class="space-y-3.5">
-                                        <div>
-                                            <label for="log-tail-lines" class="mb-1.5 block text-xs font-medium text-brand-moss">{{ __('Lines to tail') }}</label>
-                                            <input
-                                                id="log-tail-lines"
-                                                type="number"
-                                                min="50"
-                                                max="5000"
-                                                step="50"
-                                                wire:model.number="logTailLines"
-                                                class="box-border h-9 w-full rounded-lg border border-brand-ink/15 bg-white px-3 text-sm leading-none text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                                            />
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-3">
+                                        <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Fetch & display') }}</p>
+                                        <div class="grid gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <label for="log-tail-lines" class="mb-2 block text-xs font-medium text-brand-moss">{{ __('Lines to tail') }}</label>
+                                                <input
+                                                    id="log-tail-lines"
+                                                    type="number"
+                                                    min="50"
+                                                    max="5000"
+                                                    step="50"
+                                                    wire:model.number="logTailLines"
+                                                    class="box-border h-9 w-full rounded-lg border border-brand-ink/15 bg-white px-3 text-sm leading-none text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label for="log-display-lines" class="mb-2 block text-xs font-medium text-brand-moss">{{ __('Lines visible') }}</label>
+                                                <input
+                                                    id="log-display-lines"
+                                                    type="number"
+                                                    min="2"
+                                                    max="50"
+                                                    step="1"
+                                                    wire:model.number="logDisplayLines"
+                                                    class="box-border h-9 w-full rounded-lg border border-brand-ink/15 bg-white px-3 text-sm leading-none text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                                />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label for="log-display-lines" class="mb-1.5 block text-xs font-medium text-brand-moss">{{ __('Lines visible') }}</label>
-                                            <input
-                                                id="log-display-lines"
-                                                type="number"
-                                                min="2"
-                                                max="50"
-                                                step="1"
-                                                wire:model.number="logDisplayLines"
-                                                class="box-border h-9 w-full rounded-lg border border-brand-ink/15 bg-white px-3 text-sm leading-none text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                                            />
+                                        <div class="mt-3 rounded-lg border border-brand-ink/10 bg-white/80 p-3">
+                                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <label class="inline-flex items-center gap-2 text-sm font-medium text-brand-ink">
+                                                    <input type="checkbox" wire:model="logAutoRefresh" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                                                    {{ __('Auto-refresh') }}
+                                                </label>
+                                                <div class="min-w-0 sm:w-48">
+                                                    <label for="log-auto-refresh-sec" class="sr-only">{{ __('Poll interval') }}</label>
+                                                    <select
+                                                        id="log-auto-refresh-sec"
+                                                        wire:model.number="logAutoRefreshSeconds"
+                                                        class="box-border h-9 w-full rounded-lg border border-brand-ink/15 bg-white px-3 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                                    >
+                                                        <option value="15">{{ __('Every 15 seconds') }}</option>
+                                                        <option value="30">{{ __('Every 30 seconds') }}</option>
+                                                        <option value="60">{{ __('Every 60 seconds') }}</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <p class="mt-2 text-[11px] leading-5 text-brand-mist">{{ __('Follows the log by re-fetching on an interval. Backs off after errors.') }}</p>
                                         </div>
-                                        <div>
-                                            <label class="mb-1.5 flex items-center gap-2 text-xs font-medium text-brand-moss">
-                                                <input type="checkbox" wire:model="logAutoRefresh" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
-                                                {{ __('Auto-refresh (poll)') }}
-                                            </label>
-                                            <p class="mb-1.5 text-[10px] leading-4 text-brand-mist">{{ __('Follows the log by re-fetching on an interval. Backs off after errors.') }}</p>
-                                            <label for="log-auto-refresh-sec" class="sr-only">{{ __('Poll interval') }}</label>
-                                            <select
-                                                id="log-auto-refresh-sec"
-                                                wire:model.number="logAutoRefreshSeconds"
-                                                class="box-border h-9 w-full rounded-lg border border-brand-ink/15 bg-white px-3 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                        <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                            <button
+                                                type="button"
+                                                wire:click="applyLogViewerSettingsAndCloseMenu"
+                                                wire:loading.attr="disabled"
+                                                class="box-border inline-flex h-9 min-h-9 flex-1 items-center justify-center rounded-lg border border-brand-sage/20 bg-brand-sage px-3 text-sm font-medium leading-none text-white hover:bg-brand-sage/90"
                                             >
-                                                <option value="15">{{ __('Every 15 seconds') }}</option>
-                                                <option value="30">{{ __('Every 30 seconds') }}</option>
-                                                <option value="60">{{ __('Every 60 seconds') }}</option>
-                                            </select>
+                                                <span wire:loading.remove wire:target="applyLogViewerSettingsAndCloseMenu,applyLogTailLines">{{ __('Apply') }}</span>
+                                                <span wire:loading wire:target="applyLogViewerSettingsAndCloseMenu,applyLogTailLines" class="inline-flex items-center gap-2">
+                                                    <x-spinner variant="forest" size="sm" />
+                                                    {{ __('Saving…') }}
+                                                </span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                wire:click="refreshSystemLogAndCloseMenu"
+                                                wire:loading.attr="disabled"
+                                                class="box-border inline-flex h-9 min-h-9 flex-1 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-3 text-sm font-medium leading-none text-brand-ink hover:bg-brand-sand/40"
+                                            >
+                                                <span wire:loading.remove wire:target="refreshSystemLog,applyLogTailLines,applyLogViewerSettingsAndCloseMenu,refreshSystemLogAndCloseMenu">{{ __('Refresh') }}</span>
+                                                <span wire:loading wire:target="refreshSystemLog,applyLogTailLines,applyLogViewerSettingsAndCloseMenu,refreshSystemLogAndCloseMenu" class="inline-flex items-center gap-2">
+                                                    <x-spinner variant="forest" size="sm" />
+                                                    {{ __('Loading…') }}
+                                                </span>
+                                            </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            wire:click="applyLogViewerSettingsAndCloseMenu"
-                                            wire:loading.attr="disabled"
-                                            class="box-border inline-flex h-9 min-h-9 w-full items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-3 text-sm font-medium leading-none text-brand-ink hover:bg-brand-sand/40"
-                                        >
-                                            <span wire:loading.remove wire:target="applyLogViewerSettingsAndCloseMenu,applyLogTailLines">{{ __('Apply') }}</span>
-                                            <span wire:loading wire:target="applyLogViewerSettingsAndCloseMenu,applyLogTailLines" class="inline-flex items-center gap-2">
-                                                <x-spinner variant="forest" size="sm" />
-                                                {{ __('Saving…') }}
-                                            </span>
-                                        </button>
                                     </div>
-                                    <div class="my-3.5 border-t border-brand-ink/10"></div>
-                                    <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Actions') }}</p>
-                                    <div class="flex flex-col gap-2">
-                                        <button
-                                            type="button"
-                                            wire:click="refreshSystemLogAndCloseMenu"
-                                            wire:loading.attr="disabled"
-                                            class="box-border inline-flex h-9 min-h-9 w-full items-center rounded-lg border border-brand-ink/15 bg-white px-3 text-left text-sm font-medium leading-none text-brand-ink hover:bg-brand-sand/40"
-                                        >
-                                            <span wire:loading.remove wire:target="refreshSystemLog,applyLogTailLines,applyLogViewerSettingsAndCloseMenu,refreshSystemLogAndCloseMenu">{{ __('Refresh') }}</span>
-                                            <span wire:loading wire:target="refreshSystemLog,applyLogTailLines,applyLogViewerSettingsAndCloseMenu,refreshSystemLogAndCloseMenu" class="inline-flex items-center gap-2">
-                                                <x-spinner variant="forest" size="sm" />
-                                                {{ __('Loading…') }}
-                                            </span>
-                                        </button>
+                                    <div class="mt-3 flex items-center justify-between border-t border-brand-ink/10 pt-3">
                                         <button
                                             type="button"
                                             wire:click="resetLogFilterAndCloseMenu"
-                                            class="box-border inline-flex h-8 min-h-8 w-full items-center rounded-lg px-2 text-left text-sm font-medium leading-none text-brand-moss hover:bg-brand-sand/30 hover:text-brand-ink"
+                                            class="inline-flex items-center text-sm font-medium text-brand-moss hover:text-brand-ink"
                                         >
                                             {{ __('Reset filter') }}
                                         </button>
@@ -305,7 +311,7 @@
                                             type="button"
                                             wire:click="clearLogDisplayAndCloseMenu"
                                             title="{{ __('Clears the text in this viewer and the live session panel. Does not change files on the server.') }}"
-                                            class="box-border inline-flex h-9 min-h-9 w-full items-center rounded-lg border border-brand-ink/15 bg-white px-3 text-left text-sm font-medium leading-none text-brand-ink hover:bg-brand-sand/40"
+                                            class="box-border inline-flex h-9 min-h-9 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-3 text-sm font-medium leading-none text-brand-ink hover:bg-brand-sand/40"
                                         >
                                             {{ __('Clear display') }}
                                         </button>
