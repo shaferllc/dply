@@ -214,8 +214,19 @@
                             </div>
 
                             @if ($showCloudStackFields)
-                                <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
-                                    <h3 class="text-base font-semibold text-slate-900">{{ __('Core server config') }}</h3>
+                                <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-6">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <h3 class="text-base font-semibold text-slate-900">{{ __('Core server config') }}</h3>
+                                            <p class="mt-1 text-sm text-slate-600">
+                                                {{ __('Start with the essentials. You can fine-tune the stack later in advanced options.') }}
+                                            </p>
+                                        </div>
+                                        <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                                            {{ __('Essentials first') }}
+                                        </span>
+                                    </div>
+
                                     <div>
                                         <x-input-label for="server_name" :value="__('Server name')" />
                                         <div class="mt-1 flex gap-2">
@@ -231,32 +242,80 @@
                                         <x-input-error :messages="$errors->get('name')" class="mt-1" />
                                     </div>
 
-                                    <div class="grid gap-4 sm:grid-cols-2">
-                                        <div>
+                                    @php
+                                        $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
+                                        $serverRoleInstalls = collect($selectedServerRole['installs'] ?? [])
+                                            ->filter(fn ($item) => filled($item))
+                                            ->take(5)
+                                            ->values();
+                                    @endphp
+
+                                    <section class="space-y-4">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div>
+                                                <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('1. Choose the server role') }}</h4>
+                                                <p class="mt-1 text-sm text-slate-600">{{ __('Pick what this machine is mainly responsible for. We will adapt the default software stack to match.') }}</p>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+                                            <div>
                                             <x-input-label for="server_role" :value="__('Server type')" />
                                             <select wire:model.live="form.server_role" id="server_role" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                                 @foreach ($provisionOptions['server_roles'] ?? [] as $role)
                                                     <option value="{{ $role['id'] }}">{{ $role['label'] }}</option>
                                                 @endforeach
                                             </select>
-                                            @php
-                                                $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
-                                            @endphp
-                                            @if ($selectedServerRole && ! empty($selectedServerRole['detail'] ?? null))
-                                                <p class="mt-1 text-xs text-slate-600 font-mono leading-relaxed"><span class="text-slate-400 select-none" aria-hidden="true">└─</span> {{ $selectedServerRole['detail'] }}</p>
-                                            @endif
                                             <x-input-error :messages="$errors->get('server_role')" class="mt-1" />
+                                            </div>
+
+                                            @if ($selectedServerRole)
+                                                <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <p class="text-sm font-semibold text-slate-900">{{ $selectedServerRole['label'] }}</p>
+                                                            @if (! empty($selectedServerRole['summary'] ?? null))
+                                                                <p class="mt-1 text-sm leading-6 text-slate-600">{{ $selectedServerRole['summary'] }}</p>
+                                                            @elseif (! empty($selectedServerRole['detail'] ?? null))
+                                                                <p class="mt-1 text-sm leading-6 text-slate-600">{{ $selectedServerRole['detail'] }}</p>
+                                                            @endif
+                                                        </div>
+                                                        <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
+                                                            {{ __('Role') }}
+                                                        </span>
+                                                    </div>
+
+                                                    @if ($serverRoleInstalls->isNotEmpty())
+                                                        <div class="mt-4">
+                                                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Default installs') }}</p>
+                                                            <div class="mt-2 flex flex-wrap gap-2">
+                                                                @foreach ($serverRoleInstalls as $install)
+                                                                    <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+                                                                        {{ $install }}
+                                                                    </span>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    @endif
+
+                                                    <dl class="mt-4 space-y-3 text-sm">
+                                                        @if (! empty($selectedServerRole['best_for'] ?? null))
+                                                            <div>
+                                                                <dt class="font-medium text-slate-900">{{ __('Best for') }}</dt>
+                                                                <dd class="mt-1 leading-6 text-slate-600">{{ $selectedServerRole['best_for'] }}</dd>
+                                                            </div>
+                                                        @endif
+                                                        @if (! empty($selectedServerRole['does_not_include'] ?? null))
+                                                            <div>
+                                                                <dt class="font-medium text-slate-900">{{ __('Not included') }}</dt>
+                                                                <dd class="mt-1 leading-6 text-slate-600">{{ $selectedServerRole['does_not_include'] }}</dd>
+                                                            </div>
+                                                        @endif
+                                                    </dl>
+                                                </div>
+                                            @endif
                                         </div>
-                                        <div>
-                                            <x-input-label for="cache_service" :value="__('Cache service')" />
-                                            <select wire:model="form.cache_service" id="cache_service" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                @foreach ($provisionOptions['cache_services'] ?? [] as $opt)
-                                                    <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
-                                                @endforeach
-                                            </select>
-                                            <x-input-error :messages="$errors->get('cache_service')" class="mt-1" />
-                                        </div>
-                                    </div>
+                                    </section>
 
                                     <div
                                         class="grid gap-4 sm:grid-cols-2"
@@ -287,7 +346,8 @@
                                             @endphp
 
                                             <div
-                                                x-data="{ open: false, search: '', mapOpen: false, mapMode: 'simple' }"
+                                                x-data="{ open: false, search: '', mapOpen: false }"
+                                                x-on:dply-region-selected.window="$wire.set('form.region', $event.detail.value); mapOpen = false"
                                                 class="relative mt-1"
                                             >
                                                 @if ($regionOptions->isEmpty())
@@ -371,7 +431,7 @@
                                                                 </div>
                                                                 <button
                                                                     type="button"
-                                                                    x-on:click="open = false; mapOpen = true"
+                                                                    x-on:click="open = false; mapOpen = true; window.dispatchEvent(new CustomEvent('dply:region-map-open'))"
                                                                     class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
                                                                 >
                                                                     {{ __('View map') }}
@@ -465,100 +525,36 @@
                                                                         </div>
 
                                                                         @if ($hasMapableRegions)
-                                                                            <div class="mb-4 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-                                                                                <button
-                                                                                    type="button"
-                                                                                    x-on:click="mapMode = 'simple'"
-                                                                                    class="rounded-lg px-3 py-2 text-sm font-medium transition"
-                                                                                    x-bind:class="mapMode === 'simple' ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' : 'text-slate-600 hover:text-slate-900'"
-                                                                                >
-                                                                                    {{ __('Simple') }}
-                                                                                </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    x-on:click="mapMode = 'stylized'"
-                                                                                    class="rounded-lg px-3 py-2 text-sm font-medium transition"
-                                                                                    x-bind:class="mapMode === 'stylized' ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' : 'text-slate-600 hover:text-slate-900'"
-                                                                                >
-                                                                                    {{ __('Stylized') }}
-                                                                                </button>
-                                                                            </div>
+                                                                            @php
+                                                                                $plotlyRegionMarkers = collect([
+                                                                                    ['value' => 'nyc1', 'label' => 'New York', 'lat' => 40.7128, 'lon' => -74.0060],
+                                                                                    ['value' => 'nyc2', 'label' => 'New York', 'lat' => 40.7128, 'lon' => -74.0060],
+                                                                                    ['value' => 'nyc3', 'label' => 'New York', 'lat' => 40.7128, 'lon' => -74.0060],
+                                                                                    ['value' => 'tor1', 'label' => 'Toronto', 'lat' => 43.6532, 'lon' => -79.3832],
+                                                                                    ['value' => 'sfo1', 'label' => 'San Francisco', 'lat' => 37.7749, 'lon' => -122.4194],
+                                                                                    ['value' => 'sfo2', 'label' => 'San Francisco', 'lat' => 37.7749, 'lon' => -122.4194],
+                                                                                    ['value' => 'sfo3', 'label' => 'San Francisco', 'lat' => 37.7749, 'lon' => -122.4194],
+                                                                                    ['value' => 'atl1', 'label' => 'Atlanta', 'lat' => 33.7490, 'lon' => -84.3880],
+                                                                                    ['value' => 'ams2', 'label' => 'Amsterdam', 'lat' => 52.3676, 'lon' => 4.9041],
+                                                                                    ['value' => 'ams3', 'label' => 'Amsterdam', 'lat' => 52.3676, 'lon' => 4.9041],
+                                                                                    ['value' => 'lon1', 'label' => 'London', 'lat' => 51.5072, 'lon' => -0.1276],
+                                                                                    ['value' => 'fra1', 'label' => 'Frankfurt', 'lat' => 50.1109, 'lon' => 8.6821],
+                                                                                    ['value' => 'blr1', 'label' => 'Bangalore', 'lat' => 12.9716, 'lon' => 77.5946],
+                                                                                    ['value' => 'sgp1', 'label' => 'Singapore', 'lat' => 1.3521, 'lon' => 103.8198],
+                                                                                    ['value' => 'syd1', 'label' => 'Sydney', 'lat' => -33.8688, 'lon' => 151.2093],
+                                                                                ])->filter(
+                                                                                    fn (array $marker) => $regionOptions->contains(fn (array $region) => ($region['value'] ?? null) === $marker['value'])
+                                                                                )->values();
+                                                                            @endphp
 
-                                                                            <div x-show="mapMode === 'simple'" class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                                                                                <div class="mb-3 text-sm font-medium text-slate-700">{{ __('Simple flat world map') }}</div>
-                                                                                <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#dbeafe_0%,#eff6ff_55%,#f8fafc_100%)]">
-                                                                                    <svg viewBox="0 0 900 500" class="block h-[22rem] w-full" aria-hidden="true">
-                                                                                        <rect width="900" height="500" fill="transparent" />
-                                                                                        <g fill="#94a3b8" fill-opacity="0.95">
-                                                                                            <path d="M96 154c42-37 121-51 182-29 28 11 45 27 56 52 8 18 5 39-10 57-17 22-48 35-82 38-46 5-100-5-131-29-31-23-45-62-15-89Z"/>
-                                                                                            <path d="M392 134c36-19 83-24 117-12 29 11 47 32 50 60 3 20-6 39-22 54-17 15-43 25-71 27-43 4-85-7-103-31-18-23-12-75 29-98Z"/>
-                                                                                            <path d="M509 176c13-11 31-14 46-9 13 5 20 17 20 31 0 14-8 26-21 34-15 8-35 10-48 2-17-10-18-41 3-58Z"/>
-                                                                                            <path d="M606 139c55-27 141-26 194 5 39 23 61 58 54 95-6 30-29 53-61 69-44 21-107 24-161 10-52-14-95-49-94-95 1-37 24-67 68-84Z"/>
-                                                                                            <path d="M708 359c28-10 66-10 93 0 21 9 35 25 35 43s-14 34-36 44c-28 12-67 12-95 1-21-8-36-24-37-42-1-21 16-37 40-46Z"/>
-                                                                                        </g>
-                                                                                    </svg>
-
-                                                                                    @foreach ($digitalOceanRegionMarkers as $marker)
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            data-region-marker="{{ $marker['value'] }}"
-                                                                                            wire:click="$set('form.region', '{{ $marker['value'] }}')"
-                                                                                            x-on:click="mapOpen = false"
-                                                                                            class="absolute -translate-x-1/2 -translate-y-1/2"
-                                                                                            style="top: {{ $marker['top'] }}; left: {{ $marker['left'] }};"
-                                                                                        >
-                                                                                            <span class="flex flex-col items-center gap-1">
-                                                                                                <span class="h-4 w-4 rounded-full border-2 border-white shadow-md {{ $form->region === $marker['value'] ? 'bg-sky-600 ring-4 ring-sky-200' : 'bg-slate-700 hover:bg-sky-500' }}"></span>
-                                                                                                <span class="rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-700 shadow-sm ring-1 ring-slate-200">
-                                                                                                    {{ $marker['value'] }}
-                                                                                                </span>
-                                                                                            </span>
-                                                                                        </button>
-                                                                                    @endforeach
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div x-show="mapMode === 'stylized'" class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                                                                                <div class="mb-3 text-sm font-medium text-slate-700">{{ __('Stylized world map') }}</div>
-                                                                                <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-[radial-gradient(circle_at_50%_15%,rgba(56,189,248,0.22),transparent_28%),linear-gradient(180deg,#082f49_0%,#0f172a_100%)]">
-                                                                                    <svg viewBox="0 0 900 500" class="block h-[22rem] w-full" aria-hidden="true">
-                                                                                        <rect width="900" height="500" fill="transparent" />
-                                                                                        <g fill="#93c5fd" fill-opacity="0.36" stroke="#bfdbfe" stroke-opacity="0.55" stroke-width="4">
-                                                                                            <path d="M96 154c42-37 121-51 182-29 28 11 45 27 56 52 8 18 5 39-10 57-17 22-48 35-82 38-46 5-100-5-131-29-31-23-45-62-15-89Z"/>
-                                                                                            <path d="M392 134c36-19 83-24 117-12 29 11 47 32 50 60 3 20-6 39-22 54-17 15-43 25-71 27-43 4-85-7-103-31-18-23-12-75 29-98Z"/>
-                                                                                            <path d="M509 176c13-11 31-14 46-9 13 5 20 17 20 31 0 14-8 26-21 34-15 8-35 10-48 2-17-10-18-41 3-58Z"/>
-                                                                                            <path d="M606 139c55-27 141-26 194 5 39 23 61 58 54 95-6 30-29 53-61 69-44 21-107 24-161 10-52-14-95-49-94-95 1-37 24-67 68-84Z"/>
-                                                                                            <path d="M708 359c28-10 66-10 93 0 21 9 35 25 35 43s-14 34-36 44c-28 12-67 12-95 1-21-8-36-24-37-42-1-21 16-37 40-46Z"/>
-                                                                                        </g>
-                                                                                    </svg>
-
-                                                                                    <div class="absolute inset-x-0 top-3 flex justify-center">
-                                                                                        <span class="rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-800 shadow-sm">
-                                                                                            {{ __('Click a highlighted region') }}
-                                                                                        </span>
-                                                                                    </div>
-
-                                                                                    @foreach ($digitalOceanRegionMarkers as $marker)
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            data-region-marker="{{ $marker['value'] }}"
-                                                                                            wire:click="$set('form.region', '{{ $marker['value'] }}')"
-                                                                                            x-on:click="mapOpen = false"
-                                                                                            class="absolute -translate-x-1/2 -translate-y-1/2"
-                                                                                            style="top: {{ $marker['top'] }}; left: {{ $marker['left'] }};"
-                                                                                        >
-                                                                                            <span class="flex flex-col items-center gap-1">
-                                                                                                <span class="relative flex h-5 w-5 items-center justify-center">
-                                                                                                    <span class="absolute inline-flex h-5 w-5 rounded-full {{ $form->region === $marker['value'] ? 'bg-cyan-300/60' : 'bg-sky-300/35' }}"></span>
-                                                                                                    <span class="relative h-3.5 w-3.5 rounded-full border-2 border-white {{ $form->region === $marker['value'] ? 'bg-cyan-400' : 'bg-sky-500' }}"></span>
-                                                                                                </span>
-                                                                                                <span class="rounded-full bg-slate-950/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm ring-1 ring-white/15">
-                                                                                                    {{ $marker['value'] }}
-                                                                                                </span>
-                                                                                            </span>
-                                                                                        </button>
-                                                                                    @endforeach
-                                                                                </div>
+                                                                            <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                                                                                <div class="mb-3 text-sm font-medium text-slate-700">{{ __('Interactive world map') }}</div>
+                                                                                <div
+                                                                                    data-region-map
+                                                                                    data-selected-region="{{ $form->region }}"
+                                                                                    data-region-points='@json($plotlyRegionMarkers)'
+                                                                                    class="h-[24rem] w-full overflow-hidden rounded-2xl border border-slate-200"
+                                                                                ></div>
                                                                             </div>
                                                                         @else
                                                                             <div class="rounded-3xl border border-dashed border-slate-300 bg-white/80 p-6 text-sm text-slate-500">
@@ -764,7 +760,21 @@
                                     <summary class="cursor-pointer list-none text-base font-semibold text-slate-900">
                                         {{ __('Advanced options') }}
                                     </summary>
+                                    <div class="mt-2 text-sm text-slate-600">
+                                        {{ __('Adjust stack defaults, runtime versions, and optional provisioning behavior only if you need something specific.') }}
+                                    </div>
                                     <div class="mt-5 space-y-5">
+                                        <div>
+                                            <x-input-label for="cache_service" :value="__('Cache service')" />
+                                            <select wire:model="form.cache_service" id="cache_service" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                @foreach ($provisionOptions['cache_services'] ?? [] as $opt)
+                                                    <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                            <p class="mt-1 text-xs text-slate-500">{{ __('Used when this server role includes an application stack or cache-backed services.') }}</p>
+                                            <x-input-error :messages="$errors->get('cache_service')" class="mt-1" />
+                                        </div>
+
                                         <div class="grid gap-4 sm:grid-cols-3" wire:key="provision-stack-{{ $form->server_role }}">
                                             <div>
                                                 <x-input-label for="webserver" :value="__('Web server')" />

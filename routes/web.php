@@ -5,6 +5,7 @@ use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
@@ -163,7 +164,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             return redirect()->route('servers.journey', $server);
         }
 
-        if ($server->status === Server::STATUS_READY && in_array($server->setup_status, [Server::SETUP_STATUS_PENDING, Server::SETUP_STATUS_RUNNING], true)) {
+        if ($server->status === Server::STATUS_READY
+            && RunSetupScriptJob::shouldDispatch($server)
+            && $server->setup_status !== Server::SETUP_STATUS_DONE) {
             return redirect()->route('servers.journey', $server);
         }
 

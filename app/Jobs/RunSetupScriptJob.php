@@ -144,7 +144,7 @@ class RunSetupScriptJob implements ShouldQueue
             $tracked->setTaskModel($taskModel);
 
             $taskModel->update([
-                'instance' => serialize($tracked),
+                'instance' => TaskRunnerTaskModel::storeInstance($tracked),
             ]);
 
             $output = $dispatcher->runInBackgroundWithModel($tracked, $taskModel);

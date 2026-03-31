@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Livewire\Servers\Create as ServersCreate;
 use App\Livewire\Servers\Index as ServersIndex;
+use App\Livewire\Servers\ProvisionJourney;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
+use App\Jobs\WaitForServerSshReadyJob;
 use App\Models\LogViewerShare;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -375,7 +377,8 @@ class ServerTest extends TestCase
         $response->assertOk();
         $response->assertSee('View map');
         $response->assertSee('Open the full map modal for easier geographic selection.');
-        $response->assertSee('data-region-marker="nyc3"', false);
+        $response->assertSee('data-region-map', false);
+        $response->assertSee('"value":"nyc3"', false);
         $response->assertSee('New York 3');
         $response->assertSee('Frankfurt 1');
     }
@@ -432,6 +435,30 @@ class ServerTest extends TestCase
         $this->actingAs($user)
             ->get(route('servers.show', $server))
             ->assertRedirect(route('servers.overview', $server));
+    }
+
+    public function test_servers_show_routes_ready_server_with_incomplete_setup_to_journey_page(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ip_address' => '203.0.113.10',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_FAILED,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('servers.show', $server))
+            ->assertRedirect(route('servers.journey', $server));
     }
 
     public function test_servers_journey_page_renders_active_pending_and_completed_steps(): void
@@ -495,8 +522,11 @@ class ServerTest extends TestCase
             'status' => TaskStatus::Running,
             'output' => implode("\n", [
                 '[dply-step] Checking server status',
+                'Checking existing packages',
                 '[dply-step] Testing server connection',
+                'Connection established',
                 '[dply-step] Installing system updates',
+                'Hit:1 ubuntu packages',
             ]),
             'server_id' => $server->id,
             'created_by' => $user->id,
@@ -514,6 +544,68 @@ class ServerTest extends TestCase
         $response->assertSee('Testing server connection');
         $response->assertSee('Installing system updates');
         $response->assertDontSee('Running server setup');
+        $response->assertSee('Checking existing packages');
+        $response->assertSee('Connection established');
+        $response->assertSee('Hit:1 ubuntu packages');
+    }
+
+    public function test_servers_journey_page_shows_persisted_output_for_completed_steps(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+            'ip_address' => '203.0.113.10',
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'script_content' => implode("\n", [
+                "echo '[dply-step] Checking server status'",
+                "echo '[dply-step] Creating server user'",
+                "echo '[dply-step] Installing nginx'",
+            ]),
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Running,
+            'output' => implode("\n", [
+                '[dply-step] Installing nginx',
+                'Reading package lists',
+            ]),
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subSeconds(21),
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], [
+                'provision_task_id' => (string) $task->id,
+                'provision_step_snapshots' => [
+                    'script_'.md5('Checking server status') => [
+                        'label' => 'Checking server status',
+                        'output' => 'Server is reachable',
+                    ],
+                    'script_'.md5('Creating server user') => [
+                        'label' => 'Creating server user',
+                        'output' => implode("\n", [
+                            'Adding deploy user',
+                            'Granting sudo access',
+                        ]),
+                    ],
+                ],
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Creating server user');
+        $response->assertSee('Adding deploy user');
+        $response->assertSee('Granting sudo access');
     }
 
     public function test_servers_journey_page_renders_pending_state_copy(): void
@@ -554,6 +646,58 @@ class ServerTest extends TestCase
         $response->assertSee('Failed');
         $response->assertSee('Running server setup');
         $response->assertSee('The server setup task failed before finishing.');
+    }
+
+    public function test_servers_journey_can_restart_install(): void
+    {
+        Queue::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ip_address' => '203.0.113.10',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_FAILED,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+                'provision_task_id' => 'old-task-id',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ProvisionJourney::class, ['server' => $server])
+            ->call('rerunSetup')
+            ->assertRedirect(route('servers.journey', $server));
+
+        $server->refresh();
+
+        $this->assertSame(Server::SETUP_STATUS_PENDING, $server->setup_status);
+        $this->assertArrayNotHasKey('provision_task_id', $server->meta ?? []);
+
+        Queue::assertPushed(WaitForServerSshReadyJob::class, function (WaitForServerSshReadyJob $job) use ($server) {
+            return $job->server->is($server);
+        });
+    }
+
+    public function test_servers_journey_redirects_to_server_overview_once_setup_finishes(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_DONE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ProvisionJourney::class, ['server' => $server])
+            ->assertRedirect(route('servers.overview', $server));
     }
 
     public function test_servers_show_is_displayed_for_owner(): void

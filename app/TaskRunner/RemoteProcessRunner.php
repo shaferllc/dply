@@ -95,11 +95,12 @@ class RemoteProcessRunner
      */
     public function runUploadedScriptInBackground(string $script, string $output, int $timeout = 0): ProcessOutput
     {
-        $script = Helper::scriptInBackground(
-            scriptPath: $this->path($script),
-            outputPath: $this->path($output),
-            timeout: $timeout,
-        );
+        $scriptPath = $this->path($script);
+        $outputPath = $this->path($output);
+
+        $script = $timeout > 0
+            ? "timeout {$timeout}s bash {$scriptPath} > {$outputPath} 2>&1 &"
+            : "bash {$scriptPath} > {$outputPath} 2>&1 &";
 
         return $this->run($script, 10);
     }

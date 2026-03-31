@@ -95,7 +95,10 @@ final class ServerProvisionCommandBuilder
             $this->stepMarker('Installing system updates'),
             'apt-get update -y',
             $this->stepMarker('Installing base packages'),
-            'apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release software-properties-common ufw unattended-upgrades',
+            ...$this->ensurePackagesInstalled(
+                ['ca-certificates', 'curl', 'gnupg', 'lsb-release', 'software-properties-common', 'ufw', 'unattended-upgrades'],
+                '[dply] base packages already installed; skipping package install.'
+            ),
         ];
     }
 
@@ -108,7 +111,10 @@ final class ServerProvisionCommandBuilder
 
         if (config('server_provision.install_fail2ban', true)) {
             $lines[] = $this->stepMarker('Installing Fail2ban');
-            $lines[] = 'apt-get install -y --no-install-recommends fail2ban';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['fail2ban'],
+                '[dply] fail2ban already installed; skipping package install.'
+            ));
             $lines[] = 'systemctl enable --now fail2ban || true';
         }
 
@@ -134,7 +140,7 @@ final class ServerProvisionCommandBuilder
 
         if (config('server_provision.install_composer', true) && $php !== 'none') {
             $lines[] = $this->stepMarker('Installing Composer');
-            $lines[] = 'curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer';
+            $lines[] = 'if command -v composer >/dev/null 2>&1; then echo "[dply] composer already installed; skipping installer."; else curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; fi';
         }
 
         return $lines;
@@ -146,7 +152,10 @@ final class ServerProvisionCommandBuilder
     private function roleDocker(string $web, string $php, string $database, string $cache): array
     {
         return array_merge($this->withStep('Installing Docker', [
-            'apt-get install -y --no-install-recommends docker.io docker-compose-v2',
+            ...$this->ensurePackagesInstalled(
+                ['docker.io', 'docker-compose-v2'],
+                '[dply] docker packages already installed; skipping package install.'
+            ),
             'systemctl enable --now docker',
         ]), $this->roleApplication($web, $php, $database, $cache));
     }
@@ -181,7 +190,10 @@ final class ServerProvisionCommandBuilder
     private function roleRedis(): array
     {
         $lines = $this->ufwSsh();
-        $lines[] = 'apt-get install -y --no-install-recommends redis-server';
+        $lines = array_merge($lines, $this->ensurePackagesInstalled(
+            ['redis-server'],
+            '[dply] redis-server already installed; skipping package install.'
+        ));
         $lines[] = 'systemctl enable --now redis-server';
 
         return $lines;
@@ -191,7 +203,7 @@ final class ServerProvisionCommandBuilder
     private function roleValkey(): array
     {
         $lines = $this->ufwSsh();
-        $lines[] = 'apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey';
+        $lines[] = 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi';
         $lines[] = 'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true';
 
         return $lines;
@@ -201,7 +213,10 @@ final class ServerProvisionCommandBuilder
     private function roleLoadBalancer(): array
     {
         $lines = $this->ufwSsh();
-        $lines[] = 'apt-get install -y --no-install-recommends haproxy certbot';
+        $lines = array_merge($lines, $this->ensurePackagesInstalled(
+            ['haproxy', 'certbot'],
+            '[dply] haproxy and certbot already installed; skipping package install.'
+        ));
         $lines[] = 'systemctl enable --now haproxy';
         $lines[] = 'ufw allow 80/tcp';
         $lines[] = 'ufw allow 443/tcp';
@@ -229,7 +244,10 @@ final class ServerProvisionCommandBuilder
 
         return [
             $this->stepMarker('Installing Supervisor'),
-            'apt-get install -y --no-install-recommends supervisor',
+            ...$this->ensurePackagesInstalled(
+                ['supervisor'],
+                '[dply] supervisor already installed; skipping package install.'
+            ),
             'systemctl enable --now supervisor',
         ];
     }
@@ -249,13 +267,16 @@ final class ServerProvisionCommandBuilder
     {
         if ($cache === 'valkey') {
             return $this->withStep('Installing Valkey', [
-                'apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey',
+                'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi',
                 'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true',
             ]);
         }
 
         return $this->withStep('Installing Redis', [
-            'apt-get install -y --no-install-recommends redis-server',
+            ...$this->ensurePackagesInstalled(
+                ['redis-server'],
+                '[dply] redis-server already installed; skipping package install.'
+            ),
             'systemctl enable --now redis-server',
         ]);
     }
@@ -273,13 +294,19 @@ final class ServerProvisionCommandBuilder
 
         if ($web === 'nginx') {
             $lines[] = $this->stepMarker('Installing webserver');
-            $lines[] = 'apt-get install -y --no-install-recommends nginx';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['nginx'],
+                '[dply] nginx already installed; skipping package install.'
+            ));
             $lines[] = 'ufw allow "Nginx Full"';
             $lines[] = 'systemctl enable --now nginx';
             $lines = array_merge($lines, $this->certbotForWeb($web));
         } elseif ($web === 'apache') {
             $lines[] = $this->stepMarker('Installing webserver');
-            $lines[] = 'apt-get install -y --no-install-recommends apache2';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['apache2'],
+                '[dply] apache2 already installed; skipping package install.'
+            ));
             $lines[] = 'ufw allow "Apache Full"';
             $lines[] = 'systemctl enable --now apache2';
             $lines = array_merge($lines, $this->certbotForWeb($web));
@@ -302,10 +329,16 @@ final class ServerProvisionCommandBuilder
     private function certbotForWeb(string $web): array
     {
         if ($web === 'nginx') {
-            return ['apt-get install -y --no-install-recommends certbot python3-certbot-nginx'];
+            return $this->ensurePackagesInstalled(
+                ['certbot', 'python3-certbot-nginx'],
+                '[dply] nginx certbot packages already installed; skipping package install.'
+            );
         }
         if ($web === 'apache') {
-            return ['apt-get install -y --no-install-recommends certbot python3-certbot-apache'];
+            return $this->ensurePackagesInstalled(
+                ['certbot', 'python3-certbot-apache'],
+                '[dply] apache certbot packages already installed; skipping package install.'
+            );
         }
 
         return [];
@@ -350,7 +383,10 @@ final class ServerProvisionCommandBuilder
             $pkgs[] = $stem.'-mysql';
         }
 
-        $lines[] = 'apt-get install -y --no-install-recommends '.implode(' ', $pkgs);
+        $lines = array_merge($lines, $this->ensurePackagesInstalled(
+            $pkgs,
+            '[dply] PHP packages already installed; skipping package install.'
+        ));
 
         $lines = array_merge($lines, $this->wireWebserverToPhp($web, $php));
 
@@ -435,7 +471,10 @@ EOF',
             }
 
             return $this->withStep('Installing MySQL', [
-                'apt-get install -y --no-install-recommends mysql-server',
+                ...$this->ensurePackagesInstalled(
+                    ['mysql-server'],
+                    '[dply] mysql-server already installed; skipping package install.'
+                ),
                 'systemctl enable --now mysql',
                 'echo "[dply] MySQL variants (5.7/8.0/8.4) use distro mysql-server package where applicable; pin versions in follow-up automation if required."',
             ]);
@@ -443,7 +482,10 @@ EOF',
 
         if (str_starts_with($database, 'mariadb')) {
             return $this->withStep('Installing MariaDB', [
-                'apt-get install -y --no-install-recommends mariadb-server',
+                ...$this->ensurePackagesInstalled(
+                    ['mariadb-server'],
+                    '[dply] mariadb-server already installed; skipping package install.'
+                ),
                 'systemctl enable --now mariadb',
             ]);
         }
@@ -472,7 +514,10 @@ EOF',
             'chmod 644 /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc',
             '. /etc/os-release && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list',
             'apt-get update -y',
-            'apt-get install -y --no-install-recommends postgresql-'.$ver,
+            ...$this->ensurePackagesInstalled(
+                ['postgresql-'.$ver],
+                '[dply] postgresql-'.$ver.' already installed; skipping package install.'
+            ),
             'systemctl enable --now postgresql',
         ];
     }
@@ -516,6 +561,27 @@ EOF',
         return [
             $this->stepMarker($label),
             ...$commands,
+        ];
+    }
+
+    /**
+     * @param  list<string>  $packages
+     * @return list<string>
+     */
+    private function ensurePackagesInstalled(array $packages, string $alreadyInstalledMessage): array
+    {
+        $packages = array_values(array_filter($packages, fn (string $package): bool => trim($package) !== ''));
+        if ($packages === []) {
+            return [];
+        }
+
+        $checks = array_map(
+            fn (string $package): string => 'dpkg -s '.escapeshellarg($package).' >/dev/null 2>&1',
+            $packages,
+        );
+
+        return [
+            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else apt-get install -y --no-install-recommends '.implode(' ', $packages).'; fi',
         ];
     }
 }

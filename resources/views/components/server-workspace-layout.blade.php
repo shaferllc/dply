@@ -3,10 +3,13 @@
     'active',
     'title',
     'description' => null,
+    'showNavigation' => null,
 ])
 
-<x-server-workspace-shell :server="$server" :active="$active">
-    @include('livewire.servers.partials.workspace-mobile-nav', ['server' => $server, 'active' => $active])
+<x-server-workspace-shell :server="$server" :active="$active" :show-navigation="$showNavigation">
+    @if (($showNavigation ?? ($server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE)) === true)
+        @include('livewire.servers.partials.workspace-mobile-nav', ['server' => $server, 'active' => $active])
+    @endif
 
     <nav class="text-sm text-brand-moss mb-6" aria-label="{{ __('Breadcrumb') }}">
         <ol class="flex flex-wrap items-center gap-2">

@@ -2,19 +2,21 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\RunSetupScriptJob;
+use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use App\Modules\TaskRunner\Models\Task;
+use App\Support\Servers\ProvisionStepSnapshots;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\Livewire;
 
 #[Layout('layouts.app')]
 class ProvisionJourney extends Component
 {
     use InteractsWithServerWorkspace;
-
-    protected const SCRIPT_STEP_PREFIX = '[dply-step] ';
 
     public function mount(Server $server): void
     {
@@ -25,9 +27,38 @@ class ProvisionJourney extends Component
     {
         $this->server->refresh();
 
+        if ($this->shouldRedirectToServerOverview()) {
+            // #region agent log
+            @file_put_contents(
+                base_path('.cursor/debug-182f08.log'),
+                json_encode([
+                    'sessionId' => '182f08',
+                    'runId' => 'pre-fix',
+                    'hypothesisId' => 'H1',
+                    'location' => 'app/Livewire/Servers/ProvisionJourney.php:30',
+                    'message' => 'Journey render reached completion branch',
+                    'data' => [
+                        'serverId' => (string) $this->server->id,
+                        'serverStatus' => (string) $this->server->status,
+                        'setupStatus' => (string) $this->server->setup_status,
+                        'isLivewireRequest' => Livewire::isLivewireRequest(),
+                    ],
+                    'timestamp' => round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES).PHP_EOL,
+                FILE_APPEND
+            );
+            // #endregion
+            if (Livewire::isLivewireRequest()) {
+                $this->dispatch('provision-journey-complete', url: route('servers.overview', $this->server));
+            } else {
+                $this->redirectRoute('servers.overview', $this->server, navigate: true);
+            }
+        }
+
         $task = $this->provisionTask();
         $steps = $this->steps($task);
         $completedCount = collect($steps)->where('state', 'completed')->count();
+        $shouldPoll = $this->shouldPoll();
 
         return view('livewire.servers.provision-journey', [
             'task' => $task,
@@ -38,7 +69,44 @@ class ProvisionJourney extends Component
             'pendingSteps' => collect($steps)->where('state', 'pending')->values(),
             'completedSteps' => collect($steps)->where('state', 'completed')->values(),
             'failedStep' => collect($steps)->firstWhere('state', 'failed'),
+            'shouldPoll' => $shouldPoll,
         ]);
+    }
+
+    protected function shouldPoll(): bool
+    {
+        return ! $this->shouldRedirectToServerOverview();
+    }
+
+    protected function shouldRedirectToServerOverview(): bool
+    {
+        return $this->server->status === Server::STATUS_READY
+            && $this->server->setup_status === Server::SETUP_STATUS_DONE;
+    }
+
+    public function rerunSetup(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $server = $this->server->fresh();
+        if (! $server || ! RunSetupScriptJob::shouldDispatch($server)) {
+            $this->flash_error = 'This server is not ready for a setup re-run yet.';
+
+            return;
+        }
+
+        $meta = $server->meta ?? [];
+        unset($meta['provision_task_id']);
+        unset($meta['provision_step_snapshots']);
+
+        $server->update([
+            'setup_status' => Server::SETUP_STATUS_PENDING,
+            'meta' => $meta,
+        ]);
+
+        WaitForServerSshReadyJob::dispatch($server->fresh());
+
+        $this->redirectRoute('servers.journey', $server, navigate: true);
     }
 
     protected function provisionTask(): ?Task
@@ -52,7 +120,7 @@ class ProvisionJourney extends Component
     }
 
     /**
-     * @return list<array{key:string,label:string,state:string,detail:?string,duration:?string}>
+     * @return list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}>
      */
     protected function steps(?Task $task): array
     {
@@ -117,6 +185,7 @@ class ProvisionJourney extends Component
                 'label' => $step['label'],
                 'state' => $state,
                 'detail' => $this->stepDetail($step['key'], $task, $server, $state),
+                'output' => $this->stepOutput($step['key'], $task, $server, $state),
                 'duration' => $this->stepDuration($step['key'], $task, $server, $state),
             ];
         }, $steps, array_keys($steps));
@@ -166,6 +235,22 @@ class ProvisionJourney extends Component
         return $server->created_at?->diffForHumans(now(), true);
     }
 
+    protected function stepOutput(string $key, ?Task $task, Server $server, string $state): ?string
+    {
+        $scriptLabel = $this->scriptStepLabelForKey($task, $key);
+        if ($scriptLabel !== null) {
+            return $this->persistedStepOutput($server, $key) ?? $this->scriptStepOutput($task, $scriptLabel);
+        }
+
+        if ($key === 'setup' && $task && in_array($state, ['active', 'failed', 'completed'], true)) {
+            $output = trim((string) $task->tailOutput(12));
+
+            return $output !== '' ? $output : null;
+        }
+
+        return null;
+    }
+
     /**
      * @return list<array{key:string,label:string}>
      */
@@ -199,23 +284,7 @@ class ProvisionJourney extends Component
      */
     protected function extractScriptStepLabels(string $content): array
     {
-        $labels = [];
-
-        foreach (preg_split('/\r\n|\r|\n/', $content) ?: [] as $line) {
-            if (! str_contains($line, self::SCRIPT_STEP_PREFIX)) {
-                continue;
-            }
-
-            $label = trim(str_replace(["echo '", 'echo "', "'", '"'], '', strstr($line, self::SCRIPT_STEP_PREFIX) ?: ''));
-            $label = preg_replace('/^\[dply-step\]\s*/', '', $label ?? '');
-            $label = trim((string) $label);
-
-            if ($label !== '' && ! in_array($label, $labels, true)) {
-                $labels[] = $label;
-            }
-        }
-
-        return $labels;
+        return ProvisionStepSnapshots::extractLabels($content);
     }
 
     protected function lastSeenScriptStepKey(?Task $task, array $scriptSteps): ?string
@@ -253,6 +322,19 @@ class ProvisionJourney extends Component
 
     protected function scriptStepOutputTail(?Task $task, string $label): ?string
     {
+        $output = $this->scriptStepOutput($task, $label);
+
+        if ($output === null) {
+            return null;
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $output) ?: [];
+
+        return implode("\n", array_slice($lines, -3));
+    }
+
+    protected function scriptStepOutput(?Task $task, string $label): ?string
+    {
         if (! $task || ! is_string($task->output) || trim($task->output) === '') {
             return null;
         }
@@ -262,12 +344,12 @@ class ProvisionJourney extends Component
         $capture = false;
 
         foreach ($lines as $line) {
-            if (str_contains($line, self::SCRIPT_STEP_PREFIX.$label)) {
+            if (str_contains($line, ProvisionStepSnapshots::SCRIPT_STEP_PREFIX.$label)) {
                 $capture = true;
                 continue;
             }
 
-            if ($capture && str_contains($line, self::SCRIPT_STEP_PREFIX)) {
+            if ($capture && str_contains($line, ProvisionStepSnapshots::SCRIPT_STEP_PREFIX)) {
                 break;
             }
 
@@ -276,6 +358,14 @@ class ProvisionJourney extends Component
             }
         }
 
-        return $filtered === [] ? null : implode("\n", array_slice($filtered, -3));
+        return $filtered === [] ? null : implode("\n", $filtered);
+    }
+
+    protected function persistedStepOutput(Server $server, string $key): ?string
+    {
+        $snapshot = $server->meta['provision_step_snapshots'][$key] ?? null;
+        $output = is_array($snapshot) ? trim((string) ($snapshot['output'] ?? '')) : '';
+
+        return $output !== '' ? $output : null;
     }
 }

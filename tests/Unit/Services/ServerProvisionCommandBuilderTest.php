@@ -123,4 +123,30 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('[dply-step] Installing Composer', $joined);
         $this->assertStringContainsString('[dply-step] Finalizing server', $joined);
     }
+
+    public function test_build_emits_repeat_safe_install_checks_for_reruns(): void
+    {
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $commands = app(ServerProvisionCommandBuilder::class)->build($server);
+        $joined = implode("\n", $commands);
+
+        $this->assertStringContainsString("dpkg -s 'nginx'", $joined);
+        $this->assertStringContainsString('[dply] nginx already installed; skipping package install.', $joined);
+        $this->assertStringContainsString("dpkg -s 'mysql-server'", $joined);
+        $this->assertStringContainsString('[dply] mysql-server already installed; skipping package install.', $joined);
+        $this->assertStringContainsString("dpkg -s 'redis-server'", $joined);
+        $this->assertStringContainsString('[dply] redis-server already installed; skipping package install.', $joined);
+        $this->assertStringContainsString('command -v composer >/dev/null 2>&1', $joined);
+        $this->assertStringContainsString('[dply] composer already installed; skipping installer.', $joined);
+    }
 }

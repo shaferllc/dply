@@ -482,6 +482,11 @@ abstract class Task
      */
     public function outputLogPath(): string
     {
+        $persistedPath = trim((string) ($this->taskModel?->options['remote_output_path'] ?? ''));
+        if ($persistedPath !== '') {
+            return $persistedPath;
+        }
+
         if (! $this->taskModel || ! $this->taskModel->server) {
             return '';
         }
@@ -571,7 +576,7 @@ abstract class Task
             'output' => $this->output,
             'exit_code' => $this->exitCode,
             'options' => $this->options,
-            'instance' => serialize($this),
+            'instance' => Models\Task::storeInstance($this),
         ]);
 
         return $model;

@@ -74,7 +74,9 @@ class TrackTaskInBackground extends Task implements HasCallbacks
      */
     public function getTimeout(): int
     {
-        return $this->actualTask->getTimeout() + 30;
+        $timeout = (int) ($this->actualTask->getTimeout() ?? 0) + 30;
+
+        return min($timeout, 3600);
     }
 
     /**
@@ -324,6 +326,31 @@ class TrackTaskInBackground extends Task implements HasCallbacks
             'delay' => $this->callbackDelay ?? 5,
             'backoff_multiplier' => $this->callbackBackoffMultiplier ?? 2,
         ];
+    }
+
+    /**
+     * The background wrapper script intentionally uses shell variable expansion and command
+     * substitution while still honoring script size and forbidden command checks.
+     */
+    protected function validateScript(string $script): void
+    {
+        $errors = [];
+
+        if (strlen($script) > 1024 * 1024) {
+            $errors['script_size'] = 'Script is too large (max 1024KB).';
+        }
+
+        $forbiddenCommands = config('task-runner.security.forbidden_commands', []);
+        foreach ($forbiddenCommands as $command) {
+            if (stripos($script, $command) !== false) {
+                $errors['forbidden_command'] = "Script contains forbidden command: {$command}";
+                break;
+            }
+        }
+
+        if (! empty($errors)) {
+            throw \App\Modules\TaskRunner\Exceptions\TaskValidationException::withErrors($errors);
+        }
     }
 
     /**

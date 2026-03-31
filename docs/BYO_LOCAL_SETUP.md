@@ -102,7 +102,7 @@ php artisan queue:work
 
 Use `redis` or another driver in production if you prefer; the important part is that **some** worker consumes the queue you configure.
 
-**Laravel Horizon** (optional): set `QUEUE_CONNECTION=redis`, ensure **Redis** is running (`brew services start redis` on macOS), then run `php artisan horizon` or `composer run dev:horizon` (same stack as `composer dev` but swaps `queue:listen` for Horizon). Open `/horizon` while signed in (`APP_ENV=local` allows any authenticated user; production uses `HORIZON_ALLOWED_EMAILS`). The **Horizon** pane in `php artisan solo` runs the same command.
+**Laravel Horizon** (optional): set `QUEUE_CONNECTION=redis`, ensure **Redis** is running (`brew services start redis` on macOS), then run `php artisan horizon:listen` or `composer run dev:horizon` (same stack as `composer dev` but swaps `queue:listen` for Horizon). This uses Horizon's built-in file watcher from `config/horizon.php`, so local code and config changes restart Horizon automatically. Open `/horizon` while signed in (`APP_ENV=local` allows any authenticated user; production uses `HORIZON_ALLOWED_EMAILS`). The **Horizon** pane in `php artisan solo` runs the same command.
 
 ---
 

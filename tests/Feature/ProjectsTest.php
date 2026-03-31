@@ -348,4 +348,68 @@ class ProjectsTest extends TestCase
 
         $this->assertSame('Project deploy failed', $log->action_summary);
     }
+
+    public function test_project_resources_page_shows_server_and_site_navigation_links(): void
+    {
+        $owner = $this->userWithOrganization();
+        $org = $owner->currentOrganization();
+        $workspace = Workspace::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $owner->id,
+        ]);
+        $server = Server::factory()->create([
+            'user_id' => $owner->id,
+            'organization_id' => $org->id,
+            'workspace_id' => $workspace->id,
+            'name' => 'API Server',
+        ]);
+        $site = Site::factory()->create([
+            'user_id' => $owner->id,
+            'organization_id' => $org->id,
+            'server_id' => $server->id,
+            'workspace_id' => $workspace->id,
+            'name' => 'Customer App',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('projects.resources', $workspace));
+
+        $response->assertOk()
+            ->assertSee('API Server')
+            ->assertSee('Customer App')
+            ->assertSee(route('servers.logs', $server), escape: false)
+            ->assertSee(route('servers.monitor', $server), escape: false)
+            ->assertSee(route('servers.services', $server), escape: false)
+            ->assertSee(route('servers.manage', $server), escape: false)
+            ->assertSee(route('sites.show', [$site->server, $site]), escape: false)
+            ->assertSee(route('sites.insights', [$site->server, $site]), escape: false);
+    }
+
+    public function test_project_delivery_page_shows_site_navigation_links(): void
+    {
+        $owner = $this->userWithOrganization();
+        $org = $owner->currentOrganization();
+        $workspace = Workspace::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $owner->id,
+        ]);
+        $server = Server::factory()->create([
+            'user_id' => $owner->id,
+            'organization_id' => $org->id,
+            'workspace_id' => $workspace->id,
+        ]);
+        $site = Site::factory()->create([
+            'user_id' => $owner->id,
+            'organization_id' => $org->id,
+            'server_id' => $server->id,
+            'workspace_id' => $workspace->id,
+            'name' => 'Docs Site',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('projects.delivery', $workspace));
+
+        $response->assertOk()
+            ->assertSee('Docs Site')
+            ->assertSee(route('sites.show', [$site->server, $site]), escape: false)
+            ->assertSee(route('sites.insights', [$site->server, $site]), escape: false);
+    }
 }

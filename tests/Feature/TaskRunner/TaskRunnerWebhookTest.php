@@ -6,6 +6,8 @@ namespace Tests\Feature\TaskRunner;
 
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use App\Modules\TaskRunner\Tests\Helpers\TestTask;
+use App\Modules\TaskRunner\TrackTaskInBackground;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
@@ -47,6 +49,30 @@ class TaskRunnerWebhookTest extends TestCase
         $this->assertStringContainsString('from remote', (string) $task->output);
     }
 
+    public function test_signed_webhook_update_output_appends_multiple_chunks_in_order(): void
+    {
+        $task = Task::query()->create([
+            'name' => 'Webhook probe',
+            'action' => 'probe',
+            'status' => TaskStatus::Running,
+            'output' => "existing\n",
+        ]);
+
+        $url = URL::signedRoute('webhook.task.update-output', ['task' => $task->id]);
+
+        $this->postJson($url, ['output' => 'first line', 'append_newline' => true])
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+
+        $this->postJson($url, ['output' => 'second line', 'append_newline' => true])
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+
+        $task->refresh();
+
+        $this->assertSame("existing\nfirst line\nsecond line\n", (string) $task->output);
+    }
+
     public function test_signed_webhook_mark_as_finished_returns_success_without_task_instance(): void
     {
         $task = Task::query()->create([
@@ -61,6 +87,112 @@ class TaskRunnerWebhookTest extends TestCase
         $this->postJson($url, [])
             ->assertOk()
             ->assertJson(['status' => 'success']);
+
+        $task->refresh();
+        $this->assertSame(TaskStatus::Finished, $task->status);
+        $this->assertSame(0, $task->exit_code);
+        $this->assertNotNull($task->completed_at);
+    }
+
+    public function test_signed_webhook_mark_as_finished_updates_tracked_task_status(): void
+    {
+        $actualTask = new TestTask('Provision server');
+        $trackedTask = new TrackTaskInBackground(
+            $actualTask,
+            'https://example.com/finished',
+            'https://example.com/failed',
+            'https://example.com/timeout',
+        );
+
+        $task = Task::query()->create([
+            'name' => 'Provision server',
+            'action' => 'provision_stack',
+            'status' => TaskStatus::Running,
+            'script' => 'wrapper.sh',
+            'timeout' => 300,
+            'user' => 'root',
+        ]);
+
+        $actualTask->setTaskModel($task);
+        $trackedTask->setTaskModel($task);
+        $task->update([
+            'instance' => serialize($trackedTask),
+        ]);
+
+        $url = URL::signedRoute('webhook.task.mark-as-finished', ['task' => $task->id]);
+
+        $this->postJson($url, ['exit_code' => 0])
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Finished, $task->status);
+        $this->assertSame(0, $task->exit_code);
+        $this->assertNotNull($task->completed_at);
+    }
+
+    public function test_signed_webhook_mark_as_finished_updates_tracked_task_status_with_encoded_instance(): void
+    {
+        $actualTask = new TestTask('Provision server');
+        $trackedTask = new TrackTaskInBackground(
+            $actualTask,
+            'https://example.com/finished',
+            'https://example.com/failed',
+            'https://example.com/timeout',
+        );
+
+        $task = Task::query()->create([
+            'name' => 'Provision server',
+            'action' => 'provision_stack',
+            'status' => TaskStatus::Running,
+            'script' => 'wrapper.sh',
+            'timeout' => 300,
+            'user' => 'root',
+        ]);
+
+        $actualTask->setTaskModel($task);
+        $trackedTask->setTaskModel($task);
+        $task->update([
+            'instance' => base64_encode(serialize($trackedTask)),
+        ]);
+
+        $url = URL::signedRoute('webhook.task.mark-as-finished', ['task' => $task->id]);
+
+        $this->postJson($url, ['exit_code' => 0])
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Finished, $task->status);
+        $this->assertSame(0, $task->exit_code);
+        $this->assertNotNull($task->completed_at);
+    }
+
+    public function test_signed_webhook_mark_as_finished_finalizes_task_even_with_malformed_instance(): void
+    {
+        $task = Task::query()->create([
+            'name' => 'Provision server',
+            'action' => 'provision_stack',
+            'status' => TaskStatus::Running,
+            'script' => 'wrapper.sh',
+            'timeout' => 300,
+            'user' => 'root',
+            'instance' => 'O:44:"App\Modules\TaskRunner\TrackTaskInBackground":12:{s:14:"',
+        ]);
+
+        $url = URL::signedRoute('webhook.task.mark-as-finished', ['task' => $task->id]);
+
+        $this->postJson($url, ['exit_code' => 0])
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Finished, $task->status);
+        $this->assertSame(0, $task->exit_code);
+        $this->assertNotNull($task->completed_at);
     }
 
     public function test_webhook_url_uses_dply_public_app_url_when_configured(): void
