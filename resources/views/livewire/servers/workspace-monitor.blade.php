@@ -213,12 +213,85 @@
                             {{ __('Waiting for first sample') }}
                         @endif
                     </dd>
+                    <dd class="mt-1 text-xs text-brand-mist">
+                        @if ($sampleAgeMinutes !== null)
+                            {{ trans_choice('Age: :minutes minute|Age: :minutes minutes', $sampleAgeMinutes, ['minutes' => $sampleAgeMinutes]) }}
+                        @else
+                            {{ __('Freshness updates after the first callback arrives.') }}
+                        @endif
+                    </dd>
                 </div>
             </dl>
         </div>
     @endif
 
     @if ($showMetricsPanels)
+        <div class="{{ $card }} p-6 sm:p-8">
+            <div class="grid gap-4 lg:grid-cols-3">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Observe') }}</p>
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Watch for capacity and drift') }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('CPU, memory, disk, and load tell you whether the host is healthy before a deploy or incident response step.') }}</p>
+                </div>
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Correlate') }}</p>
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Relate spikes to releases') }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Deployment context on this page helps answer whether a resource spike came from new code, a scheduled job, or a server-level change.') }}</p>
+                </div>
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Escalate') }}</p>
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Route findings to the team') }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use organization and project notification routing so health changes reach the right people instead of living only on this screen.') }}</p>
+                </div>
+            </div>
+
+            <div class="mt-6 grid gap-4 lg:grid-cols-3">
+                <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Sample freshness') }}</p>
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">
+                        @if ($sampleAgeMinutes === null)
+                            {{ __('Waiting for first callback') }}
+                        @elseif ($sampleAgeMinutes <= 2)
+                            {{ __('Fresh') }}
+                        @elseif ($sampleAgeMinutes <= 10)
+                            {{ __('Aging') }}
+                        @else
+                            {{ __('Stale') }}
+                        @endif
+                    </p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                        @if ($sampleAgeMinutes === null)
+                            {{ __('No server sample has been stored yet.') }}
+                        @else
+                            {{ trans_choice('Latest metric sample is :minutes minute old.|Latest metric sample is :minutes minutes old.', $sampleAgeMinutes, ['minutes' => $sampleAgeMinutes]) }}
+                        @endif
+                    </p>
+                </div>
+                <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Server notification routes') }}</p>
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ trans_choice(':count saved|:count saved', $routingSummary['server_routes'], ['count' => $routingSummary['server_routes']]) }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use server-scoped routes for host-specific incidents and service alerts.') }}</p>
+                </div>
+                <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Project escalation routes') }}</p>
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">
+                        @if ($routingSummary['has_project'])
+                            {{ trans_choice(':count saved|:count saved', $routingSummary['project_routes'], ['count' => $routingSummary['project_routes']]) }}
+                        @else
+                            {{ __('No project attached') }}
+                        @endif
+                    </p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                        @if ($routingSummary['has_project'])
+                            {{ __('Project routes are where grouped health and deploy signals should land.') }}
+                        @else
+                            {{ __('Attach this server to a project if you want grouped health and deploy routing.') }}
+                        @endif
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <div class="{{ $card }} p-6 sm:p-8">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>

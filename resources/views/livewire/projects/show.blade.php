@@ -49,6 +49,13 @@
                 </div>
             </div>
 
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-5">
+                <h3 class="text-sm font-semibold text-slate-900">{{ __('Projects are for day-two operations, not just grouping') }}</h3>
+                <p class="mt-2 text-sm leading-6 text-slate-600">
+                    {{ __('Use a project as the shared operating surface for one app, customer, or environment family. Keep runbooks, health, release context, notification routing, and shared variables here so recovery and change management do not depend on one person remembering the setup.') }}
+                </p>
+            </div>
+
             @if ($health['issues'] !== [])
                 <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                     <p class="font-medium">{{ __('Needs attention') }}</p>
@@ -367,6 +374,31 @@
                     <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('This tab is for day-two work: reviewing what changed, seeing whether the grouped resources are healthy, capturing runbooks, and routing the right alerts. Check here first during incident response or before planned maintenance.') }}</p>
                 </div>
 
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="max-w-2xl">
+                            <h3 class="font-medium text-slate-900">{{ __('Operational readiness') }}</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('Use this quick check before a risky deploy or while handling an incident. A strong project should have health visibility, at least one recovery runbook, and notification routing that reaches the right team.') }}</p>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-3 lg:min-w-[24rem]">
+                            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                                <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Runbooks') }}</p>
+                                <p class="mt-2 text-sm font-semibold text-slate-900">{{ trans_choice(':count ready|:count ready', $operationsSummary['runbook_count'], ['count' => $operationsSummary['runbook_count']]) }}</p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                                <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Notification routes') }}</p>
+                                <p class="mt-2 text-sm font-semibold text-slate-900">{{ trans_choice(':count saved|:count saved', $operationsSummary['notification_route_count'], ['count' => $operationsSummary['notification_route_count']]) }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ trans_choice(':count event covered|:count events covered', $operationsSummary['notification_event_count'], ['count' => $operationsSummary['notification_event_count']]) }}</p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                                <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Health') }}</p>
+                                <p class="mt-2 text-sm font-semibold text-slate-900">{{ $health['status_label'] }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ __('Monitored servers: :count', ['count' => $operationsSummary['monitored_servers']]) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid gap-8 xl:grid-cols-2">
                     <div class="space-y-8">
                         <div class="bg-white border border-slate-200 rounded-lg p-6">
@@ -420,6 +452,22 @@
                             <div class="mb-4">
                                 <h3 class="font-medium text-slate-900">{{ __('Project notifications') }}</h3>
                                 <p class="mt-1 text-sm text-slate-500">{{ __('Choose where project-level alerts and summaries should go. This is best for escalation channels, team inboxes, or webhook sinks that should receive grouped project events.') }}</p>
+                            </div>
+                            <div class="mb-4 grid gap-3 sm:grid-cols-3">
+                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Saved routes') }}</p>
+                                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ $operationsSummary['notification_route_count'] }}</p>
+                                </div>
+                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Event coverage') }}</p>
+                                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ trans_choice(':count event|:count events', $operationsSummary['notification_event_count'], ['count' => $operationsSummary['notification_event_count']]) }}</p>
+                                </div>
+                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Suggested use') }}</p>
+                                    <p class="mt-2 text-sm font-semibold text-slate-900">
+                                        {{ $operationsSummary['notification_route_count'] > 0 ? __('Escalation ready') : __('Needs a destination') }}
+                                    </p>
+                                </div>
                             </div>
                             <div class="space-y-4">
                                 <div>
@@ -492,6 +540,20 @@
                                 <h3 class="font-medium text-slate-900">{{ __('Health summary') }}</h3>
                                 <p class="mt-1 text-sm text-slate-500">{{ __('Use this summary to spot trouble before drilling into individual servers and sites. If this section looks healthy, the project is usually safe to leave alone.') }}</p>
                             </div>
+                            <div class="mb-4 grid gap-4 sm:grid-cols-3">
+                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Monitored servers') }}</p>
+                                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ __(':count / :total', ['count' => $operationsSummary['monitored_servers'], 'total' => $workspace->servers->count()]) }}</p>
+                                </div>
+                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Servers with samples') }}</p>
+                                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ __(':count / :total', ['count' => $operationsSummary['servers_with_samples'], 'total' => $operationsSummary['monitored_servers']]) }}</p>
+                                </div>
+                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Pending deploys') }}</p>
+                                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ $health['pending_deploys'] }}</p>
+                                </div>
+                            </div>
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div class="rounded-lg border border-slate-200 p-4">
                                     <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Servers') }}</p>
@@ -535,6 +597,24 @@
                 <div class="bg-white border border-slate-200 rounded-lg p-6">
                     <h3 class="font-medium text-slate-900">{{ __('How to use delivery') }}</h3>
                     <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('Use this tab when you want the project to coordinate releases across several sites. Save shared variables here before deploys, then queue one batch when multiple sites should move together.') }}</p>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                    <h3 class="font-medium text-slate-900">{{ __('Recovery and migration checklist') }}</h3>
+                    <div class="mt-4 grid gap-4 md:grid-cols-3">
+                        <div class="rounded-lg border border-slate-200 bg-white p-4">
+                            <p class="text-sm font-medium text-slate-900">{{ __('1. Shared config is ready') }}</p>
+                            <p class="mt-1 text-sm text-slate-600">{{ __('Keep the variables and secrets this project needs in one place before rebuilding a server or moving traffic.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-4">
+                            <p class="text-sm font-medium text-slate-900">{{ __('2. Recovery steps are written down') }}</p>
+                            <p class="mt-1 text-sm text-slate-600">{{ __('Tie rollback notes, backup destinations, import commands, and cache-clear steps to project runbooks so another operator can take over.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-4">
+                            <p class="text-sm font-medium text-slate-900">{{ __('3. Releases can move together') }}</p>
+                            <p class="mt-1 text-sm text-slate-600">{{ __('When one deploy spans several sites, queue it here so release timing and follow-up checks stay grouped.') }}</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid gap-8 xl:grid-cols-2">

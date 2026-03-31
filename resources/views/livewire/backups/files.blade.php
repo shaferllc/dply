@@ -13,16 +13,88 @@
         <header class="mb-6">
             <h1 class="text-2xl font-semibold text-brand-ink">{{ __('File backups') }}</h1>
             <p class="mt-2 text-sm text-brand-moss max-w-3xl leading-relaxed">
-                {{ __('Archive document roots, uploads, or custom paths for sites in :org. Pair with Storage destinations so archives land in S3, SFTP, or other providers.', ['org' => $organization->name]) }}
+                {{ __('Protect uploads, shared assets, and app-specific paths for :org with a recovery policy your team can explain. File backups should say what is included, what is excluded, and how operators restore traffic when a release or server goes wrong.', ['org' => $organization->name]) }}
             </p>
         </header>
 
         <x-backups-subnav active="files" />
 
+        <div class="grid gap-4 md:grid-cols-3 mb-6">
+            <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</p>
+                <h2 class="mt-2 text-base font-semibold text-brand-ink">{{ __('Decide what matters') }}</h2>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                    {{ __('Include the paths that are hard to recreate, such as uploads, user-generated assets, shared config, and release artifacts you cannot rebuild quickly.') }}
+                </p>
+            </section>
+            <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Noise control') }}</p>
+                <h2 class="mt-2 text-base font-semibold text-brand-ink">{{ __('Record excludes and limits') }}</h2>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                    {{ __('Temporary caches, vendor trees, or build output often belong in deploys, not in archives. Capture exclusions and bandwidth constraints before they surprise you.') }}
+                </p>
+            </section>
+            <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Recovery drill') }}</p>
+                <h2 class="mt-2 text-base font-semibold text-brand-ink">{{ __('Practice the import path') }}</h2>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                    {{ __('The right backup policy includes a destination, a restore location, and a documented drill for replacing content on a new server or after a bad release.') }}
+                </p>
+            </section>
+        </div>
+
+        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-gradient-to-r from-brand-sand/40 to-white px-5 py-4 shadow-sm">
+            <p class="text-sm font-semibold text-brand-ink">{{ __('Good file backup hygiene') }}</p>
+            <ul class="mt-2 space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
+                <li>{{ __('List the paths you would miss in the first hour of an outage.') }}</li>
+                <li>{{ __('Keep exclusions explicit so archives stay small and predictable.') }}</li>
+                <li>{{ __('Store the restore destination and verification step with the same site.') }}</li>
+            </ul>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-3 mb-6">
+            <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm lg:col-span-2">
+                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Available storage destinations') }}</h2>
+                @if ($storageDestinations->isEmpty())
+                    <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                        {{ __('No storage destinations yet. Add one before you expect repeatable file recovery.') }}
+                    </p>
+                    <a href="{{ route('profile.backup-configurations') }}" wire:navigate class="mt-4 inline-flex text-sm font-medium text-brand-sage hover:text-brand-ink">
+                        {{ __('Add storage destination') }}
+                    </a>
+                @else
+                    <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                        {{ trans_choice(':count destination can be reused for archives and restore drills.|:count destinations can be reused for archives and restore drills.', $storageDestinations->count(), ['count' => $storageDestinations->count()]) }}
+                    </p>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        @foreach ($storageDestinations->take(4) as $destination)
+                            <span class="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-brand-sand/30 px-3 py-1 text-xs text-brand-ink">
+                                <span class="font-semibold">{{ $destination->name }}</span>
+                                <span class="text-brand-mist">· {{ $providerLabels[$destination->provider] ?? $destination->provider }}</span>
+                            </span>
+                        @endforeach
+                        @if ($storageDestinations->count() > 4)
+                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs text-brand-moss">
+                                {{ __('+:count more', ['count' => $storageDestinations->count() - 4]) }}
+                            </span>
+                        @endif
+                    </div>
+                @endif
+            </section>
+            <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recovery drill') }}</h2>
+                <ul class="mt-3 space-y-2 text-sm leading-relaxed text-brand-moss list-disc list-inside">
+                    <li>{{ __('Confirm the writable paths that matter for each site.') }}</li>
+                    <li>{{ __('Write down where restored files should land.') }}</li>
+                    <li>{{ __('Keep a runbook for post-restore checks and cache clears.') }}</li>
+                </ul>
+            </section>
+        </div>
+
         <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
             <div class="px-4 py-3 sm:px-6 border-b border-brand-ink/10 bg-brand-sand/30">
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Sites in this organization') }}</h2>
-                <p class="text-xs text-brand-moss mt-0.5">{{ __('File backup jobs will include paths you configure per site (coming soon).') }}</p>
+                    <p class="text-xs text-brand-moss mt-0.5">{{ __('Use each site as the source of truth for what should be archived, excluded, and restored.') }}</p>
             </div>
             @if ($sites->isEmpty())
                 <div class="px-6 py-12 text-center">
@@ -40,19 +112,44 @@
                             <tr class="border-b border-brand-ink/10 bg-brand-sand/20 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
                                 <th class="px-4 py-3">{{ __('Site') }}</th>
                                 <th class="px-4 py-3">{{ __('Server') }}</th>
-                                <th class="px-4 py-3">{{ __('Paths') }}</th>
-                                <th class="px-4 py-3 text-right">{{ __('Last backup') }}</th>
+                                <th class="px-4 py-3">{{ __('Archive scope') }}</th>
+                                <th class="px-4 py-3">{{ __('Recovery note') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/10">
                             @foreach ($sites as $site)
+                                @php
+                                    $runbookCount = $site->workspace?->runbooks?->count() ?? 0;
+                                    $effectiveRoot = $site->effectiveRepositoryPath();
+                                @endphp
                                 <tr wire:key="file-backup-{{ $site->id }}" class="hover:bg-brand-sand/20">
                                     <td class="px-4 py-3 font-medium text-brand-ink">
                                         <a href="{{ route('sites.show', [$site->server, $site]) }}" wire:navigate class="hover:text-brand-sage">{{ $site->name }}</a>
                                     </td>
                                     <td class="px-4 py-3 text-brand-moss">{{ $site->server?->name ?? '—' }}</td>
-                                    <td class="px-4 py-3 text-brand-moss">{{ __('Not configured') }}</td>
-                                    <td class="px-4 py-3 text-right text-brand-mist">—</td>
+                                    <td class="px-4 py-3 text-brand-moss">
+                                        <div class="space-y-1">
+                                            <p>{{ __('Document root: :path', ['path' => $site->document_root]) }}</p>
+                                            <p class="text-xs text-brand-mist">
+                                                @if ($effectiveRoot !== $site->document_root)
+                                                    {{ __('Repository root: :path. Add excludes for caches, vendor trees, and other deploy-generated content.', ['path' => $effectiveRoot]) }}
+                                                @else
+                                                    {{ __('Add excludes for caches, vendor trees, and other deploy-generated content.') }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-brand-moss">
+                                        <div class="space-y-1">
+                                            @if ($runbookCount > 0)
+                                                <p>{{ trans_choice(':count project runbook is already attached to this site workspace.|:count project runbooks are already attached to this site workspace.', $runbookCount, ['count' => $runbookCount]) }}</p>
+                                                <p class="text-xs text-brand-mist">{{ __('Use those runbooks to capture restore destination, cache-clear steps, and verification checks.') }}</p>
+                                            @else
+                                                <p>{{ __('No project runbook yet. Note where restored files should land and how you confirm the app is healthy afterward.') }}</p>
+                                                <p class="text-xs text-brand-mist">{{ __('Project delivery and runbooks are the right home for step-by-step recovery notes.') }}</p>
+                                            @endif
+                                        </div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -61,8 +158,11 @@
             @endif
         </div>
 
-        <p class="mt-6 text-xs text-brand-mist max-w-3xl leading-relaxed">
-            {{ __('Large trees may need exclude rules and bandwidth limits; we will expose those when scheduling ships.') }}
-        </p>
+        <div class="mt-6 rounded-2xl border border-brand-ink/10 bg-white px-5 py-4 shadow-sm">
+            <p class="text-sm font-semibold text-brand-ink">{{ __('Current operating model') }}</p>
+            <p class="mt-2 text-sm leading-relaxed text-brand-moss max-w-3xl">
+                {{ __('Large trees still need explicit excludes, destination choices, and bandwidth guardrails. Until file scheduling is fully productized for every path, use this page to agree on coverage, then drive the archive job from the server or agent path with the same conventions recorded here.') }}
+            </p>
+        </div>
     </div>
 </div>

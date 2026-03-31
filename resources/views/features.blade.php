@@ -49,6 +49,8 @@
                     <a href="#credentials" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Credentials</a>
                     <a href="#servers" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Servers</a>
                     <a href="#sites" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Sites &amp; deploy</a>
+                    <a href="#recovery" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Recovery</a>
+                    <a href="#project-ops" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Project ops</a>
                     <a href="#forge-style" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Forge-style</a>
                     <a href="#serverpilot" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">ServerPilot</a>
                     <a href="#coverage" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Coverage</a>
@@ -377,6 +379,67 @@
             </div>
         </section>
 
+        <section id="recovery" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/45 scroll-mt-24">
+            <div class="max-w-6xl mx-auto">
+                <div class="max-w-3xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Recovery and confidence</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Backups, rollback, and migration work as one story</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">
+                        Production teams do not buy hosting control planes only for deploy buttons. They buy confidence that they can
+                        <strong class="text-brand-forest font-medium">restore data</strong>, <strong class="text-brand-forest font-medium">roll back code</strong>, and
+                        <strong class="text-brand-forest font-medium">plan workload moves safely</strong> when a server, release, or provider decision changes.
+                    </p>
+                    <p class="mt-4 text-brand-moss leading-relaxed">
+                        {{ config('app.name') }} keeps that workflow close to the app itself: <strong class="text-brand-forest font-medium">storage destinations and backup planning</strong>,
+                        <strong class="text-brand-forest font-medium">atomic releases with rollback</strong>, and <strong class="text-brand-forest font-medium">project runbooks</strong> that capture recovery steps beside the resources they affect.
+                    </p>
+                </div>
+
+                <div class="mt-12 grid gap-6 lg:grid-cols-3">
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink">Backups with ownership</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Use the Backups area to define what should be captured for databases and files, where archives land, and what restore path the team is expected to follow.</p>
+                    </article>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink">Rollback without heroics</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Atomic releases and deployment history keep code rollback obvious when a release misbehaves, so recovery is not “SSH around until it works.”</p>
+                    </article>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink">Migration as a guided operation</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">When teams move a site or rebuild a server, they already have one home for deploy settings, backup expectations, health checks, and project notes instead of scattered docs and ad-hoc checklists.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="project-ops" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-brand-sand/20 to-white/70 scroll-mt-24">
+            <div class="max-w-6xl mx-auto">
+                <div class="max-w-3xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">A better operating surface</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Projects turn servers into a team control plane</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">
+                        Many panels stop at server CRUD. {{ config('app.name') }} adds a <strong class="text-brand-forest font-medium">project layer</strong> for grouped health,
+                        shared variables, notification routing, deploy batches, runbooks, and activity feeds, so one customer stack or product area can be operated from one place.
+                    </p>
+                </div>
+
+                <div class="mt-12 grid gap-6 lg:grid-cols-3">
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink">Grouped health</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Review server readiness, SSL status, recent failures, and project issues before drilling into a single machine.</p>
+                    </article>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink">Runbooks and routing</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Keep incident notes, escalation URLs, notification channels, and delivery context with the same project that owns the production change.</p>
+                    </article>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink">Coordinated delivery</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Queue releases across multiple sites, keep shared variables together, and treat a product stack as one operating unit instead of many unrelated screens.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
         {{-- Positioning vs Laravel Forge–style panels; reference Serversinc comparison narrative --}}
         <section id="forge-style" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-brand-sand/25 to-white/80 scroll-mt-24">
             <div class="max-w-6xl mx-auto">
@@ -445,8 +508,8 @@
                     <strong class="text-brand-forest font-medium">sites, TLS, PHP-FPM, Node, static assets, databases, cron, and firewall rules</strong>.
                     We drive configuration over <strong class="text-brand-forest font-medium">SSH</strong> (and cloud APIs when you provision through us)—we do not claim the same
                     <strong class="text-brand-forest font-medium">agent architecture</strong> or <strong class="text-brand-forest font-medium">Apache+.htaccess</strong> stack ServerPilot markets; advanced
-                    <strong class="text-brand-forest font-medium">host metrics dashboards</strong> and <strong class="text-brand-forest font-medium">one-click cross-server migrations</strong> are
-                    <strong class="text-brand-forest font-medium">not</strong> first-class products here today—use health checks, backups, and manual or scripted moves until dedicated flows exist.
+                    <strong class="text-brand-forest font-medium">host metrics dashboards</strong> and <strong class="text-brand-forest font-medium">cross-server migrations</strong> are handled here through
+                    <strong class="text-brand-forest font-medium">metrics, backup planning, deploy history, and project runbooks</strong> rather than a single opaque wizard.
                 </p>
                 <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
                     Where we often go <strong class="text-brand-forest font-medium">further</strong> for product teams: <strong class="text-brand-forest font-medium">git-native deploys</strong>, <strong class="text-brand-forest font-medium">atomic releases</strong>,
@@ -480,11 +543,11 @@
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Metrics dashboards</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-amber-800 font-semibold">Partial</span> — HTTP <strong class="text-brand-forest font-medium">health checks</strong> and status; not the same as ServerPilot-style <strong class="text-brand-forest font-medium">full host metrics UI</strong>.</td>
+                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-800 font-semibold">Supported</span> — server metrics, recent history, deployment correlation, callback diagnostics, and project shortcuts for grouped troubleshooting.</td>
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Migrations between servers</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-amber-800 font-semibold">Operational</span> — use <strong class="text-brand-forest font-medium">SSH, backups, and deploys</strong>; no dedicated “move app wizard” like some classic panels advertise.</td>
+                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-brand-ink font-semibold">Operational</span> — use <strong class="text-brand-forest font-medium">backup planning, deploys, restore notes, and project runbooks</strong> to move safely without losing the surrounding context.</td>
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">WordPress one-click</td>
@@ -564,7 +627,7 @@
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Monitoring (CPU / RAM / disk)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-amber-800 font-semibold">Partial</span> — HTTP health checks and server status in the control plane; not a bundled host metrics agent with live graphs like a full APM stack.</td>
+                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — server CPU, memory, disk, load, historical charts, deployment correlation, diagnostics, and project-aware drilldowns in the same control plane.</td>
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Fail2Ban, unattended upgrades, hardening</td>
@@ -576,7 +639,7 @@
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Backups</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — backup configuration for files and databases (see Backups in the app).</td>
+                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — dedicated database and file backup planning surfaces, storage destinations, retention expectations, and restore-oriented operator guidance in the app.</td>
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Teams &amp; audit</td>
@@ -584,7 +647,7 @@
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Alerts (email, Slack, webhooks)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-amber-800 font-semibold">Partial</span> — notification channels and events exist; wire the channels your org uses so deploy and uptime events reach the right place.</td>
+                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — notification channels, event routing, quiet hours, project notifications, and webhook-friendly delivery paths let teams send the right events to the right operators.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -615,6 +678,21 @@
                         <p class="mt-2 text-sm text-brand-mist leading-relaxed">A verified address is required for dashboard access. Name and profile settings live on your user—they do not reset when you switch org context.</p>
                     </li>
                 </ul>
+
+                <div class="mt-10 grid gap-6 lg:grid-cols-3">
+                    <div class="rounded-xl border border-white/10 bg-white/5 p-6">
+                        <h3 class="font-semibold text-brand-cream">Governed API access</h3>
+                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Organization-scoped tokens and granular abilities keep automation inside clearer boundaries instead of long-lived root credentials on laptops.</p>
+                    </div>
+                    <div class="rounded-xl border border-white/10 bg-white/5 p-6">
+                        <h3 class="font-semibold text-brand-cream">Approval-friendly operations</h3>
+                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Teams can pair firewall approvals, audit visibility, and project routing so production changes are easier to review before and after they ship.</p>
+                    </div>
+                    <div class="rounded-xl border border-white/10 bg-white/5 p-6">
+                        <h3 class="font-semibold text-brand-cream">Recovery lives in-product</h3>
+                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Backups, deployment history, and project runbooks keep recovery guidance attached to the same resources you operate every day.</p>
+                    </div>
+                </div>
             </div>
         </section>
 

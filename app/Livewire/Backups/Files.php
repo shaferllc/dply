@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Backups;
 
+use App\Models\BackupConfiguration;
 use App\Models\Site;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -21,17 +22,25 @@ class Files extends Component
         $this->authorize('viewAny', Site::class);
 
         $serverIds = $org->servers()->pluck('id');
+        $user = auth()->user();
 
         /** @var Collection<int, Site> $sites */
         $sites = Site::query()
             ->whereIn('server_id', $serverIds)
-            ->with('server')
+            ->with(['server', 'workspace.runbooks'])
             ->orderBy('name')
             ->get();
+
+        $storageDestinations = $user->backupConfigurations()
+            ->orderBy('name')
+            ->get(['id', 'name', 'provider']);
 
         return view('livewire.backups.files', [
             'organization' => $org,
             'sites' => $sites,
+            'storageDestinations' => $storageDestinations,
+            'providerLabels' => collect(BackupConfiguration::providers())
+                ->mapWithKeys(fn (string $provider) => [$provider => BackupConfiguration::labelForProvider($provider)]),
         ]);
     }
 }

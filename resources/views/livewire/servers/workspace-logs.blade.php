@@ -40,6 +40,23 @@
         </div>
     @endif
 
+    <div class="rounded-2xl border border-brand-ink/10 bg-white px-5 py-4 text-sm text-brand-ink shadow-sm">
+        <div class="grid gap-3 lg:grid-cols-3">
+            <div>
+                <p class="font-semibold">{{ __('Use logs to verify symptoms') }}</p>
+                <p class="mt-1 leading-relaxed text-brand-moss">{{ __('Check whether an incident is code, capacity, or host-related before reaching for a rollback.') }}</p>
+            </div>
+            <div>
+                <p class="font-semibold">{{ __('Pair with metrics and project ops') }}</p>
+                <p class="mt-1 leading-relaxed text-brand-moss">{{ __('This page is strongest when used beside Metrics and the project operations tab so you can line up events across the stack.') }}</p>
+            </div>
+            <div>
+                <p class="font-semibold">{{ __('Capture evidence for recovery') }}</p>
+                <p class="mt-1 leading-relaxed text-brand-moss">{{ __('Saved views, exports, and share links make it easier to hand off context when another operator needs to jump in.') }}</p>
+            </div>
+        </div>
+    </div>
+
     <div
         class="{{ $card }} overflow-hidden"
         wire:init="loadSystemLogIfEmpty"
