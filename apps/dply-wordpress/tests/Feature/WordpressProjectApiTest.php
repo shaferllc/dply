@@ -129,4 +129,16 @@ class WordpressProjectApiTest extends TestCase
             'Authorization' => 'Bearer wordpress_test_api_token',
         ])->assertStatus(422);
     }
+
+    public function test_store_rejects_non_hosted_runtime_in_settings(): void
+    {
+        $this->postJson('/api/wordpress/projects', [
+            'name' => 'X',
+            'slug' => 'bad-runtime',
+            'settings' => ['runtime' => 'vps'],
+        ], [
+            'Authorization' => 'Bearer wordpress_test_api_token',
+        ])->assertStatus(422)
+            ->assertJsonPath('errors.settings.0', 'settings.runtime must be "hosted" when set.');
+    }
 }

@@ -41,72 +41,34 @@
             data-subscribe="{{ $cronRunEchoSubscribable ? '1' : '0' }}"
         ></div>
 
-        <div
-            class="mb-6 flex flex-wrap gap-1 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-1 shadow-sm"
-            role="tablist"
-            aria-label="{{ __('Cron workspace sections') }}"
-        >
-            <button
-                type="button"
-                role="tab"
-                id="cron-tab-jobs"
-                wire:click="$set('cron_workspace_tab', 'jobs')"
-                aria-selected="{{ $cron_workspace_tab === 'jobs' ? 'true' : 'false' }}"
-                class="min-w-[7rem] flex-1 rounded-xl px-3 py-2.5 text-center text-sm font-medium transition-colors sm:flex-none {{ $cron_workspace_tab === 'jobs' ? 'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' : 'text-brand-moss hover:bg-white/60 hover:text-brand-ink' }}"
-            >
+        <x-server-workspace-tablist :aria-label="__('Cron workspace sections')">
+            <x-server-workspace-tab id="cron-tab-jobs" :active="$cron_workspace_tab === 'jobs'" wire:click="$set('cron_workspace_tab', 'jobs')">
                 {{ __('Jobs') }}
-            </button>
-            <button
-                type="button"
-                role="tab"
-                id="cron-tab-run"
-                wire:click="$set('cron_workspace_tab', 'run')"
-                aria-selected="{{ $cron_workspace_tab === 'run' ? 'true' : 'false' }}"
-                class="min-w-[7rem] flex-1 rounded-xl px-3 py-2.5 text-center text-sm font-medium transition-colors sm:flex-none {{ $cron_workspace_tab === 'run' ? 'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' : 'text-brand-moss hover:bg-white/60 hover:text-brand-ink' }}"
-            >
+            </x-server-workspace-tab>
+            <x-server-workspace-tab id="cron-tab-run" :active="$cron_workspace_tab === 'run'" wire:click="$set('cron_workspace_tab', 'run')">
                 {{ __('Run now') }}
-            </button>
-            <button
-                type="button"
-                role="tab"
-                id="cron-tab-history"
-                wire:click="$set('cron_workspace_tab', 'history')"
-                aria-selected="{{ $cron_workspace_tab === 'history' ? 'true' : 'false' }}"
-                class="min-w-[7rem] flex-1 rounded-xl px-3 py-2.5 text-center text-sm font-medium transition-colors sm:flex-none {{ $cron_workspace_tab === 'history' ? 'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' : 'text-brand-moss hover:bg-white/60 hover:text-brand-ink' }}"
-            >
+            </x-server-workspace-tab>
+            <x-server-workspace-tab id="cron-tab-history" :active="$cron_workspace_tab === 'history'" wire:click="$set('cron_workspace_tab', 'history')">
                 {{ __('History') }}
-            </button>
-            <button
-                type="button"
-                role="tab"
-                id="cron-tab-templates"
-                wire:click="$set('cron_workspace_tab', 'templates')"
-                aria-selected="{{ $cron_workspace_tab === 'templates' ? 'true' : 'false' }}"
-                class="min-w-[7rem] flex-1 rounded-xl px-3 py-2.5 text-center text-sm font-medium transition-colors sm:flex-none {{ $cron_workspace_tab === 'templates' ? 'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' : 'text-brand-moss hover:bg-white/60 hover:text-brand-ink' }}"
-            >
+            </x-server-workspace-tab>
+            <x-server-workspace-tab id="cron-tab-templates" :active="$cron_workspace_tab === 'templates'" wire:click="$set('cron_workspace_tab', 'templates')">
                 {{ __('Templates') }}
-            </button>
-            <button
-                type="button"
-                role="tab"
-                id="cron-tab-inspect"
-                wire:click="$set('cron_workspace_tab', 'inspect')"
-                aria-selected="{{ $cron_workspace_tab === 'inspect' ? 'true' : 'false' }}"
-                class="min-w-[7rem] flex-1 rounded-xl px-3 py-2.5 text-center text-sm font-medium transition-colors sm:flex-none {{ $cron_workspace_tab === 'inspect' ? 'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' : 'text-brand-moss hover:bg-white/60 hover:text-brand-ink' }}"
-            >
+            </x-server-workspace-tab>
+            @if ($canUpdateOrg)
+                <x-server-workspace-tab id="cron-tab-maintenance" :active="$cron_workspace_tab === 'maintenance'" wire:click="$set('cron_workspace_tab', 'maintenance')">
+                    {{ __('Maintenance') }}
+                </x-server-workspace-tab>
+            @endif
+            <x-server-workspace-tab id="cron-tab-inspect" :active="$cron_workspace_tab === 'inspect'" wire:click="$set('cron_workspace_tab', 'inspect')">
                 {{ __('Inspect') }}
-            </button>
-        </div>
+            </x-server-workspace-tab>
+        </x-server-workspace-tablist>
 
-        <div
-            @class([
-                'space-y-8',
-                'hidden' => $cron_workspace_tab !== 'jobs',
-            ])
-            role="tabpanel"
+        <x-server-workspace-tab-panel
             id="cron-panel-jobs"
-            aria-labelledby="cron-tab-jobs"
-            aria-hidden="{{ $cron_workspace_tab !== 'jobs' ? 'true' : 'false' }}"
+            labelled-by="cron-tab-jobs"
+            :hidden="$cron_workspace_tab !== 'jobs'"
+            panel-class="space-y-8"
         >
         <div class="{{ $card }}">
             <div class="p-6 sm:p-8">
@@ -339,6 +301,39 @@
                     @endif
                 </x-primary-button>
             </div>
+            @if ($canUpdateOrg)
+                <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-5 sm:px-8">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Save as organization template') }}</h3>
+                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">
+                        {{ __('Saves the command, schedule, and run-as user from the job form above. Use the Templates tab to apply or delete saved presets.') }}
+                    </p>
+                    <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <div class="min-w-0 flex-1">
+                            <x-input-label for="template_save_name" value="{{ __('Template name') }}" />
+                            <input
+                                id="template_save_name"
+                                type="text"
+                                wire:model="template_save_name"
+                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist"
+                                placeholder="{{ __('e.g. Nightly database backup') }}"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="saveOrgCronTemplate"
+                            wire:loading.attr="disabled"
+                            wire:target="saveOrgCronTemplate"
+                            class="inline-flex min-w-[8rem] shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-forest px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                        >
+                            <span wire:loading.remove wire:target="saveOrgCronTemplate">{{ __('Save template') }}</span>
+                            <span wire:loading wire:target="saveOrgCronTemplate" class="inline-flex items-center gap-2">
+                                <x-spinner variant="white" size="sm" />
+                                {{ __('Saving…') }}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            @endif
         </div>
 
         <div class="{{ $card }}">
@@ -458,18 +453,14 @@
                 {{ __('Sync also adds Laravel scheduler lines for sites with that enabled. The document icon is the last saved run output; live output streams on the Run now tab.') }}
             </p>
         </div>
-        </div>
+        </x-server-workspace-tab-panel>
 
-        <div
-            @class([
-                'hidden' => $cron_workspace_tab !== 'run',
-            ])
-            role="tabpanel"
+        <x-server-workspace-tab-panel
             id="cron-panel-run"
-            aria-labelledby="cron-tab-run"
-            aria-hidden="{{ $cron_workspace_tab !== 'run' ? 'true' : 'false' }}"
+            labelled-by="cron-tab-run"
+            :hidden="$cron_workspace_tab !== 'run'"
+            panel-class="space-y-8"
         >
-            <div class="space-y-8">
                 <div class="{{ $card }}">
                     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                         <h2 class="text-sm font-semibold text-brand-ink">{{ __('Choose a job to run') }}</h2>
@@ -511,11 +502,18 @@
                                             type="button"
                                             wire:click="runCronJobNow('{{ $cj->id }}')"
                                             wire:loading.attr="disabled"
-                                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-40"
+                                            wire:target="runCronJobNow"
+                                            class="inline-flex min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-40"
                                             @disabled(! $cj->enabled)
                                         >
-                                            <x-heroicon-o-bolt class="h-4 w-4" />
-                                            {{ __('Run now') }}
+                                            <span wire:loading.remove wire:target="runCronJobNow" class="inline-flex items-center gap-1.5">
+                                                <x-heroicon-o-bolt class="h-4 w-4" />
+                                                {{ __('Run now') }}
+                                            </span>
+                                            <span wire:loading wire:target="runCronJobNow" class="inline-flex items-center gap-1.5">
+                                                <x-spinner variant="white" size="sm" />
+                                                {{ __('Running…') }}
+                                            </span>
                                         </button>
                                     </div>
                                 </li>
@@ -567,17 +565,12 @@
 @endif</pre>
                     </div>
                 </div>
-            </div>
-        </div>
+        </x-server-workspace-tab-panel>
 
-        <div
-            @class([
-                'hidden' => $cron_workspace_tab !== 'history',
-            ])
-            role="tabpanel"
+        <x-server-workspace-tab-panel
             id="cron-panel-history"
-            aria-labelledby="cron-tab-history"
-            aria-hidden="{{ $cron_workspace_tab !== 'history' ? 'true' : 'false' }}"
+            labelled-by="cron-tab-history"
+            :hidden="$cron_workspace_tab !== 'history'"
         >
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
@@ -613,86 +606,104 @@
                     @endif
                 </div>
             </div>
-        </div>
+        </x-server-workspace-tab-panel>
 
-        <div
-            @class([
-                'hidden' => $cron_workspace_tab !== 'templates',
-            ])
-            role="tabpanel"
+        <x-server-workspace-tab-panel
             id="cron-panel-templates"
-            aria-labelledby="cron-tab-templates"
-            aria-hidden="{{ $cron_workspace_tab !== 'templates' ? 'true' : 'false' }}"
+            labelled-by="cron-tab-templates"
+            :hidden="$cron_workspace_tab !== 'templates'"
         >
-            <div class="space-y-6">
-                <div class="{{ $card }}">
-                    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Organization templates') }}</h2>
-                        <p class="mt-1 text-xs text-brand-moss">{{ __('Reusable presets for this organization. Apply loads the form on the Jobs tab.') }}</p>
-                    </div>
-                    @if ($orgCronTemplates->isEmpty())
-                        <p class="px-6 py-8 text-sm text-brand-moss sm:px-8">{{ __('No templates yet. Fill the job form and save one below.') }}</p>
-                    @else
-                        <ul class="divide-y divide-brand-ink/10">
-                            @foreach ($orgCronTemplates as $tpl)
-                                <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-8">
-                                    <div class="min-w-0">
-                                        <p class="font-medium text-brand-ink">{{ $tpl->name }}</p>
-                                        <p class="mt-1 font-mono text-xs text-brand-moss">{{ \Illuminate\Support\Str::limit($tpl->command, 100) }}</p>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button type="button" wire:click="applyOrgCronTemplate('{{ $tpl->id }}')" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink">{{ __('Apply') }}</button>
-                                        @if ($canUpdateOrg)
-                                            <button type="button" wire:click="deleteOrgCronTemplate('{{ $tpl->id }}')" wire:confirm="{{ __('Delete this template?') }}" class="rounded-lg px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">{{ __('Delete') }}</button>
-                                        @endif
-                                    </div>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                    @if ($canUpdateOrg)
-                        <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <x-input-label for="template_save_name" value="{{ __('Save current form as template') }}" />
-                            <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
-                                <input id="template_save_name" type="text" wire:model="template_save_name" class="block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm" placeholder="{{ __('Template name') }}" />
-                                <button type="button" wire:click="saveOrgCronTemplate" class="shrink-0 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-white">{{ __('Save') }}</button>
-                            </div>
-                        </div>
-                    @endif
+            <div class="{{ $card }}">
+                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Organization templates') }}</h2>
+                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">
+                        {{ __('Saved command and schedule presets for this organization. Apply copies values into the job form on the Jobs tab. To create a template, fill that form and use “Save as organization template” at the bottom of the Jobs tab.') }}
+                    </p>
                 </div>
-                @if ($canUpdateOrg)
-                    <div class="{{ $card }}">
-                        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <h2 class="text-sm font-semibold text-brand-ink">{{ __('Maintenance window') }}</h2>
-                            <p class="mt-1 text-xs text-brand-moss">{{ __('Pauses installing managed cron lines for all servers in this organization until the chosen time.') }}</p>
-                        </div>
-                        <div class="space-y-4 p-6 sm:p-8">
-                            <div>
-                                <x-input-label for="org_maintenance_until_local" value="{{ __('Until (local app timezone)') }}" />
-                                <input id="org_maintenance_until_local" type="datetime-local" wire:model="org_maintenance_until_local" class="mt-1 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm" />
-                            </div>
-                            <div>
-                                <x-input-label for="org_maintenance_note" value="{{ __('Note (optional)') }}" />
-                                <textarea id="org_maintenance_note" wire:model="org_maintenance_note" rows="2" class="mt-1 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm"></textarea>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="saveOrgCronMaintenance" class="rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-white">{{ __('Save window') }}</button>
-                                <button type="button" wire:click="clearOrgCronMaintenance" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink">{{ __('Clear') }}</button>
-                            </div>
-                        </div>
-                    </div>
+                @if ($orgCronTemplates->isEmpty())
+                    <p class="px-6 py-8 text-sm text-brand-moss sm:px-8">
+                        {{ __('No templates yet. Go to the Jobs tab, fill in the new job form, then save it as a template using the section below that form.') }}
+                    </p>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($orgCronTemplates as $tpl)
+                            <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-8">
+                                <div class="min-w-0">
+                                    <p class="font-medium text-brand-ink">{{ $tpl->name }}</p>
+                                    <p class="mt-1 font-mono text-xs text-brand-moss">{{ \Illuminate\Support\Str::limit($tpl->command, 100) }}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="button" wire:click="applyOrgCronTemplate('{{ $tpl->id }}')" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink">{{ __('Apply') }}</button>
+                                    @if ($canUpdateOrg)
+                                        <button type="button" wire:click="deleteOrgCronTemplate('{{ $tpl->id }}')" wire:confirm="{{ __('Delete this template?') }}" class="rounded-lg px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">{{ __('Delete') }}</button>
+                                    @endif
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
                 @endif
             </div>
-        </div>
+        </x-server-workspace-tab-panel>
 
-        <div
-            @class([
-                'hidden' => $cron_workspace_tab !== 'inspect',
-            ])
-            role="tabpanel"
+        @if ($canUpdateOrg)
+            <x-server-workspace-tab-panel
+                id="cron-panel-maintenance"
+                labelled-by="cron-tab-maintenance"
+                :hidden="$cron_workspace_tab !== 'maintenance'"
+            >
+                <div class="{{ $card }}">
+                    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Organization maintenance window') }}</h2>
+                        <p class="mt-1 text-xs text-brand-moss leading-relaxed">
+                            {{ __('Pauses installing managed cron lines for all servers in this organization until the chosen time. This is separate from saved job templates.') }}
+                        </p>
+                    </div>
+                    <div class="space-y-4 p-6 sm:p-8">
+                        <div>
+                            <x-input-label for="org_maintenance_until_local" value="{{ __('Until (local app timezone)') }}" />
+                            <input id="org_maintenance_until_local" type="datetime-local" wire:model="org_maintenance_until_local" class="mt-1 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm" />
+                        </div>
+                        <div>
+                            <x-input-label for="org_maintenance_note" value="{{ __('Note (optional)') }}" />
+                            <textarea id="org_maintenance_note" wire:model="org_maintenance_note" rows="2" class="mt-1 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm"></textarea>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                wire:click="saveOrgCronMaintenance"
+                                wire:loading.attr="disabled"
+                                wire:target="saveOrgCronMaintenance"
+                                class="inline-flex min-w-[8rem] items-center justify-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                            >
+                                <span wire:loading.remove wire:target="saveOrgCronMaintenance">{{ __('Save window') }}</span>
+                                <span wire:loading wire:target="saveOrgCronMaintenance" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="white" size="sm" />
+                                    {{ __('Saving…') }}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="clearOrgCronMaintenance"
+                                wire:loading.attr="disabled"
+                                wire:target="clearOrgCronMaintenance"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink disabled:opacity-50"
+                            >
+                                <span wire:loading.remove wire:target="clearOrgCronMaintenance">{{ __('Clear') }}</span>
+                                <span wire:loading wire:target="clearOrgCronMaintenance" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Clearing…') }}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </x-server-workspace-tab-panel>
+        @endif
+
+        <x-server-workspace-tab-panel
             id="cron-panel-inspect"
-            aria-labelledby="cron-tab-inspect"
-            aria-hidden="{{ $cron_workspace_tab !== 'inspect' ? 'true' : 'false' }}"
+            labelled-by="cron-tab-inspect"
+            :hidden="$cron_workspace_tab !== 'inspect'"
         >
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
@@ -744,11 +755,9 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </x-server-workspace-tab-panel>
     @else
-        <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
-            {{ __('Provisioning and SSH must be ready before you can use this section.') }}
-        </div>
+        @include('livewire.servers.partials.workspace-ops-not-ready')
     @endif
 
     <x-slot name="modals">

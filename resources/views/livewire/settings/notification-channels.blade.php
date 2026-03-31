@@ -175,8 +175,15 @@
                                                     type="button"
                                                     wire:click="sendTest({{ $channel->id }})"
                                                     wire:loading.attr="disabled"
-                                                    class="text-sm font-medium text-brand-sage hover:underline disabled:opacity-50"
-                                                >{{ __('Send test') }}</button>
+                                                    wire:target="sendTest"
+                                                    class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                                >
+                                                    <span wire:loading.remove wire:target="sendTest">{{ __('Send test') }}</span>
+                                                    <span wire:loading wire:target="sendTest" class="inline-flex items-center gap-1.5">
+                                                        <x-spinner variant="forest" size="sm" />
+                                                        {{ __('Sending…') }}
+                                                    </span>
+                                                </button>
                                                 <button type="button" wire:click="startEdit({{ $channel->id }})" class="text-sm font-medium text-brand-ink hover:underline">{{ __('Edit') }}</button>
                                                 <button
                                                     type="button"

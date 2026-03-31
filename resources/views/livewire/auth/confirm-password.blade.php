@@ -27,7 +27,10 @@
         <div class="pt-2 border-t border-brand-ink/10">
             <x-primary-button class="w-full sm:w-auto min-w-[8rem]" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="submit">{{ __('Confirm') }}</span>
-                <span wire:loading wire:target="submit">{{ __('Confirming…') }}</span>
+                <span wire:loading wire:target="submit" class="inline-flex items-center justify-center gap-2">
+                    <x-spinner variant="cream" />
+                    {{ __('Confirming…') }}
+                </span>
             </x-primary-button>
         </div>
     </form>

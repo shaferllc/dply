@@ -36,9 +36,9 @@ class WordpressDeployApiTest extends TestCase
             ->assertJsonPath('message', 'Unknown project_slug.');
     }
 
-    public function test_post_deploy_queues_and_stub_completes_sync_queue(): void
+    public function test_post_deploy_queues_and_engine_completes_sync_queue(): void
     {
-        $project = WordpressProject::factory()->create(['slug' => 'api-app', 'name' => 'API App']);
+        $project = WordpressProject::factory()->hosted()->create(['slug' => 'api-app', 'name' => 'API App']);
 
         $response = $this->postJson('/api/wordpress/deploy', [
             'project_slug' => 'api-app',
@@ -53,18 +53,42 @@ class WordpressDeployApiTest extends TestCase
         $id = (int) $response->json('id');
         $this->assertGreaterThan(0, $id);
 
+        $expectedRevision = hash('sha256', 'api-app|feature/x|8.3|API App');
+
         $deployment = WordpressDeployment::query()->findOrFail($id);
         $this->assertSame(WordpressDeployment::STATUS_SUCCEEDED, $deployment->status);
         $this->assertSame($project->id, $deployment->wordpress_project_id);
         $this->assertSame('feature/x', $deployment->git_ref);
-        $this->assertSame('wp-stub-revision-1', $deployment->revision_id);
+        $this->assertSame($expectedRevision, $deployment->revision_id);
         $this->assertNotNull($deployment->provisioner_output);
+        $out = json_decode((string) $deployment->provisioner_output, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('deployed', $out['status']);
+        $this->assertSame('hosted', $out['runtime']);
+    }
+
+    public function test_post_deploy_rejects_project_without_hosted_target(): void
+    {
+        WordpressProject::factory()->create([
+            'slug' => 'no-target',
+            'name' => 'No Target',
+            'settings' => ['runtime' => 'hosted'],
+        ]);
+
+        $this->postJson('/api/wordpress/deploy', [
+            'project_slug' => 'no-target',
+        ], [
+            'Authorization' => 'Bearer wordpress_test_api_token',
+        ])->assertStatus(422)
+            ->assertJsonPath(
+                'message',
+                'Hosted project requires settings.environment_id or settings.primary_url before deploy.'
+            );
     }
 
     public function test_deployments_index_filters_by_project_slug(): void
     {
-        $a = WordpressProject::factory()->create(['slug' => 'a', 'name' => 'A']);
-        $b = WordpressProject::factory()->create(['slug' => 'b', 'name' => 'B']);
+        $a = WordpressProject::factory()->hosted()->create(['slug' => 'a', 'name' => 'A']);
+        $b = WordpressProject::factory()->hosted()->create(['slug' => 'b', 'name' => 'B']);
         WordpressDeployment::factory()->create(['wordpress_project_id' => $a->id]);
         WordpressDeployment::factory()->create(['wordpress_project_id' => $b->id]);
 
@@ -92,7 +116,7 @@ class WordpressDeployApiTest extends TestCase
 
     public function test_idempotency_returns_same_deployment_when_active(): void
     {
-        WordpressProject::factory()->create(['slug' => 'idem', 'name' => 'Idem']);
+        WordpressProject::factory()->hosted()->create(['slug' => 'idem', 'name' => 'Idem']);
 
         $headers = [
             'Authorization' => 'Bearer wordpress_test_api_token',

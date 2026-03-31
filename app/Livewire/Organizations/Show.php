@@ -50,6 +50,10 @@ class Show extends Component
 
     public bool $int_evt_skipped = true;
 
+    public bool $int_evt_insight_opened = false;
+
+    public bool $int_evt_insight_resolved = false;
+
     public bool $deploy_email_notifications_enabled = true;
 
     public string $team_name = '';
@@ -349,6 +353,12 @@ class Show extends Component
         if ($this->int_evt_skipped) {
             $events[] = 'deploy_skipped';
         }
+        if ($this->int_evt_insight_opened) {
+            $events[] = 'insight_opened';
+        }
+        if ($this->int_evt_insight_resolved) {
+            $events[] = 'insight_resolved';
+        }
 
         IntegrationOutboundWebhook::query()->create([
             'organization_id' => $this->organization->id,
@@ -365,6 +375,8 @@ class Show extends Component
         $this->int_evt_success = true;
         $this->int_evt_failed = true;
         $this->int_evt_skipped = true;
+        $this->int_evt_insight_opened = false;
+        $this->int_evt_insight_resolved = false;
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Integration webhook saved.');
     }

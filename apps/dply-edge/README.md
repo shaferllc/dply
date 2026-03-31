@@ -6,6 +6,13 @@
 
 Fifth product app in the monorepo: **git-native JS and static** sites (control plane MVP: projects API, deploy records, stub engine). **Separate Laravel install and database** from BYO, Serverless, Cloud, and WordPress.
 
+## Marketing site (`/`)
+
+The default **`/`** route renders a branded landing page (Tailwind v4, same palette as the main dply app). **Log in**, **Register**, **Dashboard**, **Features**, **Pricing**, and **Docs** links target the **main BYO application** — set **`DPLY_MAIN_APP_URL`** in `.env` to that app’s origin (e.g. `https://dply.test`). Accounts use **Fortify on the main site**; this app does not duplicate web auth.
+
+- **`public/build`** (Vite output) is **committed** so the marketing layout loads without running Node on first clone. If you change `resources/css` or `resources/js`, run **`npm install && npm run build`** (or **`npm run dev`** while iterating).
+- Logo asset: `public/images/dply-logo.svg` (same mark as the root app).
+
 ## Local setup
 
 ```bash
@@ -18,6 +25,15 @@ php artisan migrate
 php artisan test
 php artisan serve
 ```
+
+### Troubleshooting
+
+- **HTTP 500** with `MissingAppKeyException` / “No application encryption key” in `storage/logs/laravel.log`: **`APP_KEY`** in **`apps/dply-edge/.env`** is empty or missing.
+  - **New setup:** copy **`.env.example`** to **`.env`** (the example includes a valid local **`APP_KEY`**).
+  - **Already have `.env`:** run **`php artisan key:generate --force`** from **`apps/dply-edge`**, or paste the **`APP_KEY=`** line from **`.env.example`** into your **`.env`**.
+  - Then run **`php artisan config:clear`** if you have ever run **`config:cache`**.
+- **Valet / Herd path:** the site must point at **`…/apps/dply-edge/public`**. Link from the app folder: **`cd apps/dply-edge && valet link dply-edge`** (not from the monorepo root). Wrong path → wrong **`.env`** → missing key.
+- **`ViteManifestNotFoundException`:** run **`npm install && npm run build`**, or use the committed **`public/build`** from the repo.
 
 ## Monorepo
 

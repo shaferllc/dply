@@ -15,6 +15,11 @@ return [
 
     'supervisor_conf_d' => env('DPLY_SUPERVISOR_CONF_D', '/etc/supervisor/conf.d'),
 
+    /**
+     * systemd unit for the Supervisor daemon (Debian/Ubuntu package is usually "supervisor").
+     */
+    'supervisor_systemd_unit' => env('DPLY_SUPERVISOR_SYSTEMD_UNIT', 'supervisor'),
+
     /*
     | Webhook signing: preferred format uses X-Dply-Timestamp (unix seconds) + body signed as
     | HMAC-SHA256 of "{timestamp}.{rawBody}". Legacy body-only HMAC is still accepted.

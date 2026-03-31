@@ -105,7 +105,7 @@ class ProcessRunner
         $output = new ProcessOutput;
 
         // Create a combined output handler that handles both callbacks and streaming
-        $combinedOutputHandler = function (string $type, string $buffer) use ($output, $onOutput, $process) {
+        $combinedOutputHandler = function (string $type, string $buffer) use ($onOutput, $process) {
             // Call the original output handler if provided
             if ($onOutput !== null) {
                 $onOutput($type, $buffer);
@@ -116,8 +116,9 @@ class ProcessRunner
                 'command' => $process->command,
             ]);
 
-            // Update the ProcessOutput buffer
-            $output($type, $buffer);
+            // Do not call $output($type, $buffer) here: ProcessOutput::__invoke already appended
+            // $buffer before invoking this callback; calling __invoke again re-enters recursively
+            // and repeats streaming / onOutput once per nesting level (duplicate log lines).
         };
 
         if ($onOutput !== null) {

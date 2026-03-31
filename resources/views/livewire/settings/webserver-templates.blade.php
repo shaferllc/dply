@@ -78,9 +78,14 @@
                             type="button"
                             wire:click="testDraft"
                             wire:loading.attr="disabled"
-                            class="inline-flex items-center rounded-lg border border-brand-mist bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            wire:target="testDraft"
+                            class="inline-flex min-w-[8rem] items-center justify-center gap-2 rounded-lg border border-brand-mist bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
                         >
-                            {{ __('Test template') }}
+                            <span wire:loading.remove wire:target="testDraft" class="inline-flex items-center gap-2">{{ __('Test template') }}</span>
+                            <span wire:loading wire:target="testDraft" class="inline-flex items-center gap-2">
+                                <x-spinner variant="forest" size="sm" />
+                                {{ __('Testing…') }}
+                            </span>
                         </button>
                         @if ($editingId)
                             <button type="button" wire:click="cancelEdit" class="text-sm font-medium text-brand-moss hover:text-brand-ink">
@@ -91,9 +96,14 @@
                             type="button"
                             wire:click="save"
                             wire:loading.attr="disabled"
-                            class="inline-flex items-center rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-ink/90"
+                            wire:target="save"
+                            class="inline-flex min-w-[8rem] items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-ink/90 disabled:opacity-50"
                         >
-                            {{ $editingId ? __('Save changes') : __('Create') }}
+                            <span wire:loading.remove wire:target="save">{{ $editingId ? __('Save changes') : __('Create') }}</span>
+                            <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Saving…') }}
+                            </span>
                         </button>
                     </div>
                 @endif
@@ -129,9 +139,14 @@
                                 type="button"
                                 wire:click="testSaved({{ $template->id }})"
                                 wire:loading.attr="disabled"
-                                class="inline-flex items-center rounded-lg border border-brand-mist bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                                wire:target="testSaved"
+                                class="inline-flex min-w-[7rem] items-center justify-center gap-2 rounded-lg border border-brand-mist bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                             >
-                                {{ __('Test template') }}
+                                <span wire:loading.remove wire:target="testSaved">{{ __('Test template') }}</span>
+                                <span wire:loading wire:target="testSaved" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Testing…') }}
+                                </span>
                             </button>
                             @if ($canManage)
                                 <button

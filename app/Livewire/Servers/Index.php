@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Actions\Servers\DeleteServerAction;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\Server;
+use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -261,7 +262,7 @@ class Index extends Component
         };
     }
 
-    public function render(): View
+    public function render(OrganizationInsightsMetricsService $insightsMetrics): View
     {
         $base = $this->baseQuery();
         $hasServersInScope = $base !== null && (clone $base)->exists();
@@ -270,6 +271,10 @@ class Index extends Component
             : collect();
 
         $groupedServers = $this->groupedServers($servers);
+
+        $insightRollup = $servers->isNotEmpty()
+            ? $insightsMetrics->perServerRollup($servers->pluck('id'))
+            : collect();
 
         $deleteModalServer = $this->deleteModalServerId
             ? Server::query()->find($this->deleteModalServerId)
@@ -282,6 +287,7 @@ class Index extends Component
             'hasServersInScope' => $hasServersInScope,
             'servers' => $servers,
             'groupedServers' => $groupedServers,
+            'insightRollup' => $insightRollup,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
             'sortOptions' => config('user_preferences.server_sort_options', []),

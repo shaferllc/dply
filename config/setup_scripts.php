@@ -14,7 +14,10 @@ return [
             'commands' => [
                 'export DEBIAN_FRONTEND=noninteractive',
                 'apt-get update -y',
-                'apt-get install -y php-cli php-fpm php-mbstring php-xml php-mysql php-curl php-zip unzip git',
+                // Laravel server requirements + typical stack: DB drivers, Redis, images, intl, sodium.
+                'apt-get install -y ca-certificates curl git unzip '
+                    .'php-bcmath php-cli php-curl php-fpm php-gd php-intl php-mbstring php-mysql '
+                    .'php-pgsql php-redis php-sodium php-sqlite3 php-xml php-zip',
                 'curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer',
             ],
         ],
@@ -30,7 +33,9 @@ return [
             'commands' => [
                 'export DEBIAN_FRONTEND=noninteractive',
                 'apt-get update -y',
-                'apt-get install -y php-cli php-fpm php-mbstring php-xml php-mysql php-curl php-zip unzip git',
+                'apt-get install -y ca-certificates curl git unzip '
+                    .'php-bcmath php-cli php-curl php-fpm php-gd php-intl php-mbstring php-mysql '
+                    .'php-pgsql php-redis php-sodium php-sqlite3 php-xml php-zip',
                 'curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer',
                 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash -',
                 'apt-get install -y nodejs',

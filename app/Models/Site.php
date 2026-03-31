@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Str;
 
 class Site extends Model
@@ -252,6 +253,16 @@ class Site extends Model
     public function notificationSubscriptions(): MorphMany
     {
         return $this->morphMany(NotificationSubscription::class, 'subscribable');
+    }
+
+    public function insightSetting(): MorphOne
+    {
+        return $this->morphOne(InsightSetting::class, 'settingsable');
+    }
+
+    public function insightFindings(): HasMany
+    {
+        return $this->hasMany(InsightFinding::class)->orderByDesc('detected_at');
     }
 
     public function ensureUniqueSlug(): void

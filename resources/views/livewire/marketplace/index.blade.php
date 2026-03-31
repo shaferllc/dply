@@ -79,9 +79,14 @@
                                         type="button"
                                         wire:click="importWebserverTemplate('{{ $item->id }}')"
                                         wire:loading.attr="disabled"
-                                        class="inline-flex items-center rounded-lg bg-brand-ink px-3 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-ink/90"
+                                        wire:target="importWebserverTemplate"
+                                        class="inline-flex min-w-[8.5rem] items-center justify-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-ink/90 disabled:opacity-50"
                                     >
-                                        {{ __('Import to org') }}
+                                        <span wire:loading.remove wire:target="importWebserverTemplate">{{ __('Import to org') }}</span>
+                                        <span wire:loading wire:target="importWebserverTemplate" class="inline-flex items-center gap-2">
+                                            <x-spinner variant="cream" size="sm" />
+                                            {{ __('Importing…') }}
+                                        </span>
                                     </button>
                                 @else
                                     <span class="text-xs text-brand-moss">{{ __('Org admin only') }}</span>

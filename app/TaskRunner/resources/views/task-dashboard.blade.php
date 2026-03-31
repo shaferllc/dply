@@ -345,6 +345,8 @@
     </div>
 
     @livewireScripts
+
+    @include('task-runner::partials.task-runner-modals')
     
     <script>
         // Task templates
@@ -459,13 +461,13 @@ uptime | awk -F'load average:' '{print $2}'`,
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert('Task started successfully!');
+                    TaskRunnerModal.showAlert('Task started', 'Task started successfully.', 'success');
                     refreshTasks();
                 } else {
-                    alert('Error: ' + (result.error || 'Failed to start task'));
+                    TaskRunnerModal.showAlert('Could not start task', (result.error || 'Failed to start task'), 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                TaskRunnerModal.showAlert('Error', error.message, 'error');
             }
         });
 
@@ -556,7 +558,8 @@ uptime | awk -F'load average:' '{print $2}'`,
         }
 
         async function cancelTask(taskId) {
-            if (!confirm('Are you sure you want to cancel this task?')) return;
+            const ok = await TaskRunnerModal.showConfirm('Are you sure you want to cancel this task?', 'Cancel task');
+            if (!ok) return;
 
             try {
                 const response = await fetch(`/api/tasks/${taskId}/cancel`, {
@@ -567,13 +570,13 @@ uptime | awk -F'load average:' '{print $2}'`,
                 });
 
                 if (response.ok) {
-                    alert('Task cancelled successfully!');
+                    TaskRunnerModal.showAlert('Task cancelled', 'The task was cancelled successfully.', 'success');
                     refreshTasks();
                 } else {
-                    alert('Error cancelling task');
+                    TaskRunnerModal.showAlert('Could not cancel', 'Error cancelling task.', 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                TaskRunnerModal.showAlert('Error', error.message, 'error');
             }
         }
 
@@ -582,7 +585,7 @@ uptime | awk -F'load average:' '{print $2}'`,
             const command = document.getElementById('taskCommand').value;
             
             if (!name || !command) {
-                alert('Please fill in task name and command');
+                TaskRunnerModal.showAlert('Missing fields', 'Please fill in task name and command.', 'warning');
                 return;
             }
 
@@ -591,7 +594,7 @@ uptime | awk -F'load average:' '{print $2}'`,
             savedTasks.push({ name, command, timestamp: new Date().toISOString() });
             localStorage.setItem('savedTasks', JSON.stringify(savedTasks));
             
-            alert('Task saved successfully!');
+            TaskRunnerModal.showAlert('Saved', 'Task saved successfully.', 'success');
         }
 
         // Initialize

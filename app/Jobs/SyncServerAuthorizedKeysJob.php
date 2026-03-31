@@ -24,6 +24,6 @@ class SyncServerAuthorizedKeysJob implements ShouldQueue
             return;
         }
 
-        $synchronizer->sync($server);
+        $synchronizer->sync($server, null, null);
     }
 }

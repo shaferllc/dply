@@ -5,6 +5,7 @@ namespace App\Livewire\Sites;
 use App\Jobs\InstallSiteNginxJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
@@ -200,7 +201,9 @@ class Show extends Component
         try {
             RunSiteDeploymentJob::dispatchSync($this->site, SiteDeployment::TRIGGER_MANUAL);
             $this->site->refresh();
-            $this->flash_success = 'Deployment finished.';
+            $this->flash_success = config('insights.queue_after_deploy', true)
+                ? __('Deployment finished. Server and site insight runs have been queued.')
+                : __('Deployment finished.');
         } catch (\Throwable $e) {
             $this->flash_error = $e->getMessage();
         }
@@ -210,7 +213,10 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
-        $this->flash_success = 'Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.';
+        $base = __('Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.');
+        $this->flash_success = config('insights.queue_after_deploy', true)
+            ? $base.' '.__('After a successful deploy, server and site insight runs are queued automatically.')
+            : $base;
         $this->flash_error = null;
     }
 
@@ -553,8 +559,14 @@ class Show extends Component
             'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
         ]);
 
+        $openSiteInsightsCount = InsightFinding::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->count();
+
         return view('livewire.sites.show', [
             'deployHookUrl' => $this->site->deployHookUrl(),
+            'openSiteInsightsCount' => $openSiteInsightsCount,
         ]);
     }
 }

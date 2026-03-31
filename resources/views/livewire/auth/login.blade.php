@@ -65,7 +65,10 @@
             </a>
             <x-primary-button class="w-full sm:w-auto min-w-[8rem]" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="submit">{{ __('Log in') }}</span>
-                <span wire:loading wire:target="submit">{{ __('Logging in…') }}</span>
+                <span wire:loading wire:target="submit" class="inline-flex items-center justify-center gap-2">
+                    <x-spinner variant="cream" />
+                    {{ __('Logging in…') }}
+                </span>
             </x-primary-button>
         </div>
     </form>

@@ -36,7 +36,10 @@
                                 class="text-sm font-medium text-brand-sage hover:text-brand-ink"
                             >
                                 <span wire:loading.remove wire:target="verifyCredential">{{ __('Verify') }}</span>
-                                <span wire:loading wire:target="verifyCredential">{{ __('Verifying…') }}</span>
+                                <span wire:loading wire:target="verifyCredential" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Verifying…') }}
+                                </span>
                             </button>
                         @endif
                         <button type="button" wire:click="destroy({{ $cred->id }})" wire:confirm="{{ __('Remove this credential?') }}" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Remove') }}</button>
@@ -87,7 +90,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeDigitalOcean">{{ __('Connect DigitalOcean') }}</span>
-                        <span wire:loading wire:target="storeDigitalOcean">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeDigitalOcean" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>
@@ -110,7 +116,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeHetzner">{{ __('Connect Hetzner') }}</span>
-                        <span wire:loading wire:target="storeHetzner">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeHetzner" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>
@@ -133,7 +142,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeLinode">{{ __('Connect Linode') }}</span>
-                        <span wire:loading wire:target="storeLinode">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeLinode" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>
@@ -156,7 +168,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeVultr">{{ __('Connect Vultr') }}</span>
-                        <span wire:loading wire:target="storeVultr">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeVultr" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>
@@ -180,7 +195,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeAkamai">{{ __('Connect Akamai') }}</span>
-                        <span wire:loading wire:target="storeAkamai">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeAkamai" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>
@@ -208,7 +226,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeEquinixMetal">{{ __('Connect Equinix Metal') }}</span>
-                        <span wire:loading wire:target="storeEquinixMetal">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeEquinixMetal" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>
@@ -236,7 +257,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeUpCloud">{{ __('Connect UpCloud') }}</span>
-                        <span wire:loading wire:target="storeUpCloud">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeUpCloud" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>
@@ -264,7 +288,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeScaleway">{{ __('Connect Scaleway') }}</span>
-                        <span wire:loading wire:target="storeScaleway">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeScaleway" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>
@@ -336,7 +363,10 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="storeFlyIo">{{ __('Connect Fly.io') }}</span>
-                        <span wire:loading wire:target="storeFlyIo">{{ __('Connecting…') }}</span>
+                        <span wire:loading wire:target="storeFlyIo" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
                     </x-primary-button>
                 </form>
             </div>

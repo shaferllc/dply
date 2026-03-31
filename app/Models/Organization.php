@@ -27,6 +27,10 @@ class Organization extends Model
         'default_site_script_id',
         'cron_maintenance_until',
         'cron_maintenance_note',
+        'firewall_settings',
+        'database_workspace_settings',
+        'insights_preferences',
+        'services_preferences',
     ];
 
     protected function casts(): array
@@ -36,6 +40,10 @@ class Organization extends Model
             'deploy_email_notifications_enabled' => 'boolean',
             'server_site_preferences' => 'array',
             'cron_maintenance_until' => 'datetime',
+            'firewall_settings' => 'array',
+            'database_workspace_settings' => 'array',
+            'insights_preferences' => 'array',
+            'services_preferences' => 'array',
         ];
     }
 
@@ -99,6 +107,108 @@ class Organization extends Model
     }
 
     /**
+     * Organization firewall JSON merged with config defaults (known keys only).
+     *
+     * @return array{require_second_approval: bool, notify_drift_webhook: bool, synthetic_probe_url: ?string}
+     */
+    public function mergedFirewallSettings(): array
+    {
+        $defaults = config('server_firewall.organization_settings', []);
+        $keys = array_keys($defaults);
+        $stored = $this->firewall_settings ?? [];
+
+        return array_merge($defaults, array_intersect_key($stored, array_flip($keys)));
+    }
+
+    /**
+     * Database workspace policy merged with config defaults (credential shares, import caps).
+     *
+     * @return array{credential_shares_enabled: bool, import_max_bytes: int|null}
+     */
+    public function mergedDatabaseWorkspaceSettings(): array
+    {
+        $defaults = config('server_database.organization_defaults', []);
+        $keys = array_keys($defaults);
+        $stored = $this->database_workspace_settings ?? [];
+
+        return array_merge($defaults, array_intersect_key($stored, array_flip($keys)));
+    }
+
+    /**
+     * @return array{digest_non_critical: bool, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     */
+    public function mergedInsightsPreferences(): array
+    {
+        $defaults = config('insights.organization_defaults', []);
+        $stored = is_array($this->insights_preferences) ? $this->insights_preferences : [];
+
+        return array_replace_recursive($defaults, $stored);
+    }
+
+    /**
+     * @return array{
+     *     deployer_systemd_actions_enabled: bool,
+     *     systemd_notifications_digest: 'immediate'|'hourly',
+     *     systemd_status_only_units: list<string>
+     * }
+     */
+    public function mergedServicesPreferences(): array
+    {
+        $defaults = config('server_services.organization_defaults', []);
+        if (! is_array($defaults)) {
+            $defaults = [];
+        }
+        $stored = is_array($this->services_preferences) ? $this->services_preferences : [];
+
+        $merged = array_replace_recursive($defaults, $stored);
+        $digest = (string) ($merged['systemd_notifications_digest'] ?? 'immediate');
+        if (! in_array($digest, ['immediate', 'hourly'], true)) {
+            $digest = 'immediate';
+        }
+        $norm = static function (mixed $v): string {
+            if (! is_string($v)) {
+                return '';
+            }
+
+            return strtolower(trim(str_replace('.service', '', $v)));
+        };
+        $globalOnly = config('server_services.systemd_status_only_units', []);
+        $globalOnly = is_array($globalOnly) ? $globalOnly : [];
+        $fromGlobal = array_filter(array_map($norm, $globalOnly), static fn (string $v) => $v !== '');
+        $statusOnly = $merged['systemd_status_only_units'] ?? [];
+        if (! is_array($statusOnly)) {
+            $statusOnly = [];
+        }
+        $fromOrg = array_filter(array_map($norm, $statusOnly), static fn (string $v) => $v !== '');
+        $statusOnly = array_values(array_unique(array_merge($fromGlobal, $fromOrg)));
+
+        return [
+            'deployer_systemd_actions_enabled' => (bool) ($merged['deployer_systemd_actions_enabled'] ?? false),
+            'systemd_notifications_digest' => $digest,
+            'systemd_status_only_units' => $statusOnly,
+        ];
+    }
+
+    public function allowsDatabaseCredentialShares(): bool
+    {
+        return (bool) ($this->mergedDatabaseWorkspaceSettings()['credential_shares_enabled'] ?? true);
+    }
+
+    /**
+     * Effective SQL import size limit for this org (bytes), never above app import_max_bytes.
+     */
+    public function databaseImportMaxBytes(): int
+    {
+        $global = (int) config('server_database.import_max_bytes', 10485760);
+        $raw = $this->mergedDatabaseWorkspaceSettings()['import_max_bytes'] ?? null;
+        if ($raw === null || $raw === '') {
+            return $global;
+        }
+
+        return min(max((int) $raw, 1024), $global);
+    }
+
+    /**
      * Whether deploy-related email (immediate or digest) should go to org stakeholders.
      * Global app config still disables all deploy notifications when off.
      */
@@ -152,6 +262,11 @@ class Organization extends Model
     public function supervisorProgramTemplates(): HasMany
     {
         return $this->hasMany(OrganizationSupervisorProgramTemplate::class);
+    }
+
+    public function firewallRuleTemplates(): HasMany
+    {
+        return $this->hasMany(FirewallRuleTemplate::class);
     }
 
     public function defaultSiteScript(): BelongsTo

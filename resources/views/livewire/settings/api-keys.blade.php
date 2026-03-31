@@ -178,7 +178,10 @@
                                 class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:opacity-50"
                             >
                                 <span wire:loading.remove wire:target="createToken">{{ __('Create') }}</span>
-                                <span wire:loading wire:target="createToken">{{ __('Creating…') }}</span>
+                                <span wire:loading wire:target="createToken" class="inline-flex items-center justify-center gap-2">
+                                    <x-spinner variant="cream" />
+                                    {{ __('Creating…') }}
+                                </span>
                             </button>
                         </div>
                     </div>

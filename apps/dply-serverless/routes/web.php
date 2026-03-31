@@ -4,10 +4,30 @@ use App\Features\ServerlessFeature;
 use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Deploy\ServerlessDeployContext;
 use Dply\Core\Security\WebhookSignature;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return view('home');
+})->name('home');
+
+Route::get('/health', function () {
+    try {
+        DB::connection()->getPdo();
+        $database = true;
+    } catch (Throwable) {
+        $database = false;
+    }
+
+    $ok = $database;
+
+    return response()->json([
+        'app' => 'dply-serverless',
+        'ok' => $ok,
+        'checks' => [
+            'database' => $database,
+        ],
+    ], $ok ? 200 : 503);
 });
 
 Route::view('/serverless', 'serverless.overview')

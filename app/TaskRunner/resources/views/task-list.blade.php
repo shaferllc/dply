@@ -231,6 +231,8 @@
     </div>
 
     @livewireScripts
+
+    @include('task-runner::partials.task-runner-modals')
     
     <script>
         let currentPage = 1;
@@ -443,7 +445,8 @@
         }
 
         async function cancelTask(taskId) {
-            if (!confirm('Are you sure you want to cancel this task?')) return;
+            const ok = await TaskRunnerModal.showConfirm('Are you sure you want to cancel this task?', 'Cancel task');
+            if (!ok) return;
 
             try {
                 const response = await fetch(`/api/tasks/${taskId}/cancel`, {
@@ -454,18 +457,19 @@
                 });
 
                 if (response.ok) {
-                    alert('Task cancelled successfully!');
+                    TaskRunnerModal.showAlert('Task cancelled', 'The task was cancelled successfully.', 'success');
                     loadTasks();
                 } else {
-                    alert('Error cancelling task');
+                    TaskRunnerModal.showAlert('Could not cancel', 'Error cancelling task.', 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                TaskRunnerModal.showAlert('Error', error.message, 'error');
             }
         }
 
         async function deleteTask(taskId) {
-            if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) return;
+            const ok = await TaskRunnerModal.showConfirm('Are you sure you want to delete this task? This action cannot be undone.', 'Delete task');
+            if (!ok) return;
 
             try {
                 const response = await fetch(`/api/tasks/${taskId}`, {
@@ -476,13 +480,13 @@
                 });
 
                 if (response.ok) {
-                    alert('Task deleted successfully!');
+                    TaskRunnerModal.showAlert('Task deleted', 'The task was deleted successfully.', 'success');
                     loadTasks();
                 } else {
-                    alert('Error deleting task');
+                    TaskRunnerModal.showAlert('Could not delete', 'Error deleting task.', 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                TaskRunnerModal.showAlert('Error', error.message, 'error');
             }
         }
 
@@ -501,7 +505,8 @@
         }
 
         async function clearCompleted() {
-            if (!confirm('Are you sure you want to clear all completed tasks? This action cannot be undone.')) return;
+            const ok = await TaskRunnerModal.showConfirm('Are you sure you want to clear all completed tasks? This action cannot be undone.', 'Clear completed tasks');
+            if (!ok) return;
 
             try {
                 const response = await fetch('/api/tasks/clear-completed', {
@@ -512,13 +517,13 @@
                 });
 
                 if (response.ok) {
-                    alert('Completed tasks cleared successfully!');
+                    TaskRunnerModal.showAlert('Cleared', 'Completed tasks were cleared successfully.', 'success');
                     loadTasks();
                 } else {
-                    alert('Error clearing completed tasks');
+                    TaskRunnerModal.showAlert('Could not clear', 'Error clearing completed tasks.', 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                TaskRunnerModal.showAlert('Error', error.message, 'error');
             }
         }
 

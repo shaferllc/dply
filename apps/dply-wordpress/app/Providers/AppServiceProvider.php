@@ -3,7 +3,10 @@
 namespace App\Providers;
 
 use App\Contracts\DeployEngine;
+use App\Contracts\HostedWordpressProvisioner;
 use App\Services\Deploy\WordpressDeployEngine;
+use App\Services\Wordpress\Provisioners\LocalHostedWordpressProvisioner;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -13,6 +16,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(HostedWordpressProvisioner::class, LocalHostedWordpressProvisioner::class);
         $this->app->singleton(DeployEngine::class, WordpressDeployEngine::class);
     }
 
@@ -21,6 +25,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        View::share('dplyMainUrl', (string) config('dply.main_app_url'));
     }
 }

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\Servers\ServerManageSshExecutor;
+use App\Services\Servers\ServerMetricsGuestPushService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -134,6 +135,13 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => null,
                 'flash_success' => $this->flashSuccessMessage,
             ]);
+
+            if ($this->taskName === 'services-install:install_monitoring_prerequisites') {
+                $server = Server::query()->find($this->serverId);
+                if ($server !== null) {
+                    app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
+                }
+            }
         } catch (ManageRemoteTaskSupersededException) {
             $trimmed = trim(ServerManageSshExecutor::stripSshClientNoise($fullOutput));
             $this->mergePayload([

@@ -89,7 +89,13 @@
                             </div>
                             <x-input-error :messages="$errors->get('selected_server_ids')" class="mt-2" />
                             <div class="flex justify-end">
-                                <x-primary-button type="button" wire:click="runOnServers" wire:loading.attr="disabled">{{ __('Run script') }}</x-primary-button>
+                                <x-primary-button type="button" wire:click="runOnServers" wire:loading.attr="disabled">
+                                    <span wire:loading.remove wire:target="runOnServers">{{ __('Run script') }}</span>
+                                    <span wire:loading wire:target="runOnServers" class="inline-flex items-center justify-center gap-2">
+                                        <x-spinner variant="cream" size="sm" />
+                                        {{ __('Running…') }}
+                                    </span>
+                                </x-primary-button>
                             </div>
                         @endif
 

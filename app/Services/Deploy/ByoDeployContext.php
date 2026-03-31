@@ -17,6 +17,6 @@ final class ByoDeployContext
         public readonly Project $project,
         public readonly string $trigger,
         public readonly ?string $apiIdempotencyHash = null,
-        public readonly ?int $auditUserId = null,
+        public readonly ?string $auditUserId = null,
     ) {}
 }

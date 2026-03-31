@@ -19,7 +19,7 @@ class WordpressDeploymentFactory extends Factory
     public function definition(): array
     {
         return [
-            'wordpress_project_id' => WordpressProject::factory(),
+            'wordpress_project_id' => WordpressProject::factory()->hosted(),
             'application_name' => fake()->slug(),
             'php_version' => '8.3',
             'git_ref' => 'main',

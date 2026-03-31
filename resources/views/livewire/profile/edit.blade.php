@@ -138,7 +138,10 @@
                 <p x-show="profileSaved" x-transition class="text-sm text-brand-moss">{{ __('Saved.') }}</p>
                 <x-primary-button type="button" wire:click="updateProfile" wire:loading.attr="disabled">
                     <span wire:loading.remove wire:target="updateProfile">{{ __('Save profile') }}</span>
-                    <span wire:loading wire:target="updateProfile">{{ __('Saving…') }}</span>
+                    <span wire:loading wire:target="updateProfile" class="inline-flex items-center justify-center gap-2">
+                        <x-spinner variant="cream" />
+                        {{ __('Saving…') }}
+                    </span>
                 </x-primary-button>
             </div>
         </div>
@@ -200,7 +203,10 @@
                 <p x-show="billingSaved" x-transition class="text-sm text-brand-moss">{{ __('Saved.') }}</p>
                 <x-primary-button type="button" wire:click="updateBilling" wire:loading.attr="disabled">
                     <span wire:loading.remove wire:target="updateBilling">{{ __('Save billing details') }}</span>
-                    <span wire:loading wire:target="updateBilling">{{ __('Saving…') }}</span>
+                    <span wire:loading wire:target="updateBilling" class="inline-flex items-center justify-center gap-2">
+                        <x-spinner variant="cream" />
+                        {{ __('Saving…') }}
+                    </span>
                 </x-primary-button>
             </div>
         </div>

@@ -90,7 +90,10 @@
                     <div>
                         <x-primary-button type="button" wire:click="createKey" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="createKey">{{ __('Create') }}</span>
-                            <span wire:loading wire:target="createKey">{{ __('Saving…') }}</span>
+                            <span wire:loading wire:target="createKey" class="inline-flex items-center justify-center gap-2">
+                                <x-spinner variant="cream" />
+                                {{ __('Saving…') }}
+                            </span>
                         </x-primary-button>
                     </div>
                 </div>
@@ -160,7 +163,10 @@
                     <button type="button" wire:click="cancelEdit" class="px-4 py-2 text-sm font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                     <x-primary-button type="button" wire:click="saveEdit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="saveEdit">{{ __('Save') }}</span>
-                        <span wire:loading wire:target="saveEdit">{{ __('Saving…') }}</span>
+                        <span wire:loading wire:target="saveEdit" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Saving…') }}
+                        </span>
                     </x-primary-button>
                 </div>
             </div>
@@ -192,7 +198,10 @@
                     <button type="button" wire:click="cancelDeploy" class="px-4 py-2 text-sm font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                     <x-primary-button type="button" wire:click="confirmDeploy" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="confirmDeploy">{{ __('Deploy') }}</span>
-                        <span wire:loading wire:target="confirmDeploy">{{ __('Deploying…') }}</span>
+                        <span wire:loading wire:target="confirmDeploy" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Deploying…') }}
+                        </span>
                     </x-primary-button>
                 </div>
             </div>

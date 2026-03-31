@@ -69,7 +69,10 @@
                     <p x-show="passwordSaved" x-transition class="text-sm text-brand-moss">{{ __('Saved.') }}</p>
                     <x-primary-button type="submit" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="updatePassword">{{ __('Save password') }}</span>
-                        <span wire:loading wire:target="updatePassword">{{ __('Saving…') }}</span>
+                        <span wire:loading wire:target="updatePassword" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Saving…') }}
+                        </span>
                     </x-primary-button>
                 </div>
             </form>

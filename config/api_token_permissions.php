@@ -20,7 +20,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'presets' => [
-        'read' => ['servers.read', 'sites.read'],
+        'read' => ['servers.read', 'sites.read', 'insights.read'],
         'deploy' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy'],
         'ops' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy', 'commands.run'],
         'full' => ['*'],
@@ -51,6 +51,20 @@ return [
         'sites.deploy' => 'sites.deploy',
         'sites.deployments' => 'sites.read',
         'sites.deployment_show' => 'sites.read',
+        'firewall.show' => 'network.read',
+        'firewall.preview' => 'network.read',
+        'firewall.drift' => 'network.read',
+        'firewall.terraform' => 'network.read',
+        'firewall.iptables' => 'network.read',
+        'firewall.export' => 'network.read',
+        'firewall.apply' => 'network.write',
+        'firewall.import' => 'network.write',
+        'firewall.bundled_apply' => 'network.write',
+        'firewall.template_apply' => 'network.write',
+        'firewall.snapshot_create' => 'network.write',
+        'firewall.snapshot_restore' => 'network.write',
+        'insights.server_findings' => 'insights.read',
+        'insights.org_summary' => 'insights.read',
     ],
 
     'categories' => [
@@ -167,6 +181,13 @@ return [
             'label' => 'Email',
             'permissions' => [
                 ['ability' => 'email.send', 'label' => 'Send'],
+            ],
+        ],
+        [
+            'id' => 'insights',
+            'label' => 'Insights',
+            'permissions' => [
+                ['ability' => 'insights.read', 'label' => 'Read'],
             ],
         ],
     ],

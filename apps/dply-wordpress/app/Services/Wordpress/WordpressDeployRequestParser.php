@@ -3,11 +3,16 @@
 namespace App\Services\Wordpress;
 
 use App\Models\WordpressProject;
+use App\Services\Wordpress\Validation\HostedWordpressProjectSettingsValidator;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 final class WordpressDeployRequestParser
 {
+    public function __construct(
+        private HostedWordpressProjectSettingsValidator $hostedSettings,
+    ) {}
+
     /**
      * @return array{wordpress_project_id: int, application_name: string, php_version: string, git_ref: string, idempotency_key: string|null}
      */
@@ -24,6 +29,8 @@ final class WordpressDeployRequestParser
         if ($project === null) {
             throw new InvalidArgumentException('Unknown project_slug.');
         }
+
+        $this->hostedSettings->assertDeployable($project);
 
         $defaultPhp = (string) config('wordpress.default_php_version', '8.3');
         $defaultGitRef = (string) config('wordpress.default_git_ref', 'main');

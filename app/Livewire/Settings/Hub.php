@@ -24,6 +24,14 @@ class Hub extends Component
     /** @var array<string, mixed> */
     public array $organizationServerSite = [];
 
+    /** @var array{require_second_approval: bool, notify_drift_webhook: bool, synthetic_probe_url: string} */
+    public array $organizationFirewall = [];
+
+    /**
+     * @var array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     */
+    public array $organizationInsights = [];
+
     /** @var array<string, mixed> */
     public array $teamServerSite = [];
 
@@ -86,6 +94,8 @@ class Hub extends Component
 
         if (! $org instanceof Organization) {
             $this->organizationServerSite = $orgDefaults;
+            $this->organizationFirewall = $this->defaultOrganizationFirewallState();
+            $this->organizationInsights = $this->defaultInsightsState();
             $this->teamServerSite = $teamDefaults;
             $this->selectedTeamId = null;
 
@@ -93,6 +103,8 @@ class Hub extends Component
         }
 
         $this->organizationServerSite = $org->mergedServerSitePreferences();
+        $this->organizationFirewall = $this->organizationFirewallStateFromOrg($org);
+        $this->organizationInsights = $this->insightsStateFromOrg($org);
 
         $teams = $org->teams()->orderBy('name')->get();
         if ($teams->isEmpty()) {
@@ -111,6 +123,71 @@ class Hub extends Component
         $this->teamServerSite = $team instanceof Team
             ? $team->mergedTeamPreferences()
             : $teamDefaults;
+    }
+
+    /**
+     * @return array{require_second_approval: bool, notify_drift_webhook: bool, synthetic_probe_url: string}
+     */
+    protected function defaultOrganizationFirewallState(): array
+    {
+        $defaults = config('server_firewall.organization_settings', []);
+
+        return [
+            'require_second_approval' => (bool) ($defaults['require_second_approval'] ?? false),
+            'notify_drift_webhook' => (bool) ($defaults['notify_drift_webhook'] ?? false),
+            'synthetic_probe_url' => isset($defaults['synthetic_probe_url']) && is_string($defaults['synthetic_probe_url'])
+                ? $defaults['synthetic_probe_url']
+                : '',
+        ];
+    }
+
+    /**
+     * @return array{require_second_approval: bool, notify_drift_webhook: bool, synthetic_probe_url: string}
+     */
+    protected function organizationFirewallStateFromOrg(Organization $org): array
+    {
+        $m = $org->mergedFirewallSettings();
+        $url = $m['synthetic_probe_url'] ?? null;
+
+        return [
+            'require_second_approval' => (bool) ($m['require_second_approval'] ?? false),
+            'notify_drift_webhook' => (bool) ($m['notify_drift_webhook'] ?? false),
+            'synthetic_probe_url' => is_string($url) && $url !== '' ? $url : '',
+        ];
+    }
+
+    /**
+     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     */
+    protected function defaultInsightsState(): array
+    {
+        $d = config('insights.organization_defaults', []);
+        $freq = ($d['digest_frequency'] ?? 'daily') === 'weekly' ? 'weekly' : 'daily';
+
+        return [
+            'digest_non_critical' => (bool) ($d['digest_non_critical'] ?? false),
+            'digest_frequency' => $freq,
+            'quiet_hours_enabled' => (bool) ($d['quiet_hours_enabled'] ?? false),
+            'quiet_hours_start' => (int) ($d['quiet_hours_start'] ?? 22),
+            'quiet_hours_end' => (int) ($d['quiet_hours_end'] ?? 7),
+        ];
+    }
+
+    /**
+     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     */
+    protected function insightsStateFromOrg(Organization $org): array
+    {
+        $m = $org->mergedInsightsPreferences();
+        $freq = ($m['digest_frequency'] ?? 'daily') === 'weekly' ? 'weekly' : 'daily';
+
+        return [
+            'digest_non_critical' => (bool) ($m['digest_non_critical'] ?? false),
+            'digest_frequency' => $freq,
+            'quiet_hours_enabled' => (bool) ($m['quiet_hours_enabled'] ?? false),
+            'quiet_hours_start' => (int) ($m['quiet_hours_start'] ?? 22),
+            'quiet_hours_end' => (int) ($m['quiet_hours_end'] ?? 7),
+        ];
     }
 
     public function saveProfile(): void
@@ -169,6 +246,90 @@ class Hub extends Component
         $this->organizationServerSite = $org->fresh()->mergedServerSitePreferences();
 
         session()->flash('success', __('Organization settings saved.'));
+    }
+
+    public function saveOrganizationFirewall(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $org = $user->currentOrganization();
+
+        if (! $org instanceof Organization) {
+            session()->flash('error', __('Select or create an organization to save firewall settings.'));
+
+            return;
+        }
+
+        $this->authorize('update', $org);
+
+        $this->validate([
+            'organizationFirewall.require_second_approval' => ['boolean'],
+            'organizationFirewall.notify_drift_webhook' => ['boolean'],
+            'organizationFirewall.synthetic_probe_url' => ['nullable', 'string', 'max:2048'],
+        ]);
+
+        $trimmedUrl = trim((string) ($this->organizationFirewall['synthetic_probe_url'] ?? ''));
+        if ($trimmedUrl !== '' && ! filter_var($trimmedUrl, FILTER_VALIDATE_URL)) {
+            $this->addError('organizationFirewall.synthetic_probe_url', __('Enter a valid URL or leave blank.'));
+
+            return;
+        }
+
+        $keys = array_keys(config('server_firewall.organization_settings', []));
+        $payload = [
+            'require_second_approval' => (bool) ($this->organizationFirewall['require_second_approval'] ?? false),
+            'notify_drift_webhook' => (bool) ($this->organizationFirewall['notify_drift_webhook'] ?? false),
+            'synthetic_probe_url' => $trimmedUrl === '' ? null : $trimmedUrl,
+        ];
+        $filtered = array_intersect_key($payload, array_flip($keys));
+
+        $org->update([
+            'firewall_settings' => array_merge($org->firewall_settings ?? [], $filtered),
+        ]);
+
+        $this->organizationFirewall = $this->organizationFirewallStateFromOrg($org->fresh());
+
+        session()->flash('success', __('Firewall settings saved.'));
+    }
+
+    public function saveOrganizationInsights(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $org = $user->currentOrganization();
+
+        if (! $org instanceof Organization) {
+            session()->flash('error', __('Select or create an organization to save Insights preferences.'));
+
+            return;
+        }
+
+        $this->authorize('update', $org);
+
+        $this->validate([
+            'organizationInsights.digest_non_critical' => ['boolean'],
+            'organizationInsights.digest_frequency' => ['required', 'string', Rule::in(['daily', 'weekly'])],
+            'organizationInsights.quiet_hours_enabled' => ['boolean'],
+            'organizationInsights.quiet_hours_start' => ['required', 'integer', 'min:0', 'max:23'],
+            'organizationInsights.quiet_hours_end' => ['required', 'integer', 'min:0', 'max:23'],
+        ]);
+
+        $stored = $org->insights_preferences ?? [];
+        if (! is_array($stored)) {
+            $stored = [];
+        }
+
+        $stored['digest_non_critical'] = (bool) ($this->organizationInsights['digest_non_critical'] ?? false);
+        $stored['digest_frequency'] = ($this->organizationInsights['digest_frequency'] ?? 'daily') === 'weekly' ? 'weekly' : 'daily';
+        $stored['quiet_hours_enabled'] = (bool) ($this->organizationInsights['quiet_hours_enabled'] ?? false);
+        $stored['quiet_hours_start'] = (int) ($this->organizationInsights['quiet_hours_start'] ?? 22);
+        $stored['quiet_hours_end'] = (int) ($this->organizationInsights['quiet_hours_end'] ?? 7);
+
+        $org->update(['insights_preferences' => $stored]);
+
+        $this->organizationInsights = $this->insightsStateFromOrg($org->fresh());
+
+        session()->flash('success', __('Insights preferences saved.'));
     }
 
     public function saveTeamServersSites(): void

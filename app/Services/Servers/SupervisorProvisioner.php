@@ -71,9 +71,11 @@ class SupervisorProvisioner
         $log = $this->removeOrphanConfigsForServer($ssh, $server, $dir);
 
         $programs = $server->supervisorPrograms()->where('is_active', true)->get();
+        $rereadUpdate = $this->supervisorRereadUpdateExecLine($server);
+
         if ($programs->isEmpty()) {
             $log .= "No active Supervisor programs configured.\n";
-            $log .= $ssh->exec('supervisorctl reread 2>&1; supervisorctl update 2>&1; printf "\nDPLY_SV_EXIT:%s" "$?"', 180);
+            $log .= $ssh->exec($rereadUpdate, 180);
 
             return $log;
         }
@@ -86,7 +88,7 @@ class SupervisorProvisioner
             $log .= "Wrote {$path}\n";
         }
 
-        $log .= $ssh->exec('supervisorctl reread 2>&1; supervisorctl update 2>&1; printf "\nDPLY_SV_EXIT:%s" "$?"', 180);
+        $log .= $ssh->exec($rereadUpdate, 180);
 
         return $log;
     }
@@ -205,7 +207,8 @@ class SupervisorProvisioner
         $group = 'dply-sv-'.$prog->id;
         $ssh = new SshConnection($server);
         try {
-            $out = $ssh->exec('supervisorctl '.$verb.' '.escapeshellarg($group).' 2>&1', 120);
+            $sc = $this->supervisorctlInv($server);
+            $out = $ssh->exec($sc.' '.$verb.' '.escapeshellarg($group).' 2>&1', 120);
         } finally {
             $ssh->disconnect();
         }
@@ -227,10 +230,11 @@ class SupervisorProvisioner
         }
         $ssh = new SshConnection($server);
         try {
+            $sc = $this->supervisorctlInv($server);
             $chunks = [];
             foreach ($programs as $p) {
                 $group = 'dply-sv-'.$p->id;
-                $chunks[] = trim((string) $ssh->exec('supervisorctl restart '.escapeshellarg($group).' 2>&1', 120));
+                $chunks[] = trim((string) $ssh->exec($sc.' restart '.escapeshellarg($group).' 2>&1', 120));
             }
 
             return implode("\n", $chunks);
@@ -288,7 +292,65 @@ class SupervisorProvisioner
         }
         $ssh = new SshConnection($server);
         try {
-            return trim((string) $ssh->exec('supervisorctl status 2>&1', 120));
+            $sc = $this->supervisorctlInv($server);
+
+            return trim((string) $ssh->exec($sc.' status 2>&1', 120));
+        } finally {
+            $ssh->disconnect();
+        }
+    }
+
+    /**
+     * Shell line for: supervisorctl reread; supervisorctl update (with sudo when SSH user is not root).
+     * Deploy users often cannot access supervisord's socket without sudo — matches {@see privilegedBash}.
+     */
+    public function supervisorRereadUpdateExecLine(Server $server, string $exitLabel = 'DPLY_SV_EXIT'): string
+    {
+        $sc = $this->supervisorctlInv($server);
+
+        return $sc.' reread 2>&1; '.$sc.' update 2>&1; printf "\n'.$exitLabel.':%s" "$?"';
+    }
+
+    /**
+     * How to invoke supervisorctl over SSH: plain for root, {@code sudo -n supervisorctl} for other users.
+     */
+    protected function supervisorctlInv(Server $server): string
+    {
+        $user = trim((string) $server->ssh_user);
+        if ($user === '' || $user === 'root') {
+            return 'supervisorctl';
+        }
+
+        return 'sudo -n supervisorctl';
+    }
+
+    /**
+     * Start/stop/restart the Supervisor system service (systemd), or query status / boot flags.
+     * Uses {@see privilegedBash} so non-root SSH users run via passwordless sudo, like other server management.
+     *
+     * @param  string  $action  One of: status, start, stop, restart, reload, is-active, is-enabled, enable, disable
+     */
+    public function manageSupervisorService(Server $server, string $action): string
+    {
+        $allowed = ['status', 'start', 'stop', 'restart', 'reload', 'is-active', 'is-enabled', 'enable', 'disable'];
+        if (! in_array($action, $allowed, true)) {
+            throw new \InvalidArgumentException('Invalid supervisor service action.');
+        }
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $unit = (string) config('sites.supervisor_systemd_unit', 'supervisor');
+        $unitEsc = escapeshellarg($unit);
+
+        $inner = match ($action) {
+            'is-active', 'is-enabled' => 'systemctl '.$action.' '.$unitEsc.' 2>&1; printf \'\nDPLY_EXIT:%s\' "$?"',
+            default => '(systemctl '.$action.' '.$unitEsc.' 2>&1) || (service '.$unitEsc.' '.$action.' 2>&1); printf \'\nDPLY_EXIT:%s\' "$?"',
+        };
+
+        $ssh = new SshConnection($server);
+        try {
+            return trim((string) $ssh->exec($this->privilegedBash($server, $inner), 180));
         } finally {
             $ssh->disconnect();
         }
@@ -520,6 +582,7 @@ class SupervisorProvisioner
             ? $program->autorestart
             : 'true';
         $redirectStderr = $program->redirect_stderr ?? true;
+        $redirectStderrIni = $redirectStderr ? 'true' : 'false';
 
         $env = is_array($program->env_vars) ? $program->env_vars : [];
         $envBlock = $env !== [] ? SupervisorEnvFormatter::toIniFragment($env) : '';
@@ -534,7 +597,7 @@ autostart=true
 autorestart={$autorestart}
 numprocs={$num}
 startsecs={$startsecs}
-redirect_stderr={$redirectStderr}
+redirect_stderr={$redirectStderrIni}
 stdout_logfile={$logPath}
 
 INI;

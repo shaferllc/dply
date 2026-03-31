@@ -347,7 +347,7 @@ class WorkspaceCron extends Component
         $this->server->loadMissing('organization');
         $org = $this->server->organization;
         if ($org?->cron_maintenance_until && now()->lt($org->cron_maintenance_until)) {
-            $this->flash_error = __('Cron runs are paused for this organization until the maintenance window ends. Clear it under Templates or ask an admin.');
+            $this->flash_error = __('Cron runs are paused for this organization until the maintenance window ends. Clear it under the Maintenance tab or ask an admin.');
 
             return;
         }
@@ -836,6 +836,10 @@ class WorkspaceCron extends Component
 
         $org = $this->server->organization;
         $canUpdateOrg = $org !== null && auth()->user()?->can('update', $org);
+
+        if (! $canUpdateOrg && $this->cron_workspace_tab === 'maintenance') {
+            $this->cron_workspace_tab = 'jobs';
+        }
 
         return view('livewire.servers.workspace-cron', [
             'deletionSummary' => $this->showRemoveServerModal

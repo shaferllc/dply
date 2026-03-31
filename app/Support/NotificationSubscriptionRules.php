@@ -9,6 +9,10 @@ class NotificationSubscriptionRules
 {
     public static function subscribableClassForEvent(string $eventKey): ?string
     {
+        if (str_starts_with($eventKey, 'server.systemd.u.')) {
+            return Server::class;
+        }
+
         if (str_starts_with($eventKey, 'server.')) {
             return Server::class;
         }

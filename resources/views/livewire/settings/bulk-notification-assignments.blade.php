@@ -156,9 +156,16 @@
                 type="button"
                 wire:click="assign"
                 wire:loading.attr="disabled"
+                wire:target="assign"
                 @disabled(! $this->canSubmitAssign())
-                class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-brand-ink font-semibold text-sm text-brand-cream shadow-md shadow-brand-ink/15 hover:bg-brand-forest focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            >{{ __('Assign notifications') }}</button>
+                class="inline-flex min-w-[12rem] items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-ink font-semibold text-sm text-brand-cream shadow-md shadow-brand-ink/15 hover:bg-brand-forest focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+                <span wire:loading.remove wire:target="assign">{{ __('Assign notifications') }}</span>
+                <span wire:loading wire:target="assign" class="inline-flex items-center gap-2">
+                    <x-spinner variant="cream" size="sm" />
+                    {{ __('Assigning…') }}
+                </span>
+            </button>
         </div>
     </div>
 </div>

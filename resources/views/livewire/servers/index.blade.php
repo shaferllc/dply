@@ -22,6 +22,16 @@
 
         return 'bg-brand-mist';
     };
+    $insightBadgeClass = function (string $serverId) use ($insightRollup): string {
+        $worst = $insightRollup[$serverId]['worst'] ?? null;
+
+        return match ($worst) {
+            'critical' => 'bg-red-600 text-white',
+            'warning' => 'bg-amber-500 text-white',
+            'info' => 'bg-slate-500 text-white',
+            default => 'bg-brand-ink text-brand-cream',
+        };
+    };
 @endphp
 
 <div wire:key="servers-epoch-{{ $serverListEpoch }}">
@@ -135,7 +145,13 @@
                                             <div class="w-1 shrink-0 {{ $stripe($server) }}" aria-hidden="true"></div>
                                             <div class="flex flex-1 flex-col gap-3 p-4 min-w-0">
                                                 <div class="min-w-0">
-                                                    <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-semibold text-brand-ink hover:text-brand-sage truncate block">{{ $server->name }}</a>
+                                                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                                                        <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-semibold text-brand-ink hover:text-brand-sage truncate block">{{ $server->name }}</a>
+                                                        @php $insOpen = (int) ($insightRollup[$server->id]['open'] ?? 0); @endphp
+                                                        @if ($insOpen > 0)
+                                                            <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $insightBadgeClass($server->id) }}">{{ trans_choice(':count insight|:count insights', $insOpen, ['count' => $insOpen]) }}</a>
+                                                        @endif
+                                                    </div>
                                                     <p class="mt-1 font-mono text-sm text-brand-moss truncate">{{ $server->ip_address ?? __('Provisioning…') }}</p>
                                                     @if ($server->scheduled_deletion_at)
                                                         <p class="mt-1 text-xs font-medium text-amber-800">
@@ -184,11 +200,17 @@
                                             <div class="w-1 shrink-0 {{ $stripe($server) }}" aria-hidden="true"></div>
                                             <div class="flex flex-1 flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-6 min-w-0">
                                                 <div class="min-w-0">
-                                                    <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-semibold text-brand-ink hover:text-brand-sage">
-                                                        {{ $server->name }}
-                                                        <span class="text-brand-mist font-normal">·</span>
-                                                        <span class="font-mono text-sm font-normal text-brand-moss">{{ $server->ip_address ?? __('Provisioning…') }}</span>
-                                                    </a>
+                                                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                        <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-semibold text-brand-ink hover:text-brand-sage">
+                                                            {{ $server->name }}
+                                                            <span class="text-brand-mist font-normal">·</span>
+                                                            <span class="font-mono text-sm font-normal text-brand-moss">{{ $server->ip_address ?? __('Provisioning…') }}</span>
+                                                        </a>
+                                                        @php $insOpenList = (int) ($insightRollup[$server->id]['open'] ?? 0); @endphp
+                                                        @if ($insOpenList > 0)
+                                                            <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $insightBadgeClass($server->id) }}">{{ trans_choice(':count insight|:count insights', $insOpenList, ['count' => $insOpenList]) }}</a>
+                                                        @endif
+                                                    </div>
                                                     <p class="mt-1 text-sm text-brand-moss">
                                                         {{ trans_choice(':count site|:count sites', $server->sites_count, ['count' => $server->sites_count]) }}
                                                         @if ($server->status === \App\Models\Server::STATUS_READY)

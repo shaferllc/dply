@@ -17,7 +17,10 @@
                     <div class="mt-6 flex gap-3">
                         <x-primary-button wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="store">Create organization</span>
-                        <span wire:loading wire:target="store">Creating…</span>
+                        <span wire:loading wire:target="store" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            Creating…
+                        </span>
                     </x-primary-button>
                         <a href="{{ route('organizations.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-md font-semibold text-xs text-slate-700 uppercase tracking-widest hover:bg-slate-50">
                             Cancel

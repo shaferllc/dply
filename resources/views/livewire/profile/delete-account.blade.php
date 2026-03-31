@@ -55,7 +55,10 @@
                     <div class="flex flex-wrap items-center gap-4">
                         <x-danger-button type="submit" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="deleteAccount">{{ __('Permanently delete my account') }}</span>
-                            <span wire:loading wire:target="deleteAccount">{{ __('Deleting…') }}</span>
+                            <span wire:loading wire:target="deleteAccount" class="inline-flex items-center justify-center gap-2">
+                                <x-spinner variant="white" size="sm" />
+                                {{ __('Deleting…') }}
+                            </span>
                         </x-danger-button>
                         <a
                             href="{{ route('profile.edit') }}"

@@ -95,6 +95,15 @@
                                 @case('cog-8-tooth')
                                     <x-heroicon-o-cog-8-tooth class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('chart-bar')
+                                    <x-heroicon-o-chart-bar class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('light-bulb')
+                                    <x-heroicon-o-light-bulb class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('rectangle-stack')
+                                    <x-heroicon-o-rectangle-stack class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                             @endswitch
                             {{ $label }}
                         </a>

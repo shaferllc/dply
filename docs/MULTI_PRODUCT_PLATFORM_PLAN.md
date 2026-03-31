@@ -291,7 +291,7 @@ Work proceeds in order; skipping **Phase B** before **C** tends to double migrat
 ### Phase F — dply WordPress (fourth product)
 
 - [x] **`apps/dply-wordpress`** Laravel 13 + **dedicated DB** + **`shaferllc/dply-core`** path repo.
-- [x] **`wordpress_projects`** API (Bearer **`WORDPRESS_API_TOKEN`**) + **`wordpress_deployments`** + **`POST /api/wordpress/deploy`** (**`php_version`**, **`git_ref`**, idempotency) + list/show deployments; **`WordpressDeployEngine`** **stub** until managed WP lifecycle exists.
+- [x] **`wordpress_projects`** API (Bearer **`WORDPRESS_API_TOKEN`**) + **`wordpress_deployments`** + **`POST /api/wordpress/deploy`** (**`php_version`**, **`git_ref`**, idempotency) + list/show deployments; **`WordpressDeployEngine`** + **`LocalHostedWordpressProvisioner`** (hosted-only; see [ADR-007](adr/0007-wordpress-hosted-runtime-provisioning.md)); backups/staging still open.
 
 **Exit criteria:** Managed WP path documented and shippable for a narrow MVP (real core/plugins/backups still TBD).
 

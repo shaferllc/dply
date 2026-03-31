@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Support\NotificationSubscriptionRules;
+use App\Support\ServerSystemdServiceNotificationKeys;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -187,7 +188,7 @@ class BulkNotificationAssignments extends Component
             }
         }
         foreach ($this->selected_event_keys as $ek) {
-            if (! in_array($ek, $validEvents, true)) {
+            if (! in_array($ek, $validEvents, true) && ! ServerSystemdServiceNotificationKeys::isValidDynamicEventKey($ek)) {
                 $this->addError('selected_event_keys', __('Invalid notification type.'));
 
                 return;

@@ -4,10 +4,30 @@ use App\Contracts\DeployEngine;
 use App\Services\Deploy\CloudDeployContext;
 use App\Services\Deploy\DeployEngineResolver;
 use Dply\Core\Security\WebhookSignature;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return view('home');
+})->name('home');
+
+Route::get('/health', function () {
+    try {
+        DB::connection()->getPdo();
+        $database = true;
+    } catch (Throwable) {
+        $database = false;
+    }
+
+    $ok = $database;
+
+    return response()->json([
+        'app' => 'dply-cloud',
+        'ok' => $ok,
+        'checks' => [
+            'database' => $database,
+        ],
+    ], $ok ? 200 : 503);
 });
 
 /** Monorepo spike: dply-core + {@see DeployEngine} stub (gated by CLOUD_INTERNAL_SPIKE). */

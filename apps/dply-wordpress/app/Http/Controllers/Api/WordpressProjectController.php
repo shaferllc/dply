@@ -4,11 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WordpressProject;
+use App\Services\Wordpress\Validation\HostedWordpressProjectSettingsValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 final class WordpressProjectController extends Controller
 {
+    public function __construct(
+        private HostedWordpressProjectSettingsValidator $hostedSettings,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
@@ -55,6 +60,8 @@ final class WordpressProjectController extends Controller
             'credentials' => ['sometimes', 'array'],
         ]);
 
+        $this->hostedSettings->validateForApi($validated['settings'] ?? null);
+
         $project = WordpressProject::query()->create($validated);
 
         return response()->json(['project' => $this->projectPayload($project)], 201);
@@ -67,6 +74,10 @@ final class WordpressProjectController extends Controller
             'settings' => ['sometimes', 'array'],
             'credentials' => ['sometimes', 'array'],
         ]);
+
+        if (array_key_exists('settings', $validated)) {
+            $this->hostedSettings->validateForApi($validated['settings']);
+        }
 
         if (array_key_exists('name', $validated)) {
             $project->name = $validated['name'];

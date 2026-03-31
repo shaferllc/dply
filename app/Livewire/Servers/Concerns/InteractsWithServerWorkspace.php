@@ -21,6 +21,23 @@ trait InteractsWithServerWorkspace
         $this->server = $server;
     }
 
+    protected function currentUserIsDeployer(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null && ($user->currentOrganization()?->userIsDeployer($user) ?? false);
+    }
+
+    /** True when the server is ready for SSH-based workspace operations (inventory, manage, metrics install, etc.). */
+    protected function serverOpsReady(): bool
+    {
+        $s = $this->server;
+
+        return $s->isReady()
+            && filled($s->ip_address)
+            && filled($s->ssh_private_key);
+    }
+
     #[On('server-state-updated')]
     public function onServerStateUpdated(string $organizationId, string $action, ?string $serverId = null, ?array $server = null): void
     {

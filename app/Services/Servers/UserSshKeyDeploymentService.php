@@ -36,7 +36,7 @@ class UserSshKeyDeploymentService
             $this->ensureServerRow($key, $server);
         }
 
-        $this->synchronizer->sync($server->fresh());
+        $this->synchronizer->sync($server->fresh(), null, null);
     }
 
     /**
@@ -55,7 +55,7 @@ class UserSshKeyDeploymentService
         }
 
         $this->ensureServerRow($userSshKey, $server);
-        $this->synchronizer->sync($server->fresh());
+        $this->synchronizer->sync($server->fresh(), null, null);
 
         return ['ok' => true, 'message' => 'authorized_keys updated on '.$server->name.'.'];
     }
@@ -100,7 +100,9 @@ class UserSshKeyDeploymentService
         return ServerAuthorizedKey::query()->updateOrCreate(
             [
                 'server_id' => $server->id,
-                'user_ssh_key_id' => $userSshKey->id,
+                'managed_key_type' => UserSshKey::class,
+                'managed_key_id' => $userSshKey->id,
+                'target_linux_user' => '',
             ],
             [
                 'name' => $userSshKey->name,
@@ -115,7 +117,8 @@ class UserSshKeyDeploymentService
     public function syncLinkedServerRows(UserSshKey $userSshKey): void
     {
         ServerAuthorizedKey::query()
-            ->where('user_ssh_key_id', $userSshKey->id)
+            ->where('managed_key_type', UserSshKey::class)
+            ->where('managed_key_id', $userSshKey->id)
             ->update([
                 'name' => $userSshKey->name,
                 'public_key' => trim($userSshKey->public_key),

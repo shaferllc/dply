@@ -16,8 +16,11 @@ class InternalWordpressSpikeTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('app', 'dply-wordpress');
         $response->assertJsonPath('deploy.provider', 'wordpress');
-        $response->assertJsonPath('deploy.status', 'stub');
-        $response->assertJsonPath('engine.sha', 'wp-stub-revision-1');
+        $response->assertJsonPath('deploy.status', 'deployed');
+        $response->assertJsonPath('deploy.runtime', 'hosted');
+        $response->assertJsonPath('deploy.trigger', 'internal_spike');
+        $expectedSha = hash('sha256', 'spike|main|8.3|spike-app');
+        $response->assertJsonPath('engine.sha', $expectedSha);
     }
 
     public function test_internal_spike_not_found_when_disabled(): void

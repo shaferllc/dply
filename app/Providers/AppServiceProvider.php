@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ProcessReferralInvoicePayment;
+use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
 use App\Models\BackupConfiguration;
 use App\Models\Incident;
 use App\Models\NotificationChannel;
@@ -37,6 +39,7 @@ use App\Policies\UserSshKeyPolicy;
 use App\Policies\WorkspacePolicy;
 use App\Services\Deploy\ByoServerDeployEngine;
 use App\Services\Deploy\DeployEngineResolver;
+use App\Services\Servers\ServerMetricsGuestScript;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -66,9 +69,12 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->discardCorruptedViteHotFile();
 
+        $this->mergeServerMonitoringInstallScript();
+
         Cashier::useCustomerModel(Organization::class);
 
         Event::listen(WebhookReceived::class, ProcessReferralInvoicePayment::class);
+        Event::listen(ServerAuthorizedKeysSynced::class, DispatchServerAuthorizedKeysSyncedWebhook::class);
 
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(Server::class, ServerPolicy::class);
@@ -174,6 +180,34 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute((int) config('sites.webhook_max_attempts_per_minute', 30))->by($key);
         });
+
+        RateLimiter::for('metrics-ingest', function (Request $request) {
+            return Limit::perMinute(300)->by($request->ip());
+        });
+
+        RateLimiter::for('metrics-guest-push', function (Request $request) {
+            $sid = $request->input('server_id');
+
+            return Limit::perMinute(120)->by(is_string($sid) && $sid !== '' ? 'gmp:'.$sid : 'gmp-ip:'.$request->ip());
+        });
+    }
+
+    /**
+     * Replaces the fallback apt-only script with apt + deploy of resources/server-scripts/server-metrics-snapshot.py.
+     */
+    private function mergeServerMonitoringInstallScript(): void
+    {
+        try {
+            $guest = $this->app->make(ServerMetricsGuestScript::class);
+            if (! is_readable($guest->localPath())) {
+                return;
+            }
+            config([
+                'server_services.install_actions.install_monitoring_prerequisites.script' => $guest->monitoringPrerequisitesInstallScript(),
+            ]);
+        } catch (\Throwable) {
+            // Keep config/server_services.php fallback when the guest file is unavailable.
+        }
     }
 
     /**

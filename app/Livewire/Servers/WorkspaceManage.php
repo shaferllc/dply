@@ -308,22 +308,6 @@ BASH;
         ]);
     }
 
-    protected function currentUserIsDeployer(): bool
-    {
-        $user = auth()->user();
-
-        return $user !== null && ($user->currentOrganization()?->userIsDeployer($user) ?? false);
-    }
-
-    protected function serverOpsReady(): bool
-    {
-        $s = $this->server;
-
-        return $s->isReady()
-            && filled($s->ip_address)
-            && filled($s->ssh_private_key);
-    }
-
     protected function assertAllowlistedConfigPath(string $path): void
     {
         $normalized = str_starts_with($path, '/') ? $path : '/'.$path;

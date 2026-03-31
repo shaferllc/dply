@@ -22,4 +22,17 @@ class WordpressProjectFactory extends Factory
             'slug' => Str::slug($name).'-'.fake()->unique()->numerify('###'),
         ];
     }
+
+    /**
+     * Hosted metadata required for deploy (ADR-007).
+     */
+    public function hosted(): static
+    {
+        return $this->state(fn (): array => [
+            'settings' => [
+                'runtime' => 'hosted',
+                'environment_id' => 'env-factory-'.fake()->unique()->numerify('########'),
+            ],
+        ]);
+    }
 }

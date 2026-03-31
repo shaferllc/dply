@@ -6,6 +6,13 @@
 
 Third product app in the monorepo: **managed long-lived PHP / Rails** workloads on **your** infrastructure (build/publish TBD). **Separate Laravel install and database** from the BYO app and from `apps/dply-serverless`.
 
+## Marketing site (`/`)
+
+The default **`/`** route renders a branded landing page (Tailwind v4, same palette as the main dply app). **Log in**, **Register**, **Dashboard**, **Features**, **Pricing**, and **Docs** links target the **main BYO application** — set **`DPLY_MAIN_APP_URL`** in `.env` to that app’s origin (e.g. `https://dply.test`). Accounts use **Fortify on the main site**; this app does not duplicate web auth.
+
+- **`npm run build`** (or **`npm run dev`**) compiles `resources/css/app.css` + Vite.
+- Logo asset: `public/images/dply-logo.svg` (same mark as the root app).
+
 ## Local setup
 
 ```bash

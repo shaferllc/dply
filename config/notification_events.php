@@ -3,6 +3,10 @@
 /**
  * Keys used by notification subscriptions (channel + target + event).
  * Prefix determines compatible target: server.* → Server, site.* / backup.* → Site.
+ *
+ * Per-systemd-unit keys (server target) are created from the Services workspace; they match
+ * {@see ServerSystemdServiceNotificationKeys::isValidDynamicEventKey} and are
+ * accepted by bulk-assign validation even though they are not listed below.
  */
 return [
     'categories' => [

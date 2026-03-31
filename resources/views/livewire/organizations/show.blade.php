@@ -200,7 +200,7 @@
                     <section class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         <div class="px-6 py-4 border-b border-slate-200">
                             <h3 class="font-medium text-slate-900">Deploy integrations (Slack / Discord / Teams)</h3>
-                            <p class="text-sm text-slate-500 mt-1">POSTs a short text payload on deploy finished (success, failed, or skipped). Org-wide hooks fire for every site; site-specific hooks only when that site deploys.</p>
+                            <p class="text-sm text-slate-500 mt-1">{{ __('POSTs a short text payload on deploy finished and optionally when Insights open or resolve. Org-wide hooks fire for every site; site-specific hooks only when that site deploys.') }}</p>
                         </div>
                         <div class="px-6 py-4 space-y-4">
                             <form wire:submit="saveOutboundIntegration" class="flex flex-col gap-3 max-w-2xl">
@@ -222,10 +222,14 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="flex flex-wrap gap-4 text-sm text-slate-700">
-                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_success" class="rounded border-slate-300"> Success</label>
-                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_failed" class="rounded border-slate-300"> Failed</label>
-                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_skipped" class="rounded border-slate-300"> Skipped</label>
+                                <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-700">
+                                    <span class="text-xs font-medium text-slate-500 w-full">{{ __('Deploy') }}</span>
+                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_success" class="rounded border-slate-300"> {{ __('Success') }}</label>
+                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_failed" class="rounded border-slate-300"> {{ __('Failed') }}</label>
+                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_skipped" class="rounded border-slate-300"> {{ __('Skipped') }}</label>
+                                    <span class="text-xs font-medium text-slate-500 w-full sm:ml-0">{{ __('Insights (org-wide hooks only)') }}</span>
+                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_opened" class="rounded border-slate-300"> {{ __('Opened') }}</label>
+                                    <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_resolved" class="rounded border-slate-300"> {{ __('Resolved') }}</label>
                                 </div>
                                 <x-primary-button type="submit" class="!text-sm w-fit">Add integration</x-primary-button>
                             </form>

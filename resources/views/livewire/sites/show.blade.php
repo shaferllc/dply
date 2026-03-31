@@ -5,7 +5,15 @@
                 <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ $site->name }}</h2>
                 <p class="text-sm text-slate-500">{{ $server->name }} · {{ $site->type->label() }}</p>
             </div>
-            <a href="{{ route('servers.show', $server) }}" class="text-slate-500 hover:text-slate-700 text-sm">← Server</a>
+            <div class="flex items-center gap-4">
+                <a href="{{ route('sites.insights', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                    {{ __('Insights') }}
+                    @if ($openSiteInsightsCount > 0)
+                        <span class="inline-flex min-w-[1.25rem] justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" title="{{ trans_choice(':count open finding|:count open findings', $openSiteInsightsCount, ['count' => $openSiteInsightsCount]) }}">{{ $openSiteInsightsCount }}</span>
+                    @endif
+                </a>
+                <a href="{{ route('servers.show', $server) }}" class="text-slate-500 hover:text-slate-700 text-sm">← Server</a>
+            </div>
         </div>
     </header>
     <div class="py-12">

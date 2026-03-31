@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Credentials\ProviderOAuthController;
+use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\SiteDeployWebhookController;
@@ -34,10 +35,13 @@ use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDatabases;
 use App\Livewire\Servers\WorkspaceDeploy;
 use App\Livewire\Servers\WorkspaceFirewall;
+use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
+use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspaceRecipes;
+use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSshKeys;
@@ -53,6 +57,7 @@ use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Show as SitesShow;
+use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Livewire\StatusPages\Manage as StatusPagesManage;
@@ -84,6 +89,10 @@ Route::get('/features', function () {
 Route::livewire('/status/{statusPage}', StatusPublicPage::class)
     ->middleware(['throttle:120,1'])
     ->name('status.public');
+
+Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareController::class, 'show'])
+    ->middleware(['throttle:60,1'])
+    ->name('database-credential-shares.show');
 
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
@@ -147,9 +156,13 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         return redirect()->route('servers.sites', $server);
     })->name('servers.show');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
+    Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}', SitesShow::class)->name('sites.show');
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
+    Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
+    Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
+    Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->name('servers.daemons');

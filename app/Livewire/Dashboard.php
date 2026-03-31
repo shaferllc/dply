@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Services\Insights\OrganizationInsightsMetricsService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -9,10 +10,16 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Dashboard extends Component
 {
-    public function render(): View
+    public function render(OrganizationInsightsMetricsService $insightsMetrics): View
     {
-        $servers = auth()->user()->servers()->latest()->take(5)->get();
+        $user = auth()->user();
+        $servers = $user->servers()->latest()->take(5)->get();
+        $org = $user->currentOrganization();
+        $fleetInsights = $insightsMetrics->fleetSummary($org);
 
-        return view('livewire.dashboard', ['servers' => $servers]);
+        return view('livewire.dashboard', [
+            'servers' => $servers,
+            'fleetInsights' => $fleetInsights,
+        ]);
     }
 }

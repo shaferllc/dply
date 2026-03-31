@@ -13,17 +13,20 @@ class ServerAuthorizedKey extends Model
 
     protected $fillable = [
         'server_id',
+        'target_linux_user',
         'managed_key_type',
         'managed_key_id',
         'name',
         'public_key',
         'synced_at',
+        'review_after',
     ];
 
     protected function casts(): array
     {
         return [
             'synced_at' => 'datetime',
+            'review_after' => 'date',
         ];
     }
 

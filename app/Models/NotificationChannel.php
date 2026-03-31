@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class NotificationChannel extends Model
@@ -446,5 +447,159 @@ class NotificationChannel extends Model
         }
 
         return ['ok' => true, 'message' => __('Test message sent.')];
+    }
+
+    /**
+     * Deliver a short operational alert (insights, health, etc.) to this channel.
+     */
+    public function sendOperationalMessage(string $subject, string $text, ?string $actionUrl = null, ?string $actionLabel = null): void
+    {
+        $lines = array_filter([$subject, $text, $actionUrl && $actionLabel ? $actionLabel.': '.$actionUrl : $actionUrl]);
+        $full = implode("\n\n", $lines);
+
+        try {
+            match ($this->type) {
+                self::TYPE_SLACK => $this->deliverSlackPlain($full),
+                self::TYPE_DISCORD => $this->deliverDiscordPlain($full),
+                self::TYPE_EMAIL => $this->deliverEmailPlain($subject, $full),
+                self::TYPE_TELEGRAM => $this->deliverTelegramPlain($full),
+                self::TYPE_PUSHOVER => $this->deliverPushoverPlain($subject, $full),
+                self::TYPE_MICROSOFT_TEAMS => $this->deliverTeamsPlain($subject, $full),
+                self::TYPE_ROCKETCHAT => $this->deliverRocketchatPlain($full),
+                self::TYPE_GOOGLE_CHAT => $this->deliverGoogleChatPlain($full),
+                self::TYPE_WEBHOOK => $this->deliverWebhookInsight($subject, $text, $actionUrl),
+                default => null,
+            };
+        } catch (\Throwable $e) {
+            Log::warning('notification_channel.operational_failed', [
+                'channel_id' => $this->id,
+                'type' => $this->type,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    protected function deliverSlackPlain(string $text): void
+    {
+        $url = $this->config['webhook_url'] ?? null;
+        if (! is_string($url) || $url === '') {
+            return;
+        }
+
+        $payload = ['text' => $text];
+        $channel = $this->config['channel'] ?? null;
+        if (is_string($channel) && $channel !== '') {
+            $payload['channel'] = $channel;
+        }
+
+        Http::timeout(10)->post($url, $payload);
+    }
+
+    protected function deliverDiscordPlain(string $text): void
+    {
+        $url = $this->config['webhook_url'] ?? null;
+        if (! is_string($url) || $url === '') {
+            return;
+        }
+
+        Http::timeout(10)->asJson()->post($url, ['content' => mb_substr($text, 0, 1900)]);
+    }
+
+    protected function deliverEmailPlain(string $subject, string $body): void
+    {
+        $to = $this->config['email'] ?? null;
+        if (! is_string($to) || $to === '' || ! filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        Mail::raw($body, function ($message) use ($to, $subject): void {
+            $message->to($to)->subject($subject);
+        });
+    }
+
+    protected function deliverTelegramPlain(string $text): void
+    {
+        $token = $this->config['bot_token'] ?? null;
+        $chatId = $this->config['chat_id'] ?? null;
+        if (! is_string($token) || $token === '' || ! is_string($chatId) || $chatId === '') {
+            return;
+        }
+
+        $url = 'https://api.telegram.org/bot'.rawurlencode($token).'/sendMessage';
+        Http::timeout(10)->asForm()->post($url, [
+            'chat_id' => $chatId,
+            'text' => mb_substr($text, 0, 4000),
+        ]);
+    }
+
+    protected function deliverPushoverPlain(string $title, string $message): void
+    {
+        $appToken = $this->config['app_token'] ?? null;
+        $userKey = $this->config['user_key'] ?? null;
+        if (! is_string($appToken) || $appToken === '' || ! is_string($userKey) || $userKey === '') {
+            return;
+        }
+
+        Http::timeout(10)->asForm()->post('https://api.pushover.net/1/messages.json', [
+            'token' => $appToken,
+            'user' => $userKey,
+            'title' => mb_substr($title, 0, 250),
+            'message' => mb_substr($message, 0, 1000),
+        ]);
+    }
+
+    protected function deliverTeamsPlain(string $title, string $text): void
+    {
+        $url = $this->config['webhook_url'] ?? null;
+        if (! is_string($url) || $url === '') {
+            return;
+        }
+
+        Http::timeout(10)->asJson()->post($url, [
+            '@type' => 'MessageCard',
+            '@context' => 'https://schema.org/extensions',
+            'summary' => $title,
+            'title' => $title,
+            'text' => $text,
+        ]);
+    }
+
+    protected function deliverRocketchatPlain(string $text): void
+    {
+        $url = $this->config['webhook_url'] ?? null;
+        if (! is_string($url) || $url === '') {
+            return;
+        }
+
+        Http::timeout(10)->asJson()->post($url, ['text' => $text]);
+    }
+
+    protected function deliverGoogleChatPlain(string $text): void
+    {
+        $url = $this->config['webhook_url'] ?? null;
+        if (! is_string($url) || $url === '') {
+            return;
+        }
+
+        Http::timeout(10)->asJson()->post($url, ['text' => $text]);
+    }
+
+    protected function deliverWebhookInsight(string $subject, string $text, ?string $actionUrl): void
+    {
+        $url = $this->config['url'] ?? null;
+        if (! is_string($url) || $url === '') {
+            return;
+        }
+
+        Http::timeout(10)
+            ->withHeaders(is_array($this->config['headers'] ?? null) ? $this->config['headers'] : [])
+            ->asJson()
+            ->post($url, [
+                'event' => 'server.insights_alerts',
+                'subject' => $subject,
+                'text' => $text,
+                'action_url' => $actionUrl,
+                'sent_at' => now()->toIso8601String(),
+            ]);
     }
 }

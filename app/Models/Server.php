@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
 
@@ -115,6 +117,16 @@ class Server extends Model
         return $this->hasMany(ServerDatabase::class);
     }
 
+    public function databaseAdminCredential(): HasOne
+    {
+        return $this->hasOne(ServerDatabaseAdminCredential::class);
+    }
+
+    public function databaseAuditEvents(): HasMany
+    {
+        return $this->hasMany(ServerDatabaseAuditEvent::class)->orderByDesc('created_at');
+    }
+
     public function cronJobs(): HasMany
     {
         return $this->hasMany(ServerCronJob::class);
@@ -130,9 +142,54 @@ class Server extends Model
         return $this->hasMany(ServerFirewallRule::class)->orderBy('sort_order');
     }
 
+    public function firewallSnapshots(): HasMany
+    {
+        return $this->hasMany(ServerFirewallSnapshot::class)->orderByDesc('created_at');
+    }
+
+    public function firewallAuditEvents(): HasMany
+    {
+        return $this->hasMany(ServerFirewallAuditEvent::class)->orderByDesc('created_at');
+    }
+
+    public function firewallApplyLogs(): HasMany
+    {
+        return $this->hasMany(ServerFirewallApplyLog::class)->orderByDesc('created_at');
+    }
+
+    public function metricSnapshots(): HasMany
+    {
+        return $this->hasMany(ServerMetricSnapshot::class)->orderByDesc('captured_at');
+    }
+
+    public function systemdServiceStates(): HasMany
+    {
+        return $this->hasMany(ServerSystemdServiceState::class)->orderBy('label');
+    }
+
+    public function systemdServiceAuditEvents(): HasMany
+    {
+        return $this->hasMany(ServerSystemdServiceAuditEvent::class)->orderByDesc('occurred_at');
+    }
+
+    public function insightSetting(): MorphOne
+    {
+        return $this->morphOne(InsightSetting::class, 'settingsable');
+    }
+
+    public function insightFindings(): HasMany
+    {
+        return $this->hasMany(InsightFinding::class)->orderByDesc('detected_at');
+    }
+
     public function authorizedKeys(): HasMany
     {
         return $this->hasMany(ServerAuthorizedKey::class);
+    }
+
+    public function sshKeyAuditEvents(): HasMany
+    {
+        return $this->hasMany(ServerSshKeyAuditEvent::class)->orderByDesc('created_at');
     }
 
     public function recipes(): HasMany

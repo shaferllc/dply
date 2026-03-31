@@ -53,6 +53,37 @@
                 </div>
             @endif
         </dl>
+        @if ($server->isReady() && $server->ip_address && $server->ssh_private_key)
+            <div class="mt-8 border-t border-brand-ink/10 pt-8">
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Server monitoring') }}</h3>
+                <p class="mt-2 max-w-2xl text-sm text-brand-moss leading-relaxed">
+                    {{ __('View CPU, memory, disk, and load history. Dply can install Python on the guest over SSH when needed, then collect metrics from the Monitor tab.') }}
+                </p>
+                @php
+                    $monitorMeta = $server->meta ?? [];
+                    $lastMetricAt = isset($monitorMeta['monitoring_last_sample_at'])
+                        ? \Illuminate\Support\Carbon::parse($monitorMeta['monitoring_last_sample_at'])->timezone(config('app.timezone'))
+                        : null;
+                @endphp
+                @if ($lastMetricAt)
+                    <p class="mt-2 text-xs text-brand-mist">
+                        {{ __('Last stored sample') }}: {{ $lastMetricAt->format('Y-m-d H:i') }}
+                        <span class="text-brand-moss">({{ $lastMetricAt->diffForHumans() }})</span>
+                    </p>
+                @endif
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                    <a
+                        href="{{ route('servers.monitor', $server) }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors"
+                    >
+                        <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" />
+                        {{ __('Open Metrics') }}
+                    </a>
+                    <a href="{{ route('servers.services', $server) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Or install packages under Services') }} →</a>
+                </div>
+            </div>
+        @endif
         @if ($server->status === 'ready' && $server->ip_address)
             <div class="mt-8 space-y-4 border-t border-brand-ink/10 pt-8">
                 <button type="button" wire:click="checkHealth" class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Check health now') }}</button>

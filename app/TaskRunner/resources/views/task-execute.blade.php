@@ -271,6 +271,8 @@
     </div>
 
     @livewireScripts
+
+    @include('task-runner::partials.task-runner-modals')
     
     <script>
         let currentTaskId = null;
@@ -306,7 +308,7 @@
 
             // Validate required fields
             if (!data.command.trim()) {
-                alert('Please enter a command to execute');
+                TaskRunnerModal.showAlert('Command required', 'Please enter a command to execute.', 'error');
                 return;
             }
 

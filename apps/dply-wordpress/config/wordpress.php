@@ -32,4 +32,25 @@ return [
 
     'default_git_ref' => env('WORDPRESS_DEFAULT_GIT_REF', 'main'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Hosted provisioner (ADR-007)
+    |--------------------------------------------------------------------------
+    |
+    | The deploy engine uses HostedWordpressProvisioner. `local` is the in-app
+    | deterministic implementation; add an HTTP/SDK driver when the tenant fleet
+    | API is available.
+    |
+    */
+
+    'provisioner' => env('WORDPRESS_PROVISIONER', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mock WordPress version (local provisioner output only)
+    |--------------------------------------------------------------------------
+    */
+
+    'mock_wordpress_version' => env('WORDPRESS_MOCK_WP_VERSION', '6.4.2'),
+
 ];

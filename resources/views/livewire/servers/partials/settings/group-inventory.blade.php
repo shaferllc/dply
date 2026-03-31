@@ -33,7 +33,10 @@
                         class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                     >
                         <span wire:loading.remove wire:target="refreshServerInventoryDetails">{{ __('Refresh inventory') }}</span>
-                        <span wire:loading wire:target="refreshServerInventoryDetails">{{ __('Running…') }}</span>
+                        <span wire:loading wire:target="refreshServerInventoryDetails" class="inline-flex items-center gap-2">
+                            <x-spinner variant="forest" size="sm" />
+                            {{ __('Running…') }}
+                        </span>
                     </button>
                     <button
                         type="button"

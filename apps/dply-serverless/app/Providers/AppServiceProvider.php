@@ -16,6 +16,7 @@ use App\Serverless\Stub\LocalStubProvisioner;
 use App\Serverless\Stub\RoadmapStubProvisioner;
 use App\Serverless\Vercel\VercelZipDeployProvisioner;
 use App\Services\Deploy\ServerlessDeployEngine;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature as PennantFeature;
 
@@ -46,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        View::share('dplyMainUrl', (string) config('dply.main_app_url'));
+
         PennantFeature::define(ServerlessFeature::INTERNAL_SPIKE, function (): bool {
             $raw = env('SERVERLESS_INTERNAL_SPIKE');
 

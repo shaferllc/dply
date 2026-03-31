@@ -54,7 +54,11 @@
 
                     <div class="flex justify-end pt-2">
                         <x-primary-button type="button" wire:click="createConfiguration" wire:loading.attr="disabled">
-                            {{ __('Create') }}
+                            <span wire:loading.remove wire:target="createConfiguration">{{ __('Create') }}</span>
+                            <span wire:loading wire:target="createConfiguration" class="inline-flex items-center justify-center gap-2">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Creating…') }}
+                            </span>
                         </x-primary-button>
                     </div>
                 </div>
@@ -89,7 +93,11 @@
                         <div class="flex flex-wrap justify-end gap-3 pt-2">
                             <x-secondary-button type="button" wire:click="cancelEdit">{{ __('Cancel') }}</x-secondary-button>
                             <x-primary-button type="button" wire:click="updateConfiguration" wire:loading.attr="disabled">
-                                {{ __('Save changes') }}
+                                <span wire:loading.remove wire:target="updateConfiguration">{{ __('Save changes') }}</span>
+                                <span wire:loading wire:target="updateConfiguration" class="inline-flex items-center justify-center gap-2">
+                                    <x-spinner variant="cream" size="sm" />
+                                    {{ __('Saving…') }}
+                                </span>
                             </x-primary-button>
                         </div>
                     </div>

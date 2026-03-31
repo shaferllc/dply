@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 | so workers listen on those Redis lists too.
 */
 $horizonExtraQueues = [];
-foreach (['SERVER_CRON_RUN_QUEUE', 'SERVER_MANAGE_REMOTE_TASK_QUEUE'] as $envKey) {
+foreach (['SERVER_CRON_RUN_QUEUE', 'SERVER_MANAGE_REMOTE_TASK_QUEUE', 'SERVER_METRICS_INGEST_QUEUE', 'SERVER_METRICS_PROBE_QUEUE', 'SERVER_METRICS_GUEST_SCRIPT_UPGRADE_QUEUE', 'SERVER_METRICS_GUEST_PUSH_DEPLOY_QUEUE', 'SERVER_DATABASE_EXPORT_QUEUE', 'SERVER_SYSTEMD_SYNC_QUEUE'] as $envKey) {
     $q = env($envKey);
     if (is_string($q) && $q !== '') {
         $horizonExtraQueues[] = $q;
@@ -252,8 +252,9 @@ return [
                 'connection' => 'redis',
                 'queue' => $horizonWorkerQueues,
                 'balance' => 'simple',
-                'maxProcesses' => 1,
-                'memory' => 128,
+                // Concurrent workers for local dev (Redis default maxclients is usually plenty).
+                'maxProcesses' => max(1, (int) env('HORIZON_LOCAL_MAX_PROCESSES', 8)),
+                'memory' => (int) env('HORIZON_LOCAL_WORKER_MEMORY', 128),
                 'tries' => 1,
                 'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 120),
                 'nice' => 0,
