@@ -11,6 +11,19 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @if ($server->workspace)
+        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+            <p class="font-semibold">{{ __('Project context') }}</p>
+            <p class="mt-1 leading-relaxed text-brand-moss">
+                {{ __('This server is managed as part of the :project project. Use the project pages when you need access control, grouped activity, shared variables, coordinated deploys, or cross-resource health review.', ['project' => $server->workspace->name]) }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-3">
+                <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project overview') }}</a>
+                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
+            </div>
+        </div>
+    @endif
+
     <div class="{{ $card }} p-6 sm:p-8">
         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Server details') }}</h2>
         <dl class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">

@@ -19,6 +19,19 @@
 
     @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 18])
 
+    @if ($server->workspace)
+        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+            <p class="font-semibold">{{ __('Project operations context') }}</p>
+            <p class="mt-1 leading-relaxed text-brand-moss">
+                {{ __('Manage actions on this server can affect the rest of the :project project. Use the project operations page for runbooks, activity review, and alert routing before making broader stack changes.', ['project' => $server->workspace->name]) }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-3">
+                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
+                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project resources') }}</a>
+            </div>
+        </div>
+    @endif
+
     @if ($isDeployer)
         <div class="rounded-2xl border border-amber-200/80 bg-amber-50/90 px-5 py-4 text-sm text-amber-950">
             {{ __('Deployers can view this page but cannot run SSH actions or change manage settings.') }}

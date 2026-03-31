@@ -34,6 +34,14 @@ class SitePolicy
 
     public function update(User $user, Site $site): bool
     {
+        if ($site->workspace_id && $site->workspace) {
+            if (! $site->workspace->userCanView($user)) {
+                return false;
+            }
+
+            return $site->workspace->userCanUpdate($user);
+        }
+
         return $user->can('update', $site->server);
     }
 

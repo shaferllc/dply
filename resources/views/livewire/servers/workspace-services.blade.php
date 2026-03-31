@@ -25,6 +25,19 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => null, 'command_error' => $remote_error ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @if ($server->workspace)
+        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+            <p class="font-semibold">{{ __('Project operations shortcut') }}</p>
+            <p class="mt-1 leading-relaxed text-brand-moss">
+                {{ __('Service changes here may affect the wider project. Use the project operations page to review runbooks, recent activity, and alert routing when this server is part of a larger grouped stack.') }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-3">
+                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
+                <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Review project access') }}</a>
+            </div>
+        </div>
+    @endif
+
     @if ($isDeployer && ($deployerSystemdLocked ?? true))
         <div class="rounded-2xl border border-amber-200/80 bg-amber-50/90 px-5 py-4 text-sm text-amber-950">
             {{ __('Deployers can view this page but cannot run service actions over SSH unless your organization allows deployer systemd access.') }}

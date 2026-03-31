@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 #[Fillable([
     'name',
     'email',
+    'dply_auth_id',
     'password',
     'country_code',
     'locale',

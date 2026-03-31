@@ -13,6 +13,8 @@ use App\Models\Server;
  */
 final class ServerProvisionCommandBuilder
 {
+    private const STEP_PREFIX = '[dply-step] ';
+
     /** @return list<string> */
     public function build(Server $server): array
     {
@@ -73,7 +75,7 @@ final class ServerProvisionCommandBuilder
 
         $b64 = base64_encode($pub);
 
-        return [
+        return $this->withStep('Creating server user', [
             'echo '.escapeshellarg($b64).' | base64 -d > /tmp/dply-ssh-bootstrap.pub',
             'chmod 600 /tmp/dply-ssh-bootstrap.pub',
             'id -u '.escapeshellarg($username).' &>/dev/null || useradd -m -s /bin/bash -G sudo '.escapeshellarg($username),
@@ -82,7 +84,7 @@ final class ServerProvisionCommandBuilder
             'rm -f /tmp/dply-ssh-bootstrap.pub',
             'printf \'%s\\n\' '.escapeshellarg($username.' ALL=(ALL) NOPASSWD:ALL').' > /etc/sudoers.d/90-dply-user',
             'chmod 440 /etc/sudoers.d/90-dply-user',
-        ];
+        ]);
     }
 
     /** @return list<string> */
@@ -90,7 +92,9 @@ final class ServerProvisionCommandBuilder
     {
         return [
             'export DEBIAN_FRONTEND=noninteractive',
+            $this->stepMarker('Installing system updates'),
             'apt-get update -y',
+            $this->stepMarker('Installing base packages'),
             'apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release software-properties-common ufw unattended-upgrades',
         ];
     }
@@ -103,10 +107,12 @@ final class ServerProvisionCommandBuilder
         $lines = [];
 
         if (config('server_provision.install_fail2ban', true)) {
+            $lines[] = $this->stepMarker('Installing Fail2ban');
             $lines[] = 'apt-get install -y --no-install-recommends fail2ban';
             $lines[] = 'systemctl enable --now fail2ban || true';
         }
 
+        $lines[] = $this->stepMarker('Finalizing server');
         $lines[] = 'ufw --force enable || true';
         $lines[] = 'echo "[dply] provision finished"';
 
@@ -127,6 +133,7 @@ final class ServerProvisionCommandBuilder
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
 
         if (config('server_provision.install_composer', true) && $php !== 'none') {
+            $lines[] = $this->stepMarker('Installing Composer');
             $lines[] = 'curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer';
         }
 
@@ -138,10 +145,10 @@ final class ServerProvisionCommandBuilder
      */
     private function roleDocker(string $web, string $php, string $database, string $cache): array
     {
-        return array_merge([
+        return array_merge($this->withStep('Installing Docker', [
             'apt-get install -y --no-install-recommends docker.io docker-compose-v2',
             'systemctl enable --now docker',
-        ], $this->roleApplication($web, $php, $database, $cache));
+        ]), $this->roleApplication($web, $php, $database, $cache));
     }
 
     /**
@@ -221,6 +228,7 @@ final class ServerProvisionCommandBuilder
         }
 
         return [
+            $this->stepMarker('Installing Supervisor'),
             'apt-get install -y --no-install-recommends supervisor',
             'systemctl enable --now supervisor',
         ];
@@ -229,9 +237,9 @@ final class ServerProvisionCommandBuilder
     /** @return list<string> */
     private function ufwSsh(): array
     {
-        return [
+        return $this->withStep('Configuring firewall', [
             'ufw allow OpenSSH',
-        ];
+        ]);
     }
 
     /**
@@ -240,16 +248,16 @@ final class ServerProvisionCommandBuilder
     private function installAppCache(string $cache): array
     {
         if ($cache === 'valkey') {
-            return [
+            return $this->withStep('Installing Valkey', [
                 'apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey',
                 'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true',
-            ];
+            ]);
         }
 
-        return [
+        return $this->withStep('Installing Redis', [
             'apt-get install -y --no-install-recommends redis-server',
             'systemctl enable --now redis-server',
-        ];
+        ]);
     }
 
     /**
@@ -264,16 +272,19 @@ final class ServerProvisionCommandBuilder
         $lines = [];
 
         if ($web === 'nginx') {
+            $lines[] = $this->stepMarker('Installing webserver');
             $lines[] = 'apt-get install -y --no-install-recommends nginx';
             $lines[] = 'ufw allow "Nginx Full"';
             $lines[] = 'systemctl enable --now nginx';
             $lines = array_merge($lines, $this->certbotForWeb($web));
         } elseif ($web === 'apache') {
+            $lines[] = $this->stepMarker('Installing webserver');
             $lines[] = 'apt-get install -y --no-install-recommends apache2';
             $lines[] = 'ufw allow "Apache Full"';
             $lines[] = 'systemctl enable --now apache2';
             $lines = array_merge($lines, $this->certbotForWeb($web));
         } elseif ($web === 'caddy') {
+            $lines[] = $this->stepMarker('Installing webserver');
             $lines[] = 'install -d /usr/share/keyrings';
             $lines[] = 'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg';
             $lines[] = 'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list';
@@ -311,6 +322,7 @@ final class ServerProvisionCommandBuilder
 
         $stem = $this->phpStem($php);
         $lines = [
+            $this->stepMarker('Installing PHP '.$php),
             'add-apt-repository -y ppa:ondrej/php',
             'apt-get update -y',
         ];
@@ -419,21 +431,21 @@ EOF',
 
         if (str_starts_with($database, 'mysql') || $database === 'sqlite3') {
             if ($database === 'sqlite3') {
-                return ['apt-get install -y --no-install-recommends sqlite3 libsqlite3-0'];
+                return $this->withStep('Installing SQLite', ['apt-get install -y --no-install-recommends sqlite3 libsqlite3-0']);
             }
 
-            return [
+            return $this->withStep('Installing MySQL', [
                 'apt-get install -y --no-install-recommends mysql-server',
                 'systemctl enable --now mysql',
                 'echo "[dply] MySQL variants (5.7/8.0/8.4) use distro mysql-server package where applicable; pin versions in follow-up automation if required."',
-            ];
+            ]);
         }
 
         if (str_starts_with($database, 'mariadb')) {
-            return [
+            return $this->withStep('Installing MariaDB', [
                 'apt-get install -y --no-install-recommends mariadb-server',
                 'systemctl enable --now mariadb',
-            ];
+            ]);
         }
 
         return [];
@@ -454,6 +466,7 @@ EOF',
         };
 
         return [
+            $this->stepMarker('Installing PostgreSQL'),
             'install -d /usr/share/postgresql-common/pgdg',
             'curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc',
             'chmod 644 /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc',
@@ -487,5 +500,22 @@ EOF',
         }
 
         return $this->isAllowed($section, $fallback) ? $fallback : (string) $value;
+    }
+
+    private function stepMarker(string $label): string
+    {
+        return 'echo '.escapeshellarg(self::STEP_PREFIX.$label);
+    }
+
+    /**
+     * @param  list<string>  $commands
+     * @return list<string>
+     */
+    private function withStep(string $label, array $commands): array
+    {
+        return [
+            $this->stepMarker($label),
+            ...$commands,
+        ];
     }
 }

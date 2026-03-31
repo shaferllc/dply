@@ -26,6 +26,12 @@
                                         · {{ $d->hostname }}
                                     @endif
                                     · {{ $site->type->label() }}
+                                    @if ($site->workspace)
+                                        · {{ __('Project:') }}
+                                        <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-slate-700 hover:text-slate-900">
+                                            {{ $site->workspace->name }}
+                                        </a>
+                                    @endif
                                 </p>
                             </div>
                             <div class="text-sm text-slate-600">

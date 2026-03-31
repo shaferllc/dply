@@ -27,6 +27,19 @@
 
     @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => $logDisplayLines])
 
+    @if ($server->workspace)
+        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+            <p class="font-semibold">{{ __('Project troubleshooting shortcut') }}</p>
+            <p class="mt-1 leading-relaxed text-brand-moss">
+                {{ __('Use server logs here for machine-level debugging, then jump to the project operations page to compare activity across related resources in the same project.') }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-3">
+                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
+                <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project delivery') }}</a>
+            </div>
+        </div>
+    @endif
+
     <div
         class="{{ $card }} overflow-hidden"
         wire:init="loadSystemLogIfEmpty"

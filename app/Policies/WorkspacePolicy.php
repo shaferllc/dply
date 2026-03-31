@@ -14,12 +14,7 @@ class WorkspacePolicy
 
     public function view(User $user, Workspace $workspace): bool
     {
-        $org = $user->currentOrganization();
-        if (! $org || $workspace->organization_id !== $org->id) {
-            return false;
-        }
-
-        return $org->hasMember($user);
+        return $workspace->userCanView($user);
     }
 
     public function create(User $user): bool
@@ -34,7 +29,7 @@ class WorkspacePolicy
 
     public function update(User $user, Workspace $workspace): bool
     {
-        return $this->view($user, $workspace);
+        return $workspace->userCanUpdate($user);
     }
 
     public function delete(User $user, Workspace $workspace): bool

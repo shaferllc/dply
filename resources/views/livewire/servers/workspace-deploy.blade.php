@@ -12,6 +12,19 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null, 'command_error' => $command_error ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @if ($server->workspace)
+        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+            <p class="font-semibold">{{ __('Project delivery shortcut') }}</p>
+            <p class="mt-1 leading-relaxed text-brand-moss">
+                {{ __('If this server hosts sites that should release together, use the project delivery page to queue shared deploy batches, review project variables, and coordinate rollouts across the whole stack.') }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-3">
+                <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project delivery') }}</a>
+                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project resources') }}</a>
+            </div>
+        </div>
+    @endif
+
     @if ($opsReady)
         <div class="space-y-8">
             @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 18])

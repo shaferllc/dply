@@ -33,5 +33,13 @@ return [
                 'backup.site_files' => 'Site file backups',
             ],
         ],
+        'project' => [
+            'label' => 'Project notifications',
+            'events' => [
+                'project.deployments' => 'Project deploy batches',
+                'project.health' => 'Project health alerts',
+                'project.activity' => 'Project activity summaries',
+            ],
+        ],
     ],
 ];

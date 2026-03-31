@@ -4,6 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Actions\Servers\DeleteServerAction;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
@@ -224,7 +225,7 @@ class Index extends Component
         }
 
         $query = Server::query()
-            ->with(['sites', 'organization', 'team'])
+            ->with(['sites', 'organization', 'team', 'workspace'])
             ->withCount('sites')
             ->where(function (Builder $q) use ($org) {
                 $q->where('organization_id', $org->id)
@@ -265,6 +266,7 @@ class Index extends Component
     public function render(OrganizationInsightsMetricsService $insightsMetrics): View
     {
         $base = $this->baseQuery();
+        $org = auth()->user()->currentOrganization();
         $hasServersInScope = $base !== null && (clone $base)->exists();
         $servers = $base
             ? $this->applyFilters(clone $base)->get()
@@ -275,6 +277,29 @@ class Index extends Component
         $insightRollup = $servers->isNotEmpty()
             ? $insightsMetrics->perServerRollup($servers->pluck('id'))
             : collect();
+
+        $summary = [
+            'total' => $servers->count(),
+            'ready' => $servers->where('status', Server::STATUS_READY)->count(),
+            'attention' => $servers->filter(function (Server $server): bool {
+                if ($server->scheduled_deletion_at !== null) {
+                    return true;
+                }
+
+                if (in_array($server->status, [Server::STATUS_ERROR, Server::STATUS_DISCONNECTED], true)) {
+                    return true;
+                }
+
+                return $server->status === Server::STATUS_READY
+                    && $server->health_status === Server::HEALTH_UNREACHABLE;
+            })->count(),
+            'sites' => (int) $servers->sum('sites_count'),
+        ];
+
+        $openInsights = (int) $insightRollup->sum(fn (array $row): int => (int) ($row['open'] ?? 0));
+        $hasProviderCredentials = $org
+            ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
+            : false;
 
         $deleteModalServer = $this->deleteModalServerId
             ? Server::query()->find($this->deleteModalServerId)
@@ -288,6 +313,9 @@ class Index extends Component
             'servers' => $servers,
             'groupedServers' => $groupedServers,
             'insightRollup' => $insightRollup,
+            'summary' => $summary,
+            'openInsights' => $openInsights,
+            'hasProviderCredentials' => $hasProviderCredentials,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
             'sortOptions' => config('user_preferences.server_sort_options', []),

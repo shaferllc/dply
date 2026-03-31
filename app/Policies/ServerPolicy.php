@@ -18,6 +18,10 @@ class ServerPolicy
             return true;
         }
         if ($server->organization_id && $server->organization->hasMember($user)) {
+            if ($server->workspace_id && $server->workspace) {
+                return $server->workspace->userCanView($user);
+            }
+
             return true;
         }
 
@@ -33,7 +37,15 @@ class ServerPolicy
 
     public function update(User $user, Server $server): bool
     {
-        return $this->view($user, $server);
+        if (! $this->view($user, $server)) {
+            return false;
+        }
+
+        if ($server->workspace_id && $server->workspace) {
+            return $server->workspace->userCanUpdate($user);
+        }
+
+        return true;
     }
 
     public function delete(User $user, Server $server): bool

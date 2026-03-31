@@ -28,7 +28,7 @@ class Index extends Component
 
         $sites = Site::query()
             ->whereIn('server_id', $serverIds)
-            ->with(['server', 'domains'])
+            ->with(['server', 'domains', 'workspace'])
             ->orderByDesc('id')
             ->get();
 

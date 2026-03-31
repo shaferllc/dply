@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Auth;
 
+use App\Actions\Organizations\EnsureUserHasWorkspaceOrganization;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Livewire\Forms\RegisterForm;
 use App\Models\User;
@@ -46,12 +47,14 @@ class Register extends Component
             'email' => $this->form->email,
             'password' => Hash::make($this->form->password),
         ]);
+        $organization = EnsureUserHasWorkspaceOrganization::run($user);
 
         ReferralAttribution::assignFromSession($user);
 
         event(new Registered($user));
         Auth::login($user);
         session()->regenerate();
+        session(['current_organization_id' => $organization->id]);
 
         $target = $user->hasVerifiedEmail()
             ? route('dashboard')

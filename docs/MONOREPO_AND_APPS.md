@@ -15,6 +15,7 @@ dply/   (clone root — single git repo)
 ├── packages/
 │   └── dply-core/           ← shared PHP package (webhook signing, etc.)
 └── apps/
+    ├── dply-auth/           ← central identity (OAuth / Passport + Fortify); see docs/DPLY_CENTRAL_AUTH.md
     ├── dply-serverless/     ← product 2 — own composer.json + .env + DB
     ├── dply-cloud/          ← product 3
     ├── dply-wordpress/      ← product 4
@@ -29,6 +30,7 @@ dply/   (clone root — single git repo)
 | **`apps/dply-cloud`** | **Cloud control plane** — stub deploy engine, projects + deployments API, own migrations. |
 | **`apps/dply-wordpress`** | **WordPress control plane** — managed WP direction; projects + deployments API, stub engine. |
 | **`apps/dply-edge`** | **Edge control plane** — git-native JS/static; projects + deployments API (`framework` slug), stub engine. |
+| **`apps/dply-auth`** | **Central auth** — Passport OAuth server + Fortify (login, 2FA); deploy at e.g. `auth.dply.io`. |
 
 All five product **lines** are represented in-repo; default onboarding still targets **BYO only** — see [BYO_LOCAL_SETUP.md](BYO_LOCAL_SETUP.md).
 

@@ -20,6 +20,14 @@
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 p-4 sm:p-5">
                     <p class="truncate text-base font-semibold text-brand-ink">{{ $server->name }}</p>
+                    @if ($server->workspace)
+                        <p class="mt-2 text-xs text-brand-moss">
+                            {{ __('Project:') }}
+                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
+                                {{ $server->workspace->name }}
+                            </a>
+                        </p>
+                    @endif
                     <div class="mt-3 flex flex-wrap items-center gap-2">
                         <span class="rounded-md bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">SSH</span>
                         @if ($server->ip_address)

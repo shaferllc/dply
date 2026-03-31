@@ -119,7 +119,7 @@ trait ManagesProviderCredentials
             'do_name' => 'nullable|string|max:255',
             'do_api_token' => 'required|string',
         ], [], ['do_api_token' => 'API token']);
-        $this->store('digitalocean', $this->do_name, $this->do_api_token, 'do_api_token');
+        $this->storeProviderCredential('digitalocean', $this->do_name, $this->do_api_token, 'do_api_token');
         if (! $this->flash_error) {
             $this->reset('do_name', 'do_api_token');
         }
@@ -134,7 +134,7 @@ trait ManagesProviderCredentials
             'hetzner_name' => 'nullable|string|max:255',
             'hetzner_api_token' => 'required|string',
         ], [], ['hetzner_api_token' => 'API token']);
-        $this->store('hetzner', $this->hetzner_name, $this->hetzner_api_token, 'hetzner_api_token');
+        $this->storeProviderCredential('hetzner', $this->hetzner_name, $this->hetzner_api_token, 'hetzner_api_token');
         if (! $this->flash_error) {
             $this->reset('hetzner_name', 'hetzner_api_token');
         }
@@ -149,7 +149,7 @@ trait ManagesProviderCredentials
             'linode_name' => 'nullable|string|max:255',
             'linode_api_token' => 'required|string',
         ], [], ['linode_api_token' => 'API token']);
-        $this->store('linode', $this->linode_name, $this->linode_api_token, 'linode_api_token');
+        $this->storeProviderCredential('linode', $this->linode_name, $this->linode_api_token, 'linode_api_token');
         if (! $this->flash_error) {
             $this->reset('linode_name', 'linode_api_token');
         }
@@ -164,7 +164,7 @@ trait ManagesProviderCredentials
             'vultr_name' => 'nullable|string|max:255',
             'vultr_api_token' => 'required|string',
         ], [], ['vultr_api_token' => 'API token']);
-        $this->store('vultr', $this->vultr_name, $this->vultr_api_token, 'vultr_api_token');
+        $this->storeProviderCredential('vultr', $this->vultr_name, $this->vultr_api_token, 'vultr_api_token');
         if (! $this->flash_error) {
             $this->reset('vultr_name', 'vultr_api_token');
         }
@@ -179,7 +179,7 @@ trait ManagesProviderCredentials
             'akamai_name' => 'nullable|string|max:255',
             'akamai_api_token' => 'required|string',
         ], [], ['akamai_api_token' => 'API token']);
-        $this->store('akamai', $this->akamai_name, $this->akamai_api_token, 'akamai_api_token');
+        $this->storeProviderCredential('akamai', $this->akamai_name, $this->akamai_api_token, 'akamai_api_token');
         if (! $this->flash_error) {
             $this->reset('akamai_name', 'akamai_api_token');
         }
@@ -227,6 +227,7 @@ trait ManagesProviderCredentials
         $this->flash_success = 'Provider connected.';
         $this->flash_error = null;
         $this->reset('equinix_metal_name', 'equinix_metal_api_token', 'equinix_metal_project_id');
+        $this->notifyProviderCredentialStored('equinix_metal');
     }
 
     public function storeUpCloud(): void
@@ -271,6 +272,7 @@ trait ManagesProviderCredentials
         $this->flash_success = 'Provider connected.';
         $this->flash_error = null;
         $this->reset('upcloud_name', 'upcloud_username', 'upcloud_password');
+        $this->notifyProviderCredentialStored('upcloud');
     }
 
     public function storeScaleway(): void
@@ -315,6 +317,7 @@ trait ManagesProviderCredentials
         $this->flash_success = 'Provider connected.';
         $this->flash_error = null;
         $this->reset('scaleway_name', 'scaleway_api_token', 'scaleway_project_id');
+        $this->notifyProviderCredentialStored('scaleway');
     }
 
     public function storeOvh(): void
@@ -326,7 +329,7 @@ trait ManagesProviderCredentials
             'ovh_name' => 'nullable|string|max:255',
             'ovh_api_token' => 'required|string',
         ], [], ['ovh_api_token' => 'API token']);
-        $this->store('ovh', $this->ovh_name, $this->ovh_api_token, 'ovh_api_token');
+        $this->storeProviderCredential('ovh', $this->ovh_name, $this->ovh_api_token, 'ovh_api_token');
         if (! $this->flash_error) {
             $this->reset('ovh_name', 'ovh_api_token');
         }
@@ -341,7 +344,7 @@ trait ManagesProviderCredentials
             'rackspace_name' => 'nullable|string|max:255',
             'rackspace_api_token' => 'required|string',
         ], [], ['rackspace_api_token' => 'API key']);
-        $this->store('rackspace', $this->rackspace_name, $this->rackspace_api_token, 'rackspace_api_token');
+        $this->storeProviderCredential('rackspace', $this->rackspace_name, $this->rackspace_api_token, 'rackspace_api_token');
         if (! $this->flash_error) {
             $this->reset('rackspace_name', 'rackspace_api_token');
         }
@@ -389,6 +392,7 @@ trait ManagesProviderCredentials
         $this->flash_success = 'Provider connected.';
         $this->flash_error = null;
         $this->reset('fly_io_name', 'fly_io_api_token', 'fly_io_org_slug');
+        $this->notifyProviderCredentialStored('fly_io');
     }
 
     public function storeRender(): void
@@ -397,7 +401,7 @@ trait ManagesProviderCredentials
             return;
         }
         $this->validate(['render_name' => 'nullable|string|max:255', 'render_api_token' => 'required|string'], [], ['render_api_token' => 'API token']);
-        $this->store('render', $this->render_name, $this->render_api_token, 'render_api_token');
+        $this->storeProviderCredential('render', $this->render_name, $this->render_api_token, 'render_api_token');
         if (! $this->flash_error) {
             $this->reset('render_name', 'render_api_token');
         }
@@ -409,7 +413,7 @@ trait ManagesProviderCredentials
             return;
         }
         $this->validate(['railway_name' => 'nullable|string|max:255', 'railway_api_token' => 'required|string'], [], ['railway_api_token' => 'API token']);
-        $this->store('railway', $this->railway_name, $this->railway_api_token, 'railway_api_token');
+        $this->storeProviderCredential('railway', $this->railway_name, $this->railway_api_token, 'railway_api_token');
         if (! $this->flash_error) {
             $this->reset('railway_name', 'railway_api_token');
         }
@@ -441,6 +445,7 @@ trait ManagesProviderCredentials
         $this->flash_success = 'Credential saved. Server create/destroy not yet implemented.';
         $this->flash_error = null;
         $this->reset('coolify_name', 'coolify_api_url', 'coolify_api_token');
+        $this->notifyProviderCredentialStored('coolify');
     }
 
     public function storeCapRover(): void
@@ -469,6 +474,7 @@ trait ManagesProviderCredentials
         $this->flash_success = 'Credential saved. Server create/destroy not yet implemented.';
         $this->flash_error = null;
         $this->reset('cap_rover_name', 'cap_rover_api_url', 'cap_rover_api_token');
+        $this->notifyProviderCredentialStored('cap_rover');
     }
 
     public function storeAws(): void
@@ -507,6 +513,7 @@ trait ManagesProviderCredentials
         $this->flash_success = 'Provider connected.';
         $this->flash_error = null;
         $this->reset('aws_name', 'aws_access_key_id', 'aws_secret_access_key');
+        $this->notifyProviderCredentialStored('aws');
     }
 
     public function storeGcp(): void
@@ -515,7 +522,7 @@ trait ManagesProviderCredentials
             return;
         }
         $this->validate(['gcp_name' => 'nullable|string|max:255', 'gcp_api_token' => 'required|string'], [], ['gcp_api_token' => 'API token']);
-        $this->store('gcp', $this->gcp_name, $this->gcp_api_token, 'gcp_api_token');
+        $this->storeProviderCredential('gcp', $this->gcp_name, $this->gcp_api_token, 'gcp_api_token');
         if (! $this->flash_error) {
             $this->reset('gcp_name', 'gcp_api_token');
         }
@@ -527,7 +534,7 @@ trait ManagesProviderCredentials
             return;
         }
         $this->validate(['azure_name' => 'nullable|string|max:255', 'azure_api_token' => 'required|string'], [], ['azure_api_token' => 'API token']);
-        $this->store('azure', $this->azure_name, $this->azure_api_token, 'azure_api_token');
+        $this->storeProviderCredential('azure', $this->azure_name, $this->azure_api_token, 'azure_api_token');
         if (! $this->flash_error) {
             $this->reset('azure_name', 'azure_api_token');
         }
@@ -539,7 +546,7 @@ trait ManagesProviderCredentials
             return;
         }
         $this->validate(['oracle_name' => 'nullable|string|max:255', 'oracle_api_token' => 'required|string'], [], ['oracle_api_token' => 'API token']);
-        $this->store('oracle', $this->oracle_name, $this->oracle_api_token, 'oracle_api_token');
+        $this->storeProviderCredential('oracle', $this->oracle_name, $this->oracle_api_token, 'oracle_api_token');
         if (! $this->flash_error) {
             $this->reset('oracle_name', 'oracle_api_token');
         }
@@ -557,7 +564,7 @@ trait ManagesProviderCredentials
         return false;
     }
 
-    protected function store(string $provider, string $name, string $apiToken, string $tokenErrorKey): void
+    protected function storeProviderCredential(string $provider, string $name, string $apiToken, string $tokenErrorKey): void
     {
         $this->authorize('create', ProviderCredential::class);
 
@@ -608,6 +615,14 @@ trait ManagesProviderCredentials
 
         $this->flash_success = 'Provider connected.';
         $this->flash_error = null;
+        $this->notifyProviderCredentialStored($provider);
+    }
+
+    protected function notifyProviderCredentialStored(string $provider): void
+    {
+        if (method_exists($this, 'afterProviderCredentialStored')) {
+            $this->afterProviderCredentialStored($provider);
+        }
     }
 
     public function canVerifyCredentialProvider(string $provider): bool

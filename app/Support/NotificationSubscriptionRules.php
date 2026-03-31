@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\Workspace;
 
 class NotificationSubscriptionRules
 {
@@ -19,6 +20,10 @@ class NotificationSubscriptionRules
 
         if (str_starts_with($eventKey, 'site.') || str_starts_with($eventKey, 'backup.')) {
             return Site::class;
+        }
+
+        if (str_starts_with($eventKey, 'project.')) {
+            return Workspace::class;
         }
 
         return null;

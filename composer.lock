@@ -5806,9 +5806,10 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/dply-core",
-                "reference": "5230ebfb56c6e52cb4e88e44fd5d27016126e7da"
+                "reference": "a70c7b060c336af6d006fc394c1efdec69389bef"
             },
             "require": {
+                "guzzlehttp/guzzle": "^7.8",
                 "php": "^8.3"
             },
             "require-dev": {

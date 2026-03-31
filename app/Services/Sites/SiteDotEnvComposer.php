@@ -8,10 +8,16 @@ class SiteDotEnvComposer
 {
     public function compose(Site $site): string
     {
-        $site->loadMissing('environmentVariables');
+        $site->loadMissing(['environmentVariables', 'workspace.variables']);
         $envName = $site->deployment_environment ?: 'production';
 
         $map = $this->parseDotenv((string) ($site->env_file_content ?? ''));
+
+        if ($site->workspace) {
+            foreach ($site->workspace->variables as $row) {
+                $map[$row->env_key] = (string) ($row->env_value ?? '');
+            }
+        }
 
         foreach ($site->environmentVariables as $row) {
             if ($row->environment === $envName) {

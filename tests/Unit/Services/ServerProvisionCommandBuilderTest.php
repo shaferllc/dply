@@ -93,4 +93,34 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('haproxy', $joined);
         $this->assertStringNotContainsString('ondrej/php', $joined);
     }
+
+    public function test_build_emits_named_step_markers_for_setup_progress(): void
+    {
+        $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'ssh_private_key' => file_get_contents($keyPath),
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $commands = app(ServerProvisionCommandBuilder::class)->build($server);
+        $joined = implode("\n", $commands);
+
+        $this->assertStringContainsString('[dply-step] Installing system updates', $joined);
+        $this->assertStringContainsString('[dply-step] Installing base packages', $joined);
+        $this->assertStringContainsString('[dply-step] Creating server user', $joined);
+        $this->assertStringContainsString('[dply-step] Installing webserver', $joined);
+        $this->assertStringContainsString('[dply-step] Installing PHP 8.3', $joined);
+        $this->assertStringContainsString('[dply-step] Installing MySQL', $joined);
+        $this->assertStringContainsString('[dply-step] Installing Redis', $joined);
+        $this->assertStringContainsString('[dply-step] Installing Composer', $joined);
+        $this->assertStringContainsString('[dply-step] Finalizing server', $joined);
+    }
 }

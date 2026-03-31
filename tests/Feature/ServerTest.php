@@ -11,10 +11,14 @@ use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Models\LogViewerShare;
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\TaskRunner\Enums\TaskStatus;
+use App\Modules\TaskRunner\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -47,7 +51,21 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.index'));
 
         $response->assertOk();
-        $response->assertSee('Servers');
+        $response->assertSee('Fleet control');
+        $response->assertSee('Create server');
+        $response->assertSee('No servers yet');
+        $response->assertSee('Create your first server-ready workspace');
+    }
+
+    public function test_servers_index_prompts_for_provider_setup_when_no_provider_credentials_exist(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('servers.index'));
+
+        $response->assertOk();
+        $response->assertSee('Set up a provider');
+        $response->assertSee('Add provider credentials before you provision infrastructure.');
     }
 
     public function test_servers_index_lists_servers_in_current_organization(): void
@@ -170,6 +188,198 @@ class ServerTest extends TestCase
         $response->assertSee('Create server');
     }
 
+    public function test_servers_create_prompts_to_add_provider_when_none_exist(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('Add a provider before you create a cloud server.');
+        $response->assertSee('Connect DigitalOcean');
+        $response->assertSee('Custom server');
+        $response->assertSee('Custom server details');
+        $response->assertDontSee('Provision a new server with a connected provider');
+        $response->assertDontSee('Choose server type');
+        $response->assertDontSee('Cloud server setup');
+        $response->assertDontSee('No credentials');
+    }
+
+    public function test_servers_create_uses_two_path_flow(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->assertSee('Cloud server')
+            ->assertSee('Custom server')
+            ->assertSee('Core server config')
+            ->assertSee('Advanced options')
+            ->set('form.type', 'custom')
+            ->assertSee('SSH private key (PEM / OpenSSH)')
+            ->assertDontSee('Core server config')
+            ->assertDontSee('Advanced options');
+    }
+
+    public function test_servers_create_generates_a_name_and_can_regenerate_it(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $component = Livewire::actingAs($user)->test(ServersCreate::class);
+
+        $initial = $component->get('form.name');
+
+        $this->assertNotSame('', $initial);
+
+        $component->call('regenerateServerName');
+
+        $regenerated = $component->get('form.name');
+
+        $this->assertNotSame('', $regenerated);
+        $this->assertNotSame($initial, $regenerated);
+    }
+
+    public function test_servers_create_defaults_to_cloud_first_provider_closest_region_and_smallest_size_after_connecting_provider(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
+            'https://api.digitalocean.com/v2/regions' => Http::response([
+                'regions' => [
+                    ['slug' => 'fra1', 'name' => 'Frankfurt 1', 'available' => true],
+                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
+                    ['slug' => 'sfo3', 'name' => 'San Francisco 3', 'available' => true],
+                ],
+            ]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response([
+                'sizes' => [
+                    ['slug' => 's-2vcpu-4gb', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true],
+                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
+                    ['slug' => 's-1vcpu-2gb', 'memory' => 2048, 'vcpus' => 1, 'disk' => 50, 'price_monthly' => 12, 'available' => true],
+                ],
+            ]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $user->forceFill(['country_code' => 'US'])->save();
+
+        $component = Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('do_name', 'Primary DO')
+            ->set('do_api_token', 'dop_v1_test')
+            ->call('storeDigitalOcean');
+
+        $credential = ProviderCredential::query()
+            ->where('organization_id', $user->currentOrganization()?->id)
+            ->where('provider', 'digitalocean')
+            ->first();
+
+        $this->assertNotNull($credential);
+
+        $component
+            ->assertSet('form.type', 'digitalocean')
+            ->assertSet('active_provider', 'digitalocean')
+            ->assertSet('form.provider_credential_id', (string) $credential->id)
+            ->assertSet('form.region', 'nyc3')
+            ->assertSet('form.size', 's-1vcpu-1gb');
+    }
+
+    public function test_servers_create_renders_plan_picker_columns_for_cloud_sizes(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
+            'https://api.digitalocean.com/v2/regions' => Http::response([
+                'regions' => [
+                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
+                ],
+            ]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response([
+                'sizes' => [
+                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
+                    ['slug' => 's-2vcpu-4gb', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true],
+                ],
+            ]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('Price / mo');
+        $response->assertSee('RAM');
+        $response->assertSee('CPU');
+        $response->assertSee('Disk');
+        $response->assertSee('s-1vcpu-1gb');
+        $response->assertSee('$6');
+        $response->assertSee('Recommended');
+    }
+
+    public function test_servers_create_renders_digitalocean_region_picker_map_and_list(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
+            'https://api.digitalocean.com/v2/regions' => Http::response([
+                'regions' => [
+                    ['slug' => 'fra1', 'name' => 'Frankfurt 1', 'available' => true],
+                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
+                    ['slug' => 'sfo3', 'name' => 'San Francisco 3', 'available' => true],
+                ],
+            ]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response([
+                'sizes' => [
+                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
+                ],
+            ]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('View map');
+        $response->assertSee('Open the full map modal for easier geographic selection.');
+        $response->assertSee('data-region-marker="nyc3"', false);
+        $response->assertSee('New York 3');
+        $response->assertSee('Frankfurt 1');
+    }
+
     public function test_servers_can_be_stored_as_custom(): void
     {
         $user = $this->userWithOrganization();
@@ -194,6 +404,158 @@ class ServerTest extends TestCase
         ]);
     }
 
+    public function test_servers_show_routes_provisioning_server_to_journey_page(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Server::STATUS_PENDING,
+            'setup_status' => Server::SETUP_STATUS_PENDING,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('servers.show', $server))
+            ->assertRedirect(route('servers.journey', $server));
+    }
+
+    public function test_servers_show_routes_ready_server_to_overview_page(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('servers.show', $server))
+            ->assertRedirect(route('servers.overview', $server));
+    }
+
+    public function test_servers_journey_page_renders_active_pending_and_completed_steps(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+            'ip_address' => '203.0.113.10',
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Provision server',
+            'action' => 'script',
+            'script' => 'echo setup',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Running,
+            'output' => "Installing packages\nConfiguring nginx\n",
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subSeconds(21),
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], ['provision_task_id' => (string) $task->id]),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Installation tasks');
+        $response->assertSee('Running server setup');
+        $response->assertSee('Pending tasks');
+        $response->assertSee('Completed tasks');
+        $response->assertSee('Provisioning server');
+        $response->assertSee('Waiting for SSH');
+        $response->assertSee('Request queued with provider');
+        $response->assertSee('Installing packages');
+    }
+
+    public function test_servers_journey_page_uses_provision_script_step_markers_when_present(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+            'ip_address' => '203.0.113.10',
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Running,
+            'output' => implode("\n", [
+                '[dply-step] Checking server status',
+                '[dply-step] Testing server connection',
+                '[dply-step] Installing system updates',
+            ]),
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subSeconds(21),
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], ['provision_task_id' => (string) $task->id]),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Checking server status');
+        $response->assertSee('Testing server connection');
+        $response->assertSee('Installing system updates');
+        $response->assertDontSee('Running server setup');
+    }
+
+    public function test_servers_journey_page_renders_pending_state_copy(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Server::STATUS_PENDING,
+            'setup_status' => Server::SETUP_STATUS_PENDING,
+            'ip_address' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Request queued with provider');
+        $response->assertSee('Provisioning server');
+        $response->assertSee('Your request has been accepted and is waiting to start provisioning.');
+        $response->assertSee('Pending tasks');
+    }
+
+    public function test_servers_journey_page_renders_failed_state_copy(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Server::STATUS_ERROR,
+            'setup_status' => Server::SETUP_STATUS_FAILED,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Failed');
+        $response->assertSee('Running server setup');
+        $response->assertSee('The server setup task failed before finishing.');
+    }
+
     public function test_servers_show_is_displayed_for_owner(): void
     {
         $user = $this->userWithOrganization();
@@ -204,9 +566,9 @@ class ServerTest extends TestCase
             'name' => 'Test Server',
         ]);
 
-        $this->actingAs($user)->get(route('servers.show', $server))->assertRedirect(route('servers.sites', $server));
+        $this->actingAs($user)->get(route('servers.show', $server))->assertRedirect(route('servers.overview', $server));
 
-        $response = $this->actingAs($user)->get(route('servers.sites', $server));
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
         $response->assertOk();
         $response->assertSee('Test Server');
     }

@@ -45,6 +45,38 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_local_tj_account_can_authenticate_without_password(): void
+    {
+        config()->set('app.env', 'local');
+
+        $user = User::factory()->create([
+            'email' => 'tj@tjshafer.com',
+        ]);
+
+        Livewire::test(Login::class)
+            ->set('email', $user->email)
+            ->set('password', '')
+            ->call('submit')
+            ->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_local_tj_account_can_use_quick_login_button(): void
+    {
+        config()->set('app.env', 'local');
+
+        $user = User::factory()->create([
+            'email' => 'tj@tjshafer.com',
+        ]);
+
+        Livewire::test(Login::class)
+            ->call('quickLogin')
+            ->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertAuthenticatedAs($user);
+    }
+
     public function test_users_can_logout(): void
     {
         $user = User::factory()->create();

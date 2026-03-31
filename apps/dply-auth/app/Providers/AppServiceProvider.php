@@ -20,6 +20,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Passport::viewPrefix('auth.oauth');
+
+        Passport::tokensCan([
+            'read-user' => 'Read your name and email',
+        ]);
+
         Passport::tokensExpireIn(now()->addHours(12));
         Passport::refreshTokensExpireIn(now()->addDays(30));
     }

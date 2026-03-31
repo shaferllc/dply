@@ -30,6 +30,7 @@ use App\Livewire\Scripts\Index as ScriptsIndex;
 use App\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Livewire\Servers\Create as ServersCreate;
 use App\Livewire\Servers\Index as ServersIndex;
+use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDatabases;
@@ -145,7 +146,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
     Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
-    Route::livewire('projects/{workspace}', ProjectsShow::class)->name('projects.show');
+    Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
+    Route::livewire('projects/{workspace}/overview', ProjectsShow::class)->defaults('section', 'overview')->name('projects.overview');
+    Route::livewire('projects/{workspace}/resources', ProjectsShow::class)->defaults('section', 'resources')->name('projects.resources');
+    Route::livewire('projects/{workspace}/access', ProjectsShow::class)->defaults('section', 'access')->name('projects.access');
+    Route::livewire('projects/{workspace}/operations', ProjectsShow::class)->defaults('section', 'operations')->name('projects.operations');
+    Route::livewire('projects/{workspace}/delivery', ProjectsShow::class)->defaults('section', 'delivery')->name('projects.delivery');
     Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
     Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
@@ -153,8 +159,17 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}', function (Server $server) {
         Gate::authorize('view', $server);
 
-        return redirect()->route('servers.sites', $server);
+        if ($server->status === Server::STATUS_PENDING || $server->status === Server::STATUS_PROVISIONING) {
+            return redirect()->route('servers.journey', $server);
+        }
+
+        if ($server->status === Server::STATUS_READY && in_array($server->setup_status, [Server::SETUP_STATUS_PENDING, Server::SETUP_STATUS_RUNNING], true)) {
+            return redirect()->route('servers.journey', $server);
+        }
+
+        return redirect()->route('servers.overview', $server);
     })->name('servers.show');
+    Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}', SitesShow::class)->name('sites.show');

@@ -40,6 +40,7 @@ use App\Policies\WorkspacePolicy;
 use App\Services\Deploy\ByoServerDeployEngine;
 use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Servers\ServerMetricsGuestScript;
+use Dply\Core\Auth\CentralOAuthClient;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -56,6 +57,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(CentralOAuthClient::class, function () {
+            return new CentralOAuthClient(
+                authBaseUrl: rtrim((string) config('dply_auth.auth_url'), '/'),
+                clientId: (string) config('dply_auth.client_id'),
+                clientSecret: (string) config('dply_auth.client_secret'),
+                redirectUri: (string) config('dply_auth.redirect_uri'),
+            );
+        });
+
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(DeployEngineResolver::class, function ($app) {
             return new DeployEngineResolver($app->make(ByoServerDeployEngine::class));

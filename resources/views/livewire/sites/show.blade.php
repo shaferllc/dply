@@ -3,9 +3,25 @@
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center flex-wrap gap-2">
             <div>
                 <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ $site->name }}</h2>
-                <p class="text-sm text-slate-500">{{ $server->name }} · {{ $site->type->label() }}</p>
+                <p class="text-sm text-slate-500">
+                    {{ $server->name }} · {{ $site->type->label() }}
+                    @if ($site->workspace)
+                        · {{ __('Project:') }}
+                        <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-slate-700 hover:text-slate-900">
+                            {{ $site->workspace->name }}
+                        </a>
+                    @endif
+                </p>
             </div>
             <div class="flex items-center gap-4">
+                @if ($site->workspace)
+                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                        {{ __('Project') }}
+                    </a>
+                    <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                        {{ __('Project delivery') }}
+                    </a>
+                @endif
                 <a href="{{ route('sites.insights', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
                     {{ __('Insights') }}
                     @if ($openSiteInsightsCount > 0)
@@ -38,6 +54,18 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
                 <h3 class="font-medium text-slate-900 mb-3">Status</h3>
+                @if ($site->workspace)
+                    <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <p class="font-medium text-slate-900">{{ __('Project context') }}</p>
+                        <p class="mt-1">
+                            {{ __('This site rolls up into the :project project.', ['project' => $site->workspace->name]) }}
+                            <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project operations') }}</a>
+                            {{ __('for grouped health and activity, or') }}
+                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('open project delivery') }}</a>
+                            {{ __('to coordinate releases and shared variables.') }}
+                        </p>
+                    </div>
+                @endif
                 <p class="text-sm text-slate-600 mb-3">
                     {{ __('Show this site on a public') }}
                     <a href="{{ route('status-pages.index') }}" class="text-slate-800 font-medium hover:underline">{{ __('status page') }}</a>.
@@ -200,6 +228,16 @@
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
                 <h3 class="font-medium text-slate-900">Deployment &amp; Nginx tuning</h3>
                 <p class="text-sm text-slate-600"><strong>Atomic</strong> deploys clone into <code class="text-xs bg-slate-100 px-1 rounded">releases/&lt;timestamp&gt;</code> and flip a <code class="text-xs bg-slate-100 px-1 rounded">current</code> symlink. Nginx web root becomes <code class="text-xs bg-slate-100 px-1 rounded">…/current/public</code>. Enable Laravel scheduler here, then sync crontab on the server page.</p>
+                @if ($site->workspace)
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <p class="font-medium text-slate-900">{{ __('Project delivery context') }}</p>
+                        <p class="mt-1">
+                            {{ __('This site belongs to the :project project.', ['project' => $site->workspace->name]) }}
+                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project delivery') }}</a>
+                            {{ __('to review shared variables, coordinated deploy batches, and delivery notes before changing this site.') }}
+                        </p>
+                    </div>
+                @endif
                 <form wire:submit="saveDeploymentSettings" class="space-y-3">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -244,7 +282,25 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
                 <h3 class="font-medium text-slate-900">Environment variables (key / value)</h3>
-                <p class="text-sm text-slate-600">Merged with the raw .env draft below for the selected environment. Values are encrypted in Dply.</p>
+                <p class="text-sm text-slate-600">Merged with project-level variables and the raw .env draft below for the selected environment. Values are encrypted in Dply.</p>
+                @if ($site->workspace && $site->workspace->variables->isNotEmpty())
+                    <div class="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                        <p class="font-medium">{{ __('Inherited project variables') }}</p>
+                        <p class="mt-1 text-sky-900">{{ __('These values are merged into the final .env for this site. Keep shared values on the project, then add a site variable only when this site needs an override.') }}</p>
+                        <ul class="mt-3 space-y-1">
+                            @foreach ($site->workspace->variables as $projectVariable)
+                                <li>
+                                    <span class="font-mono text-xs">{{ $projectVariable->env_key }}</span>
+                                    <span class="text-sky-800">·</span>
+                                    <span>{{ $projectVariable->is_secret ? __('secret') : __('shared value') }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                        <p class="mt-3">
+                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-sky-950 hover:underline">{{ __('Manage project variables') }}</a>
+                        </p>
+                    </div>
+                @endif
                 @if ($site->environmentVariables->isNotEmpty())
                     <ul class="divide-y divide-slate-100 text-sm">
                         @foreach ($site->environmentVariables as $ev)
@@ -401,6 +457,16 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3" wire:poll.10s>
                 <h3 class="font-medium text-slate-900">Deployment log</h3>
+                @if ($site->workspace)
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <p class="font-medium text-slate-900">{{ __('Project delivery context') }}</p>
+                        <p class="mt-1">
+                            {{ __('Use this log for site-specific output, then') }}
+                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('open project delivery') }}</a>
+                            {{ __('to coordinate shared deploy batches, compare related site rollouts, and review project-level delivery notes for :project.', ['project' => $site->workspace->name]) }}
+                        </p>
+                    </div>
+                @endif
                 @if ($site->deployments->isEmpty())
                     <p class="text-sm text-slate-500">No deployments yet.</p>
                 @else
@@ -435,7 +501,13 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
                 <h3 class="font-medium text-slate-900">Environment (.env)</h3>
-                <p class="text-sm text-slate-600">Draft is stored encrypted. Push merges <strong>key/value variables</strong> (for <code class="text-xs bg-slate-100 px-1">{{ $site->deployment_environment }}</code>) with this draft and writes <code class="text-xs bg-slate-100 px-1">{{ $site->effectiveEnvDirectory() }}/.env</code>.</p>
+                <p class="text-sm text-slate-600">Draft is stored encrypted. Push merges <strong>project variables</strong>, then <strong>site key/value variables</strong> (for <code class="text-xs bg-slate-100 px-1">{{ $site->deployment_environment }}</code>) with this draft and writes <code class="text-xs bg-slate-100 px-1">{{ $site->effectiveEnvDirectory() }}/.env</code>.</p>
+                @if ($site->workspace)
+                    <p class="text-sm text-slate-500">
+                        {{ __('For shared settings across multiple sites in this project, prefer storing them at the project level first.') }}
+                        <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-700 hover:text-slate-900">{{ __('Open project delivery') }}</a>
+                    </p>
+                @endif
                 <textarea wire:model="env_file_content" rows="8" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="APP_NAME=…"></textarea>
                 <div class="flex flex-wrap gap-2">
                     <button type="button" wire:click="saveEnvDraft" class="px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50">Save draft in Dply</button>
