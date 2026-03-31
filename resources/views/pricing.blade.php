@@ -84,7 +84,7 @@
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            Server setup scripts (coming soon)
+                            Backup planning, metrics, and rollback-friendly delivery
                         </li>
                     </ul>
                     <a href="{{ route('register') }}" class="mt-8 block w-full rounded-xl bg-brand-ink px-4 py-3 text-center text-sm font-semibold text-brand-cream shadow-md hover:bg-brand-forest transition-colors">Get started</a>
@@ -103,7 +103,7 @@
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            Team seats &amp; SSO
+                            Advanced governance and rollout support
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
@@ -117,7 +117,7 @@
 
         <section class="border-t border-brand-ink/10 bg-white/60 py-16 px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center">
-                <p class="text-brand-moss leading-relaxed">All plans include secure credential storage, SSH key management, and DigitalOcean integration. You only pay for the cloud resources you use.</p>
+                <p class="text-brand-moss leading-relaxed">All plans include secure credential storage, SSH key management, and provider-connected operations. You only pay for the cloud resources you use, while Dply gives your team one place for deploys, visibility, and clearer operating context.</p>
             </div>
         </section>
     </main>

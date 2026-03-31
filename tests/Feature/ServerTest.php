@@ -11,7 +11,6 @@ use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Jobs\WaitForServerSshReadyJob;
-use App\Models\LogViewerShare;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
@@ -1372,60 +1371,22 @@ class ServerTest extends TestCase
             ->assertSee('Log source')
             ->assertSee('Dply activity')
             ->assertSee(__('Options'))
+            ->assertSee(__('Refresh'))
+            ->assertSee(__('Regex'))
+            ->assertSee(__('Time'))
+            ->assertDontSee(__('Copy'))
+            ->assertDontSee(__('Download'))
+            ->assertDontSee(__('Export & share'))
+            ->assertDontSee(__('Saved views'))
+            ->assertDontSee(__('Pinned lines'))
+            ->assertDontSee(__('Line hints (visible fetch)'))
+            ->assertDontSee(__('How this viewer works'))
+            ->call('toggleLogOptionsMenu')
             ->assertSee(__('Lines to tail'))
             ->assertSee(__('Lines visible'))
-            ->assertSee(__('Clear display'))
-            ->assertSee(__('Copy'))
-            ->assertSee(__('Regex'))
-            ->assertSee(__('Time range'));
-    }
-
-    public function test_log_viewer_share_link_can_be_created_and_viewed(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceLogs::class, ['server' => $server])
-            ->set('remoteLogRaw', 'snapshot line')
-            ->call('createLogShareLink');
-
-        $share = LogViewerShare::query()->where('server_id', $server->id)->latest('id')->first();
-        $this->assertNotNull($share);
-        $this->assertSame('snapshot line', $share->content);
-
-        $this->actingAs($user)
-            ->get(route('log-viewer-shares.show', ['token' => $share->token]))
-            ->assertOk()
-            ->assertSee('snapshot line', false)
-            ->assertSee(__('Shared log snapshot'), false);
-    }
-
-    public function test_log_viewer_pin_line_creates_database_row(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-        ]);
-
-        $fingerprint = str_repeat('a', 64);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceLogs::class, ['server' => $server])
-            ->call('pinLogLine', $fingerprint, 'pinned note');
-
-        $this->assertDatabaseHas('server_log_pins', [
-            'server_id' => $server->id,
-            'user_id' => $user->id,
-            'line_fingerprint' => $fingerprint,
-            'note' => 'pinned note',
-        ]);
+            ->assertSee(__('Auto-refresh'))
+            ->assertSee(__('Reset filter'))
+            ->assertSee(__('Clear display'));
     }
 
     public function test_server_logs_select_log_source_updates_active_key(): void

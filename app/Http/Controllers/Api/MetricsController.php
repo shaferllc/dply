@@ -87,7 +87,7 @@ class MetricsController extends Controller
         }
 
         $capturedAt = isset($data['captured_at'])
-            ? Carbon::parse($data['captured_at'])
+            ? $this->parseGuestCapturedAt($server, (string) $data['captured_at'])
             : now();
 
         $payload = $collector->normalizePayload($data['metrics']);
@@ -98,5 +98,21 @@ class MetricsController extends Controller
         $server->forceFill(['meta' => $meta])->saveQuietly();
 
         return response()->json(['ok' => true], 202);
+    }
+
+    protected function parseGuestCapturedAt(Server $server, string $rawCapturedAt): Carbon
+    {
+        if ($this->capturedAtHasExplicitTimezone($rawCapturedAt)) {
+            return Carbon::parse($rawCapturedAt)->utc();
+        }
+
+        $serverTimezone = trim((string) (($server->meta ?? [])['timezone'] ?? '')) ?: 'UTC';
+
+        return Carbon::parse($rawCapturedAt, $serverTimezone)->utc();
+    }
+
+    protected function capturedAtHasExplicitTimezone(string $rawCapturedAt): bool
+    {
+        return preg_match('/(?:Z|[+-]\d{2}:\d{2}|[+-]\d{4}| [A-Z]{2,5})$/i', trim($rawCapturedAt)) === 1;
     }
 }

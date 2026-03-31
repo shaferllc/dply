@@ -7,6 +7,7 @@ use App\Jobs\UpgradeGuestMetricsScriptJob;
 use App\Livewire\Servers\Concerns\ConfirmsServerMonitoringInstall;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerPackageInstalls;
+use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\SiteDeployment;
@@ -585,6 +586,23 @@ BASH);
             ? $this->summarizeLatestPayload($latest->payload ?? [])
             : [];
         $deploymentContext = $this->deploymentContext($this->server);
+        $sampleAgeMinutesRaw = $latest?->captured_at?->diffInMinutes(now(), false);
+        $sampleAgeMinutes = $sampleAgeMinutesRaw !== null ? abs((int) ceil($sampleAgeMinutesRaw)) : null;
+        $sampleTimestampInFuture = $sampleAgeMinutesRaw !== null && $sampleAgeMinutesRaw < 0;
+        $workspace = $this->server->workspace;
+        $routingSummary = [
+            'server_routes' => NotificationSubscription::query()
+                ->where('subscribable_type', Server::class)
+                ->where('subscribable_id', $this->server->id)
+                ->count(),
+            'project_routes' => $workspace
+                ? NotificationSubscription::query()
+                    ->where('subscribable_type', get_class($workspace))
+                    ->where('subscribable_id', $workspace->id)
+                    ->count()
+                : 0,
+            'has_project' => $workspace !== null,
+        ];
 
         return view('livewire.servers.workspace-monitor', [
             'latest' => $latest,
@@ -606,6 +624,9 @@ BASH);
             'guestPushVerification' => $guestPushVerification,
             'latestPayloadSummary' => $latestPayloadSummary,
             'deploymentContext' => $deploymentContext,
+            'sampleAgeMinutes' => $sampleAgeMinutes,
+            'sampleTimestampInFuture' => $sampleTimestampInFuture,
+            'routingSummary' => $routingSummary,
         ]);
     }
 }

@@ -6,6 +6,7 @@ use App\Jobs\RunWorkspaceDeployJob;
 use App\Models\AuditLog;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
+use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\Workspace;
@@ -644,6 +645,26 @@ class Show extends Component
             'url' => $this->activityUrl($event),
             'linkLabel' => $this->activityLinkLabel($event),
         ]);
+        $workspaceRoutes = NotificationSubscription::query()
+            ->where('subscribable_type', Workspace::class)
+            ->where('subscribable_id', $workspace->id)
+            ->get();
+        $monitoredServerIds = $workspace->servers
+            ->filter(fn (Server $server): bool => (bool) (($server->meta ?? [])['monitoring_python_installed'] ?? false))
+            ->pluck('id');
+        $serversWithSamples = $monitoredServerIds->isEmpty()
+            ? 0
+            : ServerMetricSnapshot::query()
+                ->whereIn('server_id', $monitoredServerIds->all())
+                ->distinct('server_id')
+                ->count('server_id');
+        $operationsSummary = [
+            'runbook_count' => $workspace->runbooks->count(),
+            'notification_route_count' => $workspaceRoutes->count(),
+            'notification_event_count' => $workspaceRoutes->pluck('event_key')->unique()->count(),
+            'monitored_servers' => $monitoredServerIds->count(),
+            'servers_with_samples' => $serversWithSamples,
+        ];
 
         $costSummary = [
             'servers_used' => $workspace->servers->count(),
@@ -662,6 +683,7 @@ class Show extends Component
             'assignableChannels' => $assignableChannels,
             'health' => $health,
             'activity' => $activityItems,
+            'operationsSummary' => $operationsSummary,
             'costSummary' => $costSummary,
             'section' => $this->section,
             'workspaceRoles' => WorkspaceMember::roles(),

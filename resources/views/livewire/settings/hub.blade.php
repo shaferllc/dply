@@ -528,4 +528,22 @@
             <li><span class="font-medium text-brand-ink">{{ __('SSH keys') }}</span> — <a href="{{ route('profile.ssh-keys') }}" class="font-medium text-brand-sage underline underline-offset-2 hover:text-brand-ink" wire:navigate>{{ __('Save keys on your account') }}</a> {{ __('and deploy to servers, or add keys on each server’s page.') }}</li>
         </ul>
     </section>
+
+    <section class="mt-10 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-brand-mist">{{ __('Operational trust') }}</h2>
+        <div class="mt-4 grid gap-4 md:grid-cols-3">
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Recovery paths') }}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Keep backups, storage destinations, and restore notes current before the next production incident. Settings link you into those workflows, while projects and server pages carry them into operations.') }}</p>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Governed changes') }}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Firewall approvals, notification routing, and org defaults help teams make changes with clearer ownership and less hidden machine state.') }}</p>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Team-wide visibility') }}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Preferences here shape how the wider workspace behaves, but the goal is simple: fewer surprises when someone else has to deploy, recover, or audit the stack.') }}</p>
+            </div>
+        </div>
+    </section>
 </div>
