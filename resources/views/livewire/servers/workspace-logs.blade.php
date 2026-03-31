@@ -3,6 +3,7 @@
     /** Entry methods only — omit loadSystemLog and poll so auto-refresh / Reverb merges do not flash a layer over the log. */
     $logLoadingTargets = 'selectLogSource,selectLogSourceFromMenu,loadSystemLogIfEmpty,refreshSystemLog,refreshSystemLogAndCloseMenu,applyLogViewerSettingsAndCloseMenu,applyLogTailLines,setLogTimeRange,setLogTimeRangeFromSelect';
     $currentLogDef = $logSources[$logKey] ?? [];
+    $currentLogIsDply = ($currentLogDef['type'] ?? '') === 'dply';
     $logFetchedHuman = $logLastFetchedAt
         ? \Illuminate\Support\Carbon::parse($logLastFetchedAt)->timezone(config('app.timezone'))->format('Y-m-d H:i:s T')
         : null;
@@ -33,7 +34,10 @@
         @if ($logAutoRefresh) wire:poll.{{ $logAutoRefreshSeconds }}s="pollLogViewerRefresh" @endif
     >
         <div
-            class="flex min-h-0 flex-col lg:min-h-[calc(100dvh-10.5rem)]"
+            @class([
+                'flex min-h-0 flex-col',
+                'lg:min-h-[calc(100dvh-10.5rem)]' => ! $currentLogIsDply,
+            ])
             x-data="{
                 logViewerFocusFilter() {
                     const el = document.getElementById('log-filter');
@@ -329,6 +333,9 @@
                     $logViewerVisibleLines = max(2, min(50, (int) $logDisplayLines));
                     $logLineHeightRem = 1.5;
                     $logViewerHeightRem = $logViewerVisibleLines * $logLineHeightRem;
+                    if ($currentLogIsDply) {
+                        $logViewerHeightRem = max(12, min(18, $logViewerHeightRem));
+                    }
                 @endphp
                 <div
                     class="relative mt-3 overflow-hidden rounded-xl border border-zinc-300 bg-zinc-50 shadow-inner"
