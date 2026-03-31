@@ -86,6 +86,7 @@ class DeployGuestMetricsCallbackEnvJob implements ShouldBeUnique, ShouldQueue
             $meta = $server->meta ?? [];
             $meta['monitoring_callback_env_deployed'] = true;
             $meta['monitoring_callback_env_deployed_at'] = now()->toIso8601String();
+            $meta['monitoring_guest_push_callback_url'] = $push->guestPushUrl();
             $meta['monitoring_guest_cron_installed_at'] = now()->toIso8601String();
             $meta['monitoring_guest_push_cron_expression'] = $push->normalizedGuestPushCronExpression();
             $server->forceFill(['meta' => $meta])->saveQuietly();

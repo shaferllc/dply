@@ -11,7 +11,10 @@ use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\ClassifyProvisionFailure;
+use App\Support\Servers\ProvisionVerificationSummary;
 use App\Support\Servers\ProvisionStepSnapshots;
+use Illuminate\Support\Collection;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -64,14 +67,20 @@ class ProvisionJourney extends Component
 
         $task = $this->provisionTask();
         $run = $this->provisionRun();
+        $artifacts = $run?->artifacts()->get() ?? collect();
         $steps = $this->steps($task);
         $completedCount = collect($steps)->where('state', 'completed')->count();
         $shouldPoll = $this->shouldPoll();
+        $verificationChecks = $this->verificationChecks($artifacts);
+        $failureClassification = $this->failureClassification($task, $steps, $run, $verificationChecks);
+        $repairGuidance = $this->repairGuidance($task, $steps, $run, $verificationChecks, $failureClassification);
+        $stackSummary = $this->stackSummary($artifacts);
+        $stallState = $this->stallState($task, $steps);
 
         return view('livewire.servers.provision-journey', [
             'task' => $task,
             'run' => $run,
-            'artifacts' => $run?->artifacts()->get() ?? collect(),
+            'artifacts' => $artifacts,
             'steps' => $steps,
             'completedCount' => $completedCount,
             'totalCount' => count($steps),
@@ -79,6 +88,11 @@ class ProvisionJourney extends Component
             'pendingSteps' => collect($steps)->where('state', 'pending')->values(),
             'completedSteps' => collect($steps)->where('state', 'completed')->values(),
             'failedStep' => collect($steps)->firstWhere('state', 'failed'),
+            'verificationChecks' => $verificationChecks,
+            'failureClassification' => $failureClassification,
+            'repairGuidance' => $repairGuidance,
+            'stackSummary' => $stackSummary,
+            'stallState' => $stallState,
             'shouldPoll' => $shouldPoll,
             'canCancelProvision' => $this->canCancelProvision($task),
             'deletionSummary' => $this->showRemoveServerModal
@@ -500,5 +514,157 @@ class ProvisionJourney extends Component
         return str_contains($output, 'already installed; skipping package install.')
             || str_contains($output, 'already installed; skipping installer.')
             || str_contains($output, 'already installed; skipping package setup.');
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $artifacts
+     * @return list<array{key:string,label:string,status:string,detail:?string}>
+     */
+    protected function verificationChecks(Collection $artifacts): array
+    {
+        /** @var \App\Models\ServerProvisionArtifact|null $artifact */
+        $artifact = $artifacts->firstWhere('type', 'verification_report');
+
+        return ProvisionVerificationSummary::fromArtifact($artifact);
+    }
+
+    /**
+     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}>  $steps
+     * @param  list<array{key:string,label:string,status:string,detail:?string}>  $verificationChecks
+     * @return array{code:string,label:string,detail:string}|null
+     */
+    protected function failureClassification(?Task $task, array $steps, ?ServerProvisionRun $run, array $verificationChecks): ?array
+    {
+        if (! $run || $run->status !== 'failed') {
+            return null;
+        }
+
+        $failedStep = collect($steps)->firstWhere('state', 'failed');
+
+        return ClassifyProvisionFailure::classify(
+            $failedStep['label'] ?? null,
+            $task?->tailOutput(12),
+            $verificationChecks,
+            $run->rollback_status,
+        );
+    }
+
+    /**
+     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}>  $steps
+     * @param  list<array{key:string,label:string,status:string,detail:?string}>  $verificationChecks
+     * @param  array{code:string,label:string,detail:string}|null  $failureClassification
+     * @return array{summary:string,actions:list<string>,commands:list<string>}|null
+     */
+    protected function repairGuidance(?Task $task, array $steps, ?ServerProvisionRun $run, array $verificationChecks, ?array $failureClassification): ?array
+    {
+        if (! $run || ! in_array($run->status, ['failed', 'cancelled'], true)) {
+            return null;
+        }
+
+        $failedStep = collect($steps)->firstWhere('state', 'failed');
+        $failingChecks = collect($verificationChecks)
+            ->where('status', '!=', 'ok')
+            ->pluck('label')
+            ->values()
+            ->all();
+
+        $actions = [];
+        $commands = [];
+
+        if ($run->rollback_status === 'repair_required') {
+            $actions[] = 'Inspect the generated config and service state before reusing this server.';
+            $actions[] = 'Remove the server if you want a fully clean rebuild.';
+        } else {
+            $actions[] = 'Resume install after reviewing the failed step output.';
+            $actions[] = 'Inspect the generated configs and recent task output if the rerun fails again.';
+        }
+
+        if ($failingChecks !== []) {
+            $actions[] = 'Review the failed verification checks: '.implode(', ', $failingChecks).'.';
+        }
+
+        if (($failureClassification['code'] ?? null) === 'config_validation') {
+            $commands[] = 'sudo nginx -t';
+            $commands[] = 'sudo haproxy -c -f /etc/haproxy/haproxy.cfg';
+        } elseif (($failureClassification['code'] ?? null) === 'service_startup') {
+            $commands[] = 'sudo systemctl status nginx --no-pager';
+            $commands[] = 'sudo systemctl status php8.3-fpm --no-pager';
+        } else {
+            $commands[] = 'sudo journalctl -xe --no-pager | tail -n 80';
+            $commands[] = 'sudo systemctl --failed';
+        }
+
+        return [
+            'summary' => $failedStep
+                ? 'The run stopped during "'.$failedStep['label'].'". Review the output and the suggested actions before retrying.'
+                : 'Provisioning did not complete. Review the latest output and suggested actions before retrying.',
+            'actions' => array_values(array_unique($actions)),
+            'commands' => array_values(array_unique($commands)),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $artifacts
+     * @return array{role:?string,webserver:?string,php_version:?string,database:?string,cache_service:?string,deploy_user:?string,expected_services:list<string>,paths:array<string,string>,config_files:list<string>}|null
+     */
+    protected function stackSummary(Collection $artifacts): ?array
+    {
+        /** @var \App\Models\ServerProvisionArtifact|null $artifact */
+        $artifact = $artifacts->firstWhere('type', 'stack_summary');
+        if (! $artifact) {
+            return null;
+        }
+
+        $decoded = $artifact->metadata;
+        if (! is_array($decoded) || $decoded === []) {
+            $decoded = json_decode((string) $artifact->content, true);
+        }
+
+        if (! is_array($decoded) || $decoded === []) {
+            return null;
+        }
+
+        return [
+            'role' => isset($decoded['role']) ? (string) $decoded['role'] : null,
+            'webserver' => isset($decoded['webserver']) ? (string) $decoded['webserver'] : null,
+            'php_version' => isset($decoded['php_version']) ? (string) $decoded['php_version'] : null,
+            'database' => isset($decoded['database']) ? (string) $decoded['database'] : null,
+            'cache_service' => isset($decoded['cache_service']) ? (string) $decoded['cache_service'] : null,
+            'deploy_user' => isset($decoded['deploy_user']) ? (string) $decoded['deploy_user'] : null,
+            'expected_services' => array_values(array_filter(array_map('strval', is_array($decoded['expected_services'] ?? null) ? $decoded['expected_services'] : []))),
+            'paths' => is_array($decoded['paths'] ?? null) ? $decoded['paths'] : [],
+            'config_files' => array_values(array_filter(array_map('strval', is_array($decoded['config_files'] ?? null) ? $decoded['config_files'] : []))),
+        ];
+    }
+
+    /**
+     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}>  $steps
+     * @return array{eta:string,last_output:string,stalled:bool,warning:?string}|null
+     */
+    protected function stallState(?Task $task, array $steps): ?array
+    {
+        if (! $task || ! $task->status->isActive()) {
+            return null;
+        }
+
+        $activeStep = collect($steps)->firstWhere('state', 'active');
+        $minutesSinceUpdate = (int) max(0, now()->diffInMinutes($task->updated_at ?? $task->started_at ?? now()));
+        $minutesRunning = (int) max(0, now()->diffInMinutes($task->started_at ?? $task->created_at ?? now()));
+        $eta = match ($activeStep['key'] ?? null) {
+            'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
+            'setup' => 'Usually 5-10 minutes',
+            default => 'Usually a few minutes',
+        };
+
+        $stalled = $minutesSinceUpdate >= 6 || $minutesRunning >= 8;
+
+        return [
+            'eta' => $eta,
+            'last_output' => $minutesSinceUpdate === 0
+                ? "Running for {$minutesRunning} minute".($minutesRunning === 1 ? '' : 's')
+                : "No new output for {$minutesSinceUpdate} minute".($minutesSinceUpdate === 1 ? '' : 's'),
+            'stalled' => $stalled,
+            'warning' => $stalled ? 'This run may be stalled. Review the latest output or cancel and retry if it does not recover soon.' : null,
+        ];
     }
 }

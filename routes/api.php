@@ -1,8 +1,7 @@
 <?php
 
-use App\Http\Controllers\Api\GuestMetricsPushController;
 use App\Http\Controllers\Api\InsightsController;
-use App\Http\Controllers\Api\MetricsIngestController;
+use App\Http\Controllers\Api\MetricsController;
 use App\Http\Controllers\Api\OperatorReadmeController;
 use App\Http\Controllers\Api\OperatorSummaryController;
 use App\Http\Controllers\Api\ServerController;
@@ -12,21 +11,16 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Metrics ingest (shared stats API)
+| Metrics API
 |--------------------------------------------------------------------------
 |
-| POST /api/metrics — Bearer DPLY_METRICS_INGEST_TOKEN. BYO workers forward
-| snapshots here when DPLY_METRICS_INGEST_ENABLED=true and URL points to this app.
+| POST /api/metrics accepts both:
+| - guest server callbacks from server-metrics-snapshot.py using per-server token
+| - ingest/export payloads using Bearer DPLY_METRICS_INGEST_TOKEN
 |
 */
-Route::post('/metrics', [MetricsIngestController::class, 'store'])
-    ->middleware(['metrics.ingest', 'throttle:metrics-ingest']);
-
-/*
-| POST /api/metrics/guest-push — server-metrics-snapshot.py (cron) with per-server token.
-*/
-Route::post('/metrics/guest-push', [GuestMetricsPushController::class, 'store'])
-    ->middleware('throttle:metrics-guest-push');
+Route::post('/metrics', [MetricsController::class, 'store'])
+    ->middleware(['throttle:metrics-guest-push', 'throttle:metrics-ingest']);
 
 Route::prefix('v1')->group(function (): void {
     Route::middleware('fleet.operator')->group(function (): void {

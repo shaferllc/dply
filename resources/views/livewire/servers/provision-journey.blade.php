@@ -152,10 +152,15 @@
                                         <p class="mt-1 text-sm leading-6 text-red-800">{{ $failedStep['detail'] }}</p>
                                     @endif
                                     @if ($failedStep['output'])
-                                        <div class="mt-4 rounded-xl border border-red-200 bg-white/80 p-4">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-red-700">{{ __('Captured output') }}</p>
-                                            <pre class="mt-2 whitespace-pre-wrap font-mono text-xs leading-6 text-red-900">{{ $failedStep['output'] }}</pre>
-                                        </div>
+                                        <details class="mt-4 rounded-xl border border-red-200 bg-white/80 p-4">
+                                            <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-red-700">
+                                                <div class="flex items-center justify-between gap-3">
+                                                    <span>{{ __('Captured output') }}</span>
+                                                    <x-heroicon-o-chevron-down class="h-4 w-4" />
+                                                </div>
+                                            </summary>
+                                            <pre class="mt-3 whitespace-pre-wrap font-mono text-xs leading-6 text-red-900">{{ $failedStep['output'] }}</pre>
+                                        </details>
                                     @endif
                                 </div>
                                 <span class="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-red-800">{{ __('Failed') }}</span>
@@ -171,6 +176,16 @@
                                     </div>
                                     @if ($activeStep['detail'])
                                         <p class="mt-3 text-sm leading-6 text-brand-moss whitespace-pre-line">{{ $activeStep['detail'] }}</p>
+                                    @endif
+                                    @if ($stallState)
+                                        <div class="mt-3 rounded-xl border border-blue-100 bg-white/80 p-4">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Run timing') }}</p>
+                                            <p class="mt-2 text-sm text-brand-ink">{{ $stallState['eta'] }}</p>
+                                            <p class="mt-1 text-sm text-brand-moss">{{ $stallState['last_output'] }}</p>
+                                            @if ($stallState['warning'])
+                                                <p class="mt-2 text-sm font-medium text-amber-700">{{ $stallState['warning'] }}</p>
+                                            @endif
+                                        </div>
                                     @endif
                                     @if ($activeStep['output'])
                                         <div class="mt-4 rounded-xl border border-blue-100 bg-white/80 p-4">
@@ -198,8 +213,8 @@
                                 @foreach ($pendingSteps as $step)
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-4">
                                         <div class="flex items-start justify-between gap-4">
-                                            <div class="flex items-center gap-3">
-                                                <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-brand-mist"></span>
+                                            <div class="flex items-start gap-3">
+                                                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full border-2 border-brand-mist"></span>
                                                 <div>
                                                     <p class="text-base font-medium text-brand-ink">{{ $step['label'] }}</p>
                                                     @if ($step['detail'])
@@ -226,8 +241,8 @@
                                 @foreach ($completedSteps as $step)
                                     <div class="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-4">
                                         <div class="flex items-start justify-between gap-4">
-                                            <div class="flex items-center gap-3">
-                                                <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white">
+                                            <div class="flex items-start gap-3">
+                                                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full bg-emerald-500 text-white">
                                                     <x-heroicon-o-check class="h-4 w-4" />
                                                 </span>
                                                 <div>
@@ -236,10 +251,15 @@
                                                         <p class="mt-1 text-sm text-brand-moss whitespace-pre-line">{{ $step['detail'] }}</p>
                                                     @endif
                                                     @if ($step['output'])
-                                                        <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-4">
-                                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Captured output') }}</p>
-                                                            <pre class="mt-2 whitespace-pre-wrap font-mono text-xs leading-6 text-brand-ink">{{ $step['output'] }}</pre>
-                                                        </div>
+                                                        <details class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-4">
+                                                            <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-brand-mist">
+                                                                <div class="flex items-center justify-between gap-3">
+                                                                    <span>{{ __('Captured output') }}</span>
+                                                                    <x-heroicon-o-chevron-down class="h-4 w-4" />
+                                                                </div>
+                                                            </summary>
+                                                            <pre class="mt-3 whitespace-pre-wrap font-mono text-xs leading-6 text-brand-ink">{{ $step['output'] }}</pre>
+                                                        </details>
                                                     @endif
                                                 </div>
                                             </div>
@@ -310,6 +330,13 @@
                         <div class="mt-4 space-y-3 text-sm">
                             <p class="text-brand-moss">{{ __('Attempt') }}: <span class="font-medium text-brand-ink">#{{ $run->attempt }}</span></p>
                             <p class="text-brand-moss">{{ __('Run status') }}: <span class="font-medium text-brand-ink">{{ ucfirst($run->status) }}</span></p>
+                            @if ($failureClassification)
+                                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-red-700">{{ __('Failure classification') }}</p>
+                                    <p class="mt-1 text-sm font-semibold text-red-900">{{ $failureClassification['label'] }}</p>
+                                    <p class="mt-1 text-sm text-red-800">{{ $failureClassification['detail'] }}</p>
+                                </div>
+                            @endif
                             @if ($run->rollback_status)
                                 <p class="text-brand-moss">{{ __('Rollback') }}: <span class="font-medium text-brand-ink">{{ str_replace('_', ' ', ucfirst($run->rollback_status)) }}</span></p>
                             @endif
@@ -317,6 +344,87 @@
                                 <p class="rounded-xl bg-brand-sand/20 p-4 text-brand-ink">{{ $run->summary }}</p>
                             @endif
                         </div>
+                    </section>
+                @endif
+
+                @if ($verificationChecks !== [])
+                    <section class="{{ $card }} p-6">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Verification results') }}</h3>
+                        <div class="mt-4 space-y-3">
+                            @foreach ($verificationChecks as $check)
+                                <div class="rounded-xl border {{ $check['status'] === 'ok' ? 'border-emerald-100 bg-emerald-50/70' : 'border-red-200 bg-red-50/70' }} px-4 py-3">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-brand-ink">{{ $check['label'] }}</p>
+                                            @if ($check['detail'])
+                                                <p class="mt-1 text-sm {{ $check['status'] === 'ok' ? 'text-brand-moss' : 'text-red-800' }}">{{ $check['detail'] }}</p>
+                                            @endif
+                                        </div>
+                                        <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide {{ $check['status'] === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800' }}">
+                                            {{ $check['status'] === 'ok' ? __('Passed') : __('Needs attention') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
+                @if ($repairGuidance)
+                    <section class="{{ $card }} p-6">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Repair guidance') }}</h3>
+                        <p class="mt-4 text-sm leading-6 text-brand-moss">{{ $repairGuidance['summary'] }}</p>
+                        <div class="mt-4 space-y-2">
+                            @foreach ($repairGuidance['actions'] as $action)
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3 text-sm text-brand-ink">{{ $action }}</div>
+                            @endforeach
+                        </div>
+                        @if ($repairGuidance['commands'] !== [])
+                            <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Suggested commands') }}</p>
+                                <pre class="mt-2 whitespace-pre-wrap font-mono text-xs leading-6 text-brand-ink">{{ implode("\n", $repairGuidance['commands']) }}</pre>
+                            </div>
+                        @endif
+                    </section>
+                @endif
+
+                @if ($stackSummary)
+                    <section class="{{ $card }} p-6">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Installed stack') }}</h3>
+                        <dl class="mt-4 space-y-3 text-sm">
+                            <div><dt class="text-brand-moss">{{ __('Role') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['role'] ?: '—' }}</dd></div>
+                            <div><dt class="text-brand-moss">{{ __('Web server') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['webserver'] ?: '—' }}</dd></div>
+                            <div><dt class="text-brand-moss">{{ __('PHP') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['php_version'] ?: '—' }}</dd></div>
+                            <div><dt class="text-brand-moss">{{ __('Database') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['database'] ?: '—' }}</dd></div>
+                            <div><dt class="text-brand-moss">{{ __('Cache') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['cache_service'] ?: '—' }}</dd></div>
+                            <div><dt class="text-brand-moss">{{ __('Deploy user') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['deploy_user'] ?: '—' }}</dd></div>
+                        </dl>
+                        @if ($stackSummary['expected_services'] !== [])
+                            <div class="mt-4">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Expected services') }}</p>
+                                <p class="mt-2 text-sm text-brand-ink">{{ implode(', ', $stackSummary['expected_services']) }}</p>
+                            </div>
+                        @endif
+                        @if ($stackSummary['paths'] !== [])
+                            <div class="mt-4">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Deploy paths') }}</p>
+                                <div class="mt-2 space-y-2">
+                                    @foreach ($stackSummary['paths'] as $label => $path)
+                                        <div class="text-sm text-brand-ink"><span class="font-medium">{{ ucfirst($label) }}:</span> <span class="font-mono">{{ $path }}</span></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                        @if ($stackSummary['config_files'] !== [])
+                            <div class="mt-4">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Config files') }}</p>
+                                <div class="mt-2 space-y-2">
+                                    @foreach ($stackSummary['config_files'] as $file)
+                                        <div class="text-sm font-mono text-brand-ink">{{ $file }}</div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </section>
                 @endif
 

@@ -1019,6 +1019,131 @@ class ServerTest extends TestCase
         $response->assertSee('Verification report');
     }
 
+    public function test_servers_journey_page_renders_verification_repair_and_stack_summary_cards(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_FAILED,
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Failed,
+            'output' => 'haproxy -c failed',
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subMinutes(3),
+            'completed_at' => now(),
+        ]);
+
+        $run = ServerProvisionRun::query()->create([
+            'server_id' => $server->id,
+            'task_id' => $task->id,
+            'attempt' => 1,
+            'status' => 'failed',
+            'rollback_status' => 'repair_required',
+            'summary' => 'Provisioning failed and needs guided repair.',
+            'started_at' => now()->subMinutes(5),
+            'completed_at' => now(),
+        ]);
+
+        $run->artifacts()->create([
+            'type' => 'verification_report',
+            'key' => 'verification-report',
+            'label' => 'Verification report',
+            'metadata' => [
+                'checks' => [
+                    ['key' => 'haproxy', 'status' => 'failed', 'detail' => 'Config test failed'],
+                ],
+            ],
+            'content' => '[]',
+        ]);
+
+        $run->artifacts()->create([
+            'type' => 'stack_summary',
+            'key' => 'stack-summary',
+            'label' => 'Installed stack',
+            'metadata' => [
+                'role' => 'load_balancer',
+                'webserver' => 'none',
+                'php_version' => 'none',
+                'database' => 'none',
+                'cache_service' => 'none',
+                'deploy_user' => 'dply',
+                'expected_services' => ['haproxy', 'ufw'],
+                'paths' => ['current' => '/home/dply/apps/lb/current'],
+                'config_files' => ['/etc/haproxy/haproxy.cfg'],
+            ],
+            'content' => '{}',
+        ]);
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], [
+                'provision_task_id' => (string) $task->id,
+                'provision_run_id' => (string) $run->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Verification results');
+        $response->assertSee('HAProxy config test');
+        $response->assertSee('Repair guidance');
+        $response->assertSee('Rollback needs repair');
+        $response->assertSee('Installed stack');
+        $response->assertSee('/etc/haproxy/haproxy.cfg');
+    }
+
+    public function test_servers_journey_page_renders_stall_timing_hint_for_active_task(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+            'ip_address' => '203.0.113.10',
+        ]);
+
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Running,
+            'script_content' => "echo '[dply-step] Running server setup'",
+            'output' => '[dply-step] Running server setup',
+            'server_id' => $server->id,
+            'created_by' => $user->id,
+            'started_at' => now()->subMinutes(9),
+        ]);
+        Task::withoutTimestamps(function () use ($task): void {
+            $task->update([
+                'updated_at' => now()->subMinutes(7),
+            ]);
+        });
+
+        $server->update([
+            'meta' => array_merge($server->meta ?? [], [
+                'provision_task_id' => (string) $task->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.journey', $server));
+
+        $response->assertOk();
+        $response->assertSee('Run timing');
+    }
+
     public function test_servers_journey_can_restart_install(): void
     {
         Queue::fake();

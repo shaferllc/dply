@@ -50,6 +50,13 @@
                         @php
                             $fix = config('insights.insights.'.$f->insight_key.'.fix');
                             $canFix = is_array($fix) && ($fix['action'] ?? null);
+                            $checkedAtRaw = is_array($f->meta ?? null) ? ($f->meta['checked_at'] ?? null) : null;
+                            $checkedAt = is_string($checkedAtRaw) && $checkedAtRaw !== ''
+                                ? \Carbon\Carbon::parse($checkedAtRaw)
+                                : null;
+                            $appTimezone = config('app.timezone') ?: 'UTC';
+                            $checkedAtLocal = $checkedAt?->copy()->timezone($appTimezone);
+                            $checkedAtUtc = $checkedAt?->copy()->timezone('UTC');
                         @endphp
                         <li class="px-5 py-4 flex flex-wrap items-start justify-between gap-4">
                             <div class="min-w-0">
@@ -66,7 +73,18 @@
                                     <p class="mt-2 text-sm text-brand-moss whitespace-pre-wrap">{{ $f->body }}</p>
                                 @endif
                                 @include('livewire.partials.insight-correlation', ['finding' => $f])
-                                <p class="mt-2 text-xs text-brand-mist">{{ $f->detected_at?->diffForHumans() }}</p>
+                                @if ($f->insight_key === 'insights_pipeline_heartbeat' && $checkedAtLocal && $checkedAtUtc)
+                                    <div class="mt-2 space-y-1 text-xs text-brand-mist">
+                                        <p>{{ __('App time') }}: {{ $checkedAtLocal->format('Y-m-d H:i:s T') }}</p>
+                                        <p>{{ __('UTC') }}: {{ $checkedAtUtc->format('Y-m-d H:i:s T') }}</p>
+                                        <p>{{ __('Recorded') }}: {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') }}</p>
+                                    </div>
+                                @else
+                                    <p class="mt-2 text-xs text-brand-mist">
+                                        {{ __('Detected') }}:
+                                        {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') ?? '—' }}
+                                    </p>
+                                @endif
                             </div>
                             @if ($canFix)
                                 <button type="button" wire:click="applyFix({{ $f->id }})" wire:confirm="{{ __('Apply the suggested fix on the server?') }}" class="{{ $btnSecondary }} shrink-0">

@@ -7,7 +7,7 @@ use App\Models\Server;
 use Illuminate\Support\Str;
 
 /**
- * Per-server token for {@see GuestMetricsPushController}, ~/.dply/metrics-callback.env,
+ * Per-server token for the unified metrics API, ~/.dply/metrics-callback.env,
  * and the guest user crontab block installed by {@see DeployGuestMetricsCallbackEnvJob}.
  */
 class ServerMetricsGuestPushService
@@ -41,14 +41,32 @@ class ServerMetricsGuestPushService
         }
 
         $desiredCron = $this->normalizedGuestPushCronExpression();
+        $desiredCallbackUrl = $this->guestPushUrl();
         $storedCronRaw = $meta['monitoring_guest_push_cron_expression'] ?? null;
         $storedCronStr = is_string($storedCronRaw) ? $storedCronRaw : '';
+        $storedCallbackUrlRaw = $meta['monitoring_guest_push_callback_url'] ?? null;
+        $storedCallbackUrl = is_string($storedCallbackUrlRaw) ? trim($storedCallbackUrlRaw) : '';
+        $remoteEnvPresent = array_key_exists('monitoring_callback_env_present_remote', $meta)
+            ? (bool) $meta['monitoring_callback_env_present_remote']
+            : true;
+        $remoteCronPresent = array_key_exists('monitoring_guest_cron_present_remote', $meta)
+            ? (bool) $meta['monitoring_guest_cron_present_remote']
+            : true;
         $missingStoredExpr = ! empty($meta['monitoring_guest_cron_installed_at']) && $storedCronStr === '';
         $cronOutOfDate = $missingStoredExpr || ($storedCronStr !== '' && $storedCronStr !== $desiredCron);
+        $callbackUrlOutOfDate = ! empty($meta['monitoring_callback_env_deployed'])
+            && $storedCallbackUrl !== ''
+            && $storedCallbackUrl !== $desiredCallbackUrl;
+        $missingStoredCallbackUrl = ! empty($meta['monitoring_callback_env_deployed']) && $storedCallbackUrl === '';
+        $remoteStateMissing = (! empty($meta['monitoring_callback_env_deployed']) && ! $remoteEnvPresent)
+            || (! empty($meta['monitoring_guest_cron_installed_at']) && ! $remoteCronPresent);
 
         if (! empty($meta['monitoring_callback_env_deployed'])
             && ! empty($meta['monitoring_guest_cron_installed_at'])
-            && ! $cronOutOfDate) {
+            && ! $cronOutOfDate
+            && ! $callbackUrlOutOfDate
+            && ! $remoteStateMissing
+            && ! $missingStoredCallbackUrl) {
             return;
         }
 
@@ -110,7 +128,17 @@ class ServerMetricsGuestPushService
 
     public function guestPushUrl(): string
     {
-        return rtrim((string) config('app.url'), '/').'/api/metrics/guest-push';
+        $ingestUrl = trim((string) config('server_metrics.ingest.url', ''));
+        if ($ingestUrl !== '') {
+            return rtrim($ingestUrl, '/');
+        }
+
+        $public = trim((string) config('dply.public_app_url', ''));
+        if ($public !== '') {
+            return rtrim($public, '/').'/api/metrics';
+        }
+
+        return rtrim((string) config('app.url'), '/').'/api/metrics';
     }
 
     /**

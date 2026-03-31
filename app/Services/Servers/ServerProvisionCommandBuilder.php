@@ -106,6 +106,48 @@ final class ServerProvisionCommandBuilder
         ];
 
         $artifacts[] = [
+            'type' => 'stack_summary',
+            'key' => 'stack-summary',
+            'label' => 'Installed stack',
+            'content' => json_encode([
+                'role' => $role,
+                'webserver' => $web,
+                'php_version' => $php,
+                'database' => $database,
+                'cache_service' => $cache,
+                'deploy_user' => (string) config('server_provision.deploy_ssh_user', 'dply'),
+                'expected_services' => array_keys($this->verificationLabels($role, $web, $php, $database, $cache)),
+                'paths' => [
+                    'current' => $layout['current'],
+                    'shared' => $layout['shared'],
+                    'logs' => $layout['logs'],
+                ],
+                'config_files' => collect($this->renderedConfigs($role, $web, $php, $layout))
+                    ->map(fn (array $config): string => $config['path'])
+                    ->values()
+                    ->all(),
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}',
+            'metadata' => [
+                'role' => $role,
+                'webserver' => $web,
+                'php_version' => $php,
+                'database' => $database,
+                'cache_service' => $cache,
+                'deploy_user' => (string) config('server_provision.deploy_ssh_user', 'dply'),
+                'expected_services' => array_keys($this->verificationLabels($role, $web, $php, $database, $cache)),
+                'paths' => [
+                    'current' => $layout['current'],
+                    'shared' => $layout['shared'],
+                    'logs' => $layout['logs'],
+                ],
+                'config_files' => collect($this->renderedConfigs($role, $web, $php, $layout))
+                    ->map(fn (array $config): string => $config['path'])
+                    ->values()
+                    ->all(),
+            ],
+        ];
+
+        $artifacts[] = [
             'type' => 'rollback_plan',
             'key' => 'rollback-plan',
             'label' => 'Rollback plan',
