@@ -1,5 +1,4 @@
 import './bootstrap';
-import Plotly from 'plotly.js-dist-min';
 
 /**
  * Livewire 3 ships Alpine; do not import `alpinejs` or call `Alpine.start()` here
@@ -27,8 +26,51 @@ document.addEventListener('alpine:init', () => {
     }));
 });
 
-function renderDplyRegionMaps() {
-    document.querySelectorAll('[data-region-map]').forEach((el) => {
+const plotlyCdnUrl = 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.4.0/plotly.min.js';
+
+let plotlyLoader = null;
+
+function loadPlotly() {
+    if (window.Plotly) {
+        return Promise.resolve(window.Plotly);
+    }
+
+    if (plotlyLoader) {
+        return plotlyLoader;
+    }
+
+    plotlyLoader = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-plotly-cdn="1"]');
+
+        if (existing) {
+            existing.addEventListener('load', () => resolve(window.Plotly), { once: true });
+            existing.addEventListener('error', () => reject(new Error('Failed to load Plotly CDN script.')), { once: true });
+
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = plotlyCdnUrl;
+        script.async = true;
+        script.dataset.plotlyCdn = '1';
+        script.onload = () => resolve(window.Plotly);
+        script.onerror = () => reject(new Error('Failed to load Plotly CDN script.'));
+        document.head.appendChild(script);
+    });
+
+    return plotlyLoader;
+}
+
+async function renderDplyRegionMaps() {
+    const mapElements = [...document.querySelectorAll('[data-region-map]')];
+
+    if (mapElements.length === 0) {
+        return;
+    }
+
+    const Plotly = await loadPlotly();
+
+    mapElements.forEach((el) => {
         const rawPoints = el.dataset.regionPoints ?? '[]';
         const selected = el.dataset.selectedRegion ?? '';
 
@@ -109,12 +151,12 @@ function renderDplyRegionMaps() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    renderDplyRegionMaps();
+    renderDplyRegionMaps().catch(() => {});
 });
 
 window.addEventListener('dply:region-map-open', () => {
     window.setTimeout(() => {
-        renderDplyRegionMaps();
+        renderDplyRegionMaps().catch(() => {});
         window.dispatchEvent(new Event('resize'));
     }, 50);
 });
