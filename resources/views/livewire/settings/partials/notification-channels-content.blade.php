@@ -25,35 +25,33 @@
 @endif
 @endif
 
-<header class="mb-8 flex flex-wrap items-start justify-between gap-4">
-    <div>
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ $pageTitle }}</h1>
-        <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">{{ $intro }}</p>
-    </div>
+<x-page-header :title="$pageTitle" :description="$intro" flush>
     @if (! empty($showBulkAssign ?? false))
-        <a
-            href="{{ route('profile.notification-channels.bulk-assign') }}"
-            wire:navigate
-            class="shrink-0 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/50"
-        >{{ __('Bulk assign notifications') }}</a>
+        <x-slot name="actions">
+            <a
+                href="{{ route('profile.notification-channels.bulk-assign') }}"
+                wire:navigate
+                class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+            >{{ __('Bulk assign notifications') }}</a>
+        </x-slot>
     @endif
-</header>
+</x-page-header>
 
 @if ($flash_success)
-    <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ $flash_success }}</div>
+    <x-alert tone="success" class="mb-6">{{ $flash_success }}</x-alert>
 @endif
 @if ($flash_error)
-    <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">{{ $flash_error }}</div>
+    <x-alert tone="error" class="mb-6">{{ $flash_error }}</x-alert>
 @endif
 
 <div class="space-y-10">
     @if (($currentOrganization ?? null) || ($teamChannelGroups ?? collect())->isNotEmpty())
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+        <x-section-card>
+            <x-slot name="header">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Available beyond your personal channels') }}</h2>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Organization-owned and team-owned channels can be assigned too. Manage them from their own settings pages.') }}</p>
-            </div>
-            <div class="space-y-6 p-6 sm:p-8">
+            </x-slot>
+            <div class="space-y-6">
                 @if (($currentOrganization ?? null) && isset($organizationChannels))
                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 p-4">
                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -116,46 +114,37 @@
                     </div>
                 @endif
             </div>
-        </section>
+        </x-section-card>
     @endif
 
-    <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+    <x-section-card>
+        <x-slot name="header">
             <h2 class="text-lg font-semibold text-brand-ink">{{ __('Create notification channel') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Connect chat, email, Pushover, webhooks, or mobile tokens. Credentials are stored encrypted.') }}</p>
-        </div>
+        </x-slot>
         @if ($canManage && count($types) === 0)
-            <div class="px-6 py-6 sm:px-8 text-sm text-brand-moss">
-                {{ __('No notification channel types are enabled. Add types in configuration (DPLY_NOTIFICATION_CHANNEL_TYPES) when ready.') }}
-            </div>
+            <x-empty-state
+                :title="__('No notification channel types are enabled.')"
+                :description="__('Add types in configuration (DPLY_NOTIFICATION_CHANNEL_TYPES) when ready.')"
+                class="m-6 sm:m-8"
+            />
         @elseif ($canManage)
-            <form wire:submit="createChannel" class="p-6 sm:p-8 space-y-5">
+            <form wire:submit="createChannel" class="space-y-5">
                 <div class="grid gap-5 sm:grid-cols-2">
                     <div>
                         <x-input-label for="new_type" :value="__('Type')" />
-                        <select
-                            id="new_type"
-                            wire:model.live="new_type"
-                            class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                        >
+                        <x-select id="new_type" wire:model.live="new_type">
                             @foreach ($types as $t)
                                 <option value="{{ $t }}">{{ \App\Models\NotificationChannel::labelForType($t) }}</option>
                             @endforeach
-                        </select>
+                        </x-select>
                         @error('new_type')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
                     <div>
                         <x-input-label for="new_label" :value="__('Label')" />
-                        <input
-                            id="new_label"
-                            type="text"
-                            wire:model="new_label"
-                            class="mt-1 block w-full rounded-xl border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                            placeholder="{{ __('e.g. #alerts') }}"
-                            required
-                        />
+                        <x-text-input id="new_label" type="text" wire:model="new_label" placeholder="{{ __('e.g. #alerts') }}" required />
                         @error('new_label')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                         @enderror
@@ -169,21 +158,28 @@
                 </div>
             </form>
         @else
-            <div class="px-6 py-6 sm:px-8 text-sm text-brand-moss">{{ __('You can view channels here. Ask an admin to add or change destinations.') }}</div>
+            <x-empty-state
+                :title="__('You can view channels here.')"
+                :description="__('Ask an admin to add or change destinations.')"
+                class="m-6 sm:m-8"
+                :dashed="false"
+            />
         @endif
-    </section>
+    </x-section-card>
 
-    <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+    <x-section-card>
+        <x-slot name="header">
+            <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 class="text-lg font-semibold text-brand-ink">{{ __('My channels') }}</h2>
-            <input
+            <x-text-input
                 type="search"
                 wire:model.live.debounce.300ms="search"
                 placeholder="{{ __('Search…') }}"
-                class="rounded-xl border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage w-full max-w-xs"
+                class="w-full max-w-xs"
             />
-        </div>
-        <div class="overflow-x-auto">
+            </div>
+        </x-slot>
+        <x-table-shell class="border-0 rounded-none">
             <table class="min-w-full divide-y divide-brand-ink/10">
                 <thead>
                     <tr class="bg-brand-sand/40 text-left text-xs font-semibold uppercase tracking-wider text-brand-moss">
@@ -202,22 +198,18 @@
                                         <div class="grid gap-4 sm:grid-cols-2">
                                             <div>
                                                 <x-input-label for="edit_type" :value="__('Type')" />
-                                                <select
-                                                    id="edit_type"
-                                                    wire:model.live="edit_type"
-                                                    class="mt-1 block w-full rounded-xl border border-brand-ink/15 px-3 py-2 text-sm"
-                                                >
+                                                <x-select id="edit_type" wire:model.live="edit_type">
                                                     @foreach ($typesForEdit as $t)
                                                         <option value="{{ $t }}">{{ \App\Models\NotificationChannel::labelForType($t) }}</option>
                                                     @endforeach
-                                                </select>
+                                                </x-select>
                                                 @error('edit_type')
                                                     <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                                 @enderror
                                             </div>
                                             <div>
                                                 <x-input-label for="edit_label" :value="__('Label')" />
-                                                <input id="edit_label" type="text" wire:model="edit_label" class="mt-1 block w-full rounded-xl border border-brand-ink/15 px-3 py-2 text-sm" />
+                                                <x-text-input id="edit_label" type="text" wire:model="edit_label" />
                                                 @error('edit_label')
                                                     <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                                 @enderror
@@ -226,7 +218,7 @@
                                         @include('livewire.settings.partials.notification-channel-fields', ['prefix' => 'edit_', 'type' => $edit_type])
                                         <div class="flex flex-wrap gap-2">
                                             <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
-                                            <button type="button" wire:click="cancelEdit" class="rounded-xl border border-brand-ink/15 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/60">{{ __('Cancel') }}</button>
+                                            <x-secondary-button type="button" wire:click="cancelEdit">{{ __('Cancel') }}</x-secondary-button>
                                         </div>
                                     </form>
                                 </td>
@@ -268,6 +260,6 @@
                     @endforelse
                 </tbody>
             </table>
-        </div>
-    </section>
+        </x-table-shell>
+    </x-section-card>
 </div>

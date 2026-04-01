@@ -2,63 +2,58 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-organization-shell :organization="$organization" section="overview">
             <div>
-                <header class="mb-8 rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
-                    <div class="flex flex-wrap items-start justify-between gap-4">
-                        <div class="max-w-3xl">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Organization overview') }}</p>
-                            <h1 class="mt-2 text-2xl font-semibold text-slate-900">{{ $organization->name }}</h1>
-                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('Use this page for a quick snapshot of plan usage, people, and recent organization activity. Detailed billing, notifications, provider credentials, and templates each have their own focused page in the organization sidebar.') }}</p>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
+                <x-page-header
+                    :eyebrow="__('Organization overview')"
+                    :title="$organization->name"
+                    :description="__('Use this page for a quick snapshot of plan usage, people, and recent organization activity. Detailed billing, notifications, provider credentials, and templates each have their own focused page in the organization sidebar.')"
+                >
+                    <x-slot name="actions">
                             @if ($organization->hasAdminAccess(auth()->user()))
-                                <a href="{{ route('billing.show', $organization) }}" wire:navigate class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Billing & plan') }}</a>
+                                <a href="{{ route('billing.show', $organization) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Billing & plan') }}</a>
                             @endif
                             @can('viewNotificationChannels', $organization)
-                                <a href="{{ route('organizations.notification-channels', $organization) }}" wire:navigate class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Notification channels') }}</a>
+                                <a href="{{ route('organizations.notification-channels', $organization) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Notification channels') }}</a>
                             @endcan
                             @can('viewAny', \App\Models\ProviderCredential::class)
-                                <a href="{{ route('organizations.credentials', $organization) }}" wire:navigate class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Server providers') }}</a>
+                                <a href="{{ route('organizations.credentials', $organization) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Server providers') }}</a>
                             @endcan
-                        </div>
-                    </div>
-                </header>
+                    </x-slot>
+                </x-page-header>
 
                 @if ($new_token_plaintext)
-                    <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <x-alert tone="warning" class="mb-4">
                         <p class="mb-1 font-medium text-amber-900">{{ __('API token created: :name', ['name' => $new_token_name]) }}</p>
                         <p class="mb-2 text-sm text-amber-800">{{ __("Copy this token now. It won't be shown again.") }}</p>
                         <code class="block break-all rounded border border-amber-200 bg-white p-3 text-sm select-all">{{ $new_token_plaintext }}</code>
                         <button type="button" wire:click="clearNewToken" class="mt-2 text-sm text-amber-800 underline">{{ __('Dismiss') }}</button>
-                    </div>
+                    </x-alert>
                 @endif
 
                 <div class="space-y-8">
                     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Plan') }}</p>
-                            <p class="mt-3 text-xl font-semibold text-slate-900">{{ $organization->planTierLabel() }}</p>
-                            <p class="mt-1 text-sm text-slate-600">{{ __('Limits and billing apply to the whole organization.') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Infrastructure') }}</p>
-                            <p class="mt-3 text-xl font-semibold text-slate-900">{{ $organization->servers_count }} {{ Str::plural('server', $organization->servers_count) }}</p>
-                            <p class="mt-1 text-sm text-slate-600">
+                        <x-stat-card
+                            :label="__('Plan')"
+                            :value="$organization->planTierLabel()"
+                            :meta="__('Limits and billing apply to the whole organization.')"
+                        />
+                        <x-stat-card :label="__('Infrastructure')" :value="$organization->servers_count.' '.Str::plural('server', $organization->servers_count)">
+                            <span class="text-sm text-brand-moss">
                                 {{ $organization->sites_count }} {{ Str::plural('site', $organization->sites_count) }}
                                 @if ($organization->maxServers() < PHP_INT_MAX || $organization->maxSites() < PHP_INT_MAX)
                                     · {{ __('tracked against plan limits') }}
                                 @endif
-                            </p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('People') }}</p>
-                            <p class="mt-3 text-xl font-semibold text-slate-900">{{ $organization->users->count() }} {{ Str::plural('member', $organization->users->count()) }}</p>
-                            <p class="mt-1 text-sm text-slate-600">{{ $organization->teams->count() }} {{ Str::plural('team', $organization->teams->count()) }} · {{ $organization->invitations->count() }} {{ Str::plural('pending invite', $organization->invitations->count()) }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Automation') }}</p>
-                            <p class="mt-3 text-xl font-semibold text-slate-900">{{ $organization->apiTokens->count() }} {{ Str::plural('API token', $organization->apiTokens->count()) }}</p>
-                            <p class="mt-1 text-sm text-slate-600">{{ $organization->notificationWebhookDestinations->count() }} {{ Str::plural('webhook destination', $organization->notificationWebhookDestinations->count()) }}</p>
-                        </div>
+                            </span>
+                        </x-stat-card>
+                        <x-stat-card
+                            :label="__('People')"
+                            :value="$organization->users->count().' '.Str::plural('member', $organization->users->count())"
+                            :meta="$organization->teams->count().' '.Str::plural('team', $organization->teams->count()).' · '.$organization->invitations->count().' '.Str::plural('pending invite', $organization->invitations->count())"
+                        />
+                        <x-stat-card
+                            :label="__('Automation')"
+                            :value="$organization->apiTokens->count().' '.Str::plural('API token', $organization->apiTokens->count())"
+                            :meta="$organization->notificationWebhookDestinations->count().' '.Str::plural('webhook destination', $organization->notificationWebhookDestinations->count())"
+                        />
                     </section>
 
                     <section class="grid gap-8 xl:grid-cols-[1.45fr,1fr]">

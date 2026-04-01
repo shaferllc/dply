@@ -20,7 +20,7 @@ Route::middleware('guest')->group(function () {
     Route::get('oauth/central/redirect', [CentralAuthController::class, 'redirect'])
         ->name('oauth.central.redirect');
     Route::get('oauth/callback', [CentralAuthController::class, 'callback'])
-        ->name('oauth.callback');
+        ->name('oauth.central.callback');
 
     Route::livewire('register', Register::class)->name('register');
     Route::livewire('login', Login::class)->name('login');

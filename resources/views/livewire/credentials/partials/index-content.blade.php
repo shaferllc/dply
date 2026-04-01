@@ -10,27 +10,24 @@
     </ol>
 </nav>
 
-<header class="mb-8">
-    <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Provider credentials') }}</h1>
-    <p class="mt-2 text-sm text-brand-moss max-w-3xl leading-relaxed">
-        {{ __('Store encrypted API keys for the cloud providers your organization uses. Tokens are validated when possible. Use the list on the left to configure one provider at a time.') }}
-    </p>
+<x-page-header
+    :title="__('Provider credentials')"
+    :description="__('Store encrypted API keys for the cloud providers your organization uses. Tokens are validated when possible. Use the list on the left to configure one provider at a time.')"
+    flush
+>
     @if ($organization)
-        <p class="mt-2 text-xs text-brand-mist">
-            {{ __('Organization:') }}
-            <span class="font-medium text-brand-moss">{{ $organization->name }}</span>
-        </p>
+        <x-slot name="actions">
+            <x-badge tone="accent" class="normal-case tracking-normal text-xs">
+                {{ __('Organization: :name', ['name' => $organization->name]) }}
+            </x-badge>
+        </x-slot>
     @endif
-</header>
+</x-page-header>
 
 {{-- Mobile: jump to provider --}}
 <div class="mb-6 lg:hidden">
     <x-input-label for="credentials_provider_picker" :value="__('Provider')" />
-    <select
-        id="credentials_provider_picker"
-        wire:model.live="active_provider"
-        class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-    >
+    <x-select id="credentials_provider_picker" wire:model.live="active_provider">
         @foreach ($providerNav as $group)
             <optgroup label="{{ $group['label'] }}">
                 @foreach ($group['items'] as $item)
@@ -38,7 +35,7 @@
                 @endforeach
             </optgroup>
         @endforeach
-    </select>
+    </x-select>
 </div>
 
 <div class="lg:grid lg:grid-cols-12 lg:gap-10 items-start">

@@ -4,33 +4,32 @@
             <div>
                 <x-livewire-validation-errors />
 
-                <header class="mb-8">
-                    <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Billing & plan') }}</h1>
-                    <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-                        {{ __('Plan status, payment method, usage limits, and Stripe checkout for :org.', ['org' => $organization->name]) }}
-                    </p>
-                </header>
+                <x-page-header
+                    :title="__('Billing & plan')"
+                    :description="__('Plan status, payment method, usage limits, and Stripe checkout for :org.', ['org' => $organization->name])"
+                    flush
+                />
 
     @if (request()->query('checkout') === 'success')
-        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ __('Subscription updated successfully.') }}</div>
+        <x-alert tone="success" class="mb-6">{{ __('Subscription updated successfully.') }}</x-alert>
     @endif
     @if (request()->query('checkout') === 'cancelled')
-        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">{{ __('Checkout was cancelled.') }}</div>
+        <x-alert tone="warning" class="mb-6">{{ __('Checkout was cancelled.') }}</x-alert>
     @endif
     @error('plan')
-        <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{{ $message }}</div>
+        <x-alert tone="error" class="mb-6">{{ $message }}</x-alert>
     @enderror
     @error('billing')
-        <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{{ $message }}</div>
+        <x-alert tone="error" class="mb-6">{{ $message }}</x-alert>
     @enderror
 
     <div class="space-y-6">
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-brand-ink/10 bg-brand-sand/30">
+        <x-section-card>
+            <x-slot name="header">
                 <h2 class="font-semibold text-brand-ink">{{ __('Subscription') }}</h2>
                 <p class="text-sm text-brand-moss mt-0.5">{{ __('Current plan and status.') }}</p>
-            </div>
-            <div class="px-6 py-4 space-y-2">
+            </x-slot>
+            <div class="space-y-2">
                 <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                         <dt class="text-sm font-medium text-brand-moss">{{ __('Status') }}</dt>
@@ -58,14 +57,14 @@
                     @endif
                 </dl>
             </div>
-        </section>
+        </x-section-card>
 
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-brand-ink/10 bg-brand-sand/30">
+        <x-section-card>
+            <x-slot name="header">
                 <h2 class="font-semibold text-brand-ink">{{ __('Plan limits & usage') }}</h2>
                 <p class="text-sm text-brand-moss mt-0.5">{{ __('Counts include every server and site in this organization. Pro removes these caps when your Stripe subscription matches the configured Pro prices.') }}</p>
-            </div>
-            <div class="px-6 py-4">
+            </x-slot>
+            <div>
                 <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
                         <dt class="text-sm font-medium text-brand-moss">{{ __('Servers') }}</dt>
@@ -102,28 +101,30 @@
                     <a href="{{ route('docs.org-roles-and-limits') }}" class="font-medium text-brand-sage hover:text-brand-ink underline underline-offset-2">{{ __('Roles & limits reference') }}</a>
                 </p>
             </div>
-        </section>
+        </x-section-card>
 
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-brand-ink/10 bg-brand-sand/30">
+        <x-section-card>
+            <x-slot name="header">
                 <h2 class="font-semibold text-brand-ink">{{ __('Payment method') }}</h2>
                 <p class="text-sm text-brand-moss mt-0.5">{{ __('Default card on file.') }}</p>
-            </div>
-            <div class="px-6 py-4">
+            </x-slot>
+            <div>
                 <p class="text-sm text-brand-ink">{{ $this->paymentSummary }}</p>
             </div>
-        </section>
+        </x-section-card>
 
         @if ($this->canManageBilling)
-            <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-brand-ink/10 bg-brand-sand/30 flex flex-wrap items-start justify-between gap-3">
+            <x-section-card>
+                <x-slot name="header">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h2 class="font-semibold text-brand-ink">{{ __('Invoices') }}</h2>
                         <p class="text-sm text-brand-moss mt-0.5">{{ __('Recent paid invoices from Stripe.') }}</p>
                     </div>
                     <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View all invoices') }}</a>
-                </div>
-                <div class="px-6 py-4">
+                    </div>
+                </x-slot>
+                <div>
                     @if ($this->invoices->isEmpty())
                         <p class="text-sm text-brand-moss">{{ __('No invoices yet, or they could not be loaded.') }}</p>
                     @else
@@ -146,15 +147,15 @@
                         </ul>
                     @endif
                 </div>
-            </section>
+            </x-section-card>
         @endif
 
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-brand-ink/10 bg-brand-sand/30">
+        <x-section-card>
+            <x-slot name="header">
                 <h2 class="font-semibold text-brand-ink">{{ __('Actions') }}</h2>
                 <p class="text-sm text-brand-moss mt-0.5">{{ __('Subscribe or manage billing in Stripe.') }}</p>
-            </div>
-            <div class="px-6 py-4 flex flex-wrap gap-3">
+            </x-slot>
+            <div class="flex flex-wrap gap-3">
                 @if ($this->plans->isNotEmpty())
                     @foreach ($this->plans as $plan)
                         <button type="button" wire:click="checkout('{{ $plan['id'] }}')" class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90">
@@ -165,12 +166,12 @@
                     <p class="text-sm text-brand-moss">{{ __('No plans configured. Set Stripe price IDs in .env.') }}</p>
                 @endif
                 @if ($this->canManageBilling)
-                    <button type="button" wire:click="portal" class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-brand-sand/40 px-4 py-2.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/60">
+                    <x-secondary-button type="button" wire:click="portal">
                         {{ __('Manage billing') }}
-                    </button>
+                    </x-secondary-button>
                 @endif
             </div>
-        </section>
+        </x-section-card>
     </div>
             </div>
         </x-organization-shell>
