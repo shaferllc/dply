@@ -83,14 +83,14 @@ final class BuildProviderCredentialHealth
     private function runHealthCheck(string $type, ProviderCredential $credential): void
     {
         match ($type) {
-            'digitalocean', 'digitalocean_functions' => (new DigitalOceanService($credential))->validateToken(),
+            'digitalocean', 'digitalocean_functions', 'digitalocean_kubernetes' => (new DigitalOceanService($credential))->validateToken(),
             'hetzner' => (new HetznerService($credential))->validateToken(),
             'linode', 'akamai' => (new LinodeService($credential))->validateToken(),
             'vultr' => (new VultrService($credential))->validateToken(),
             'scaleway' => (new ScalewayService($credential))->validateToken(),
             'upcloud' => (new UpCloudService($credential))->validateToken(),
             'equinix_metal' => (new EquinixMetalService($credential))->validateToken(),
-            'aws' => (new AwsEc2Service($credential))->validateCredentials(),
+            'aws', 'aws_lambda' => (new AwsEc2Service($credential))->validateCredentials(),
             'fly_io' => (new FlyIoService($credential))->validateToken((string) (($credential->credentials ?? [])['org_slug'] ?? '')),
             default => throw new \InvalidArgumentException('Unsupported provider type for health check.'),
         };

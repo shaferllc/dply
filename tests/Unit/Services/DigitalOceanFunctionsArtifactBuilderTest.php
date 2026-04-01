@@ -6,7 +6,6 @@ namespace Tests\Unit\Services;
 
 use App\Models\Site;
 use App\Services\Deploy\DigitalOceanFunctionsArtifactBuilder;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -42,7 +41,7 @@ class DigitalOceanFunctionsArtifactBuilderTest extends TestCase
         ]);
         $site->id = 'functions-builder-test';
 
-        $builder = new DigitalOceanFunctionsArtifactBuilder(new SourceControlRepositoryBrowser);
+        $builder = app(DigitalOceanFunctionsArtifactBuilder::class);
 
         $result = $builder->build($site);
 

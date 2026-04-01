@@ -28,7 +28,7 @@ final class ServerlessRepositoryCheckout
         string $repositoryUrl,
         string $branch,
         string $subdirectory = '',
-        ?int $userId = null,
+        int|string|null $userId = null,
         ?string $sourceControlAccountId = null,
     ): array {
         $repositoryUrl = trim($repositoryUrl);
@@ -80,7 +80,7 @@ final class ServerlessRepositoryCheckout
         }
     }
 
-    private function cloneUrl(string $repositoryUrl, ?int $userId, ?string $sourceControlAccountId): string
+    private function cloneUrl(string $repositoryUrl, int|string|null $userId, ?string $sourceControlAccountId): string
     {
         $accountId = is_string($sourceControlAccountId) ? trim($sourceControlAccountId) : '';
         if ($accountId === '' || $userId === null) {

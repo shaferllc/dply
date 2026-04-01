@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 #[Layout('layouts.settings')]
@@ -117,6 +118,13 @@ class SshKeys extends Component
         if ($this->setup_source === 'servers.create') {
             $this->flash_success .= ' '.__('You can go back to create your server now.');
         }
+    }
+
+    #[On('personal-ssh-key-created')]
+    public function refreshAfterPersonalSshKeyCreated(): void
+    {
+        $this->flash_success = __('SSH key saved.');
+        $this->flash_error = null;
     }
 
     public function startEdit(int $id): void

@@ -199,34 +199,55 @@
                         <div class="grid gap-5 md:grid-cols-2">
                             <div class="md:col-span-2">
                                 <x-input-label for="functions_repository_url" :value="__('Repository URL')" />
-                                <x-text-input id="functions_repository_url" wire:model="form.functions_repository_url" class="mt-1 block w-full font-mono text-sm" placeholder="https://github.com/org/repo.git" />
+                                <x-text-input id="functions_repository_url" wire:model.blur="form.functions_repository_url" class="mt-1 block w-full font-mono text-sm" placeholder="https://github.com/org/repo.git" />
                                 <p class="mt-2 text-sm text-slate-600">{{ __('Dply clones this repo on the queue worker, builds it, and packages the deployable output into a zip before publish.') }}</p>
                                 <x-input-error :messages="$errors->get('form.functions_repository_url')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label for="functions_repository_branch" :value="__('Branch')" />
-                                <x-text-input id="functions_repository_branch" wire:model="form.functions_repository_branch" class="mt-1 block w-full font-mono text-sm" />
+                                <x-text-input id="functions_repository_branch" wire:model.blur="form.functions_repository_branch" class="mt-1 block w-full font-mono text-sm" />
                                 <x-input-error :messages="$errors->get('form.functions_repository_branch')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label for="functions_repository_subdirectory" :value="__('Repository subdirectory')" />
-                                <x-text-input id="functions_repository_subdirectory" wire:model="form.functions_repository_subdirectory" class="mt-1 block w-full font-mono text-sm" placeholder="apps/functions" />
+                                <x-text-input id="functions_repository_subdirectory" wire:model.blur="form.functions_repository_subdirectory" class="mt-1 block w-full font-mono text-sm" placeholder="apps/functions" />
                                 <p class="mt-2 text-sm text-slate-600">{{ __('Optional. Use this when the deployable function code lives in a subdirectory of a monorepo.') }}</p>
                                 <x-input-error :messages="$errors->get('form.functions_repository_subdirectory')" class="mt-1" />
                             </div>
-                            <div class="md:col-span-2">
-                                <x-input-label for="functions_build_command" :value="__('Build command')" />
-                                <textarea id="functions_build_command" wire:model="form.functions_build_command" rows="3" class="mt-1 block w-full rounded-lg border-slate-300 font-mono text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500" placeholder="npm install && npm run build"></textarea>
-                                <p class="mt-2 text-sm text-slate-600">{{ __('This runs inside the checked-out repo before Dply packages the deployable output.') }}</p>
-                                <x-input-error :messages="$errors->get('form.functions_build_command')" class="mt-1" />
-                            </div>
-                            <div class="md:col-span-2">
-                                <x-input-label for="functions_artifact_output_path" :value="__('Build output path')" />
-                                <x-text-input id="functions_artifact_output_path" wire:model="form.functions_artifact_output_path" class="mt-1 block w-full font-mono text-sm" placeholder="dist" />
-                                <p class="mt-2 text-sm text-slate-600">{{ __('Path inside the repo checkout that should be packaged into the final zip. This can point to a directory or a generated zip file.') }}</p>
-                                <x-input-error :messages="$errors->get('form.functions_artifact_output_path')" class="mt-1" />
-                            </div>
                         </div>
+
+                        @if ($functionsDetection !== [])
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-900">{{ __('Detected setup') }}</p>
+                                        <p class="mt-1 text-sm text-slate-600">
+                                            {{ __('Dply inspected the selected repository and inferred a starting runtime/build setup. You can override it below if needed.') }}
+                                        </p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
+                                        {{ strtoupper((string) ($functionsDetection['confidence'] ?? 'low')) }}
+                                    </span>
+                                </div>
+                                <dl class="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Framework') }}</dt>
+                                        <dd class="mt-1 text-sm font-medium text-slate-900">{{ str((string) ($functionsDetection['framework'] ?? 'unknown'))->replace('_', ' ')->title() }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Language') }}</dt>
+                                        <dd class="mt-1 text-sm font-medium text-slate-900">{{ str((string) ($functionsDetection['language'] ?? 'unknown'))->replace('_', ' ')->title() }}</dd>
+                                    </div>
+                                </dl>
+                                @if (count($functionsDetection['warnings'] ?? []) > 0)
+                                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
+                                        @foreach (($functionsDetection['warnings'] ?? []) as $warning)
+                                            <p>{{ $warning }}</p>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 </section>
                 @endif
@@ -235,25 +256,38 @@
                     <h2 id="runtime-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('4. Runtime settings') }}</h2>
                     <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
                         @if ($functionsHost)
-                            <div class="grid gap-5 md:grid-cols-2">
-                                <div>
-                                    <x-input-label for="functions_runtime" :value="__('Functions runtime')" />
-                                    <x-text-input id="functions_runtime" wire:model="form.functions_runtime" class="mt-1 block w-full font-mono text-sm" />
-                                    <p class="mt-2 text-sm text-slate-600">{{ __('Example: `nodejs:18` or another OpenWhisk-compatible kind accepted by your namespace.') }}</p>
-                                    <x-input-error :messages="$errors->get('form.functions_runtime')" class="mt-1" />
-                                </div>
-                                <div>
-                                    <x-input-label for="functions_entrypoint" :value="__('HTTP entrypoint')" />
-                                    <x-text-input id="functions_entrypoint" wire:model="form.functions_entrypoint" class="mt-1 block w-full font-mono text-sm" />
-                                    <p class="mt-2 text-sm text-slate-600">{{ __('This maps to the default action entrypoint inside the deployed zip artifact.') }}</p>
-                                    <x-input-error :messages="$errors->get('form.functions_entrypoint')" class="mt-1" />
-                                </div>
-                                <div class="md:col-span-2">
-                                    <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
-                                        {{ __('Dply will generate and store the deploy zip automatically from your repo and build output. You no longer need to enter an absolute local artifact path here.') }}
+                            <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
+                                {{ __('Dply will generate and store the deploy zip automatically from your repo and build output. Runtime, entrypoint, and build settings are auto-detected first, then you can review them in Advanced settings if needed.') }}
+                            </div>
+                            <details class="rounded-2xl border border-slate-200 bg-white p-4" @if(($functionsDetection['unsupported_for_target'] ?? false) || (($functionsDetection['confidence'] ?? '') === 'low')) open @endif>
+                                <summary class="cursor-pointer list-none text-sm font-semibold text-slate-900">{{ __('Advanced runtime overrides') }}</summary>
+                                <div class="mt-4 grid gap-5 md:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="functions_runtime" :value="__('Functions runtime')" />
+                                        <x-text-input id="functions_runtime" wire:model="form.functions_runtime" class="mt-1 block w-full font-mono text-sm" />
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('Example: `nodejs:18` or another OpenWhisk-compatible kind accepted by your namespace.') }}</p>
+                                        <x-input-error :messages="$errors->get('form.functions_runtime')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="functions_entrypoint" :value="__('HTTP entrypoint')" />
+                                        <x-text-input id="functions_entrypoint" wire:model="form.functions_entrypoint" class="mt-1 block w-full font-mono text-sm" />
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('This maps to the default action entrypoint inside the deployed zip artifact.') }}</p>
+                                        <x-input-error :messages="$errors->get('form.functions_entrypoint')" class="mt-1" />
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <x-input-label for="functions_build_command" :value="__('Build command')" />
+                                        <textarea id="functions_build_command" wire:model="form.functions_build_command" rows="3" class="mt-1 block w-full rounded-lg border-slate-300 font-mono text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500" placeholder="npm install && npm run build"></textarea>
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('This runs inside the checked-out repo before Dply packages the deployable output.') }}</p>
+                                        <x-input-error :messages="$errors->get('form.functions_build_command')" class="mt-1" />
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <x-input-label for="functions_artifact_output_path" :value="__('Build output path')" />
+                                        <x-text-input id="functions_artifact_output_path" wire:model="form.functions_artifact_output_path" class="mt-1 block w-full font-mono text-sm" placeholder="dist" />
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('Path inside the repo checkout that should be packaged into the final zip. This can point to a directory or a generated zip file.') }}</p>
+                                        <x-input-error :messages="$errors->get('form.functions_artifact_output_path')" class="mt-1" />
                                     </div>
                                 </div>
-                            </div>
+                            </details>
                         @endif
 
                         @if ($form->type === 'php')

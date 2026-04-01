@@ -53,7 +53,7 @@ final class ResolveServerCreateCatalog
         }
 
         $credentials = GetProviderCredentialsForServerType::run($org, $type);
-        if ($type === 'digitalocean_functions') {
+        if (in_array($type, ['digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
             return array_merge($empty, ['credentials' => $credentials]);
         }
 

@@ -72,7 +72,25 @@ final class HostCapabilities
 
     public function supportsFunctionDeploy(): bool
     {
-        return $this->kind() === Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS;
+        return in_array($this->kind(), [
+            Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+            Server::HOST_KIND_AWS_LAMBDA,
+        ], true);
+    }
+
+    public function supportsContainerDeploy(): bool
+    {
+        return $this->kind() === Server::HOST_KIND_DOCKER;
+    }
+
+    public function supportsClusterDeploy(): bool
+    {
+        return $this->kind() === Server::HOST_KIND_KUBERNETES;
+    }
+
+    public function supportsIngressManagement(): bool
+    {
+        return $this->supportsClusterDeploy();
     }
 
     public function supportsTestingHostnameProvisioning(): bool

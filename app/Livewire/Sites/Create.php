@@ -8,6 +8,9 @@ use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
+use App\Services\Deploy\ServerlessRepositoryCheckout;
+use App\Services\Deploy\ServerlessRuntimeDetector;
+use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
@@ -38,6 +41,13 @@ class Create extends Component
      * @var list<array{label: string, url: string, branch: string}>
      */
     public array $availableFunctionsRepositories = [];
+
+    /**
+     * @var array<string, mixed>
+     */
+    public array $functionsDetection = [];
+
+    public bool $functionsOverridesTouched = false;
 
     public function mount(
         Server $server,
@@ -135,9 +145,45 @@ class Create extends Component
 
             $this->form->functions_repository_url = (string) $repository['url'];
             $this->form->functions_repository_branch = (string) ($repository['branch'] ?: 'main');
+            $this->refreshFunctionsDetection();
 
             return;
         }
+    }
+
+    public function updatedFormFunctionsRepositoryUrl(): void
+    {
+        $this->refreshFunctionsDetection();
+    }
+
+    public function updatedFormFunctionsRepositoryBranch(): void
+    {
+        $this->refreshFunctionsDetection();
+    }
+
+    public function updatedFormFunctionsRepositorySubdirectory(): void
+    {
+        $this->refreshFunctionsDetection();
+    }
+
+    public function updatedFormFunctionsBuildCommand(): void
+    {
+        $this->functionsOverridesTouched = true;
+    }
+
+    public function updatedFormFunctionsArtifactOutputPath(): void
+    {
+        $this->functionsOverridesTouched = true;
+    }
+
+    public function updatedFormFunctionsRuntime(): void
+    {
+        $this->functionsOverridesTouched = true;
+    }
+
+    public function updatedFormFunctionsEntrypoint(): void
+    {
+        $this->functionsOverridesTouched = true;
     }
 
     public function updatedFormPrimaryHostname(string $value): void
@@ -170,6 +216,9 @@ class Create extends Component
 
         $phpVersionIds = array_column($this->phpVersions, 'id');
         $functionsHost = $this->server->isDigitalOceanFunctionsHost();
+        $dockerHost = $this->server->isDockerHost();
+        $kubernetesHost = $this->server->isKubernetesCluster();
+        $containerHost = $dockerHost || $kubernetesHost;
 
         $rules = [
             'name' => 'required|string|max:120',
@@ -201,7 +250,7 @@ class Create extends Component
             ],
         ];
 
-        if ($this->form->type === 'php' && ! $functionsHost) {
+        if ($this->form->type === 'php' && ! $functionsHost && ! $containerHost) {
             $rules['php_version'] = ['required', 'string', 'max:10'];
 
             if ($phpVersionIds !== []) {
@@ -210,6 +259,12 @@ class Create extends Component
         }
 
         if ($functionsHost) {
+            if (($this->functionsDetection['unsupported_for_target'] ?? false) === true) {
+                $this->addError('form.functions_repository_url', (string) (($this->functionsDetection['warnings'][0] ?? __('This repository runtime is not supported by the selected target.'))));
+
+                return null;
+            }
+
             $rules['functions_runtime'] = ['required', 'string', 'max:50'];
             $rules['functions_entrypoint'] = ['required', 'string', 'max:255'];
             $rules['functions_repo_source'] = ['required', 'string', 'in:manual,provider'];
@@ -232,10 +287,12 @@ class Create extends Component
 
         $meta = [];
         if ($functionsHost) {
+            $detectedRuntime = is_array($this->functionsDetection) ? $this->functionsDetection : [];
             $meta['runtime_profile'] = 'digitalocean_functions_web';
             $meta['digitalocean_functions'] = [
                 'runtime' => $this->form->functions_runtime,
                 'entrypoint' => trim($this->form->functions_entrypoint),
+                'package' => trim((string) ($detectedRuntime['package'] ?? 'default')),
                 'repo_source' => trim($this->form->functions_repo_source),
                 'source_control_account_id' => $this->form->functions_repo_source === 'provider'
                     ? trim($this->form->functions_source_control_account_id)
@@ -243,6 +300,18 @@ class Create extends Component
                 'repository_subdirectory' => trim($this->form->functions_repository_subdirectory),
                 'build_command' => trim($this->form->functions_build_command),
                 'artifact_output_path' => trim($this->form->functions_artifact_output_path),
+                'detected_runtime' => $detectedRuntime !== [] ? $detectedRuntime : null,
+            ];
+        } elseif ($dockerHost) {
+            $meta['runtime_profile'] = 'docker_web';
+            $meta['docker_runtime'] = [
+                'app_type' => $this->form->type,
+            ];
+        } elseif ($kubernetesHost) {
+            $meta['runtime_profile'] = 'kubernetes_web';
+            $meta['kubernetes_runtime'] = [
+                'app_type' => $this->form->type,
+                'namespace' => (string) data_get($this->server->meta, 'kubernetes.namespace', 'default'),
             ];
         }
 
@@ -256,7 +325,7 @@ class Create extends Component
             'type' => SiteType::from($this->form->type),
             'document_root' => $functionsHost ? '/functions/'.$this->form->functions_entrypoint : $this->form->document_root,
             'repository_path' => $functionsHost ? null : ($this->form->repository_path ?: null),
-            'php_version' => $this->form->type === 'php' && ! $functionsHost ? $this->form->php_version : null,
+            'php_version' => $this->form->type === 'php' && ! $functionsHost && ! $containerHost ? $this->form->php_version : null,
             'app_port' => $this->form->type === 'node' ? $this->form->app_port : null,
             'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
@@ -286,6 +355,65 @@ class Create extends Component
         ProvisionSiteJob::dispatch($site->id);
 
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
+    }
+
+    private function refreshFunctionsDetection(): void
+    {
+        if (! $this->server->isDigitalOceanFunctionsHost()) {
+            return;
+        }
+
+        $repositoryUrl = trim($this->form->functions_repository_url);
+        $branch = trim($this->form->functions_repository_branch);
+
+        if ($repositoryUrl === '' || $branch === '') {
+            $this->functionsDetection = [];
+
+            return;
+        }
+
+        $checkout = null;
+
+        try {
+            $checkout = app(ServerlessRepositoryCheckout::class)->checkout(
+                'preview-create-'.(string) auth()->id().'-'.md5($repositoryUrl.'|'.$branch.'|'.$this->form->functions_repository_subdirectory),
+                $repositoryUrl,
+                $branch,
+                $this->form->functions_repository_subdirectory,
+                auth()->id(),
+                $this->form->functions_repo_source === 'provider' ? $this->form->functions_source_control_account_id : null,
+            );
+
+            $this->functionsDetection = app(ServerlessRuntimeDetector::class)->detect(
+                $checkout['working_directory'],
+                app(ServerlessTargetCapabilityResolver::class)->forServer($this->server),
+            );
+
+            if (! $this->functionsOverridesTouched) {
+                $this->form->functions_runtime = (string) ($this->functionsDetection['runtime'] ?? $this->form->functions_runtime);
+                $this->form->functions_entrypoint = (string) ($this->functionsDetection['entrypoint'] ?? $this->form->functions_entrypoint);
+                $this->form->functions_build_command = (string) ($this->functionsDetection['build_command'] ?? $this->form->functions_build_command);
+                $this->form->functions_artifact_output_path = (string) ($this->functionsDetection['artifact_output_path'] ?? $this->form->functions_artifact_output_path);
+            }
+        } catch (\Throwable $e) {
+            $this->functionsDetection = [
+                'framework' => 'unknown',
+                'language' => 'unknown',
+                'runtime' => '',
+                'entrypoint' => '',
+                'build_command' => '',
+                'artifact_output_path' => '',
+                'package' => 'default',
+                'confidence' => 'low',
+                'reasons' => [],
+                'warnings' => [$e->getMessage()],
+                'unsupported_for_target' => false,
+            ];
+        } finally {
+            if (is_array($checkout) && isset($checkout['workspace_path']) && is_string($checkout['workspace_path'])) {
+                app(ServerlessRepositoryCheckout::class)->cleanup($checkout['workspace_path']);
+            }
+        }
     }
 
     public function render(): View

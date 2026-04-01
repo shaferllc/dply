@@ -29,6 +29,14 @@ class Site extends Model
 
     public const STATUS_TRAEFIK_ACTIVE = 'traefik_active';
 
+    public const STATUS_DOCKER_ACTIVE = 'docker_active';
+
+    public const STATUS_DOCKER_CONFIGURED = 'docker_configured';
+
+    public const STATUS_KUBERNETES_ACTIVE = 'kubernetes_active';
+
+    public const STATUS_KUBERNETES_CONFIGURED = 'kubernetes_configured';
+
     public const STATUS_FUNCTIONS_CONFIGURED = 'functions_configured';
 
     public const STATUS_FUNCTIONS_ACTIVE = 'functions_active';
@@ -239,6 +247,14 @@ class Site extends Model
             return 'digitalocean_functions';
         }
 
+        if ($this->usesDockerRuntime()) {
+            return 'docker';
+        }
+
+        if ($this->usesKubernetesRuntime()) {
+            return 'kubernetes';
+        }
+
         $serverMeta = is_array($this->server?->meta) ? $this->server->meta : [];
         $webserver = $serverMeta['webserver'] ?? 'nginx';
 
@@ -339,6 +355,8 @@ class Site extends Model
             self::STATUS_CADDY_ACTIVE,
             self::STATUS_OPENLITESPEED_ACTIVE,
             self::STATUS_TRAEFIK_ACTIVE,
+            self::STATUS_DOCKER_ACTIVE,
+            self::STATUS_KUBERNETES_ACTIVE,
             self::STATUS_FUNCTIONS_ACTIVE,
         ], true);
     }
@@ -346,7 +364,11 @@ class Site extends Model
     public function isReadyForWorkspace(): bool
     {
         return $this->isReadyForTraffic()
-            || $this->status === self::STATUS_FUNCTIONS_CONFIGURED;
+            || in_array($this->status, [
+                self::STATUS_DOCKER_CONFIGURED,
+                self::STATUS_KUBERNETES_CONFIGURED,
+                self::STATUS_FUNCTIONS_CONFIGURED,
+            ], true);
     }
 
     public function statusLabel(): string
@@ -357,6 +379,10 @@ class Site extends Model
             self::STATUS_CADDY_ACTIVE => 'caddy active',
             self::STATUS_OPENLITESPEED_ACTIVE => 'openlitespeed active',
             self::STATUS_TRAEFIK_ACTIVE => 'traefik active',
+            self::STATUS_DOCKER_CONFIGURED => 'docker configured',
+            self::STATUS_DOCKER_ACTIVE => 'docker active',
+            self::STATUS_KUBERNETES_CONFIGURED => 'kubernetes configured',
+            self::STATUS_KUBERNETES_ACTIVE => 'kubernetes active',
             self::STATUS_FUNCTIONS_CONFIGURED => 'functions configured',
             self::STATUS_FUNCTIONS_ACTIVE => 'functions active',
             default => str_replace('_', ' ', $this->status),
@@ -370,6 +396,8 @@ class Site extends Model
             'caddy' => self::STATUS_CADDY_ACTIVE,
             'openlitespeed' => self::STATUS_OPENLITESPEED_ACTIVE,
             'traefik' => self::STATUS_TRAEFIK_ACTIVE,
+            'docker' => self::STATUS_DOCKER_ACTIVE,
+            'kubernetes' => self::STATUS_KUBERNETES_ACTIVE,
             'digitalocean_functions' => self::STATUS_FUNCTIONS_ACTIVE,
             default => self::STATUS_NGINX_ACTIVE,
         };
@@ -384,14 +412,46 @@ class Site extends Model
             return $profile;
         }
 
-        return $this->server?->isDigitalOceanFunctionsHost()
-            ? 'digitalocean_functions_web'
-            : 'vm_web';
+        if ($this->server?->isDigitalOceanFunctionsHost()) {
+            return 'digitalocean_functions_web';
+        }
+
+        if ($this->server?->isAwsLambdaHost()) {
+            return 'aws_lambda_bref_web';
+        }
+
+        if ($this->server?->isDockerHost()) {
+            return 'docker_web';
+        }
+
+        if ($this->server?->isKubernetesCluster()) {
+            return 'kubernetes_web';
+        }
+
+        return 'vm_web';
     }
 
     public function usesFunctionsRuntime(): bool
     {
-        return $this->runtimeProfile() === 'digitalocean_functions_web';
+        return in_array($this->runtimeProfile(), [
+            'digitalocean_functions_web',
+            'aws_lambda_bref_web',
+        ], true);
+    }
+
+    public function usesAwsLambdaRuntime(): bool
+    {
+        return $this->runtimeProfile() === 'aws_lambda_bref_web';
+    }
+
+    public function usesDockerRuntime(): bool
+    {
+        return $this->runtimeProfile() === 'docker_web';
+    }
+
+    public function usesKubernetesRuntime(): bool
+    {
+        return $this->runtimeProfile() === 'kubernetes_web';
     }
 
     /**
@@ -399,8 +459,16 @@ class Site extends Model
      */
     public function functionsConfig(): array
     {
+        return $this->serverlessConfig();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function serverlessConfig(): array
+    {
         $meta = is_array($this->meta) ? $this->meta : [];
-        $config = $meta['digitalocean_functions'] ?? [];
+        $config = $meta['serverless'] ?? $meta['digitalocean_functions'] ?? [];
 
         return is_array($config) ? $config : [];
     }

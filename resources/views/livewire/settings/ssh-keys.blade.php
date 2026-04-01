@@ -12,10 +12,21 @@
     </nav>
 
     <header class="mb-8">
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ __('SSH keys') }}</h1>
-        <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-            {{ __('Save public keys on your account, optionally add them automatically to new servers, and deploy them to existing servers when you need access.') }}
-        </p>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h1 class="text-2xl font-semibold text-brand-ink">{{ __('SSH keys') }}</h1>
+                <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Save public keys on your account, optionally add them automatically to new servers, and deploy them to existing servers when you need access.') }}
+                </p>
+            </div>
+            <button
+                type="button"
+                x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')"
+                class="inline-flex items-center justify-center rounded-xl border border-brand-ink/10 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-cream"
+            >
+                {{ __('Add SSH key') }}
+            </button>
+        </div>
     </header>
 
     @if ($setup_source === 'servers.create')
@@ -25,11 +36,11 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Before you create a server') }}</p>
                     <h2 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('Add at least one SSH key to your profile first') }}</h2>
                     <p class="mt-2 text-sm leading-6 text-brand-moss">
-                        {{ __('Dply uses your saved public key to place account access on new servers during setup. Add a key here, optionally enable "Always provision to new servers," then go back to the server form.') }}
+                        {{ __('Dply uses your saved public key to place account access on new servers during setup. Add a key from the modal here, optionally enable "Always provision to new servers," then go back to the server form.') }}
                     </p>
                     <ol class="mt-4 space-y-2 text-sm leading-6 text-brand-moss">
                         <li>{{ __('1. Generate or copy your SSH public key from your machine.') }}</li>
-                        <li>{{ __('2. Paste the public key here and give it a clear name like "Work laptop."') }}</li>
+                        <li>{{ __('2. Open the add key modal and give the key a clear name like "Work laptop."') }}</li>
                         <li>{{ __('3. Turn on "Always provision to new servers" if this key should be added automatically.') }}</li>
                         <li>{{ __('4. Save the key, then return to create your server.') }}</li>
                     </ol>
@@ -58,87 +69,22 @@
     @endif
 
     <div class="space-y-10">
-        {{-- New key --}}
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-            <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
-                <div class="lg:col-span-4">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('New SSH key') }}</h2>
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('Paste an OpenSSH public key. Private keys are never stored here.') }}
-                    </p>
-                </div>
-                <div class="lg:col-span-8 space-y-5">
-                    <div>
-                        <x-input-label for="ssh_new_name" :value="__('Name')" />
-                        <x-text-input id="ssh_new_name" wire:model="new_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Work laptop') }}" autocomplete="off" />
-                        <x-input-error :messages="$errors->get('new_name')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="ssh_new_pub" :value="__('Public key')" />
-                        <textarea id="ssh_new_pub" wire:model="new_public_key" rows="5" class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-mono shadow-sm focus:border-brand-sage focus:ring-brand-sage" placeholder="ssh-ed25519 AAAA…"></textarea>
-                        <x-input-error :messages="$errors->get('new_public_key')" class="mt-2" />
-                    </div>
-                    <label class="flex items-start gap-3 cursor-pointer">
-                        <input type="checkbox" wire:model.boolean="new_provision_on_new_servers" class="mt-1 rounded border-brand-ink/20 text-brand-ink focus:ring-brand-sage" />
-                        <span class="text-sm text-brand-moss leading-relaxed">{{ __('Always provision to new servers') }} <span class="text-brand-mist">({{ __('uses servers you create while this is enabled') }})</span></span>
-                    </label>
-
-                    @if ($servers->isNotEmpty())
-                        <div>
-                            <div class="flex items-center justify-between gap-2 mb-2">
-                                <x-input-label :value="__('Select servers to push this key to (optional)')" />
-                                <button
-                                    type="button"
-                                    wire:click="$set('new_server_ids', {{ json_encode($servers->pluck('id')->values()->all()) }})"
-                                    class="text-xs font-medium text-brand-sage hover:text-brand-ink"
-                                >{{ __('Select all') }}</button>
-                            </div>
-                            <div class="max-h-48 overflow-y-auto rounded-xl border border-brand-ink/10 divide-y divide-brand-ink/10">
-                                @foreach ($servers as $server)
-                                    <label class="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-sand/30 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            wire:model.live="new_server_ids"
-                                            value="{{ $server->id }}"
-                                            class="rounded border-brand-ink/20 text-brand-ink focus:ring-brand-sage"
-                                        />
-                                        <span class="text-sm text-brand-ink font-medium">{{ $server->name }}</span>
-                                        @if ($server->ip_address)
-                                            <span class="text-xs text-brand-mist font-mono">{{ $server->ip_address }}</span>
-                                        @endif
-                                    </label>
-                                @endforeach
-                            </div>
-                            <x-input-error :messages="$errors->get('new_server_ids')" class="mt-2" />
-                        </div>
-                    @else
-                        @if ($currentOrganization)
-                            <p class="text-sm text-brand-moss">{{ __('No servers in :org yet. Add a server under Servers to push this key during setup or from the list below after you create the key.', ['org' => $currentOrganization->name]) }}</p>
-                        @else
-                            <p class="text-sm text-brand-moss">{{ __('Create or join an organization, then add servers to push keys during setup. You can still save keys to your account below.') }}</p>
-                        @endif
-                    @endif
-
-                    <div>
-                        <x-primary-button type="button" wire:click="createKey" wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="createKey">{{ __('Create') }}</span>
-                            <span wire:loading wire:target="createKey" class="inline-flex items-center justify-center gap-2">
-                                <x-spinner variant="cream" />
-                                {{ __('Saving…') }}
-                            </span>
-                        </x-primary-button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         {{-- List --}}
         <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-brand-ink/10 flex flex-wrap items-center justify-between gap-2">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your keys') }}</h2>
             </div>
             @if ($sshKeys->isEmpty())
-                <p class="px-6 py-10 text-sm text-brand-moss text-center">{{ __('No SSH keys yet. Add one above.') }}</p>
+                <div class="px-6 py-10 text-center">
+                    <p class="text-sm text-brand-moss">{{ __('No SSH keys yet.') }}</p>
+                    <button
+                        type="button"
+                        x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')"
+                        class="mt-4 inline-flex items-center justify-center rounded-xl border border-brand-ink/10 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-cream"
+                    >
+                        {{ __('Add SSH key') }}
+                    </button>
+                </div>
             @else
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
@@ -241,6 +187,7 @@
     @endif
 
     <x-slot name="modals">
+        <livewire:profile.personal-ssh-key-modal />
         @include('livewire.partials.confirm-action-modal')
     </x-slot>
 </div>

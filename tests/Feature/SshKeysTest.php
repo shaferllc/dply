@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Profile\PersonalSshKeyModal;
 use App\Livewire\Settings\SshKeys;
 use App\Models\Organization;
 use App\Models\Server;
@@ -49,6 +50,17 @@ class SshKeysTest extends TestCase
             ->assertSee('ssh-keygen -t ed25519 -C "you@example.com"');
     }
 
+    public function test_ssh_keys_page_uses_shared_add_key_modal(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('profile.ssh-keys'))
+            ->assertOk()
+            ->assertSee('Add SSH key')
+            ->assertSee('Add a personal SSH key');
+    }
+
     public function test_user_can_create_ssh_key_without_deploy(): void
     {
         $user = $this->userWithOrganization();
@@ -66,6 +78,27 @@ class SshKeysTest extends TestCase
         $this->assertDatabaseHas('user_ssh_keys', [
             'user_id' => $user->id,
             'name' => 'Laptop',
+            'provision_on_new_servers' => true,
+        ]);
+    }
+
+    public function test_user_can_create_ssh_key_from_shared_modal(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $pub = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('k', 43).' modal';
+
+        Livewire::actingAs($user)
+            ->test(PersonalSshKeyModal::class, ['source' => 'servers.create'])
+            ->set('name', 'Modal laptop')
+            ->set('public_key', $pub)
+            ->set('provision_on_new_servers', true)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('user_ssh_keys', [
+            'user_id' => $user->id,
+            'name' => 'Modal laptop',
             'provision_on_new_servers' => true,
         ]);
     }

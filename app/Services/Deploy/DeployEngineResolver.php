@@ -14,11 +14,21 @@ final class DeployEngineResolver
     public function __construct(
         private ByoServerDeployEngine $byoServerDeployEngine,
         private DigitalOceanFunctionsDeployEngine $digitalOceanFunctionsDeployEngine,
+        private DockerDeployEngine $dockerDeployEngine,
+        private KubernetesDeployEngine $kubernetesDeployEngine,
     ) {}
 
     public function forProject(Project $project): DeployEngine
     {
         $project->loadMissing('site.server');
+
+        if ($project->site?->usesDockerRuntime()) {
+            return $this->dockerDeployEngine;
+        }
+
+        if ($project->site?->usesKubernetesRuntime()) {
+            return $this->kubernetesDeployEngine;
+        }
 
         if ($project->site?->server?->isDigitalOceanFunctionsHost()) {
             return $this->digitalOceanFunctionsDeployEngine;

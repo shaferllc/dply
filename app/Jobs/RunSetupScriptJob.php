@@ -14,7 +14,7 @@ use App\Modules\TaskRunner\Models\Task as TaskRunnerTaskModel;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
 use App\Observers\TaskRunnerTaskObserver;
-use App\Services\Servers\ServerProvisionCommandBuilder;
+use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -65,11 +65,15 @@ class RunSetupScriptJob implements ShouldQueue
 
     public static function shouldDispatch(Server $server): bool
     {
-        if ($server->status !== Server::STATUS_READY || empty($server->ip_address)) {
+        if ($server->status !== Server::STATUS_READY) {
             return false;
         }
 
-        if (! filled($server->ssh_private_key)) {
+        if (! $server->isVmHost()) {
+            return false;
+        }
+
+        if (empty($server->ip_address) || ! filled($server->ssh_private_key)) {
             return false;
         }
 
@@ -85,7 +89,7 @@ class RunSetupScriptJob implements ShouldQueue
     }
 
     public function handle(
-        ServerProvisionCommandBuilder $builder,
+        ServerBootstrapStrategyResolver $bootstrapStrategies,
         CreateServerProvisionRun $createProvisionRun,
         UpsertServerProvisionArtifact $upsertProvisionArtifact,
         TaskDispatcher $dispatcher,
@@ -95,7 +99,8 @@ class RunSetupScriptJob implements ShouldQueue
             return;
         }
 
-        $commands = $builder->build($server);
+        $strategy = $bootstrapStrategies->for($server);
+        $commands = $strategy->build($server);
 
         $scripts = config('setup_scripts.scripts', []);
         if (filled($server->setup_script_key) && $server->setup_script_key !== 'none') {
@@ -133,7 +138,7 @@ class RunSetupScriptJob implements ShouldQueue
         $taskModel->save();
 
         $run = $createProvisionRun->handle($server, $taskModel);
-        foreach ($builder->buildArtifacts($server) as $artifact) {
+        foreach ($strategy->buildArtifacts($server) as $artifact) {
             $upsertProvisionArtifact->handle(
                 $run,
                 $artifact['type'],

@@ -72,19 +72,19 @@
                                     @if ($profileKeys->isNotEmpty())
                                         {{ __('Select a key from your profile or paste a new one here, then sync authorized_keys so this server includes one of your personal login keys.') }}
                                     @else
-                                        {{ __('You do not have any personal SSH keys saved in your profile yet. Add one first, then come back here to attach it to this server.') }}
+                                        {{ __('You do not have any personal SSH keys saved in your profile yet. Add one here, then select it below and sync authorized_keys to attach it to this server.') }}
                                     @endif
                                 </p>
                             </div>
                             <div class="flex flex-wrap gap-3">
                                 @if ($profileKeys->isEmpty())
-                                    <a
-                                        href="{{ route('profile.ssh-keys') }}"
-                                        wire:navigate
+                                    <button
+                                        type="button"
+                                        x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')"
                                         class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 font-medium text-brand-ink hover:bg-brand-sand/40"
                                     >
                                         {{ __('Add profile key') }}
-                                    </a>
+                                    </button>
                                 @endif
                                 <button type="button" wire:click="syncAuthorizedKeys" wire:loading.attr="disabled" wire:target="syncAuthorizedKeys" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 font-medium text-brand-ink disabled:opacity-50">
                                     <span wire:loading.remove wire:target="syncAuthorizedKeys">{{ __('Sync authorized_keys') }}</span>
@@ -439,6 +439,7 @@
     @endif
 
     <x-slot name="modals">
+        <livewire:profile.personal-ssh-key-modal source="servers.workspace-ssh-keys" />
         @include('livewire.partials.confirm-action-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,

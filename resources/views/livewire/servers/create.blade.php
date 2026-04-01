@@ -112,7 +112,7 @@
                             <button
                                 type="button"
                                 wire:click="$set('form.type', 'digitalocean')"
-                                class="rounded-2xl border-2 p-5 text-left transition {{ ! in_array($form->type, ['custom', 'digitalocean_functions'], true) ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
+                                class="rounded-2xl border-2 p-5 text-left transition {{ ! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true) ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
                             >
                                 <span class="block text-lg font-semibold text-slate-900">{{ __('Cloud server') }}</span>
                                 <span class="mt-2 block text-sm leading-6 text-slate-600">
@@ -131,6 +131,26 @@
                             </button>
                             <button
                                 type="button"
+                                wire:click="$set('form.type', 'digitalocean_kubernetes')"
+                                class="rounded-2xl border-2 p-5 text-left transition {{ $form->type === 'digitalocean_kubernetes' ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
+                            >
+                                <span class="block text-lg font-semibold text-slate-900">{{ __('DigitalOcean Kubernetes') }}</span>
+                                <span class="mt-2 block text-sm leading-6 text-slate-600">
+                                    {{ __('Register a managed Kubernetes cluster target backed by your DigitalOcean account instead of an SSH server.') }}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="$set('form.type', 'aws_lambda')"
+                                class="rounded-2xl border-2 p-5 text-left transition {{ $form->type === 'aws_lambda' ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
+                            >
+                                <span class="block text-lg font-semibold text-slate-900">{{ __('AWS Lambda') }}</span>
+                                <span class="mt-2 block text-sm leading-6 text-slate-600">
+                                    {{ __('Use the repo-first serverless flow with AWS credentials so Laravel/PHP projects can deploy through a Lambda/Bref target.') }}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
                                 wire:click="$set('form.type', 'custom')"
                                 class="rounded-2xl border-2 p-5 text-left transition {{ $form->type === 'custom' ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
                             >
@@ -143,7 +163,7 @@
                     </section>
                 @endif
 
-                @if ($hasAnyProviderCredentials && ! in_array($form->type, ['custom', 'digitalocean_functions'], true))
+                @if ($hasAnyProviderCredentials && ! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true))
                     <section aria-labelledby="details-heading">
                         <h2 id="details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('2. Cloud server setup') }}</h2>
 
@@ -940,6 +960,17 @@
                                                                     <div>
                                                                         <p class="text-sm font-semibold">{{ $check['label'] }}</p>
                                                                         <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+                                                                        @if ($check['key'] === 'user_ssh_keys')
+                                                                            <div class="mt-3">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')"
+                                                                                    class="inline-flex items-center rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-50"
+                                                                                >
+                                                                                    {{ __('Add SSH key') }}
+                                                                                </button>
+                                                                            </div>
+                                                                        @endif
                                                                     </div>
                                                                     <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">
                                                                         {{ $check['blocking'] ? __('Blocking') : match($check['severity']) {
@@ -1123,6 +1154,101 @@
                             </div>
                         </form>
                     </section>
+                @elseif ($hasAnyProviderCredentials && $form->type === 'aws_lambda')
+                    <section aria-labelledby="aws-lambda-details-heading">
+                        <h2 id="aws-lambda-details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('2. AWS Lambda setup') }}</h2>
+
+                        @php
+                            $preflightBadgeClasses = match ($preflight['status']) {
+                                'ready' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                'warning' => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                default => 'bg-rose-50 text-rose-700 ring-rose-200',
+                            };
+                            $preflightItemClasses = static function (string $severity): string {
+                                return match ($severity) {
+                                    'info' => 'border-emerald-200 bg-emerald-50/70 text-emerald-900',
+                                    'warning' => 'border-amber-200 bg-amber-50 text-amber-900',
+                                    default => 'border-rose-200 bg-rose-50 text-rose-900',
+                                };
+                            };
+                        @endphp
+
+                        <form wire:submit="store" class="mt-4 space-y-6">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-900">{{ __('Lambda target basics') }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('This target keeps the same server and site workflow, but deploys repo builds to AWS Lambda so Laravel/PHP projects can use the Bref path without an SSH machine.') }}</p>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="aws_lambda_name" :value="__('Host name')" />
+                                    <div class="mt-1 flex gap-2">
+                                        <x-text-input id="aws_lambda_name" wire:model="form.name" type="text" class="block w-full" required autocomplete="off" />
+                                        <button type="button" wire:click="regenerateServerName" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
+                                            {{ __('Regenerate') }}
+                                        </button>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('name')" class="mt-1" />
+                                </div>
+
+                                <div class="grid gap-5 md:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="provider_credential_id_aws_lambda" :value="__('AWS credential')" />
+                                        <select wire:model.live="form.provider_credential_id" id="provider_credential_id_aws_lambda" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500" @if($catalog['credentials']->isEmpty()) disabled @endif>
+                                            <option value="">{{ __('Select account') }}</option>
+                                            @foreach ($catalog['credentials'] as $c)
+                                                <option value="{{ $c->id }}">{{ $c->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="aws_lambda_region" :value="__('Lambda region')" />
+                                        <x-text-input id="aws_lambda_region" wire:model="form.aws_lambda_region" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="us-east-1" autocomplete="off" />
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('Choose the region where the target Lambda functions already live, such as `us-east-1`.') }}</p>
+                                        <x-input-error :messages="$errors->get('aws_lambda_region')" class="mt-1" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-base font-semibold text-slate-900">{{ __('Preflight and runtime notes') }}</h3>
+                                        <p class="mt-1 text-sm text-slate-600">{{ $preflight['summary'] }}</p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $preflightBadgeClasses }}">
+                                        {{ match($preflight['status']) {
+                                            'ready' => __('Ready'),
+                                            'warning' => __('Needs review'),
+                                            default => __('Blocked'),
+                                        } }}
+                                    </span>
+                                </div>
+
+                                <div class="space-y-4">
+                                    @foreach ($preflight['groups'] as $groupChecks)
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <div class="space-y-3">
+                                                @foreach ($groupChecks as $check)
+                                                    <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($check['severity']) }}">
+                                                        <p class="text-sm font-semibold">{{ $check['label'] }}</p>
+                                                        <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end">
+                                <button type="submit" class="inline-flex items-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
+                                    {{ __('Create server') }}
+                                </button>
+                            </div>
+                        </form>
+                    </section>
                 @elseif ($hasAnyProviderCredentials && $form->type === 'digitalocean_functions')
                     <section aria-labelledby="functions-details-heading">
                         <h2 id="functions-details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('2. DigitalOcean Functions setup') }}</h2>
@@ -1261,6 +1387,138 @@
                             </div>
                         </form>
                     </section>
+                @elseif ($hasAnyProviderCredentials && $form->type === 'digitalocean_kubernetes')
+                    <section aria-labelledby="kubernetes-details-heading">
+                        <h2 id="kubernetes-details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('2. DigitalOcean Kubernetes setup') }}</h2>
+
+                        @php
+                            $preflightBadgeClasses = match ($preflight['status']) {
+                                'ready' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                'warning' => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                default => 'bg-rose-50 text-rose-700 ring-rose-200',
+                            };
+                            $preflightItemClasses = static function (string $severity): string {
+                                return match ($severity) {
+                                    'info' => 'border-emerald-200 bg-emerald-50/70 text-emerald-900',
+                                    'warning' => 'border-amber-200 bg-amber-50 text-amber-900',
+                                    default => 'border-rose-200 bg-rose-50 text-rose-900',
+                                };
+                            };
+                        @endphp
+
+                        <form wire:submit="store" class="mt-4 space-y-6">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-900">{{ __('Cluster target basics') }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('Use this when Dply should target a managed DigitalOcean Kubernetes cluster instead of provisioning an SSH machine.') }}</p>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="kubernetes_name" :value="__('Target name')" />
+                                    <div class="mt-1 flex gap-2">
+                                        <x-text-input id="kubernetes_name" wire:model="form.name" type="text" class="block w-full" required autocomplete="off" />
+                                        <button
+                                            type="button"
+                                            wire:click="regenerateServerName"
+                                            class="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                        >
+                                            {{ __('Regenerate') }}
+                                        </button>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('name')" class="mt-1" />
+                                </div>
+
+                                <div>
+                                    <x-input-label for="provider_credential_id_kubernetes" :value="__('DigitalOcean credential')" />
+                                    <select
+                                        wire:model.live="form.provider_credential_id"
+                                        id="provider_credential_id_kubernetes"
+                                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        @if($catalog['credentials']->isEmpty()) disabled @endif
+                                    >
+                                        <option value="">{{ __('Select account') }}</option>
+                                        @foreach ($catalog['credentials'] as $c)
+                                            <option value="{{ $c->id }}">{{ $c->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
+                                </div>
+
+                                <div class="grid gap-5 md:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="do_kubernetes_cluster_name" :value="__('Cluster name')" />
+                                        <x-text-input id="do_kubernetes_cluster_name" wire:model="form.do_kubernetes_cluster_name" type="text" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('Enter the managed cluster name exactly as it appears in DigitalOcean.') }}</p>
+                                        <x-input-error :messages="$errors->get('do_kubernetes_cluster_name')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="do_kubernetes_namespace" :value="__('Namespace')" />
+                                        <x-text-input id="do_kubernetes_namespace" wire:model="form.do_kubernetes_namespace" type="text" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                                        <x-input-error :messages="$errors->get('do_kubernetes_namespace')" class="mt-1" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-base font-semibold text-slate-900">{{ __('Preflight and runtime notes') }}</h3>
+                                        <p class="mt-1 text-sm text-slate-600">{{ $preflight['summary'] }}</p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $preflightBadgeClasses }}">
+                                        {{ match($preflight['status']) {
+                                            'ready' => __('Ready'),
+                                            'warning' => __('Needs review'),
+                                            default => __('Blocked'),
+                                        } }}
+                                    </span>
+                                </div>
+
+                                <div class="space-y-4">
+                                    @foreach ($preflight['groups'] as $groupKey => $groupChecks)
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                {{ match($groupKey) {
+                                                    'account_readiness' => __('Account readiness'),
+                                                    'verification' => __('Verification'),
+                                                    default => __('Cluster readiness'),
+                                                } }}
+                                            </p>
+                                            <div class="mt-3 space-y-3">
+                                                @foreach ($groupChecks as $check)
+                                                    <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($check['severity']) }}">
+                                                        <div class="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p class="text-sm font-semibold">{{ $check['label'] }}</p>
+                                                                <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+                                                            </div>
+                                                            <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                                                                {{ $check['blocking'] ? __('Blocking') : match($check['severity']) {
+                                                                    'warning' => __('Warning'),
+                                                                    default => __('Ready'),
+                                                                } }}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
+                                <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg font-medium text-sm text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Cancel') }}</a>
+                                <button
+                                    type="submit"
+                                    @disabled(! $preflight['can_submit'])
+                                    class="inline-flex items-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
+                                >
+                                    {{ __('Create server') }}
+                                </button>
+                            </div>
+                        </form>
+                    </section>
                 @else
                     <section aria-labelledby="custom-details-heading">
                         <h2 id="custom-details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('Custom server details') }}</h2>
@@ -1280,6 +1538,15 @@
                                         </button>
                                     </div>
                                     <x-input-error :messages="$errors->get('name')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="custom_host_kind" :value="__('Host target')" />
+                                    <select id="custom_host_kind" wire:model="form.custom_host_kind" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                        <option value="vm">{{ __('Standard VM / VPS') }}</option>
+                                        <option value="docker">{{ __('Docker host') }}</option>
+                                    </select>
+                                    <p class="mt-2 text-sm text-slate-600">{{ __('Use Docker host when this machine should run container-based site deploys instead of the classic SSH + webserver stack.') }}</p>
+                                    <x-input-error :messages="$errors->get('custom_host_kind')" class="mt-1" />
                                 </div>
                                 <div>
                                     <x-input-label for="ip_address" :value="__('IP address')" />
@@ -1407,6 +1674,7 @@
         </div>
 
         <x-slot name="modals">
+        <livewire:profile.personal-ssh-key-modal source="servers.create" />
             @include('livewire.partials.confirm-action-modal')
         </x-slot>
     </div>

@@ -60,6 +60,7 @@ use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Index as SitesIndex;
+use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
@@ -181,6 +182,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
+    Route::livewire('servers/{server}/sites/{site}/settings/{section?}', SiteSettings::class)->name('sites.settings');
     Route::livewire('servers/{server}/sites/{site}', SitesShow::class)->name('sites.show');
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
     Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');

@@ -7,7 +7,7 @@ use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Notifications\DeployDigestBuffer;
-use App\Services\Deploy\ByoDeployContext;
+use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Notifications\NotificationPublisher;
 use App\Support\DeployLogRedactor;
@@ -98,7 +98,7 @@ class RunSiteDeploymentJob implements ShouldQueue
 
             try {
                 $engine = $deployEngineResolver->forProject($this->site->project);
-                $result = $engine->run(new ByoDeployContext(
+                $result = $engine->run(new DeployContext(
                     project: $this->site->project,
                     trigger: $this->trigger,
                     apiIdempotencyHash: $this->apiIdempotencyHash,
@@ -112,13 +112,15 @@ class RunSiteDeploymentJob implements ShouldQueue
                     'log_output' => $redacted,
                     'finished_at' => now(),
                 ]);
-                $siteUpdates = ['last_deploy_at' => now()];
+                $siteUpdates = [
+                    'last_deploy_at' => now(),
+                ];
                 if ($this->site->server?->isDigitalOceanFunctionsHost()) {
-                    $siteUpdates['status'] = Site::STATUS_FUNCTIONS_ACTIVE;
+                    $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
                 }
                 $this->site->update($siteUpdates);
                 $this->cacheIdempotencySuccess($deployment);
-                if (config('insights.queue_after_deploy', true) && ! $this->site->server?->isDigitalOceanFunctionsHost()) {
+                if (config('insights.queue_after_deploy', true) && $this->site->server?->isVmHost()) {
                     RunServerInsightsJob::dispatch($this->site->server_id);
                     RunSiteInsightsJob::dispatch($this->site->id);
                 }

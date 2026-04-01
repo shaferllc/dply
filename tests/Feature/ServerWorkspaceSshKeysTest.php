@@ -88,6 +88,16 @@ class ServerWorkspaceSshKeysTest extends TestCase
             ->assertSee('Sync authorized_keys');
     }
 
+    public function test_component_uses_shared_modal_when_no_profile_keys_exist(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertSee('Add profile key')
+            ->assertSee('Add a personal SSH key');
+    }
+
     public function test_component_hides_reminder_when_server_has_current_users_personal_key_attached(): void
     {
         [$user, $server] = $this->actingOwnerWithServer();

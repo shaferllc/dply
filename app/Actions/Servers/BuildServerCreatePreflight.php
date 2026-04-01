@@ -82,6 +82,8 @@ final class BuildServerCreatePreflight
         $checks = match ($form->type) {
             'custom' => $this->customChecks($form, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $customConnectionTest),
             'digitalocean_functions' => $this->digitalOceanFunctionsChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
+            'digitalocean_kubernetes' => $this->digitalOceanKubernetesChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
+            'aws_lambda' => $this->awsLambdaChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
             default => $this->cloudChecks($form, $catalog, $provisionOptions, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth, $sizeRecommendations),
         };
 
@@ -405,6 +407,170 @@ final class BuildServerCreatePreflight
     }
 
     /**
+     * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
+     */
+    private function digitalOceanKubernetesChecks(
+        ServerCreateForm $form,
+        array $catalog,
+        bool $canCreateServer,
+        bool $hasAnyProviderCredentials,
+        bool $hasLinkedCredential,
+        ?array $providerHealth,
+    ): array {
+        $checks = [];
+
+        if (! $canCreateServer) {
+            $checks[] = $this->check('server_limit', 'error', __('Server limit reached'), __('Your organization cannot create another server on the current plan.'), true);
+        }
+
+        if (! $hasAnyProviderCredentials) {
+            $checks[] = $this->check('provider_credentials', 'error', __('Add a provider credential'), __('Add a DigitalOcean credential before creating a Kubernetes cluster target.'), true, 'provider_credential_id');
+
+            return $checks;
+        }
+
+        if (! $hasLinkedCredential || $catalog['credentials']->isEmpty()) {
+            $checks[] = $this->check('provider_credentials', 'error', __('No linked DigitalOcean account'), __('Add or select a DigitalOcean credential before continuing.'), true, 'provider_credential_id');
+        } elseif ($form->provider_credential_id === '') {
+            $checks[] = $this->check('provider_credential_id', 'error', __('Choose an account'), __('Select the DigitalOcean account that should manage this Kubernetes target.'), true, 'provider_credential_id');
+        } elseif (! $catalog['credentials']->contains('id', $form->provider_credential_id)) {
+            $checks[] = $this->check('provider_credential_id', 'error', __('Selected account is unavailable'), __('The chosen DigitalOcean credential is not available.'), true, 'provider_credential_id');
+        } else {
+            $checks[] = $this->check('provider_credential_id', 'info', __('Account selected'), __('The selected DigitalOcean credential is ready for this request.'), false);
+        }
+
+        if ($providerHealth !== null) {
+            $checks[] = $this->check(
+                'provider_health',
+                $providerHealth['severity'],
+                $providerHealth['label'],
+                $providerHealth['detail'],
+                in_array($providerHealth['status'], ['invalid', 'expired', 'under_scoped', 'misconfigured'], true),
+                'provider_credential_id',
+            );
+        }
+
+        try {
+            Validator::make(
+                [
+                    'name' => $form->name,
+                    'do_kubernetes_cluster_name' => $form->do_kubernetes_cluster_name,
+                    'do_kubernetes_namespace' => $form->do_kubernetes_namespace,
+                ],
+                [
+                    'name' => 'required|string|max:255',
+                    'do_kubernetes_cluster_name' => 'required|string|max:255',
+                    'do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+                ]
+            )->validate();
+
+            $checks[] = $this->check('kubernetes_config', 'info', __('Kubernetes target settings look valid'), __('The cluster name and namespace are present.'), false);
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $checks[] = $this->check(
+                    'kubernetes_'.$field,
+                    'error',
+                    __('Missing required Kubernetes target details'),
+                    (string) ($messages[0] ?? __('This field is required.')),
+                    true,
+                    $field
+                );
+            }
+        }
+
+        $checks[] = $this->check(
+            'kubernetes_runtime',
+            'warning',
+            __('Kubernetes targets use a cluster-native deploy path'),
+            __('This target skips SSH, package installs, nginx, firewall, cron, and server health checks. Site deploys render Kubernetes manifests and runtime artifacts instead.'),
+            false
+        );
+
+        return $checks;
+    }
+
+    /**
+     * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
+     */
+    private function awsLambdaChecks(
+        ServerCreateForm $form,
+        array $catalog,
+        bool $canCreateServer,
+        bool $hasAnyProviderCredentials,
+        bool $hasLinkedCredential,
+        ?array $providerHealth,
+    ): array {
+        $checks = [];
+
+        if (! $canCreateServer) {
+            $checks[] = $this->check('server_limit', 'error', __('Server limit reached'), __('Your organization cannot create another server on the current plan.'), true);
+        }
+
+        if (! $hasAnyProviderCredentials) {
+            $checks[] = $this->check('provider_credentials', 'error', __('Add an AWS credential'), __('Add an AWS credential before creating a Lambda target.'), true, 'provider_credential_id');
+
+            return $checks;
+        }
+
+        if (! $hasLinkedCredential || $catalog['credentials']->isEmpty()) {
+            $checks[] = $this->check('provider_credentials', 'error', __('No linked AWS account'), __('Add or select an AWS credential before continuing.'), true, 'provider_credential_id');
+        } elseif ($form->provider_credential_id === '') {
+            $checks[] = $this->check('provider_credential_id', 'error', __('Choose an account'), __('Select the AWS account that should manage this Lambda target.'), true, 'provider_credential_id');
+        } elseif (! $catalog['credentials']->contains('id', $form->provider_credential_id)) {
+            $checks[] = $this->check('provider_credential_id', 'error', __('Selected account is unavailable'), __('The chosen AWS credential is not available.'), true, 'provider_credential_id');
+        } else {
+            $checks[] = $this->check('provider_credential_id', 'info', __('Account selected'), __('The selected AWS credential is ready for this request.'), false);
+        }
+
+        if ($providerHealth !== null) {
+            $checks[] = $this->check(
+                'provider_health',
+                $providerHealth['severity'],
+                $providerHealth['label'],
+                $providerHealth['detail'],
+                in_array($providerHealth['status'], ['invalid', 'expired', 'under_scoped', 'misconfigured'], true),
+                'provider_credential_id',
+            );
+        }
+
+        try {
+            Validator::make(
+                [
+                    'name' => $form->name,
+                    'aws_lambda_region' => $form->aws_lambda_region,
+                ],
+                [
+                    'name' => 'required|string|max:255',
+                    'aws_lambda_region' => 'required|string|max:255',
+                ]
+            )->validate();
+
+            $checks[] = $this->check('aws_lambda_config', 'info', __('Lambda target settings look valid'), __('The AWS region is present and ready for repo-first runtime detection.'), false);
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $checks[] = $this->check(
+                    'aws_lambda_'.$field,
+                    'error',
+                    __('Missing required Lambda target details'),
+                    (string) ($messages[0] ?? __('This field is required.')),
+                    true,
+                    $field
+                );
+            }
+        }
+
+        $checks[] = $this->check(
+            'aws_lambda_runtime',
+            'info',
+            __('Lambda targets support PHP and Node deploys'),
+            __('Laravel and generic PHP repositories can resolve to the AWS Lambda/Bref path, while JavaScript builds can still use the same repo-first detection flow.'),
+            false
+        );
+
+        return $checks;
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $options
      * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
      */
@@ -470,7 +636,7 @@ final class BuildServerCreatePreflight
         $size = collect($catalog['sizes'] ?? [])->first(fn (array $option): bool => (string) ($option['value'] ?? '') === $form->size);
 
         if (! is_array($size)) {
-            if ($form->type === 'digitalocean_functions') {
+            if (in_array($form->type, ['digitalocean_functions', 'digitalocean_kubernetes'], true)) {
                 return [
                     'state' => 'unavailable',
                     'provider' => $form->type,
@@ -480,9 +646,13 @@ final class BuildServerCreatePreflight
                     'price_hourly' => null,
                     'formatted_price' => null,
                     'source' => null,
-                    'detail' => __('DigitalOcean Functions pricing depends on invocations, execution time, and memory. Review pricing in DigitalOcean before launch.'),
+                    'detail' => $form->type === 'digitalocean_kubernetes'
+                        ? __('DigitalOcean Kubernetes pricing depends on node pools, load balancers, storage, and network usage. Review pricing in DigitalOcean before launch.')
+                        : __('DigitalOcean Functions pricing depends on invocations, execution time, and memory. Review pricing in DigitalOcean before launch.'),
                     'extras' => [],
-                    'notes' => [__('Functions hosts do not use VM region/size catalogs.')],
+                    'notes' => [$form->type === 'digitalocean_kubernetes'
+                        ? __('Managed Kubernetes targets do not use VM region/size catalogs in this create flow.')
+                        : __('Functions hosts do not use VM region/size catalogs.')],
                 ];
             }
 

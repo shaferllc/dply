@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Deploy;
 
 use App\Models\Site;
-use App\Models\SocialAccount;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
@@ -15,7 +13,9 @@ use ZipArchive;
 class DigitalOceanFunctionsArtifactBuilder
 {
     public function __construct(
-        private readonly SourceControlRepositoryBrowser $repositoryBrowser,
+        private readonly ServerlessRepositoryCheckout $repositoryCheckout,
+        private readonly ServerlessRuntimeDetector $runtimeDetector,
+        private readonly ServerlessTargetCapabilityResolver $capabilityResolver,
         private readonly ServerlessDeploymentConfigResolver $deploymentConfigResolver,
     ) {}
 
@@ -32,50 +32,52 @@ class DigitalOceanFunctionsArtifactBuilder
         }
 
         $resolvedConfig = $this->deploymentConfigResolver->resolve($site);
-        $branch = trim((string) ($site->git_branch ?: 'main'));
-        $subdirectory = trim((string) ($resolvedConfig['repository_subdirectory'] ?? ''));
-        $buildCommand = trim((string) ($resolvedConfig['build_command'] ?? ''));
-        $artifactOutputPath = trim((string) ($resolvedConfig['artifact_output_path'] ?? ''));
+        $checkout = $this->repositoryCheckout->checkout(
+            'build-'.$site->id,
+            $repositoryUrl,
+            (string) ($site->git_branch ?: 'main'),
+            (string) ($resolvedConfig['repository_subdirectory'] ?? ''),
+            $site->user_id,
+            isset($resolvedConfig['source_control_account_id']) && is_string($resolvedConfig['source_control_account_id'])
+                ? $resolvedConfig['source_control_account_id']
+                : null,
+        );
+
+        $detected = $this->runtimeDetector->detect(
+            $checkout['working_directory'],
+            $this->capabilityResolver->forSite($site),
+        );
+
+        if ($detected['unsupported_for_target']) {
+            throw new \RuntimeException((string) ($detected['warnings'][0] ?? 'The detected runtime is not supported by this target.'));
+        }
+
+        $buildCommand = trim((string) ($resolvedConfig['build_command'] !== '' ? $resolvedConfig['build_command'] : $detected['build_command']));
+        $artifactOutputPath = trim((string) ($resolvedConfig['artifact_output_path'] !== '' ? $resolvedConfig['artifact_output_path'] : $detected['artifact_output_path']));
+        $runtime = trim((string) ($resolvedConfig['runtime'] !== '' ? $resolvedConfig['runtime'] : $detected['runtime']));
+        $entrypoint = trim((string) ($resolvedConfig['entrypoint'] !== '' ? $resolvedConfig['entrypoint'] : $detected['entrypoint']));
+        $package = trim((string) ($resolvedConfig['package'] !== '' ? $resolvedConfig['package'] : $detected['package']));
 
         if ($buildCommand === '') {
-            throw new \RuntimeException('Set a build command before deploying this Functions site.');
+            throw new \RuntimeException('Dply could not determine a build command for this Functions site. Open Advanced settings and set one manually.');
         }
 
         if ($artifactOutputPath === '') {
-            throw new \RuntimeException('Set a build output path before deploying this Functions site.');
+            throw new \RuntimeException('Dply could not determine a build output path for this Functions site. Open Advanced settings and set one manually.');
         }
 
-        $workspacePath = storage_path('app/functions-builds/'.$site->id);
-        $repositoryPath = $workspacePath.'/repo';
-        File::ensureDirectoryExists($workspacePath);
-
-        $cloneUrl = $this->cloneUrl($site, $repositoryUrl, [
-            'source_control_account_id' => $resolvedConfig['source_control_account_id'] ?? null,
+        $resolvedConfig = $this->deploymentConfigResolver->persistResolvedConfig($site, [
+            'runtime' => $runtime,
+            'entrypoint' => $entrypoint,
+            'package' => $package,
+            'build_command' => $buildCommand,
+            'artifact_output_path' => $artifactOutputPath,
         ]);
-        $log = [];
 
-        if (is_dir($repositoryPath.'/.git')) {
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'remote', 'set-url', 'origin', $cloneUrl], $workspacePath);
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--depth', '1', 'origin', $branch], $workspacePath);
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '-B', $branch, 'FETCH_HEAD'], $workspacePath);
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath);
-        } else {
-            File::deleteDirectory($repositoryPath);
-            $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $branch, $cloneUrl, $repositoryPath], $workspacePath);
-        }
+        $log = array_filter([$checkout['output']]);
+        $log[] = $this->runShell($buildCommand, $checkout['working_directory']);
 
-        $buildWorkingDirectory = $repositoryPath;
-        if ($subdirectory !== '') {
-            $buildWorkingDirectory .= '/'.trim($subdirectory, '/');
-        }
-
-        if (! is_dir($buildWorkingDirectory)) {
-            throw new \RuntimeException('Functions repository subdirectory does not exist: '.$subdirectory);
-        }
-
-        $log[] = $this->runShell($buildCommand, $buildWorkingDirectory);
-
-        $sourcePath = $buildWorkingDirectory.'/'.ltrim($artifactOutputPath, '/');
+        $sourcePath = $checkout['working_directory'].'/'.ltrim($artifactOutputPath, '/');
         if (! file_exists($sourcePath)) {
             throw new \RuntimeException('Functions build output was not found at: '.$artifactOutputPath);
         }
@@ -92,29 +94,16 @@ class DigitalOceanFunctionsArtifactBuilder
 
         return [
             'artifact_path' => $artifactPath,
-            'output' => trim(implode("\n", array_filter($log))),
+            'output' => trim(implode("\n", array_filter(array_merge(
+                $log,
+                [
+                    'Detected framework: '.$detected['framework'],
+                    'Detected language: '.$detected['language'],
+                    'Resolved runtime: '.$resolvedConfig['runtime'],
+                    'Resolved entrypoint: '.$resolvedConfig['entrypoint'],
+                ]
+            )))),
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $functionsConfig
-     */
-    private function cloneUrl(Site $site, string $repositoryUrl, array $functionsConfig): string
-    {
-        $accountId = trim((string) ($functionsConfig['source_control_account_id'] ?? ''));
-        if ($accountId === '') {
-            return $repositoryUrl;
-        }
-
-        $account = SocialAccount::query()
-            ->where('user_id', $site->user_id)
-            ->find($accountId);
-
-        if (! $account) {
-            throw new \RuntimeException('The selected source-control account could not be found for this site.');
-        }
-
-        return $this->repositoryBrowser->authenticatedCloneUrl($account, $repositoryUrl);
     }
 
     private function artifactFilename(Site $site): string

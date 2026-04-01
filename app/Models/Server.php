@@ -32,7 +32,13 @@ class Server extends Model
 
     public const HOST_KIND_VM = 'vm';
 
+    public const HOST_KIND_DOCKER = 'docker';
+
+    public const HOST_KIND_KUBERNETES = 'kubernetes';
+
     public const HOST_KIND_DIGITALOCEAN_FUNCTIONS = 'digitalocean_functions';
+
+    public const HOST_KIND_AWS_LAMBDA = 'aws_lambda';
 
     public const HEALTH_REACHABLE = 'reachable';
 
@@ -228,7 +234,10 @@ class Server extends Model
 
         return in_array($hostKind, [
             self::HOST_KIND_VM,
+            self::HOST_KIND_DOCKER,
+            self::HOST_KIND_KUBERNETES,
             self::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+            self::HOST_KIND_AWS_LAMBDA,
         ], true) ? $hostKind : self::HOST_KIND_VM;
     }
 
@@ -247,10 +256,37 @@ class Server extends Model
         return $this->hostKind() === self::HOST_KIND_DIGITALOCEAN_FUNCTIONS;
     }
 
+    public function isAwsLambdaHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_AWS_LAMBDA;
+    }
+
+    public function isDockerHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DOCKER;
+    }
+
+    public function isKubernetesCluster(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_KUBERNETES;
+    }
+
     public function providerDisplayLabel(): string
     {
         if ($this->isDigitalOceanFunctionsHost()) {
             return 'DigitalOcean Functions';
+        }
+
+        if ($this->isAwsLambdaHost()) {
+            return 'AWS Lambda';
+        }
+
+        if ($this->isDockerHost()) {
+            return 'Docker';
+        }
+
+        if ($this->isKubernetesCluster()) {
+            return 'Kubernetes';
         }
 
         return $this->provider?->label() ?? 'Custom';

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Events\Servers\ServerAuthorizedKeysSynced;
+use App\Contracts\AwsLambdaGateway;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ProcessReferralInvoicePayment;
@@ -41,11 +42,21 @@ use App\Services\Deploy\ByoServerDeployEngine;
 use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
 use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
+use App\Services\Deploy\DockerDeployEngine;
+use App\Services\Deploy\KubernetesDeployEngine;
+use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Servers\ServerMetricsGuestScript;
+use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
+use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
+use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
+use App\Services\Servers\Bootstrap\VmServerBootstrapStrategy;
 use App\Services\Sites\SiteApacheProvisioner;
 use App\Services\Sites\SiteCaddyProvisioner;
+use App\Services\Sites\DockerRuntimeSiteProvisioner;
+use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
 use App\Services\Sites\SiteNginxProvisioner;
 use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
+use App\Services\Sites\SiteRuntimeProvisionerRegistry;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
 use Dply\Core\Auth\CentralOAuthClient;
@@ -75,15 +86,33 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(ByoServerDeployEngine::class);
+        $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
+        $this->app->singleton(ServerlessProvisionerFactory::class);
         $this->app->singleton(DeployEngineResolver::class, function ($app) {
             return new DeployEngineResolver(
                 $app->make(ByoServerDeployEngine::class),
                 $app->make(DigitalOceanFunctionsDeployEngine::class),
+                $app->make(DockerDeployEngine::class),
+                $app->make(KubernetesDeployEngine::class),
             );
         });
 
+        $this->app->singleton(ServerBootstrapStrategyResolver::class, function ($app) {
+            return new ServerBootstrapStrategyResolver($app->tagged('server.bootstrap.strategies'));
+        });
+
+        $this->app->tag([
+            VmServerBootstrapStrategy::class,
+            DockerHostBootstrapStrategy::class,
+            KubernetesClusterBootstrapStrategy::class,
+        ], 'server.bootstrap.strategies');
+
         $this->app->singleton(SiteWebserverProvisionerRegistry::class, function ($app) {
             return new SiteWebserverProvisionerRegistry($app->tagged('site.webserver.provisioners'));
+        });
+
+        $this->app->singleton(SiteRuntimeProvisionerRegistry::class, function ($app) {
+            return new SiteRuntimeProvisionerRegistry($app->tagged('site.runtime.provisioners'));
         });
 
         $this->app->tag([
@@ -93,6 +122,11 @@ class AppServiceProvider extends ServiceProvider
             SiteOpenLiteSpeedProvisioner::class,
             SiteTraefikProvisioner::class,
         ], 'site.webserver.provisioners');
+
+        $this->app->tag([
+            DockerRuntimeSiteProvisioner::class,
+            KubernetesRuntimeSiteProvisioner::class,
+        ], 'site.runtime.provisioners');
     }
 
     /**

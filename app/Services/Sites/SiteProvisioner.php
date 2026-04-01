@@ -12,6 +12,7 @@ class SiteProvisioner
     public function __construct(
         private readonly TestingHostnameProvisioner $testingHostnameProvisioner,
         private readonly SiteWebserverProvisionerRegistry $provisionerRegistry,
+        private readonly SiteRuntimeProvisionerRegistry $runtimeProvisionerRegistry,
         private readonly SiteReachabilityChecker $siteReachabilityChecker,
         private readonly DigitalOceanFunctionsSiteProvisioner $digitalOceanFunctionsSiteProvisioner,
     ) {}
@@ -34,6 +35,34 @@ class SiteProvisioner
             ]);
 
             $this->appendLog($site, 'info', 'configuring_functions_runtime', 'DigitalOcean Functions runtime metadata saved. Waiting for the first deploy to publish a live endpoint.');
+
+            return;
+        }
+
+        if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
+            $runtimeProfile = $site->runtimeProfile();
+            $state = $site->usesDockerRuntime()
+                ? 'configuring_docker_runtime'
+                : 'configuring_kubernetes_runtime';
+
+            $this->appendLog($site, 'info', 'queued', 'Runtime provisioning worker started.', [
+                'runtime_profile' => $runtimeProfile,
+                'server_id' => (string) $site->server_id,
+            ]);
+
+            $this->updateProvisioning($site, [
+                'state' => $state,
+                'webserver' => $site->webserver(),
+                'started_at' => now()->toIso8601String(),
+                'error' => null,
+            ]);
+
+            $this->runtimeProvisionerRegistry->for($runtimeProfile)->provision($site);
+            $site->refresh();
+
+            $this->appendLog($site, 'info', $state, 'Runtime deployment artifacts prepared. Waiting for the first deploy to publish the workload.', [
+                'runtime_profile' => $runtimeProfile,
+            ]);
 
             return;
         }
@@ -133,6 +162,35 @@ class SiteProvisioner
             ]);
 
             $this->appendLog($site, 'info', 'awaiting_first_deploy', 'Functions host is configured. Run the first deploy to publish a live endpoint.', [
+                'hostname' => $result['hostname'],
+                'url' => $result['url'],
+            ]);
+
+            $this->updateProvisioning($site, [
+                'state' => 'awaiting_first_deploy',
+                'webserver' => $site->webserver(),
+                'ready_hostname' => $result['hostname'],
+                'ready_url' => $result['url'],
+                'checked_at' => $result['checked_at'],
+                'host_checks' => [],
+                'error' => null,
+            ]);
+
+            return $result;
+        }
+
+        if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
+            $site->refresh();
+            $result = $this->runtimeProvisionerRegistry->for($site->runtimeProfile())->readyResult($site);
+            $configuredStatus = $site->usesDockerRuntime()
+                ? Site::STATUS_DOCKER_CONFIGURED
+                : Site::STATUS_KUBERNETES_CONFIGURED;
+
+            $site->update([
+                'status' => $configuredStatus,
+            ]);
+
+            $this->appendLog($site, 'info', 'awaiting_first_deploy', 'Runtime target is configured. Run the first deploy to publish a live workload.', [
                 'hostname' => $result['hostname'],
                 'url' => $result['url'],
             ]);

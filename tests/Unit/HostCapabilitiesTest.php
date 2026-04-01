@@ -38,4 +38,40 @@ class HostCapabilitiesTest extends TestCase
         $this->assertTrue($capabilities->supportsFunctionDeploy());
         $this->assertSame('DigitalOcean Functions', $server->providerDisplayLabel());
     }
+
+    public function test_docker_hosts_expose_container_capabilities_without_vm_features(): void
+    {
+        $server = new Server([
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+            ],
+        ]);
+
+        $capabilities = $server->hostCapabilities();
+
+        $this->assertTrue($server->isDockerHost());
+        $this->assertFalse($capabilities->supportsSsh());
+        $this->assertTrue($capabilities->supportsContainerDeploy());
+        $this->assertFalse($capabilities->supportsClusterDeploy());
+        $this->assertFalse($capabilities->supportsNginxProvisioning());
+        $this->assertSame('Docker', $server->providerDisplayLabel());
+    }
+
+    public function test_kubernetes_clusters_expose_cluster_capabilities_without_vm_features(): void
+    {
+        $server = new Server([
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_KUBERNETES,
+            ],
+        ]);
+
+        $capabilities = $server->hostCapabilities();
+
+        $this->assertTrue($server->isKubernetesCluster());
+        $this->assertFalse($capabilities->supportsSsh());
+        $this->assertFalse($capabilities->supportsContainerDeploy());
+        $this->assertTrue($capabilities->supportsClusterDeploy());
+        $this->assertTrue($capabilities->supportsIngressManagement());
+        $this->assertSame('Kubernetes', $server->providerDisplayLabel());
+    }
 }

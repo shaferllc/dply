@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -132,6 +133,13 @@ class WorkspaceSshKeys extends Component
     public function clearProfileSelection(): void
     {
         $this->profile_key_id = null;
+    }
+
+    #[On('personal-ssh-key-created')]
+    public function refreshProfileKeysAfterCreate(): void
+    {
+        $this->flash_success = __('SSH key saved. Select it below to attach it to this server, then sync authorized_keys.');
+        $this->flash_error = null;
     }
 
     public function loadSystemUsers(ServerPasswdUserLister $lister): void

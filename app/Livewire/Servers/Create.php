@@ -24,6 +24,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -105,6 +106,12 @@ class Create extends Component
         $this->applyInstallProfile();
     }
 
+    #[On('personal-ssh-key-created')]
+    public function refreshPersonalSshKeyState(): void
+    {
+        // Re-render so preflight picks up the newly saved profile key.
+    }
+
     public function store(): mixed
     {
         $user = auth()->user();
@@ -122,7 +129,7 @@ class Create extends Component
             return null;
         }
 
-        if (! in_array($this->form->type, ['custom', 'digitalocean_functions'], true) && ! $user->sshKeys()->exists()) {
+        if (! in_array($this->form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true) && ! $user->sshKeys()->exists()) {
             return $this->redirectRoute('profile.ssh-keys', [
                 'source' => 'servers.create',
                 'return_to' => 'servers.create',
@@ -329,7 +336,7 @@ class Create extends Component
 
     protected function syncProvisionPreferenceFields(): void
     {
-        if (in_array($this->form->type, ['custom', 'digitalocean_functions'], true)) {
+        if (in_array($this->form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
             return;
         }
 
@@ -597,7 +604,7 @@ class Create extends Component
 
     protected function applyInstallProfile(): void
     {
-        if ($this->form->type === 'digitalocean_functions') {
+        if (in_array($this->form->type, ['digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
             return;
         }
 
@@ -663,6 +670,8 @@ class Create extends Component
     {
         Session::flash('success', match ($type) {
             'digitalocean_functions' => __('DigitalOcean Functions host added. Create a site to wire its runtime and deploy settings.'),
+            'aws_lambda' => __('AWS Lambda target added. Create a site to wire its runtime and Bref deploy settings.'),
+            'digitalocean_kubernetes' => __('DigitalOcean Kubernetes target added. Create a site to prepare manifests and cluster runtime settings.'),
             'equinix_metal' => __('Bare metal can take 5–10 minutes.'),
             'fly_io' => __('Fly.io machine is being created.'),
             'aws' => __('AWS EC2 instance is being created. This usually takes 1–2 minutes.'),

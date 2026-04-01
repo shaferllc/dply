@@ -14,13 +14,8 @@ final class ByoServerDeployEngine implements DeployEngine
         private SiteGitDeployer $gitDeployer,
     ) {}
 
-    public function run(ByoDeployContext $context): array
+    public function run(DeployContext $context): array
     {
-        $site = $context->project->site;
-        if ($site === null) {
-            throw new \RuntimeException('BYO project #'.$context->project->getKey().' has no site; cannot run VM deploy.');
-        }
-
-        return $this->gitDeployer->run($site);
+        return $this->gitDeployer->run($context->site());
     }
 }

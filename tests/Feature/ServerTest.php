@@ -214,6 +214,32 @@ class ServerTest extends TestCase
             ->assertSee('Create server');
     }
 
+    public function test_servers_create_shows_add_ssh_key_modal_trigger_when_profile_key_is_missing(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+            'https://api.digitalocean.com/v2/regions' => Http::response(['regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]]]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response(['sizes' => [['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true]]]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('servers.create'))
+            ->assertOk()
+            ->assertSee('Add a personal profile SSH key')
+            ->assertSee('Add SSH key');
+    }
+
     public function test_servers_create_shows_digitalocean_functions_path_without_requiring_profile_ssh_keys(): void
     {
         $user = $this->userWithOrganization();
@@ -231,6 +257,24 @@ class ServerTest extends TestCase
             ->assertDontSee('Default package')
             ->assertDontSee('Default action kind')
             ->assertDontSee('Default action entrypoint');
+    }
+
+    public function test_servers_create_shows_digitalocean_kubernetes_path_without_requiring_profile_ssh_keys(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        ProviderCredential::factory()->create([
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->assertSee('DigitalOcean Kubernetes')
+            ->set('form.type', 'digitalocean_kubernetes')
+            ->assertSee('DigitalOcean Kubernetes setup')
+            ->assertSee('Cluster name')
+            ->assertSee('Namespace');
     }
 
     public function test_servers_create_can_store_a_digitalocean_functions_host_without_profile_ssh_keys(): void
@@ -260,6 +304,7 @@ class ServerTest extends TestCase
         $server = Server::query()->where('name', 'edge-fns')->firstOrFail();
 
         $this->assertSame(Server::STATUS_READY, $server->status);
+        $this->assertSame(Server::HEALTH_REACHABLE, $server->health_status);
         $this->assertTrue($server->isDigitalOceanFunctionsHost());
         $this->assertSame('digitalocean', $server->provider->value);
         $this->assertSame('fn-namespace', data_get($server->meta, 'digitalocean_functions.namespace'));
@@ -707,6 +752,59 @@ class ServerTest extends TestCase
             'provider' => 'custom',
             'status' => 'ready',
         ]);
+    }
+
+    public function test_servers_can_be_stored_as_custom_docker_hosts(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.type', 'custom')
+            ->set('form.custom_host_kind', 'docker')
+            ->set('form.name', 'Docker Box')
+            ->set('form.ip_address', '192.168.1.2')
+            ->set('form.ssh_port', '22')
+            ->set('form.ssh_user', 'root')
+            ->set('form.ssh_private_key', "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----")
+            ->call('store')
+            ->assertRedirect();
+
+        $server = Server::query()->where('name', 'Docker Box')->firstOrFail();
+
+        $this->assertSame($org->id, $server->organization_id);
+        $this->assertSame(Server::HOST_KIND_DOCKER, data_get($server->meta, 'host_kind'));
+        $this->assertTrue($server->isDockerHost());
+    }
+
+    public function test_servers_create_can_store_a_digitalocean_kubernetes_host_without_profile_ssh_keys(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.type', 'digitalocean_kubernetes')
+            ->set('form.name', 'DOKS Cluster')
+            ->set('form.provider_credential_id', (string) $credential->id)
+            ->set('form.do_kubernetes_cluster_name', 'prod-cluster')
+            ->set('form.do_kubernetes_namespace', 'apps')
+            ->call('store')
+            ->assertRedirect();
+
+        $server = Server::query()->where('name', 'DOKS Cluster')->firstOrFail();
+
+        $this->assertSame(Server::HOST_KIND_KUBERNETES, data_get($server->meta, 'host_kind'));
+        $this->assertSame('prod-cluster', data_get($server->meta, 'kubernetes.cluster_name'));
+        $this->assertSame('apps', data_get($server->meta, 'kubernetes.namespace'));
+        $this->assertSame('digitalocean', data_get($server->meta, 'kubernetes.provider'));
+        $this->assertSame(Server::STATUS_PENDING, $server->status);
+        $this->assertNull($server->health_status);
     }
 
     public function test_servers_create_custom_path_shows_warning_preflight_and_unavailable_cost(): void

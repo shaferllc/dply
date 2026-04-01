@@ -167,6 +167,8 @@ To stop and remove the container:
 docker compose -f docker-compose.ssh-dev.yml down
 ```
 
+If you are working on the newer Docker or Kubernetes runtime targets, keep using this SSH target for **VM provisioning-script validation** only. Use [DOCKER_AND_KUBERNETES_LOCAL_SETUP.md](DOCKER_AND_KUBERNETES_LOCAL_SETUP.md) for Orbit or OrbStack and container-runtime workflows.
+
 ---
 
 ## 8. Optional configuration
@@ -214,6 +216,7 @@ For a **full map** of the repo (all apps, `dply-core`, install commands per app)
 
 - [MONOREPO_AND_APPS.md](MONOREPO_AND_APPS.md) — all apps in this repo, install steps, and `dply-core`.
 - [DEPLOYMENT_FLOW.md](DEPLOYMENT_FLOW.md) — how deploys behave today.
+- [DOCKER_AND_KUBERNETES_LOCAL_SETUP.md](DOCKER_AND_KUBERNETES_LOCAL_SETUP.md) — local Docker and Kubernetes runtime workflows.
 - [API.md](API.md) — HTTP surface (BYO).
 - [ORG_ROLES_AND_LIMITS.md](ORG_ROLES_AND_LIMITS.md) — org roles and plan limits.
 

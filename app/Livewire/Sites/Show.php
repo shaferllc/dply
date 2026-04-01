@@ -17,6 +17,9 @@ use App\Models\SiteDomain;
 use App\Models\SiteEnvironmentVariable;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
+use App\Services\Deploy\ServerlessRepositoryCheckout;
+use App\Services\Deploy\ServerlessRuntimeDetector;
+use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteEnvPusher;
 use App\Services\Sites\SiteProvisioningCanceller;
@@ -52,6 +55,10 @@ class Show extends Component
     public string $functions_repository_selection = '';
 
     public string $functions_repository_subdirectory = '';
+
+    public string $functions_runtime = '';
+
+    public string $functions_entrypoint = '';
 
     public string $functions_build_command = '';
 
@@ -131,6 +138,13 @@ class Show extends Component
      */
     public array $availableFunctionsRepositories = [];
 
+    /**
+     * @var array<string, mixed>
+     */
+    public array $functionsDetection = [];
+
+    public bool $functionsOverridesTouched = false;
+
     public function mount(Server $server, Site $site): void
     {
         if ($site->server_id !== $server->id) {
@@ -145,6 +159,7 @@ class Show extends Component
         $this->site = $site;
         $this->syncFormFromSite();
         $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
+        $this->refreshFunctionsDetection();
     }
 
     protected function syncFormFromSite(): void
@@ -157,8 +172,13 @@ class Show extends Component
         $this->functions_source_control_account_id = (string) ($functionsConfig['source_control_account_id'] ?? '');
         $this->functions_repository_selection = '';
         $this->functions_repository_subdirectory = (string) ($functionsConfig['repository_subdirectory'] ?? '');
+        $this->functions_runtime = (string) ($functionsConfig['runtime'] ?? '');
+        $this->functions_entrypoint = (string) ($functionsConfig['entrypoint'] ?? '');
         $this->functions_build_command = (string) ($functionsConfig['build_command'] ?? '');
         $this->functions_artifact_output_path = (string) ($functionsConfig['artifact_output_path'] ?? '');
+        $this->functionsDetection = is_array($functionsConfig['detected_runtime'] ?? null)
+            ? $functionsConfig['detected_runtime']
+            : [];
         $this->post_deploy_command = (string) ($this->site->post_deploy_command ?? '');
         $this->env_file_content = (string) ($this->site->env_file_content ?? '');
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
@@ -433,11 +453,20 @@ class Show extends Component
         ];
 
         if ($this->server->isDigitalOceanFunctionsHost()) {
+            if (($this->functionsDetection['unsupported_for_target'] ?? false) === true) {
+                $this->flash_error = (string) ($this->functionsDetection['warnings'][0] ?? __('This repository runtime is not supported by the selected target.'));
+                $this->flash_success = null;
+
+                return;
+            }
+
             $rules = array_merge($rules, [
                 'functions_repo_source' => 'required|string|in:manual,provider',
                 'functions_source_control_account_id' => 'nullable|string|max:26',
                 'functions_repository_selection' => 'nullable|string|max:500',
                 'functions_repository_subdirectory' => 'nullable|string|max:255',
+                'functions_runtime' => 'required|string|max:50',
+                'functions_entrypoint' => 'required|string|max:255',
                 'functions_build_command' => 'required|string|max:4000',
                 'functions_artifact_output_path' => 'required|string|max:255',
                 'git_repository_url' => 'required|string|max:500',
@@ -466,8 +495,11 @@ class Show extends Component
                     ? trim($this->functions_source_control_account_id)
                     : null,
                 'repository_subdirectory' => trim($this->functions_repository_subdirectory),
+                'runtime' => trim($this->functions_runtime),
+                'entrypoint' => trim($this->functions_entrypoint),
                 'build_command' => trim($this->functions_build_command),
                 'artifact_output_path' => trim($this->functions_artifact_output_path),
+                'detected_runtime' => $this->functionsDetection !== [] ? $this->functionsDetection : null,
             ]);
             $updates['meta'] = $meta;
         }
@@ -484,6 +516,8 @@ class Show extends Component
             $this->functions_source_control_account_id = '';
             $this->functions_repository_selection = '';
             $this->availableFunctionsRepositories = [];
+
+            $this->refreshFunctionsDetection();
 
             return;
         }
@@ -524,8 +558,103 @@ class Show extends Component
 
             $this->git_repository_url = (string) $repository['url'];
             $this->git_branch = (string) ($repository['branch'] ?: 'main');
+            $this->refreshFunctionsDetection();
 
             return;
+        }
+    }
+
+    public function updatedGitRepositoryUrl(): void
+    {
+        $this->refreshFunctionsDetection();
+    }
+
+    public function updatedGitBranch(): void
+    {
+        $this->refreshFunctionsDetection();
+    }
+
+    public function updatedFunctionsRepositorySubdirectory(): void
+    {
+        $this->refreshFunctionsDetection();
+    }
+
+    public function updatedFunctionsRuntime(): void
+    {
+        $this->functionsOverridesTouched = true;
+    }
+
+    public function updatedFunctionsEntrypoint(): void
+    {
+        $this->functionsOverridesTouched = true;
+    }
+
+    public function updatedFunctionsBuildCommand(): void
+    {
+        $this->functionsOverridesTouched = true;
+    }
+
+    public function updatedFunctionsArtifactOutputPath(): void
+    {
+        $this->functionsOverridesTouched = true;
+    }
+
+    private function refreshFunctionsDetection(): void
+    {
+        if (! $this->server->isDigitalOceanFunctionsHost()) {
+            return;
+        }
+
+        $repositoryUrl = trim($this->git_repository_url);
+        $branch = trim($this->git_branch);
+
+        if ($repositoryUrl === '' || $branch === '') {
+            $this->functionsDetection = [];
+
+            return;
+        }
+
+        $checkout = null;
+
+        try {
+            $checkout = app(ServerlessRepositoryCheckout::class)->checkout(
+                'preview-site-'.$this->site->id.'-'.md5($repositoryUrl.'|'.$branch.'|'.$this->functions_repository_subdirectory),
+                $repositoryUrl,
+                $branch,
+                $this->functions_repository_subdirectory,
+                $this->site->user_id,
+                $this->functions_repo_source === 'provider' ? $this->functions_source_control_account_id : null,
+            );
+
+            $this->functionsDetection = app(ServerlessRuntimeDetector::class)->detect(
+                $checkout['working_directory'],
+                app(ServerlessTargetCapabilityResolver::class)->forServer($this->server),
+            );
+
+            if (! $this->functionsOverridesTouched) {
+                $this->functions_runtime = (string) ($this->functionsDetection['runtime'] ?? $this->functions_runtime);
+                $this->functions_entrypoint = (string) ($this->functionsDetection['entrypoint'] ?? $this->functions_entrypoint);
+                $this->functions_build_command = (string) ($this->functionsDetection['build_command'] ?? $this->functions_build_command);
+                $this->functions_artifact_output_path = (string) ($this->functionsDetection['artifact_output_path'] ?? $this->functions_artifact_output_path);
+            }
+        } catch (\Throwable $e) {
+            $this->functionsDetection = [
+                'framework' => 'unknown',
+                'language' => 'unknown',
+                'runtime' => '',
+                'entrypoint' => '',
+                'build_command' => '',
+                'artifact_output_path' => '',
+                'package' => 'default',
+                'confidence' => 'low',
+                'reasons' => [],
+                'warnings' => [$e->getMessage()],
+                'unsupported_for_target' => false,
+            ];
+        } finally {
+            if (is_array($checkout) && isset($checkout['workspace_path']) && is_string($checkout['workspace_path'])) {
+                app(ServerlessRepositoryCheckout::class)->cleanup($checkout['workspace_path']);
+            }
         }
     }
 

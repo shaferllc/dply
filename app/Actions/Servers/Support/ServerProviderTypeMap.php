@@ -11,6 +11,7 @@ final class ServerProviderTypeMap
         return match ($type) {
             'digitalocean' => 'digitalocean',
             'digitalocean_functions' => 'digitalocean',
+            'digitalocean_kubernetes' => 'digitalocean',
             'hetzner' => 'hetzner',
             'linode' => 'linode',
             'vultr' => 'vultr',
@@ -20,6 +21,7 @@ final class ServerProviderTypeMap
             'equinix_metal' => 'equinix_metal',
             'fly_io' => 'fly_io',
             'aws' => 'aws',
+            'aws_lambda' => 'aws',
             default => null,
         };
     }

@@ -10,14 +10,9 @@ final class DigitalOceanFunctionsDeployEngine implements DeployEngine
         private readonly DigitalOceanFunctionsActionDeployer $actionDeployer,
     ) {}
 
-    public function run(ByoDeployContext $context): array
+    public function run(DeployContext $context): array
     {
-        $site = $context->project->site;
-        if ($site === null) {
-            throw new \RuntimeException('Project has no site; cannot run a DigitalOcean Functions deploy.');
-        }
-
-        $result = $this->actionDeployer->deploy($site);
+        $result = $this->actionDeployer->deploy($context->site());
 
         return [
             'output' => $result['output'],
