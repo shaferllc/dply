@@ -49,6 +49,7 @@ final class ListServerProviderCards
     {
         return [
             ['id' => 'digitalocean', 'label' => 'DigitalOcean'],
+            ['id' => 'digitalocean_functions', 'label' => 'DigitalOcean Functions'],
             ['id' => 'hetzner', 'label' => 'Hetzner Cloud'],
             ['id' => 'vultr', 'label' => 'Vultr'],
             ['id' => 'linode', 'label' => 'Linode'],

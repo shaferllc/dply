@@ -1,6 +1,6 @@
 @php
     $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
-    $opsReady = $server->isReady() && $server->ssh_private_key;
+    $opsReady = $server->isReady() && $server->hasAnySshPrivateKey();
 @endphp
 
 <x-server-workspace-layout

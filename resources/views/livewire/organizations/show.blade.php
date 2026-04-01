@@ -34,13 +34,13 @@
                         <x-stat-card
                             :label="__('Plan')"
                             :value="$organization->planTierLabel()"
-                            :meta="__('Limits and billing apply to the whole organization.')"
+                            :meta="__('Trial limits and billing apply to the whole organization.')"
                         />
                         <x-stat-card :label="__('Infrastructure')" :value="$organization->servers_count.' '.Str::plural('server', $organization->servers_count)">
                             <span class="text-sm text-brand-moss">
                                 {{ $organization->sites_count }} {{ Str::plural('site', $organization->sites_count) }}
                                 @if ($organization->maxServers() < PHP_INT_MAX || $organization->maxSites() < PHP_INT_MAX)
-                                    · {{ __('tracked against plan limits') }}
+                                    · {{ __('tracked against trial or plan limits') }}
                                 @endif
                             </span>
                         </x-stat-card>
@@ -116,7 +116,7 @@
                             <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                                 <div class="border-b border-slate-200 px-6 py-4">
                                     <h3 class="font-medium text-slate-900">{{ __('Plan & usage') }}</h3>
-                                    <p class="mt-1 text-sm text-slate-500">{{ __('A quick read on how close the organization is to its limits.') }}</p>
+                                    <p class="mt-1 text-sm text-slate-500">{{ __('A quick read on how close the organization is to trial limits or Pro usage.') }}</p>
                                 </div>
                                 <div class="space-y-4 px-6 py-4 text-sm">
                                     <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4">

@@ -25,6 +25,14 @@ class Site extends Model
 
     public const STATUS_CADDY_ACTIVE = 'caddy_active';
 
+    public const STATUS_OPENLITESPEED_ACTIVE = 'openlitespeed_active';
+
+    public const STATUS_TRAEFIK_ACTIVE = 'traefik_active';
+
+    public const STATUS_FUNCTIONS_CONFIGURED = 'functions_configured';
+
+    public const STATUS_FUNCTIONS_ACTIVE = 'functions_active';
+
     public const STATUS_ERROR = 'error';
 
     public const SSL_NONE = 'none';
@@ -227,6 +235,10 @@ class Site extends Model
 
     public function webserver(): string
     {
+        if ($this->usesFunctionsRuntime()) {
+            return 'digitalocean_functions';
+        }
+
         $serverMeta = is_array($this->server?->meta) ? $this->server->meta : [];
         $webserver = $serverMeta['webserver'] ?? 'nginx';
 
@@ -283,6 +295,11 @@ class Site extends Model
 
     public function provisionedUrl(): ?string
     {
+        $readyUrl = $this->provisioningMeta()['ready_url'] ?? null;
+        if (is_string($readyUrl) && $readyUrl !== '') {
+            return $readyUrl;
+        }
+
         $hostname = $this->provisionedHostname();
 
         return $hostname ? 'http://'.$hostname : null;
@@ -320,7 +337,16 @@ class Site extends Model
             self::STATUS_NGINX_ACTIVE,
             self::STATUS_APACHE_ACTIVE,
             self::STATUS_CADDY_ACTIVE,
+            self::STATUS_OPENLITESPEED_ACTIVE,
+            self::STATUS_TRAEFIK_ACTIVE,
+            self::STATUS_FUNCTIONS_ACTIVE,
         ], true);
+    }
+
+    public function isReadyForWorkspace(): bool
+    {
+        return $this->isReadyForTraffic()
+            || $this->status === self::STATUS_FUNCTIONS_CONFIGURED;
     }
 
     public function statusLabel(): string
@@ -329,6 +355,10 @@ class Site extends Model
             self::STATUS_NGINX_ACTIVE => 'nginx active',
             self::STATUS_APACHE_ACTIVE => 'apache active',
             self::STATUS_CADDY_ACTIVE => 'caddy active',
+            self::STATUS_OPENLITESPEED_ACTIVE => 'openlitespeed active',
+            self::STATUS_TRAEFIK_ACTIVE => 'traefik active',
+            self::STATUS_FUNCTIONS_CONFIGURED => 'functions configured',
+            self::STATUS_FUNCTIONS_ACTIVE => 'functions active',
             default => str_replace('_', ' ', $this->status),
         };
     }
@@ -338,8 +368,50 @@ class Site extends Model
         return match ($webserver) {
             'apache' => self::STATUS_APACHE_ACTIVE,
             'caddy' => self::STATUS_CADDY_ACTIVE,
+            'openlitespeed' => self::STATUS_OPENLITESPEED_ACTIVE,
+            'traefik' => self::STATUS_TRAEFIK_ACTIVE,
+            'digitalocean_functions' => self::STATUS_FUNCTIONS_ACTIVE,
             default => self::STATUS_NGINX_ACTIVE,
         };
+    }
+
+    public function runtimeProfile(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $profile = $meta['runtime_profile'] ?? null;
+
+        if (is_string($profile) && $profile !== '') {
+            return $profile;
+        }
+
+        return $this->server?->isDigitalOceanFunctionsHost()
+            ? 'digitalocean_functions_web'
+            : 'vm_web';
+    }
+
+    public function usesFunctionsRuntime(): bool
+    {
+        return $this->runtimeProfile() === 'digitalocean_functions_web';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function functionsConfig(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $config = $meta['digitalocean_functions'] ?? [];
+
+        return is_array($config) ? $config : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function serverlessResolvedConfig(): array
+    {
+        return app(\App\Services\Deploy\ServerlessDeploymentConfigResolver::class)
+            ->resolve($this);
     }
 
     public function sslDomainHostnames(): Collection
@@ -380,6 +452,11 @@ class Site extends Model
         return rtrim($this->document_root, '/');
     }
 
+    public function effectiveDocumentRoot(): string
+    {
+        return $this->effectiveDocumentRootForNginx();
+    }
+
     /**
      * Directory that receives .env (project root).
      */
@@ -395,6 +472,22 @@ class Site extends Model
     public function nginxConfigBasename(): string
     {
         return 'dply-'.$this->id.'-'.$this->slug;
+    }
+
+    public function webserverConfigBasename(): string
+    {
+        return $this->nginxConfigBasename();
+    }
+
+    public function webserverLogDirectory(): string
+    {
+        return match ($this->webserver()) {
+            'apache' => '/var/log/apache2',
+            'caddy' => '/var/log/caddy',
+            'openlitespeed' => '/var/log/lshttpd',
+            'traefik' => '/var/log/caddy',
+            default => '/var/log/nginx',
+        };
     }
 
     public function deployHookUrl(): string

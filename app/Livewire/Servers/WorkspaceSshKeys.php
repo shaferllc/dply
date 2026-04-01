@@ -195,7 +195,11 @@ class WorkspaceSshKeys extends Component
             'new_auth_key' => 'required|string|max:8000',
             'new_target_linux_user' => ['required', 'string', 'max:64', Rule::in($this->system_users)],
             'new_review_after' => ['nullable', 'date'],
-            'profile_key_id' => ['nullable', 'string', 'exists:user_ssh_keys,id'],
+            'profile_key_id' => [
+                'nullable',
+                'string',
+                Rule::exists('user_ssh_keys', 'id')->where('user_id', Auth::id()),
+            ],
         ]);
 
         $selected = trim($this->new_target_linux_user);

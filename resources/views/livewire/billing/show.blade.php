@@ -6,7 +6,7 @@
 
                 <x-page-header
                     :title="__('Billing & plan')"
-                    :description="__('Plan status, payment method, usage limits, and Stripe checkout for :org.', ['org' => $organization->name])"
+                    :description="__('Trial status, Pro billing, usage limits, and Stripe checkout for :org.', ['org' => $organization->name])"
                     flush
                 />
 
@@ -27,7 +27,7 @@
         <x-section-card>
             <x-slot name="header">
                 <h2 class="font-semibold text-brand-ink">{{ __('Subscription') }}</h2>
-                <p class="text-sm text-brand-moss mt-0.5">{{ __('Current plan and status.') }}</p>
+                <p class="text-sm text-brand-moss mt-0.5">{{ __('Current trial or subscription status.') }}</p>
             </x-slot>
             <div class="space-y-2">
                 <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -45,7 +45,7 @@
                                     {{ $this->status }}
                                 </span>
                             @else
-                                {{ __('No active subscription') }}
+                                {{ __('Trial') }}
                             @endif
                         </dd>
                     </div>
@@ -62,7 +62,7 @@
         <x-section-card>
             <x-slot name="header">
                 <h2 class="font-semibold text-brand-ink">{{ __('Plan limits & usage') }}</h2>
-                <p class="text-sm text-brand-moss mt-0.5">{{ __('Counts include every server and site in this organization. Pro removes these caps when your Stripe subscription matches the configured Pro prices.') }}</p>
+                <p class="text-sm text-brand-moss mt-0.5">{{ __('Counts include every server and site in this organization. Trial limits apply org-wide until your Stripe subscription matches the configured Pro prices.') }}</p>
             </x-slot>
             <div>
                 <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -73,7 +73,7 @@
                             @if ($organization->maxServers() >= PHP_INT_MAX)
                                 <span class="text-sm font-normal text-brand-moss"> / {{ __('Unlimited') }}</span>
                             @else
-                                <span class="text-sm font-normal text-brand-moss"> / {{ $organization->maxServersDisplay() }} {{ __('on Free') }}</span>
+                                <span class="text-sm font-normal text-brand-moss"> / {{ $organization->maxServersDisplay() }} {{ __('during trial') }}</span>
                             @endif
                         </dd>
                     </div>
@@ -84,18 +84,11 @@
                             @if ($organization->maxSites() >= PHP_INT_MAX)
                                 <span class="text-sm font-normal text-brand-moss"> / {{ __('Unlimited') }}</span>
                             @else
-                                <span class="text-sm font-normal text-brand-moss"> / {{ $organization->maxSitesDisplay() }} {{ __('on Free') }}</span>
+                                <span class="text-sm font-normal text-brand-moss"> / {{ $organization->maxSitesDisplay() }} {{ __('during trial') }}</span>
                             @endif
                         </dd>
                     </div>
                 </dl>
-                @if ($organization->effectiveMemberSeatCap() !== null)
-                    <p class="mt-4 text-sm text-brand-moss">
-                        <span class="font-medium text-brand-ink">{{ __('Member seats:') }}</span>
-                        {{ $organization->users()->count() }} {{ __('members') }} + {{ $organization->invitations()->where('expires_at', '>', now())->count() }} {{ __('pending invites') }}
-                        ({{ __('cap') }} {{ $organization->effectiveMemberSeatCap() }}).
-                    </p>
-                @endif
                 <p class="mt-4 text-xs text-brand-mist">
                     {{ __('Defaults:') }} <code class="rounded bg-brand-sand/60 px-1 py-0.5 text-brand-ink">SUBSCRIPTION_SERVERS_FREE_LIMIT</code>, <code class="rounded bg-brand-sand/60 px-1 py-0.5 text-brand-ink">SUBSCRIPTION_SITES_FREE_LIMIT</code>.
                     <a href="{{ route('docs.org-roles-and-limits') }}" class="font-medium text-brand-sage hover:text-brand-ink underline underline-offset-2">{{ __('Roles & limits reference') }}</a>
@@ -153,13 +146,13 @@
         <x-section-card>
             <x-slot name="header">
                 <h2 class="font-semibold text-brand-ink">{{ __('Actions') }}</h2>
-                <p class="text-sm text-brand-moss mt-0.5">{{ __('Subscribe or manage billing in Stripe.') }}</p>
+                <p class="text-sm text-brand-moss mt-0.5">{{ __('Move from trial to Pro or manage billing in Stripe.') }}</p>
             </x-slot>
             <div class="flex flex-wrap gap-3">
                 @if ($this->plans->isNotEmpty())
                     @foreach ($this->plans as $plan)
                         <button type="button" wire:click="checkout('{{ $plan['id'] }}')" class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90">
-                            {{ __('Subscribe — :plan', ['plan' => $plan['name']]) }}
+                            {{ __('Choose :plan', ['plan' => $plan['name']]) }}
                         </button>
                     @endforeach
                 @else

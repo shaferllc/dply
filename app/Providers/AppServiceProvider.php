@@ -39,7 +39,15 @@ use App\Policies\UserSshKeyPolicy;
 use App\Policies\WorkspacePolicy;
 use App\Services\Deploy\ByoServerDeployEngine;
 use App\Services\Deploy\DeployEngineResolver;
+use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
+use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
 use App\Services\Servers\ServerMetricsGuestScript;
+use App\Services\Sites\SiteApacheProvisioner;
+use App\Services\Sites\SiteCaddyProvisioner;
+use App\Services\Sites\SiteNginxProvisioner;
+use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
+use App\Services\Sites\SiteTraefikProvisioner;
+use App\Services\Sites\SiteWebserverProvisionerRegistry;
 use Dply\Core\Auth\CentralOAuthClient;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -68,8 +76,23 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(DeployEngineResolver::class, function ($app) {
-            return new DeployEngineResolver($app->make(ByoServerDeployEngine::class));
+            return new DeployEngineResolver(
+                $app->make(ByoServerDeployEngine::class),
+                $app->make(DigitalOceanFunctionsDeployEngine::class),
+            );
         });
+
+        $this->app->singleton(SiteWebserverProvisionerRegistry::class, function ($app) {
+            return new SiteWebserverProvisionerRegistry($app->tagged('site.webserver.provisioners'));
+        });
+
+        $this->app->tag([
+            SiteNginxProvisioner::class,
+            SiteCaddyProvisioner::class,
+            SiteApacheProvisioner::class,
+            SiteOpenLiteSpeedProvisioner::class,
+            SiteTraefikProvisioner::class,
+        ], 'site.webserver.provisioners');
     }
 
     /**
@@ -165,16 +188,24 @@ class AppServiceProvider extends ServiceProvider
         Site::deleting(function (Site $site): void {
             $primary = $site->primaryDomain();
             $svIds = SupervisorProgram::query()->where('site_id', $site->id)->pluck('id')->all();
-            CleanupRemoteSiteArtifactsJob::dispatch([
-                'server_id' => $site->server_id,
-                'nginx_basename' => $site->nginxConfigBasename(),
-                'repository_base' => rtrim($site->effectiveRepositoryPath(), '/'),
-                'deploy_strategy' => $site->deploy_strategy ?? 'simple',
-                'primary_hostname' => $primary?->hostname,
-                'ssl_was_active' => $site->ssl_status === Site::SSL_ACTIVE,
-                'supervisor_program_ids' => $svIds,
-                'site_id' => $site->id,
-            ]);
+            if ($site->server?->isDigitalOceanFunctionsHost()) {
+                rescue(
+                    fn () => app(DigitalOceanFunctionsActionDeployer::class)->delete($site),
+                    report: false,
+                );
+            } else {
+                CleanupRemoteSiteArtifactsJob::dispatch([
+                    'server_id' => $site->server_id,
+                    'webserver' => $site->webserver(),
+                    'nginx_basename' => $site->nginxConfigBasename(),
+                    'repository_base' => rtrim($site->effectiveRepositoryPath(), '/'),
+                    'deploy_strategy' => $site->deploy_strategy ?? 'simple',
+                    'primary_hostname' => $primary?->hostname,
+                    'ssl_was_active' => $site->ssl_status === Site::SSL_ACTIVE,
+                    'supervisor_program_ids' => $svIds,
+                    'site_id' => $site->id,
+                ]);
+            }
             SupervisorProgram::query()->where('site_id', $site->id)->delete();
         });
 

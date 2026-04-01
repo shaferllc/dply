@@ -32,16 +32,7 @@ class TestingHostnameProvisioner
             return null;
         }
 
-        $existingHostname = $site->testingHostname();
-        if ($existingHostname !== '') {
-            $existingDomain = $site->domains->firstWhere('hostname', $existingHostname);
-            if ($existingDomain instanceof SiteDomain) {
-                return $existingDomain;
-            }
-        }
-
-        $zone = $this->chooseZone($site);
-        $hostname = $this->buildHostname($site, $zone);
+        [$hostname, $zone] = $this->resolveHostnameAndZone($site);
         $recordName = $this->relativeRecordName($hostname, $zone);
         $service = new DigitalOceanService((string) config('services.digitalocean.token'));
 
@@ -85,6 +76,24 @@ class TestingHostnameProvisioner
         }
     }
 
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function resolveHostnameAndZone(Site $site): array
+    {
+        $existingHostname = strtolower(trim($site->testingHostname()));
+        if ($existingHostname !== '') {
+            $existingZone = $this->configuredZoneForHostname($existingHostname);
+            if ($existingZone !== null) {
+                return [$existingHostname, $existingZone];
+            }
+        }
+
+        $zone = $this->chooseZone($site);
+
+        return [$this->buildHostname($site, $zone), $zone];
+    }
+
     public function chooseZone(Site $site): string
     {
         $domains = $this->configuredDomains();
@@ -121,6 +130,45 @@ class TestingHostnameProvisioner
             && $this->configuredDomains() !== [];
     }
 
+    public function delete(Site $site): void
+    {
+        $site->loadMissing(['server', 'domains']);
+
+        $testingMeta = is_array($site->meta['testing_hostname'] ?? null) ? $site->meta['testing_hostname'] : [];
+        $hostname = strtolower(trim((string) ($testingMeta['hostname'] ?? $site->testingHostname())));
+        if ($hostname === '') {
+            return;
+        }
+
+        $zone = is_string($testingMeta['zone'] ?? null) && $testingMeta['zone'] !== ''
+            ? (string) $testingMeta['zone']
+            : $this->configuredZoneForHostname($hostname);
+        if ($zone === null || trim((string) config('services.digitalocean.token')) === '') {
+            return;
+        }
+
+        $recordName = is_string($testingMeta['record_name'] ?? null) && $testingMeta['record_name'] !== ''
+            ? (string) $testingMeta['record_name']
+            : $this->relativeRecordName($hostname, $zone);
+        $serverIp = trim((string) ($testingMeta['record_data'] ?? $site->server?->ip_address ?? ''));
+
+        $service = new DigitalOceanService((string) config('services.digitalocean.token'));
+        $recordId = (int) ($testingMeta['record_id'] ?? 0);
+
+        if ($recordId <= 0) {
+            $record = $service->findDomainRecord($zone, 'A', $recordName, $serverIp !== '' ? $serverIp : null);
+            $recordId = (int) ($record['id'] ?? 0);
+        }
+
+        if ($recordId > 0) {
+            $service->deleteDomainRecord($zone, $recordId);
+        }
+
+        $site->domains()
+            ->where('hostname', $hostname)
+            ->delete();
+    }
+
     /**
      * @return list<string>
      */
@@ -146,6 +194,17 @@ class TestingHostnameProvisioner
         $key = (string) ($site->id ?: ($site->slug !== '' ? $site->slug : $site->name));
 
         return abs(crc32($key)) % $count;
+    }
+
+    private function configuredZoneForHostname(string $hostname): ?string
+    {
+        foreach ($this->configuredDomains() as $domain) {
+            if ($hostname === $domain || str_ends_with($hostname, '.'.$domain)) {
+                return $domain;
+            }
+        }
+
+        return null;
     }
 
     private function storeResult(Site $site, array $payload): void

@@ -350,14 +350,14 @@ class ServerSystemLogReader
             return null;
         }
 
-        $basename = $site->nginxConfigBasename();
+        $basename = $site->webserverConfigBasename();
         if (! preg_match('/^[a-zA-Z0-9._\-]+$/', $basename)) {
             return null;
         }
 
         $suffix = $which === 'access' ? '-access.log' : '-error.log';
 
-        return '/var/log/nginx/'.$basename.$suffix;
+        return $site->webserverLogDirectory().'/'.$basename.$suffix;
     }
 
     /**

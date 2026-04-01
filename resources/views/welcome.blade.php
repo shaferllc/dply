@@ -52,7 +52,7 @@
                                 <a
                                     href="{{ route('register') }}"
                                     class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl bg-brand-gold text-brand-ink text-sm font-semibold shadow-lg shadow-brand-gold/25 hover:bg-[#d4b24d] transition-colors"
-                                >Start free</a>
+                                >Start trial</a>
                             @endauth
                             <a
                                 href="{{ route('pricing') }}"
@@ -102,7 +102,7 @@
         <section class="border-y border-brand-ink/10 bg-brand-ink text-brand-cream py-10 px-4 sm:px-6 lg:px-8">
             <div class="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
                 <p class="text-sm font-medium text-brand-sand/90 max-w-md">
-                    Built for engineering leaders who need predictable access patterns—not shared spreadsheets of API keys.
+                    Built for engineering leaders who need predictable access patterns, clearer deploy workflows, and flat organization pricing.
                 </p>
                 <ul class="flex flex-wrap gap-3 justify-center lg:justify-end">
                     @foreach (['Credential vaulting', 'Team boundaries', 'Provider linking', 'Remote execution'] as $chip)
@@ -168,12 +168,12 @@
         <section class="pb-24 px-4 sm:px-6 lg:px-8">
             <div class="max-w-4xl mx-auto rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-white via-brand-cream to-brand-sand/30 px-8 py-16 sm:px-14 sm:py-20 text-center shadow-lg shadow-brand-forest/5">
                 <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Ready for a calmer operations posture?</h2>
-                <p class="mt-4 text-lg text-brand-moss max-w-xl mx-auto">Spin up an organization, connect your first provider, and invite your team when you are ready to standardize access.</p>
+                <p class="mt-4 text-lg text-brand-moss max-w-xl mx-auto">Spin up an organization, connect your first provider, and run a real trial on infrastructure you already control before moving to Pro.</p>
                 @guest
                     <a
                         href="{{ route('register') }}"
                         class="mt-10 inline-flex items-center px-8 py-3.5 rounded-xl bg-brand-ink text-brand-cream text-sm font-semibold hover:bg-brand-forest transition-colors shadow-md"
-                    >Create free account</a>
+                    >Start trial</a>
                 @else
                     <a
                         href="{{ route('dashboard') }}"

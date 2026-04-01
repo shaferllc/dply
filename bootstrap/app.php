@@ -6,6 +6,7 @@ use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
+use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
@@ -47,7 +48,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 return;
             }
             Site::query()
-                ->where('status', Site::STATUS_NGINX_ACTIVE)
+                ->whereIn('status', [
+                    Site::STATUS_NGINX_ACTIVE,
+                    Site::STATUS_APACHE_ACTIVE,
+                    Site::STATUS_CADDY_ACTIVE,
+                    Site::STATUS_OPENLITESPEED_ACTIVE,
+                    Site::STATUS_TRAEFIK_ACTIVE,
+                ])
                 ->whereHas('domains')
                 ->pluck('id')
                 ->each(fn (int $id) => CheckSiteUrlHealthJob::dispatch($id));
@@ -60,6 +67,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
+        $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
 
         $schedule->command(CheckSupervisorHealthCommand::class)
             ->everyFifteenMinutes()
@@ -80,7 +88,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->call(function (): void {
             Site::query()
-                ->where('status', Site::STATUS_NGINX_ACTIVE)
+                ->whereIn('status', [
+                    Site::STATUS_NGINX_ACTIVE,
+                    Site::STATUS_APACHE_ACTIVE,
+                    Site::STATUS_CADDY_ACTIVE,
+                    Site::STATUS_OPENLITESPEED_ACTIVE,
+                    Site::STATUS_TRAEFIK_ACTIVE,
+                ])
                 ->pluck('id')
                 ->each(fn (string $id) => RunSiteInsightsJob::dispatch($id));
         })->everyTwoHours();

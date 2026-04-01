@@ -12,9 +12,9 @@
  *
  * Leave price IDs empty for local/testing if you don't use Stripe.
  *
- * Limits (free/Starter tier = no active subscription or non-Pro plan):
- *   servers_free: max servers allowed when not on a Pro plan (default 3).
- *   sites_free: max sites per organization when not on Pro (default 10).
+ * Limits (trial / non-Pro state = no active subscription or non-Pro plan):
+ *   servers_free: max servers allowed before upgrading to Pro (default 3).
+ *   sites_free: max sites per organization before upgrading to Pro (default 10).
  * Pro (pro_monthly or pro_yearly) has unlimited servers and unlimited sites.
  */
 
@@ -27,14 +27,14 @@ return [
     'plans' => [
         'pro_monthly' => [
             'id' => 'pro_monthly',
-            'name' => 'Pro (monthly)',
+            'name' => 'Pro Monthly',
             'price_id' => env('STRIPE_PRICE_PRO_MONTHLY', ''),
             'interval' => 'month',
             'description' => 'Pro plan billed monthly.',
         ],
         'pro_yearly' => [
             'id' => 'pro_yearly',
-            'name' => 'Pro (yearly)',
+            'name' => 'Pro Yearly',
             'price_id' => env('STRIPE_PRICE_PRO_YEARLY', ''),
             'interval' => 'year',
             'description' => 'Pro plan billed yearly.',

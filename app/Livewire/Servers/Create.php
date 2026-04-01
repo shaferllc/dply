@@ -48,15 +48,6 @@ class Create extends Component
         $user = auth()->user();
         $org = $user?->currentOrganization();
 
-        if ($user && $org && ! $user->sshKeys()->exists()) {
-            $this->redirectRoute('profile.ssh-keys', [
-                'source' => 'servers.create',
-                'return_to' => 'servers.create',
-            ], navigate: true);
-
-            return;
-        }
-
         $ids = CredentialsIndex::credentialProviderIds();
         if ($ids !== [] && ! in_array($this->active_provider, $ids, true)) {
             $this->active_provider = $ids[0];
@@ -131,7 +122,7 @@ class Create extends Component
             return null;
         }
 
-        if (! $user->sshKeys()->exists()) {
+        if (! in_array($this->form->type, ['custom', 'digitalocean_functions'], true) && ! $user->sshKeys()->exists()) {
             return $this->redirectRoute('profile.ssh-keys', [
                 'source' => 'servers.create',
                 'return_to' => 'servers.create',
@@ -338,7 +329,7 @@ class Create extends Component
 
     protected function syncProvisionPreferenceFields(): void
     {
-        if ($this->form->type === 'custom') {
+        if (in_array($this->form->type, ['custom', 'digitalocean_functions'], true)) {
             return;
         }
 
@@ -606,6 +597,10 @@ class Create extends Component
 
     protected function applyInstallProfile(): void
     {
+        if ($this->form->type === 'digitalocean_functions') {
+            return;
+        }
+
         $profile = collect(config('server_provision_options.install_profiles', []))
             ->firstWhere('id', $this->form->install_profile);
 
@@ -667,6 +662,7 @@ class Create extends Component
     protected function flashSuccessForServerType(string $type): void
     {
         Session::flash('success', match ($type) {
+            'digitalocean_functions' => __('DigitalOcean Functions host added. Create a site to wire its runtime and deploy settings.'),
             'equinix_metal' => __('Bare metal can take 5–10 minutes.'),
             'fly_io' => __('Fly.io machine is being created.'),
             'aws' => __('AWS EC2 instance is being created. This usually takes 1–2 minutes.'),

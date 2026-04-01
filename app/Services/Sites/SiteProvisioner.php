@@ -11,14 +11,32 @@ class SiteProvisioner
 
     public function __construct(
         private readonly TestingHostnameProvisioner $testingHostnameProvisioner,
-        private readonly SiteNginxProvisioner $siteNginxProvisioner,
-        private readonly SiteCaddyProvisioner $siteCaddyProvisioner,
+        private readonly SiteWebserverProvisionerRegistry $provisionerRegistry,
         private readonly SiteReachabilityChecker $siteReachabilityChecker,
+        private readonly DigitalOceanFunctionsSiteProvisioner $digitalOceanFunctionsSiteProvisioner,
     ) {}
 
     public function begin(Site $site): void
     {
         $site->loadMissing(['server', 'domains']);
+
+        if ($site->usesFunctionsRuntime()) {
+            $this->appendLog($site, 'info', 'queued', 'Functions host provisioning worker started.', [
+                'runtime_profile' => $site->runtimeProfile(),
+                'server_id' => (string) $site->server_id,
+            ]);
+
+            $this->updateProvisioning($site, [
+                'state' => 'configuring_functions_runtime',
+                'webserver' => $site->webserver(),
+                'started_at' => now()->toIso8601String(),
+                'error' => null,
+            ]);
+
+            $this->appendLog($site, 'info', 'configuring_functions_runtime', 'DigitalOcean Functions runtime metadata saved. Waiting for the first deploy to publish a live endpoint.');
+
+            return;
+        }
 
         $this->appendLog($site, 'info', 'queued', 'Provisioning worker started.', [
             'webserver' => $site->webserver(),
@@ -55,9 +73,22 @@ class SiteProvisioner
                 'error' => $testingHostnameMeta['error'] ?? null,
             ]);
         } else {
-            $this->appendLog($site, 'warning', 'provisioning_testing_hostname', 'Testing hostname provisioning was skipped.', [
+            $this->appendLog($site, 'error', 'provisioning_testing_hostname', 'Testing hostname provisioning was skipped.', [
                 'reason' => $testingHostnameMeta['reason'] ?? null,
             ]);
+        }
+
+        if ($testingHostnameStatus !== 'ready') {
+            $reason = (string) ($testingHostnameMeta['reason'] ?? 'unknown');
+            $detail = (string) ($testingHostnameMeta['error'] ?? '');
+
+            throw new \RuntimeException(match ($reason) {
+                'disabled' => 'Testing hostname creation is required before provisioning can continue. Enable DigitalOcean testing hostnames and configure at least one testing domain.',
+                'missing_server_ip' => 'Testing hostname creation requires a server IP address before provisioning can continue.',
+                default => $detail !== ''
+                    ? 'Testing hostname creation failed before provisioning could continue: '.$detail
+                    : 'Testing hostname creation must succeed before provisioning can continue.',
+            });
         }
 
         $this->updateProvisioning($site, [
@@ -70,12 +101,7 @@ class SiteProvisioner
             'webserver' => $site->webserver(),
         ]);
 
-        match ($site->webserver()) {
-            'nginx' => $this->siteNginxProvisioner->provision($site),
-            'caddy' => $this->siteCaddyProvisioner->provision($site),
-            'apache' => throw new \RuntimeException('Apache site provisioning is not implemented yet. Use nginx or caddy for now.'),
-            default => throw new \RuntimeException('Unsupported webserver ['.$site->webserver().'] for site provisioning.'),
-        };
+        $this->provisionerRegistry->for($site->webserver())->provision($site);
 
         $site->refresh();
 
@@ -99,6 +125,31 @@ class SiteProvisioner
     public function checkReadiness(Site $site): array
     {
         $site->loadMissing(['server', 'domains']);
+
+        if ($site->usesFunctionsRuntime()) {
+            $result = $this->digitalOceanFunctionsSiteProvisioner->readyResult($site);
+            $site->update([
+                'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+            ]);
+
+            $this->appendLog($site, 'info', 'awaiting_first_deploy', 'Functions host is configured. Run the first deploy to publish a live endpoint.', [
+                'hostname' => $result['hostname'],
+                'url' => $result['url'],
+            ]);
+
+            $this->updateProvisioning($site, [
+                'state' => 'awaiting_first_deploy',
+                'webserver' => $site->webserver(),
+                'ready_hostname' => $result['hostname'],
+                'ready_url' => $result['url'],
+                'checked_at' => $result['checked_at'],
+                'host_checks' => [],
+                'error' => null,
+            ]);
+
+            return $result;
+        }
+
         $result = $this->siteReachabilityChecker->check($site);
 
         if ($result['ok']) {

@@ -19,6 +19,14 @@ trait InteractsWithServerWorkspace
     {
         $this->authorize('view', $server);
         $this->server = $server;
+
+        if (! $server->isVmHost()) {
+            $allowedRoutes = ['servers.show', 'servers.sites'];
+            $currentRoute = request()->route()?->getName();
+            if (is_string($currentRoute) && ! in_array($currentRoute, $allowedRoutes, true)) {
+                $this->redirect(route('servers.show', $server), navigate: true);
+            }
+        }
     }
 
     protected function currentUserIsDeployer(): bool
@@ -34,6 +42,7 @@ trait InteractsWithServerWorkspace
         $s = $this->server;
 
         return $s->isReady()
+            && $s->isVmHost()
             && filled($s->ip_address)
             && filled($s->ssh_private_key);
     }

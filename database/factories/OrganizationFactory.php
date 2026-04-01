@@ -21,6 +21,7 @@ class OrganizationFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name).'-'.Str::random(4),
             'email' => fake()->optional()->companyEmail(),
+            'deploy_email_notifications_enabled' => true,
         ];
     }
 }

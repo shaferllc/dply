@@ -1,4 +1,4 @@
-# Organization roles, API tokens, and plan limits (BYO)
+# Organization roles, API tokens, trial limits, and Pro billing (BYO)
 
 This applies to the **bring-your-own-server (BYO)** app at the repository root. Billing and usage limits are **per organization**. Profile, 2FA, and OAuth are **per user** (see `docs/MULTI_PRODUCT_PLATFORM_PLAN.md` §2 in the repo).
 
@@ -13,22 +13,22 @@ This applies to the **bring-your-own-server (BYO)** app at the repository root. 
 
 Invites are sent from **Organization → Members** (admins only).
 
-## Plan limits (servers & sites)
+## Trial limits and Pro billing (servers & sites)
 
 Limits apply to the **entire organization** (every server and every site in that org). They are **not** billed or counted per site.
 
-| Tier | Servers | Sites |
+| Stage | Servers | Sites |
 |------|---------|--------|
-| **Free** (no active Pro subscription) | Up to `SUBSCRIPTION_SERVERS_FREE_LIMIT` (default **3**) | Up to `SUBSCRIPTION_SITES_FREE_LIMIT` (default **10**) |
+| **Trial / non-Pro** (no active Pro subscription) | Up to `SUBSCRIPTION_SERVERS_FREE_LIMIT` (default **3**) | Up to `SUBSCRIPTION_SITES_FREE_LIMIT` (default **10**) |
 | **Pro** (Stripe price IDs match `pro_monthly` / `pro_yearly` in `config/subscription.php`) | **Unlimited** | **Unlimited** |
 
 Configure defaults in `.env`:
 
 - `SUBSCRIPTION_SERVERS_FREE_LIMIT`
 - `SUBSCRIPTION_SITES_FREE_LIMIT`
-- `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_YEARLY` (and optional seat price)
+- `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_YEARLY`
 
-**Member seat cap:** Optional Stripe seat line item plus `DPLY_MAX_ORG_MEMBERS` — see `Organization::effectiveMemberSeatCap()`.
+Public pricing is organization-based. Any member cap still present in runtime config should be treated as an internal safeguard, not customer-facing seat pricing.
 
 ## Where this appears in the app
 

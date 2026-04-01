@@ -53,6 +53,10 @@ final class ResolveServerCreateCatalog
         }
 
         $credentials = GetProviderCredentialsForServerType::run($org, $type);
+        if ($type === 'digitalocean_functions') {
+            return array_merge($empty, ['credentials' => $credentials]);
+        }
+
         if ($type === 'fly_io') {
             return $this->catalogFlyIo($credentials);
         }

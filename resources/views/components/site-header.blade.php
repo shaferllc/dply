@@ -100,7 +100,7 @@
                             class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-brand-ink text-brand-cream text-sm font-semibold shadow-sm shadow-brand-ink/10 hover:bg-brand-forest transition-colors"
                         >
                             <x-heroicon-o-rocket-launch class="{{ $hiGuest }}" />
-                            {{ __('Get started') }}
+                            {{ __('Start trial') }}
                         </a>
                     @endif
                 </nav>

@@ -83,7 +83,7 @@ final class BuildProviderCredentialHealth
     private function runHealthCheck(string $type, ProviderCredential $credential): void
     {
         match ($type) {
-            'digitalocean' => (new DigitalOceanService($credential))->validateToken(),
+            'digitalocean', 'digitalocean_functions' => (new DigitalOceanService($credential))->validateToken(),
             'hetzner' => (new HetznerService($credential))->validateToken(),
             'linode', 'akamai' => (new LinodeService($credential))->validateToken(),
             'vultr' => (new VultrService($credential))->validateToken(),

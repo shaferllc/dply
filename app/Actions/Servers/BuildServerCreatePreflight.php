@@ -79,9 +79,11 @@ final class BuildServerCreatePreflight
         array $customConnectionTest = [],
         array $sizeRecommendations = [],
     ): array {
-        $checks = $form->type === 'custom'
-            ? $this->customChecks($form, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $customConnectionTest)
-            : $this->cloudChecks($form, $catalog, $provisionOptions, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth, $sizeRecommendations);
+        $checks = match ($form->type) {
+            'custom' => $this->customChecks($form, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $customConnectionTest),
+            'digitalocean_functions' => $this->digitalOceanFunctionsChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
+            default => $this->cloudChecks($form, $catalog, $provisionOptions, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth, $sizeRecommendations),
+        };
 
         $blockingFields = [];
         foreach ($checks as $check) {
@@ -256,24 +258,6 @@ final class BuildServerCreatePreflight
             $checks[] = $this->check('server_limit', 'error', __('Server limit reached'), __('Your organization cannot create another server on the current plan.'), true);
         }
 
-        if (! $hasUserSshKeys) {
-            $checks[] = $this->check(
-                'user_ssh_keys',
-                'error',
-                __('Add a personal profile SSH key'),
-                __('Add at least one personal SSH public key in your profile first so Dply can connect your account access to the server workflow.'),
-                true
-            );
-        } elseif (! $hasProvisionableUserSshKeys) {
-            $checks[] = $this->check(
-                'user_ssh_key_defaults',
-                'warning',
-                __('No personal SSH key is set for new servers'),
-                __('This server will be saved without one of your personal profile SSH keys queued for this machine. Mark a profile key for new servers or attach one from the SSH keys page after setup.'),
-                false
-            );
-        }
-
         try {
             Validator::make(
                 [
@@ -331,6 +315,91 @@ final class BuildServerCreatePreflight
                 false
             );
         }
+
+        return $checks;
+    }
+
+    /**
+     * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
+     */
+    private function digitalOceanFunctionsChecks(
+        ServerCreateForm $form,
+        array $catalog,
+        bool $canCreateServer,
+        bool $hasAnyProviderCredentials,
+        bool $hasLinkedCredential,
+        ?array $providerHealth,
+    ): array {
+        $checks = [];
+
+        if (! $canCreateServer) {
+            $checks[] = $this->check('server_limit', 'error', __('Server limit reached'), __('Your organization cannot create another server on the current plan.'), true);
+        }
+
+        if (! $hasAnyProviderCredentials) {
+            $checks[] = $this->check('provider_credentials', 'error', __('Add a provider credential'), __('Add a DigitalOcean credential before creating a Functions host.'), true, 'provider_credential_id');
+
+            return $checks;
+        }
+
+        if (! $hasLinkedCredential || $catalog['credentials']->isEmpty()) {
+            $checks[] = $this->check('provider_credentials', 'error', __('No linked DigitalOcean account'), __('Add or select a DigitalOcean credential before continuing.'), true, 'provider_credential_id');
+        } elseif ($form->provider_credential_id === '') {
+            $checks[] = $this->check('provider_credential_id', 'error', __('Choose an account'), __('Select the DigitalOcean account that should manage this Functions host.'), true, 'provider_credential_id');
+        } elseif (! $catalog['credentials']->contains('id', $form->provider_credential_id)) {
+            $checks[] = $this->check('provider_credential_id', 'error', __('Selected account is unavailable'), __('The chosen DigitalOcean credential is not available.'), true, 'provider_credential_id');
+        } else {
+            $checks[] = $this->check('provider_credential_id', 'info', __('Account selected'), __('The selected DigitalOcean credential is ready for this request.'), false);
+        }
+
+        if ($providerHealth !== null) {
+            $checks[] = $this->check(
+                'provider_health',
+                $providerHealth['severity'],
+                $providerHealth['label'],
+                $providerHealth['detail'],
+                in_array($providerHealth['status'], ['invalid', 'expired', 'under_scoped', 'misconfigured'], true),
+                'provider_credential_id',
+            );
+        }
+
+        try {
+            Validator::make(
+                [
+                    'name' => $form->name,
+                    'do_functions_api_host' => $form->do_functions_api_host,
+                    'do_functions_namespace' => $form->do_functions_namespace,
+                    'do_functions_access_key' => $form->do_functions_access_key,
+                ],
+                [
+                    'name' => 'required|string|max:255',
+                    'do_functions_api_host' => 'required|url|max:255',
+                    'do_functions_namespace' => 'required|string|max:255',
+                    'do_functions_access_key' => ['required', 'string', 'max:500', 'regex:/^.+:.+$/'],
+                ]
+            )->validate();
+
+            $checks[] = $this->check('functions_config', 'info', __('Functions host settings look valid'), __('The namespace, API host, and access key are present.'), false);
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $checks[] = $this->check(
+                    'functions_'.$field,
+                    'error',
+                    __('Missing required Functions host details'),
+                    (string) ($messages[0] ?? __('This field is required.')),
+                    true,
+                    $field
+                );
+            }
+        }
+
+        $checks[] = $this->check(
+            'functions_runtime',
+            'warning',
+            __('Functions hosts use a different deploy path'),
+            __('This target skips SSH, package installs, nginx, firewall, cron, and server health checks. Site deploys must use the Functions runtime path instead.'),
+            false
+        );
 
         return $checks;
     }
@@ -401,6 +470,22 @@ final class BuildServerCreatePreflight
         $size = collect($catalog['sizes'] ?? [])->first(fn (array $option): bool => (string) ($option['value'] ?? '') === $form->size);
 
         if (! is_array($size)) {
+            if ($form->type === 'digitalocean_functions') {
+                return [
+                    'state' => 'unavailable',
+                    'provider' => $form->type,
+                    'region' => null,
+                    'size' => null,
+                    'price_monthly' => null,
+                    'price_hourly' => null,
+                    'formatted_price' => null,
+                    'source' => null,
+                    'detail' => __('DigitalOcean Functions pricing depends on invocations, execution time, and memory. Review pricing in DigitalOcean before launch.'),
+                    'extras' => [],
+                    'notes' => [__('Functions hosts do not use VM region/size catalogs.')],
+                ];
+            }
+
             return [
                 'state' => 'incomplete',
                 'provider' => $form->type,

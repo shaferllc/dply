@@ -73,7 +73,7 @@
                             <input type="checkbox" wire:model.boolean="ui.subscription_invoice_emails" class="mt-1 rounded border-brand-mist text-brand-ink focus:ring-brand-sage" />
                             <span>
                                 <span class="block text-sm font-medium text-brand-ink">{{ __('Receive invoice emails for subscriptions') }}</span>
-                                <span class="block text-sm text-brand-moss mt-0.5">{{ __('When your organization has an active subscription, include Stripe invoice PDFs in email.') }}</span>
+                                <span class="block text-sm text-brand-moss mt-0.5">{{ __('When your organization moves from trial to Pro, include Stripe invoice PDFs in email.') }}</span>
                             </span>
                         </label>
                     </div>
@@ -420,7 +420,7 @@
             </a>
             <a href="{{ route('organizations.index') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
                 <h3 class="font-medium text-brand-ink">{{ __('Organizations') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Members, roles, and plan usage.') }}</p>
+                <p class="mt-1 text-sm text-brand-moss">{{ __('Members, roles, and trial or Pro usage.') }}</p>
             </a>
             <a href="{{ route('profile.source-control') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
                 <h3 class="font-medium text-brand-ink">{{ __('Source control') }}</h3>
@@ -438,7 +438,7 @@
                 @if ($currentOrg->hasAdminAccess(auth()->user()))
                     <a href="{{ route('subscription.show', $currentOrg) }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
                         <h3 class="font-medium text-brand-ink">{{ __('Subscription') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Plan, payment method, and Stripe Customer Portal.') }}</p>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('Trial, Pro billing, payment method, and Stripe Customer Portal.') }}</p>
                     </a>
                     <a href="{{ route('billing.invoices', $currentOrg) }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
                         <h3 class="font-medium text-brand-ink">{{ __('Invoices') }}</h3>

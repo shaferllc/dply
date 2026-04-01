@@ -10,6 +10,7 @@ final class ServerProviderTypeMap
     {
         return match ($type) {
             'digitalocean' => 'digitalocean',
+            'digitalocean_functions' => 'digitalocean',
             'hetzner' => 'hetzner',
             'linode' => 'linode',
             'vultr' => 'vultr',

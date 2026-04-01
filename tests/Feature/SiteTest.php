@@ -5,13 +5,16 @@ namespace Tests\Feature;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Show as SitesShow;
 use App\Jobs\ProvisionSiteJob;
+use App\Jobs\RunSiteDeploymentJob;
 use App\Models\SiteDomain;
 use App\Models\SiteRelease;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -50,6 +53,7 @@ class SiteTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'php_version' => '8.3',
+            'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
         $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
@@ -88,6 +92,7 @@ class SiteTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'php_version' => '8.1',
+            'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
         $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
@@ -119,6 +124,7 @@ class SiteTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'php_version' => '8.4',
+            'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
         $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
@@ -266,7 +272,7 @@ class SiteTest extends TestCase
             ->set('form.document_root', '/srv/custom/public')
             ->set('form.repository_path', '/srv/custom')
             ->set('form.primary_hostname', 'changed.example.com')
-            ->assertSet('form.document_root', '/srv/custom')
+            ->assertSet('form.document_root', '/srv/custom/public')
             ->assertSet('form.repository_path', '/srv/custom')
             ->set('form.customize_paths', false)
             ->assertSet('form.document_root', '/var/www/changed-example-com/public')
@@ -342,6 +348,169 @@ class SiteTest extends TestCase
         });
     }
 
+    public function test_functions_host_site_creation_uses_runtime_profile_and_artifact_metadata(): void
+    {
+        Queue::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+                'digitalocean_functions' => [
+                    'api_host' => 'https://faas-nyc1-example.doserverless.co',
+                    'namespace' => 'fn-namespace',
+                    'access_key' => 'dof_v1_test:secret',
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.name', 'Functions Site')
+            ->set('form.primary_hostname', 'functions.example.com')
+            ->set('form.functions_repo_source', 'manual')
+            ->set('form.functions_repository_url', 'https://github.com/acme/functions-site.git')
+            ->set('form.functions_repository_branch', 'main')
+            ->set('form.functions_build_command', 'npm install && npm run build')
+            ->set('form.functions_artifact_output_path', 'dist')
+            ->set('form.functions_runtime', 'nodejs:18')
+            ->set('form.functions_entrypoint', 'index')
+            ->call('store')
+            ->assertRedirect();
+
+        $site = Site::query()->where('name', 'Functions Site')->firstOrFail();
+
+        $this->assertTrue($site->usesFunctionsRuntime());
+        $this->assertSame('digitalocean_functions_web', $site->runtimeProfile());
+        $this->assertSame('https://github.com/acme/functions-site.git', $site->git_repository_url);
+        $this->assertSame('main', $site->git_branch);
+        $this->assertSame('nodejs:18', data_get($site->meta, 'digitalocean_functions.runtime'));
+        $this->assertSame('index', data_get($site->meta, 'digitalocean_functions.entrypoint'));
+        $this->assertSame('npm install && npm run build', data_get($site->meta, 'digitalocean_functions.build_command'));
+        $this->assertSame('dist', data_get($site->meta, 'digitalocean_functions.artifact_output_path'));
+        $this->assertSame(Site::STATUS_PENDING, $site->status);
+        $this->assertSame('queued', $site->provisioningState());
+    }
+
+    public function test_functions_host_site_show_hides_server_only_controls(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+            'meta' => [
+                'runtime_profile' => 'digitalocean_functions_web',
+                'digitalocean_functions' => [
+                    'artifact_path' => '/tmp/functions-site.zip',
+                    'entrypoint' => 'index',
+                ],
+                'provisioning' => [
+                    'state' => 'awaiting_first_deploy',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+
+        $response->assertOk()
+            ->assertSee('Functions deploy target')
+            ->assertSee('DigitalOcean Functions')
+            ->assertSee('Build command')
+            ->assertDontSee('Install / update Nginx site')
+            ->assertDontSee('Issue / renew SSL')
+            ->assertDontSee('Push .env to server')
+            ->assertDontSee('Generate deploy key');
+    }
+
+    public function test_functions_host_deploy_uses_digitalocean_functions_engine(): void
+    {
+        Http::fake([
+            'https://faas-nyc1-example.doserverless.co/api/v1/namespaces/*' => Http::response([
+                'version' => '7',
+            ], 200),
+        ]);
+
+        $origin = storage_path('framework/testing/functions-deploy-repo-'.uniqid());
+        mkdir($origin, 0777, true);
+        (new \Symfony\Component\Process\Process(['git', 'init', '-b', 'main'], $origin))->mustRun();
+        file_put_contents($origin.'/README.md', "hello\n");
+        (new \Symfony\Component\Process\Process(['git', 'add', '.'], $origin))->mustRun();
+        (new \Symfony\Component\Process\Process(['git', 'config', 'user.email', 'tests@example.com'], $origin))->mustRun();
+        (new \Symfony\Component\Process\Process(['git', 'config', 'user.name', 'Tests'], $origin))->mustRun();
+        (new \Symfony\Component\Process\Process(['git', 'commit', '-m', 'Initial commit'], $origin))->mustRun();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+                'digitalocean_functions' => [
+                    'api_host' => 'https://faas-nyc1-example.doserverless.co',
+                    'namespace' => 'fn-namespace',
+                    'access_key' => 'dof_v1_test:secret',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+            'meta' => [
+                'runtime_profile' => 'digitalocean_functions_web',
+                'digitalocean_functions' => [
+                    'runtime' => 'nodejs:18',
+                    'entrypoint' => 'index',
+                    'build_command' => 'mkdir -p dist && printf "exports.main = true;\n" > dist/index.js',
+                    'artifact_output_path' => 'dist',
+                ],
+            ],
+            'git_repository_url' => $origin,
+            'git_branch' => 'main',
+        ]);
+
+        RunSiteDeploymentJob::dispatchSync($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+
+        $deployment = SiteDeployment::query()->where('site_id', $site->id)->latest()->firstOrFail();
+        $site->refresh();
+
+        $this->assertSame(SiteDeployment::STATUS_SUCCESS, $deployment->status);
+        $this->assertSame('7', $deployment->git_sha);
+        $this->assertSame(Site::STATUS_FUNCTIONS_ACTIVE, $site->status);
+        $this->assertSame('7', data_get($site->meta, 'digitalocean_functions.last_revision_id'));
+        $this->assertNotNull(data_get($site->meta, 'digitalocean_functions.artifact_path'));
+        $this->assertStringContainsString('DigitalOcean Functions deploy completed.', (string) $deployment->log_output);
+    }
+
+    public function test_functions_configured_state_is_ready_for_workspace_but_not_traffic(): void
+    {
+        $site = new Site([
+            'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+            'meta' => [
+                'runtime_profile' => 'digitalocean_functions_web',
+            ],
+        ]);
+
+        $this->assertTrue($site->isReadyForWorkspace());
+        $this->assertFalse($site->isReadyForTraffic());
+        $this->assertSame('functions configured', $site->statusLabel());
+    }
+
     public function test_site_show_renders_provisioning_status_card(): void
     {
         $user = $this->userWithOrganization();
@@ -354,6 +523,7 @@ class SiteTest extends TestCase
             'server_id' => $server->id,
             'user_id' => $user->id,
             'organization_id' => $org->id,
+            'status' => Site::STATUS_PENDING,
             'meta' => [
                 'testing_hostname' => [
                     'status' => 'ready',
@@ -375,8 +545,8 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
         $response->assertOk()
-            ->assertSee('Site provisioning is in progress')
-            ->assertSee('Current step: waiting for http')
+            ->assertSee('Installing your site')
+            ->assertSee('Checking reachability')
             ->assertSee('preview-app.dply.cc');
     }
 

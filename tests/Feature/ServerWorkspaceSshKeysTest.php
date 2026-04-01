@@ -112,6 +112,30 @@ class ServerWorkspaceSshKeysTest extends TestCase
             ->assertDontSee('Add one of your personal SSH keys to this server');
     }
 
+    public function test_component_hides_reminder_when_matching_profile_key_was_added_manually(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $profileKey = UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('u', 43).' pasted-test',
+        ]);
+
+        ServerAuthorizedKey::query()->create([
+            'server_id' => $server->id,
+            'managed_key_type' => null,
+            'managed_key_id' => null,
+            'name' => 'Imported manually',
+            'public_key' => $profileKey->public_key,
+            'target_linux_user' => '',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertDontSee('Add one of your personal SSH keys to this server');
+    }
+
     public function test_delete_key_writes_audit_event(): void
     {
         [$user, $server] = $this->actingOwnerWithServer();

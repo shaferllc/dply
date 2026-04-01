@@ -32,11 +32,24 @@ class SiteSslProvisioner
         $site->update(['ssl_status' => Site::SSL_PENDING]);
 
         $flags = $domains->map(fn (string $d) => '-d '.escapeshellarg($d))->implode(' ');
-        $cmd = sprintf(
-            'certbot --nginx %s --non-interactive --agree-tos -m %s --redirect 2>&1',
-            $flags,
-            escapeshellarg($email)
-        );
+        $cmd = match ($site->webserver()) {
+            'apache' => sprintf(
+                'certbot --apache %s --non-interactive --agree-tos -m %s --redirect 2>&1',
+                $flags,
+                escapeshellarg($email)
+            ),
+            'openlitespeed', 'traefik', 'caddy' => sprintf(
+                'certbot certonly --webroot -w %s %s --non-interactive --agree-tos -m %s 2>&1',
+                escapeshellarg($site->effectiveDocumentRoot()),
+                $flags,
+                escapeshellarg($email)
+            ),
+            default => sprintf(
+                'certbot --nginx %s --non-interactive --agree-tos -m %s --redirect 2>&1',
+                $flags,
+                escapeshellarg($email)
+            ),
+        };
 
         $ssh = new SshConnection($server);
         $out = $ssh->exec($cmd.'; printf "\nDPLY_EXIT:%s" "$?"', 600);

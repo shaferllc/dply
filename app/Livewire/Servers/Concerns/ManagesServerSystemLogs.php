@@ -76,16 +76,18 @@ trait ManagesServerSystemLogs
 
         foreach ($server->sites as $site) {
             $id = (string) $site->getKey();
+            $logDirectory = $site->webserverLogDirectory();
+            $basename = $site->webserverConfigBasename();
             $sources['site_'.$id.'_access'] = [
                 'type' => 'file',
                 'label' => __('Site access: :name', ['name' => $site->name]),
-                'path' => '/var/log/nginx/'.$site->nginxConfigBasename().'-access.log',
+                'path' => $logDirectory.'/'.$basename.'-access.log',
                 'group' => 'sites',
             ];
             $sources['site_'.$id.'_error'] = [
                 'type' => 'file',
                 'label' => __('Site error: :name', ['name' => $site->name]),
-                'path' => '/var/log/nginx/'.$site->nginxConfigBasename().'-error.log',
+                'path' => $logDirectory.'/'.$basename.'-error.log',
                 'group' => 'sites',
             ];
         }

@@ -70,7 +70,7 @@ class MonitorOperationalState
             return self::DEGRADED;
         }
 
-        if ($site->status === Site::STATUS_NGINX_ACTIVE && $server->health_status === Server::HEALTH_REACHABLE) {
+        if ($site->isReadyForTraffic() && $server->health_status === Server::HEALTH_REACHABLE) {
             return self::OPERATIONAL;
         }
 

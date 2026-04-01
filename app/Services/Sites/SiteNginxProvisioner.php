@@ -3,29 +3,35 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
-use App\Services\SshConnection;
+use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use Illuminate\Support\Str;
 
-class SiteNginxProvisioner
+class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
 {
     public function __construct(
-        protected NginxSiteConfigBuilder $builder
-    ) {}
+        protected NginxSiteConfigBuilder $builder,
+        ?SitePlaceholderPageBuilder $placeholderPageBuilder = null,
+    ) {
+        parent::__construct($placeholderPageBuilder);
+    }
+
+    public function webserver(): string
+    {
+        return 'nginx';
+    }
 
     public function provision(Site $site): string
     {
-        $server = $site->server;
-        if (! $server->isReady() || empty($server->ssh_private_key)) {
-            throw new \RuntimeException('Server must be ready with an SSH key.');
-        }
+        $server = $this->ensureServerReady($site);
 
         $config = $this->builder->build($site);
         $available = rtrim(config('sites.nginx_sites_available'), '/');
         $enabled = rtrim(config('sites.nginx_sites_enabled'), '/');
-        $confFile = $available.'/'.$site->nginxConfigBasename().'.conf';
-        $linkFile = $enabled.'/'.$site->nginxConfigBasename().'.conf';
+        $confFile = $available.'/'.$this->configBasename($site).'.conf';
+        $linkFile = $enabled.'/'.$this->configBasename($site).'.conf';
 
         $ssh = $this->systemSsh($site);
+        $this->installPlaceholderPage($site, $ssh);
         $this->writeSystemFile($ssh, $confFile, $config);
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_NGINX_EXIT:%%s" "$?"',
@@ -52,53 +58,37 @@ class SiteNginxProvisioner
         return $out;
     }
 
-    private function systemSsh(Site $site): SshConnection
+    public function remove(Site $site): string
     {
-        $server = $site->server;
+        $server = $this->ensureServerReady($site);
 
-        if ($server->recoverySshPrivateKey()) {
-            $root = new SshConnection($server, 'root', SshConnection::ROLE_RECOVERY);
-            if ($root->connect()) {
-                return $root;
-            }
-        }
+        $available = rtrim(config('sites.nginx_sites_available'), '/');
+        $enabled = rtrim(config('sites.nginx_sites_enabled'), '/');
+        $confFile = $available.'/'.$this->configBasename($site).'.conf';
+        $linkFile = $enabled.'/'.$this->configBasename($site).'.conf';
 
-        return new SshConnection($server);
-    }
-
-    private function writeSystemFile(SshConnection $ssh, string $remotePath, string $contents): void
-    {
-        if ($ssh->effectiveUsername() === 'root') {
-            $ssh->putFile($remotePath, $contents);
-
-            return;
-        }
-
-        $tmpFile = '/tmp/'.basename($remotePath).'.'.Str::random(8);
-        $ssh->putFile($tmpFile, $contents);
+        $ssh = $this->systemSsh($site);
         $out = $ssh->exec(sprintf(
-            '(%s) 2>&1; printf "\nDPLY_FILE_EXIT:%%s" "$?"',
-            sprintf(
-                'sudo -n mkdir -p %1$s && sudo -n mv %2$s %3$s && sudo -n chown root:root %3$s && sudo -n chmod 644 %3$s',
-                escapeshellarg(dirname($remotePath)),
-                escapeshellarg($tmpFile),
-                escapeshellarg($remotePath)
-            )
-        ), 60);
+            '(%s) 2>&1; printf "\nDPLY_NGINX_REMOVE_EXIT:%%s" "$?"',
+            $this->privilegedCommand(
+                $server,
+                sprintf(
+                    'rm -f %1$s %2$s && nginx -t && (systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || nginx -s reload)',
+                    escapeshellarg($linkFile),
+                    escapeshellarg($confFile)
+                )
+            ),
+        ), 120);
 
-        if (! preg_match('/DPLY_FILE_EXIT:0\s*$/', $out)) {
-            throw new \RuntimeException('Dply needs root SSH access or passwordless sudo to write '.$remotePath.'. Output: '.Str::limit($out, 1000));
-        }
-    }
-
-    private function privilegedCommand(\App\Models\Server $server, string $command): string
-    {
-        $user = trim((string) $server->ssh_user);
-
-        if ($user === '' || $user === 'root') {
-            return $command;
+        if (! preg_match('/DPLY_NGINX_REMOVE_EXIT:0\s*$/', $out)) {
+            throw new \RuntimeException('Nginx config cleanup failed. Output: '.Str::limit($out, 2000));
         }
 
-        return 'sudo -n bash -lc '.escapeshellarg($command);
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['nginx_cleanup_output'] = $out;
+
+        $site->update(['meta' => $meta]);
+
+        return $out;
     }
 }

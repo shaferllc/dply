@@ -112,9 +112,13 @@ class RunSiteDeploymentJob implements ShouldQueue
                     'log_output' => $redacted,
                     'finished_at' => now(),
                 ]);
-                $this->site->update(['last_deploy_at' => now()]);
+                $siteUpdates = ['last_deploy_at' => now()];
+                if ($this->site->server?->isDigitalOceanFunctionsHost()) {
+                    $siteUpdates['status'] = Site::STATUS_FUNCTIONS_ACTIVE;
+                }
+                $this->site->update($siteUpdates);
                 $this->cacheIdempotencySuccess($deployment);
-                if (config('insights.queue_after_deploy', true)) {
+                if (config('insights.queue_after_deploy', true) && ! $this->site->server?->isDigitalOceanFunctionsHost()) {
                     RunServerInsightsJob::dispatch($this->site->server_id);
                     RunSiteInsightsJob::dispatch($this->site->id);
                 }

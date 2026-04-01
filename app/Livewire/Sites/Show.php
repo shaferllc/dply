@@ -19,8 +19,11 @@ use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteEnvPusher;
+use App\Services\Sites\SiteProvisioningCanceller;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteReleaseRollback;
+use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Support\HostnameValidator;
 use App\Support\SiteDeployKeyGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -41,6 +44,18 @@ class Show extends Component
     public string $git_repository_url = '';
 
     public string $git_branch = 'main';
+
+    public string $functions_repo_source = 'manual';
+
+    public string $functions_source_control_account_id = '';
+
+    public string $functions_repository_selection = '';
+
+    public string $functions_repository_subdirectory = '';
+
+    public string $functions_build_command = '';
+
+    public string $functions_artifact_output_path = '';
 
     public string $post_deploy_command = '';
 
@@ -106,6 +121,16 @@ class Show extends Component
 
     public string $webhook_allowed_ips_text = '';
 
+    /**
+     * @var list<array{id: string, provider: string, label: string}>
+     */
+    public array $linkedSourceControlAccounts = [];
+
+    /**
+     * @var list<array{label: string, url: string, branch: string}>
+     */
+    public array $availableFunctionsRepositories = [];
+
     public function mount(Server $server, Site $site): void
     {
         if ($site->server_id !== $server->id) {
@@ -119,13 +144,21 @@ class Show extends Component
         $this->server = $server;
         $this->site = $site;
         $this->syncFormFromSite();
+        $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
     }
 
     protected function syncFormFromSite(): void
     {
         $this->site->refresh();
+        $functionsConfig = $this->site->functionsConfig();
         $this->git_repository_url = (string) ($this->site->git_repository_url ?? '');
         $this->git_branch = (string) ($this->site->git_branch ?: 'main');
+        $this->functions_repo_source = (string) ($functionsConfig['repo_source'] ?? 'manual');
+        $this->functions_source_control_account_id = (string) ($functionsConfig['source_control_account_id'] ?? '');
+        $this->functions_repository_selection = '';
+        $this->functions_repository_subdirectory = (string) ($functionsConfig['repository_subdirectory'] ?? '');
+        $this->functions_build_command = (string) ($functionsConfig['build_command'] ?? '');
+        $this->functions_artifact_output_path = (string) ($functionsConfig['artifact_output_path'] ?? '');
         $this->post_deploy_command = (string) ($this->site->post_deploy_command ?? '');
         $this->env_file_content = (string) ($this->site->env_file_content ?? '');
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
@@ -160,7 +193,7 @@ class Show extends Component
 
     public function pollProvisioningStatus(): void
     {
-        if ($this->site->isReadyForTraffic()) {
+        if ($this->site->isReadyForWorkspace()) {
             return;
         }
 
@@ -171,6 +204,11 @@ class Show extends Component
     public function savePhpSettings(ServerPhpManager $phpManager): void
     {
         $this->authorize('update', $this->site);
+        if (! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            $this->flash_error = __('This host runtime does not expose machine PHP settings.');
+
+            return;
+        }
 
         $phpData = $phpManager->sitePhpData($this->server->fresh(), $this->site->fresh());
         $installedVersions = collect($phpData['installed_versions'] ?? [])
@@ -254,6 +292,12 @@ class Show extends Component
     public function installNginx(): void
     {
         $this->authorize('update', $this->site);
+        if (! $this->server->hostCapabilities()->supportsNginxProvisioning()) {
+            $this->flash_error = __('This host runtime does not use nginx site installs.');
+
+            return;
+        }
+
         $this->flash_error = null;
         $this->flash_success = null;
         try {
@@ -268,6 +312,12 @@ class Show extends Component
     public function issueSsl(): void
     {
         $this->authorize('update', $this->site);
+        if (! $this->server->hostCapabilities()->supportsNginxProvisioning()) {
+            $this->flash_error = __('This host runtime does not issue SSL from the server workspace.');
+
+            return;
+        }
+
         $this->flash_error = null;
         $this->flash_success = null;
         try {
@@ -289,8 +339,8 @@ class Show extends Component
 
         $this->site->refresh();
 
-        if ($this->site->isReadyForTraffic()) {
-            $this->flash_success = __('This site is already available.');
+        if ($this->site->isReadyForWorkspace()) {
+            $this->flash_success = __('This site is already configured.');
 
             return;
         }
@@ -304,6 +354,32 @@ class Show extends Component
 
         $this->site->refresh();
         $this->flash_success = __('Site provisioning has been queued again.');
+    }
+
+    public function cancelProvisioning(SiteProvisioningCanceller $canceller): mixed
+    {
+        $this->authorize('update', $this->site);
+
+        $this->flash_error = null;
+        $this->flash_success = null;
+
+        $this->site->refresh();
+
+        if ($this->site->isReadyForWorkspace()) {
+            $this->flash_error = __('This site is already configured. Delete it from the site actions instead.');
+
+            return null;
+        }
+
+        try {
+            $canceller->cancel($this->site->fresh(['server', 'domains']));
+        } catch (\Throwable $e) {
+            $this->flash_error = $e->getMessage();
+
+            return null;
+        }
+
+        return $this->redirect(route('sites.create', $this->server), navigate: true);
     }
 
     public function deployNow(): void
@@ -350,23 +426,118 @@ class Show extends Component
     public function saveGit(): void
     {
         $this->authorize('update', $this->site);
-        $this->validate([
+        $rules = [
             'git_repository_url' => 'nullable|string|max:500',
             'git_branch' => 'nullable|string|max:120',
             'post_deploy_command' => 'nullable|string|max:4000',
-        ]);
-        $this->site->update([
+        ];
+
+        if ($this->server->isDigitalOceanFunctionsHost()) {
+            $rules = array_merge($rules, [
+                'functions_repo_source' => 'required|string|in:manual,provider',
+                'functions_source_control_account_id' => 'nullable|string|max:26',
+                'functions_repository_selection' => 'nullable|string|max:500',
+                'functions_repository_subdirectory' => 'nullable|string|max:255',
+                'functions_build_command' => 'required|string|max:4000',
+                'functions_artifact_output_path' => 'required|string|max:255',
+                'git_repository_url' => 'required|string|max:500',
+                'git_branch' => 'required|string|max:120',
+            ]);
+
+            if ($this->functions_repo_source === 'provider') {
+                $rules['functions_source_control_account_id'] = 'required|string|max:26';
+            }
+        }
+
+        $this->validate($rules);
+
+        $updates = [
             'git_repository_url' => trim($this->git_repository_url) ?: null,
             'git_branch' => trim($this->git_branch) ?: 'main',
             'post_deploy_command' => trim($this->post_deploy_command) ?: null,
-        ]);
+        ];
+
+        if ($this->server->isDigitalOceanFunctionsHost()) {
+            $meta = is_array($this->site->meta) ? $this->site->meta : [];
+            $functionsConfig = is_array($meta['digitalocean_functions'] ?? null) ? $meta['digitalocean_functions'] : [];
+            $meta['digitalocean_functions'] = array_merge($functionsConfig, [
+                'repo_source' => trim($this->functions_repo_source),
+                'source_control_account_id' => $this->functions_repo_source === 'provider'
+                    ? trim($this->functions_source_control_account_id)
+                    : null,
+                'repository_subdirectory' => trim($this->functions_repository_subdirectory),
+                'build_command' => trim($this->functions_build_command),
+                'artifact_output_path' => trim($this->functions_artifact_output_path),
+            ]);
+            $updates['meta'] = $meta;
+        }
+
+        $this->site->update($updates);
         $this->flash_success = 'Git settings saved.';
         $this->flash_error = null;
+        $this->syncFormFromSite();
+    }
+
+    public function updatedFunctionsRepoSource(): void
+    {
+        if ($this->functions_repo_source === 'manual') {
+            $this->functions_source_control_account_id = '';
+            $this->functions_repository_selection = '';
+            $this->availableFunctionsRepositories = [];
+
+            return;
+        }
+
+        if ($this->linkedSourceControlAccounts === []) {
+            return;
+        }
+
+        $this->functions_source_control_account_id = $this->linkedSourceControlAccounts[0]['id'];
+        $this->updatedFunctionsSourceControlAccountId($this->functions_source_control_account_id);
+    }
+
+    public function updatedFunctionsSourceControlAccountId(string $value): void
+    {
+        $this->functions_source_control_account_id = $value;
+        $this->functions_repository_selection = '';
+        $this->availableFunctionsRepositories = [];
+
+        if ($value === '') {
+            return;
+        }
+
+        $account = auth()->user()->socialAccounts()->find($value);
+        if (! $account) {
+            return;
+        }
+
+        $this->availableFunctionsRepositories = app(SourceControlRepositoryBrowser::class)
+            ->repositoriesForAccount($account);
+    }
+
+    public function updatedFunctionsRepositorySelection(string $value): void
+    {
+        foreach ($this->availableFunctionsRepositories as $repository) {
+            if (($repository['url'] ?? null) !== $value) {
+                continue;
+            }
+
+            $this->git_repository_url = (string) $repository['url'];
+            $this->git_branch = (string) ($repository['branch'] ?: 'main');
+
+            return;
+        }
     }
 
     public function generateDeployKey(): void
     {
         $this->authorize('update', $this->site);
+        if ($this->server->isDigitalOceanFunctionsHost()) {
+            $this->flash_error = __('Functions-backed sites deploy from the configured artifact zip instead of a server-side git checkout.');
+
+            return;
+        }
+
         try {
             [$private, $public] = SiteDeployKeyGenerator::generate();
             $this->site->update([
@@ -402,6 +573,12 @@ class Show extends Component
     public function pushEnvToServer(SiteEnvPusher $pusher): void
     {
         $this->authorize('update', $this->site);
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->flash_error = __('This host runtime does not support pushing a .env file over SSH.');
+
+            return;
+        }
+
         $this->validate(['env_file_content' => 'nullable|string|max:65535']);
         $this->flash_error = null;
         try {
@@ -601,9 +778,29 @@ class Show extends Component
         $this->flash_error = null;
     }
 
+    public function confirmRollbackRelease(int|string $releaseId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->openConfirmActionModal(
+            'rollbackRelease',
+            [(string) $releaseId],
+            __('Rollback release'),
+            __('Point current symlink at this release?'),
+            __('Rollback'),
+            true,
+        );
+    }
+
     public function rollbackRelease(int|string $releaseId, SiteReleaseRollback $rollback): void
     {
         $this->authorize('update', $this->site);
+        if (! $this->server->hostCapabilities()->supportsReleaseRollback()) {
+            $this->flash_error = __('This host runtime does not support release rollback via server symlinks.');
+
+            return;
+        }
+
         $this->flash_error = null;
         try {
             $release = SiteRelease::query()->where('site_id', $this->site->id)->findOrFail($releaseId);
@@ -619,7 +816,17 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         $this->validate([
-            'new_domain_hostname' => 'required|string|max:255|unique:site_domains,hostname',
+            'new_domain_hostname' => [
+                'required',
+                'string',
+                'max:255',
+                'unique:site_domains,hostname',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                        $fail('Enter a valid domain name like app.example.com.');
+                    }
+                },
+            ],
         ]);
         SiteDomain::query()->create([
             'site_id' => $this->site->id,
@@ -630,6 +837,20 @@ class Show extends Component
         $this->new_domain_hostname = '';
         $this->flash_success = 'Domain added. Re-run “Install Nginx” if the site is already provisioned.';
         $this->flash_error = null;
+    }
+
+    public function confirmRemoveDomain(int|string $domainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->openConfirmActionModal(
+            'removeDomain',
+            [(string) $domainId],
+            __('Remove domain'),
+            __('Remove this domain?'),
+            __('Remove domain'),
+            true,
+        );
     }
 
     public function removeDomain(int|string $domainId): void
@@ -685,7 +906,37 @@ class Show extends Component
         return view('livewire.sites.show', [
             'deployHookUrl' => $this->site->deployHookUrl(),
             'openSiteInsightsCount' => $openSiteInsightsCount,
-            'sitePhpData' => app(ServerPhpManager::class)->sitePhpData($this->server, $this->site),
+            'sitePhpData' => $this->server->hostCapabilities()->supportsMachinePhpManagement()
+                ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
+                : null,
         ]);
+    }
+
+    private function loadFunctionsSourceControlState(SourceControlRepositoryBrowser $repositoryBrowser): void
+    {
+        if (! $this->server->isDigitalOceanFunctionsHost()) {
+            return;
+        }
+
+        $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser(auth()->user());
+
+        if ($this->linkedSourceControlAccounts === []) {
+            $this->functions_repo_source = 'manual';
+
+            return;
+        }
+
+        if ($this->functions_repo_source === 'provider' && $this->functions_source_control_account_id === '') {
+            $this->functions_source_control_account_id = $this->linkedSourceControlAccounts[0]['id'];
+        }
+
+        if ($this->functions_repo_source !== 'provider') {
+            return;
+        }
+
+        $account = auth()->user()->socialAccounts()->find($this->functions_source_control_account_id);
+        $this->availableFunctionsRepositories = $account
+            ? $repositoryBrowser->repositoriesForAccount($account)
+            : [];
     }
 }

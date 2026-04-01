@@ -20,8 +20,8 @@
                 </li>
                 <li>
                     <a href="{{ route('docs.org-roles-and-limits') }}" class="block p-4 rounded-lg border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 transition">
-                        <span class="font-medium text-slate-900">Roles &amp; plan limits</span>
-                        <p class="text-sm text-slate-500 mt-1">Owner, admin, member, deployer; server and site caps on Free vs Pro.</p>
+                        <span class="font-medium text-slate-900">Roles, trial limits, and Pro billing</span>
+                        <p class="text-sm text-slate-500 mt-1">Owner, admin, member, deployer; organization-wide trial caps and what changes on Pro.</p>
                     </a>
                 </li>
                 <li>

@@ -24,7 +24,7 @@ class CheckSiteUrlHealthJob implements ShouldQueue
         }
 
         $site = Site::query()->find($this->siteId);
-        if (! $site || $site->status !== Site::STATUS_NGINX_ACTIVE) {
+        if (! $site || ! $site->isReadyForTraffic()) {
             return;
         }
 

@@ -210,10 +210,62 @@ class ServerTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('servers.create'))
-            ->assertRedirect(route('profile.ssh-keys', [
-                'source' => 'servers.create',
-                'return_to' => 'servers.create',
-            ], false));
+            ->assertOk()
+            ->assertSee('Create server');
+    }
+
+    public function test_servers_create_shows_digitalocean_functions_path_without_requiring_profile_ssh_keys(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        ProviderCredential::factory()->create([
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->assertSee('DigitalOcean Functions')
+            ->set('form.type', 'digitalocean_functions')
+            ->assertSee('DigitalOcean Functions setup')
+            ->assertDontSee('Default package')
+            ->assertDontSee('Default action kind')
+            ->assertDontSee('Default action entrypoint');
+    }
+
+    public function test_servers_create_can_store_a_digitalocean_functions_host_without_profile_ssh_keys(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.type', 'digitalocean_functions')
+            ->set('form.name', 'edge-fns')
+            ->set('form.provider_credential_id', (string) $credential->id)
+            ->set('form.do_functions_api_host', 'https://faas-nyc1-example.doserverless.co')
+            ->set('form.do_functions_namespace', 'fn-namespace')
+            ->set('form.do_functions_access_key', 'dof_v1_test:secret')
+            ->call('store')
+            ->assertRedirect();
+
+        $server = Server::query()->where('name', 'edge-fns')->firstOrFail();
+
+        $this->assertSame(Server::STATUS_READY, $server->status);
+        $this->assertTrue($server->isDigitalOceanFunctionsHost());
+        $this->assertSame('digitalocean', $server->provider->value);
+        $this->assertSame('fn-namespace', data_get($server->meta, 'digitalocean_functions.namespace'));
+        $this->assertNull(data_get($server->meta, 'digitalocean_functions.package'));
+        $this->assertNull(data_get($server->meta, 'digitalocean_functions.action_kind'));
+        $this->assertNull(data_get($server->meta, 'digitalocean_functions.action_main'));
     }
 
     public function test_servers_create_prompts_to_add_provider_when_none_exist(): void
@@ -282,6 +334,11 @@ class ServerTest extends TestCase
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
+
+        UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('b', 43).' blocked-size',
+        ]);
 
         ProviderCredential::factory()->create([
             'user_id' => $user->id,
@@ -552,6 +609,37 @@ class ServerTest extends TestCase
             ->assertSet('form.database', 'none');
     }
 
+    public function test_servers_create_exposes_expanded_webserver_choices(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+            'https://api.digitalocean.com/v2/regions' => Http::response(['regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]]]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response(['sizes' => [['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true]]]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('Choose the web server');
+        $response->assertSee('Recommended default for most PHP and Laravel apps.');
+        $response->assertSee('Battle-tested default');
+        $response->assertSee('Tradeoffs');
+        $response->assertSee('OpenLiteSpeed');
+        $response->assertSee('Traefik');
+        $response->assertSee('Apache (httpd)');
+    }
+
     public function test_servers_create_blocks_store_when_preflight_finds_missing_size(): void
     {
         Http::fake([
@@ -581,13 +669,15 @@ class ServerTest extends TestCase
             'credentials' => ['api_token' => 'token'],
         ]);
 
-        Livewire::actingAs($user)
+        $component = Livewire::actingAs($user)
             ->test(ServersCreate::class)
             ->set('form.name', 'Blocked Box')
             ->set('form.region', 'nyc3')
-            ->set('form.size', '')
-            ->call('store')
-            ->assertHasErrors(['size']);
+            ->set('form.size', 'missing-size');
+
+        $component->call('store');
+
+        $component->assertSee('The selected size is not available for the current catalog response.');
 
         $this->assertDatabaseMissing('servers', [
             'organization_id' => $org->id,
@@ -1508,6 +1598,7 @@ class ServerTest extends TestCase
             'command' => 'php artisan schedule:run',
             'user' => 'forge',
             'enabled' => true,
+            'overlap_policy' => ServerCronJob::OVERLAP_ALLOW,
         ]);
 
         SupervisorProgram::query()->create([
@@ -1599,6 +1690,40 @@ class ServerTest extends TestCase
             'managed_key_type' => UserSshKey::class,
             'managed_key_id' => $profileKey->id,
             'name' => $profileKey->name,
+            'public_key' => $profileKey->public_key,
+            'target_linux_user' => '',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        $response->assertDontSee('Add your personal SSH key before you need this server');
+    }
+
+    public function test_servers_overview_hides_personal_key_reminder_when_matching_profile_key_was_added_manually(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $profileKey = UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('v', 43).' overview-manual',
+        ]);
+
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ip_address' => '203.0.113.10',
+            'ssh_user' => 'forge',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_DONE,
+        ]);
+
+        ServerAuthorizedKey::query()->create([
+            'server_id' => $server->id,
+            'managed_key_type' => null,
+            'managed_key_id' => null,
+            'name' => 'Imported manually',
             'public_key' => $profileKey->public_key,
             'target_linux_user' => '',
         ]);

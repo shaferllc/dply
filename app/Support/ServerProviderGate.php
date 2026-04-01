@@ -14,6 +14,7 @@ final class ServerProviderGate
      */
     private const SERVER_CREATE_ORDER = [
         'digitalocean',
+        'digitalocean_functions',
         'hetzner',
         'vultr',
         'linode',

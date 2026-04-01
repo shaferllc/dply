@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 #[Fillable([
@@ -52,6 +53,10 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public static function newUniqueReferralCode(): string
     {
+        if (! Schema::hasTable((new static)->getTable())) {
+            return Str::lower(Str::random(20));
+        }
+
         do {
             $code = Str::lower(Str::random(20));
         } while (static::query()->where('referral_code', $code)->exists());

@@ -273,10 +273,23 @@ class DigitalOceanService
      */
     public function findDomainRecord(string $domain, string $type, string $name, ?string $data = null): ?array
     {
-        $records = $this->getDomainRecords($domain, ['type' => strtoupper($type), 'name' => $name]);
+        $type = strtoupper($type);
+        $records = $this->getDomainRecords($domain, ['type' => $type, 'name' => $name]);
+
+        if ($records === []) {
+            $records = $this->getDomainRecords($domain);
+        }
 
         foreach ($records as $record) {
             if (! is_array($record)) {
+                continue;
+            }
+
+            if (strtoupper((string) ($record['type'] ?? '')) !== $type) {
+                continue;
+            }
+
+            if ((string) ($record['name'] ?? '') !== $name) {
                 continue;
             }
 

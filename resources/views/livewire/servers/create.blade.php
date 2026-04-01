@@ -108,15 +108,25 @@
                 @if ($hasAnyProviderCredentials)
                     <section aria-labelledby="path-heading">
                         <h2 id="path-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('1. Choose server type') }}</h2>
-                        <div class="mt-4 grid gap-4 md:grid-cols-2">
+                        <div class="mt-4 grid gap-4 md:grid-cols-3">
                             <button
                                 type="button"
                                 wire:click="$set('form.type', 'digitalocean')"
-                                class="rounded-2xl border-2 p-5 text-left transition {{ $form->type !== 'custom' ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
+                                class="rounded-2xl border-2 p-5 text-left transition {{ ! in_array($form->type, ['custom', 'digitalocean_functions'], true) ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
                             >
                                 <span class="block text-lg font-semibold text-slate-900">{{ __('Cloud server') }}</span>
                                 <span class="mt-2 block text-sm leading-6 text-slate-600">
                                     {{ __('Provision a new server with a connected provider, then choose the account, region, size, and core stack.') }}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="$set('form.type', 'digitalocean_functions')"
+                                class="rounded-2xl border-2 p-5 text-left transition {{ $form->type === 'digitalocean_functions' ? 'border-sky-600 bg-sky-50/80 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300' }}"
+                            >
+                                <span class="block text-lg font-semibold text-slate-900">{{ __('DigitalOcean Functions') }}</span>
+                                <span class="mt-2 block text-sm leading-6 text-slate-600">
+                                    {{ __('Use the existing server flow, but back the host with a DigitalOcean Functions namespace instead of an SSH machine.') }}
                                 </span>
                             </button>
                             <button
@@ -133,7 +143,7 @@
                     </section>
                 @endif
 
-                @if ($hasAnyProviderCredentials && $form->type !== 'custom')
+                @if ($hasAnyProviderCredentials && ! in_array($form->type, ['custom', 'digitalocean_functions'], true))
                     <section aria-labelledby="details-heading">
                         <h2 id="details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('2. Cloud server setup') }}</h2>
 
@@ -280,6 +290,10 @@
                                             ->filter(fn ($item) => filled($item))
                                             ->take(5)
                                             ->values();
+                                        $availableWebservers = collect($provisionOptions['webservers'] ?? [])
+                                            ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'none')
+                                            ->values();
+                                        $selectedWebserver = $availableWebservers->firstWhere('id', $form->webserver);
                                     @endphp
 
                                     <section class="space-y-4">
@@ -375,6 +389,71 @@
                                                 </div>
                                             @endif
                                         </div>
+
+                                        @if ($availableWebservers->isNotEmpty())
+                                            <div class="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('3. Choose the web server') }}</h4>
+                                                    <p class="mt-1 text-sm text-slate-600">{{ __('Pick the web server Dply should install for this machine. NGINX stays selected by default because it is the safest path for most PHP apps.') }}</p>
+                                                </div>
+                                            </div>
+
+                                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+                                                <div>
+                                                    <x-input-label for="webserver" :value="__('Web server')" />
+                                                    <select wire:model.live="form.webserver" id="webserver" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                        @foreach ($availableWebservers as $opt)
+                                                            <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <p class="mt-1 text-xs text-slate-500">{{ __('Choose the default web stack for this host. You can still adjust PHP, database, and cache settings below.') }}</p>
+                                                    <x-input-error :messages="$errors->get('webserver')" class="mt-1" />
+                                                </div>
+
+                                                @if ($selectedWebserver)
+                                                    <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                                                        <div class="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p class="text-sm font-semibold text-slate-900">{{ $selectedWebserver['label'] }}</p>
+                                                                @if (! empty($selectedWebserver['summary'] ?? null))
+                                                                    <p class="mt-1 text-sm leading-6 text-slate-600">{{ $selectedWebserver['summary'] }}</p>
+                                                                @endif
+                                                            </div>
+                                                            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
+                                                                {{ ! empty($selectedWebserver['recommended'] ?? false) ? __('Default') : __('Option') }}
+                                                            </span>
+                                                        </div>
+
+                                                        <dl class="mt-4 space-y-3 text-sm">
+                                                            @if (! empty($selectedWebserver['pros'] ?? []))
+                                                                <div>
+                                                                    <dt class="font-medium text-slate-900">{{ __('Pros') }}</dt>
+                                                                    <dd class="mt-2 flex flex-wrap gap-2">
+                                                                        @foreach ($selectedWebserver['pros'] as $pro)
+                                                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-100">
+                                                                                {{ $pro }}
+                                                                            </span>
+                                                                        @endforeach
+                                                                    </dd>
+                                                                </div>
+                                                            @endif
+                                                            @if (! empty($selectedWebserver['cons'] ?? []))
+                                                                <div>
+                                                                    <dt class="font-medium text-slate-900">{{ __('Tradeoffs') }}</dt>
+                                                                    <dd class="mt-2 flex flex-wrap gap-2">
+                                                                        @foreach ($selectedWebserver['cons'] as $con)
+                                                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-100">
+                                                                                {{ $con }}
+                                                                            </span>
+                                                                        @endforeach
+                                                                    </dd>
+                                                                </div>
+                                                            @endif
+                                                        </dl>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </section>
 
                                     <div
@@ -937,7 +1016,7 @@
                                         {{ __('Advanced options') }}
                                     </summary>
                                     <div class="mt-2 text-sm text-slate-600">
-                                        {{ __('Adjust stack defaults, runtime versions, and optional provisioning behavior only if you need something specific.') }}
+                                        {{ __('Adjust cache, runtime versions, database choices, and optional provisioning behavior only if you need something specific.') }}
                                     </div>
                                     <div class="mt-5 space-y-5">
                                         <div>
@@ -951,16 +1030,7 @@
                                             <x-input-error :messages="$errors->get('cache_service')" class="mt-1" />
                                         </div>
 
-                                        <div class="grid gap-4 sm:grid-cols-3" wire:key="provision-stack-{{ $form->server_role }}">
-                                            <div>
-                                                <x-input-label for="webserver" :value="__('Web server')" />
-                                                <select wire:model="form.webserver" id="webserver" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                    @foreach ($provisionOptions['webservers'] ?? [] as $opt)
-                                                        <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
-                                                    @endforeach
-                                                </select>
-                                                <x-input-error :messages="$errors->get('webserver')" class="mt-1" />
-                                            </div>
+                                        <div class="grid gap-4 sm:grid-cols-2" wire:key="provision-stack-{{ $form->server_role }}">
                                             <div>
                                                 <x-input-label for="php_version" :value="__('PHP version')" />
                                                 <select wire:model="form.php_version" id="php_version" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
@@ -1041,6 +1111,144 @@
                                     </div>
                                 </details>
                             @endif
+                            <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
+                                <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg font-medium text-sm text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Cancel') }}</a>
+                                <button
+                                    type="submit"
+                                    @disabled(! $preflight['can_submit'])
+                                    class="inline-flex items-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
+                                >
+                                    {{ __('Create server') }}
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+                @elseif ($hasAnyProviderCredentials && $form->type === 'digitalocean_functions')
+                    <section aria-labelledby="functions-details-heading">
+                        <h2 id="functions-details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('2. DigitalOcean Functions setup') }}</h2>
+
+                        @php
+                            $preflightBadgeClasses = match ($preflight['status']) {
+                                'ready' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                'warning' => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                default => 'bg-rose-50 text-rose-700 ring-rose-200',
+                            };
+                            $preflightItemClasses = static function (string $severity): string {
+                                return match ($severity) {
+                                    'info' => 'border-emerald-200 bg-emerald-50/70 text-emerald-900',
+                                    'warning' => 'border-amber-200 bg-amber-50 text-amber-900',
+                                    default => 'border-rose-200 bg-rose-50 text-rose-900',
+                                };
+                            };
+                        @endphp
+
+                        <form wire:submit="store" class="mt-4 space-y-6">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-900">{{ __('Functions host basics') }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('This keeps the existing server workflow entry point, but the resulting host uses a DigitalOcean Functions namespace instead of an SSH machine.') }}</p>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="functions_name" :value="__('Host name')" />
+                                    <div class="mt-1 flex gap-2">
+                                        <x-text-input id="functions_name" wire:model="form.name" type="text" class="block w-full" required autocomplete="off" />
+                                        <button
+                                            type="button"
+                                            wire:click="regenerateServerName"
+                                            class="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                        >
+                                            {{ __('Regenerate') }}
+                                        </button>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('name')" class="mt-1" />
+                                </div>
+
+                                <div>
+                                    <x-input-label for="provider_credential_id_functions" :value="__('DigitalOcean credential')" />
+                                    <select
+                                        wire:model.live="form.provider_credential_id"
+                                        id="provider_credential_id_functions"
+                                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        @if($catalog['credentials']->isEmpty()) disabled @endif
+                                    >
+                                        <option value="">{{ __('Select account') }}</option>
+                                        @foreach ($catalog['credentials'] as $c)
+                                            <option value="{{ $c->id }}">{{ $c->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-1" />
+                                </div>
+
+                                <div class="grid gap-5 md:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="do_functions_api_host" :value="__('Functions API host')" />
+                                        <x-text-input id="do_functions_api_host" wire:model="form.do_functions_api_host" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="https://faas-nyc1-xxxx.doserverless.co" autocomplete="off" />
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('Use the API host returned by `doctl serverless connect`.') }}</p>
+                                        <x-input-error :messages="$errors->get('do_functions_api_host')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="do_functions_namespace" :value="__('Namespace')" />
+                                        <x-text-input id="do_functions_namespace" wire:model="form.do_functions_namespace" type="text" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                                        <x-input-error :messages="$errors->get('do_functions_namespace')" class="mt-1" />
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <x-input-label for="do_functions_access_key" :value="__('Namespace access key')" />
+                                        <textarea id="do_functions_access_key" wire:model="form.do_functions_access_key" rows="3" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm font-mono text-sm focus:border-sky-500 focus:ring-sky-500" placeholder="dof_v1_xxx:secret"></textarea>
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('Paste the namespace access key in `id:secret` format. This is separate from your DigitalOcean API token.') }}</p>
+                                        <x-input-error :messages="$errors->get('do_functions_access_key')" class="mt-1" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-base font-semibold text-slate-900">{{ __('Preflight and runtime notes') }}</h3>
+                                        <p class="mt-1 text-sm text-slate-600">{{ $preflight['summary'] }}</p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $preflightBadgeClasses }}">
+                                        {{ match($preflight['status']) {
+                                            'ready' => __('Ready'),
+                                            'warning' => __('Needs review'),
+                                            default => __('Blocked'),
+                                        } }}
+                                    </span>
+                                </div>
+
+                                <div class="space-y-4">
+                                    @foreach ($preflight['groups'] as $groupKey => $groupChecks)
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                {{ match($groupKey) {
+                                                    'account_readiness' => __('Account readiness'),
+                                                    'verification' => __('Verification'),
+                                                    default => __('Runtime readiness'),
+                                                } }}
+                                            </p>
+                                            <div class="mt-3 space-y-3">
+                                                @foreach ($groupChecks as $check)
+                                                    <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($check['severity']) }}">
+                                                        <div class="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p class="text-sm font-semibold">{{ $check['label'] }}</p>
+                                                                <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+                                                            </div>
+                                                            <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                                                                {{ $check['blocking'] ? __('Blocking') : match($check['severity']) {
+                                                                    'warning' => __('Warning'),
+                                                                    default => __('Ready'),
+                                                                } }}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
                             <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
                                 <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg font-medium text-sm text-slate-700 shadow-sm hover:bg-slate-50">{{ __('Cancel') }}</a>
                                 <button

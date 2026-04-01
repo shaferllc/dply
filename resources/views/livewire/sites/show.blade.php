@@ -1,46 +1,26 @@
 @php
+    $functionsHost = $server->isDigitalOceanFunctionsHost();
+    $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
+    $supportsNginxProvisioning = $server->hostCapabilities()->supportsNginxProvisioning();
+    $supportsEnvPush = $server->hostCapabilities()->supportsEnvPushToHost();
+    $supportsReleaseRollback = $server->hostCapabilities()->supportsReleaseRollback();
+    $supportsSshDeployHooks = $server->hostCapabilities()->supportsSshDeployHooks();
     $testingHostname = $site->testingHostname();
     $testingHostnameMeta = is_array($site->meta['testing_hostname'] ?? null) ? $site->meta['testing_hostname'] : [];
     $provisioningMeta = $site->provisioningMeta();
     $provisioningState = $site->provisioningState() ?? 'queued';
     $provisioningError = $site->provisioningError();
     $targetUrl = $testingHostname ? 'http://'.$testingHostname : ($site->visitUrl() ?? null);
-    $readyForWorkspace = $site->isReadyForTraffic();
+    $readyForWorkspace = $site->isReadyForWorkspace();
     $hostChecks = collect($provisioningMeta['host_checks'] ?? [])
         ->filter(fn ($check) => is_array($check) && is_string($check['hostname'] ?? null))
         ->values();
-    $provisioningLog = collect($site->provisioningLog())->reverse()->values();
-    $provisioningConsoleOutput = $provisioningLog->map(function (array $entry): string {
-        $lines = [];
-        $level = strtoupper((string) ($entry['level'] ?? 'info'));
-        $step = trim(str_replace('_', ' ', (string) ($entry['step'] ?? '')));
-        $timestamp = ! empty($entry['at'])
-            ? \Illuminate\Support\Carbon::parse($entry['at'])->format('M j, H:i:s')
-            : null;
-
-        $header = trim(collect([$level, $step !== '' ? '['.$step.']' : null, $timestamp])->filter()->implode(' '));
-        if ($header !== '') {
-            $lines[] = $header;
-        }
-
-        $lines[] = (string) ($entry['message'] ?? __('Provisioning event recorded.'));
-
-        $context = is_array($entry['context'] ?? null) ? $entry['context'] : [];
-        foreach ($context as $key => $value) {
-            $formattedValue = is_array($value)
-                ? json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
-                : (string) $value;
-
-            $lines[] = '  '.strtoupper(str_replace('_', ' ', (string) $key)).': '.$formattedValue;
-        }
-
-        return implode("\n", $lines);
-    })->implode("\n\n");
     $statusSteps = [
         'queued' => __('Queued'),
         'provisioning_testing_hostname' => __('Assigning testing hostname'),
         'writing_site_config' => __('Writing site config'),
         'waiting_for_http' => __('Checking reachability'),
+        'awaiting_first_deploy' => __('Waiting for first deploy'),
         'ready' => __('Site available'),
         'failed' => __('Needs attention'),
     ];
@@ -50,7 +30,6 @@
     $sidebarItems = [
         ['id' => 'general', 'label' => __('General'), 'icon' => 'heroicon-o-rectangle-stack'],
         ['id' => 'deployment-log', 'label' => __('Queue'), 'icon' => 'heroicon-o-code-bracket'],
-        ['id' => 'ssl', 'label' => __('SSL'), 'icon' => 'heroicon-o-lock-closed'],
         ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-share'],
         ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-code-bracket-square'],
         ['id' => 'redirects', 'label' => __('Redirects'), 'icon' => 'heroicon-o-arrows-right-left'],
@@ -58,7 +37,14 @@
         ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list'],
         ['id' => 'manage', 'label' => __('Manage'), 'icon' => 'heroicon-o-archive-box'],
     ];
-    if ($site->type?->value === 'php') {
+    if ($supportsNginxProvisioning) {
+        array_splice($sidebarItems, 2, 0, [[
+            'id' => 'ssl',
+            'label' => __('SSL'),
+            'icon' => 'heroicon-o-lock-closed',
+        ]]);
+    }
+    if ($site->type?->value === 'php' && $supportsMachinePhp) {
         array_splice($sidebarItems, 5, 0, [[
             'id' => 'laravel',
             'label' => __('Laravel'),
@@ -93,6 +79,7 @@
                 <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ $site->name }}</h2>
                 <p class="text-sm text-slate-500">
                     {{ $server->name }} · {{ $site->type->label() }}
+                    · {{ $server->providerDisplayLabel() }}
                     @if ($site->workspace)
                         · {{ __('Project:') }}
                         <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-slate-700 hover:text-slate-900">
@@ -253,6 +240,17 @@
                                         <p class="mt-3 text-xs leading-5 text-slate-500">{{ __('Use this after fixing root SSH access or passwordless sudo on the server.') }}</p>
                                     </div>
                                 @endif
+
+                                <div class="border-t border-slate-200 pt-4">
+                                    <button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('cancelProvisioning', [], @js(__('Cancel provisioning')), @js(__('Cancel this site setup, delete the generated testing DNS record, remove any created web server config from the server, and return to add site?')), @js(__('Cancel provisioning')), true)"
+                                        class="inline-flex w-full items-center justify-center rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-50"
+                                    >
+                                        {{ __('Cancel provisioning') }}
+                                    </button>
+                                    <p class="mt-3 text-xs leading-5 text-slate-500">{{ __('This removes the temporary DNS record, cleans up generated server config, deletes the pending site, and returns you to site creation.') }}</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -365,27 +363,10 @@
                             </div>
                         @endif
                     </div>
-                    </div>
-
-                    <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                        <div class="flex items-center justify-between gap-4 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                            <div>
-                                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Provisioning console') }}</h3>
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('Persistent server-side step log for hostname setup, config writes, retries, and readiness checks.') }}</p>
-                            </div>
-                            <span class="rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss shadow-sm">
-                                {{ $provisioningLog->count() }} {{ \Illuminate\Support\Str::plural('event', $provisioningLog->count()) }}
-                            </span>
-                        </div>
-
-                        <div class="p-5 sm:p-6">
-                            <pre class="max-h-[26rem] overflow-auto whitespace-pre-wrap break-all rounded-xl border border-brand-ink/10 bg-zinc-50 px-4 py-3 font-mono text-xs leading-6 text-brand-ink shadow-inner [scrollbar-color:rgb(82_82_91/0.45)_transparent]">{{ $provisioningConsoleOutput !== '' ? $provisioningConsoleOutput : __('No provisioning events have been recorded yet. Once the worker starts, step-by-step output will appear here.') }}</pre>
-                        </div>
-                    </div>
                 </div>
             @else
-            <div class="grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
-                <aside class="lg:sticky lg:top-8">
+            <div class="space-y-6 lg:flex lg:items-start lg:gap-8 lg:space-y-0">
+                <aside class="lg:sticky lg:top-8 lg:w-[17rem] lg:flex-none">
                     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-200 px-5 py-4">
                             <div class="flex items-center justify-between gap-3">
@@ -423,8 +404,8 @@
                     </div>
                 </aside>
 
-                <div class="space-y-6">
-            <div id="general" class="bg-white shadow-sm sm:rounded-lg p-6">
+                <main class="min-w-0 space-y-6 lg:flex-1">
+            <div id="general" class="bg-white p-6 shadow-sm sm:rounded-lg">
                 <h3 class="font-medium text-slate-900 mb-3">Status</h3>
                 @if ($site->workspace)
                     <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
@@ -448,7 +429,7 @@
                     <div><dt class="text-slate-500">SSL</dt><dd class="font-medium capitalize">{{ $site->ssl_status }}</dd></div>
                     <div><dt class="text-slate-500">Document root (configured)</dt><dd class="font-mono text-xs break-all">{{ $site->document_root }}</dd></div>
                     <div><dt class="text-slate-500">Deploy path</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveRepositoryPath() }}</dd></div>
-                    <div><dt class="text-slate-500">Nginx web root</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveDocumentRootForNginx() }}</dd></div>
+                    <div><dt class="text-slate-500">Web root</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveDocumentRoot() }}</dd></div>
                     <div><dt class="text-slate-500">Deploy strategy</dt><dd class="font-medium">{{ $site->deploy_strategy }}</dd></div>
                     @if (!empty($site->meta['site_health_last_check_at']))
                         <div><dt class="text-slate-500">URL health (scheduler)</dt><dd class="font-medium">
@@ -463,7 +444,7 @@
                 </dl>
             </div>
 
-            <div class="bg-white shadow-sm sm:rounded-lg p-6">
+            <div class="bg-white p-6 shadow-sm sm:rounded-lg">
                 <h3 class="font-medium text-slate-900 mb-3">{{ __('Testing URL') }}</h3>
 
                 @if ($testingHostname !== '')
@@ -498,13 +479,14 @@
                 @endif
             </div>
 
-            @php
+                @if ($supportsMachinePhp && is_array($sitePhpData))
+                    @php
                 $supportedInstalledPhpVersions = collect($sitePhpData['installed_versions'])
                     ->filter(fn (array $version) => (bool) ($version['is_supported'] ?? false))
                     ->values();
-            @endphp
+                    @endphp
 
-            <div id="laravel" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
+                    <div id="laravel" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <h3 class="font-medium text-slate-900">PHP</h3>
@@ -587,9 +569,10 @@
 
                     <x-primary-button type="submit">Save PHP settings</x-primary-button>
                 </form>
-            </div>
+                    </div>
+                @endif
 
-            <div id="dns" class="bg-white shadow-sm sm:rounded-lg p-6">
+            <div id="dns" class="bg-white p-6 shadow-sm sm:rounded-lg">
                 <h3 class="font-medium text-slate-900 mb-3">Domains</h3>
                 <ul class="divide-y divide-slate-100 mb-4">
                     @foreach ($site->domains as $d)
@@ -603,7 +586,7 @@
                                 @if ($d->hostname === $testingHostname)
                                     <span class="text-xs text-slate-400">{{ __('Managed by Dply') }}</span>
                                 @else
-                                    <button type="button" wire:click="openConfirmActionModal('removeDomain', ['{{ $d->id }}'], @js(__('Remove domain')), @js(__('Remove this domain?')), @js(__('Remove domain')), true)" class="text-red-600 text-sm hover:underline">Remove</button>
+                                    <button type="button" wire:click="confirmRemoveDomain('{{ $d->id }}')" class="text-red-600 text-sm hover:underline">Remove</button>
                                 @endif
                             @endif
                         </li>
@@ -619,7 +602,8 @@
                 </form>
             </div>
 
-            <div id="http-stack" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
+            @if ($supportsNginxProvisioning)
+            <div id="http-stack" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">
                 <h3 class="font-medium text-slate-900">Nginx (HTTP)</h3>
                 <p class="text-sm text-slate-600">Writes a vhost under <code class="bg-slate-100 px-1 rounded text-xs">sites-available</code>, symlinks to <code class="bg-slate-100 px-1 rounded text-xs">sites-enabled</code>, runs <code class="bg-slate-100 px-1 rounded text-xs">nginx -t</code> and reloads. Server must have Nginx installed; PHP sites need matching PHP-FPM.</p>
                 @if ($server->isReady() && $server->ssh_private_key)
@@ -634,8 +618,10 @@
                     <p class="text-sm text-amber-700">SSH key required on the server record.</p>
                 @endif
             </div>
+            @endif
 
-            <div id="ssl" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
+            @if ($supportsNginxProvisioning)
+            <div id="ssl" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">
                 <h3 class="font-medium text-slate-900">Let’s Encrypt (Certbot)</h3>
                 <p class="text-sm text-slate-600">Run after HTTP vhost works and DNS points here. Uses <code class="bg-slate-100 px-1 rounded text-xs">certbot --nginx</code>. Set <code class="bg-slate-100 px-1 rounded text-xs">DPLY_CERTBOT_EMAIL</code> in <code class="bg-slate-100 px-1 rounded text-xs">.env</code> or ensure your user/org has an email.</p>
                 @if ($server->isReady() && $server->ssh_private_key)
@@ -648,28 +634,126 @@
                     </button>
                 @endif
             </div>
+            @endif
 
-            <div id="repository" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
+            <div id="repository" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">
                 <h3 class="font-medium text-slate-900">Git & deploy</h3>
+                @if ($functionsHost)
+                    <div class="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                        <p class="font-medium">{{ __('Functions deploy target') }}</p>
+                        <p class="mt-1">{{ __('This site clones a repository on the queue worker, runs the configured build command, packages the build output, and publishes the resulting zip to DigitalOcean Functions.') }}</p>
+                    </div>
+                @endif
                 <form wire:submit="saveGit" class="space-y-3">
+                    @if ($functionsHost)
+                        <div>
+                            <x-input-label for="functions_repo_source" value="Repository source" />
+                            <select id="functions_repo_source" wire:model.live="functions_repo_source" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                @if (count($linkedSourceControlAccounts) > 0)
+                                    <option value="provider">{{ __('Connected Git provider') }}</option>
+                                @endif
+                                <option value="manual">{{ __('Manual Git URL') }}</option>
+                            </select>
+                        </div>
+
+                        @if ($functions_repo_source === 'provider' && count($linkedSourceControlAccounts) > 0)
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <div>
+                                    <x-input-label for="functions_source_control_account_id" value="Connected account" />
+                                    <select id="functions_source_control_account_id" wire:model.live="functions_source_control_account_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        <option value="">{{ __('Select an account') }}</option>
+                                        @foreach ($linkedSourceControlAccounts as $account)
+                                            <option value="{{ $account['id'] }}">{{ $account['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('functions_source_control_account_id')" class="mt-1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="functions_repository_selection" value="Repository" />
+                                    <select id="functions_repository_selection" wire:model.live="functions_repository_selection" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                        <option value="">{{ __('Select a repository') }}</option>
+                                        @foreach ($availableFunctionsRepositories as $repository)
+                                            <option value="{{ $repository['url'] }}">{{ $repository['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('functions_repository_selection')" class="mt-1" />
+                                </div>
+                            </div>
+                        @endif
+                    @endif
+
                     <div>
                         <x-input-label for="git_repository_url" value="Repository URL" />
                         <x-text-input id="git_repository_url" wire:model="git_repository_url" class="mt-1 block w-full font-mono text-sm" placeholder="git@github.com:org/repo.git" />
+                        @if ($functionsHost)
+                            <p class="mt-1 text-sm text-slate-500">{{ __('This repo is cloned locally during deploys instead of on a remote SSH machine.') }}</p>
+                        @endif
+                        <x-input-error :messages="$errors->get('git_repository_url')" class="mt-1" />
                     </div>
                     <div>
                         <x-input-label for="git_branch" value="Branch" />
                         <x-text-input id="git_branch" wire:model="git_branch" class="mt-1 block w-full w-48" />
+                        <x-input-error :messages="$errors->get('git_branch')" class="mt-1" />
                     </div>
-                    <div>
-                        <x-input-label for="post_deploy_command" value="Post-deploy command (after pipeline steps below)" />
-                        <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="composer install --no-dev && php artisan migrate --force"></textarea>
-                    </div>
+                    @if ($functionsHost)
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <div>
+                                <x-input-label for="functions_repository_subdirectory" value="Repository subdirectory" />
+                                <x-text-input id="functions_repository_subdirectory" wire:model="functions_repository_subdirectory" class="mt-1 block w-full font-mono text-sm" placeholder="apps/functions" />
+                                <p class="mt-1 text-sm text-slate-500">{{ __('Optional for monorepos.') }}</p>
+                                <x-input-error :messages="$errors->get('functions_repository_subdirectory')" class="mt-1" />
+                            </div>
+                            <div>
+                                <x-input-label for="functions_artifact_output_path" value="Build output path" />
+                                <x-text-input id="functions_artifact_output_path" wire:model="functions_artifact_output_path" class="mt-1 block w-full font-mono text-sm" placeholder="dist" />
+                                <p class="mt-1 text-sm text-slate-500">{{ __('Relative to the repo checkout or subdirectory.') }}</p>
+                                <x-input-error :messages="$errors->get('functions_artifact_output_path')" class="mt-1" />
+                            </div>
+                        </div>
+                        <div>
+                            <x-input-label for="functions_build_command" value="Build command" />
+                            <textarea id="functions_build_command" wire:model="functions_build_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="npm install && npm run build"></textarea>
+                            <x-input-error :messages="$errors->get('functions_build_command')" class="mt-1" />
+                        </div>
+                    @else
+                        <div>
+                            <x-input-label for="post_deploy_command" value="Post-deploy command (after pipeline steps below)" />
+                            <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="composer install --no-dev && php artisan migrate --force"></textarea>
+                        </div>
+                    @endif
                     <div class="flex flex-wrap gap-2">
                         <x-primary-button type="submit">Save</x-primary-button>
+                        @if (! $functionsHost)
                         <button type="button" wire:click="generateDeployKey" class="px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50">Generate deploy key</button>
+                        @endif
                     </div>
                 </form>
 
+                @if ($functionsHost)
+                    @php
+                        $functionsConfig = $site->functionsConfig();
+                    @endphp
+                    <div class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Runtime') }}</p>
+                            <p class="mt-1 font-mono text-sm text-slate-900">{{ $functionsConfig['runtime'] ?? '—' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Entrypoint') }}</p>
+                            <p class="mt-1 font-mono text-sm text-slate-900">{{ $functionsConfig['entrypoint'] ?? '—' }}</p>
+                        </div>
+                        <div class="md:col-span-2">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Latest managed artifact') }}</p>
+                            <p class="mt-1 break-all font-mono text-sm text-slate-900">{{ $functionsConfig['artifact_path'] ?? __('Not built yet') }}</p>
+                        </div>
+                        @if (! empty($functionsConfig['action_url']))
+                            <div class="md:col-span-2">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Published action URL') }}</p>
+                                <p class="mt-1 break-all font-mono text-sm text-slate-900">{{ $functionsConfig['action_url'] }}</p>
+                            </div>
+                        @endif
+                    </div>
+                @else
                 <div class="border-t border-slate-100 pt-4 mt-4 space-y-3">
                     <h4 class="text-sm font-medium text-slate-900">Deploy pipeline</h4>
                     <p class="text-sm text-slate-600">Optional ordered steps run on the server after the <code class="text-xs bg-slate-100 px-1 rounded">after_clone</code> hooks and before the post-deploy command. On <strong>atomic</strong> deploys they run in the new release directory before the <code class="text-xs bg-slate-100 px-1 rounded">current</code> symlink is updated.</p>
@@ -714,6 +798,7 @@
                         <x-primary-button type="submit" class="!py-2">Add step</x-primary-button>
                     </form>
                 </div>
+                @endif
                 @if ($site->git_deploy_key_public)
                     <div>
                         <p class="text-sm text-slate-600 mb-1">Public key (add to GitHub / GitLab deploy keys):</p>
@@ -732,9 +817,15 @@
                 </div>
             </div>
 
-            <div id="deploy-settings" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
+            <div id="deploy-settings" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">
                 <h3 class="font-medium text-slate-900">Deployment &amp; Nginx tuning</h3>
-                <p class="text-sm text-slate-600"><strong>Atomic</strong> deploys clone into <code class="text-xs bg-slate-100 px-1 rounded">releases/&lt;timestamp&gt;</code> and flip a <code class="text-xs bg-slate-100 px-1 rounded">current</code> symlink. Nginx web root becomes <code class="text-xs bg-slate-100 px-1 rounded">…/current/public</code>. Enable Laravel scheduler here, then sync crontab on the server page.</p>
+                <p class="text-sm text-slate-600">
+                    @if ($functionsHost)
+                        {{ __('Functions-backed sites keep environment grouping and deploy settings here, but do not use nginx tuning, release symlinks, or server cron integration.') }}
+                    @else
+                        <strong>Atomic</strong> deploys clone into <code class="text-xs bg-slate-100 px-1 rounded">releases/&lt;timestamp&gt;</code> and flip a <code class="text-xs bg-slate-100 px-1 rounded">current</code> symlink. Nginx web root becomes <code class="text-xs bg-slate-100 px-1 rounded">…/current/public</code>. Enable Laravel scheduler here, then sync crontab on the server page.
+                    @endif
+                </p>
                 @if ($site->workspace)
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                         <p class="font-medium text-slate-900">{{ __('Project delivery context') }}</p>
@@ -747,6 +838,7 @@
                 @endif
                 <form wire:submit="saveDeploymentSettings" class="space-y-3">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @if (! $functionsHost)
                         <div>
                             <x-input-label value="Deploy strategy" />
                             <select wire:model="deploy_strategy" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
@@ -758,10 +850,12 @@
                             <x-input-label for="releases_to_keep" value="Releases to keep" />
                             <x-text-input id="releases_to_keep" type="number" wire:model="releases_to_keep" class="mt-1 w-24" min="1" max="50" />
                         </div>
+                        @endif
                         <div>
                             <x-input-label for="deployment_environment" value="Env group (for key/value vars)" />
                             <x-text-input id="deployment_environment" wire:model="deployment_environment" class="mt-1 block w-full text-sm" />
                         </div>
+                        @if (! $functionsHost)
                         <div>
                             <x-input-label for="octane_port" value="Octane port (PHP sites only; proxies to Swoole/RoadRunner)" />
                             <x-text-input id="octane_port" wire:model="octane_port" placeholder="8000" class="mt-1 block w-full font-mono text-sm" />
@@ -770,7 +864,9 @@
                             <x-input-label for="php_fpm_user" value="PHP-FPM pool user (note in config)" />
                             <x-text-input id="php_fpm_user" wire:model="php_fpm_user" class="mt-1 block w-full text-sm" placeholder="www-data" />
                         </div>
+                        @endif
                     </div>
+                    @if (! $functionsHost)
                     <label class="flex items-center gap-2 text-sm text-slate-700">
                         <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-slate-300">
                         Laravel scheduler (<code class="text-xs bg-slate-100 px-1">schedule:run</code> every minute via server crontab)
@@ -783,11 +879,12 @@
                         <x-input-label for="nginx_extra_raw" value="Extra Nginx inside server block (advanced)" />
                         <textarea id="nginx_extra_raw" wire:model="nginx_extra_raw" rows="4" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="# location /foo { ... }"></textarea>
                     </div>
+                    @endif
                     <x-primary-button type="submit">Save</x-primary-button>
                 </form>
             </div>
 
-            <div id="env-vars" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
+            <div id="env-vars" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3">
                 <h3 class="font-medium text-slate-900">Environment variables (key / value)</h3>
                 <p class="text-sm text-slate-600">Merged with project-level variables and the raw .env draft below for the selected environment. Values are encrypted in Dply.</p>
                 @if ($site->workspace && $site->workspace->variables->isNotEmpty())
@@ -838,7 +935,8 @@
                 </form>
             </div>
 
-            <div id="redirects" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
+            @if ($supportsNginxProvisioning)
+            <div id="redirects" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3">
                 <h3 class="font-medium text-slate-900">Redirects (exact path)</h3>
                 <p class="text-sm text-slate-600">Creates <code class="text-xs bg-slate-100 px-1">location = /path</code> blocks. Re-run Install Nginx after changes.</p>
                 @if ($site->redirects->isNotEmpty())
@@ -863,8 +961,10 @@
                     <x-primary-button type="submit" class="!py-2">Add</x-primary-button>
                 </form>
             </div>
+            @endif
 
-            <div id="deploy-hooks" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
+            @if ($supportsSshDeployHooks)
+            <div id="deploy-hooks" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3">
                 <h3 class="font-medium text-slate-900">Deploy hooks (bash)</h3>
                 <p class="text-sm text-slate-600"><strong>before_clone</strong> runs in the deploy base directory. <strong>after_clone</strong> in the new release. <strong>after_activate</strong> after the <code class="text-xs bg-slate-100 px-1">current</code> symlink updates (atomic only).</p>
                 @if ($site->deployHooks->isNotEmpty())
@@ -897,9 +997,10 @@
                     <x-primary-button type="submit" class="!py-2">Add hook</x-primary-button>
                 </form>
             </div>
+            @endif
 
-            @if ($site->deploy_strategy === 'atomic')
-                <div id="commits" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
+            @if ($site->deploy_strategy === 'atomic' && $supportsReleaseRollback)
+                <div id="commits" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3">
                     <h3 class="font-medium text-slate-900">Releases &amp; rollback</h3>
                     @if ($site->releases->isEmpty())
                         <p class="text-sm text-slate-500">No recorded releases yet. Deploy once with atomic strategy.</p>
@@ -913,7 +1014,7 @@
                                         @if ($rel->git_sha)<div class="font-mono text-xs text-slate-500">{{ $rel->git_sha }}</div>@endif
                                     </div>
                                     @if (! $rel->is_active)
-                                        <button type="button" wire:click="openConfirmActionModal('rollbackRelease', ['{{ $rel->id }}'], @js(__('Rollback release')), @js(__('Point current symlink at this release?')), @js(__('Rollback')), true)" class="text-slate-800 text-xs hover:underline">Rollback</button>
+                                        <button type="button" wire:click="confirmRollbackRelease('{{ $rel->id }}')" class="text-slate-800 text-xs hover:underline">Rollback</button>
                                     @endif
                                 </li>
                             @endforeach
@@ -922,7 +1023,7 @@
                 </div>
             @endif
 
-            <div id="notifications" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
+            <div id="notifications" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3">
                 <h3 class="font-medium text-slate-900">Deploy webhook</h3>
                 <p class="text-sm text-slate-600"><strong>Recommended:</strong> send <code class="text-xs bg-slate-100 px-1 rounded">X-Dply-Timestamp</code> (unix seconds) and <code class="text-xs bg-slate-100 px-1 rounded">X-Dply-Signature: sha256=&lt;hmac&gt;</code> where HMAC is <code class="text-xs bg-slate-100 px-1 rounded">hash_hmac('sha256', "{timestamp}." . raw_body, secret)</code>. Replays of the same payload within 15 minutes return <code class="text-xs">409</code>. <strong>Legacy:</strong> signature over raw body only (no timestamp) is still accepted.</p>
                 <p class="text-sm font-mono break-all bg-slate-50 p-2 rounded">{{ $deployHookUrl }}</p>
@@ -941,7 +1042,7 @@
                 </form>
             </div>
 
-            <div id="logs" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
+            <div id="logs" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3">
                 <h3 class="font-medium text-slate-900">Webhook delivery log</h3>
                 <p class="text-sm text-slate-600">Recent inbound deploy webhook attempts (signature checks, IP allow list, etc.).</p>
                 @if ($site->webhookDeliveryLogs->isEmpty())
@@ -962,7 +1063,7 @@
                 @endif
             </div>
 
-            <div id="deployment-log" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3" wire:poll.10s>
+            <div id="deployment-log" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3" wire:poll.10s>
                 <h3 class="font-medium text-slate-900">Deployment log</h3>
                 @if ($site->workspace)
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
@@ -1006,9 +1107,15 @@
                 @endif
             </div>
 
-            <div id="env-draft" class="bg-white shadow-sm sm:rounded-lg p-6 space-y-3">
+            <div id="env-draft" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3">
                 <h3 class="font-medium text-slate-900">Environment (.env)</h3>
-                <p class="text-sm text-slate-600">Draft is stored encrypted. Push merges <strong>project variables</strong>, then <strong>site key/value variables</strong> (for <code class="text-xs bg-slate-100 px-1">{{ $site->deployment_environment }}</code>) with this draft and writes <code class="text-xs bg-slate-100 px-1">{{ $site->effectiveEnvDirectory() }}/.env</code>.</p>
+                <p class="text-sm text-slate-600">
+                    @if ($supportsEnvPush)
+                        Draft is stored encrypted. Push merges <strong>project variables</strong>, then <strong>site key/value variables</strong> (for <code class="text-xs bg-slate-100 px-1">{{ $site->deployment_environment }}</code>) with this draft and writes <code class="text-xs bg-slate-100 px-1">{{ $site->effectiveEnvDirectory() }}/.env</code>.
+                    @else
+                        {{ __('Draft is stored encrypted in Dply. For Functions-backed sites, keep environment values here and include them in your packaged runtime configuration instead of pushing a machine `.env` file.') }}
+                    @endif
+                </p>
                 @if ($site->workspace)
                     <p class="text-sm text-slate-500">
                         {{ __('For shared settings across multiple sites in this project, prefer storing them at the project level first.') }}
@@ -1018,6 +1125,7 @@
                 <textarea wire:model="env_file_content" rows="8" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="APP_NAME=…"></textarea>
                 <div class="flex flex-wrap gap-2">
                     <button type="button" wire:click="saveEnvDraft" class="px-4 py-2 border border-slate-300 rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50">Save draft in Dply</button>
+                    @if ($supportsEnvPush)
                     <button type="button" wire:click="pushEnvToServer" wire:loading.attr="disabled" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50">
                         <span wire:loading.remove wire:target="pushEnvToServer">Push .env to server</span>
                         <span wire:loading wire:target="pushEnvToServer" class="inline-flex items-center gap-2">
@@ -1025,15 +1133,15 @@
                             Pushing…
                         </span>
                     </button>
+                    @endif
                 </div>
             </div>
-
             @can('delete', $site)
-                <div id="manage" class="flex justify-between items-center">
-                    <button type="button" wire:click="openConfirmActionModal('deleteSite', [], @js(__('Delete site')), @js(__('Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab.')), @js(__('Delete site')), true)" class="text-red-600 hover:underline text-sm">Delete site</button>
+                <div id="manage" class="bg-white p-6 shadow-sm sm:rounded-lg">
+                    <button type="button" wire:click="openConfirmActionModal('deleteSite', [], @js(__('Delete site')), @js(__('Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab.')), @js(__('Delete site')), true)" class="text-sm text-red-600 hover:underline">Delete site</button>
                 </div>
             @endcan
-                </div>
+                </main>
             </div>
             @endif
         </div>

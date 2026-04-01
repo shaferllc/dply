@@ -50,4 +50,16 @@ class ServerCreateForm extends Form
     public string $do_tags = '';
 
     public string $do_user_data = '';
+
+    public string $do_functions_api_host = '';
+
+    public string $do_functions_namespace = '';
+
+    public string $do_functions_access_key = '';
+
+    public string $do_functions_package = 'default';
+
+    public string $do_functions_action_kind = 'nodejs:18';
+
+    public string $do_functions_action_main = 'index';
 }

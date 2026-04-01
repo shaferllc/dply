@@ -435,6 +435,14 @@ final class ServerProvisionCommandBuilder
             $lines[] = 'ufw allow "Apache Full"';
             $lines[] = 'systemctl enable --now apache2';
             $lines = array_merge($lines, $this->certbotForWeb($web));
+        } elseif ($web === 'openlitespeed') {
+            $lines[] = $this->stepMarker('Installing webserver');
+            $lines[] = 'wget -qO - https://repo.litespeed.sh | bash';
+            $lines[] = 'apt-get update -y';
+            $lines[] = 'apt-get install -y --no-install-recommends openlitespeed';
+            $lines[] = 'ufw allow 80/tcp';
+            $lines[] = 'ufw allow 443/tcp';
+            $lines[] = '/usr/local/lsws/bin/lswsctrl start || true';
         } elseif ($web === 'caddy') {
             $lines[] = $this->stepMarker('Installing webserver');
             $lines[] = 'install -d /usr/share/keyrings';
@@ -445,6 +453,15 @@ final class ServerProvisionCommandBuilder
             $lines[] = 'ufw allow 80/tcp';
             $lines[] = 'ufw allow 443/tcp';
             $lines[] = 'systemctl enable --now caddy';
+        } elseif ($web === 'traefik') {
+            $lines[] = $this->stepMarker('Installing webserver');
+            $lines[] = 'apt-get install -y --no-install-recommends traefik caddy';
+            $lines[] = 'install -d -m 0755 /etc/traefik/dynamic /etc/caddy/sites-enabled /var/log/traefik';
+            $lines[] = $this->writeFileWithRollback('/etc/traefik/traefik.yml', "entryPoints:\n  web:\n    address: \":80\"\nproviders:\n  file:\n    directory: \"/etc/traefik/dynamic\"\n    watch: true\nlog:\n  filePath: \"/var/log/traefik/traefik.log\"\naccessLog:\n  filePath: \"/var/log/traefik/access.log\"\n");
+            $lines[] = 'ufw allow 80/tcp';
+            $lines[] = 'ufw allow 443/tcp';
+            $lines[] = 'systemctl enable --now caddy';
+            $lines[] = 'systemctl enable --now traefik';
         }
 
         return $lines;
@@ -533,6 +550,13 @@ final class ServerProvisionCommandBuilder
                 'apt-get install -y --no-install-recommends libapache2-mod-'.$stem,
                 'a2enmod '.$stem,
                 'systemctl reload apache2',
+            ];
+        }
+
+        if ($web === 'openlitespeed') {
+            return [
+                'apt-get install -y --no-install-recommends lsphp'.str_replace('.', '', $php).' lsphp'.str_replace('.', '', $php).'-mysql lsphp'.str_replace('.', '', $php).'-pgsql || true',
+                '/usr/local/lsws/bin/lswsctrl restart || true',
             ];
         }
 
@@ -704,6 +728,44 @@ NGINX,
             ];
         }
 
+        if ($web === 'apache') {
+            $configs['apache-starter'] = [
+                'label' => 'Apache starter site',
+                'path' => '/etc/apache2/sites-available/dply.conf',
+                'content' => <<<APACHE
+<VirtualHost *:80>
+    ServerName localhost
+    DocumentRoot {$layout['current']}/public
+    <Directory {$layout['current']}/public>
+        AllowOverride All
+        Require all granted
+        DirectoryIndex index.php index.html
+        FallbackResource /index.php
+    </Directory>
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:{$phpSocket}|fcgi://localhost/"
+    </FilesMatch>
+</VirtualHost>
+APACHE,
+            ];
+        }
+
+        if ($web === 'openlitespeed') {
+            $configs['openlitespeed-starter'] = [
+                'label' => 'OpenLiteSpeed starter site',
+                'path' => '/usr/local/lsws/conf/vhosts/dply/vhconf.conf',
+                'content' => "docRoot {$layout['current']}/public/\nvhDomain localhost\nindex  {\n  useServer 0\n  indexFiles index.php, index.html\n}\n",
+            ];
+        }
+
+        if ($web === 'traefik') {
+            $configs['traefik-starter'] = [
+                'label' => 'Traefik starter config',
+                'path' => '/etc/traefik/traefik.yml',
+                'content' => "entryPoints:\n  web:\n    address: \":80\"\nproviders:\n  file:\n    directory: \"/etc/traefik/dynamic\"\n    watch: true\n",
+            ];
+        }
+
         if (in_array($role, ['worker', 'plain', 'application'], true)) {
             $configs['supervisor-default'] = [
                 'label' => 'Supervisor default worker',
@@ -753,6 +815,23 @@ NGINX,
                 $lines[] = 'systemctl reload caddy || systemctl restart caddy';
             }
 
+            if ($config['path'] === '/etc/apache2/sites-available/dply.conf') {
+                $lines[] = 'a2enmod proxy proxy_fcgi rewrite headers >/dev/null 2>&1 || true';
+                $lines[] = 'a2ensite dply.conf';
+                $lines[] = 'apachectl configtest';
+                $lines[] = 'systemctl reload apache2 || service apache2 reload';
+            }
+
+            if ($config['path'] === '/usr/local/lsws/conf/vhosts/dply/vhconf.conf') {
+                $lines[] = 'install -d -m 0755 /usr/local/lsws/conf/vhosts/dply';
+                $lines[] = '/usr/local/lsws/bin/lswsctrl restart || true';
+            }
+
+            if ($config['path'] === '/etc/traefik/traefik.yml') {
+                $lines[] = 'install -d -m 0755 /etc/traefik/dynamic /var/log/traefik';
+                $lines[] = 'systemctl restart traefik';
+            }
+
             if ($config['path'] === '/etc/haproxy/haproxy.cfg') {
                 $lines[] = 'haproxy -c -f /etc/haproxy/haproxy.cfg';
                 $lines[] = 'systemctl restart haproxy';
@@ -794,6 +873,11 @@ NGINX,
             $checks['caddy'] = 'caddy validate --config /etc/caddy/Caddyfile';
         } elseif ($web === 'apache') {
             $checks['apache'] = 'apachectl configtest';
+        } elseif ($web === 'openlitespeed') {
+            $checks['openlitespeed'] = '/usr/local/lsws/bin/lswsctrl status';
+        } elseif ($web === 'traefik') {
+            $checks['traefik'] = 'systemctl is-active traefik';
+            $checks['caddy-backend'] = 'caddy validate --config /etc/caddy/Caddyfile';
         }
 
         if (str_starts_with($database, 'postgres')) {

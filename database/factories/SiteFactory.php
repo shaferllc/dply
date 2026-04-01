@@ -33,7 +33,13 @@ class SiteFactory extends Factory
             'app_port' => null,
             'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
+            'git_branch' => 'main',
             'webhook_secret' => Str::random(48),
+            'deploy_strategy' => 'simple',
+            'releases_to_keep' => 5,
+            'laravel_scheduler' => false,
+            'deployment_environment' => 'production',
+            'restart_supervisor_programs_after_deploy' => false,
         ];
     }
 }

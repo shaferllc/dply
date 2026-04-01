@@ -8,6 +8,7 @@
 return [
     'enabled' => [
         'digitalocean' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN', true),
+        'digitalocean_functions' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_FUNCTIONS', true),
         'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', false),
         'linode' => env('DPLY_SERVER_PROVIDER_LINODE', false),
         'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', false),

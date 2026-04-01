@@ -326,7 +326,7 @@ class Organization extends Model
 
     /**
      * Maximum number of servers allowed for this organization based on subscription.
-     * Free/Starter (no active subscription or non-Pro plan): config subscription.limits.servers_free (default 3).
+     * Trial / non-Pro (no active subscription or non-Pro plan): config subscription.limits.servers_free (default 3).
      * Pro (pro_monthly or pro_yearly): unlimited.
      */
     public function maxServers(): int
@@ -409,7 +409,7 @@ class Organization extends Model
 
     public function planTierLabel(): string
     {
-        return $this->onProSubscription() ? 'Pro' : 'Free';
+        return $this->onProSubscription() ? 'Pro' : 'Trial';
     }
 
     public function onProSubscription(): bool
@@ -434,6 +434,7 @@ class Organization extends Model
 
     /**
      * Seat count from Stripe when seat billing is configured; null if not on Pro / not applicable.
+     * This remains an internal safeguard and is not part of the current public pricing story.
      */
     public function seatCapFromSubscription(): ?int
     {

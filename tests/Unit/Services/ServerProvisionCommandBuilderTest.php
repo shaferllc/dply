@@ -95,6 +95,55 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringNotContainsString('ondrej/php', $joined);
     }
 
+    public function test_build_application_stack_supports_apache_openlitespeed_and_traefik(): void
+    {
+        $builder = app(ServerProvisionCommandBuilder::class);
+
+        $apache = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'apache',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+        $openlitespeed = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'openlitespeed',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+        $traefik = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'traefik',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $apacheCommands = implode("\n", $builder->build($apache));
+        $olsCommands = implode("\n", $builder->build($openlitespeed));
+        $traefikCommands = implode("\n", $builder->build($traefik));
+
+        $this->assertStringContainsString('apache2', $apacheCommands);
+        $this->assertStringContainsString('apachectl configtest', $apacheCommands);
+
+        $this->assertStringContainsString('openlitespeed', $olsCommands);
+        $this->assertStringContainsString('lswsctrl', $olsCommands);
+
+        $this->assertStringContainsString('traefik', $traefikCommands);
+        $this->assertStringContainsString('caddy', $traefikCommands);
+    }
+
     public function test_build_emits_named_step_markers_for_setup_progress(): void
     {
         $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');

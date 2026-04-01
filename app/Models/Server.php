@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use App\Support\Hosts\HostCapabilities;
 use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
 
@@ -28,6 +29,10 @@ class Server extends Model
     public const STATUS_ERROR = 'error';
 
     public const STATUS_DISCONNECTED = 'disconnected';
+
+    public const HOST_KIND_VM = 'vm';
+
+    public const HOST_KIND_DIGITALOCEAN_FUNCTIONS = 'digitalocean_functions';
 
     public const HEALTH_REACHABLE = 'reachable';
 
@@ -216,6 +221,41 @@ class Server extends Model
         return $this->status === self::STATUS_READY;
     }
 
+    public function hostKind(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $hostKind = $meta['host_kind'] ?? self::HOST_KIND_VM;
+
+        return in_array($hostKind, [
+            self::HOST_KIND_VM,
+            self::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+        ], true) ? $hostKind : self::HOST_KIND_VM;
+    }
+
+    public function hostCapabilities(): HostCapabilities
+    {
+        return new HostCapabilities($this);
+    }
+
+    public function isVmHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_VM;
+    }
+
+    public function isDigitalOceanFunctionsHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DIGITALOCEAN_FUNCTIONS;
+    }
+
+    public function providerDisplayLabel(): string
+    {
+        if ($this->isDigitalOceanFunctionsHost()) {
+            return 'DigitalOcean Functions';
+        }
+
+        return $this->provider?->label() ?? 'Custom';
+    }
+
     /**
      * OpenSSH one-line public key derived from the stored provisioned private key.
      */
@@ -271,9 +311,31 @@ class Server extends Model
             return false;
         }
 
+        $userKeys = $user->sshKeys()
+            ->select(['id', 'public_key'])
+            ->get();
+
+        if ($userKeys->isEmpty()) {
+            return false;
+        }
+
+        $managedKeyIds = $userKeys->pluck('id');
+        $publicKeys = $userKeys
+            ->pluck('public_key')
+            ->filter(fn ($key): bool => is_string($key) && trim($key) !== '')
+            ->map(fn ($key): string => trim($key));
+
         return $this->authorizedKeys()
-            ->where('managed_key_type', UserSshKey::class)
-            ->whereIn('managed_key_id', $user->sshKeys()->select('id'))
+            ->where(function ($query) use ($managedKeyIds, $publicKeys): void {
+                $query->where(function ($managed) use ($managedKeyIds): void {
+                    $managed->where('managed_key_type', UserSshKey::class)
+                        ->whereIn('managed_key_id', $managedKeyIds);
+                });
+
+                if ($publicKeys->isNotEmpty()) {
+                    $query->orWhereIn('public_key', $publicKeys);
+                }
+            })
             ->exists();
     }
 

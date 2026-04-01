@@ -22,8 +22,8 @@
     <main class="flex-1">
         <section class="pt-16 pb-12 px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center">
-                <h1 class="text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">Transparent pricing</h1>
-                <p class="mt-4 text-lg text-brand-moss">Start free, move to production when your org is ready. No surprise limits on the fundamentals.</p>
+                <h1 class="text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">Trial first. Pro when your org is ready.</h1>
+                <p class="mt-4 text-lg text-brand-moss">Start with a trial on your own infrastructure, then move to a flat organization plan for production. No seat math. No per-site billing.</p>
             </div>
         </section>
 
@@ -38,37 +38,41 @@
         <section class="pb-24 px-4 sm:px-6 lg:px-8">
             <div class="max-w-5xl mx-auto grid gap-8 md:grid-cols-3">
                 <div class="relative flex flex-col rounded-2xl border border-brand-ink/10 bg-white/80 backdrop-blur-sm p-8 shadow-sm">
-                    <h2 class="text-lg font-semibold text-brand-ink">Starter</h2>
-                    <p class="mt-1 text-sm text-brand-moss">For side projects and experiments</p>
+                    <h2 class="text-lg font-semibold text-brand-ink">Trial</h2>
+                    <p class="mt-1 text-sm text-brand-moss">For evaluation and your first real deploys</p>
                     <div class="mt-6 flex items-baseline gap-1">
-                        <span class="text-4xl font-bold text-brand-ink">$0</span>
-                        <span class="text-brand-moss">/mo</span>
+                        <span class="text-4xl font-bold text-brand-ink">Start now</span>
                     </div>
                     <ul class="mt-8 space-y-4 flex-1">
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            Up to 3 servers
+                            Connect your first servers and sites
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            DigitalOcean &amp; SSH
+                            DigitalOcean and SSH-based workflows
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            Run commands from dashboard
+                            Git deploys, SSL, and command-center visibility
+                        </li>
+                        <li class="flex items-start gap-3 text-sm text-brand-moss">
+                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            Upgrade to Pro when the whole org is ready
                         </li>
                     </ul>
-                    <a href="{{ route('register') }}" class="mt-8 block w-full rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-3 text-center text-sm font-semibold text-brand-ink hover:border-brand-sage/40 transition-colors">Get started</a>
+                    <a href="{{ route('register') }}" class="mt-8 block w-full rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-3 text-center text-sm font-semibold text-brand-ink hover:border-brand-sage/40 transition-colors">Start trial</a>
                 </div>
 
                 <div class="relative flex flex-col rounded-2xl border-2 border-brand-gold bg-white p-8 shadow-xl shadow-brand-gold/10 ring-1 ring-brand-gold/20 md:-mt-2 md:mb-2">
                     <div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-gold px-3 py-1 text-xs font-bold text-brand-ink uppercase tracking-wide">Most popular</div>
                     <h2 class="text-lg font-semibold text-brand-ink">Pro</h2>
-                    <p class="mt-1 text-sm text-brand-moss">For growing teams and production</p>
+                    <p class="mt-1 text-sm text-brand-moss">For production teams standardizing on Dply</p>
                     <div class="mt-6 flex items-baseline gap-1">
-                        <span class="text-4xl font-bold text-brand-ink">$29</span>
-                        <span class="text-brand-moss">/mo</span>
+                        <span class="text-4xl font-bold text-brand-ink" x-text="annual ? '$290' : '$29'">$29</span>
+                        <span class="text-brand-moss" x-text="annual ? '/yr' : '/mo'">/mo</span>
                     </div>
+                    <p class="mt-2 text-sm text-brand-moss">One flat subscription for the whole organization.</p>
                     <ul class="mt-8 space-y-4 flex-1">
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
@@ -76,25 +80,29 @@
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            Everything in Starter
+                            Unlimited sites across the organization
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            Priority support
+                            API tokens and org-wide automation
+                        </li>
+                        <li class="flex items-start gap-3 text-sm text-brand-moss">
+                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            Priority support and rollout help
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                             Backup planning, metrics, and rollback-friendly delivery
                         </li>
                     </ul>
-                    <a href="{{ route('register') }}" class="mt-8 block w-full rounded-xl bg-brand-ink px-4 py-3 text-center text-sm font-semibold text-brand-cream shadow-md hover:bg-brand-forest transition-colors">Get started</a>
+                    <a href="{{ route('register') }}" class="mt-8 block w-full rounded-xl bg-brand-ink px-4 py-3 text-center text-sm font-semibold text-brand-cream shadow-md hover:bg-brand-forest transition-colors">Start trial</a>
                 </div>
 
                 <div class="relative flex flex-col rounded-2xl border border-brand-ink/10 bg-white/80 backdrop-blur-sm p-8 shadow-sm">
-                    <h2 class="text-lg font-semibold text-brand-ink">Team</h2>
-                    <p class="mt-1 text-sm text-brand-moss">For organizations</p>
+                    <h2 class="text-lg font-semibold text-brand-ink">Enterprise</h2>
+                    <p class="mt-1 text-sm text-brand-moss">For procurement, onboarding, and larger rollouts</p>
                     <div class="mt-6 flex items-baseline gap-1">
-                        <span class="text-4xl font-bold text-brand-ink">Custom</span>
+                        <span class="text-4xl font-bold text-brand-ink">Talk to us</span>
                     </div>
                     <ul class="mt-8 space-y-4 flex-1">
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
@@ -103,21 +111,21 @@
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            Advanced governance and rollout support
+                            Procurement, onboarding, and rollout planning
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
                             <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                             Dedicated support
                         </li>
                     </ul>
-                    <a href="mailto:hello@dply.io?subject=Team%20plan" class="mt-8 block w-full rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-3 text-center text-sm font-semibold text-brand-ink hover:border-brand-sage/40 transition-colors">Contact sales</a>
+                    <a href="mailto:hello@dply.io?subject=Dply%20enterprise%20pricing" class="mt-8 block w-full rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-3 text-center text-sm font-semibold text-brand-ink hover:border-brand-sage/40 transition-colors">Talk to sales</a>
                 </div>
             </div>
         </section>
 
         <section class="border-t border-brand-ink/10 bg-white/60 py-16 px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center">
-                <p class="text-brand-moss leading-relaxed">All plans include secure credential storage, SSH key management, and provider-connected operations. You only pay for the cloud resources you use, while Dply gives your team one place for deploys, visibility, and clearer operating context.</p>
+                <p class="text-brand-moss leading-relaxed">Dply pricing is per organization. You pay your cloud providers directly for infrastructure, while Dply gives your team one place for deploys, visibility, and clearer operating context.</p>
             </div>
         </section>
     </main>

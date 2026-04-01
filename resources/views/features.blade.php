@@ -260,7 +260,7 @@
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage font-semibold text-sm">C</span>
                         <div>
                             <h3 class="font-semibold text-brand-ink">Billing per organization</h3>
-                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Plans attach to the org. Subscription limits apply <strong class="text-brand-forest font-medium">organization-wide</strong>—every server and <strong class="text-brand-forest font-medium">every site</strong> under that org shares the same plan. There is no separate per-site product line on your invoice.</p>
+                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Trials and subscriptions attach to the org. Usage limits apply <strong class="text-brand-forest font-medium">organization-wide</strong>—every server and <strong class="text-brand-forest font-medium">every site</strong> under that org shares the same plan. There is no separate per-site product line on your invoice.</p>
                         </div>
                     </li>
                     <li class="flex gap-4">
@@ -281,8 +281,8 @@
 
                 {{-- Must span full grid width: without col-span-12 this sat in column 1 only (narrow strip). --}}
                 <div id="plans-and-account" class="mt-12 w-full min-w-0 lg:col-span-12 scroll-mt-24 rounded-2xl border border-brand-gold/35 bg-gradient-to-br from-brand-gold/10 to-brand-sand/20 px-6 py-8 sm:px-10">
-                    <h3 class="text-lg font-semibold text-brand-ink">Plans cover the whole organization</h3>
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed max-w-3xl">Usage limits we enforce from your plan (for example, how many <strong class="text-brand-forest font-medium">servers</strong> you can connect, and how many <strong class="text-brand-forest font-medium">sites</strong> the org may create on those servers before upgrading to Pro) are counted for the <strong class="text-brand-forest font-medium">entire org</strong>. Billing is not split per application or hostname.</p>
+                    <h3 class="text-lg font-semibold text-brand-ink">Trials and plans cover the whole organization</h3>
+                    <p class="mt-2 text-sm text-brand-moss leading-relaxed max-w-3xl">Usage limits we enforce during trial and on lower tiers, such as how many <strong class="text-brand-forest font-medium">servers</strong> you can connect and how many <strong class="text-brand-forest font-medium">sites</strong> the org may create before moving to Pro, are counted for the <strong class="text-brand-forest font-medium">entire org</strong>. Billing is not split per application or hostname.</p>
                     <h3 class="mt-8 text-lg font-semibold text-brand-ink">Profile, 2FA, and OAuth are personal</h3>
                     <p class="mt-2 text-sm text-brand-moss leading-relaxed max-w-3xl">You sign in as a person. Hardening your account with 2FA, linking an OAuth provider, or updating your profile applies to <strong class="text-brand-forest font-medium">all organizations</strong> you belong to and <strong class="text-brand-forest font-medium">every site</strong> you can reach through those memberships—without reconfiguring security per team.</p>
                 </div>
@@ -706,7 +706,7 @@
                         <a href="{{ route('docs.index') }}" class="inline-flex items-center px-6 py-3 rounded-xl bg-brand-ink text-brand-cream text-sm font-semibold hover:bg-brand-forest transition-colors shadow-md">Open docs</a>
                         <a href="{{ route('dashboard') }}" class="inline-flex items-center px-6 py-3 rounded-xl border-2 border-brand-ink/15 bg-white text-brand-ink text-sm font-semibold hover:border-brand-sage/40 transition-colors">Dashboard</a>
                     @else
-                        <a href="{{ route('register') }}" class="inline-flex items-center px-6 py-3 rounded-xl bg-brand-gold text-brand-ink text-sm font-semibold shadow-lg shadow-brand-gold/20 hover:bg-[#d4b24d] transition-colors">Create free account</a>
+                        <a href="{{ route('register') }}" class="inline-flex items-center px-6 py-3 rounded-xl bg-brand-gold text-brand-ink text-sm font-semibold shadow-lg shadow-brand-gold/20 hover:bg-[#d4b24d] transition-colors">Start trial</a>
                         <a href="{{ route('pricing') }}" class="inline-flex items-center px-6 py-3 rounded-xl border-2 border-brand-ink/15 bg-white text-brand-ink text-sm font-semibold hover:border-brand-sage/40 transition-colors">Compare plans</a>
                     @endauth
                 </div>

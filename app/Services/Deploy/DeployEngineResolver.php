@@ -13,10 +13,17 @@ final class DeployEngineResolver
 {
     public function __construct(
         private ByoServerDeployEngine $byoServerDeployEngine,
+        private DigitalOceanFunctionsDeployEngine $digitalOceanFunctionsDeployEngine,
     ) {}
 
     public function forProject(Project $project): DeployEngine
     {
+        $project->loadMissing('site.server');
+
+        if ($project->site?->server?->isDigitalOceanFunctionsHost()) {
+            return $this->digitalOceanFunctionsDeployEngine;
+        }
+
         return $this->byoServerDeployEngine;
     }
 

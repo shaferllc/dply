@@ -17,6 +17,10 @@ class SiteEnvPusher
     public function push(Site $site, ?string $draftEnvContent = null): string
     {
         $server = $site->server;
+        if (! $server->hostCapabilities()->supportsEnvPushToHost()) {
+            throw new \RuntimeException('This host runtime does not support writing a .env file over SSH.');
+        }
+
         if (! $server->isReady() || empty($server->ssh_private_key)) {
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
