@@ -131,7 +131,12 @@ class ServerAuthorizedKeysSynchronizer
 
         $fromDb = $groups->keys()->map(fn ($k) => (string) $k)->all();
 
-        $targets = array_values(array_unique(array_merge($prev, $fromDb, [$connectionUser])));
+        $targets = array_values(array_unique(array_merge(
+            $prev,
+            $fromDb,
+            [$connectionUser],
+            $this->hiddenManagedTargets($server)
+        )));
         sort($targets);
 
         return $targets;
@@ -162,16 +167,7 @@ class ServerAuthorizedKeysSynchronizer
      */
     protected function writeAuthorizedKeysForTarget(Server $server, string $connectionUser, string $targetUser, Collection $rows): string
     {
-        $lines = [];
-        foreach ($rows as $row) {
-            $key = trim((string) $row->public_key);
-            if ($key !== '') {
-                $lines[] = $key;
-            }
-        }
-
-        $lines = array_values(array_unique($lines));
-        sort($lines);
+        $lines = $this->desiredAuthorizedKeyLines($server, $connectionUser, $targetUser, $rows);
 
         $body = implode("\n", $lines);
         if ($body !== '') {
@@ -185,7 +181,7 @@ class ServerAuthorizedKeysSynchronizer
             ? $this->buildWriteScriptForCurrentUser($tmp, $b64)
             : $this->buildWriteScriptForSudoUser($targetUser, $tmp, $b64);
 
-        $out = $this->remote->runScript($server, 'Write authorized_keys ('.$targetUser.')', $script, 60);
+        $out = $this->runSyncScript($server, 'Write authorized_keys ('.$targetUser.')', $script, 60);
 
         if (! $out->isSuccessful()) {
             throw new \RuntimeException('Failed to update authorized_keys for '.$targetUser.': '.$out->getBuffer());
@@ -196,6 +192,70 @@ class ServerAuthorizedKeysSynchronizer
         }
 
         return $out->getBuffer();
+    }
+
+    /**
+     * @param  Collection<int, ServerAuthorizedKey>  $rows
+     * @return list<string>
+     */
+    protected function desiredAuthorizedKeyLines(Server $server, string $connectionUser, string $targetUser, Collection $rows): array
+    {
+        $lines = [];
+        foreach ($rows as $row) {
+            $key = trim((string) $row->public_key);
+            if ($key !== '') {
+                $lines[] = $key;
+            }
+        }
+
+        if ($targetUser === $connectionUser) {
+            $operationalKey = trim((string) $server->openSshPublicKeyFromOperationalPrivate());
+            if ($operationalKey !== '') {
+                $lines[] = $operationalKey;
+            }
+        }
+
+        if ($targetUser === 'root') {
+            $recoveryKey = trim((string) $server->openSshPublicKeyFromRecoveryPrivate());
+            if ($recoveryKey !== '') {
+                $lines[] = $recoveryKey;
+            }
+        }
+
+        $lines = array_values(array_unique($lines));
+        sort($lines);
+
+        return $lines;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function hiddenManagedTargets(Server $server): array
+    {
+        return trim((string) $server->openSshPublicKeyFromRecoveryPrivate()) !== ''
+            ? ['root']
+            : [];
+    }
+
+    protected function runSyncScript(Server $server, string $name, string $script, int $timeoutSeconds): \App\Modules\TaskRunner\ProcessOutput
+    {
+        $useRoot = (bool) config('server_ssh_keys.use_root_ssh', true);
+        $fallback = (bool) config('server_ssh_keys.fallback_to_deploy_user_ssh', true);
+
+        if (! $useRoot) {
+            return $this->remote->runScript($server, $name, $script, $timeoutSeconds, false);
+        }
+
+        try {
+            return $this->remote->runScript($server, $name, $script, $timeoutSeconds, true);
+        } catch (\Throwable $e) {
+            if (! $fallback) {
+                throw $e;
+            }
+
+            return $this->remote->runScript($server, $name, $script, $timeoutSeconds, false);
+        }
     }
 
     protected function buildWriteScriptForCurrentUser(string $tmp, string $b64): string

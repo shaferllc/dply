@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\OrganizationSshKey;
@@ -24,11 +25,11 @@ use Illuminate\Support\Facades\Request;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 #[Layout('layouts.app')]
 class WorkspaceSshKeys extends Component
 {
+    use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -46,8 +47,6 @@ class WorkspaceSshKeys extends Component
 
     /** @var list<string> */
     public array $system_users = [];
-
-    public string $bulk_import_text = '';
 
     /** @var array<string, array{remote: list<string>, desired: list<string>, added: list<string>, removed: list<string>}>|null */
     public ?array $diff_result = null;
@@ -148,7 +147,7 @@ class WorkspaceSshKeys extends Component
             $this->system_users = $merged;
             $this->flash_success = __('Loaded system users from the server.');
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->flash_error = $this->friendlyWorkspaceError($e, __('Dply could not connect to the server to load system users.'));
         }
     }
 
@@ -184,7 +183,7 @@ class WorkspaceSshKeys extends Component
             $this->diff_result = $diff->diffPerUser($this->server->fresh(['authorizedKeys']));
             $this->ssh_workspace_tab = 'preview';
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->flash_error = $this->friendlyWorkspaceError($e, __('Dply could not connect to the server to preview SSH key drift.'));
         }
     }
 
@@ -268,60 +267,6 @@ class WorkspaceSshKeys extends Component
         $this->flash_error = null;
     }
 
-    public function bulkImportKeys(ServerAuthorizedKeysAuditLogger $audit): void
-    {
-        $this->authorize('update', $this->server);
-        $this->validate([
-            'bulk_import_text' => ['required', 'string', 'max:500000'],
-        ]);
-
-        $lines = preg_split('/\r\n|\n|\r/', $this->bulk_import_text) ?: [];
-        $created = 0;
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#')) {
-                continue;
-            }
-            $parts = array_map('trim', explode('|', $line, 3));
-            if (count($parts) < 3) {
-                continue;
-            }
-            [$name, $user, $pub] = $parts;
-            if ($name === '' || $user === '' || $pub === '') {
-                continue;
-            }
-            if (! in_array($user, $this->system_users, true)) {
-                continue;
-            }
-            if (! UserSshKey::publicKeyLooksValid($pub)) {
-                continue;
-            }
-            $stored = $user === (string) $this->server->ssh_user ? '' : $user;
-            ServerAuthorizedKey::query()->create([
-                'server_id' => $this->server->id,
-                'managed_key_type' => null,
-                'managed_key_id' => null,
-                'target_linux_user' => $stored,
-                'name' => $name,
-                'public_key' => $pub,
-            ]);
-            $created++;
-        }
-
-        $audit->record(
-            $this->server->fresh(),
-            ServerSshKeyAuditEvent::EVENT_BULK_IMPORTED,
-            ['rows_created' => $created],
-            Auth::user(),
-            Request::ip()
-        );
-
-        $this->bulk_import_text = '';
-        $this->loadReviewDateInputs();
-        $this->flash_success = __('Imported :n key row(s). Sync to apply on the server.', ['n' => $created]);
-        $this->flash_error = null;
-    }
-
     public function updateKeyReviewFromInput(string $id, ServerAuthorizedKeysAuditLogger $audit): void
     {
         $date = $this->reviewDates[$id] ?? '';
@@ -391,8 +336,38 @@ class WorkspaceSshKeys extends Component
             $this->loadReviewDateInputs();
             $this->flash_success = __('authorized_keys updated on the server.');
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->flash_error = $this->friendlyWorkspaceError(
+                $e,
+                __('Dply could not connect to the server to sync authorized_keys. Check that the server SSH login user still accepts Dply\'s provisioned key.')
+            );
         }
+    }
+
+    protected function friendlyWorkspaceError(\Throwable $e, string $defaultMessage): string
+    {
+        $message = trim($e->getMessage());
+
+        if ($message === '') {
+            return $defaultMessage;
+        }
+
+        if (str_contains($message, 'Permission denied (publickey)')) {
+            return $defaultMessage.' '.__('The server rejected the SSH key for :connection.', [
+                'connection' => $this->server->getSshConnectionString(),
+            ]);
+        }
+
+        if (str_contains($message, 'Could not create script directory')) {
+            return $defaultMessage.' '.__('The server did not allow Dply to start a remote SSH task for :connection.', [
+                'connection' => $this->server->getSshConnectionString(),
+            ]);
+        }
+
+        if (str_contains($message, 'Failed to execute task:')) {
+            return $defaultMessage;
+        }
+
+        return $message;
     }
 
     public function deployOrganizationKey(OrganizationTeamSshKeyServerDeployer $deployer): void
@@ -437,58 +412,6 @@ class WorkspaceSshKeys extends Component
             $this->flash_error = $result['message'];
             $this->flash_success = null;
         }
-    }
-
-    public function exportKeysCsv(): StreamedResponse
-    {
-        $this->authorize('view', $this->server);
-        $this->server->load(['authorizedKeys']);
-        $server = $this->server;
-
-        return response()->streamDownload(function () use ($server): void {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, ['id', 'name', 'target_linux_user', 'public_key', 'sha256', 'md5', 'review_after', 'synced_at']);
-            foreach ($server->authorizedKeys as $ak) {
-                $fp = SshPublicKeyFingerprint::forLine((string) $ak->public_key);
-                fputcsv($out, [
-                    $ak->id,
-                    $ak->name,
-                    $ak->target_linux_user,
-                    $ak->public_key,
-                    $fp['sha256'] ?? '',
-                    $fp['md5'] ?? '',
-                    $ak->review_after?->toDateString() ?? '',
-                    $ak->synced_at?->toIso8601String() ?? '',
-                ]);
-            }
-            fclose($out);
-        }, 'ssh-keys-'.$server->id.'.csv', [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-        ]);
-    }
-
-    public function exportAuditCsv(): StreamedResponse
-    {
-        $this->authorize('view', $this->server);
-        $server = $this->server->fresh();
-
-        return response()->streamDownload(function () use ($server): void {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, ['id', 'created_at', 'event', 'user_id', 'ip_address', 'meta']);
-            foreach ($server->sshKeyAuditEvents()->with('user')->cursor() as $ev) {
-                fputcsv($out, [
-                    $ev->id,
-                    $ev->created_at?->toIso8601String(),
-                    $ev->event,
-                    $ev->user_id,
-                    $ev->ip_address,
-                    json_encode($ev->meta ?? [], JSON_THROW_ON_ERROR),
-                ]);
-            }
-            fclose($out);
-        }, 'ssh-key-audit-'.$server->id.'.csv', [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-        ]);
     }
 
     public function render(): View

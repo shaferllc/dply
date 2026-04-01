@@ -179,8 +179,7 @@
                 <div class="flex flex-wrap gap-2">
                     <button
                         type="button"
-                        wire:click="bulkSystemdRestart"
-                        wire:confirm="{{ __('Restart all selected services?') }}"
+                        wire:click="openConfirmActionModal('bulkSystemdRestart', [], @js(__('Restart selected services')), @js(__('Restart all selected services?')), @js(__('Restart services')), false)"
                         @disabled($systemdBulkBusy || ($systemdRowBusyUnit !== null && $systemdRowBusyUnit !== ''))
                         class="{{ $btnSecondary }}"
                     >
@@ -188,8 +187,7 @@
                     </button>
                     <button
                         type="button"
-                        wire:click="bulkSystemdStop"
-                        wire:confirm="{{ __('Stop all selected services?') }}"
+                        wire:click="openConfirmActionModal('bulkSystemdStop', [], @js(__('Stop selected services')), @js(__('Stop all selected services?')), @js(__('Stop services')), true)"
                         @disabled($systemdBulkBusy || ($systemdRowBusyUnit !== null && $systemdRowBusyUnit !== ''))
                         class="{{ $btnDanger }}"
                     >
@@ -379,8 +377,7 @@
                                     @endif
                                     <button
                                         type="button"
-                                        wire:click="runSystemdServiceAction(@js($rowUnit), 'restart')"
-                                        wire:confirm="{{ __('Restart this service?') }}"
+                                        wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'restart'], @js(__('Restart service')), @js(__('Restart this service?')), @js(__('Restart')), false)"
                                         @disabled(! $opsReady || ! $mayMutate || $otherBusy || $rowBusy)
                                         class="{{ $btnSecondary }} !shrink-0 !py-2 !text-[11px]"
                                     >
@@ -388,8 +385,7 @@
                                     </button>
                                     <button
                                         type="button"
-                                        wire:click="runSystemdServiceAction(@js($rowUnit), 'stop')"
-                                        wire:confirm="{{ __('Stop this service?') }}"
+                                        wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'stop'], @js(__('Stop service')), @js(__('Stop this service?')), @js(__('Stop')), true)"
                                         @disabled(! $opsReady || ! $mayMutate || $otherBusy || $rowBusy)
                                         class="{{ $btnDanger }} !shrink-0 !py-2 !text-[11px]"
                                     >
@@ -419,8 +415,7 @@
                                                     @if ($rowManageExtras)
                                                         <button
                                                             type="button"
-                                                            wire:click="runSystemdServiceAction(@js($rowUnit), 'reload')"
-                                                            wire:confirm="{{ __('Reload this service? Configuration is reapplied without a full restart when the unit supports reload.') }}"
+                                                            wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'reload'], @js(__('Reload service')), @js(__('Reload this service? Configuration is reapplied without a full restart when the unit supports reload.')), @js(__('Reload')), false)"
                                                             class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
                                                         >
                                                             {{ __('Reload') }}
@@ -430,8 +425,7 @@
                                                         @if ($showBootEnable)
                                                             <button
                                                                 type="button"
-                                                                wire:click="runSystemdServiceAction(@js($rowUnit), 'enable')"
-                                                                wire:confirm="{{ __('Enable this unit to start at boot?') }}"
+                                                                wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'enable'], @js(__('Enable at boot')), @js(__('Enable this unit to start at boot?')), @js(__('Enable at boot')), false)"
                                                                 class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
                                                             >
                                                                 {{ __('Enable at boot') }}
@@ -440,8 +434,7 @@
                                                         @if ($showBootDisable)
                                                             <button
                                                                 type="button"
-                                                                wire:click="runSystemdServiceAction(@js($rowUnit), 'disable')"
-                                                                wire:confirm="{{ __('Disable this unit at boot? It will not start automatically after reboot; it may keep running until stopped.') }}"
+                                                                wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'disable'], @js(__('Disable at boot')), @js(__('Disable this unit at boot? It will not start automatically after reboot; it may keep running until stopped.')), @js(__('Disable at boot')), true)"
                                                                 class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
                                                             >
                                                                 {{ __('Disable at boot') }}
@@ -482,8 +475,7 @@
                                                         <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
                                                         <button
                                                             type="button"
-                                                            wire:click="removeCustomSystemdUnit(@js($rowUnit))"
-                                                            wire:confirm="{{ __('Remove this unit from custom services?') }}"
+                                                            wire:click="openConfirmActionModal('removeCustomSystemdUnit', ['{{ $rowUnit }}'], @js(__('Remove custom unit')), @js(__('Remove this unit from custom services?')), @js(__('Remove unit')), true)"
                                                             @disabled($isDeployer)
                                                             class="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
@@ -514,6 +506,7 @@
     </div>
 
     <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
         @if ($showCustomSystemdModal)
             <div
                 class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center sm:p-6"
@@ -546,8 +539,7 @@
                                     <span>{{ $cu }}</span>
                                     <button
                                         type="button"
-                                        wire:click="removeCustomSystemdUnit(@js($cu))"
-                                        wire:confirm="{{ __('Remove this custom unit?') }}"
+                                        wire:click="openConfirmActionModal('removeCustomSystemdUnit', ['{{ $cu }}'], @js(__('Remove custom unit')), @js(__('Remove this custom unit?')), @js(__('Remove unit')), true)"
                                         class="shrink-0 text-xs font-semibold text-red-700 hover:text-red-900"
                                     >
                                         {{ __('Remove') }}

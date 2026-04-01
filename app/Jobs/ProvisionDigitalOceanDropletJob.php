@@ -4,10 +4,10 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\DigitalOceanService;
+use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
-use phpseclib3\Crypt\RSA;
 
 class ProvisionDigitalOceanDropletJob implements ShouldQueue
 {
@@ -30,13 +30,10 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
 
         $do = new DigitalOceanService($credential);
 
-        // Generate SSH key pair for this server
-        $key = RSA::createKey(2048);
-        $privateKey = $key->toString('OpenSSH');
-        $publicKey = $key->getPublicKey()->toString('OpenSSH');
+        $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
         $keyName = 'dply-'.$this->server->name.'-'.Str::random(6);
-        $doKey = $do->addSshKey($keyName, $publicKey);
+        $doKey = $do->addSshKey($keyName, $keys['recovery_public_key']);
         $sshKeyId = $doKey['id'] ?? $doKey['fingerprint'] ?? null;
         if ($sshKeyId === null) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
@@ -70,7 +67,9 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
         $this->server->update([
             'provider_id' => (string) ($droplet['id'] ?? ''),
             'status' => Server::STATUS_PROVISIONING,
-            'ssh_private_key' => $privateKey,
+            'ssh_private_key' => $keys['recovery_private_key'],
+            'ssh_recovery_private_key' => $keys['recovery_private_key'],
+            'ssh_operational_private_key' => $keys['operational_private_key'],
             'ssh_user' => config('services.digitalocean.ssh_user', 'root'),
         ]);
 

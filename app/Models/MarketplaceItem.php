@@ -27,6 +27,8 @@ class MarketplaceItem extends Model
 
     public const RECIPE_DEPLOY_COMMAND = 'deploy_command';
 
+    public const RECIPE_SERVER_RECIPE = 'server_recipe';
+
     public const RECIPE_EXTERNAL_LINK = 'external_link';
 
     protected $fillable = [

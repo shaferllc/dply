@@ -3,6 +3,7 @@
 namespace App\Livewire\Profile;
 
 use App\Http\Controllers\SessionController;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Forms\ProfileBillingForm;
 use App\Livewire\Forms\ProfileGeneralForm;
 use DateTimeZone;
@@ -15,6 +16,8 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class Edit extends Component
 {
+    use ConfirmsActionWithModal;
+
     public ProfileGeneralForm $profileForm;
 
     public ProfileBillingForm $billingForm;
@@ -123,13 +126,13 @@ class Edit extends Component
         $this->dispatch('billing-updated');
     }
 
-    public function revokeSession(string $sessionId): void
+    public function revokeSession(int|string $sessionId): void
     {
         $userId = $this->user()?->id;
         if (! $userId) {
             return;
         }
-        if ($sessionId === session()->getId()) {
+        if ((string) $sessionId === session()->getId()) {
             $this->addError('session', __('You cannot revoke your current session.'));
 
             return;
@@ -137,7 +140,7 @@ class Edit extends Component
 
         $table = config('session.table', 'sessions');
         $deleted = DB::table($table)
-            ->where('id', $sessionId)
+            ->where('id', (string) $sessionId)
             ->where('user_id', $userId)
             ->delete();
 

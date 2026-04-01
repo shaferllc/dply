@@ -41,32 +41,26 @@
             data-subscribe="{{ $cronRunEchoSubscribable ? '1' : '0' }}"
         ></div>
 
-        <x-server-workspace-tablist :aria-label="__('Cron workspace sections')">
-            <x-server-workspace-tab id="cron-tab-jobs" :active="$cron_workspace_tab === 'jobs'" wire:click="$set('cron_workspace_tab', 'jobs')">
-                {{ __('Jobs') }}
+        <div class="space-y-8">
+        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+            <p class="font-semibold">{{ __('Schedule jobs for this server') }}</p>
+            <p class="mt-1 leading-relaxed text-brand-moss">
+                {{ __('Dply writes a marked block into this server’s managed crontab. Keep the basics here: add a job, review the list, and sync when you want the server updated.') }}
+            </p>
+        </div>
+
+        <x-server-workspace-tablist :aria-label="__('Cron sections')">
+            <x-server-workspace-tab id="cron-tab-basics" :active="$cron_workspace_tab === 'jobs'" wire:click="$set('cron_workspace_tab', 'jobs')">
+                {{ __('Basics') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab id="cron-tab-run" :active="$cron_workspace_tab === 'run'" wire:click="$set('cron_workspace_tab', 'run')">
-                {{ __('Run now') }}
-            </x-server-workspace-tab>
-            <x-server-workspace-tab id="cron-tab-history" :active="$cron_workspace_tab === 'history'" wire:click="$set('cron_workspace_tab', 'history')">
-                {{ __('History') }}
-            </x-server-workspace-tab>
-            <x-server-workspace-tab id="cron-tab-templates" :active="$cron_workspace_tab === 'templates'" wire:click="$set('cron_workspace_tab', 'templates')">
-                {{ __('Templates') }}
-            </x-server-workspace-tab>
-            @if ($canUpdateOrg)
-                <x-server-workspace-tab id="cron-tab-maintenance" :active="$cron_workspace_tab === 'maintenance'" wire:click="$set('cron_workspace_tab', 'maintenance')">
-                    {{ __('Maintenance') }}
-                </x-server-workspace-tab>
-            @endif
-            <x-server-workspace-tab id="cron-tab-inspect" :active="$cron_workspace_tab === 'inspect'" wire:click="$set('cron_workspace_tab', 'inspect')">
-                {{ __('Inspect') }}
+            <x-server-workspace-tab id="cron-tab-troubleshooting" :active="$cron_workspace_tab === 'troubleshooting'" wire:click="$set('cron_workspace_tab', 'troubleshooting')">
+                {{ __('Troubleshooting') }}
             </x-server-workspace-tab>
         </x-server-workspace-tablist>
 
         <x-server-workspace-tab-panel
-            id="cron-panel-jobs"
-            labelled-by="cron-tab-jobs"
+            id="cron-panel-basics"
+            labelled-by="cron-tab-basics"
             :hidden="$cron_workspace_tab !== 'jobs'"
             panel-class="space-y-8"
         >
@@ -80,27 +74,10 @@
                     @endif
                 </h2>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                    {{ __('Entries are written into the SSH user’s crontab inside a marked block. If the run-as user differs from that account, the line uses sudo (passwordless sudo may be required).') }}
+                    {{ __('Use this form for the essentials: what should run, which user should run it, and how often. More advanced cron behavior is tucked below when you need it.') }}
                 </p>
 
                 <form id="cron-job-form" wire:submit="saveCronJob" class="mt-6 space-y-6">
-                    <div>
-                        <x-input-label for="command_preset" value="{{ __('Template') }}" />
-                        <select
-                            id="command_preset"
-                            wire:model.live="command_preset"
-                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                        >
-                            <option value="custom">{{ __('Custom — type your own command') }}</option>
-                            @foreach ($commandInstallPresets as $presetKey => $preset)
-                                <option value="{{ $presetKey }}">{{ $preset['label'] }}</option>
-                            @endforeach
-                        </select>
-                        <p class="mt-1.5 text-xs text-brand-moss">
-                            {{ __('Fills the fields below with typical commands—edit paths, domains, and users before saving.') }}
-                        </p>
-                    </div>
-
                     <div>
                         <x-input-label for="new_cron_command" value="{{ __('Command') }}" />
                         <x-text-input
@@ -219,8 +196,24 @@
                     </div>
 
                     <details class="mt-6 rounded-xl border border-brand-ink/10 bg-brand-sand/15 open:shadow-sm">
-                        <summary class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-brand-ink">{{ __('Advanced: timezone, locking, alerts, env, dependency') }}</summary>
+                        <summary class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-brand-ink">{{ __('Advanced options') }}</summary>
                         <div class="space-y-4 border-t border-brand-ink/10 px-4 py-4">
+                            <div>
+                                <x-input-label for="command_preset" value="{{ __('Starter command') }}" />
+                                <select
+                                    id="command_preset"
+                                    wire:model.live="command_preset"
+                                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                >
+                                    <option value="custom">{{ __('Custom — type your own command') }}</option>
+                                    @foreach ($commandInstallPresets as $presetKey => $preset)
+                                        <option value="{{ $presetKey }}">{{ $preset['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1.5 text-xs text-brand-moss">
+                                    {{ __('Fill the form with a common starter, then adjust paths, domains, and users before saving.') }}
+                                </p>
+                            </div>
                             <div>
                                 <x-input-label for="new_schedule_timezone" value="{{ __('Schedule timezone (export TZ before command)') }}" />
                                 <x-text-input id="new_schedule_timezone" wire:model="new_schedule_timezone" class="mt-1 block w-full font-mono text-sm" placeholder="UTC" />
@@ -301,44 +294,14 @@
                     @endif
                 </x-primary-button>
             </div>
-            @if ($canUpdateOrg)
-                <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-5 sm:px-8">
-                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Save as organization template') }}</h3>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">
-                        {{ __('Saves the command, schedule, and run-as user from the job form above. Use the Templates tab to apply or delete saved presets.') }}
-                    </p>
-                    <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-                        <div class="min-w-0 flex-1">
-                            <x-input-label for="template_save_name" value="{{ __('Template name') }}" />
-                            <input
-                                id="template_save_name"
-                                type="text"
-                                wire:model="template_save_name"
-                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist"
-                                placeholder="{{ __('e.g. Nightly database backup') }}"
-                            />
-                        </div>
-                        <button
-                            type="button"
-                            wire:click="saveOrgCronTemplate"
-                            wire:loading.attr="disabled"
-                            wire:target="saveOrgCronTemplate"
-                            class="inline-flex min-w-[8rem] shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-forest px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
-                        >
-                            <span wire:loading.remove wire:target="saveOrgCronTemplate">{{ __('Save template') }}</span>
-                            <span wire:loading wire:target="saveOrgCronTemplate" class="inline-flex items-center gap-2">
-                                <x-spinner variant="white" size="sm" />
-                                {{ __('Saving…') }}
-                            </span>
-                        </button>
-                    </div>
-                </div>
-            @endif
         </div>
 
         <div class="{{ $card }}">
             <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <h2 class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Cron jobs on this server') }}</h2>
+                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Scheduled jobs') }}</h2>
+                <p class="mt-1 text-xs text-brand-moss">
+                    {{ __('Review what is scheduled on this server, then sync after changes so the Dply-managed crontab block is updated.') }}
+                </p>
                 <div class="mt-3">
                     <x-input-label for="cron_job_search" value="{{ __('Search jobs') }}" class="sr-only" />
                     <input
@@ -437,8 +400,7 @@
                                 </button>
                                 <button
                                     type="button"
-                                    wire:click="deleteCronJob('{{ $cj->id }}')"
-                                    wire:confirm="{{ __('Delete this cron job? Sync the crontab afterward to remove it from the server.') }}"
+                                    wire:click="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)"
                                     class="rounded-lg p-2 text-red-600 hover:bg-red-50"
                                     title="{{ __('Delete') }}"
                                 >
@@ -450,20 +412,20 @@
                 </ul>
             @endif
             <p class="border-t border-brand-ink/10 px-6 py-4 text-xs text-brand-moss sm:px-8">
-                {{ __('Sync also adds Laravel scheduler lines for sites with that enabled. The document icon is the last saved run output; live output streams on the Run now tab.') }}
+                {{ __('Sync also adds Laravel scheduler lines for sites with that enabled. Use Troubleshooting below when you need manual runs, recent output, or crontab inspection.') }}
             </p>
         </div>
         </x-server-workspace-tab-panel>
 
         <x-server-workspace-tab-panel
-            id="cron-panel-run"
-            labelled-by="cron-tab-run"
-            :hidden="$cron_workspace_tab !== 'run'"
+            id="cron-panel-troubleshooting"
+            labelled-by="cron-tab-troubleshooting"
+            :hidden="$cron_workspace_tab !== 'troubleshooting'"
             panel-class="space-y-8"
         >
                 <div class="{{ $card }}">
                     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Choose a job to run') }}</h2>
+                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Run a job manually') }}</h2>
                         <p class="mt-1 text-xs text-brand-moss">
                             {{ __('Queues a one-off run over SSH (same wrapping as in crontab). Ensure queue workers are running.') }}
                         </p>
@@ -526,7 +488,7 @@
                     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                         <h2 class="text-sm font-semibold text-brand-ink">{{ __('Live output') }}</h2>
                         <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('With Reverb enabled, output streams as it arrives; otherwise the worker’s output cache is polled every second. This panel always shows status — never a blank box.') }}
+                            {{ __('Output appears here as the run progresses. This panel always shows status, so you are never left with a blank box.') }}
                         </p>
                     </div>
                     <div
@@ -558,23 +520,17 @@
 @elseif ($cron_run_id)
 <span class="inline-flex items-center gap-2">
     <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" aria-hidden="true"></span>
-    {{ __('Running…') }}
+    {{ __('Running...') }}
 </span>
 @else
-<span class="text-zinc-500">{{ __('No active run. Choose a job above and click “Run now” — output streams here.') }}</span>
+<span class="text-zinc-500">{{ __('No active run. Choose a job above and click “Run now” - output streams here.') }}</span>
 @endif</pre>
                     </div>
                 </div>
-        </x-server-workspace-tab-panel>
 
-        <x-server-workspace-tab-panel
-            id="cron-panel-history"
-            labelled-by="cron-tab-history"
-            :hidden="$cron_workspace_tab !== 'history'"
-        >
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Run history & audit') }}</h2>
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recent run history') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Recent manual and queued runs (retention :days days).', ['days' => config('cron_workspace.run_retention_days', 90)]) }}</p>
                 </div>
                 <div class="overflow-x-auto">
@@ -606,108 +562,10 @@
                     @endif
                 </div>
             </div>
-        </x-server-workspace-tab-panel>
 
-        <x-server-workspace-tab-panel
-            id="cron-panel-templates"
-            labelled-by="cron-tab-templates"
-            :hidden="$cron_workspace_tab !== 'templates'"
-        >
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Organization templates') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">
-                        {{ __('Saved command and schedule presets for this organization. Apply copies values into the job form on the Jobs tab. To create a template, fill that form and use “Save as organization template” at the bottom of the Jobs tab.') }}
-                    </p>
-                </div>
-                @if ($orgCronTemplates->isEmpty())
-                    <p class="px-6 py-8 text-sm text-brand-moss sm:px-8">
-                        {{ __('No templates yet. Go to the Jobs tab, fill in the new job form, then save it as a template using the section below that form.') }}
-                    </p>
-                @else
-                    <ul class="divide-y divide-brand-ink/10">
-                        @foreach ($orgCronTemplates as $tpl)
-                            <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-8">
-                                <div class="min-w-0">
-                                    <p class="font-medium text-brand-ink">{{ $tpl->name }}</p>
-                                    <p class="mt-1 font-mono text-xs text-brand-moss">{{ \Illuminate\Support\Str::limit($tpl->command, 100) }}</p>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button type="button" wire:click="applyOrgCronTemplate('{{ $tpl->id }}')" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink">{{ __('Apply') }}</button>
-                                    @if ($canUpdateOrg)
-                                        <button type="button" wire:click="deleteOrgCronTemplate('{{ $tpl->id }}')" wire:confirm="{{ __('Delete this template?') }}" class="rounded-lg px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">{{ __('Delete') }}</button>
-                                    @endif
-                                </div>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
-            </div>
-        </x-server-workspace-tab-panel>
-
-        @if ($canUpdateOrg)
-            <x-server-workspace-tab-panel
-                id="cron-panel-maintenance"
-                labelled-by="cron-tab-maintenance"
-                :hidden="$cron_workspace_tab !== 'maintenance'"
-            >
-                <div class="{{ $card }}">
-                    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Organization maintenance window') }}</h2>
-                        <p class="mt-1 text-xs text-brand-moss leading-relaxed">
-                            {{ __('Pauses installing managed cron lines for all servers in this organization until the chosen time. This is separate from saved job templates.') }}
-                        </p>
-                    </div>
-                    <div class="space-y-4 p-6 sm:p-8">
-                        <div>
-                            <x-input-label for="org_maintenance_until_local" value="{{ __('Until (local app timezone)') }}" />
-                            <input id="org_maintenance_until_local" type="datetime-local" wire:model="org_maintenance_until_local" class="mt-1 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm" />
-                        </div>
-                        <div>
-                            <x-input-label for="org_maintenance_note" value="{{ __('Note (optional)') }}" />
-                            <textarea id="org_maintenance_note" wire:model="org_maintenance_note" rows="2" class="mt-1 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm"></textarea>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                type="button"
-                                wire:click="saveOrgCronMaintenance"
-                                wire:loading.attr="disabled"
-                                wire:target="saveOrgCronMaintenance"
-                                class="inline-flex min-w-[8rem] items-center justify-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                            >
-                                <span wire:loading.remove wire:target="saveOrgCronMaintenance">{{ __('Save window') }}</span>
-                                <span wire:loading wire:target="saveOrgCronMaintenance" class="inline-flex items-center gap-2">
-                                    <x-spinner variant="white" size="sm" />
-                                    {{ __('Saving…') }}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="clearOrgCronMaintenance"
-                                wire:loading.attr="disabled"
-                                wire:target="clearOrgCronMaintenance"
-                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink disabled:opacity-50"
-                            >
-                                <span wire:loading.remove wire:target="clearOrgCronMaintenance">{{ __('Clear') }}</span>
-                                <span wire:loading wire:target="clearOrgCronMaintenance" class="inline-flex items-center gap-2">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Clearing…') }}
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </x-server-workspace-tab-panel>
-        @endif
-
-        <x-server-workspace-tab-panel
-            id="cron-panel-inspect"
-            labelled-by="cron-tab-inspect"
-            :hidden="$cron_workspace_tab !== 'inspect'"
-        >
-            <div class="{{ $card }}">
-                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Crontab on the server') }}</h2>
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Inspect crontab') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss leading-relaxed">
                         {{ __('Read-only: shows the real crontab file for that Linux user. Dply uses the SSH login user for “crontab -l”; other users need “sudo crontab -u … -l” (passwordless sudo).') }}
                     </p>
@@ -756,11 +614,13 @@
                 </div>
             </div>
         </x-server-workspace-tab-panel>
+        </div>
     @else
         @include('livewire.servers.partials.workspace-ops-not-ready')
     @endif
 
     <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,

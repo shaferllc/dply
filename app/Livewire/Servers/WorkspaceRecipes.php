@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use App\Models\ServerRecipe;
+use App\Models\Script;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\SshConnection;
 use Illuminate\Contracts\View\View;
@@ -16,6 +18,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceRecipes extends Component
 {
+    use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use StreamsRemoteSshLivewire;
@@ -23,6 +26,10 @@ class WorkspaceRecipes extends Component
     public string $new_recipe_name = '';
 
     public string $new_recipe_script = '';
+
+    public string $import_script_id = '';
+
+    public ?string $editing_recipe_id = null;
 
     public ?string $command_output = null;
 
@@ -40,31 +47,114 @@ class WorkspaceRecipes extends Component
             'new_recipe_name' => 'required|string|max:160',
             'new_recipe_script' => 'required|string|max:32000',
         ]);
-        ServerRecipe::query()->create([
-            'server_id' => $this->server->id,
-            'user_id' => auth()->id(),
-            'name' => $this->new_recipe_name,
-            'script' => $this->new_recipe_script,
-        ]);
-        $this->new_recipe_name = '';
-        $this->new_recipe_script = '';
-        $this->flash_success = 'Recipe saved.';
+
+        if ($this->editing_recipe_id) {
+            ServerRecipe::query()
+                ->where('server_id', $this->server->id)
+                ->whereKey($this->editing_recipe_id)
+                ->firstOrFail()
+                ->update([
+                    'name' => $this->new_recipe_name,
+                    'script' => $this->new_recipe_script,
+                ]);
+
+            $this->flash_success = 'Saved command updated.';
+        } else {
+            ServerRecipe::query()->create([
+                'server_id' => $this->server->id,
+                'user_id' => auth()->id(),
+                'name' => $this->new_recipe_name,
+                'script' => $this->new_recipe_script,
+            ]);
+
+            $this->flash_success = 'Saved command added.';
+        }
+
+        $this->resetRecipeEditor();
         $this->flash_error = null;
     }
 
-    public function deleteRecipe(int $id): void
+    public function editRecipe(string $id): void
+    {
+        $this->authorize('update', $this->server);
+
+        $recipe = ServerRecipe::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($id)
+            ->firstOrFail();
+
+        $this->editing_recipe_id = (string) $recipe->id;
+        $this->new_recipe_name = $recipe->name;
+        $this->new_recipe_script = $recipe->script;
+    }
+
+    public function cancelEditingRecipe(): void
+    {
+        $this->resetRecipeEditor();
+    }
+
+    public function deleteRecipe(string $id): void
     {
         $this->authorize('update', $this->server);
         ServerRecipe::query()->where('server_id', $this->server->id)->whereKey($id)->delete();
-        $this->flash_success = 'Recipe removed.';
+        if ($this->editing_recipe_id === $id) {
+            $this->resetRecipeEditor();
+        }
+        $this->flash_success = 'Saved command removed.';
         $this->flash_error = null;
     }
 
-    public function runRecipe(int $id): void
+    public function importOrganizationScript(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->validate([
+            'import_script_id' => 'required|string',
+        ]);
+
+        $organization = auth()->user()?->currentOrganization();
+        if (! $organization) {
+            abort(403, __('Select an organization first.'));
+        }
+
+        $script = Script::query()
+            ->where('organization_id', $organization->id)
+            ->whereKey($this->import_script_id)
+            ->firstOrFail();
+
+        ServerRecipe::query()->create([
+            'server_id' => $this->server->id,
+            'user_id' => auth()->id(),
+            'name' => $script->name,
+            'script' => $script->content,
+        ]);
+
+        $this->import_script_id = '';
+        $this->flash_success = 'Organization script copied to this server.';
+        $this->flash_error = null;
+    }
+
+    public function useRecipeAsDeployCommand(string $id): void
+    {
+        $this->authorize('update', $this->server);
+
+        $recipe = ServerRecipe::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($id)
+            ->firstOrFail();
+
+        $this->server->update([
+            'deploy_command' => trim($recipe->script) ?: null,
+        ]);
+
+        $this->flash_success = 'Saved command copied to deploy.';
+        $this->flash_error = null;
+    }
+
+    public function runRecipe(string $id): void
     {
         $this->authorize('update', $this->server);
         if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
-            $this->command_error = 'Deployers cannot run server recipes or arbitrary shell commands.';
+            $this->command_error = 'Deployers cannot run server saved commands or arbitrary shell commands.';
 
             return;
         }
@@ -77,7 +167,7 @@ class WorkspaceRecipes extends Component
             $remoteCmd = 'echo '.escapeshellarg($b64).' | base64 -d | /usr/bin/env bash 2>&1';
             $this->resetRemoteSshStreamTargets();
             $this->remoteSshStreamSetMeta(
-                __('Recipe').': '.$recipe->name,
+                __('Saved command').': '.$recipe->name,
                 $this->server->ssh_user.'@'.$this->server->ip_address.'  '.$remoteCmd
             );
             $this->command_output = $ssh->execWithCallback(
@@ -85,18 +175,32 @@ class WorkspaceRecipes extends Component
                 fn (string $chunk) => $this->remoteSshStreamAppendStdout($chunk),
                 900
             );
-            $this->flash_success = 'Recipe ran. See command output below if shown.';
+            $this->flash_success = 'Saved command ran. See command output below if shown.';
         } catch (\Throwable $e) {
             $this->command_error = $e->getMessage();
         }
+    }
+
+    protected function resetRecipeEditor(): void
+    {
+        $this->editing_recipe_id = null;
+        $this->new_recipe_name = '';
+        $this->new_recipe_script = '';
     }
 
     public function render(): View
     {
         $this->server->refresh();
         $this->server->load(['recipes']);
+        $organization = auth()->user()?->currentOrganization();
 
         return view('livewire.servers.workspace-recipes', [
+            'organizationScripts' => $organization
+                ? Script::query()
+                    ->where('organization_id', $organization->id)
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                : collect(),
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

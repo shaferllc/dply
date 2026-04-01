@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Jobs\ApplyInsightFixJob;
 use App\Jobs\RunSiteInsightsJob;
 use App\Models\InsightFinding;
@@ -16,6 +17,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceInsights extends Component
 {
+    use ConfirmsActionWithModal;
+
     public Server $server;
 
     public Site $site;

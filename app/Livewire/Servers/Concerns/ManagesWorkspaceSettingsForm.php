@@ -4,6 +4,7 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Services\Servers\ServerInventoryOsDetector;
+use App\Services\Servers\ServerSshAccessRepairer;
 use App\Services\SshConnection;
 use Illuminate\Validation\Rule;
 
@@ -106,6 +107,25 @@ trait ManagesWorkspaceSettingsForm
         $this->syncSettingsFormFromServer();
         $this->flash_success = __('Server information saved.');
         $this->flash_error = null;
+    }
+
+    public function repairSshAccess(ServerSshAccessRepairer $repairer): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->deployerCannotEditServerSettings()) {
+            $this->flash_error = __('Deployers cannot repair server SSH access.');
+
+            return;
+        }
+
+        try {
+            $repairer->repairOperationalAccess($this->server->fresh());
+            $this->server->refresh();
+            $this->flash_success = __('SSH access repaired. Dply reinstalled the operational key for this server.');
+            $this->flash_error = null;
+        } catch (\Throwable $e) {
+            $this->flash_error = $e->getMessage();
+        }
     }
 
     public function saveServerTimezone(): void

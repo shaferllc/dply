@@ -108,7 +108,7 @@
                                                 @else
                                                     <div class="flex flex-wrap justify-end gap-2">
                                                         <button type="button" wire:click="startEdit({{ $account->id }})" class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Edit') }}</button>
-                                                        <button type="button" wire:click="unlinkAccount({{ $account->id }})" wire:confirm="{{ __('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.') }}" class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">{{ __('Unlink') }}</button>
+                                                        <button type="button" wire:click="openConfirmActionModal('unlinkAccount', [{{ $account->id }}], @js(__('Unlink account')), @js(__('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.')), @js(__('Unlink')), true)" class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">{{ __('Unlink') }}</button>
                                                     </div>
                                                 @endif
                                             </td>
@@ -125,4 +125,8 @@
             </div>
         @endforelse
     </div>
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

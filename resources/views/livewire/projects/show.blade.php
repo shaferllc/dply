@@ -9,8 +9,7 @@
                 @can('delete', $workspace)
                     <button
                         type="button"
-                        wire:click="destroyWorkspace"
-                        wire:confirm="{{ __('Delete this project? Servers and sites stay in your organization; only the group is removed.') }}"
+                        wire:click="openConfirmActionModal('destroyWorkspace', [], @js(__('Delete project')), @js(__('Delete this project? Servers and sites stay in your organization; only the group is removed.')), @js(__('Delete project')), true)"
                         class="text-sm text-red-600 hover:text-red-800"
                     >
                         {{ __('Delete project') }}
@@ -713,4 +712,8 @@
             @endif
         </div>
     </div>
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

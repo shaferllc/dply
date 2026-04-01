@@ -3,7 +3,6 @@
 namespace App\Services\Servers;
 
 use App\Models\Server;
-use App\Services\SshConnection;
 
 /**
  * Lists usernames from /etc/passwd on the remote host (for UI comboboxes).
@@ -21,10 +20,12 @@ class ServerPasswdUserLister
 
         $maxLines = max(1, min(2000, $maxLines));
 
-        $ssh = new SshConnection($server);
-        $out = $ssh->exec(
-            'cut -d: -f1 /etc/passwd 2>/dev/null | sort -u | head -n '.(string) $maxLines,
-            $timeoutSeconds
+        $out = app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => $ssh->exec(
+                'cut -d: -f1 /etc/passwd 2>/dev/null | sort -u | head -n '.(string) $maxLines,
+                $timeoutSeconds
+            )
         );
 
         $lines = preg_split('/\r\n|\n|\r/', trim($out)) ?: [];

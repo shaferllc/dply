@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\User;
+use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -54,6 +56,20 @@ class ServerWorkspaceSshKeysTest extends TestCase
         ]);
     }
 
+    public function test_component_renders_simplified_sections(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertSee('New SSH key')
+            ->assertSee('Keys on this server')
+            ->assertSee('Recent audit history')
+            ->assertDontSee('Bulk import')
+            ->assertDontSee('Export CSV')
+            ->assertDontSee('Export audit CSV');
+    }
+
     public function test_delete_key_writes_audit_event(): void
     {
         [$user, $server] = $this->actingOwnerWithServer();
@@ -77,5 +93,74 @@ class ServerWorkspaceSshKeysTest extends TestCase
             'server_id' => $server->id,
             'event' => ServerSshKeyAuditEvent::EVENT_KEY_DELETED,
         ]);
+    }
+
+    public function test_invalid_public_key_is_rejected(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->set('new_auth_name', 'Broken key')
+            ->set('new_auth_key', 'not-a-valid-ssh-key')
+            ->set('new_target_linux_user', 'root')
+            ->call('addAuthorizedKey')
+            ->assertHasErrors(['new_auth_key']);
+
+        $this->assertDatabaseMissing('server_authorized_keys', [
+            'server_id' => $server->id,
+            'name' => 'Broken key',
+        ]);
+    }
+
+    public function test_review_date_update_persists_and_writes_audit_event(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $key = ServerAuthorizedKey::query()->create([
+            'server_id' => $server->id,
+            'name' => 'Existing key',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('r', 43).' review-test',
+            'target_linux_user' => '',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->set("reviewDates.{$key->id}", '2026-04-30')
+            ->call('updateKeyReviewFromInput', $key->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('server_authorized_keys', [
+            'id' => $key->id,
+            'review_after' => '2026-04-30 00:00:00',
+        ]);
+
+        $this->assertDatabaseHas('server_ssh_key_audit_events', [
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'event' => ServerSshKeyAuditEvent::EVENT_KEY_UPDATED,
+        ]);
+    }
+
+    public function test_sync_publickey_error_is_shown_as_friendly_message(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $this->mock(ServerAuthorizedKeysSynchronizer::class, function ($mock) {
+            $mock->shouldReceive('sync')
+                ->once()
+                ->andThrow(new \RuntimeException(
+                    'Failed to execute task: App\Modules\TaskRunner\AnonymousTask: Could not create script directory: dply@159.203.33.175: Permission denied (publickey).'
+                ));
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->call('syncAuthorizedKeys')
+            ->assertHasNoErrors()
+            ->assertSet(
+                'flash_error',
+                "Dply could not connect to the server to sync authorized_keys. Check that the server SSH login user still accepts Dply's provisioned key. The server rejected the SSH key for root@{$server->ip_address}."
+            );
     }
 }

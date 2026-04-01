@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Show as SitesShow;
+use App\Models\SiteDomain;
+use App\Models\SiteRelease;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -229,5 +231,78 @@ class SiteTest extends TestCase
             ->set('form.repository_path', '/var/www/app')
             ->call('store')
             ->assertHasErrors(['form.php_version']);
+    }
+
+    public function test_release_deploy_lock_uses_confirmation_modal(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+
+        cache()->put('site-deploy-active:'.$site->id, ['deployment_id' => 'abc'], 60);
+        cache()->lock('site-deploy:'.$site->id, 60)->get();
+
+        Livewire::actingAs($user)
+            ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+            ->call(
+                'openConfirmActionModal',
+                'releaseDeployLock',
+                [],
+                'Clear deploy lock',
+                'Force-clear the deploy lock? Only if no worker is actually deploying.',
+                'Clear lock',
+                true
+            )
+            ->assertSet('showConfirmActionModal', true)
+            ->assertSet('confirmActionModalMethod', 'releaseDeployLock')
+            ->call('confirmActionModal')
+            ->assertSet('flash_success', 'Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.');
+
+        $this->assertNull(cache()->get('site-deploy-active:'.$site->id));
+    }
+
+    public function test_remove_domain_can_be_confirmed_through_modal_state(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $domain = SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'www.example.test',
+            'is_primary' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+            ->call(
+                'openConfirmActionModal',
+                'removeDomain',
+                [$domain->id],
+                'Remove domain',
+                'Remove this domain?',
+                'Remove domain',
+                true
+            )
+            ->assertSet('showConfirmActionModal', true)
+            ->assertSet('confirmActionModalMethod', 'removeDomain')
+            ->call('confirmActionModal');
+
+        $this->assertDatabaseMissing('site_domains', ['id' => $domain->id]);
     }
 }

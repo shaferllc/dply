@@ -5,6 +5,7 @@ namespace App\Services\Marketplace;
 use App\Models\MarketplaceItem;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerRecipe;
 use App\Models\User;
 use App\Models\WebserverTemplate;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -60,5 +61,28 @@ class MarketplaceImportService
         }
 
         $server->update(['deploy_command' => $command]);
+    }
+
+    public function importServerRecipe(User $user, MarketplaceItem $item, Server $server): ServerRecipe
+    {
+        if ($item->recipe_type !== MarketplaceItem::RECIPE_SERVER_RECIPE) {
+            throw new \InvalidArgumentException('Invalid recipe type.');
+        }
+
+        Gate::authorize('update', $server);
+
+        $payload = $item->payload;
+        $script = trim((string) ($payload['script'] ?? ''));
+
+        if ($script === '') {
+            throw new \InvalidArgumentException('Recipe has no script.');
+        }
+
+        return ServerRecipe::query()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'name' => (string) ($payload['name'] ?? $item->name),
+            'script' => $script,
+        ]);
     }
 }

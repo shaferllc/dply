@@ -242,7 +242,7 @@
                                     </p>
                                 </div>
                                 @if (!$session['is_current'])
-                                    <button type="button" wire:click="revokeSession('{{ $session['id'] }}')" wire:confirm="{{ __('Are you sure you want to revoke this session? That device will be logged out.') }}" class="ml-4 shrink-0 inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-lg font-semibold text-xs text-white hover:bg-red-700">
+                                    <button type="button" wire:click="openConfirmActionModal('revokeSession', ['{{ $session['id'] }}'], @js(__('Revoke session')), @js(__('Are you sure you want to revoke this session? That device will be logged out.')), @js(__('Revoke')), true)" class="ml-4 shrink-0 inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-lg font-semibold text-xs text-white hover:bg-red-700">
                                         {{ __('Revoke') }}
                                     </button>
                                 @else
@@ -254,7 +254,7 @@
                         @endforelse
                     </div>
                     @if (count(array_filter($this->sessions, fn ($s) => !$s['is_current'])) > 0)
-                        <button type="button" wire:click="revokeOtherSessions" wire:confirm="{{ __('Revoke all other sessions? You will stay logged in on this device only.') }}" class="inline-flex items-center px-4 py-2 bg-white border border-brand-ink/15 rounded-lg font-semibold text-xs text-brand-ink hover:bg-brand-sand/40">
+                        <button type="button" wire:click="openConfirmActionModal('revokeOtherSessions', [], @js(__('Revoke all other sessions')), @js(__('Revoke all other sessions? You will stay logged in on this device only.')), @js(__('Revoke sessions')), true)" class="inline-flex items-center px-4 py-2 bg-white border border-brand-ink/15 rounded-lg font-semibold text-xs text-brand-ink hover:bg-brand-sand/40">
                             {{ __('Revoke all other sessions') }}
                         </button>
                     @endif
@@ -290,5 +290,9 @@
                 </div>
             </div>
         </div>
+
+        <x-slot name="modals">
+            @include('livewire.partials.confirm-action-modal')
+        </x-slot>
     </div>
 </div>

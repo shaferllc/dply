@@ -51,6 +51,84 @@ class InsightsFeatureTest extends TestCase
             ->assertOk();
     }
 
+    public function test_server_insights_page_shows_only_open_findings(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'cpu_ram_usage',
+            'dedupe_hash' => 'open',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'High CPU',
+            'body' => 'Visible finding',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'load_average_high',
+            'dedupe_hash' => 'resolved',
+            'status' => InsightFinding::STATUS_RESOLVED,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'Resolved load',
+            'body' => 'Should not be shown',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now()->subMinute(),
+            'resolved_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('servers.insights', $server))
+            ->assertOk()
+            ->assertSee('High CPU')
+            ->assertDontSee('Resolved load')
+            ->assertDontSee('Should not be shown');
+    }
+
+    public function test_server_overview_shows_open_insights_summary(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $server->update([
+            'setup_status' => Server::SETUP_STATUS_DONE,
+            'health_status' => Server::HEALTH_REACHABLE,
+        ]);
+
+        InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'metrics_missing_or_stale',
+            'dedupe_hash' => 'missing',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'Server metrics are not arriving',
+            'body' => 'No metrics snapshots have been stored.',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('servers.overview', $server))
+            ->assertOk()
+            ->assertSee('Insights')
+            ->assertSee('1 open finding')
+            ->assertSee('Server metrics are not arriving')
+            ->assertSee('Open Insights');
+    }
+
     public function test_save_settings_persists_enabled_map(): void
     {
         [$user, $server] = $this->userWithServer();
@@ -112,6 +190,53 @@ class InsightsFeatureTest extends TestCase
             'server_id' => $server->id,
             'insight_key' => 'cpu_ram_usage',
             'status' => InsightFinding::STATUS_OPEN,
+        ]);
+    }
+
+    public function test_run_server_insights_job_records_missing_metrics_finding_when_no_snapshots_exist(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        Bus::dispatchSync(new RunServerInsightsJob($server->id));
+
+        $this->assertDatabaseHas('insight_findings', [
+            'server_id' => $server->id,
+            'insight_key' => 'metrics_missing_or_stale',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+        ]);
+    }
+
+    public function test_run_server_insights_job_records_health_check_url_missing_finding_for_hosting_server(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+            'ssl_status' => Site::SSL_ACTIVE,
+        ]);
+
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now(),
+            'payload' => [
+                'cpu_pct' => 10,
+                'mem_pct' => 10,
+                'disk_pct' => 10,
+                'load_1m' => 0.5,
+            ],
+        ]);
+
+        Bus::dispatchSync(new RunServerInsightsJob($server->id));
+
+        $this->assertDatabaseHas('insight_findings', [
+            'server_id' => $server->id,
+            'insight_key' => 'health_check_url_missing',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
         ]);
     }
 

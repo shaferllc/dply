@@ -26,9 +26,7 @@ class ServerCronSynchronizer
         $schedBegin = '# BEGIN DPLY LARAVEL SCHEDULER';
         $schedEnd = '# END DPLY LARAVEL SCHEDULER';
 
-        $ssh = new SshConnection($server);
-        $current = $ssh->exec('crontab -l 2>/dev/null || true', 30);
-
+        $current = $this->readCurrentCrontab($server);
         $before = $this->stripManagedBlock($current, $markerBegin, $markerEnd);
         $before = $this->stripManagedBlock($before, $schedBegin, $schedEnd);
         $before = rtrim($before)."\n\n";
@@ -61,12 +59,7 @@ class ServerCronSynchronizer
         $schedBlock = $this->buildLaravelSchedulerBlock($server);
 
         $newCrontab = $before.$block.$schedBlock;
-        $tmp = '/tmp/dply_crontab_'.bin2hex(random_bytes(6));
-        $ssh->putFile($tmp, $newCrontab);
-        $out = $ssh->exec(
-            'crontab '.escapeshellarg($tmp).' 2>&1; ec=$?; rm -f '.escapeshellarg($tmp).'; echo DPLY_CRON_EXIT:$ec',
-            60
-        );
+        $out = $this->writeCrontab($server, $newCrontab);
         $ok = (bool) preg_match('/DPLY_CRON_EXIT:0\s*$/', $out);
 
         foreach ($jobs as $job) {
@@ -77,6 +70,70 @@ class ServerCronSynchronizer
         }
 
         return $out;
+    }
+
+    protected function readCurrentCrontab(Server $server): string
+    {
+        $lastError = null;
+
+        foreach ($this->sshLoginCandidates($server) as $loginUser) {
+            try {
+                $ssh = $this->makeConnection($server, $loginUser);
+                $command = $loginUser === 'root' && trim((string) $server->ssh_user) !== 'root'
+                    ? 'crontab -u '.escapeshellarg((string) $server->ssh_user).' -l 2>/dev/null || true'
+                    : 'crontab -l 2>/dev/null || true';
+                $output = $ssh->exec($command, 30);
+                $ssh->disconnect();
+
+                return $output;
+            } catch (\Throwable $e) {
+                $lastError = $e;
+            }
+        }
+
+        throw $lastError ?? new \RuntimeException('SSH connection failed for all cron login candidates.');
+    }
+
+    protected function writeCrontab(Server $server, string $newCrontab): string
+    {
+        $lastError = null;
+        $sshUser = trim((string) $server->ssh_user) ?: 'root';
+
+        foreach ($this->sshLoginCandidates($server) as $loginUser) {
+            $tmp = '/tmp/dply_crontab_'.bin2hex(random_bytes(6));
+
+            try {
+                $ssh = $this->makeConnection($server, $loginUser);
+                $ssh->putFile($tmp, $newCrontab);
+                $installCommand = $loginUser === 'root' && $sshUser !== 'root'
+                    ? 'crontab -u '.escapeshellarg($sshUser).' '.escapeshellarg($tmp).' 2>&1; ec=$?; rm -f '.escapeshellarg($tmp).'; echo DPLY_CRON_EXIT:$ec'
+                    : 'crontab '.escapeshellarg($tmp).' 2>&1; ec=$?; rm -f '.escapeshellarg($tmp).'; echo DPLY_CRON_EXIT:$ec';
+                $output = $ssh->exec($installCommand, 60);
+                $ssh->disconnect();
+
+                return $output;
+            } catch (\Throwable $e) {
+                $lastError = $e;
+            }
+        }
+
+        throw $lastError ?? new \RuntimeException('SSH connection failed for all cron login candidates.');
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function sshLoginCandidates(Server $server): array
+    {
+        $deploy = trim((string) $server->ssh_user) ?: 'root';
+        $useRoot = (bool) config('server_cron.use_root_ssh', true);
+        $fallback = (bool) config('server_cron.fallback_to_deploy_user_ssh', true);
+
+        if (! $useRoot || $deploy === 'root') {
+            return [$deploy];
+        }
+
+        return $fallback ? ['root', $deploy] : ['root'];
     }
 
     protected function stripManagedBlock(string $crontab, string $begin, string $end): string
@@ -109,5 +166,14 @@ class ServerCronSynchronizer
         $lines .= "# END DPLY LARAVEL SCHEDULER\n";
 
         return $lines;
+    }
+
+    protected function makeConnection(Server $server, string $loginUser): SshConnection
+    {
+        $role = $loginUser === 'root'
+            ? SshConnection::ROLE_RECOVERY
+            : SshConnection::ROLE_OPERATIONAL;
+
+        return new SshConnection($server, $loginUser, $role);
     }
 }

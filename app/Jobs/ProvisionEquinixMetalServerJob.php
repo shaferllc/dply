@@ -4,9 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\EquinixMetalService;
+use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use phpseclib3\Crypt\RSA;
 
 class ProvisionEquinixMetalServerJob implements ShouldQueue
 {
@@ -29,12 +29,10 @@ class ProvisionEquinixMetalServerJob implements ShouldQueue
 
         $metal = new EquinixMetalService($credential);
 
-        $key = RSA::createKey(2048);
-        $privateKey = $key->toString('OpenSSH');
-        $publicKey = $key->getPublicKey()->toString('OpenSSH');
+        $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
         $sshKeyLabel = 'dply-'.$this->server->id.'-'.substr(uniqid(), -6);
-        $sshKeyId = $metal->createSshKey($sshKeyLabel, $publicKey);
+        $sshKeyId = $metal->createSshKey($sshKeyLabel, $keys['recovery_public_key']);
 
         $os = config('services.equinix_metal.default_os', 'ubuntu_22_04');
 
@@ -49,7 +47,9 @@ class ProvisionEquinixMetalServerJob implements ShouldQueue
         $this->server->update([
             'provider_id' => $id,
             'status' => Server::STATUS_PROVISIONING,
-            'ssh_private_key' => $privateKey,
+            'ssh_private_key' => $keys['recovery_private_key'],
+            'ssh_recovery_private_key' => $keys['recovery_private_key'],
+            'ssh_operational_private_key' => $keys['operational_private_key'],
             'ssh_user' => config('services.equinix_metal.ssh_user', 'root'),
         ]);
 

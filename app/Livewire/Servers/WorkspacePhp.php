@@ -16,6 +16,10 @@ class WorkspacePhp extends Component
 {
     use InteractsWithServerWorkspace;
 
+    public ?string $remote_output = null;
+
+    public ?string $remote_error = null;
+
     public bool $phpConfigEditorOpen = false;
 
     public ?string $phpConfigEditorVersion = null;
@@ -38,9 +42,16 @@ class WorkspacePhp extends Component
 
         $this->flash_success = null;
         $this->flash_error = null;
+        $this->remote_error = null;
+        $this->remote_output = __('Running PHP :action for version :version on the server…', [
+            'action' => str_replace('_', ' ', $action),
+            'version' => $version,
+        ]);
 
         if (! $this->serverOpsReady()) {
             $this->flash_error = __('Provisioning and SSH must be ready before managing PHP packages.');
+            $this->remote_error = $this->flash_error;
+            $this->remote_output = null;
 
             return;
         }
@@ -51,14 +62,18 @@ class WorkspacePhp extends Component
 
             if (($result['status'] ?? null) === 'stale') {
                 $this->flash_error = $result['message'] ?? __('PHP inventory may be stale.');
+                $this->remote_error = $this->flash_error;
+                $this->remote_output = $result['output'] ?? $this->remote_output;
 
                 return;
             }
 
             $this->flash_success = $result['message'] ?? __('PHP action completed.');
+            $this->remote_output = $result['output'] ?? $this->remote_output;
         } catch (\Throwable $e) {
             $this->server->refresh();
             $this->flash_error = $e->getMessage();
+            $this->remote_error = $e->getMessage();
         }
     }
 
@@ -68,9 +83,13 @@ class WorkspacePhp extends Component
 
         $this->flash_success = null;
         $this->flash_error = null;
+        $this->remote_error = null;
+        $this->remote_output = __('Refreshing PHP inventory on the server…');
 
         if (! $this->serverOpsReady()) {
             $this->flash_error = __('Provisioning and SSH must be ready before refreshing PHP inventory.');
+            $this->remote_error = $this->flash_error;
+            $this->remote_output = null;
 
             return;
         }
@@ -81,14 +100,18 @@ class WorkspacePhp extends Component
 
             if (($result['status'] ?? null) === 'stale') {
                 $this->flash_error = $result['message'] ?? __('PHP inventory may be stale.');
+                $this->remote_error = $this->flash_error;
+                $this->remote_output = $result['output'] ?? $this->remote_output;
 
                 return;
             }
 
             $this->flash_success = $result['message'] ?? __('PHP inventory refreshed.');
+            $this->remote_output = $result['output'] ?? $this->remote_output;
         } catch (\Throwable $e) {
             $this->server->refresh();
             $this->flash_error = $e->getMessage();
+            $this->remote_error = $e->getMessage();
         }
     }
 
@@ -99,9 +122,13 @@ class WorkspacePhp extends Component
         $this->flash_success = null;
         $this->flash_error = null;
         $this->phpConfigEditorValidationOutput = null;
+        $this->remote_error = null;
+        $this->remote_output = __('Loading PHP config from the server…');
 
         if (! $this->serverOpsReady()) {
             $this->flash_error = __('Provisioning and SSH must be ready before editing PHP config.');
+            $this->remote_error = $this->flash_error;
+            $this->remote_output = null;
 
             return;
         }
@@ -116,8 +143,13 @@ class WorkspacePhp extends Component
             $this->phpConfigEditorPath = $result['path'];
             $this->phpConfigEditorContent = $result['content'];
             $this->phpConfigEditorReloadGuidance = $result['reload_guidance'] ?? null;
+            $this->remote_output = __('Loaded :label from :path', [
+                'label' => $result['label'],
+                'path' => $result['path'],
+            ]);
         } catch (\Throwable $e) {
             $this->flash_error = $e->getMessage();
+            $this->remote_error = $e->getMessage();
         }
     }
 
@@ -140,15 +172,21 @@ class WorkspacePhp extends Component
         $this->flash_success = null;
         $this->flash_error = null;
         $this->phpConfigEditorValidationOutput = null;
+        $this->remote_error = null;
+        $this->remote_output = __('Saving PHP config on the server…');
 
         if (! $this->serverOpsReady()) {
             $this->flash_error = __('Provisioning and SSH must be ready before editing PHP config.');
+            $this->remote_error = $this->flash_error;
+            $this->remote_output = null;
 
             return;
         }
 
         if ($this->phpConfigEditorVersion === null || $this->phpConfigEditorTarget === null) {
             $this->flash_error = __('Choose a PHP config target before saving.');
+            $this->remote_error = $this->flash_error;
+            $this->remote_output = null;
 
             return;
         }
@@ -164,11 +202,15 @@ class WorkspacePhp extends Component
             $this->flash_success = $result['message'] ?? __('PHP config saved.');
             $this->phpConfigEditorReloadGuidance = $result['reload_guidance'] ?? null;
             $this->phpConfigEditorValidationOutput = $result['verification_output'] ?? null;
+            $this->remote_output = $result['output'] ?? $this->phpConfigEditorValidationOutput ?? $this->remote_output;
         } catch (ServerPhpConfigValidationException $e) {
             $this->flash_error = $e->getMessage();
             $this->phpConfigEditorValidationOutput = $e->validationOutput();
+            $this->remote_error = $e->getMessage();
+            $this->remote_output = $e->validationOutput();
         } catch (\Throwable $e) {
             $this->flash_error = $e->getMessage();
+            $this->remote_error = $e->getMessage();
         }
     }
 
@@ -198,7 +240,10 @@ class WorkspacePhp extends Component
             'phpInventoryStale' => ($refreshMeta['status'] ?? null) === 'stale',
             'phpInventoryRefreshError' => is_string($refreshMeta['error'] ?? null) ? $refreshMeta['error'] : null,
             'phpEnvironmentUnsupported' => array_key_exists('supported', $inventoryMeta) && ($inventoryMeta['supported'] === false),
-            'phpInventoryNeverRun' => $opsReady && $refreshMeta === [] && $inventoryMeta === [],
+            'phpInventoryNeverRun' => $opsReady
+                && $refreshMeta === []
+                && $inventoryMeta === []
+                && ((int) ($phpData['summary']['installed_count'] ?? 0) === 0),
         ]);
     }
 }

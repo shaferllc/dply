@@ -15,7 +15,7 @@ class SessionController extends Controller
      *
      * @return array<int, array{id: string, ip_address: string|null, user_agent: string|null, last_activity: int, device_label: string, is_current: bool}>
      */
-    public static function listSessionsForUser(int $userId, string $currentSessionId): array
+    public static function listSessionsForUser(int|string $userId, string $currentSessionId): array
     {
         $table = config('session.table', 'sessions');
 

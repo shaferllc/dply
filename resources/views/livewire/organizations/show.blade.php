@@ -111,7 +111,7 @@
                                     <li class="flex items-center justify-between text-sm">
                                         <span>{{ $inv->email }} ({{ $inv->role }})</span>
                                         @if ($organization->hasAdminAccess(auth()->user()))
-                                            <button type="button" wire:click="cancelInvitation({{ $inv->id }})" wire:confirm="Cancel this invitation?" class="text-red-600 hover:underline">Cancel</button>
+                                            <button type="button" wire:click="openConfirmActionModal('cancelInvitation', ['{{ $inv->id }}'], @js(__('Cancel invitation')), @js(__('Cancel this invitation?')), @js(__('Cancel invitation')), true)" class="text-red-600 hover:underline">Cancel</button>
                                         @endif
                                     </li>
                                 @endforeach
@@ -190,7 +190,7 @@
                                                 <p class="text-xs text-slate-500 mt-1">IPs: {{ implode(', ', $apiToken->allowed_ips) }}</p>
                                             @endif
                                         </div>
-                                        <button type="button" wire:click="revokeApiToken({{ $apiToken->id }})" wire:confirm="Revoke this token? It will stop working immediately." class="text-red-600 hover:underline text-sm">Revoke</button>
+                                        <button type="button" wire:click="openConfirmActionModal('revokeApiToken', ['{{ $apiToken->id }}'], @js(__('Revoke API token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)" class="text-red-600 hover:underline text-sm">Revoke</button>
                                     </li>
                                 @endforeach
                             </ul>
@@ -249,7 +249,7 @@
                                             </div>
                                             <div class="flex gap-2">
                                                 <button type="button" wire:click="toggleOutboundIntegration({{ $hook->id }})" class="text-slate-600 hover:underline text-xs">Toggle</button>
-                                                <button type="button" wire:click="deleteOutboundIntegration(@js($hook->id))" wire:confirm="Remove this integration?" class="text-red-600 hover:underline text-xs">Remove</button>
+                                                <button type="button" wire:click="openConfirmActionModal('deleteOutboundIntegration', ['{{ $hook->id }}'], @js(__('Remove integration')), @js(__('Remove this integration?')), @js(__('Remove')), true)" class="text-red-600 hover:underline text-xs">Remove</button>
                                             </div>
                                         </li>
                                     @endforeach
@@ -292,7 +292,7 @@
                                         </div>
                                         @if ($organization->hasAdminAccess(auth()->user()))
                                             <div class="flex gap-2 shrink-0">
-                                                <button type="button" wire:click="deleteTeam({{ $team->id }})" wire:confirm="Remove this team?" class="text-red-600 hover:underline text-sm">Delete</button>
+                                                <button type="button" wire:click="openConfirmActionModal('deleteTeam', ['{{ $team->id }}'], @js(__('Delete team')), @js(__('Remove this team?')), @js(__('Delete')), true)" class="text-red-600 hover:underline text-sm">Delete</button>
                                             </div>
                                         @endif
                                     </div>
@@ -361,5 +361,9 @@
             </div>
             </div>
         </x-organization-shell>
+
+        <x-slot name="modals">
+            @include('livewire.partials.confirm-action-modal')
+        </x-slot>
     </div>
 </div>

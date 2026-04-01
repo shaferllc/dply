@@ -14,6 +14,8 @@ use Livewire\Attributes\Computed;
 
 trait ManagesNotificationChannels
 {
+    use ConfirmsActionWithModal;
+
     public string $new_type = NotificationChannel::TYPE_SLACK;
 
     public string $new_label = '';

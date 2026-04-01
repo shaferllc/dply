@@ -10,11 +10,16 @@ use phpseclib3\Net\SSH2;
 
 class SshConnection implements RemoteShell
 {
+    public const ROLE_OPERATIONAL = 'operational';
+
+    public const ROLE_RECOVERY = 'recovery';
+
     protected ?SSH2 $ssh = null;
 
     public function __construct(
         protected Server $server,
         protected ?string $loginUsername = null,
+        protected string $credentialRole = self::ROLE_OPERATIONAL,
     ) {}
 
     /**
@@ -50,8 +55,10 @@ class SshConnection implements RemoteShell
 
         $this->ssh = new SSH2($host, $port, $timeout);
 
-        if ($this->server->ssh_private_key) {
-            $key = PublicKeyLoader::load($this->server->ssh_private_key);
+        $privateKey = $this->privateKeyForConnection();
+
+        if ($privateKey) {
+            $key = PublicKeyLoader::load($privateKey);
             if (! $this->ssh->login($user, $key)) {
                 $this->ssh = null;
 
@@ -140,13 +147,14 @@ class SshConnection implements RemoteShell
         $host = $this->server->ip_address;
         $port = (int) $this->server->ssh_port;
         $user = $this->effectiveUsername();
+        $privateKey = $this->privateKeyForConnection();
 
-        if (empty($host) || $host === '0.0.0.0' || ! $this->server->ssh_private_key) {
+        if (empty($host) || $host === '0.0.0.0' || ! $privateKey) {
             throw new \RuntimeException('SSH connection failed for server: '.$this->server->name);
         }
 
         $sftp = new SFTP($host, $port, $timeoutSeconds);
-        $key = PublicKeyLoader::load($this->server->ssh_private_key);
+        $key = PublicKeyLoader::load($privateKey);
         if (! $sftp->login($user, $key)) {
             throw new \RuntimeException('SFTP login failed for server: '.$this->server->name);
         }
@@ -185,5 +193,13 @@ class SshConnection implements RemoteShell
     public function isConnected(): bool
     {
         return $this->ssh !== null;
+    }
+
+    protected function privateKeyForConnection(): ?string
+    {
+        return match ($this->credentialRole) {
+            self::ROLE_RECOVERY => $this->server->recoverySshPrivateKey(),
+            default => $this->server->operationalSshPrivateKey(),
+        };
     }
 }

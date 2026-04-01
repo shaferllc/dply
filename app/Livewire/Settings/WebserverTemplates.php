@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\Organization;
 use App\Models\WebserverTemplate;
 use App\Services\Webserver\NginxConfigSyntaxTester;
@@ -14,6 +15,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WebserverTemplates extends Component
 {
+    use ConfirmsActionWithModal;
+
     public Organization $organization;
 
     public string $label = '';
@@ -119,7 +122,7 @@ NGINX;
         $this->cancelEdit();
     }
 
-    public function delete(int $id): void
+    public function delete(int|string $id): void
     {
         $this->authorize('update', $this->organization);
 

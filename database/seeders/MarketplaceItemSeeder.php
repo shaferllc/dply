@@ -144,6 +144,64 @@ NGINX
                 'sort_order' => 60,
             ],
             [
+                'slug' => 'server-disk-usage-summary',
+                'name' => 'Disk usage summary',
+                'summary' => __('A server-local diagnostic runbook for filesystem usage and large app directories.', []),
+                'category' => MarketplaceItem::CATEGORY_SERVERS,
+                'recipe_type' => MarketplaceItem::RECIPE_SERVER_RECIPE,
+                'payload' => [
+                    'name' => 'Disk usage summary',
+                    'script' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+df -hT
+echo "---"
+du -sh /var/www/* 2>/dev/null || true
+SH,
+                ],
+                'sort_order' => 65,
+            ],
+            [
+                'slug' => 'server-nginx-test-and-reload',
+                'name' => 'Nginx: test config and reload',
+                'summary' => __('A server-local maintenance command for validating nginx config before reloading it.', []),
+                'category' => MarketplaceItem::CATEGORY_SERVERS,
+                'recipe_type' => MarketplaceItem::RECIPE_SERVER_RECIPE,
+                'payload' => [
+                    'name' => 'Nginx: test config and reload',
+                    'script' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+nginx -t
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl reload nginx
+else
+  service nginx reload
+fi
+echo "Nginx config OK and reload requested."
+SH,
+                ],
+                'sort_order' => 66,
+            ],
+            [
+                'slug' => 'server-php-version-and-modules',
+                'name' => 'PHP version and loaded extensions',
+                'summary' => __('A server-local check for the active PHP runtime and loaded modules.', []),
+                'category' => MarketplaceItem::CATEGORY_SERVERS,
+                'recipe_type' => MarketplaceItem::RECIPE_SERVER_RECIPE,
+                'payload' => [
+                    'name' => 'PHP version and loaded extensions',
+                    'script' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+php -v
+echo "---"
+php -m | sort
+SH,
+                ],
+                'sort_order' => 67,
+            ],
+            [
                 'slug' => 'guide-first-server',
                 'name' => 'Create your first server',
                 'summary' => __('Connect a provider and provision a VPS from the docs.', []),

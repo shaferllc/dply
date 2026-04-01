@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\RunServerCronJobNowJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\OrganizationCronJobTemplate;
@@ -27,6 +28,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceCron extends Component
 {
+    use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -347,7 +349,7 @@ class WorkspaceCron extends Component
         $this->server->loadMissing('organization');
         $org = $this->server->organization;
         if ($org?->cron_maintenance_until && now()->lt($org->cron_maintenance_until)) {
-            $this->flash_error = __('Cron runs are paused for this organization until the maintenance window ends. Clear it under the Maintenance tab or ask an admin.');
+            $this->flash_error = __('Cron runs are paused for this organization until the maintenance window ends. Clear the organization-level maintenance window or ask an admin.');
 
             return;
         }
@@ -567,7 +569,7 @@ class WorkspaceCron extends Component
         $this->authorize('update', $this->server);
         $this->flash_success = null;
         $this->flash_error = null;
-        $this->cron_workspace_tab = 'inspect';
+        $this->cron_workspace_tab = 'troubleshooting';
         $this->inspect_crontab_body = null;
         $this->inspect_crontab_exit_code = null;
 

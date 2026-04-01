@@ -40,7 +40,7 @@
                                 </span>
                             </button>
                         @endif
-                        <button type="button" wire:click="destroy({{ $cred->id }})" wire:confirm="{{ __('Remove this credential?') }}" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Remove') }}</button>
+                        <button type="button" wire:click="openConfirmActionModal('destroy', ['{{ $cred->id }}'], @js(__('Remove credential')), @js(__('Remove this credential?')), @js(__('Remove')), true)" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Remove') }}</button>
                     </div>
                 </li>
             @endforeach

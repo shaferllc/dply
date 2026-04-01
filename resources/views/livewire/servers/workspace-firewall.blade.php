@@ -7,7 +7,7 @@
     :server="$server"
     active="firewall"
     :title="__('Firewall')"
-    :description="__('UFW on the host: TCP/UDP ports, ICMP/ICMPv6, templates, drift check, import/export, and API access with network.* token abilities.')"
+    :description="__('Manage basic UFW access on the host with rules, presets, templates, apply, status, and recent history.')"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -21,8 +21,11 @@
                 <x-server-workspace-tab id="firewall-tab-templates" :active="$firewall_workspace_tab === 'templates'" wire:click="$set('firewall_workspace_tab', 'templates')">
                     {{ __('Templates') }}
                 </x-server-workspace-tab>
-                <x-server-workspace-tab id="firewall-tab-advanced" :active="$firewall_workspace_tab === 'advanced'" wire:click="$set('firewall_workspace_tab', 'advanced')">
-                    {{ __('Advanced') }}
+                <x-server-workspace-tab id="firewall-tab-history" :active="$firewall_workspace_tab === 'history'" wire:click="$set('firewall_workspace_tab', 'history')">
+                    {{ __('History') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="firewall-tab-audit" :active="$firewall_workspace_tab === 'audit'" wire:click="$set('firewall_workspace_tab', 'audit')">
+                    {{ __('Audit') }}
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
 
@@ -36,7 +39,7 @@
                         <div>
                             <h2 class="text-lg font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
                             <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                {{ __('Rules are stored in Dply, then applied on the server with UFW. Related/established traffic is handled by the kernel connection tracking; add explicit allows for new inbound services.') }}
+                                {{ __('Rules are stored in Dply and applied to the server with UFW. Keep this page focused on the ports and sources you actually want reachable.') }}
                             </p>
                             @if ($sshNotCovered ?? false)
                                 <p class="mt-3 rounded-lg border border-amber-300/80 bg-amber-50/90 px-3 py-2 text-sm text-amber-950">
@@ -86,38 +89,74 @@
                             <button
                                 type="button"
                                 wire:click="selectAllFirewallRules"
+                                wire:loading.attr="disabled"
                                 class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
                             >
-                                {{ __('Select all') }}
+                                <span wire:loading.remove wire:target="selectAllFirewallRules">{{ __('Select all') }}</span>
+                                <span wire:loading wire:target="selectAllFirewallRules" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Selecting…') }}
+                                </span>
                             </button>
                             <button
                                 type="button"
                                 wire:click="clearFirewallBulkSelection"
+                                wire:loading.attr="disabled"
                                 class="rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-moss hover:bg-brand-sand/30"
                             >
-                                {{ __('Clear') }}
+                                <span wire:loading.remove wire:target="clearFirewallBulkSelection">{{ __('Clear') }}</span>
+                                <span wire:loading wire:target="clearFirewallBulkSelection" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Clearing…') }}
+                                </span>
                             </button>
                             <button
                                 type="button"
                                 wire:click="bulkEnableFirewallRules"
+                                wire:loading.attr="disabled"
                                 class="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100/80"
                             >
-                                {{ __('Enable selected') }}
+                                <span wire:loading.remove wire:target="bulkEnableFirewallRules">{{ __('Enable selected') }}</span>
+                                <span wire:loading wire:target="bulkEnableFirewallRules" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Enabling…') }}
+                                </span>
                             </button>
                             <button
                                 type="button"
                                 wire:click="bulkDisableFirewallRules"
+                                wire:loading.attr="disabled"
                                 class="rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                             >
-                                {{ __('Disable selected') }}
+                                <span wire:loading.remove wire:target="bulkDisableFirewallRules">{{ __('Disable selected') }}</span>
+                                <span wire:loading wire:target="bulkDisableFirewallRules" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Disabling…') }}
+                                </span>
                             </button>
                             <button
                                 type="button"
-                                wire:click="bulkDeleteFirewallRules"
-                                wire:confirm="{{ __('Remove selected rules from the panel and try to delete matching UFW entries?') }}"
+                                wire:click="openConfirmActionModal('bulkDeleteFirewallRules', [], @js(__('Delete selected firewall rules')), @js(__('Remove selected rules from the panel and try to delete matching UFW entries?')), @js(__('Delete selected')), true)"
+                                wire:loading.attr="disabled"
                                 class="rounded-lg border border-red-200 bg-red-50/80 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100/80"
                             >
-                                {{ __('Delete selected') }}
+                                <span wire:loading.remove wire:target="bulkDeleteFirewallRules">{{ __('Delete selected') }}</span>
+                                <span wire:loading wire:target="bulkDeleteFirewallRules" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Deleting…') }}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="openConfirmActionModal('trimDuplicateFirewallRules', [], @js(__('Trim duplicate firewall rules')), @js(__('Trim exact duplicate firewall rules and keep the first copy of each?')), @js(__('Trim duplicates')), false)"
+                                wire:loading.attr="disabled"
+                                class="rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
+                            >
+                                <span wire:loading.remove wire:target="trimDuplicateFirewallRules">{{ __('Trim duplicates') }}</span>
+                                <span wire:loading wire:target="trimDuplicateFirewallRules" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Trimming…') }}
+                                </span>
                             </button>
                         </div>
                         <div class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10">
@@ -167,43 +206,43 @@
                                                 <button
                                                     type="button"
                                                     wire:click="toggleFirewallRuleEnabled('{{ $fr->id }}')"
+                                                    wire:loading.attr="disabled"
                                                     class="text-xs font-medium {{ $fr->enabled ? 'text-emerald-700 hover:underline' : 'text-brand-moss hover:underline' }}"
                                                 >
-                                                    {{ $fr->enabled ? __('Yes') : __('No') }}
+                                                    <span wire:loading.remove wire:target="toggleFirewallRuleEnabled('{{ $fr->id }}')">
+                                                        {{ $fr->enabled ? __('Yes') : __('No') }}
+                                                    </span>
+                                                    <span wire:loading wire:target="toggleFirewallRuleEnabled('{{ $fr->id }}')" class="inline-flex items-center gap-1">
+                                                        <x-spinner variant="forest" size="sm" />
+                                                        {{ __('Saving…') }}
+                                                    </span>
                                                 </button>
                                             </td>
                                             <td class="whitespace-nowrap px-4 py-3 text-right">
                                                 <div class="inline-flex flex-wrap items-center justify-end gap-2">
                                                     <button
                                                         type="button"
-                                                        wire:click="moveFirewallRuleUp('{{ $fr->id }}')"
-                                                        class="text-xs text-brand-moss hover:text-brand-ink"
-                                                        title="{{ __('Move up') }}"
-                                                    >
-                                                        ↑
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        wire:click="moveFirewallRuleDown('{{ $fr->id }}')"
-                                                        class="text-xs text-brand-moss hover:text-brand-ink"
-                                                        title="{{ __('Move down') }}"
-                                                    >
-                                                        ↓
-                                                    </button>
-                                                    <button
-                                                        type="button"
                                                         wire:click="startEditRule('{{ $fr->id }}')"
+                                                        wire:loading.attr="disabled"
                                                         class="text-xs font-medium text-brand-forest hover:underline"
                                                     >
-                                                        {{ __('Edit') }}
+                                                        <span wire:loading.remove wire:target="startEditRule('{{ $fr->id }}')">{{ __('Edit') }}</span>
+                                                        <span wire:loading wire:target="startEditRule('{{ $fr->id }}')" class="inline-flex items-center gap-1">
+                                                            <x-spinner variant="forest" size="sm" />
+                                                            {{ __('Loading…') }}
+                                                        </span>
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        wire:click="deleteFirewallRule('{{ $fr->id }}')"
-                                                        wire:confirm="{{ __('Remove this rule from the panel and try to delete the matching UFW entry?') }}"
+                                                        wire:click="openConfirmActionModal('deleteFirewallRule', ['{{ $fr->id }}'], @js(__('Delete firewall rule')), @js(__('Remove this rule from the panel and try to delete the matching UFW entry?')), @js(__('Delete rule')), true)"
+                                                        wire:loading.attr="disabled"
                                                         class="text-xs font-medium text-red-600 hover:underline"
                                                     >
-                                                        {{ __('Remove') }}
+                                                        <span wire:loading.remove wire:target="deleteFirewallRule('{{ $fr->id }}')">{{ __('Remove') }}</span>
+                                                        <span wire:loading wire:target="deleteFirewallRule('{{ $fr->id }}')" class="inline-flex items-center gap-1">
+                                                            <x-spinner variant="forest" size="sm" />
+                                                            {{ __('Removing…') }}
+                                                        </span>
                                                     </button>
                                                 </div>
                                             </td>
@@ -213,7 +252,7 @@
                             </table>
                         </div>
                     @else
-                        <p class="mt-6 text-sm text-brand-moss">{{ __('No rules yet. Add one below, use a template, or rely on provisioning defaults.') }}</p>
+                        <p class="mt-6 text-sm text-brand-moss">{{ __('No rules yet. Add one below or start from a template.') }}</p>
                     @endif
 
                     <div class="mt-8 border-t border-brand-ink/10 pt-6">
@@ -385,6 +424,15 @@
                             </div>
                         </form>
                     </div>
+
+                    @if ($ufw_status_text !== null && $ufw_status_text !== '')
+                        <div class="mt-8 overflow-hidden rounded-2xl border border-brand-ink/10">
+                            <div class="border-b border-brand-ink/10 px-5 py-3 text-sm font-medium text-brand-ink">
+                                {{ __('UFW status (verbose)') }}
+                            </div>
+                            <pre class="max-h-96 overflow-x-auto bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">{{ $ufw_status_text }}</pre>
+                        </div>
+                    @endif
                 </div>
             </x-server-workspace-tab-panel>
 
@@ -395,7 +443,7 @@
             >
                 <div class="{{ $card }} p-6 sm:p-8 space-y-8">
                     <div>
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Bundled bundles') }}</h2>
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Bundled templates') }}</h2>
                         <p class="mt-2 text-sm text-brand-moss">{{ __('Adds rules to this server’s list (does not replace existing rows).') }}</p>
                         <div class="mt-4 flex flex-wrap gap-2">
                             @foreach ($bundledTemplates as $bKey => $b)
@@ -409,25 +457,6 @@
                             @endforeach
                         </div>
                     </div>
-
-                    @if (! empty($policyPacks))
-                        <div class="border-t border-brand-ink/10 pt-8">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Policy packs') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss">{{ __('Apply multiple bundles in order (adds to the rule list; does not replace).') }}</p>
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                @foreach ($policyPacks as $packKey => $pack)
-                                    <button
-                                        type="button"
-                                        wire:click="applyPolicyPack('{{ $packKey }}')"
-                                        class="rounded-lg border border-brand-forest/30 bg-emerald-50/60 px-3 py-2 text-sm font-medium text-brand-ink hover:bg-emerald-100/60"
-                                        title="{{ $pack['description'] ?? '' }}"
-                                    >
-                                        {{ $pack['label'] ?? $packKey }}
-                                    </button>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
 
                     @if ($savedTemplates->isNotEmpty())
                         <div>
@@ -483,235 +512,71 @@
             </x-server-workspace-tab-panel>
 
             <x-server-workspace-tab-panel
-                id="firewall-panel-advanced"
-                labelled-by="firewall-tab-advanced"
-                :hidden="$firewall_workspace_tab !== 'advanced'"
-                panel-class="space-y-6"
+                id="firewall-panel-history"
+                labelled-by="firewall-tab-history"
+                :hidden="$firewall_workspace_tab !== 'history'"
             >
-                    <div class="{{ $card }} p-6 sm:p-8 space-y-6">
-                        <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Dry-run / preview') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss">{{ __('Exact shell lines that would run for enabled rules (sudo when SSH user is not root).') }}</p>
-                            <button
-                                type="button"
-                                wire:click="previewFirewallCommands"
-                                wire:loading.attr="disabled"
-                                wire:target="previewFirewallCommands"
-                                class="mt-3 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
-                            >
-                                <span wire:loading.remove wire:target="previewFirewallCommands">{{ __('Generate preview') }}</span>
-                                <span wire:loading wire:target="previewFirewallCommands">{{ __('Generating…') }}</span>
-                            </button>
-                            @if (is_array($firewall_preview_lines))
-                                @if (count($firewall_preview_lines) > 0)
-                                    <pre class="mt-4 max-h-64 overflow-x-auto rounded-xl bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">{{ implode("\n", $firewall_preview_lines) }}</pre>
-                                @else
-                                    <p class="mt-4 rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
-                                        {{ __('No enabled rules — there is nothing to apply. Enable rules on the Rules tab or add new ones.') }}
-                                    </p>
-                                @endif
-                            @endif
-                        </div>
-
-                        <div class="border-t border-brand-ink/10 pt-6">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Drift detection') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss">{{ __('Compares Dply rules to `ufw status verbose` (best-effort; app profiles may show as extras).') }}</p>
-                            <button
-                                type="button"
-                                wire:click="analyzeFirewallDrift"
-                                class="mt-3 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium"
-                            >
-                                {{ __('Analyze drift') }}
-                            </button>
-                            @if (is_array($firewall_drift))
-                                <div class="mt-4 space-y-2 text-sm">
-                                    <p class="font-medium {{ ($firewall_drift['in_sync'] ?? false) ? 'text-emerald-800' : 'text-amber-900' }}">
-                                        {{ ($firewall_drift['in_sync'] ?? false) ? __('No drift detected for matched signatures.') : __('Differences detected.') }}
-                                    </p>
-                                    @if (! empty($firewall_drift['missing_on_host'] ?? []))
-                                        <p class="text-brand-moss">{{ __('Missing on host') }}: {{ implode(', ', $firewall_drift['missing_on_host']) }}</p>
-                                    @endif
-                                    @if (! empty($firewall_drift['extra_on_host'] ?? []))
-                                        <p class="text-brand-moss">{{ __('Extra on host') }}: {{ implode(', ', $firewall_drift['extra_on_host']) }}</p>
-                                    @endif
-                                    <p class="text-xs text-brand-moss">{{ $firewall_drift['notes'] ?? '' }}</p>
-                                </div>
-                            @endif
-                        </div>
-
-                        <div class="border-t border-brand-ink/10 pt-6">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('iptables (danger zone)') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss">
-                                {{ __('Read-only snapshot of filter table counters. Enable SERVER_FIREWALL_IPTABLES_COUNTERS and prefer SSH/console access if unsure.') }}
-                                @if (config('server_firewall.docs.fail2ban'))
-                                    <a
-                                        href="{{ config('server_firewall.docs.fail2ban') }}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="font-medium text-brand-forest underline"
-                                    >fail2ban</a>
-                                @endif
-                            </p>
-                            <button
-                                type="button"
-                                wire:click="refreshFirewallIptablesSnapshot"
-                                wire:loading.attr="disabled"
-                                wire:target="refreshFirewallIptablesSnapshot"
-                                class="mt-3 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
-                            >
-                                <span wire:loading.remove wire:target="refreshFirewallIptablesSnapshot">{{ __('Fetch iptables snapshot') }}</span>
-                                <span wire:loading wire:target="refreshFirewallIptablesSnapshot">{{ __('Reading…') }}</span>
-                            </button>
-                            @if (is_string($firewall_iptables_text) && $firewall_iptables_text !== '')
-                                <pre class="mt-4 max-h-64 overflow-x-auto rounded-xl bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">{{ $firewall_iptables_text }}</pre>
-                            @endif
-                        </div>
-
-                        @if ($provider_sync_blurb)
-                            <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-4 py-3 text-sm text-brand-ink">
-                                {{ $provider_sync_blurb }}
-                            </div>
-                        @endif
-                    </div>
-
-                    <div class="{{ $card }} p-6 sm:p-8 space-y-6">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Import / export') }}</h2>
-                        <p class="text-sm text-brand-moss">{{ __('JSON for IaC backups. Import replaces all rules unless you merge manually in the file first.') }}</p>
-                        <div class="flex flex-wrap gap-2">
-                            <button type="button" wire:click="exportFirewallJson" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm">
-                                {{ __('Export to field') }}
-                            </button>
-                        </div>
-                        <form wire:submit="importFirewallJson" class="space-y-3">
-                            <textarea
-                                wire:model="firewall_import_text"
-                                rows="8"
-                                class="w-full rounded-lg border-brand-ink/15 font-mono text-xs"
-                                placeholder="{{ __('Paste exported JSON…') }}"
-                            ></textarea>
-                            <x-input-error :messages="$errors->get('firewall_import_text')" />
-                            <button type="submit" class="rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white">
-                                {{ __('Import (replace all)') }}
-                            </button>
-                        </form>
-                    </div>
-
-                    <div class="{{ $card }} p-6 sm:p-8 space-y-4">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Terraform (documentation)') }}</h2>
-                        <p class="text-sm text-brand-moss">{{ __('Cloud-style HCL for hand-off; UFW on the host remains authoritative.') }}</p>
-                        <button
-                            type="button"
-                            wire:click="exportFirewallTerraform"
-                            class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm"
-                        >
-                            {{ __('Generate snippet') }}
-                        </button>
-                        @if ($firewall_terraform_hcl !== '')
-                            <textarea
-                                readonly
-                                rows="12"
-                                class="w-full rounded-lg border-brand-ink/15 font-mono text-xs"
-                            >{{ $firewall_terraform_hcl }}</textarea>
-                        @endif
-                    </div>
-
-                    <div class="{{ $card }} p-6 sm:p-8 space-y-6">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Snapshots (rollback)') }}</h2>
-                        <form wire:submit="createFirewallSnapshot" class="flex flex-wrap items-end gap-2">
-                            <div class="grow sm:max-w-xs">
-                                <x-input-label for="snap-label" :value="__('Label (optional)')" />
-                                <x-text-input id="snap-label" type="text" class="mt-1 block w-full" wire:model="snapshot_label_input" />
-                            </div>
-                            <x-primary-button type="submit" class="!py-2">{{ __('Save snapshot') }}</x-primary-button>
-                        </form>
-                        @if ($snapshots->isNotEmpty())
-                            <ul class="space-y-2 text-sm">
-                                @foreach ($snapshots as $snap)
-                                    <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-3 py-2">
-                                        <span>{{ $snap->label ?: $snap->id }}</span>
-                                        <span class="text-xs text-brand-moss">{{ $snap->created_at?->diffForHumans() }}</span>
-                                        <button
-                                            type="button"
-                                            wire:click="restoreFirewallSnapshot('{{ $snap->id }}')"
-                                            wire:confirm="{{ __('Replace all rules on this server with this snapshot?') }}"
-                                            class="text-xs font-medium text-amber-800 hover:underline"
-                                        >
-                                            {{ __('Restore') }}
-                                        </button>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    </div>
-
-                    <div class="{{ $card }} p-6 sm:p-8 space-y-4">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Scheduled apply') }}</h2>
-                        <p class="text-sm text-brand-moss">{{ __('Queue a full apply after a delay (runs via your queue worker).') }}</p>
-                        <form wire:submit="scheduleDelayedFirewallApply" class="flex flex-wrap items-end gap-2">
-                            <div>
-                                <x-input-label for="sched-min" :value="__('Delay (minutes)')" />
-                                <x-text-input id="sched-min" type="number" wire:model="schedule_apply_delay_minutes" min="1" max="1440" class="mt-1 w-28" />
-                                <x-input-error :messages="$errors->get('schedule_apply_delay_minutes')" />
-                            </div>
-                            <x-primary-button type="submit" class="!py-2">{{ __('Queue apply') }}</x-primary-button>
-                        </form>
-                    </div>
+                <div class="{{ $card }} p-6 sm:p-8">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Apply history') }}</h2>
+                    <p class="mt-2 text-sm text-brand-moss">{{ __('Review recent firewall apply attempts and the rule set hash recorded for each run.') }}</p>
 
                     @if (isset($applyLogs) && $applyLogs->isNotEmpty())
-                        <div class="{{ $card }} p-6 sm:p-8">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Apply history') }}</h2>
-                            <ul class="mt-4 space-y-3 text-sm">
-                                @foreach ($applyLogs as $log)
-                                    <li class="border-b border-brand-ink/5 pb-3 last:border-0">
-                                        <div class="flex flex-wrap items-center justify-between gap-2">
-                                            <span class="font-medium {{ $log->success ? 'text-emerald-800' : 'text-red-700' }}">
-                                                {{ $log->success ? __('Applied') : __('Failed') }}
-                                            </span>
-                                            <span class="text-xs text-brand-moss">{{ $log->created_at?->diffForHumans() }}</span>
-                                        </div>
-                                        <p class="mt-1 font-mono text-xs text-brand-ink/80">
-                                            {{ $log->rules_hash ? substr($log->rules_hash, 0, 12).'…' : '—' }}
-                                            · {{ $log->rule_count }} {{ __('rules') }}
-                                        </p>
-                                        @if ($log->message)
-                                            <p class="mt-1 text-xs text-brand-moss">{{ \Illuminate\Support\Str::limit($log->message, 240) }}</p>
-                                        @endif
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
+                        <ul class="mt-6 space-y-3 text-sm">
+                            @foreach ($applyLogs as $log)
+                                <li class="border-b border-brand-ink/5 pb-3 last:border-0">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <span class="font-medium {{ $log->success ? 'text-emerald-800' : 'text-red-700' }}">
+                                            {{ $log->success ? __('Applied') : __('Failed') }}
+                                        </span>
+                                        <span class="text-xs text-brand-moss">{{ $log->created_at?->diffForHumans() }}</span>
+                                    </div>
+                                    <p class="mt-1 font-mono text-xs text-brand-ink/80">
+                                        {{ $log->rules_hash ? substr($log->rules_hash, 0, 12).'…' : '—' }}
+                                        · {{ $log->rule_count }} {{ __('rules') }}
+                                    </p>
+                                    @if ($log->message)
+                                        <p class="mt-1 text-xs text-brand-moss">{{ \Illuminate\Support\Str::limit($log->message, 240) }}</p>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="mt-6 text-sm text-brand-moss">{{ __('No firewall apply history yet.') }}</p>
                     @endif
+                </div>
+            </x-server-workspace-tab-panel>
+
+            <x-server-workspace-tab-panel
+                id="firewall-panel-audit"
+                labelled-by="firewall-tab-audit"
+                :hidden="$firewall_workspace_tab !== 'audit'"
+            >
+                <div class="{{ $card }} p-6 sm:p-8">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent audit') }}</h2>
+                    <p class="mt-2 text-sm text-brand-moss">{{ __('Track recent firewall changes, template applications, and apply activity for this server.') }}</p>
 
                     @if ($auditEvents->isNotEmpty())
-                        <div class="{{ $card }} p-6 sm:p-8">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent audit') }}</h2>
-                            <ul class="mt-4 space-y-2 text-sm text-brand-moss">
-                                @foreach ($auditEvents as $ev)
-                                    <li class="flex flex-wrap justify-between gap-2 border-b border-brand-ink/5 pb-2">
-                                        <span class="font-mono text-xs text-brand-ink">{{ $ev->event }}</span>
-                                        <span class="text-xs">{{ $ev->created_at?->diffForHumans() }}</span>
-                                        <span class="w-full text-xs">{{ $ev->user?->name ?? __('API') }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
+                        <ul class="mt-6 space-y-2 text-sm text-brand-moss">
+                            @foreach ($auditEvents as $ev)
+                                <li class="flex flex-wrap justify-between gap-2 border-b border-brand-ink/5 pb-2">
+                                    <span class="font-mono text-xs text-brand-ink">{{ $ev->event }}</span>
+                                    <span class="text-xs">{{ $ev->created_at?->diffForHumans() }}</span>
+                                    <span class="w-full text-xs">{{ $ev->user?->name ?? __('API') }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="mt-6 text-sm text-brand-moss">{{ __('No firewall audit events yet.') }}</p>
                     @endif
-
-                    @if ($ufw_status_text !== null && $ufw_status_text !== '')
-                        <div class="{{ $card }}">
-                            <div class="border-b border-brand-ink/10 px-5 py-3 text-sm font-medium text-brand-ink">
-                                {{ __('UFW status (verbose)') }}
-                            </div>
-                            <pre class="max-h-96 overflow-x-auto rounded-b-2xl bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">{{ $ufw_status_text }}</pre>
-                        </div>
-                    @endif
-        </x-server-workspace-tab-panel>
+                </div>
+            </x-server-workspace-tab-panel>
         </div>
     @else
         @include('livewire.servers.partials.workspace-ops-not-ready')
     @endif
 
     <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,

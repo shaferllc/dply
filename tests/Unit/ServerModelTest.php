@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -42,5 +43,11 @@ class ServerModelTest extends TestCase
         ]);
 
         $this->assertSame('root@0.0.0.0', $server->getSshConnectionString());
+    }
+
+    public function test_servers_table_has_dual_key_columns(): void
+    {
+        $this->assertTrue(Schema::hasColumn('servers', 'ssh_operational_private_key'));
+        $this->assertTrue(Schema::hasColumn('servers', 'ssh_recovery_private_key'));
     }
 }

@@ -25,6 +25,8 @@ class Index extends Component
 
     public ?string $deployModalItemId = null;
 
+    public ?string $serverRecipeModalItemId = null;
+
     public ?string $deployServerId = null;
 
     public function updatedCategory(string $value): void
@@ -52,9 +54,28 @@ class Index extends Component
         $this->deployServerId = $servers->first()->id;
     }
 
-    public function closeDeployModal(): void
+    public function openServerRecipeImport(string $itemId): void
+    {
+        $item = MarketplaceItem::query()->active()->findOrFail($itemId);
+        if ($item->recipe_type !== MarketplaceItem::RECIPE_SERVER_RECIPE) {
+            return;
+        }
+
+        $servers = $this->serversForCurrentOrg();
+        if ($servers->isEmpty()) {
+            session()->flash('error', __('Add a server to this organization before importing a saved command.'));
+
+            return;
+        }
+
+        $this->serverRecipeModalItemId = $itemId;
+        $this->deployServerId = $servers->first()->id;
+    }
+
+    public function closeServerImportModal(): void
     {
         $this->deployModalItemId = null;
+        $this->serverRecipeModalItemId = null;
         $this->deployServerId = null;
     }
 
@@ -85,8 +106,39 @@ class Index extends Component
 
         $importService->importDeployCommand($user, $item, $server);
 
-        $this->closeDeployModal();
+        $this->closeServerImportModal();
         session()->flash('success', __('Deploy command imported to :server.', ['server' => $server->name]));
+    }
+
+    public function confirmServerRecipeImport(MarketplaceImportService $importService): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        if (! $this->serverRecipeModalItemId || ! $this->deployServerId) {
+            return;
+        }
+
+        $item = MarketplaceItem::query()->active()->findOrFail($this->serverRecipeModalItemId);
+
+        $orgId = $user->currentOrganization()?->id;
+        if (! $orgId) {
+            session()->flash('error', __('Select an organization first.'));
+
+            return;
+        }
+
+        $server = Server::query()
+            ->where('organization_id', $orgId)
+            ->whereKey($this->deployServerId)
+            ->firstOrFail();
+
+        $this->authorize('update', $server);
+
+        $importService->importServerRecipe($user, $item, $server);
+
+        $this->closeServerImportModal();
+        session()->flash('success', __('Saved command imported to :server.', ['server' => $server->name]));
     }
 
     public function importWebserverTemplate(string $itemId, MarketplaceImportService $importService): void

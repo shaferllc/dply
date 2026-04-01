@@ -443,6 +443,63 @@ class ServerPhpManagerTest extends TestCase
     }
 
     #[Test]
+    public function it_allows_patch_when_remote_inventory_reports_the_detected_default_version_only(): void
+    {
+        $server = $this->makeServerWithMeta([
+            'server_role' => 'application',
+            'default_php_version' => '8.3',
+            'php_version' => '8.3',
+        ]);
+
+        $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $manager->shouldReceive('fetchRemoteInventory')
+            ->once()
+            ->andReturn([
+                'supported' => true,
+                'installed_versions' => [],
+                'detected_default_version' => '8.3',
+            ]);
+        $manager->shouldReceive('executePackageAction')
+            ->once()
+            ->withArgs(fn (Server $refreshedServer, string $action, string $version) => $refreshedServer->is($server) && $action === 'patch' && $version === '8.3');
+        $manager->shouldReceive('fetchRemoteInventory')
+            ->once()
+            ->andReturn([
+                'supported' => true,
+                'installed_versions' => [],
+                'detected_default_version' => '8.3',
+            ]);
+
+        $result = $manager->applyPackageAction($server, 'patch', '8.3');
+
+        $this->assertSame('succeeded', $result['status']);
+    }
+
+    #[Test]
+    public function the_remote_inventory_script_counts_fpm_packages_as_installed_versions(): void
+    {
+        $server = $this->makeServerWithMeta([
+            'server_role' => 'application',
+        ]);
+
+        $manager = new class extends ServerPhpManager
+        {
+            public function inventoryScript(Server $server, string $quotedVersions): string
+            {
+                return $this->privilegedShellScript($server, $quotedVersions);
+            }
+        };
+
+        $script = $manager->inventoryScript($server, "'8.3' '8.4'");
+
+        $this->assertStringContainsString('"php${version}-cli"', $script);
+        $this->assertStringContainsString('"php${version}-fpm"', $script);
+        $this->assertStringContainsString('command -v "php${version}"', $script);
+        $this->assertStringContainsString('command -v "php-fpm${version}"', $script);
+        $this->assertStringContainsString('[ -d "/etc/php/${version}" ]', $script);
+    }
+
+    #[Test]
     public function it_blocks_uninstall_when_the_version_is_used_by_a_site(): void
     {
         $server = $this->makeServerWithMeta([

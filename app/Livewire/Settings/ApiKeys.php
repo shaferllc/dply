@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
@@ -16,6 +17,8 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class ApiKeys extends Component
 {
+    use ConfirmsActionWithModal;
+
     public string $token_name = '';
 
     public ?string $token_expires_at = null;
@@ -161,7 +164,7 @@ class ApiKeys extends Component
         $this->new_token_name = null;
     }
 
-    public function revokeToken(int $apiTokenId): void
+    public function revokeToken(int|string $apiTokenId): void
     {
         $org = $this->resolvedOrganization();
         if (! $org) {

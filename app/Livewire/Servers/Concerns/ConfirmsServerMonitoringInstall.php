@@ -5,7 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use Livewire\Component;
 
 /**
- * Styled confirm modal for install_monitoring_prerequisites (replaces wire:confirm).
+ * Styled confirm modal for install_monitoring_prerequisites.
  *
  * @phpstan-require-extends Component
  */

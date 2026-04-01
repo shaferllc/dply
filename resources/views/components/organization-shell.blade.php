@@ -51,13 +51,6 @@
                 @endcan
                 @can('view', $org)
                     <a
-                        href="{{ route('organizations.daemons', $org) }}"
-                        wire:navigate
-                        @class(['block rounded-lg px-3 py-2 text-sm font-medium transition-colors', $link('daemons')])
-                    >
-                        {{ __('Supervisor (Daemons)') }}
-                    </a>
-                    <a
                         href="{{ route('organizations.webserver-templates', $org) }}"
                         wire:navigate
                         @class(['block rounded-lg px-3 py-2 text-sm font-medium transition-colors', $link('webserver')])

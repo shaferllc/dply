@@ -34,17 +34,33 @@ class ServerCronJobRunner
             throw new \RuntimeException(__('Command is empty.'));
         }
 
-        $ssh = new SshConnection($server);
-        $wrapped = 'bash -lc '.escapeshellarg($segment);
+        $lastError = null;
+        $output = '';
+        $exit = null;
 
-        if ($onOutputChunk !== null) {
-            [$output, $exit] = $ssh->execWithCallbackAndExit($wrapped, $onOutputChunk, $timeoutSeconds);
-        } else {
-            $output = $ssh->exec($wrapped, $timeoutSeconds);
-            $exit = $ssh->lastExecExitCode();
+        foreach ($this->sshLoginCandidates($server) as $loginUser) {
+            try {
+                $ssh = $this->makeConnection($server, $loginUser);
+                $wrapped = 'bash -lc '.escapeshellarg($this->commandForLoginUser($server, $segment, $loginUser));
+
+                if ($onOutputChunk !== null) {
+                    [$output, $exit] = $ssh->execWithCallbackAndExit($wrapped, $onOutputChunk, $timeoutSeconds);
+                } else {
+                    $output = $ssh->exec($wrapped, $timeoutSeconds);
+                    $exit = $ssh->lastExecExitCode();
+                }
+
+                $ssh->disconnect();
+                $lastError = null;
+                break;
+            } catch (\Throwable $e) {
+                $lastError = $e;
+            }
         }
 
-        $ssh->disconnect();
+        if ($lastError !== null) {
+            throw $lastError;
+        }
 
         $job->update([
             'last_run_at' => now(),
@@ -65,5 +81,41 @@ class ServerCronJobRunner
         }
 
         return __('Nothing was executed. The worker would run this over SSH:')."\n\n".$segment;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function sshLoginCandidates(Server $server): array
+    {
+        $deploy = trim((string) $server->ssh_user) ?: 'root';
+        $useRoot = (bool) config('server_cron.use_root_ssh', true);
+        $fallback = (bool) config('server_cron.fallback_to_deploy_user_ssh', true);
+
+        if (! $useRoot || $deploy === 'root') {
+            return [$deploy];
+        }
+
+        return $fallback ? ['root', $deploy] : ['root'];
+    }
+
+    protected function commandForLoginUser(Server $server, string $segment, string $loginUser): string
+    {
+        $sshUser = trim((string) $server->ssh_user) ?: 'root';
+
+        if ($loginUser === 'root' && $sshUser !== 'root') {
+            return 'sudo -u '.escapeshellarg($sshUser).' -H -- /bin/sh -lc '.escapeshellarg($segment);
+        }
+
+        return $segment;
+    }
+
+    protected function makeConnection(Server $server, string $loginUser): SshConnection
+    {
+        $role = $loginUser === 'root'
+            ? SshConnection::ROLE_RECOVERY
+            : SshConnection::ROLE_OPERATIONAL;
+
+        return new SshConnection($server, $loginUser, $role);
     }
 }

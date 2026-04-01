@@ -16,6 +16,8 @@ use App\Support\ServerProviderGate;
 
 trait ManagesProviderCredentials
 {
+    use ConfirmsActionWithModal;
+
     public string $do_name = '';
 
     public string $do_api_token = '';

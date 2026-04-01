@@ -243,13 +243,15 @@ class WorkspacePhpTest extends TestCase
             ->andReturn([
                 'status' => 'succeeded',
                 'message' => 'PHP inventory refreshed.',
+                'output' => "Supported environment: yes\nInstalled versions: 8.3\nDetected CLI default: 8.3",
             ]);
         $this->app->instance(ServerPhpManager::class, $manager);
 
         Livewire::actingAs($user)
             ->test(WorkspacePhp::class, ['server' => $server])
             ->call('refreshPhpInventory')
-            ->assertSet('flash_success', 'PHP inventory refreshed.');
+            ->assertSet('flash_success', 'PHP inventory refreshed.')
+            ->assertSet('remote_output', "Supported environment: yes\nInstalled versions: 8.3\nDetected CLI default: 8.3");
     }
 
     public function test_php_workspace_renders_version_rows_and_package_actions(): void
@@ -288,14 +290,46 @@ class WorkspacePhpTest extends TestCase
         $response->assertSee('Default for new sites');
         $response->assertSee('Used by 1 site');
         $response->assertSee('Install');
+        $response->assertSee('Installing…');
         $response->assertSee('Patch');
+        $response->assertSee('Patching…');
         $response->assertSee('Set CLI default');
+        $response->assertSee('Setting CLI default…');
         $response->assertSee('Set new-site default');
+        $response->assertSee('Setting new-site default…');
         $response->assertSee('Uninstall');
+        $response->assertSee('Uninstalling…');
         $response->assertSee('CLI ini');
+        $response->assertSee('Opening CLI ini…');
         $response->assertSee('FPM ini');
+        $response->assertSee('Opening FPM ini…');
         $response->assertSee('Pool config');
+        $response->assertSee('Opening pool config…');
         $response->assertSeeHtml('wire:loading.attr="disabled"');
+    }
+
+    public function test_php_workspace_falls_back_to_known_default_version_before_inventory_refresh(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_DONE,
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'meta' => [
+                'php_version' => '8.3',
+                'default_php_version' => '8.3',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+
+        $response->assertOk();
+        $response->assertSee('PHP 8.3');
+        $response->assertSee('Installed versions');
+        $response->assertSee('CLI default');
+        $response->assertDontSee('No PHP inventory yet');
     }
 
     public function test_php_workspace_can_open_a_version_config_editor_from_livewire(): void
@@ -421,6 +455,7 @@ class WorkspacePhpTest extends TestCase
                 'message' => 'FPM ini saved for PHP 8.3.',
                 'reload_guidance' => 'Reload PHP-FPM 8.3 after saving to apply these changes.',
                 'verification_output' => 'configuration file syntax is ok',
+                'output' => "configuration file syntax is ok\n\nFPM ini saved and PHP-FPM 8.3 reloaded.",
             ]);
         $this->app->instance(ServerPhpConfigEditor::class, $editor);
 
@@ -431,7 +466,8 @@ class WorkspacePhpTest extends TestCase
             ->call('savePhpConfigEditor')
             ->assertSet('flash_success', 'FPM ini saved for PHP 8.3.')
             ->assertSet('phpConfigEditorReloadGuidance', 'Reload PHP-FPM 8.3 after saving to apply these changes.')
-            ->assertSet('phpConfigEditorValidationOutput', 'configuration file syntax is ok');
+            ->assertSet('phpConfigEditorValidationOutput', 'configuration file syntax is ok')
+            ->assertSet('remote_output', "configuration file syntax is ok\n\nFPM ini saved and PHP-FPM 8.3 reloaded.");
     }
 
     public function test_php_workspace_surfaces_config_validation_failures_without_replacing_the_live_file(): void
@@ -501,6 +537,7 @@ class WorkspacePhpTest extends TestCase
             ->call('savePhpConfigEditor')
             ->assertSet('flash_error', 'CLI ini validation failed. The live file was not replaced.')
             ->assertSet('phpConfigEditorValidationOutput', 'PHP: syntax error on line 2')
+            ->assertSet('remote_output', 'PHP: syntax error on line 2')
             ->assertSet('phpConfigEditorContent', "memory_limit==512M\n");
     }
 
@@ -543,6 +580,7 @@ class WorkspacePhpTest extends TestCase
             ->andReturn([
                 'status' => 'succeeded',
                 'message' => 'PHP 8.4 installed.',
+                'output' => "Installing packages...\n\nSupported environment: yes\nInstalled versions: 8.4\nDetected CLI default: 8.4",
             ]);
         $this->app->instance(ServerPhpManager::class, $manager);
 
@@ -550,6 +588,7 @@ class WorkspacePhpTest extends TestCase
             ->test(WorkspacePhp::class, ['server' => $server])
             ->call('runPhpPackageAction', 'install', '8.4')
             ->assertSet('flash_success', 'PHP 8.4 installed.')
+            ->assertSet('remote_output', "Installing packages...\n\nSupported environment: yes\nInstalled versions: 8.4\nDetected CLI default: 8.4")
             ->assertSet('flash_error', null);
     }
 
@@ -588,6 +627,7 @@ class WorkspacePhpTest extends TestCase
             ->test(WorkspacePhp::class, ['server' => $server])
             ->call('runPhpPackageAction', 'uninstall', '8.3')
             ->assertSet('flash_error', 'PHP 8.3 is still used by 1 site.')
+            ->assertSet('remote_error', 'PHP 8.3 is still used by 1 site.')
             ->assertSet('flash_success', null);
     }
 

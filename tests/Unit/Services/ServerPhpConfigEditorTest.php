@@ -138,12 +138,16 @@ class ServerPhpConfigEditorTest extends TestCase
             ]);
         $editor->shouldReceive('replaceRemoteTarget')
             ->once();
+        $editor->shouldReceive('reloadRuntimeIfNeeded')
+            ->once()
+            ->andReturn('FPM ini saved and PHP-FPM 8.3 reloaded.');
 
         $result = $editor->saveTarget($server, '8.3', 'fpm_ini', "memory_limit=512M\n");
 
-        $this->assertSame('FPM ini saved for PHP 8.3.', $result['message']);
-        $this->assertStringContainsString('Reload PHP-FPM 8.3', $result['reload_guidance']);
+        $this->assertSame('FPM ini saved and PHP-FPM 8.3 reloaded.', $result['message']);
+        $this->assertStringContainsString('reloaded automatically', $result['reload_guidance']);
         $this->assertSame('configuration file syntax is ok', $result['verification_output']);
+        $this->assertSame("configuration file syntax is ok\n\nFPM ini saved and PHP-FPM 8.3 reloaded.", $result['output']);
     }
 
     #[Test]

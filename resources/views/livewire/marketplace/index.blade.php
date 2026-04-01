@@ -9,7 +9,7 @@
         <div class="mb-8">
             <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Marketplace') }}</h1>
             <p class="mt-2 max-w-3xl text-sm text-brand-moss">
-                {{ __('Import ready-made recipes into your organization: Nginx snippets, deploy commands, and shortcuts to guides. Inspired by control-panel marketplaces like Ploi.') }}
+                {{ __('Import curated starters into the right scope: webserver templates go to your organization, deploy starters go to Deploy on a server, and server runbooks go to Saved commands. Guides and integrations stay linked here for discovery.') }}
             </p>
         </div>
 
@@ -98,7 +98,19 @@
                                         wire:click="openDeployImport('{{ $item->id }}')"
                                         class="inline-flex items-center rounded-lg bg-brand-ink px-3 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-ink/90"
                                     >
-                                        {{ __('Import to server') }}
+                                        {{ __('Import to deploy') }}
+                                    </button>
+                                @else
+                                    <span class="text-xs text-brand-moss">{{ __('Requires a server in this organization') }}</span>
+                                @endif
+                            @elseif ($item->recipe_type === \App\Models\MarketplaceItem::RECIPE_SERVER_RECIPE)
+                                @if ($hasOrganization && $servers->isNotEmpty())
+                                    <button
+                                        type="button"
+                                        wire:click="openServerRecipeImport('{{ $item->id }}')"
+                                        class="inline-flex items-center rounded-lg bg-brand-ink px-3 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-ink/90"
+                                    >
+                                        {{ __('Import to saved commands') }}
                                     </button>
                                 @else
                                     <span class="text-xs text-brand-moss">{{ __('Requires a server in this organization') }}</span>
@@ -127,12 +139,18 @@
         @endif
     </div>
 
-    @if ($deployModalItemId)
+    @if ($deployModalItemId || $serverRecipeModalItemId)
         <div class="fixed inset-0 z-40 flex items-end justify-center sm:items-center p-4" role="dialog" aria-modal="true">
-            <button type="button" class="absolute inset-0 bg-brand-ink/40" wire:click="closeDeployModal" aria-label="{{ __('Close') }}"></button>
+            <button type="button" class="absolute inset-0 bg-brand-ink/40" wire:click="closeServerImportModal" aria-label="{{ __('Close') }}"></button>
             <div class="relative z-10 w-full max-w-md rounded-2xl border border-brand-mist bg-brand-cream p-6 shadow-xl">
-                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Import deploy command') }}</h3>
-                <p class="mt-2 text-sm text-brand-moss">{{ __('Choose which server should receive this deploy script. You can edit it later on the server page.') }}</p>
+                <h3 class="text-lg font-semibold text-brand-ink">
+                    {{ $deployModalItemId ? __('Import deploy command') : __('Import saved command') }}
+                </h3>
+                <p class="mt-2 text-sm text-brand-moss">
+                    {{ $deployModalItemId
+                        ? __('Choose which server should receive this deploy script. You can edit it later on the Deploy page.')
+                        : __('Choose which server should receive this saved command. You can run or edit it later on the Saved commands page.') }}
+                </p>
                 <div class="mt-4">
                     <label for="deploy-server" class="block text-sm font-medium text-brand-ink">{{ __('Server') }}</label>
                     <select
@@ -146,12 +164,12 @@
                     </select>
                 </div>
                 <div class="mt-6 flex justify-end gap-2">
-                    <button type="button" wire:click="closeDeployModal" class="rounded-lg px-4 py-2 text-sm font-medium text-brand-moss hover:text-brand-ink">
+                    <button type="button" wire:click="closeServerImportModal" class="rounded-lg px-4 py-2 text-sm font-medium text-brand-moss hover:text-brand-ink">
                         {{ __('Cancel') }}
                     </button>
                     <button
                         type="button"
-                        wire:click="confirmDeployImport"
+                        wire:click="{{ $deployModalItemId ? 'confirmDeployImport' : 'confirmServerRecipeImport' }}"
                         class="rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-ink/90"
                     >
                         {{ __('Import') }}

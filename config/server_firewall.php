@@ -2,6 +2,13 @@
 
 return [
 
+    /**
+     * Try root SSH first for UFW/status actions, then fall back to the configured deploy user.
+     */
+    'use_root_ssh' => (bool) env('SERVER_FIREWALL_USE_ROOT_SSH', true),
+
+    'fallback_to_deploy_user_ssh' => (bool) env('SERVER_FIREWALL_FALLBACK_TO_DEPLOY_SSH', true),
+
     /*
     |--------------------------------------------------------------------------
     | New rule form defaults
@@ -133,69 +140,10 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Policy packs (one click: merge multiple bundled templates)
-    |--------------------------------------------------------------------------
-    |
-    | Keys reference server_firewall.bundled_templates. Order is preserved.
-    |
-    */
-    'policy_packs' => [
-        'full_stack' => [
-            'label' => 'Web + PostgreSQL',
-            'description' => 'Laravel web (SSH/HTTP/HTTPS) plus PostgreSQL without duplicating SSH.',
-            'bundled_templates' => ['laravel_web', 'postgres_inbound'],
-        ],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cloud provider SG mirror (roadmap)
-    |--------------------------------------------------------------------------
-    */
-    'provider_sync' => [
-        'enabled' => filter_var(env('SERVER_FIREWALL_PROVIDER_SYNC', false), FILTER_VALIDATE_BOOL),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Optional HTTP probe after apply (queue job)
-    |--------------------------------------------------------------------------
-    */
-    'synthetic_probe' => [
-        'dispatch_after_apply' => filter_var(env('SERVER_FIREWALL_SYNTHETIC_PROBE_AFTER_APPLY', false), FILTER_VALIDATE_BOOL),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Danger zone (read-only host introspection)
-    |--------------------------------------------------------------------------
-    */
-    'danger_zone' => [
-        'iptables_counters_enabled' => filter_var(env('SERVER_FIREWALL_IPTABLES_COUNTERS', false), FILTER_VALIDATE_BOOL),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Docs / cross-links (UI copy)
     |--------------------------------------------------------------------------
     */
     'docs' => [
         'fail2ban' => 'https://github.com/fail2ban/fail2ban',
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Organization-level settings (organizations.firewall_settings JSON)
-    |--------------------------------------------------------------------------
-    |
-    | Admins edit these under Settings → Servers & Sites. Stored keys are merged
-    | with defaults; unknown keys are preserved for forward compatibility.
-    |
-    */
-    'organization_settings' => [
-        'require_second_approval' => false,
-        'notify_drift_webhook' => false,
-        'synthetic_probe_url' => null,
-    ],
-
 ];

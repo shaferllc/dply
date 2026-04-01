@@ -12,12 +12,12 @@
             <div>
                 <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Scripts') }}</h1>
                 <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-                    {{ __('Run shell scripts on your servers, edit them anytime, or start from the marketplace and customize.') }}
+                    {{ __('Keep reusable organization-wide automation here. Start from script presets, edit them anytime, and copy a script into a server only when it should become a server-local saved command.') }}
                 </p>
             </div>
             <div class="flex flex-wrap gap-2 shrink-0">
                 <a href="{{ route('scripts.marketplace') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                    {{ __('Marketplace') }}
+                    {{ __('Script presets') }}
                 </a>
                 @can('create', App\Models\Script::class)
                     <a href="{{ route('scripts.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">

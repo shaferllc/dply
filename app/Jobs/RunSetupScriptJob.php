@@ -48,7 +48,7 @@ class RunSetupScriptJob implements ShouldQueue
             $updates = [
                 'setup_status' => Server::SETUP_STATUS_DONE,
             ];
-            if ($server->openSshPublicKeyFromPrivate() !== null) {
+            if ($server->hasDedicatedOperationalSshPrivateKey()) {
                 $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
                 if ($deployUser !== '' && $deployUser !== 'root'
                     && preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $deployUser)) {

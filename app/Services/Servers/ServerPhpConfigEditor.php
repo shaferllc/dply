@@ -3,7 +3,6 @@
 namespace App\Services\Servers;
 
 use App\Models\Server;
-use App\Services\SshConnection;
 use Illuminate\Support\Facades\Cache;
 
 class ServerPhpConfigEditor
@@ -52,7 +51,7 @@ class ServerPhpConfigEditor
                 'path' => "/etc/php/{$version}/fpm/php.ini",
                 'validator' => "php-fpm{$version}",
                 'verification_label' => 'FPM ini validation',
-                'reload_guidance' => __('Reload PHP-FPM :version after saving to apply these changes.', ['version' => $version]),
+                'reload_guidance' => __('PHP-FPM :version will be reloaded automatically after saving.', ['version' => $version]),
             ],
             'pool_config' => [
                 'version' => $version,
@@ -61,7 +60,7 @@ class ServerPhpConfigEditor
                 'path' => "/etc/php/{$version}/fpm/pool.d/www.conf",
                 'validator' => "php-fpm{$version}",
                 'verification_label' => 'Pool config validation',
-                'reload_guidance' => __('Reload PHP-FPM :version after saving to apply these changes.', ['version' => $version]),
+                'reload_guidance' => __('PHP-FPM :version will be reloaded automatically after saving.', ['version' => $version]),
             ],
             default => throw new \RuntimeException('Unknown PHP config target.'),
         };
@@ -86,7 +85,7 @@ class ServerPhpConfigEditor
     }
 
     /**
-     * @return array{message: string, reload_guidance: string, verification_output: ?string}
+     * @return array{message: string, reload_guidance: string, verification_output: ?string, output?: ?string}
      */
     public function saveTarget(Server $server, string $version, string $target, string $content): array
     {
@@ -108,14 +107,19 @@ class ServerPhpConfigEditor
             $resolved = $this->resolveEditableTarget($server, $version, $target);
             $verification = $this->verifyProposedContent($server, $resolved, $content);
             $this->replaceRemoteTarget($server, $resolved, $content);
+            $reloadMessage = $this->reloadRuntimeIfNeeded($server, $resolved);
 
             return [
-                'message' => __(':label saved for PHP :version.', [
+                'message' => $reloadMessage ?? __(':label saved for PHP :version.', [
                     'label' => $resolved['label'],
                     'version' => $resolved['version'],
                 ]),
                 'reload_guidance' => $resolved['reload_guidance'],
                 'verification_output' => $verification['output'] ?? null,
+                'output' => trim(implode("\n\n", array_filter([
+                    $verification['output'] ?? null,
+                    $reloadMessage,
+                ]))) ?: null,
             ];
         } finally {
             $lock->release();
@@ -127,13 +131,10 @@ class ServerPhpConfigEditor
      */
     protected function readRemoteTarget(Server $server, array $target): string
     {
-        $ssh = new SshConnection($server);
-
-        try {
-            $output = $ssh->exec($this->buildReadScript($server, $target), 60);
-        } finally {
-            $ssh->disconnect();
-        }
+        $output = app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => $ssh->exec($this->buildReadScript($server, $target), 60)
+        );
 
         if (str_starts_with($output, '__DPLY_MISSING__')) {
             throw new \RuntimeException(__(':label is not available for PHP :version on this server.', [
@@ -151,17 +152,16 @@ class ServerPhpConfigEditor
      */
     protected function verifyProposedContent(Server $server, array $target, string $content): array
     {
-        $ssh = new SshConnection($server);
-
         try {
-            $output = $ssh->exec($this->buildValidationScript($server, $target, $content), 120);
+            $output = app(ServerSshConnectionRunner::class)->run(
+                $server,
+                fn ($ssh): string => $ssh->exec($this->buildValidationScript($server, $target, $content), 120)
+            );
         } catch (\Throwable $e) {
             throw new ServerPhpConfigValidationException(
                 __(':label validation failed. The live file was not replaced.', ['label' => $target['label']]),
                 trim($e->getMessage())
             );
-        } finally {
-            $ssh->disconnect();
         }
 
         return [
@@ -174,13 +174,38 @@ class ServerPhpConfigEditor
      */
     protected function replaceRemoteTarget(Server $server, array $target, string $content): void
     {
-        $ssh = new SshConnection($server);
+        app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($server, $target, $content): null {
+                $ssh->exec($this->buildReplaceScript($server, $target, $content), 120);
 
-        try {
-            $ssh->exec($this->buildReplaceScript($server, $target, $content), 120);
-        } finally {
-            $ssh->disconnect();
+                return null;
+            }
+        );
+    }
+
+    /**
+     * @param  array{label: string, path: string, version: string, target: string}  $target
+     */
+    protected function reloadRuntimeIfNeeded(Server $server, array $target): ?string
+    {
+        if (! in_array($target['target'], ['fpm_ini', 'pool_config'], true)) {
+            return null;
         }
+
+        app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($server, $target): null {
+                $ssh->exec($this->buildReloadScript($server, $target['version']), 120);
+
+                return null;
+            }
+        );
+
+        return __(':label saved and PHP-FPM :version reloaded.', [
+            'label' => $target['label'],
+            'version' => $target['version'],
+        ]);
     }
 
     protected function serverMutationLockKey(Server $server): string
@@ -321,6 +346,25 @@ tmp_file=\$(mktemp)
 trap 'rm -f "\$tmp_file"' EXIT
 printf '%s' {$this->shellQuote($encoded)} | base64 --decode > "\$tmp_file"
 install -m 0644 "\$tmp_file" {$targetPath}
+BASH;
+
+        return $this->withPrivilege($server, $script);
+    }
+
+    protected function buildReloadScript(Server $server, string $version): string
+    {
+        $unit = escapeshellarg('php'.$version.'-fpm');
+
+        $script = <<<BASH
+set -eu
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl reload {$unit} || systemctl restart {$unit}
+elif command -v service >/dev/null 2>&1; then
+  service {$unit} reload || service {$unit} restart
+else
+  echo "No supported service manager found to reload PHP-FPM {$version}."
+  exit 1
+fi
 BASH;
 
         return $this->withPrivilege($server, $script);

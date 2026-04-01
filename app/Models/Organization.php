@@ -107,20 +107,6 @@ class Organization extends Model
     }
 
     /**
-     * Organization firewall JSON merged with config defaults (known keys only).
-     *
-     * @return array{require_second_approval: bool, notify_drift_webhook: bool, synthetic_probe_url: ?string}
-     */
-    public function mergedFirewallSettings(): array
-    {
-        $defaults = config('server_firewall.organization_settings', []);
-        $keys = array_keys($defaults);
-        $stored = $this->firewall_settings ?? [];
-
-        return array_merge($defaults, array_intersect_key($stored, array_flip($keys)));
-    }
-
-    /**
      * Database workspace policy merged with config defaults (credential shares, import caps).
      *
      * @return array{credential_shares_enabled: bool, import_max_bytes: int|null}

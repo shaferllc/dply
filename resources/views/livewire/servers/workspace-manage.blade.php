@@ -74,8 +74,7 @@
                 @foreach ($serviceActions as $actionKey => $action)
                     <button
                         type="button"
-                        wire:click="runAllowlistedAction('{{ $actionKey }}')"
-                        wire:confirm="{{ $action['confirm'] ?? __('Run this action?') }}"
+                        wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label'] ?? $actionKey), @js($action['confirm'] ?? __('Run this action?')), @js($action['label'] ?? __('Run action')), false)"
                         @disabled(! $opsReady || $isDeployer)
                         class="{{ $btnPrimary }} w-full sm:w-auto"
                     >
@@ -96,8 +95,7 @@
                     @foreach ($dangerousActions as $actionKey => $action)
                         <button
                             type="button"
-                            wire:click="runAllowlistedAction('{{ $actionKey }}')"
-                            wire:confirm="{{ $action['confirm'] ?? __('Are you sure?') }}"
+                            wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label'] ?? $actionKey), @js($action['confirm'] ?? __('Are you sure?')), @js($action['label'] ?? __('Run action')), true)"
                             @disabled(! $opsReady || $isDeployer)
                             class="inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-red-900 hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -212,6 +210,7 @@
     </div>
 
     <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,

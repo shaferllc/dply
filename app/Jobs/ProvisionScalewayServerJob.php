@@ -4,9 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\ScalewayService;
+use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use phpseclib3\Crypt\RSA;
 
 class ProvisionScalewayServerJob implements ShouldQueue
 {
@@ -29,10 +29,8 @@ class ProvisionScalewayServerJob implements ShouldQueue
 
         $scw = new ScalewayService($credential);
 
-        $key = RSA::createKey(2048);
-        $privateKey = $key->toString('OpenSSH');
-        $publicKey = $key->getPublicKey()->toString('OpenSSH');
-        $tagValue = 'AUTHORIZED_KEY='.str_replace(' ', '_', trim($publicKey));
+        $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
+        $tagValue = 'AUTHORIZED_KEY='.str_replace(' ', '_', trim($keys['recovery_public_key']));
 
         $image = config('services.scaleway.default_image', 'ubuntu_jammy');
 
@@ -47,7 +45,9 @@ class ProvisionScalewayServerJob implements ShouldQueue
         $this->server->update([
             'provider_id' => $id,
             'status' => Server::STATUS_PROVISIONING,
-            'ssh_private_key' => $privateKey,
+            'ssh_private_key' => $keys['recovery_private_key'],
+            'ssh_recovery_private_key' => $keys['recovery_private_key'],
+            'ssh_operational_private_key' => $keys['operational_private_key'],
             'ssh_user' => config('services.scaleway.ssh_user', 'root'),
         ]);
 

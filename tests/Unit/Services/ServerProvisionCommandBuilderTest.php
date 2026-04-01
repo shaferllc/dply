@@ -8,6 +8,7 @@ use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Services\Servers\ServerProvisionCommandBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use phpseclib3\Crypt\RSA;
 use Tests\TestCase;
 
 class ServerProvisionCommandBuilderTest extends TestCase
@@ -187,5 +188,31 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringNotContainsString('already installed; skipping package install.', $joined);
         $this->assertStringNotContainsString('already installed; skipping repository setup.', $joined);
         $this->assertStringNotContainsString('already installed; skipping installer.', $joined);
+    }
+
+    public function test_build_uses_operational_public_key_for_deploy_user_bootstrap_when_present(): void
+    {
+        $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+        $recoveryKey = RSA::createKey(2048)->toString('OpenSSH');
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'ssh_private_key' => $recoveryKey,
+            'ssh_recovery_private_key' => $recoveryKey,
+            'ssh_operational_private_key' => file_get_contents($keyPath),
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $commands = app(ServerProvisionCommandBuilder::class)->build($server);
+        $joined = implode("\n", $commands);
+
+        $this->assertStringContainsString(base64_encode((string) $server->openSshPublicKeyFromOperationalPrivate()), $joined);
+        $this->assertStringNotContainsString(base64_encode((string) $server->openSshPublicKeyFromRecoveryPrivate()), $joined);
     }
 }

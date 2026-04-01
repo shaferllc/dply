@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\ExportServerDatabaseBackupJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
@@ -12,14 +13,19 @@ use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseExtraUser;
+use App\Models\NotificationSubscription;
+use App\Services\Notifications\AssignableNotificationChannels;
+use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseDriftAnalyzer;
 use App\Services\Servers\ServerDatabaseHostCapabilities;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\ServerDatabaseNotificationKeys;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -30,6 +36,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 #[Layout('layouts.app')]
 class WorkspaceDatabases extends Component
 {
+    use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use WithFileUploads;
@@ -43,6 +50,10 @@ class WorkspaceDatabases extends Component
     public string $new_db_username = '';
 
     public string $new_db_password = '';
+
+    public string $new_db_user_mode = 'new';
+
+    public string $new_db_existing_user_reference = '';
 
     public string $new_db_host = '127.0.0.1';
 
@@ -59,6 +70,9 @@ class WorkspaceDatabases extends Component
     public array $remote_postgres_databases = [];
 
     public ?string $credentials_modal_db_id = null;
+
+    /** @var array{name: string, engine: string, username: string, password: string, password_generated: bool, username_generated: bool}|null */
+    public ?array $generated_database_credentials = null;
 
     public bool $db_engine_default_applied = false;
 
@@ -88,6 +102,16 @@ class WorkspaceDatabases extends Component
 
     public int $share_max_views;
 
+    public ?string $share_link_modal_url = null;
+
+    public ?string $share_link_modal_db_name = null;
+
+    /** @var array<string, array{created: bool, removed: bool}> */
+    public array $databaseAlertMatrix = [];
+
+    /** @var list<array{id: string, label: string}> */
+    public array $databaseAlertChannelRows = [];
+
     /** @var array<string, mixed>|null */
     public ?array $drift_snapshot = null;
 
@@ -109,6 +133,7 @@ class WorkspaceDatabases extends Component
             $this->admin_postgres_superuser = $ac->postgres_superuser;
             $this->admin_postgres_use_sudo = $ac->postgres_use_sudo;
         }
+        $this->loadDatabaseAlertMatrix();
     }
 
     public function refreshDatabaseCapabilities(ServerDatabaseHostCapabilities $capabilities): void
@@ -122,13 +147,21 @@ class WorkspaceDatabases extends Component
 
     public function setWorkspaceTab(string $tab): void
     {
-        $allowed = ['databases', 'users', 'admin', 'drift', 'activity', 'tools'];
+        $allowed = ['databases', 'advanced'];
         $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'databases';
     }
 
     public function generateNewDbPassword(): void
     {
         $this->new_db_password = Str::password(24);
+    }
+
+    public function updatedNewDbEngine(string $value): void
+    {
+        if ($value !== 'mysql') {
+            $this->new_db_user_mode = 'new';
+            $this->new_db_existing_user_reference = '';
+        }
     }
 
     public function openCredentialsModal(string $databaseId): void
@@ -144,6 +177,70 @@ class WorkspaceDatabases extends Component
     public function closeCredentialsModal(): void
     {
         $this->credentials_modal_db_id = null;
+    }
+
+    public function dismissGeneratedDatabaseCredentials(): void
+    {
+        $this->generated_database_credentials = null;
+    }
+
+    public function closeShareLinkModal(): void
+    {
+        $this->share_link_modal_url = null;
+        $this->share_link_modal_db_name = null;
+    }
+
+    public function saveDatabaseAlertPreferences(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer()) {
+            $this->flash_error = __('Deployers cannot change notification routing.');
+
+            return;
+        }
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        $channels = AssignableNotificationChannels::forUser($user, $user->currentOrganization());
+        $allowedIds = $channels->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+        DB::transaction(function () use ($channels, $allowedIds): void {
+            foreach ($channels as $channel) {
+                $cid = (string) $channel->id;
+                if (! in_array($cid, $allowedIds, true)) {
+                    continue;
+                }
+
+                $row = $this->databaseAlertMatrix[$cid] ?? [];
+                foreach (ServerDatabaseNotificationKeys::KINDS as $kind) {
+                    $wanted = (bool) ($row[$kind] ?? false);
+                    $eventKey = ServerDatabaseNotificationKeys::eventKey($kind);
+                    $q = NotificationSubscription::query()
+                        ->where('notification_channel_id', $channel->id)
+                        ->where('subscribable_type', Server::class)
+                        ->where('subscribable_id', $this->server->id)
+                        ->where('event_key', $eventKey);
+
+                    if ($wanted) {
+                        NotificationSubscription::query()->firstOrCreate([
+                            'notification_channel_id' => $channel->id,
+                            'subscribable_type' => Server::class,
+                            'subscribable_id' => $this->server->id,
+                            'event_key' => $eventKey,
+                        ]);
+                    } else {
+                        $q->delete();
+                    }
+                }
+            }
+        });
+
+        $this->flash_success = __('Database notification routing updated.');
+        $this->flash_error = null;
+        $this->loadDatabaseAlertMatrix();
     }
 
     public function saveAdminCredentials(
@@ -347,7 +444,9 @@ class WorkspaceDatabases extends Component
             'server_database_id' => $db->id,
         ], auth()->user());
 
-        $this->flash_success = __('Share link created. Copy it now: :url', ['url' => $url]);
+        $this->share_link_modal_url = $url;
+        $this->share_link_modal_db_name = $db->name;
+        $this->flash_success = __('Share link created.');
     }
 
     public function queueExport(string $databaseId, ServerDatabaseAuditLogger $auditLogger): void
@@ -483,9 +582,11 @@ class WorkspaceDatabases extends Component
 
             return;
         }
-        $this->workspace_tab = 'databases';
+        $this->workspace_tab = 'advanced';
         $this->new_db_name = $name;
         $this->new_db_engine = $engine;
+        $this->new_db_user_mode = 'new';
+        $this->new_db_existing_user_reference = '';
         $this->new_db_username = '';
         $this->new_db_password = '';
     }
@@ -494,6 +595,7 @@ class WorkspaceDatabases extends Component
         ServerDatabaseProvisioner $provisioner,
         ServerDatabaseHostCapabilities $capabilities,
         ServerDatabaseAuditLogger $auditLogger,
+        ServerDatabaseNotificationDispatcher $notificationDispatcher,
     ): void {
         $this->authorize('update', $this->server);
         $this->new_db_username = trim($this->new_db_username);
@@ -517,13 +619,20 @@ class WorkspaceDatabases extends Component
             'new_db_description' => 'nullable|string|max:2000',
             'new_mysql_charset' => 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/',
             'new_mysql_collation' => 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/',
+            'new_db_user_mode' => 'required|in:new,existing',
+            'new_db_existing_user_reference' => 'nullable|string|max:100',
         ];
-        if ($this->new_db_username !== '') {
+        if ($this->new_db_user_mode === 'existing' && $this->new_db_engine === 'mysql') {
+            $rules['new_db_existing_user_reference'] = 'required|string|max:100';
+            $rules['new_db_username'] = 'nullable';
+        } elseif ($this->new_db_username !== '') {
             $rules['new_db_username'] = 'required|string|max:64|regex:/^[a-zA-Z0-9_]+$/';
         } else {
             $rules['new_db_username'] = 'nullable';
         }
-        if ($this->new_db_password !== null && $this->new_db_password !== '') {
+        if ($this->new_db_user_mode === 'existing' && $this->new_db_engine === 'mysql') {
+            $rules['new_db_password'] = 'nullable';
+        } elseif ($this->new_db_password !== null && $this->new_db_password !== '') {
             $rules['new_db_password'] = 'required|string|max:200';
         } else {
             $rules['new_db_password'] = 'nullable';
@@ -533,18 +642,38 @@ class WorkspaceDatabases extends Component
         $this->flash_success = null;
         $this->flash_error = null;
 
-        $username = $this->new_db_username;
+        $existingMysqlUser = null;
+        if ($this->new_db_user_mode === 'existing') {
+            if ($this->new_db_engine !== 'mysql') {
+                $this->addError('new_db_user_mode', __('Existing user selection is currently supported for MySQL only.'));
+
+                return;
+            }
+
+            $existingMysqlUser = $this->resolveExistingMysqlUser();
+            if ($existingMysqlUser === null) {
+                $this->addError('new_db_existing_user_reference', __('Choose an existing MySQL user to grant access to this database.'));
+
+                return;
+            }
+        }
+
+        $username = $existingMysqlUser['username'] ?? $this->new_db_username;
+        $usernameGenerated = false;
         if ($username === '') {
             $base = Str::slug($this->new_db_name, '_');
             if ($base === '') {
                 $base = 'db';
             }
             $username = Str::limit($base, 28, '').'_'.Str::lower(Str::random(4));
+            $usernameGenerated = true;
         }
 
-        $password = $this->new_db_password;
+        $password = $existingMysqlUser['password'] ?? $this->new_db_password;
+        $passwordGenerated = false;
         if ($password === null || $password === '') {
             $password = Str::password(24);
+            $passwordGenerated = true;
         }
 
         try {
@@ -559,14 +688,28 @@ class WorkspaceDatabases extends Component
                 'mysql_charset' => $this->new_mysql_charset ?: null,
                 'mysql_collation' => $this->new_mysql_collation ?: null,
             ]);
-            $out = $provisioner->createOnServer($db);
+            $out = $existingMysqlUser
+                ? $provisioner->createMysqlDatabaseForExistingUser($db, $existingMysqlUser['grant_host'])
+                : $provisioner->createOnServer($db);
             $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DATABASE_CREATED, [
                 'server_database_id' => $db->id,
                 'engine' => $db->engine,
                 'name' => $db->name,
+                'used_existing_user' => $existingMysqlUser !== null,
             ], auth()->user());
+            $notificationDispatcher->notifyIfSubscribed($this->server, 'created', $db, auth()->user());
             $this->flash_success = __('Database provisioned on the server.').' '.Str::limit($out, 500);
+            $this->generated_database_credentials = [
+                'name' => $db->name,
+                'engine' => $db->engine,
+                'username' => $db->username,
+                'password' => $db->password,
+                'username_generated' => $usernameGenerated,
+                'password_generated' => $passwordGenerated,
+            ];
             $this->new_db_name = '';
+            $this->new_db_user_mode = 'new';
+            $this->new_db_existing_user_reference = '';
             $this->new_db_username = '';
             $this->new_db_password = '';
             $this->new_db_description = null;
@@ -577,7 +720,11 @@ class WorkspaceDatabases extends Component
         }
     }
 
-    public function deleteDatabase(string $id, ServerDatabaseAuditLogger $auditLogger): void
+    public function deleteDatabase(
+        string $id,
+        ServerDatabaseAuditLogger $auditLogger,
+        ServerDatabaseNotificationDispatcher $notificationDispatcher,
+    ): void
     {
         $this->authorize('update', $this->server);
         $db = ServerDatabase::query()->where('server_id', $this->server->id)->findOrFail($id);
@@ -585,6 +732,7 @@ class WorkspaceDatabases extends Component
             'server_database_id' => $db->id,
             'name' => $db->name,
         ], auth()->user());
+        $notificationDispatcher->notifyIfSubscribed($this->server, 'removed', $db, auth()->user(), false);
         $db->delete();
         $this->flash_success = __('Removed this database from Dply. The database was not dropped on the server.');
         $this->flash_error = null;
@@ -598,6 +746,7 @@ class WorkspaceDatabases extends Component
         ServerDatabaseProvisioner $provisioner,
         ServerDatabaseHostCapabilities $capabilities,
         ServerDatabaseAuditLogger $auditLogger,
+        ServerDatabaseNotificationDispatcher $notificationDispatcher,
     ): void {
         $this->authorize('update', $this->server);
         $this->flash_success = null;
@@ -622,6 +771,7 @@ class WorkspaceDatabases extends Component
                 'server_database_id' => $db->id,
                 'name' => $db->name,
             ], auth()->user());
+            $notificationDispatcher->notifyIfSubscribed($this->server, 'removed', $db, auth()->user(), true);
             $db->delete();
             $this->flash_success = __('Database and user were dropped on the server and the entry was removed from Dply.').' '.Str::limit($out, 400);
             if ($this->credentials_modal_db_id === $id) {
@@ -642,7 +792,16 @@ class WorkspaceDatabases extends Component
             'databaseAuditEvents' => fn ($q) => $q->limit(80),
         ]);
 
-        $capabilities = $capabilitiesService->forServer($this->server);
+        $capabilities = ['mysql' => false, 'postgres' => false, 'redis' => false];
+        try {
+            $capabilities = $capabilitiesService->forServer($this->server);
+        } catch (\Throwable $e) {
+            $this->flash_error = $this->friendlyDatabaseWorkspaceError(
+                $e,
+                __('Dply could not connect to the server to check database engines.')
+            );
+        }
+
         if (! $this->db_engine_default_applied) {
             if (! $capabilities['mysql'] && $capabilities['postgres']) {
                 $this->new_db_engine = 'postgres';
@@ -659,8 +818,15 @@ class WorkspaceDatabases extends Component
                 ->find($this->credentials_modal_db_id);
         }
 
-        if ($this->workspace_tab === 'drift' && $this->drift_snapshot === null) {
-            $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
+        if ($this->workspace_tab === 'advanced' && $this->drift_snapshot === null) {
+            try {
+                $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
+            } catch (\Throwable $e) {
+                $this->flash_error = $this->friendlyDatabaseWorkspaceError(
+                    $e,
+                    __('Dply could not connect to the server to compare database drift.')
+                );
+            }
         }
 
         $recentBackups = ServerDatabaseBackup::query()
@@ -679,12 +845,152 @@ class WorkspaceDatabases extends Component
         return view('livewire.servers.workspace-databases', [
             'capabilities' => $capabilities,
             'credentialsModalDatabase' => $credentialsModalDatabase,
+            'existingMysqlUserOptions' => $this->existingMysqlUserOptions(),
             'recentBackups' => $recentBackups,
             'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
             'databaseImportMaxBytes' => $databaseImportMaxBytes,
+            'isDeployer' => $this->currentUserIsDeployer(),
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
         ]);
+    }
+
+    protected function friendlyDatabaseWorkspaceError(\Throwable $e, string $defaultMessage): string
+    {
+        $message = trim($e->getMessage());
+
+        if ($message === '') {
+            return $defaultMessage;
+        }
+
+        if (str_contains($message, 'SSH connection failed for server:')) {
+            return $defaultMessage.' '.__('The server is not accepting Dply\'s SSH login right now for :connection.', [
+                'connection' => $this->server->getSshConnectionString(),
+            ]);
+        }
+
+        if (str_contains($message, 'Permission denied (publickey)')) {
+            return $defaultMessage.' '.__('The server rejected the SSH key for :connection.', [
+                'connection' => $this->server->getSshConnectionString(),
+            ]);
+        }
+
+        return $message;
+    }
+
+    /**
+     * @return array{username: string, password: string, grant_host: string}|null
+     */
+    protected function resolveExistingMysqlUser(): ?array
+    {
+        $reference = trim($this->new_db_existing_user_reference);
+        if ($reference === '') {
+            return null;
+        }
+
+        if (str_starts_with($reference, 'primary:')) {
+            $databaseId = substr($reference, 8);
+            $database = ServerDatabase::query()
+                ->where('server_id', $this->server->id)
+                ->where('engine', 'mysql')
+                ->find($databaseId);
+
+            if (! $database) {
+                return null;
+            }
+
+            return [
+                'username' => (string) $database->username,
+                'password' => (string) $database->password,
+                'grant_host' => 'localhost',
+            ];
+        }
+
+        if (str_starts_with($reference, 'extra:')) {
+            $extraId = substr($reference, 6);
+            $extra = ServerDatabaseExtraUser::query()
+                ->whereKey($extraId)
+                ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id)->where('engine', 'mysql'))
+                ->first();
+
+            if (! $extra) {
+                return null;
+            }
+
+            return [
+                'username' => (string) $extra->username,
+                'password' => (string) $extra->password,
+                'grant_host' => (string) ($extra->host ?: 'localhost'),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    protected function existingMysqlUserOptions(): array
+    {
+        $options = [];
+
+        foreach ($this->server->serverDatabases->where('engine', 'mysql')->sortBy('name') as $database) {
+            $options[] = [
+                'id' => 'primary:'.$database->id,
+                'label' => __('Primary user for :database (:username@localhost)', [
+                    'database' => $database->name,
+                    'username' => $database->username,
+                ]),
+            ];
+
+            foreach ($database->extraUsers->sortBy('username') as $extraUser) {
+                $options[] = [
+                    'id' => 'extra:'.$extraUser->id,
+                    'label' => __('Extra user for :database (:username@:host)', [
+                        'database' => $database->name,
+                        'username' => $extraUser->username,
+                        'host' => $extraUser->host ?: 'localhost',
+                    ]),
+                ];
+            }
+        }
+
+        return $options;
+    }
+
+    protected function loadDatabaseAlertMatrix(): void
+    {
+        $this->databaseAlertMatrix = [];
+        $this->databaseAlertChannelRows = [];
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        $channels = AssignableNotificationChannels::forUser($user, $user->currentOrganization());
+        foreach ($channels as $channel) {
+            $cid = (string) $channel->id;
+            $entry = [
+                'created' => false,
+                'removed' => false,
+            ];
+
+            foreach (ServerDatabaseNotificationKeys::KINDS as $kind) {
+                $entry[$kind] = NotificationSubscription::query()
+                    ->where('notification_channel_id', $channel->id)
+                    ->where('subscribable_type', Server::class)
+                    ->where('subscribable_id', $this->server->id)
+                    ->where('event_key', ServerDatabaseNotificationKeys::eventKey($kind))
+                    ->exists();
+            }
+
+            $this->databaseAlertMatrix[$cid] = $entry;
+            $this->databaseAlertChannelRows[] = [
+                'id' => $cid,
+                'label' => (string) $channel->label,
+            ];
+        }
     }
 }

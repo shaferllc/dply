@@ -5,6 +5,7 @@ namespace App\Livewire\Sites;
 use App\Jobs\InstallSiteNginxJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
@@ -28,6 +29,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Show extends Component
 {
+    use ConfirmsActionWithModal;
+
     public Server $server;
 
     public Site $site;
@@ -548,7 +551,7 @@ class Show extends Component
         $this->flash_error = null;
     }
 
-    public function rollbackRelease(int $releaseId, SiteReleaseRollback $rollback): void
+    public function rollbackRelease(int|string $releaseId, SiteReleaseRollback $rollback): void
     {
         $this->authorize('update', $this->site);
         $this->flash_error = null;
@@ -579,7 +582,7 @@ class Show extends Component
         $this->flash_error = null;
     }
 
-    public function removeDomain(int $domainId): void
+    public function removeDomain(int|string $domainId): void
     {
         $this->authorize('update', $this->site);
         $domain = SiteDomain::query()->where('site_id', $this->site->id)->findOrFail($domainId);

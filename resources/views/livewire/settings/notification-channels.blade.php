@@ -187,8 +187,7 @@
                                                 <button type="button" wire:click="startEdit({{ $channel->id }})" class="text-sm font-medium text-brand-ink hover:underline">{{ __('Edit') }}</button>
                                                 <button
                                                     type="button"
-                                                    wire:click="deleteChannel({{ $channel->id }})"
-                                                    wire:confirm="{{ __('Remove this channel?') }}"
+                                                    wire:click="openConfirmActionModal('deleteChannel', [{{ $channel->id }}], @js(__('Delete notification channel')), @js(__('Remove this channel?')), @js(__('Delete')), true)"
                                                     class="text-sm font-medium text-red-600 hover:underline"
                                                 >{{ __('Delete') }}</button>
                                             @endif
@@ -211,4 +210,8 @@
             </x-organization-shell>
         </div>
     @endif
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

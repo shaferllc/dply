@@ -17,7 +17,8 @@ return [
 
     'nav' => [
         ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites'],
-        ['key' => 'overview', 'route' => 'servers.overview', 'icon' => 'cpu-chip', 'label' => 'Server'],
+        ['key' => 'deploy', 'route' => 'servers.deploy', 'icon' => 'rocket-launch', 'label' => 'Deploy'],
+        ['key' => 'overview', 'route' => 'servers.overview', 'icon' => 'cpu-chip', 'label' => 'Overview'],
         ['key' => 'insights', 'route' => 'servers.insights', 'icon' => 'light-bulb', 'label' => 'Insights'],
         ['key' => 'monitor', 'route' => 'servers.monitor', 'icon' => 'chart-bar', 'label' => 'Metrics'],
         ['key' => 'services', 'route' => 'servers.services', 'icon' => 'rectangle-stack', 'label' => 'Services'],
@@ -27,8 +28,7 @@ return [
         ['key' => 'daemons', 'route' => 'servers.daemons', 'icon' => 'server-stack', 'label' => 'Daemons'],
         ['key' => 'firewall', 'route' => 'servers.firewall', 'icon' => 'shield-check', 'label' => 'Firewall'],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys'],
-        ['key' => 'recipes', 'route' => 'servers.recipes', 'icon' => 'document-text', 'label' => 'Recipes'],
-        ['key' => 'deploy', 'route' => 'servers.deploy', 'icon' => 'rocket-launch', 'label' => 'Deploy'],
+        ['key' => 'recipes', 'route' => 'servers.recipes', 'icon' => 'document-text', 'label' => 'Saved commands'],
         ['key' => 'logs', 'route' => 'servers.logs', 'icon' => 'clipboard-document-list', 'label' => 'Logs'],
         ['key' => 'manage', 'route' => 'servers.manage', 'icon' => 'wrench-screwdriver', 'label' => 'Manage'],
         ['key' => 'settings', 'route' => 'servers.settings', 'icon' => 'cog-8-tooth', 'label' => 'Settings'],

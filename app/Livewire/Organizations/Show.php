@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Organizations;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\ApiToken;
 use App\Models\IntegrationOutboundWebhook;
 use App\Models\Organization;
@@ -21,6 +22,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Show extends Component
 {
+    use ConfirmsActionWithModal;
+
     public Organization $organization;
 
     public string $invite_email = '';
@@ -165,7 +168,7 @@ class Show extends Component
         $this->dispatch('notify', message: 'Invitation sent to '.$email);
     }
 
-    public function cancelInvitation(int $invitationId): void
+    public function cancelInvitation(int|string $invitationId): void
     {
         $this->authorize('update', $this->organization);
 
@@ -220,7 +223,7 @@ class Show extends Component
         $this->new_token_name = null;
     }
 
-    public function revokeApiToken(int $apiTokenId): void
+    public function revokeApiToken(int|string $apiTokenId): void
     {
         $this->authorize('update', $this->organization);
 
@@ -275,7 +278,7 @@ class Show extends Component
         $this->dispatch('notify', message: 'Team updated.');
     }
 
-    public function deleteTeam(int $teamId): void
+    public function deleteTeam(int|string $teamId): void
     {
         $team = $this->organization->teams()->findOrFail($teamId);
         $this->authorize('delete', $team);

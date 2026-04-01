@@ -37,7 +37,9 @@ class ScriptsTest extends TestCase
         $this->actingAs($user)
             ->get(route('scripts.index'))
             ->assertOk()
-            ->assertSee('Scripts', false);
+            ->assertSee('Scripts', false)
+            ->assertSee('organization-wide automation', false)
+            ->assertSee('Script presets', false);
     }
 
     public function test_member_can_create_script(): void
@@ -89,5 +91,16 @@ class ScriptsTest extends TestCase
             'source' => Script::SOURCE_MARKETPLACE,
             'marketplace_key' => 'disk-usage-summary',
         ]);
+    }
+
+    public function test_script_presets_page_uses_preset_language(): void
+    {
+        $user = $this->ownerWithOrg();
+
+        $this->actingAs($user)
+            ->get(route('scripts.marketplace'))
+            ->assertOk()
+            ->assertSee('Script presets')
+            ->assertSee('Saved commands');
     }
 }

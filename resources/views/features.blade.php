@@ -341,7 +341,7 @@
                     </article>
                     <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6">
                         <h3 class="font-semibold text-brand-ink">Firewall rules</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Open or restrict ports with intent—pair network policy with the same server your team already uses for deploys.</p>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Manage basic UFW rules for the same server your team already uses for deploys: the ports you open, the sources you trust, and the rule history you can review.</p>
                     </article>
                     <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6">
                         <h3 class="font-semibold text-brand-ink">SSH keys &amp; recipes</h3>
@@ -615,7 +615,7 @@
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Firewall (UFW)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — declarative rules per server synced to <code class="text-xs bg-brand-sand/60 px-1 rounded">ufw allow</code> patterns.</td>
+                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — basic per-server UFW rules with presets, templates, apply, status, and recent history.</td>
                             </tr>
                             <tr>
                                 <td class="px-4 py-4 sm:px-6 font-medium align-top">Cron &amp; Supervisor (workers)</td>

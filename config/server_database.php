@@ -3,6 +3,14 @@
 return [
 
     /**
+     * Try root SSH first for local database probes and admin commands, then fall back to the
+     * configured SSH user when root login is unavailable.
+     */
+    'use_root_ssh' => (bool) env('SERVER_DATABASE_USE_ROOT_SSH', true),
+
+    'fallback_to_deploy_user_ssh' => (bool) env('SERVER_DATABASE_FALLBACK_TO_DEPLOY_SSH', true),
+
+    /**
      * Cache SSH database-engine probes (MySQL/MariaDB root + PostgreSQL) to avoid a round trip on every Livewire render.
      */
     'capabilities_cache_ttl_seconds' => (int) env('SERVER_DATABASE_CAPABILITIES_TTL', 120),

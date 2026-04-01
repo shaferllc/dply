@@ -48,7 +48,7 @@
                         <span class="text-amber-800">· run #{{ $this->deployLockInfo['deployment_id'] }}</span>
                     @endif
                     <p class="mt-1 text-amber-800">Queued deploys may appear as <span class="font-medium">skipped</span> until this run finishes.</p>
-                    <button type="button" wire:click="releaseDeployLock" wire:confirm="Force-clear the deploy lock? Only if no worker is actually deploying." class="mt-2 text-sm text-amber-900 underline">Clear lock</button>
+                    <button type="button" wire:click="openConfirmActionModal('releaseDeployLock', [], @js(__('Clear deploy lock')), @js(__('Force-clear the deploy lock? Only if no worker is actually deploying.')), @js(__('Clear lock')), true)" class="mt-2 text-sm text-amber-900 underline">Clear lock</button>
                 </div>
             @endif
 
@@ -188,7 +188,7 @@
                         <li class="py-2 flex justify-between items-center gap-2">
                             <span class="font-mono text-sm">{{ $d->hostname }} @if ($d->is_primary)<span class="text-slate-400">(primary)</span>@endif</span>
                             @if (! $d->is_primary)
-                                <button type="button" wire:click="removeDomain({{ $d->id }})" wire:confirm="Remove this domain?" class="text-red-600 text-sm hover:underline">Remove</button>
+                                <button type="button" wire:click="openConfirmActionModal('removeDomain', ['{{ $d->id }}'], @js(__('Remove domain')), @js(__('Remove this domain?')), @js(__('Remove domain')), true)" class="text-red-600 text-sm hover:underline">Remove</button>
                             @endif
                         </li>
                     @endforeach
@@ -497,7 +497,7 @@
                                         @if ($rel->git_sha)<div class="font-mono text-xs text-slate-500">{{ $rel->git_sha }}</div>@endif
                                     </div>
                                     @if (! $rel->is_active)
-                                        <button type="button" wire:click="rollbackRelease({{ $rel->id }})" wire:confirm="Point current symlink at this release?" class="text-slate-800 text-xs hover:underline">Rollback</button>
+                                        <button type="button" wire:click="openConfirmActionModal('rollbackRelease', ['{{ $rel->id }}'], @js(__('Rollback release')), @js(__('Point current symlink at this release?')), @js(__('Rollback')), true)" class="text-slate-800 text-xs hover:underline">Rollback</button>
                                     @endif
                                 </li>
                             @endforeach
@@ -614,9 +614,13 @@
 
             @can('delete', $site)
                 <div class="flex justify-between items-center">
-                    <button type="button" wire:click="deleteSite" wire:confirm="Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab." class="text-red-600 hover:underline text-sm">Delete site</button>
+                    <button type="button" wire:click="openConfirmActionModal('deleteSite', [], @js(__('Delete site')), @js(__('Delete this site from Dply? A background job removes Nginx vhost, optional releases/repo/cert (see DPLY_* env flags), supervisor rows tied to this site, deploy SSH key, and re-syncs server crontab.')), @js(__('Delete site')), true)" class="text-red-600 hover:underline text-sm">Delete site</button>
                 </div>
             @endcan
         </div>
+
+        <x-slot name="modals">
+            @include('livewire.partials.confirm-action-modal')
+        </x-slot>
     </div>
 </div>

@@ -16,7 +16,6 @@ use App\Livewire\Dashboard;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
-use App\Livewire\Organizations\Daemons as OrganizationsDaemons;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Livewire\Organizations\Show as OrganizationsShow;
@@ -128,7 +127,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
     Route::livewire('organizations', OrganizationsIndex::class)->name('organizations.index');
     Route::livewire('organizations/create', OrganizationsCreate::class)->name('organizations.create');
-    Route::livewire('organizations/{organization}/daemons', OrganizationsDaemons::class)->name('organizations.daemons');
     Route::livewire('organizations/{organization}', OrganizationsShow::class)->name('organizations.show');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');

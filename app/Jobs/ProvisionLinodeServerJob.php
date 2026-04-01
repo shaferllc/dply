@@ -4,9 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\LinodeService;
+use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use phpseclib3\Crypt\RSA;
 
 class ProvisionLinodeServerJob implements ShouldQueue
 {
@@ -29,9 +29,7 @@ class ProvisionLinodeServerJob implements ShouldQueue
 
         $linode = new LinodeService($credential);
 
-        $key = RSA::createKey(2048);
-        $privateKey = $key->toString('OpenSSH');
-        $publicKey = $key->getPublicKey()->toString('OpenSSH');
+        $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
         $image = config('services.linode.default_image', 'linode/ubuntu24.04');
 
@@ -40,13 +38,15 @@ class ProvisionLinodeServerJob implements ShouldQueue
             region: $this->server->region,
             type: $this->server->size,
             image: $image,
-            authorizedKeys: [$publicKey]
+            authorizedKeys: [$keys['recovery_public_key']]
         );
 
         $this->server->update([
             'provider_id' => (string) $id,
             'status' => Server::STATUS_PROVISIONING,
-            'ssh_private_key' => $privateKey,
+            'ssh_private_key' => $keys['recovery_private_key'],
+            'ssh_recovery_private_key' => $keys['recovery_private_key'],
+            'ssh_operational_private_key' => $keys['operational_private_key'],
             'ssh_user' => config('services.linode.ssh_user', 'root'),
         ]);
 

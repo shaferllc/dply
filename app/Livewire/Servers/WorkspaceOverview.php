@@ -7,9 +7,13 @@ use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Models\InsightFinding;
 use App\Models\Server;
+use App\Models\Site;
+use App\Models\SiteDeployment;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -77,7 +81,78 @@ class WorkspaceOverview extends Component
     {
         $this->server->refresh();
 
+        $siteSummaries = $this->server->sites()
+            ->with(['domains'])
+            ->orderBy('name')
+            ->limit(4)
+            ->get()
+            ->map(function (Site $site): array {
+                $primaryDomain = $site->domains->firstWhere('is_primary', true) ?? $site->domains->first();
+
+                return [
+                    'name' => $site->name,
+                    'status' => $site->status,
+                    'primary_domain' => $primaryDomain?->hostname,
+                    'route' => route('sites.show', ['server' => $this->server, 'site' => $site]),
+                ];
+            });
+
+        $siteIds = $this->server->sites()->pluck('id');
+        $latestDeployment = $siteIds->isEmpty()
+            ? null
+            : SiteDeployment::query()
+                ->with('site')
+                ->whereIn('site_id', $siteIds)
+                ->latest('created_at')
+                ->first();
+
+        $monitorLastSampleAt = isset(($this->server->meta ?? [])['monitoring_last_sample_at'])
+            ? Carbon::parse($this->server->meta['monitoring_last_sample_at'])->timezone(config('app.timezone'))
+            : null;
+
+        $opsSummary = [
+            'firewall_rules_enabled' => $this->server->firewallRules()->where('enabled', true)->count(),
+            'cron_jobs' => $this->server->cronJobs()->count(),
+            'daemons' => $this->server->supervisorPrograms()->count(),
+            'ssh_keys' => $this->server->authorizedKeys()->count(),
+        ];
+
+        $healthSummary = [
+            'status' => $this->server->health_status,
+            'last_checked_at' => $this->server->last_health_check_at,
+            'monitor_last_sample_at' => $monitorLastSampleAt,
+        ];
+
+        $insightFindings = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->orderByRaw("case severity when 'critical' then 0 when 'warning' then 1 else 2 end")
+            ->orderByDesc('detected_at')
+            ->limit(3)
+            ->get();
+
+        $openInsightQuery = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN);
+
+        $insightSummary = [
+            'open_count' => (clone $openInsightQuery)->count(),
+            'critical_count' => (clone $openInsightQuery)->where('severity', InsightFinding::SEVERITY_CRITICAL)->count(),
+            'warning_count' => (clone $openInsightQuery)->where('severity', InsightFinding::SEVERITY_WARNING)->count(),
+            'info_count' => (clone $openInsightQuery)->where('severity', InsightFinding::SEVERITY_INFO)->count(),
+            'latest_detected_at' => (clone $openInsightQuery)->max('detected_at'),
+        ];
+
         return view('livewire.servers.workspace-overview', [
+            'siteSummaries' => $siteSummaries,
+            'siteCount' => $this->server->sites()->count(),
+            'latestDeployment' => $latestDeployment,
+            'opsSummary' => $opsSummary,
+            'healthSummary' => $healthSummary,
+            'insightFindings' => $insightFindings,
+            'insightSummary' => $insightSummary,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

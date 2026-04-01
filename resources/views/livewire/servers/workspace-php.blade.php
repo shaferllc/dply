@@ -1,6 +1,6 @@
 @php
     $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-ink/90 disabled:cursor-not-allowed disabled:opacity-60';
+    $btnPrimary = 'inline-flex w-auto shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-ink/90 disabled:cursor-not-allowed disabled:opacity-60';
     $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:border-brand-ink/20 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-60';
     $badge = 'inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2.5 py-1 text-xs font-medium text-brand-ink';
 @endphp
@@ -11,7 +11,7 @@
     :title="__('PHP')"
     :description="__('Review server-level PHP inventory, defaults, and runtime configuration from one workspace.')"
 >
-    @include('livewire.servers.partials.workspace-flashes')
+    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null, 'command_error' => $remote_error ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if (! $opsReady && ! $sshUnavailable)
@@ -182,93 +182,127 @@
                                 </div>
 
                                 <div class="flex flex-col gap-3 xl:items-end">
-                                    <div class="flex flex-wrap gap-2">
-                                        @can('update', $server)
-                                            <button
-                                                type="button"
-                                                wire:click="runPhpPackageAction('install', '{{ $row['id'] }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="{{ $actionTarget('install') }}"
-                                                class="{{ $btnPrimary }}"
-                                                @disabled($isInstalled)
-                                            >
-                                                {{ __('Install') }}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="runPhpPackageAction('patch', '{{ $row['id'] }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="{{ $actionTarget('patch') }}"
-                                                class="{{ $btnSecondary }}"
-                                                @disabled(! $isInstalled)
-                                            >
-                                                {{ __('Patch') }}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="runPhpPackageAction('set_cli_default', '{{ $row['id'] }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="{{ $actionTarget('set_cli_default') }}"
-                                                class="{{ $btnSecondary }}"
-                                                @disabled(! $isInstalled || $isCliDefault)
-                                            >
-                                                {{ __('Set CLI default') }}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="runPhpPackageAction('set_new_site_default', '{{ $row['id'] }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="{{ $actionTarget('set_new_site_default') }}"
-                                                class="{{ $btnSecondary }}"
-                                                @disabled(! $isInstalled || $isNewSiteDefault)
-                                            >
-                                                {{ __('Set new-site default') }}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="runPhpPackageAction('uninstall', '{{ $row['id'] }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="{{ $actionTarget('uninstall') }}"
-                                                class="{{ $btnSecondary }}"
-                                                @disabled($disableUninstall)
-                                            >
-                                                {{ __('Uninstall') }}
-                                            </button>
-                                        @endcan
-                                    </div>
-
                                     @can('update', $server)
-                                        <div class="flex flex-wrap gap-2 text-sm">
-                                            <button
-                                                type="button"
-                                                wire:click="openPhpConfigEditor('{{ $row['id'] }}', 'cli_ini')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'cli_ini')"
-                                                class="{{ $btnSecondary }}"
-                                                @disabled(! $isInstalled)
-                                            >
-                                                {{ __('CLI ini') }}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="openPhpConfigEditor('{{ $row['id'] }}', 'fpm_ini')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'fpm_ini')"
-                                                class="{{ $btnSecondary }}"
-                                                @disabled(! $isInstalled)
-                                            >
-                                                {{ __('FPM ini') }}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="openPhpConfigEditor('{{ $row['id'] }}', 'pool_config')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'pool_config')"
-                                                class="{{ $btnSecondary }}"
-                                                @disabled(! $isInstalled)
-                                            >
-                                                {{ __('Pool config') }}
-                                            </button>
+                                        <div class="flex flex-wrap gap-2 xl:justify-end">
+                                            @if (! $isInstalled)
+                                                <button
+                                                    type="button"
+                                                    wire:click="runPhpPackageAction('install', '{{ $row['id'] }}')"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="{{ $actionTarget('install') }}"
+                                                    class="{{ $btnPrimary }}"
+                                                >
+                                                    <span wire:loading.remove wire:target="{{ $actionTarget('install') }}">{{ __('Install') }}</span>
+                                                    <span wire:loading wire:target="{{ $actionTarget('install') }}">{{ __('Installing…') }}</span>
+                                                </button>
+                                            @else
+                                                <button
+                                                    type="button"
+                                                    wire:click="runPhpPackageAction('patch', '{{ $row['id'] }}')"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="{{ $actionTarget('patch') }}"
+                                                    class="{{ $btnPrimary }}"
+                                                >
+                                                    <span wire:loading.remove wire:target="{{ $actionTarget('patch') }}">{{ __('Patch') }}</span>
+                                                    <span wire:loading wire:target="{{ $actionTarget('patch') }}">{{ __('Patching…') }}</span>
+                                                </button>
+
+                                                <x-dropdown align="right" width="w-56" contentClasses="py-1 bg-white">
+                                                    <x-slot name="trigger">
+                                                        <button
+                                                            type="button"
+                                                            class="{{ $btnSecondary }}"
+                                                            aria-label="{{ __('Version actions') }}"
+                                                            aria-haspopup="true"
+                                                        >
+                                                            {{ __('Version actions') }}
+                                                            <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-ink/70" />
+                                                        </button>
+                                                    </x-slot>
+                                                    <x-slot name="content">
+                                                        <button
+                                                            type="button"
+                                                            wire:click="runPhpPackageAction('set_cli_default', '{{ $row['id'] }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="{{ $actionTarget('set_cli_default') }}"
+                                                            @disabled($isCliDefault)
+                                                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            <span wire:loading.remove wire:target="{{ $actionTarget('set_cli_default') }}">{{ __('Set CLI default') }}</span>
+                                                            <span wire:loading wire:target="{{ $actionTarget('set_cli_default') }}">{{ __('Setting CLI default…') }}</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="runPhpPackageAction('set_new_site_default', '{{ $row['id'] }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="{{ $actionTarget('set_new_site_default') }}"
+                                                            @disabled($isNewSiteDefault)
+                                                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            <span wire:loading.remove wire:target="{{ $actionTarget('set_new_site_default') }}">{{ __('Set new-site default') }}</span>
+                                                            <span wire:loading wire:target="{{ $actionTarget('set_new_site_default') }}">{{ __('Setting new-site default…') }}</span>
+                                                        </button>
+                                                        <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="runPhpPackageAction('uninstall', '{{ $row['id'] }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="{{ $actionTarget('uninstall') }}"
+                                                            @disabled($disableUninstall)
+                                                            class="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            <span wire:loading.remove wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstall') }}</span>
+                                                            <span wire:loading wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstalling…') }}</span>
+                                                        </button>
+                                                    </x-slot>
+                                                </x-dropdown>
+
+                                                <x-dropdown align="right" width="w-48" contentClasses="py-1 bg-white">
+                                                    <x-slot name="trigger">
+                                                        <button
+                                                            type="button"
+                                                            class="{{ $btnSecondary }}"
+                                                            aria-label="{{ __('Edit config') }}"
+                                                            aria-haspopup="true"
+                                                        >
+                                                            {{ __('Edit config') }}
+                                                            <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-ink/70" />
+                                                        </button>
+                                                    </x-slot>
+                                                    <x-slot name="content">
+                                                        <button
+                                                            type="button"
+                                                            wire:click="openPhpConfigEditor('{{ $row['id'] }}', 'cli_ini')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'cli_ini')"
+                                                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                        >
+                                                            <span wire:loading.remove wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'cli_ini')">{{ __('CLI ini') }}</span>
+                                                            <span wire:loading wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'cli_ini')">{{ __('Opening CLI ini…') }}</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="openPhpConfigEditor('{{ $row['id'] }}', 'fpm_ini')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'fpm_ini')"
+                                                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                        >
+                                                            <span wire:loading.remove wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'fpm_ini')">{{ __('FPM ini') }}</span>
+                                                            <span wire:loading wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'fpm_ini')">{{ __('Opening FPM ini…') }}</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="openPhpConfigEditor('{{ $row['id'] }}', 'pool_config')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'pool_config')"
+                                                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                        >
+                                                            <span wire:loading.remove wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'pool_config')">{{ __('Pool config') }}</span>
+                                                            <span wire:loading wire:target="openPhpConfigEditor('{{ $row['id'] }}', 'pool_config')">{{ __('Opening pool config…') }}</span>
+                                                        </button>
+                                                    </x-slot>
+                                                </x-dropdown>
+                                            @endif
                                         </div>
                                     @endcan
                                 </div>
@@ -279,64 +313,79 @@
             </div>
         @endif
 
+    </div>
+
+    <x-slot name="modals">
         @if ($phpConfigEditorOpen)
-            <div class="{{ $card }}">
-                <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">
-                                {{ __('Editing PHP :version :target', ['version' => $phpConfigEditorVersion, 'target' => $phpConfigEditorTargetLabel]) }}
-                            </h2>
-                            <p class="mt-1 text-sm text-brand-moss">
-                                {{ __('Review and verify the selected shared PHP config before replacing the live file.') }}
-                            </p>
-                            @if ($phpConfigEditorPath)
-                                <p class="mt-2 font-mono text-xs text-brand-moss">{{ $phpConfigEditorPath }}</p>
-                            @endif
-                        </div>
+            <div
+                class="fixed inset-0 z-50 overflow-y-auto overscroll-y-contain"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="php-config-editor-title"
+            >
+                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closePhpConfigEditor"></div>
+                <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
+                    <div class="my-auto w-full max-w-5xl rounded-2xl border border-brand-ink/10 bg-white shadow-xl" @click.stop>
+                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <h2 id="php-config-editor-title" class="text-lg font-semibold text-brand-ink">
+                                        {{ __('Editing PHP :version :target', ['version' => $phpConfigEditorVersion, 'target' => $phpConfigEditorTargetLabel]) }}
+                                    </h2>
+                                    <p class="mt-1 text-sm text-brand-moss">
+                                        {{ __('Edit the config, then save to validate it before Dply replaces the live file.') }}
+                                    </p>
+                                    @if ($phpConfigEditorPath)
+                                        <p class="mt-2 font-mono text-xs text-brand-moss">{{ $phpConfigEditorPath }}</p>
+                                    @endif
+                                </div>
 
-                        <button type="button" wire:click="closePhpConfigEditor" wire:loading.attr="disabled" class="{{ $btnSecondary }}">
-                            {{ __('Close') }}
-                        </button>
-                    </div>
-                </div>
-
-                <div class="space-y-4 p-6 sm:p-8">
-                    @if ($phpConfigEditorReloadGuidance)
-                        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
-                            {{ $phpConfigEditorReloadGuidance }}
-                        </div>
-                    @endif
-
-                    <div class="space-y-2">
-                        <label for="php-config-editor" class="text-sm font-medium text-brand-ink">{{ __('Config content') }}</label>
-                        <textarea
-                            id="php-config-editor"
-                            wire:model.defer="phpConfigEditorContent"
-                            rows="18"
-                            class="w-full rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-ink/20 focus:outline-none focus:ring-0"
-                        ></textarea>
-                    </div>
-
-                    @if ($phpConfigEditorValidationOutput)
-                        <div class="{{ $card }}">
-                            <div class="border-b border-brand-ink/10 px-5 py-3 text-sm font-medium text-brand-ink">
-                                {{ __('Verification output') }}
+                                <button type="button" wire:click="closePhpConfigEditor" wire:loading.attr="disabled" class="{{ $btnSecondary }}">
+                                    {{ __('Close') }}
+                                </button>
                             </div>
-                            <pre class="max-h-80 overflow-x-auto bg-brand-ink p-4 text-sm text-emerald-400/95">{{ $phpConfigEditorValidationOutput }}</pre>
                         </div>
-                    @endif
 
-                    <div class="flex flex-wrap gap-3">
-                        <button type="button" wire:click="savePhpConfigEditor" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
-                            {{ __('Save config') }}
-                        </button>
-                        <button type="button" wire:click="closePhpConfigEditor" wire:loading.attr="disabled" class="{{ $btnSecondary }}">
-                            {{ __('Cancel') }}
-                        </button>
+                        <div class="space-y-4 p-6 sm:p-8">
+                            @if ($phpConfigEditorReloadGuidance)
+                                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+                                    {{ $phpConfigEditorReloadGuidance }}
+                                </div>
+                            @endif
+
+                            <div class="space-y-2">
+                                <label for="php-config-editor" class="text-sm font-medium text-brand-ink">{{ __('Config content') }}</label>
+                                <textarea
+                                    id="php-config-editor"
+                                    wire:model.defer="phpConfigEditorContent"
+                                    rows="18"
+                                    class="w-full rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-ink/20 focus:outline-none focus:ring-0"
+                                ></textarea>
+                            </div>
+
+                            @if ($phpConfigEditorValidationOutput)
+                                <div class="{{ $card }}">
+                                    <div class="border-b border-brand-ink/10 px-5 py-3 text-sm font-medium text-brand-ink">
+                                        {{ __('Verification output') }}
+                                    </div>
+                                    <pre class="max-h-80 overflow-x-auto bg-brand-ink p-4 text-sm text-emerald-400/95">{{ $phpConfigEditorValidationOutput }}</pre>
+                                </div>
+                            @endif
+
+                            <div class="flex flex-wrap gap-3">
+                                <button type="button" wire:click="savePhpConfigEditor" wire:loading.attr="disabled" wire:target="savePhpConfigEditor" class="{{ $btnPrimary }}">
+                                    <span wire:loading.remove wire:target="savePhpConfigEditor">{{ __('Save and validate config') }}</span>
+                                    <span wire:loading wire:target="savePhpConfigEditor">{{ __('Validating and saving…') }}</span>
+                                </button>
+                                <button type="button" wire:click="closePhpConfigEditor" wire:loading.attr="disabled" wire:target="closePhpConfigEditor" class="{{ $btnSecondary }}">
+                                    <span wire:loading.remove wire:target="closePhpConfigEditor">{{ __('Cancel') }}</span>
+                                    <span wire:loading wire:target="closePhpConfigEditor">{{ __('Closing…') }}</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         @endif
-    </div>
+    </x-slot>
 </x-server-workspace-layout>

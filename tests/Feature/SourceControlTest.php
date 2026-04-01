@@ -37,4 +37,47 @@ class SourceControlTest extends TestCase
             ->call('unlinkAccount', $user->socialAccounts->first()->id)
             ->assertHasErrors('unlink');
     }
+
+    public function test_unlink_account_uses_confirmation_modal_before_deleting(): void
+    {
+        $user = User::factory()->create();
+        $account = SocialAccount::create([
+            'user_id' => $user->id,
+            'provider' => 'github',
+            'provider_id' => 'gh-1',
+            'nickname' => 'dev',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SourceControl::class)
+            ->call(
+                'openConfirmActionModal',
+                'unlinkAccount',
+                [$account->id],
+                'Unlink account',
+                'Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.',
+                'Unlink',
+                true
+            )
+            ->assertSet('showConfirmActionModal', true)
+            ->assertSet('confirmActionModalMethod', 'unlinkAccount')
+            ->assertSet('confirmActionModalArguments', [$account->id]);
+
+        $this->assertDatabaseHas('social_accounts', ['id' => $account->id]);
+
+        Livewire::actingAs($user)
+            ->test(SourceControl::class)
+            ->call(
+                'openConfirmActionModal',
+                'unlinkAccount',
+                [$account->id],
+                'Unlink account',
+                'Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.',
+                'Unlink',
+                true
+            )
+            ->call('confirmActionModal');
+
+        $this->assertDatabaseMissing('social_accounts', ['id' => $account->id]);
+    }
 }

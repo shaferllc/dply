@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Projects;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Jobs\RunWorkspaceDeployJob;
 use App\Models\AuditLog;
 use App\Models\NotificationSubscription;
@@ -25,6 +26,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Show extends Component
 {
+    use ConfirmsActionWithModal;
+
     public Workspace $workspace;
 
     public string $section = 'overview';

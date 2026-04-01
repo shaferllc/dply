@@ -4,7 +4,6 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\SshConnection;
 use Illuminate\Support\Facades\Cache;
 
 class ServerPhpManager
@@ -64,6 +63,9 @@ class ServerPhpManager
             ->all();
 
         $installedIds = $this->normalizeVersionList($inventory['installed_versions'] ?? []);
+        if ($installedIds === []) {
+            $installedIds = $this->inferInstalledVersionIds($server, $meta);
+        }
         $installedVersions = [];
 
         foreach ($installedIds as $id) {
@@ -75,10 +77,17 @@ class ServerPhpManager
             ];
         }
 
+        $detectedDefaultVersion = $this->normalizeVersionId($inventory['detected_default_version'] ?? null);
+        if ($detectedDefaultVersion === null || ! in_array($detectedDefaultVersion, $installedIds, true)) {
+            $detectedDefaultVersion = $this->normalizeVersionId($meta['default_php_version'] ?? null)
+                ?? $this->normalizeVersionId($meta['php_version'] ?? null)
+                ?? ($installedIds[0] ?? null);
+        }
+
         return [
             'is_supported_environment' => array_key_exists('supported', $inventory) ? (bool) $inventory['supported'] : null,
             'installed_versions' => $installedVersions,
-            'detected_default_version' => $this->normalizeVersionId($inventory['detected_default_version'] ?? null),
+            'detected_default_version' => $detectedDefaultVersion,
         ];
     }
 
@@ -286,7 +295,7 @@ class ServerPhpManager
     }
 
     /**
-     * @return array{status: 'succeeded'|'stale', message: string}
+     * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
      */
     public function refreshInventory(Server $server): array
     {
@@ -328,6 +337,7 @@ class ServerPhpManager
             return [
                 'status' => 'succeeded',
                 'message' => __('PHP inventory refreshed.'),
+                'output' => $this->inventorySummaryOutput($freshInventory),
             ];
         } catch (\Throwable $e) {
             $this->persistRefreshMeta($server->fresh(), [
@@ -339,12 +349,13 @@ class ServerPhpManager
             return [
                 'status' => 'stale',
                 'message' => __('Remote PHP state changed, but Dply could not save the refreshed snapshot.'),
+                'output' => $this->inventorySummaryOutput($freshInventory),
             ];
         }
     }
 
     /**
-     * @return array{status: 'succeeded'|'stale', message: string}
+     * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
      */
     public function applyPackageAction(Server $server, string $action, string $version): array
     {
@@ -370,7 +381,7 @@ class ServerPhpManager
             $preflightInventory = $this->fetchRemoteInventory($server);
             $this->guardPackageAction($server, $action, $version, $preflightInventory);
 
-            $this->executePackageAction($server, $action, $version);
+            $commandOutput = $this->executePackageAction($server, $action, $version);
 
             $freshInventory = $this->fetchRemoteInventory($server->fresh());
             $meta = $this->reconcileFreshInventory($server->fresh(), $freshInventory);
@@ -394,6 +405,7 @@ class ServerPhpManager
                 return [
                     'status' => 'succeeded',
                     'message' => $this->packageActionSuccessMessage($action, $version),
+                    'output' => $this->packageActionOutput($commandOutput, $freshInventory),
                 ];
             } catch (\Throwable $e) {
                 $this->persistRefreshMeta($server->fresh(), [
@@ -405,6 +417,7 @@ class ServerPhpManager
                 return [
                     'status' => 'stale',
                     'message' => __('Remote PHP state changed, but Dply could not save the refreshed snapshot.'),
+                    'output' => $this->packageActionOutput($commandOutput, $freshInventory),
                 ];
             }
         } finally {
@@ -488,6 +501,16 @@ class ServerPhpManager
     {
         $supportedIds = array_column($this->supportedVersions($server), 'id');
         $installedIds = $this->normalizeVersionList($inventory['installed_versions'] ?? []);
+        $detectedDefaultVersion = $this->normalizeVersionId($inventory['detected_default_version'] ?? null);
+
+        if (
+            $detectedDefaultVersion !== null
+            && in_array($detectedDefaultVersion, $supportedIds, true)
+            && ! in_array($detectedDefaultVersion, $installedIds, true)
+        ) {
+            $installedIds[] = $detectedDefaultVersion;
+        }
+
         $siteCount = (int) $server->sites()->where('php_version', $version)->count();
         $defaults = $this->currentDefaults($server, [
             'installed_versions' => array_map(fn (string $id) => [
@@ -496,12 +519,12 @@ class ServerPhpManager
                 'is_supported' => in_array($id, $supportedIds, true),
                 'site_count' => 0,
             ], $installedIds),
-            'detected_default_version' => $this->normalizeVersionId($inventory['detected_default_version'] ?? null),
+            'detected_default_version' => $detectedDefaultVersion,
             'is_supported_environment' => (bool) ($inventory['supported'] ?? true),
         ]);
 
         if ($action === 'uninstall') {
-            $defaults['cli_default'] = $this->normalizeVersionId($inventory['detected_default_version'] ?? null);
+            $defaults['cli_default'] = $detectedDefaultVersion;
         }
 
         if (! ($inventory['supported'] ?? true)) {
@@ -600,26 +623,58 @@ class ServerPhpManager
 
         $supportedIds = array_column($this->supportedVersions($server), 'id');
         $quotedVersions = implode(' ', array_map(static fn (string $id) => escapeshellarg($id), $supportedIds));
-        $ssh = new SshConnection($server);
-
-        try {
-            $output = $ssh->exec($this->privilegedShellScript($server, $quotedVersions), 120);
-        } finally {
-            $ssh->disconnect();
-        }
+        $output = app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => $ssh->exec($this->privilegedShellScript($server, $quotedVersions), 120),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
 
         return $this->parseRemoteInventoryOutput($output);
     }
 
-    protected function executePackageAction(Server $server, string $action, string $version): void
+    protected function executePackageAction(Server $server, string $action, string $version): string
     {
-        $ssh = new SshConnection($server);
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($server, $action, $version): string {
+                return $ssh->exec($this->packageActionScript($server, $action, $version), 600);
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
+    }
 
-        try {
-            $ssh->exec($this->packageActionScript($server, $action, $version), 600);
-        } finally {
-            $ssh->disconnect();
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $inventory
+     */
+    protected function inventorySummaryOutput(array $inventory): string
+    {
+        $installed = $this->normalizeVersionList($inventory['installed_versions'] ?? []);
+        $default = $this->normalizeVersionId($inventory['detected_default_version'] ?? null);
+
+        return trim(implode("\n", array_filter([
+            'Supported environment: '.(($inventory['supported'] ?? false) ? 'yes' : 'no'),
+            'Installed versions: '.($installed !== [] ? implode(', ', $installed) : 'none reported'),
+            'Detected CLI default: '.($default ?? 'none reported'),
+        ])));
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $inventory
+     */
+    protected function packageActionOutput(string $commandOutput, array $inventory): string
+    {
+        $parts = [];
+        $trimmedCommandOutput = trim($commandOutput);
+
+        if ($trimmedCommandOutput !== '') {
+            $parts[] = $trimmedCommandOutput;
         }
+
+        $parts[] = $this->inventorySummaryOutput($inventory);
+
+        return implode("\n\n", array_filter($parts));
     }
 
     /**
@@ -644,6 +699,35 @@ class ServerPhpManager
         $server->forceFill([
             'meta' => $meta,
         ])->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<string>
+     */
+    protected function inferInstalledVersionIds(Server $server, array $meta): array
+    {
+        $inferred = [];
+
+        foreach ([
+            $meta['default_php_version'] ?? null,
+            $meta['php_new_site_default_version'] ?? null,
+            $meta['php_version'] ?? null,
+        ] as $candidate) {
+            $normalized = $this->normalizeVersionId($candidate);
+            if ($normalized !== null) {
+                $inferred[] = $normalized;
+            }
+        }
+
+        foreach ($server->sites()->whereNotNull('php_version')->pluck('php_version')->all() as $siteVersion) {
+            $normalized = $this->normalizeVersionId($siteVersion);
+            if ($normalized !== null) {
+                $inferred[] = $normalized;
+            }
+        }
+
+        return array_values(array_unique($inferred));
     }
 
     /**
@@ -684,7 +768,14 @@ installed_versions=()
 if command -v dpkg-query >/dev/null 2>&1; then
   supported=true
   for version in "${supported_versions[@]}"; do
-    if dpkg-query -W -f='\${Status}' "php${version}-cli" 2>/dev/null | grep -q "install ok installed"; then
+    if \
+      dpkg-query -W -f='\${Status}' "php${version}-cli" 2>/dev/null | grep -q "install ok installed" \
+      || dpkg-query -W -f='\${Status}' "php${version}-fpm" 2>/dev/null | grep -q "install ok installed" \
+      || command -v "php${version}" >/dev/null 2>&1 \
+      || command -v "php-fpm${version}" >/dev/null 2>&1 \
+      || [ -x "/usr/bin/php${version}" ] \
+      || [ -x "/usr/sbin/php-fpm${version}" ] \
+      || [ -d "/etc/php/${version}" ]; then
       installed_versions+=("$version")
     fi
   done
@@ -757,5 +848,15 @@ BASH;
         }
 
         return 'sudo -n bash -lc '.escapeshellarg($inner);
+    }
+
+    protected function useRootSsh(): bool
+    {
+        return true;
+    }
+
+    protected function fallbackToDeployUserSsh(): bool
+    {
+        return true;
     }
 }
