@@ -31,6 +31,42 @@ class NotificationChannelsTest extends TestCase
             ->assertOk();
     }
 
+    public function test_profile_notification_channels_page_shows_current_org_and_team_channels(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create(['name' => 'Acme']);
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        session(['current_organization_id' => $org->id]);
+
+        $org->notificationChannels()->create([
+            'type' => NotificationChannel::TYPE_SLACK,
+            'label' => 'Org alerts',
+            'config' => ['webhook_url' => 'https://hooks.slack.com/services/T/B/ORG'],
+        ]);
+
+        $team = Team::query()->create([
+            'organization_id' => $org->id,
+            'name' => 'Engineering',
+            'slug' => 'engineering',
+        ]);
+        $team->users()->attach($user->id, ['role' => 'member']);
+        $team->notificationChannels()->create([
+            'type' => NotificationChannel::TYPE_EMAIL,
+            'label' => 'Team inbox',
+            'config' => ['email' => 'team@example.com'],
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_organization_id' => $org->id])
+            ->get(route('profile.notification-channels'))
+            ->assertOk()
+            ->assertSee('Available beyond your personal channels')
+            ->assertSee('Acme')
+            ->assertSee('Org alerts')
+            ->assertSee('Engineering')
+            ->assertSee('Team inbox');
+    }
+
     public function test_user_can_create_a_personal_notification_channel(): void
     {
         $user = User::factory()->create();
@@ -221,5 +257,49 @@ class NotificationChannelsTest extends TestCase
             ->get(route('profile.notification-channels.bulk-assign'))
             ->assertOk()
             ->assertSee('Bulk assign notifications', false);
+    }
+
+    public function test_bulk_assign_page_can_preselect_server_from_query_string(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        session(['current_organization_id' => $org->id]);
+
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'web-1',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('profile.notification-channels.bulk-assign', ['server' => $server->id]))
+            ->assertOk()
+            ->assertSee('Assigning notifications for server:')
+            ->assertSee('web-1');
+    }
+
+    public function test_bulk_assign_page_can_quick_add_notification_channel(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        session(['current_organization_id' => $org->id]);
+
+        Livewire::actingAs($user)
+            ->test(BulkNotificationAssignments::class)
+            ->set('quick_new_owner_scope', 'personal')
+            ->set('quick_new_type', NotificationChannel::TYPE_SLACK)
+            ->set('quick_new_label', 'Ops alerts')
+            ->set('quick_new_slack_webhook_url', 'https://hooks.slack.com/services/T/B/X')
+            ->call('createQuickNotificationChannel')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('notification_channels', [
+            'owner_type' => User::class,
+            'owner_id' => $user->id,
+            'type' => NotificationChannel::TYPE_SLACK,
+            'label' => 'Ops alerts',
+        ]);
     }
 }

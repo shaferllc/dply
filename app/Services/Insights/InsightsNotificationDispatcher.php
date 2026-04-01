@@ -4,17 +4,20 @@ namespace App\Services\Insights;
 
 use App\Models\InsightDigestQueue;
 use App\Models\InsightFinding;
-use App\Models\NotificationSubscription;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\Team;
+use App\Services\Notifications\NotificationPublisher;
 use Carbon\Carbon;
 
 class InsightsNotificationDispatcher
 {
     public const EVENT_KEY = 'server.insights_alerts';
 
-    public function notifyIfSubscribed(Server $server, InsightFinding $finding, bool $wasReopened): void
+    public function __construct(
+        private readonly NotificationPublisher $publisher,
+    ) {}
+
+    public function notifyIfSubscribed(Server $server, InsightFinding $finding, bool $wasReopened, string $insightState = 'opened'): void
     {
         $org = $server->organization;
         if (! $org instanceof Organization) {
@@ -23,6 +26,10 @@ class InsightsNotificationDispatcher
 
         $prefs = $org->mergedInsightsPreferences();
         $isCritical = $finding->severity === InsightFinding::SEVERITY_CRITICAL;
+        $recipientUsers = $org->users()
+            ->wherePivotIn('role', ['owner', 'admin'])
+            ->pluck('users.id')
+            ->all();
 
         if (! $isCritical && ($prefs['digest_non_critical'] ?? false)) {
             InsightDigestQueue::query()->firstOrCreate(
@@ -41,28 +48,9 @@ class InsightsNotificationDispatcher
             return;
         }
 
-        $subs = NotificationSubscription::query()
-            ->where('event_key', self::EVENT_KEY)
-            ->where(function ($q) use ($server): void {
-                $q->where(fn ($q2) => $q2
-                    ->where('subscribable_type', Server::class)
-                    ->where('subscribable_id', $server->id));
-                if ($server->team_id !== null) {
-                    $q->orWhere(fn ($q2) => $q2
-                        ->where('subscribable_type', Team::class)
-                        ->where('subscribable_id', $server->team_id));
-                }
-            })
-            ->with('channel')
-            ->get()
-            ->unique('notification_channel_id');
-
-        if ($subs->isEmpty()) {
-            return;
-        }
-
         $severityLabel = strtoupper($finding->severity);
-        $subject = '['.config('app.name').'] ['.$severityLabel.'] '.$server->name.' — '.$finding->title;
+        $stateLabel = $insightState === 'resolved' ? 'RESOLVED' : $severityLabel;
+        $subject = '['.config('app.name').'] ['.$stateLabel.'] '.$server->name.' — '.$finding->title;
         $lines = [
             '['.$severityLabel.'] '.$finding->title,
         ];
@@ -75,6 +63,9 @@ class InsightsNotificationDispatcher
         if ($wasReopened) {
             $lines[] = __('This issue recurred after being resolved.');
         }
+        if ($insightState === 'resolved') {
+            $lines[] = __('This issue is now resolved.');
+        }
 
         $playbook = config('insights_playbooks.'.$finding->insight_key);
         if (is_array($playbook) && ! empty($playbook['url'])) {
@@ -86,14 +77,28 @@ class InsightsNotificationDispatcher
         $text = implode("\n", $lines);
         $url = route('servers.insights', $server, absolute: true);
 
-        foreach ($subs as $sub) {
-            $channel = $sub->channel;
-            if ($channel === null) {
-                continue;
-            }
-
-            $channel->sendOperationalMessage($subject, $text, $url, __('Open Insights'));
-        }
+        $this->publisher->publish(
+            eventKey: self::EVENT_KEY,
+            subject: $finding,
+            title: $subject,
+            body: $text,
+            url: $url,
+            metadata: [
+                'server_id' => $server->id,
+                'finding_id' => $finding->id,
+                'insight_key' => $finding->insight_key,
+                'severity' => $finding->severity,
+                'was_reopened' => $wasReopened,
+                'insight_state' => $insightState,
+            ],
+            contextOverrides: [
+                'organization_id' => $org->id,
+                'team_id' => $server->team_id,
+                'resource_type' => Server::class,
+                'resource_id' => (string) $server->getKey(),
+            ],
+            recipientUsers: $recipientUsers,
+        );
     }
 
     /**

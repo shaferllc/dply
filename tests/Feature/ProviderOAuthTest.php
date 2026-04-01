@@ -8,7 +8,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -83,12 +82,12 @@ class ProviderOAuthTest extends TestCase
         $this->assertNotNull($org);
 
         $nonce = Str::random(40);
-        Session::put('credentials_oauth:digitalocean:'.$nonce, [
+        $oauthState = [
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'label' => 'OAuth test',
             'issued_at' => now()->timestamp,
-        ]);
+        ];
 
         Http::fake(function (Request $request) {
             if (str_contains($request->url(), 'cloud.digitalocean.com/v1/oauth/token')) {
@@ -106,12 +105,17 @@ class ProviderOAuthTest extends TestCase
             return Http::response('unexpected URL in test: '.$request->url(), 500);
         });
 
-        $response = $this->actingAs($user)->get(route('credentials.oauth.digitalocean.callback', [
-            'code' => 'auth-code-xyz',
-            'state' => $nonce,
-        ]));
+        $response = $this->actingAs($user)
+            ->withSession([
+                'current_organization_id' => $org->id,
+                'credentials_oauth:digitalocean:'.$nonce => $oauthState,
+            ])
+            ->get(route('credentials.oauth.digitalocean.callback', [
+                'code' => 'auth-code-xyz',
+                'state' => $nonce,
+            ]));
 
-        $response->assertRedirect(route('credentials.index', ['provider' => 'digitalocean'], false));
+        $response->assertRedirect(route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'], false));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('provider_credentials', [

@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\Server;
 use App\Notifications\ServerRemovalScheduledNotification;
+use App\Services\Notifications\NotificationPublisher;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
@@ -93,14 +94,24 @@ trait ManagesServerRemovalForm
         $actor = auth()->user();
         $display = $at->copy()->timezone((string) config('app.timezone'))->toFormattedDateString();
 
-        Notification::send(
-            $users,
-            new ServerRemovalScheduledNotification(
-                $server,
-                $display,
-                $reason,
-                $actor?->name ?? $actor?->email ?? '?',
-            )
+        $event = app(NotificationPublisher::class)->publish(
+            eventKey: 'server.removal.scheduled',
+            subject: $server,
+            title: '['.config('app.name').'] '.$server->name.' removal scheduled',
+            body: 'Removal window ends: '.$display.($reason ? "\nReason: ".$reason : ''),
+            url: route('servers.show', $server, absolute: true),
+            actor: $actor,
+            recipientUsers: $users->pluck('id')->all(),
+            metadata: [
+                'server_id' => $server->id,
+                'server_name' => $server->name,
+                'organization_name' => $org->name,
+                'scheduled_for_display' => $display,
+                'reason' => $reason,
+                'actor_name' => $actor?->name ?? $actor?->email ?? '?',
+            ],
         );
+
+        Notification::send($users, new ServerRemovalScheduledNotification($event));
     }
 }

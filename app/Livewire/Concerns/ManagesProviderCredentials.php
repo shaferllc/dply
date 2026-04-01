@@ -674,7 +674,7 @@ trait ManagesProviderCredentials
         $this->flash_error = null;
     }
 
-    public function destroy(int $id): void
+    public function destroy(string|int $id): void
     {
         $credential = ProviderCredential::findOrFail($id);
         $this->authorize('delete', $credential);

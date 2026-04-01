@@ -593,6 +593,12 @@
 
             @if ($section === 'delivery')
             <x-server-workspace-tab-panel id="project-delivery" labelled-by="project-delivery-tab" panelClass="space-y-8">
+                <x-resource-notification-summary
+                    :resource="$workspace"
+                    :heading="__('Project notifications')"
+                    :manage-url="route('projects.delivery', $workspace)"
+                />
+
                 <div class="bg-white border border-slate-200 rounded-lg p-6">
                     <h3 class="font-medium text-slate-900">{{ __('How to use delivery') }}</h3>
                     <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('Use this tab when you want the project to coordinate releases across several sites. Save shared variables here before deploys, then queue one batch when multiple sites should move together.') }}</p>

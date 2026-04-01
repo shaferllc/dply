@@ -6,9 +6,10 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Notifications\SiteDeploymentCompletedNotification;
+use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Deploy\ByoDeployContext;
 use App\Services\Deploy\DeployEngineResolver;
-use App\Services\Integrations\DeployIntegrationDispatcher;
+use App\Services\Notifications\NotificationPublisher;
 use App\Support\DeployLogRedactor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,7 +35,10 @@ class RunSiteDeploymentJob implements ShouldQueue
         public ?string $auditUserId = null,
     ) {}
 
-    public function handle(DeployEngineResolver $deployEngineResolver, DeployIntegrationDispatcher $integrationDispatcher): void
+    public function handle(
+        DeployEngineResolver $deployEngineResolver,
+        NotificationPublisher $notificationPublisher,
+    ): void
     {
         $this->site = $this->site->fresh();
         if (! $this->site) {
@@ -68,7 +72,7 @@ class RunSiteDeploymentJob implements ShouldQueue
             ]);
             $this->auditDeploy($deployment);
             $this->clearIdempotencyInflight();
-            $this->notifyStakeholders($deployment, $integrationDispatcher);
+            $this->notifyStakeholders($deployment, $notificationPublisher);
 
             return;
         }
@@ -125,12 +129,12 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $this->cacheIdempotencyFailure($deployment, $msg);
                 Log::warning('RunSiteDeploymentJob failed', ['site_id' => $this->site->id, 'error' => $msg]);
                 $this->auditDeploy($deployment);
-                $this->notifyStakeholders($deployment, $integrationDispatcher);
+                $this->notifyStakeholders($deployment, $notificationPublisher);
                 throw $e;
             }
 
             $this->auditDeploy($deployment);
-            $this->notifyStakeholders($deployment, $integrationDispatcher);
+            $this->notifyStakeholders($deployment, $notificationPublisher);
         } finally {
             Cache::forget($activeKey);
             $lock->release();
@@ -198,7 +202,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         ]);
     }
 
-    protected function notifyStakeholders(SiteDeployment $deployment, DeployIntegrationDispatcher $integrationDispatcher): void
+    protected function notifyStakeholders(SiteDeployment $deployment, NotificationPublisher $notificationPublisher): void
     {
         if (! config('dply.deploy_notifications', true)) {
             return;
@@ -226,17 +230,42 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         $users = User::query()->whereIn('id', $userIds->unique()->all())->get();
-        $sendDeployEmail = true;
-        if ($org && ! $org->wantsDeployEmailNotifications()) {
-            $sendDeployEmail = false;
-        }
-        if ($sendDeployEmail && $users->isNotEmpty()) {
-            Notification::send($users, new SiteDeploymentCompletedNotification($deployment->fresh()));
+        $event = $notificationPublisher->publish(
+            eventKey: 'site.deployments',
+            subject: $deployment->fresh(),
+            title: '['.config('app.name').'] '.$site->name.' deploy '.strtoupper($deployment->status),
+            body: 'Trigger: '.$deployment->trigger.($deployment->git_sha ? "\nGit SHA: ".$deployment->git_sha : ''),
+            url: route('sites.show', [$site->server, $site], absolute: true),
+            metadata: [
+                'deployment_id' => $deployment->id,
+                'site_id' => $site->id,
+                'site_name' => $site->name,
+                'status' => $deployment->status,
+                'trigger' => $deployment->trigger,
+                'git_sha' => $deployment->git_sha,
+                'log_excerpt' => $deployment->log_output
+                    ? \Illuminate\Support\Str::limit(\App\Support\DeployLogRedactor::redact($deployment->log_output), 1200)
+                    : null,
+            ],
+        );
+
+        $sendDeployEmail = ! $org || $org->wantsDeployEmailNotifications();
+        if (! $sendDeployEmail || $users->isEmpty()) {
+            return;
         }
 
-        if ($org) {
-            $integrationDispatcher->dispatch($org, $site, $deployment->fresh());
+        if ($org && (int) config('dply.deploy_digest_hours', 0) > 0) {
+            DeployDigestBuffer::record((string) $org->id, sprintf(
+                '%s — %s — %s',
+                $site->name,
+                strtoupper($deployment->status),
+                $deployment->trigger
+            ));
+
+            return;
         }
+
+        Notification::send($users, new SiteDeploymentCompletedNotification($event));
     }
 
     public function failed(?\Throwable $exception): void

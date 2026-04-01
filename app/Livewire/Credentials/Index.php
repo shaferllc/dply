@@ -3,22 +3,30 @@
 namespace App\Livewire\Credentials;
 
 use App\Livewire\Concerns\ManagesProviderCredentials;
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
-use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-#[Layout('layouts.settings')]
 class Index extends Component
 {
     use ManagesProviderCredentials;
 
+    public ?Organization $organization = null;
+
     /** @var string Provider key from {@see credentialProviderNav()} */
     public string $active_provider = 'digitalocean';
 
-    public function mount(): void
+    public function mount(?Organization $organization = null): void
     {
+        $this->organization = $organization;
+
+        if ($this->organization) {
+            $this->authorize('view', $this->organization);
+            session(['current_organization_id' => $this->organization->id]);
+        }
+
         $this->authorize('viewAny', ProviderCredential::class);
 
         $ids = self::credentialProviderIds();
@@ -136,7 +144,7 @@ class Index extends Component
 
     public function credentialCountFor(string $provider): int
     {
-        $org = auth()->user()->currentOrganization();
+        $org = $this->organization ?: auth()->user()->currentOrganization();
         $query = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)
             : auth()->user()->providerCredentials()->whereNull('organization_id');
@@ -146,7 +154,7 @@ class Index extends Component
 
     public function render(): View
     {
-        $org = auth()->user()->currentOrganization();
+        $org = $this->organization ?: auth()->user()->currentOrganization();
         $credentials = $org
             ? ProviderCredential::where('organization_id', $org->id)->latest()->get()
             : auth()->user()->providerCredentials()->whereNull('organization_id')->latest()->get();
@@ -155,6 +163,8 @@ class Index extends Component
             'credentials' => $credentials,
             'providerNav' => self::credentialProviderNav(),
             'activeProviderLabel' => $this->resolveActiveProviderLabel(),
-        ]);
+            'organization' => $org,
+            'useOrgShell' => $org instanceof Organization,
+        ])->layout($org instanceof Organization ? 'layouts.app' : 'layouts.settings');
     }
 }

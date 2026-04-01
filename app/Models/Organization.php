@@ -295,9 +295,9 @@ class Organization extends Model
         return $this->hasMany(ApiToken::class);
     }
 
-    public function integrationOutboundWebhooks(): HasMany
+    public function notificationWebhookDestinations(): HasMany
     {
-        return $this->hasMany(IntegrationOutboundWebhook::class);
+        return $this->hasMany(NotificationWebhookDestination::class);
     }
 
     public function notificationChannels(): MorphMany

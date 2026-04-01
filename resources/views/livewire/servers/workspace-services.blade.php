@@ -50,6 +50,12 @@
         </div>
     @endif
 
+    <x-resource-notification-summary
+        :resource="$server"
+        :heading="__('Service notifications')"
+        :manage-url="route('servers.services', $server)"
+    />
+
     <div class="{{ $card }} overflow-hidden">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div>

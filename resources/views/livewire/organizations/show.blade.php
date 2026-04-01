@@ -61,16 +61,47 @@
                 @if ($organization->hasAdminAccess(auth()->user()))
                     <section class="bg-white overflow-hidden shadow-sm sm:rounded-lg" id="notification-settings">
                         <div class="px-6 py-4 border-b border-slate-200">
-                            <h3 class="font-medium text-slate-900">Deploy email notifications</h3>
+                            <h3 class="font-medium text-slate-900">Notification destinations &amp; preferences</h3>
                             <p class="text-sm text-slate-500 mt-1">
-                                When enabled, site owners and org owners/admins receive email when a deploy finishes (or digest mail if <code class="text-xs bg-slate-100 px-1 rounded">DPLY_DEPLOY_DIGEST_HOURS</code> is set). Outbound integration webhooks are unchanged.
+                                Use this section to control where organization notifications go. The universal notification system now supports the in-app inbox, email, saved notification channels, and webhook destinations from the same event pipeline.
                             </p>
                         </div>
-                        <div class="px-6 py-4">
-                            <label class="flex items-center gap-3 cursor-pointer">
-                                <input type="checkbox" wire:model.live="deploy_email_notifications_enabled" class="rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                                <span class="text-sm text-slate-700">Send deploy emails for sites in this organization</span>
-                            </label>
+                        <div class="px-6 py-4 space-y-5">
+                            <div class="rounded-md border border-slate-200 bg-slate-50/80 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h4 class="text-sm font-medium text-slate-900">Deploy email destination</h4>
+                                        <p class="mt-1 text-sm text-slate-600">
+                                            When enabled, site owners and org owners/admins receive email when a deploy finishes, or digest mail if <code class="text-xs bg-slate-100 px-1 rounded">DPLY_DEPLOY_DIGEST_HOURS</code> is set.
+                                        </p>
+                                    </div>
+                                    <a href="{{ route('organizations.notification-channels', $organization) }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                                        Manage saved destinations
+                                    </a>
+                                </div>
+                                <label class="mt-4 flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" wire:model.live="deploy_email_notifications_enabled" class="rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                    <span class="text-sm text-slate-700">Send deploy emails for sites in this organization</span>
+                                </label>
+                            </div>
+
+                            <div class="rounded-md border border-slate-200 bg-white p-4">
+                                <h4 class="text-sm font-medium text-slate-900">How this fits together</h4>
+                                <dl class="mt-3 grid gap-3 md:grid-cols-3 text-sm">
+                                    <div>
+                                        <dt class="font-medium text-slate-800">Inbox</dt>
+                                        <dd class="mt-1 text-slate-600">Every published event can appear in-app so operators have one shared activity stream.</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="font-medium text-slate-800">Destinations</dt>
+                                        <dd class="mt-1 text-slate-600">Saved channels and webhook endpoints receive copies when their rules match an event.</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="font-medium text-slate-800">Rules</dt>
+                                        <dd class="mt-1 text-slate-600">Projects, servers, sites, and org-level settings decide which destinations get which events.</dd>
+                                    </div>
+                                </dl>
+                            </div>
                         </div>
                     </section>
                 @endif
@@ -199,13 +230,20 @@
 
                     <section class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         <div class="px-6 py-4 border-b border-slate-200">
-                            <h3 class="font-medium text-slate-900">Deploy integrations (Slack / Discord / Teams)</h3>
-                            <p class="text-sm text-slate-500 mt-1">{{ __('POSTs a short text payload on deploy finished and optionally when Insights open or resolve. Org-wide hooks fire for every site; site-specific hooks only when that site deploys.') }}</p>
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="font-medium text-slate-900">Webhook destinations</h3>
+                                    <p class="text-sm text-slate-500 mt-1">{{ __('These destinations are part of the shared notification system. They receive deploy and insight events from the same universal pipeline that powers the inbox and saved channels. Org-wide hooks fire for every site; site-specific hooks only when that site deploys.') }}</p>
+                                </div>
+                                <a href="{{ route('organizations.notification-channels', $organization) }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                                    Open notification channels
+                                </a>
+                            </div>
                         </div>
                         <div class="px-6 py-4 space-y-4">
-                            <form wire:submit="saveOutboundIntegration" class="flex flex-col gap-3 max-w-2xl">
+                            <form wire:submit="saveWebhookDestination" class="flex flex-col gap-3 max-w-2xl">
                                 <div class="flex flex-wrap gap-2">
-                                    <input type="text" wire:model="int_hook_name" placeholder="Name" required class="rounded-md border-slate-300 shadow-sm text-sm flex-1 min-w-[140px]">
+                                    <input type="text" wire:model="int_hook_name" placeholder="Destination name" required class="rounded-md border-slate-300 shadow-sm text-sm flex-1 min-w-[140px]">
                                     <select wire:model="int_hook_driver" class="rounded-md border-slate-300 shadow-sm text-sm">
                                         <option value="slack">Slack</option>
                                         <option value="discord">Discord</option>
@@ -214,7 +252,7 @@
                                 </div>
                                 <input type="url" wire:model="int_hook_url" placeholder="Incoming webhook URL" required class="rounded-md border-slate-300 shadow-sm text-sm w-full font-mono text-xs">
                                 <div>
-                                    <label for="int_hook_site_id" class="block text-xs font-medium text-slate-600 mb-1">Limit to site (optional)</label>
+                                    <label for="int_hook_site_id" class="block text-xs font-medium text-slate-600 mb-1">Limit this destination to one site (optional)</label>
                                     <select id="int_hook_site_id" wire:model="int_hook_site_id" class="rounded-md border-slate-300 shadow-sm text-sm w-full max-w-md">
                                         <option value="">All sites in this org</option>
                                         @foreach ($organization->sites as $s)
@@ -223,21 +261,21 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-700">
-                                    <span class="text-xs font-medium text-slate-500 w-full">{{ __('Deploy') }}</span>
+                                    <span class="text-xs font-medium text-slate-500 w-full">{{ __('Deploy events') }}</span>
                                     <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_success" class="rounded border-slate-300"> {{ __('Success') }}</label>
                                     <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_failed" class="rounded border-slate-300"> {{ __('Failed') }}</label>
                                     <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_skipped" class="rounded border-slate-300"> {{ __('Skipped') }}</label>
-                                    <span class="text-xs font-medium text-slate-500 w-full sm:ml-0">{{ __('Insights (org-wide hooks only)') }}</span>
+                                    <span class="text-xs font-medium text-slate-500 w-full sm:ml-0">{{ __('Insight events (org-wide destinations only)') }}</span>
                                     <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_opened" class="rounded border-slate-300"> {{ __('Opened') }}</label>
                                     <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_resolved" class="rounded border-slate-300"> {{ __('Resolved') }}</label>
                                 </div>
-                                <x-primary-button type="submit" class="!text-sm w-fit">Add integration</x-primary-button>
+                                <x-primary-button type="submit" class="!text-sm w-fit">Add webhook destination</x-primary-button>
                             </form>
-                            @if ($organization->integrationOutboundWebhooks->isEmpty())
-                                <p class="text-sm text-slate-500">No integrations yet.</p>
+                            @if ($organization->notificationWebhookDestinations->isEmpty())
+                                <p class="text-sm text-slate-500">No webhook destinations yet.</p>
                             @else
                                 <ul class="divide-y divide-slate-100 border border-slate-100 rounded-md">
-                                    @foreach ($organization->integrationOutboundWebhooks as $hook)
+                                    @foreach ($organization->notificationWebhookDestinations as $hook)
                                         <li class="px-4 py-3 flex flex-wrap justify-between gap-2 text-sm">
                                             <div>
                                                 <span class="font-medium">{{ $hook->name }}</span>
@@ -248,8 +286,8 @@
                                                 <span class="text-xs ml-2 {{ $hook->enabled ? 'text-green-600' : 'text-slate-400' }}">{{ $hook->enabled ? 'on' : 'off' }}</span>
                                             </div>
                                             <div class="flex gap-2">
-                                                <button type="button" wire:click="toggleOutboundIntegration({{ $hook->id }})" class="text-slate-600 hover:underline text-xs">Toggle</button>
-                                                <button type="button" wire:click="openConfirmActionModal('deleteOutboundIntegration', ['{{ $hook->id }}'], @js(__('Remove integration')), @js(__('Remove this integration?')), @js(__('Remove')), true)" class="text-red-600 hover:underline text-xs">Remove</button>
+                                                <button type="button" wire:click="toggleWebhookDestination('{{ $hook->id }}')" class="text-slate-600 hover:underline text-xs">Toggle</button>
+                                                <button type="button" wire:click="openConfirmActionModal('deleteWebhookDestination', ['{{ $hook->id }}'], @js(__('Remove webhook destination')), @js(__('Remove this webhook destination?')), @js(__('Remove')), true)" class="text-red-600 hover:underline text-xs">Remove</button>
                                             </div>
                                         </li>
                                     @endforeach

@@ -2,8 +2,6 @@
 
 namespace App\Services\Notifications;
 
-use App\Models\NotificationChannel;
-use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\User;
@@ -11,6 +9,10 @@ use App\Support\ServerDatabaseNotificationKeys;
 
 final class ServerDatabaseNotificationDispatcher
 {
+    public function __construct(
+        private readonly NotificationPublisher $publisher,
+    ) {}
+
     public function notifyIfSubscribed(
         Server $server,
         string $kind,
@@ -23,18 +25,6 @@ final class ServerDatabaseNotificationDispatcher
         }
 
         $eventKey = ServerDatabaseNotificationKeys::eventKey($kind);
-
-        $subs = NotificationSubscription::query()
-            ->where('event_key', $eventKey)
-            ->where('subscribable_type', Server::class)
-            ->where('subscribable_id', $server->id)
-            ->with('channel')
-            ->get()
-            ->unique('notification_channel_id');
-
-        if ($subs->isEmpty()) {
-            return;
-        }
 
         $subject = match ($kind) {
             'created' => '['.config('app.name').'] '.$server->name.' — database created',
@@ -62,13 +52,20 @@ final class ServerDatabaseNotificationDispatcher
         $text = implode("\n", $lines);
         $url = route('servers.databases', $server, absolute: true);
 
-        foreach ($subs as $sub) {
-            $channel = $sub->channel;
-            if (! $channel instanceof NotificationChannel) {
-                continue;
-            }
-
-            $channel->sendOperationalMessage($subject, $text, $url, __('Open Databases'));
-        }
+        $this->publisher->publish(
+            eventKey: $eventKey,
+            subject: $database,
+            title: $subject,
+            body: $text,
+            url: $url,
+            metadata: [
+                'server_id' => $server->id,
+                'database_id' => $database->id,
+                'database_name' => $database->name,
+                'kind' => $kind,
+                'dropped_from_server' => $droppedFromServer,
+            ],
+            actor: $actor,
+        );
     }
 }

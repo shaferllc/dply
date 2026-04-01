@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Server;
 use App\Notifications\SupervisorProgramsUnhealthyNotification;
+use App\Services\Notifications\NotificationPublisher;
 use App\Services\Servers\SupervisorProvisioner;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -18,7 +19,7 @@ class CheckSupervisorHealthCommand extends Command
 
     protected $description = 'SSH to servers with Supervisor programs, snapshot status, and alert org admins on failure states';
 
-    public function handle(SupervisorProvisioner $provisioner): int
+    public function handle(SupervisorProvisioner $provisioner, NotificationPublisher $notificationPublisher): int
     {
         if (! config('dply.supervisor_health_check_enabled', true)) {
             $this->info('Supervisor health checks are disabled (DPLY_SUPERVISOR_HEALTH_CHECK_ENABLED).');
@@ -31,7 +32,7 @@ class CheckSupervisorHealthCommand extends Command
             ->whereNotNull('ip_address')
             ->whereHas('supervisorPrograms', fn ($q) => $q->where('is_active', true))
             ->with(['organization', 'supervisorPrograms'])
-            ->chunk(50, function ($servers) use ($provisioner): void {
+            ->chunk(50, function ($servers) use ($provisioner, $notificationPublisher): void {
                 foreach ($servers as $server) {
                     /** @var Server $server */
                     if (empty($server->ssh_private_key)) {
@@ -71,10 +72,23 @@ class CheckSupervisorHealthCommand extends Command
                                     ->wherePivotIn('role', ['owner', 'admin'])
                                     ->get();
                                 if ($users->isNotEmpty()) {
-                                    Notification::send(
-                                        $users,
-                                        new SupervisorProgramsUnhealthyNotification($server, $issueSummary)
+                                    $event = $notificationPublisher->publish(
+                                        eventKey: 'server.supervisor.unhealthy',
+                                        subject: $server,
+                                        title: '['.config('app.name').'] Supervisor programs need attention',
+                                        body: $issueSummary,
+                                        url: route('servers.daemons', $server, absolute: true),
+                                        recipientUsers: $users->pluck('id')->all(),
+                                        metadata: [
+                                            'server_id' => $server->id,
+                                            'server_name' => $server->name,
+                                            'organization_name' => $server->organization->name,
+                                            'summary' => $issueSummary,
+                                            'config_drift' => $drift,
+                                        ],
                                     );
+
+                                    Notification::send($users, new SupervisorProgramsUnhealthyNotification($event));
                                 }
                             }
                         }

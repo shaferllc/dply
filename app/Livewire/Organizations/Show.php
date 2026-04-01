@@ -4,12 +4,13 @@ namespace App\Livewire\Organizations;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\ApiToken;
-use App\Models\IntegrationOutboundWebhook;
+use App\Models\NotificationWebhookDestination;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\OrganizationInvitationNotification;
+use App\Services\Notifications\NotificationPublisher;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -41,7 +42,7 @@ class Show extends Component
 
     public string $int_hook_name = '';
 
-    public string $int_hook_driver = IntegrationOutboundWebhook::DRIVER_SLACK;
+    public string $int_hook_driver = NotificationWebhookDestination::DRIVER_SLACK;
 
     public string $int_hook_url = '';
 
@@ -86,7 +87,7 @@ class Show extends Component
                 'teams' => fn ($q) => $q->withCount('users')->with('users'),
                 'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
                 'apiTokens',
-                'integrationOutboundWebhooks',
+                'notificationWebhookDestinations',
                 'sites' => fn ($q) => $q->orderBy('name'),
             ]);
         $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
@@ -160,7 +161,24 @@ class Show extends Component
             auth()->user()
         );
 
-        Notification::route('mail', $email)->notify(new OrganizationInvitationNotification($invitation));
+        $event = app(NotificationPublisher::class)->publish(
+            eventKey: 'organization.invitation.sent',
+            subject: $this->organization,
+            title: 'Invitation sent',
+            body: $email.' was invited to join '.$this->organization->name.'.',
+            url: route('organizations.show', $this->organization, absolute: true),
+            actor: auth()->user(),
+            recipientUsers: $this->organization->users()->wherePivotIn('role', ['owner', 'admin'])->pluck('users.id')->all(),
+            metadata: [
+                'invitation_id' => $invitation->id,
+                'invitation_token' => $invitation->token,
+                'email' => $email,
+                'role' => $invitation->role,
+                'organization_name' => $this->organization->name,
+                'inviter_name' => auth()->user()?->name ?? auth()->user()?->email ?? __('Someone'),
+            ],
+        );
+        Notification::route('mail', $email)->notify(new OrganizationInvitationNotification($event));
         audit_log($this->organization, auth()->user(), 'invitation.sent', $invitation);
 
         $this->reset(['invite_email', 'invite_role']);
@@ -328,7 +346,7 @@ class Show extends Component
         $this->dispatch('notify', message: 'Member removed from team.');
     }
 
-    public function saveOutboundIntegration(): void
+    public function saveWebhookDestination(): void
     {
         $this->authorize('update', $this->organization);
 
@@ -363,7 +381,7 @@ class Show extends Component
             $events[] = 'insight_resolved';
         }
 
-        IntegrationOutboundWebhook::query()->create([
+        NotificationWebhookDestination::query()->create([
             'organization_id' => $this->organization->id,
             'site_id' => $siteId,
             'name' => $this->int_hook_name,
@@ -374,29 +392,29 @@ class Show extends Component
         ]);
 
         $this->reset(['int_hook_name', 'int_hook_url', 'int_hook_site_id']);
-        $this->int_hook_driver = IntegrationOutboundWebhook::DRIVER_SLACK;
+        $this->int_hook_driver = NotificationWebhookDestination::DRIVER_SLACK;
         $this->int_evt_success = true;
         $this->int_evt_failed = true;
         $this->int_evt_skipped = true;
         $this->int_evt_insight_opened = false;
         $this->int_evt_insight_resolved = false;
         $this->refreshOrganization();
-        $this->dispatch('notify', message: 'Integration webhook saved.');
+        $this->dispatch('notify', message: 'Webhook destination saved.');
     }
 
-    public function deleteOutboundIntegration(string $id): void
+    public function deleteWebhookDestination(string $id): void
     {
         $this->authorize('update', $this->organization);
-        $hook = $this->organization->integrationOutboundWebhooks()->whereKey($id)->firstOrFail();
+        $hook = $this->organization->notificationWebhookDestinations()->whereKey($id)->firstOrFail();
         $hook->delete();
         $this->refreshOrganization();
-        $this->dispatch('notify', message: 'Integration removed.');
+        $this->dispatch('notify', message: 'Webhook destination removed.');
     }
 
-    public function toggleOutboundIntegration(int $id): void
+    public function toggleWebhookDestination(string $id): void
     {
         $this->authorize('update', $this->organization);
-        $hook = $this->organization->integrationOutboundWebhooks()->whereKey($id)->firstOrFail();
+        $hook = $this->organization->notificationWebhookDestinations()->whereKey($id)->firstOrFail();
         $hook->update(['enabled' => ! $hook->enabled]);
         $this->refreshOrganization();
     }

@@ -5,14 +5,12 @@ namespace App\Services\Insights;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Integrations\InsightsWebhookDispatcher;
 
 class InsightFindingRecorder
 {
     public function __construct(
         protected InsightsNotificationDispatcher $notifications,
         protected InsightCorrelationService $correlation,
-        protected InsightsWebhookDispatcher $webhooks,
     ) {}
 
     /**
@@ -74,7 +72,7 @@ class InsightFindingRecorder
         ])->save();
 
         if ($org !== null && $server !== null) {
-            $this->webhooks->dispatchInsightResolved($org, $server, $finding->fresh());
+            $this->notifications->notifyIfSubscribed($server, $finding->fresh(), false, 'resolved');
         }
     }
 
@@ -117,9 +115,6 @@ class InsightFindingRecorder
             if ($this->shouldNotifySubscribers($c->insightKey)) {
                 $this->notifications->notifyIfSubscribed($server, $row, wasReopened: false);
             }
-            if ($server->organization !== null) {
-                $this->webhooks->dispatchInsightOpened($server->organization, $server, $row);
-            }
 
             return;
         }
@@ -148,9 +143,6 @@ class InsightFindingRecorder
 
         if ($this->shouldNotifySubscribers($c->insightKey)) {
             $this->notifications->notifyIfSubscribed($server, $existing->fresh(), wasReopened: true);
-        }
-        if ($server->organization !== null) {
-            $this->webhooks->dispatchInsightOpened($server->organization, $server, $existing->fresh());
         }
     }
 

@@ -284,6 +284,165 @@
                     <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
                         <div class="flex items-start justify-between gap-4">
                             <div>
+                                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Notifications') }}</h3>
+                                <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Add channels, assign common server events here, and open the deeper notification pages only when you need more control.') }}</p>
+                            </div>
+                            @if ($server->organization_id)
+                                <a
+                                    href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
+                                    wire:navigate
+                                    class="text-sm font-medium text-brand-sage hover:text-brand-forest"
+                                >
+                                    {{ __('Assign events') }}
+                                </a>
+                            @endif
+                        </div>
+
+                        <div class="mt-5 space-y-4">
+                            <x-resource-notification-summary
+                                :resource="$server"
+                                :heading="__('Server notifications')"
+                                :manage-url="route('profile.notification-channels.bulk-assign', ['server' => $server->id])"
+                            />
+
+                            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h4 class="text-sm font-semibold text-brand-ink">{{ __('Quick assign') }}</h4>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Pick one or more channels plus the server events you want routed from this server.') }}</p>
+                                    </div>
+                                    <a
+                                        href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
+                                        wire:navigate
+                                        class="text-xs font-medium text-brand-sage hover:text-brand-forest"
+                                    >
+                                        {{ __('Open advanced assignment') }}
+                                    </a>
+                                </div>
+
+                                <div class="mt-4 rounded-2xl border border-brand-ink/10 bg-white p-4">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <h5 class="text-sm font-semibold text-brand-ink">{{ __('Quick add channel') }}</h5>
+                                            <p class="mt-1 text-sm text-brand-moss">{{ __('Create a new destination here, then it will be selected automatically for assignment below.') }}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            wire:click="openQuickNotificationChannelModal"
+                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        >
+                                            <x-heroicon-o-plus class="h-4 w-4 shrink-0 opacity-90" />
+                                            {{ __('Add channel') }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 grid gap-5 lg:grid-cols-2">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Channels') }}</p>
+                                        <div class="mt-3 space-y-2">
+                                            @forelse ($assignableChannels as $channel)
+                                                <label class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm text-brand-ink">
+                                                    <input
+                                                        type="checkbox"
+                                                        wire:model.live="quick_notification_channel_ids"
+                                                        value="{{ $channel->id }}"
+                                                        class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
+                                                    >
+                                                    <span>
+                                                        <span class="font-medium">{{ $channel->label }}</span>
+                                                        <span class="text-brand-mist">[{{ \App\Models\NotificationChannel::labelForType($channel->type) }}]</span>
+                                                    </span>
+                                                </label>
+                                            @empty
+                                                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-3 py-3 text-sm text-brand-moss">
+                                                    {{ __('No channels available yet. Create one from My channels or Organization channels first.') }}
+                                                </div>
+                                            @endforelse
+                                        </div>
+                                        @error('quick_notification_channel_ids')
+                                            <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Server events') }}</p>
+                                        <div class="mt-3 space-y-2">
+                                            @foreach ($serverEventOptions as $eventKey => $eventLabel)
+                                                <label class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm text-brand-ink">
+                                                    <input
+                                                        type="checkbox"
+                                                        wire:model.live="quick_notification_event_keys"
+                                                        value="{{ $eventKey }}"
+                                                        class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
+                                                    >
+                                                    <span>{{ $eventLabel }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                        @error('quick_notification_event_keys')
+                                            <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        wire:click="saveQuickNotificationAssignments"
+                                        wire:loading.attr="disabled"
+                                        wire:target="saveQuickNotificationAssignments"
+                                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <x-heroicon-o-bell-alert class="h-4 w-4 shrink-0 opacity-90" />
+                                        <span wire:loading.remove wire:target="saveQuickNotificationAssignments">{{ __('Save quick assignment') }}</span>
+                                        <span wire:loading wire:target="saveQuickNotificationAssignments">{{ __('Saving…') }}</span>
+                                    </button>
+                                    <a
+                                        href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
+                                        wire:navigate
+                                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    >
+                                        <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 opacity-90" />
+                                        {{ __('Advanced assignment') }}
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap gap-2">
+                                <a
+                                    href="{{ route('profile.notification-channels') }}"
+                                    wire:navigate
+                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-bell class="h-4 w-4 shrink-0 opacity-90" />
+                                    {{ __('My channels') }}
+                                </a>
+                                @if ($server->organization_id)
+                                    <a
+                                        href="{{ route('organizations.notification-channels', $server->organization_id) }}"
+                                        wire:navigate
+                                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    >
+                                        <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0 opacity-90" />
+                                        {{ __('Organization channels') }}
+                                    </a>
+                                    <a
+                                        href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
+                                        wire:navigate
+                                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest"
+                                    >
+                                        <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 opacity-90" />
+                                        {{ __('Assign server events') }}
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
                                 <h3 class="text-lg font-semibold text-brand-ink">{{ __('Latest deploy') }}</h3>
                                 <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Use this summary to spot the most recent release outcome before opening the full deploy workspace.') }}</p>
                             </div>
@@ -417,6 +576,15 @@
         </div>
     @endcan
     @endif
+
+    <x-notification-channel-quick-add-modal
+        :show="$showQuickNotificationChannelModal"
+        :types="$quickAddTypes"
+        :current-type="$quick_new_type"
+        :can-manage-organization-notification-channels="$canManageOrganizationNotificationChannels"
+        :title="__('Quick add channel')"
+        :description="__('Create a new destination here, then it will be selected automatically for assignment below.')"
+    />
 
     <x-slot name="modals">
         @include('livewire.servers.partials.remove-server-modal', [

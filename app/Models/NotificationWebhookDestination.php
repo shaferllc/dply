@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class IntegrationOutboundWebhook extends Model
+class NotificationWebhookDestination extends Model
 {
     use HasUlids;
+
+    protected $table = 'notification_webhook_destinations';
 
     public const DRIVER_SLACK = 'slack';
 

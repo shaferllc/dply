@@ -103,6 +103,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->morphMany(NotificationChannel::class, 'owner');
     }
 
+    public function notificationInboxItems(): HasMany
+    {
+        return $this->hasMany(NotificationInboxItem::class)->latest();
+    }
+
     public function backupConfigurations(): HasMany
     {
         return $this->hasMany(BackupConfiguration::class);

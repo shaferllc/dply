@@ -9,7 +9,6 @@ use App\Support\ServerProviderGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 
 class ProviderOAuthController extends Controller
@@ -48,7 +47,7 @@ class ProviderOAuthController extends Controller
         }
 
         $nonce = Str::random(40);
-        Session::put('credentials_oauth:digitalocean:'.$nonce, [
+        $request->session()->put('credentials_oauth:digitalocean:'.$nonce, [
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'label' => $label !== '' ? $label : null,
@@ -84,7 +83,7 @@ class ProviderOAuthController extends Controller
         ]);
 
         $nonce = $request->string('state')->toString();
-        $payload = Session::pull('credentials_oauth:digitalocean:'.$nonce);
+        $payload = $request->session()->pull('credentials_oauth:digitalocean:'.$nonce);
 
         if (! is_array($payload)) {
             return redirect()
@@ -96,7 +95,7 @@ class ProviderOAuthController extends Controller
         $organizationId = $payload['organization_id'] ?? null;
         $issuedAt = $payload['issued_at'] ?? 0;
 
-        if (! is_int($userId) || ! is_int($organizationId) || ! is_int($issuedAt)) {
+        if (! is_int($userId) || ! is_string($organizationId) || $organizationId === '' || ! is_int($issuedAt)) {
             return redirect()
                 ->route('credentials.index', ['provider' => 'digitalocean'])
                 ->with('error', __('Invalid or expired OAuth state. Please try again.'));
@@ -118,7 +117,7 @@ class ProviderOAuthController extends Controller
         $org = Organization::query()->find($organizationId);
         if (! $org || ! $org->hasMember($user) || $org->userIsDeployer($user)) {
             return redirect()
-                ->route('credentials.index', ['provider' => 'digitalocean'])
+                ->route('organizations.credentials', ['organization' => $organizationId, 'provider' => 'digitalocean'])
                 ->with('error', __('You cannot add credentials for that organization.'));
         }
 
@@ -126,7 +125,7 @@ class ProviderOAuthController extends Controller
 
         if (! $this->digitalOceanOAuthConfigured()) {
             return redirect()
-                ->route('credentials.index', ['provider' => 'digitalocean'])
+                ->route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'])
                 ->with('error', __('DigitalOcean OAuth is not configured.'));
         }
 
@@ -146,14 +145,14 @@ class ProviderOAuthController extends Controller
                 ?? $tokenResponse->body();
 
             return redirect()
-                ->route('credentials.index', ['provider' => 'digitalocean'])
+                ->route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'])
                 ->with('error', __('Could not complete DigitalOcean sign-in: :detail', ['detail' => is_string($detail) ? $detail : __('unknown error')]));
         }
 
         $accessToken = $tokenResponse->json('access_token');
         if (! is_string($accessToken) || $accessToken === '') {
             return redirect()
-                ->route('credentials.index', ['provider' => 'digitalocean'])
+                ->route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'])
                 ->with('error', __('DigitalOcean did not return an access token.'));
         }
 
@@ -183,12 +182,12 @@ class ProviderOAuthController extends Controller
             $credential->delete();
 
             return redirect()
-                ->route('credentials.index', ['provider' => 'digitalocean'])
+                ->route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'])
                 ->with('error', __('Connected account could not use the API: :message', ['message' => $e->getMessage()]));
         }
 
         return redirect()
-            ->route('credentials.index', ['provider' => 'digitalocean'])
+            ->route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'])
             ->with('success', __('DigitalOcean connected.'));
     }
 

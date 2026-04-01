@@ -432,7 +432,7 @@
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Personal access tokens for the HTTP API.') }}</p>
             </a>
             @if ($currentOrg)
-                <a href="{{ route('credentials.index') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
+                <a href="{{ route('organizations.credentials', $currentOrg) }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
                     <h3 class="font-medium text-brand-ink">{{ __('Server providers') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Cloud API tokens to create and manage infrastructure.') }}</p>
                 </a>

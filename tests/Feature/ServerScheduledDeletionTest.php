@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\WorkspaceOverview;
+use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
@@ -53,6 +54,17 @@ class ServerScheduledDeletionTest extends TestCase
         $server->refresh();
         $this->assertNotNull($server->scheduled_deletion_at);
         $this->assertTrue($server->scheduled_deletion_at->isFuture());
+        $this->assertDatabaseHas('notification_events', [
+            'event_key' => 'server.removal.scheduled',
+            'subject_type' => Server::class,
+            'subject_id' => $server->id,
+            'organization_id' => $org->id,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'type' => \App\Notifications\UniversalEventNotification::class,
+        ]);
     }
 
     public function test_wrong_confirm_name_is_rejected(): void
@@ -88,6 +100,15 @@ class ServerScheduledDeletionTest extends TestCase
         $this->artisan(ProcessScheduledServerDeletionsCommand::class)->assertSuccessful();
 
         $this->assertModelMissing($server);
+        $this->assertDatabaseHas('notification_events', [
+            'event_key' => 'server.removal.executed',
+            'organization_id' => $org->id,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'type' => \App\Notifications\UniversalEventNotification::class,
+        ]);
     }
 
     public function test_cancel_scheduled_removal_clears_timestamp(): void
@@ -105,6 +126,99 @@ class ServerScheduledDeletionTest extends TestCase
             ->call('cancelScheduledServerRemoval');
 
         $this->assertNull($server->fresh()->scheduled_deletion_at);
+    }
+
+    public function test_server_overview_exposes_notification_management_actions(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'notify-server',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_DONE,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('servers.overview', $server))
+            ->assertOk()
+            ->assertSee('Server notifications')
+            ->assertSee('My channels')
+            ->assertSee('Organization channels')
+            ->assertSee('Assign server events');
+    }
+
+    public function test_server_overview_can_quick_assign_server_notifications(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'notify-server',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_DONE,
+        ]);
+
+        $channel = NotificationChannel::factory()->forUser($user)->create([
+            'type' => NotificationChannel::TYPE_SLACK,
+            'label' => 'Ops',
+            'config' => [
+                'webhook_url' => 'https://hooks.slack.com/services/T/B/X',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceOverview::class, ['server' => $server])
+            ->set('quick_notification_channel_ids', [(string) $channel->id])
+            ->set('quick_notification_event_keys', ['server.monitoring', 'server.ssh_login'])
+            ->call('saveQuickNotificationAssignments')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('notification_subscriptions', [
+            'notification_channel_id' => $channel->id,
+            'subscribable_type' => Server::class,
+            'subscribable_id' => $server->id,
+            'event_key' => 'server.monitoring',
+        ]);
+
+        $this->assertDatabaseHas('notification_subscriptions', [
+            'notification_channel_id' => $channel->id,
+            'subscribable_type' => Server::class,
+            'subscribable_id' => $server->id,
+            'event_key' => 'server.ssh_login',
+        ]);
+    }
+
+    public function test_server_overview_can_quick_add_notification_channel(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'notify-server',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_DONE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceOverview::class, ['server' => $server])
+            ->set('quick_new_owner_scope', 'personal')
+            ->set('quick_new_type', NotificationChannel::TYPE_SLACK)
+            ->set('quick_new_label', 'Ops alerts')
+            ->set('quick_new_slack_webhook_url', 'https://hooks.slack.com/services/T/B/X')
+            ->call('createQuickNotificationChannel')
+            ->assertHasNoErrors()
+            ->assertSet('quick_new_label', '');
+
+        $this->assertDatabaseHas('notification_channels', [
+            'owner_type' => User::class,
+            'owner_id' => $user->id,
+            'type' => NotificationChannel::TYPE_SLACK,
+            'label' => 'Ops alerts',
+        ]);
     }
 
     public function test_rerun_setup_queues_fresh_setup_attempt_for_existing_server(): void
