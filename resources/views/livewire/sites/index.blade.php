@@ -40,11 +40,28 @@
                                         </a>
                                     @endif
                                 </p>
+                                @if ($site->isProvisioning())
+                                    <p class="mt-1 text-xs text-brand-moss">
+                                        {{ __('Provisioning step: :step', ['step' => str_replace('_', ' ', $site->provisioningState() ?? 'queued')]) }}
+                                    </p>
+                                @elseif ($site->provisioningState() === 'failed')
+                                    <p class="mt-1 text-xs text-red-700">
+                                        {{ $site->provisioningError() ?: __('Provisioning failed.') }}
+                                    </p>
+                                @endif
                             </div>
                             <div class="flex flex-wrap items-center gap-2 text-sm text-brand-moss">
-                                <x-badge size="sm">{{ str_replace('_', ' ', $site->status) }}</x-badge>
+                                <x-badge size="sm">{{ $site->statusLabel() }}</x-badge>
+                                @if ($site->isProvisioning())
+                                    <x-badge size="sm" tone="accent">{{ __('Provisioning') }}</x-badge>
+                                @endif
                                 @if ($site->ssl_status !== 'none')
                                     <x-badge size="sm" tone="accent">{{ __('SSL: :status', ['status' => $site->ssl_status]) }}</x-badge>
+                                @endif
+                                @if ($site->visitUrl())
+                                    <a href="{{ $site->visitUrl() }}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-xs font-medium text-brand-ink hover:underline">
+                                        {{ __('Visit') }}
+                                    </a>
                                 @endif
                             </div>
                         </li>

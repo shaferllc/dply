@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\User;
+use App\Models\UserSshKey;
 use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -68,6 +69,47 @@ class ServerWorkspaceSshKeysTest extends TestCase
             ->assertDontSee('Bulk import')
             ->assertDontSee('Export CSV')
             ->assertDontSee('Export audit CSV');
+    }
+
+    public function test_component_reminds_user_when_server_has_no_personal_profile_key_attached(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('p', 43).' reminder-test',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertSee('Add one of your personal SSH keys to this server')
+            ->assertSee('Select a key from your profile')
+            ->assertSee('Sync authorized_keys');
+    }
+
+    public function test_component_hides_reminder_when_server_has_current_users_personal_key_attached(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $profileKey = UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('q', 43).' attached-test',
+        ]);
+
+        ServerAuthorizedKey::query()->create([
+            'server_id' => $server->id,
+            'managed_key_type' => UserSshKey::class,
+            'managed_key_id' => $profileKey->id,
+            'name' => $profileKey->name,
+            'public_key' => $profileKey->public_key,
+            'target_linux_user' => '',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertDontSee('Add one of your personal SSH keys to this server');
     }
 
     public function test_delete_key_writes_audit_event(): void

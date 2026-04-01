@@ -63,6 +63,41 @@
                     </div>
                 </div>
 
+                @if (! $serverHasPersonalProfileKey)
+                    <div class="mt-6 rounded-2xl border border-brand-gold/40 bg-brand-sand/40 p-5 text-sm text-brand-olive">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="max-w-2xl">
+                                <p class="font-semibold text-brand-ink">{{ __('Add one of your personal SSH keys to this server') }}</p>
+                                <p class="mt-2 leading-6">
+                                    @if ($profileKeys->isNotEmpty())
+                                        {{ __('Select a key from your profile or paste a new one here, then sync authorized_keys so this server includes one of your personal login keys.') }}
+                                    @else
+                                        {{ __('You do not have any personal SSH keys saved in your profile yet. Add one first, then come back here to attach it to this server.') }}
+                                    @endif
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap gap-3">
+                                @if ($profileKeys->isEmpty())
+                                    <a
+                                        href="{{ route('profile.ssh-keys') }}"
+                                        wire:navigate
+                                        class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 font-medium text-brand-ink hover:bg-brand-sand/40"
+                                    >
+                                        {{ __('Add profile key') }}
+                                    </a>
+                                @endif
+                                <button type="button" wire:click="syncAuthorizedKeys" wire:loading.attr="disabled" wire:target="syncAuthorizedKeys" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 font-medium text-brand-ink disabled:opacity-50">
+                                    <span wire:loading.remove wire:target="syncAuthorizedKeys">{{ __('Sync authorized_keys') }}</span>
+                                    <span wire:loading wire:target="syncAuthorizedKeys" class="inline-flex items-center gap-2">
+                                        <x-spinner variant="forest" size="sm" />
+                                        {{ __('Syncing…') }}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 @if ($profileKeys->isNotEmpty())
                     <div class="mt-6">
                         <x-input-label for="profile_key_id" :value="__('Select SSH key from your profile')" />

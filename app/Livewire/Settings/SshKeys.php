@@ -10,6 +10,7 @@ use App\Services\Servers\UserSshKeyDeploymentService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -45,9 +46,19 @@ class SshKeys extends Component
 
     public ?string $flash_error = null;
 
+    public ?string $setup_source = null;
+
+    public ?string $return_to = null;
+
     public function mount(): void
     {
         $this->authorize('viewAny', UserSshKey::class);
+
+        $source = request()->string('source')->toString();
+        $returnTo = request()->string('return_to')->toString();
+
+        $this->setup_source = $source !== '' ? $source : null;
+        $this->return_to = $returnTo !== '' && Route::has($returnTo) ? $returnTo : null;
     }
 
     public function createKey(UserSshKeyDeploymentService $deployment): void
@@ -102,6 +113,10 @@ class SshKeys extends Component
             ? __('SSH key saved.')
             : __('SSH key saved and deployed to the selected servers.');
         $this->flash_error = null;
+
+        if ($this->setup_source === 'servers.create') {
+            $this->flash_success .= ' '.__('You can go back to create your server now.');
+        }
     }
 
     public function startEdit(int $id): void
@@ -256,6 +271,7 @@ class SshKeys extends Component
             'sshKeys' => $keys,
             'servers' => $this->serversForUi(),
             'currentOrganization' => Auth::user()->currentOrganization(),
+            'returnUrl' => $this->return_to ? route($this->return_to) : null,
         ]);
     }
 }

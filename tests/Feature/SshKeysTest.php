@@ -34,6 +34,21 @@ class SshKeysTest extends TestCase
             ->assertOk();
     }
 
+    public function test_ssh_keys_page_can_show_server_create_onboarding_help(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('profile.ssh-keys', [
+                'source' => 'servers.create',
+                'return_to' => 'servers.create',
+            ]))
+            ->assertOk()
+            ->assertSee('Add at least one SSH key to your profile first')
+            ->assertSee('Back to create server')
+            ->assertSee('ssh-keygen -t ed25519 -C "you@example.com"');
+    }
+
     public function test_user_can_create_ssh_key_without_deploy(): void
     {
         $user = $this->userWithOrganization();

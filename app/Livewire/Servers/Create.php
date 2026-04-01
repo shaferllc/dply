@@ -19,6 +19,7 @@ use App\Services\SshConnection;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -44,6 +45,18 @@ class Create extends Component
 
     public function mount(): void
     {
+        $user = auth()->user();
+        $org = $user?->currentOrganization();
+
+        if ($user && $org && ! $user->sshKeys()->exists()) {
+            $this->redirectRoute('profile.ssh-keys', [
+                'source' => 'servers.create',
+                'return_to' => 'servers.create',
+            ], navigate: true);
+
+            return;
+        }
+
         $ids = CredentialsIndex::credentialProviderIds();
         if ($ids !== [] && ! in_array($this->active_provider, $ids, true)) {
             $this->active_provider = $ids[0];
@@ -53,7 +66,6 @@ class Create extends Component
             $this->form->type = ServerProviderGate::defaultServerCreateType();
         }
 
-        $org = auth()->user()?->currentOrganization();
         $hasAnyProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
@@ -118,6 +130,14 @@ class Create extends Component
 
             return null;
         }
+
+        if (! $user->sshKeys()->exists()) {
+            return $this->redirectRoute('profile.ssh-keys', [
+                'source' => 'servers.create',
+                'return_to' => 'servers.create',
+            ], navigate: true);
+        }
+
         if (! $org->canCreateServer()) {
             $this->addError('org', 'Server limit reached for your plan. Upgrade to add more.');
 
@@ -524,6 +544,9 @@ class Create extends Component
             ];
 
         $canCreateServer = $org ? $org->canCreateServer() : false;
+        $userSshKeys = auth()->user()?->sshKeys();
+        $hasUserSshKeys = $userSshKeys?->exists() ?? false;
+        $hasProvisionableUserSshKeys = $userSshKeys?->where('provision_on_new_servers', true)->exists() ?? false;
         $hasAnyProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
@@ -561,6 +584,8 @@ class Create extends Component
                 $catalog,
                 $provisionOptions,
                 $canCreateServer,
+                $hasUserSshKeys,
+                $hasProvisionableUserSshKeys,
                 $hasAnyProviderCredentials,
                 $hasLinkedCredential,
                 $providerHealth,

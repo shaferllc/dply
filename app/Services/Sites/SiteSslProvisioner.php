@@ -15,7 +15,7 @@ class SiteSslProvisioner
         }
 
         $site->loadMissing('domains');
-        $domains = $site->domains->pluck('hostname')->filter()->unique()->values();
+        $domains = $site->sslDomainHostnames();
         if ($domains->isEmpty()) {
             throw new \InvalidArgumentException('Add at least one domain before requesting SSL.');
         }
@@ -53,6 +53,7 @@ class SiteSslProvisioner
             'meta' => array_merge($site->meta ?? [], [
                 'ssl_last_output' => $out,
                 'ssl_last_attempt_at' => now()->toIso8601String(),
+                'ssl_last_requested_domains' => $domains->all(),
             ]),
         ]);
 

@@ -149,6 +149,34 @@
                 </div>
             </section>
 
+            @if (! $serverHasPersonalProfileKey)
+                <section class="mt-6 rounded-2xl border border-brand-gold/40 bg-brand-sand/35 p-6">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="max-w-2xl">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Add your personal SSH key before you need this server') }}</h3>
+                            <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                @if ($hasProfileSshKeys)
+                                    {{ __('This server is ready, but it does not yet include one of your personal profile SSH keys. Attach one from the SSH keys workspace and sync authorized_keys so your own login access is on the machine.') }}
+                                @else
+                                    {{ __('This server is ready, but you do not have any personal SSH keys saved in your profile yet. Add one first, then attach it from the SSH keys workspace so your own login access is on the machine.') }}
+                                @endif
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream transition-colors hover:bg-brand-forest">
+                                <x-heroicon-o-key class="h-4 w-4" />
+                                {{ __('Open SSH keys') }}
+                            </a>
+                            @if (! $hasProfileSshKeys)
+                                <a href="{{ route('profile.ssh-keys') }}" wire:navigate class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
+                                    {{ __('Add profile key') }}
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                </section>
+            @endif
+
             <section class="mt-6 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
                 <x-stat-card
                     :label="__('Health')"

@@ -24,6 +24,7 @@ use App\Models\SiteDeployment;
 use App\Models\SiteDomain;
 use App\Models\SupervisorProgram;
 use App\Models\User;
+use App\Models\UserSshKey;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
@@ -192,6 +193,10 @@ class ServerTest extends TestCase
     public function test_servers_create_is_displayed_with_organization(): void
     {
         $user = $this->userWithOrganization();
+        UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('z', 43).' create-test',
+        ]);
 
         $response = $this->actingAs($user)->get(route('servers.create'));
 
@@ -199,9 +204,25 @@ class ServerTest extends TestCase
         $response->assertSee('Create server');
     }
 
+    public function test_servers_create_redirects_to_profile_ssh_keys_when_user_has_no_key(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $this->actingAs($user)
+            ->get(route('servers.create'))
+            ->assertRedirect(route('profile.ssh-keys', [
+                'source' => 'servers.create',
+                'return_to' => 'servers.create',
+            ], false));
+    }
+
     public function test_servers_create_prompts_to_add_provider_when_none_exist(): void
     {
         $user = $this->userWithOrganization();
+        UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('y', 43).' provider-test',
+        ]);
 
         $response = $this->actingAs($user)->get(route('servers.create'));
 
@@ -214,6 +235,47 @@ class ServerTest extends TestCase
         $response->assertDontSee('Choose server type');
         $response->assertDontSee('Cloud server setup');
         $response->assertDontSee('No credentials');
+    }
+
+    public function test_servers_create_warns_when_no_personal_key_is_set_to_provision_on_new_servers(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+            'https://api.digitalocean.com/v2/regions' => Http::response([
+                'regions' => [
+                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
+                ],
+            ]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response([
+                'sizes' => [
+                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
+                ],
+            ]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('m', 43).' no-default',
+            'provision_on_new_servers' => false,
+        ]);
+
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.create'));
+
+        $response->assertOk();
+        $response->assertSee('No personal SSH key is set for new servers');
+        $response->assertSee('This server will be created without one of your saved personal SSH keys unless you attach one after setup or mark a profile key for new servers.');
     }
 
     public function test_servers_create_uses_two_path_flow(): void
@@ -1485,6 +1547,66 @@ class ServerTest extends TestCase
         $response->assertSee('Check health now');
         $response->assertSee('Checking…');
         $response->assertSee('status page');
+    }
+
+    public function test_servers_overview_reminds_user_when_ready_server_has_no_personal_profile_key_attached(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('o', 43).' overview-reminder',
+        ]);
+
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ip_address' => '203.0.113.10',
+            'ssh_user' => 'forge',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_DONE,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        $response->assertSee('Add your personal SSH key before you need this server');
+        $response->assertSee(route('servers.ssh-keys', $server), false);
+    }
+
+    public function test_servers_overview_hides_personal_key_reminder_once_server_has_current_users_key(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $profileKey = UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('n', 43).' overview-attached',
+        ]);
+
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ip_address' => '203.0.113.10',
+            'ssh_user' => 'forge',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_DONE,
+        ]);
+
+        ServerAuthorizedKey::query()->create([
+            'server_id' => $server->id,
+            'managed_key_type' => UserSshKey::class,
+            'managed_key_id' => $profileKey->id,
+            'name' => $profileKey->name,
+            'public_key' => $profileKey->public_key,
+            'target_linux_user' => '',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        $response->assertDontSee('Add your personal SSH key before you need this server');
     }
 
     public function test_server_show_logs_tab_renders(): void

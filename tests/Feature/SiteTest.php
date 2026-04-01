@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Show as SitesShow;
+use App\Jobs\ProvisionSiteJob;
 use App\Models\SiteDomain;
 use App\Models\SiteRelease;
 use App\Models\Organization;
@@ -11,6 +12,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -200,7 +202,75 @@ class SiteTest extends TestCase
         Livewire::actingAs($user)
             ->test(SitesCreate::class, ['server' => $server])
             ->assertSet('form.type', 'php')
+            ->assertSet('form.document_root', '/var/www/app/public')
+            ->assertSet('form.repository_path', '/var/www/app')
             ->assertSet('form.php_version', '8.4');
+    }
+
+    public function test_site_creation_reconfigures_paths_when_stack_changes(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'php_inventory' => [
+                    'supported' => true,
+                    'installed_versions' => ['8.4', '8.3'],
+                    'detected_default_version' => '8.3',
+                ],
+                'default_php_version' => '8.3',
+                'php_new_site_default_version' => '8.4',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.primary_hostname', 'app.example.com')
+            ->assertSet('form.document_root', '/var/www/app-example-com/public')
+            ->assertSet('form.repository_path', '/var/www/app-example-com')
+            ->set('form.type', 'node')
+            ->assertSet('form.document_root', '/var/www/app-example-com')
+            ->assertSet('form.repository_path', '/var/www/app-example-com')
+            ->assertSet('form.app_port', 3000)
+            ->set('form.type', 'php')
+            ->assertSet('form.document_root', '/var/www/app-example-com/public')
+            ->assertSet('form.repository_path', '/var/www/app-example-com');
+    }
+
+    public function test_site_creation_keeps_auto_paths_hidden_until_customized(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'php_inventory' => [
+                    'supported' => true,
+                    'installed_versions' => ['8.4', '8.3'],
+                    'detected_default_version' => '8.3',
+                ],
+                'default_php_version' => '8.3',
+                'php_new_site_default_version' => '8.4',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->assertSet('form.customize_paths', false)
+            ->set('form.primary_hostname', 'api.example.com')
+            ->assertSet('form.document_root', '/var/www/api-example-com/public')
+            ->set('form.customize_paths', true)
+            ->set('form.document_root', '/srv/custom/public')
+            ->set('form.repository_path', '/srv/custom')
+            ->set('form.primary_hostname', 'changed.example.com')
+            ->assertSet('form.document_root', '/srv/custom')
+            ->assertSet('form.repository_path', '/srv/custom')
+            ->set('form.customize_paths', false)
+            ->assertSet('form.document_root', '/var/www/changed-example-com/public')
+            ->assertSet('form.repository_path', '/var/www/changed-example-com');
     }
 
     public function test_php_site_creation_requires_explicit_selection_when_saved_default_is_not_installed(): void
@@ -231,6 +301,141 @@ class SiteTest extends TestCase
             ->set('form.repository_path', '/var/www/app')
             ->call('store')
             ->assertHasErrors(['form.php_version']);
+    }
+
+    public function test_site_creation_queues_async_provisioning_and_redirects_to_site_show(): void
+    {
+        Queue::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'webserver' => 'nginx',
+                'php_inventory' => [
+                    'supported' => true,
+                    'installed_versions' => ['8.4', '8.3'],
+                    'detected_default_version' => '8.4',
+                ],
+                'php_new_site_default_version' => '8.4',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.name', 'Async Site')
+            ->set('form.primary_hostname', 'async.example.com')
+            ->set('form.type', 'php')
+            ->set('form.php_version', '8.4')
+            ->call('store')
+            ->assertRedirect();
+
+        $site = Site::query()->where('name', 'Async Site')->firstOrFail();
+
+        $this->assertSame('queued', $site->provisioningState());
+        $this->assertSame('nginx', data_get($site->meta, 'provisioning.webserver'));
+
+        Queue::assertPushed(ProvisionSiteJob::class, function (ProvisionSiteJob $job) use ($site): bool {
+            return $job->siteId === $site->id && $job->probeAttempt === 0;
+        });
+    }
+
+    public function test_site_show_renders_provisioning_status_card(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'testing_hostname' => [
+                    'status' => 'ready',
+                    'hostname' => 'preview-app.dply.cc',
+                ],
+                'provisioning' => [
+                    'state' => 'waiting_for_http',
+                    'webserver' => 'nginx',
+                ],
+            ],
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'preview-app.dply.cc',
+            'is_primary' => false,
+            'www_redirect' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+
+        $response->assertOk()
+            ->assertSee('Site provisioning is in progress')
+            ->assertSee('Current step: waiting for http')
+            ->assertSee('preview-app.dply.cc');
+    }
+
+    public function test_sites_index_shows_provisioning_badge_and_visit_link_only_when_ready(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+
+        $pending = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Pending Site',
+            'status' => Site::STATUS_PENDING,
+            'meta' => [
+                'provisioning' => [
+                    'state' => 'waiting_for_http',
+                ],
+            ],
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $pending->id,
+            'hostname' => 'pending.example.com',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $ready = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Ready Site',
+            'status' => Site::STATUS_NGINX_ACTIVE,
+            'meta' => [
+                'provisioning' => [
+                    'state' => 'ready',
+                    'ready_hostname' => 'ready.dply.cc',
+                ],
+            ],
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $ready->id,
+            'hostname' => 'ready.example.com',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.index', absolute: false));
+
+        $response->assertOk()
+            ->assertSee('Pending Site')
+            ->assertSee('Provisioning')
+            ->assertSee('Ready Site')
+            ->assertSee('http://ready.dply.cc')
+            ->assertDontSee('http://pending.example.com');
     }
 
     public function test_release_deploy_lock_uses_confirmation_modal(): void

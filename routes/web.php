@@ -14,6 +14,7 @@ use App\Livewire\Billing\Show as BillingShow;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
+use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
@@ -88,6 +89,9 @@ Route::get('/pricing', function () {
 Route::get('/features', function () {
     return view('features');
 })->name('features');
+
+Route::livewire('/coming-soon', MarketingComingSoonSignup::class)
+    ->name('coming-soon');
 
 Route::livewire('/status/{statusPage}', StatusPublicPage::class)
     ->middleware(['throttle:120,1'])

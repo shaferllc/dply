@@ -2,16 +2,16 @@
 
 - Use Tailwind CSS v4 with CSS-first configuration (`@import "tailwindcss"`, `@theme`, and related v4 patterns) for new and updated styling.
 - Use one shared site header across marketing and authenticated app layouts; only the navigation should differ for guests versus signed-in users.
-- Prefer **[Blade UI Kit Blade Icons](https://blade-ui-kit.com/blade-icons)** for **header and primary navigation** icons; avoid an overcrowded top bar by moving **overflow links into dropdowns**.
-- Keep the header logo visually prominent (larger than a minimal favicon-scale mark).
+- Prefer **[Blade UI Kit Blade Icons](https://blade-ui-kit.com/blade-icons)** for **header and primary navigation** icons, keep the header logo visually prominent, and avoid an overcrowded top bar by moving **overflow links into dropdowns**.
 - Use a **shared global footer** (the same **`x-marketing-footer`** component or equivalent) on **app**, **settings**, and **public status** layouts so the footer matches marketing and guest pages and stays visually anchored on short pages.
 - Auth screens should pair the form with supporting layout: short value props, icons, or similar context—not a bare form only.
-- Aim for an enterprise-ready SaaS look and feel consistent with the product logo and brand colors, and prefer basics-first progressive disclosure so one primary workflow leads while advanced tools are visually secondary, especially on server workspace pages.
+- Aim for an enterprise-ready SaaS look and feel consistent with the product logo and brand colors, and prefer basics-first progressive disclosure so one primary workflow leads while advanced tools are visually secondary; default and auto-fill app-aware setup values where possible, especially on server and site creation flows.
 - Include a **features** (or equivalent) page that explains **how product capabilities connect**, not only isolated feature lists.
 - For BYO, surface **subscription and plan limits** in the product UI and keep them aligned with **docs** (roles, quotas, gates).
 - Prefer **Livewire v3 `Form` objects** (or equivalent form components) for forms with **about four or more** fields, instead of many separate `wire:model` properties on the component.
 - When using **Livewire `stream()`** for long-running output (for example remote SSH), **only stream during Livewire requests** (`Livewire::isLivewireRequest()`), not on full-page navigations, so full-document HTML is not corrupted.
 - Avoid native **`alert()`** and similar browser dialogs for product flows; use **site-styled modals** (or equivalent Livewire/UI patterns) for confirmations and detail content.
+- Make notifications universal and easy to attach from anywhere in the product: support quick-add channel flows near the relevant resource UI and prefer reusable modals/components over one-off notification management affordances.
 
 ## Learned Workspace Facts
 

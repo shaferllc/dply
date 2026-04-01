@@ -265,6 +265,18 @@ class Server extends Model
         return $this->operationalSshPrivateKey() !== null || $this->recoverySshPrivateKey() !== null;
     }
 
+    public function hasPersonalUserSshKey(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $this->authorizedKeys()
+            ->where('managed_key_type', UserSshKey::class)
+            ->whereIn('managed_key_id', $user->sshKeys()->select('id'))
+            ->exists();
+    }
+
     public function hasDedicatedOperationalSshPrivateKey(): bool
     {
         $key = $this->ssh_operational_private_key;

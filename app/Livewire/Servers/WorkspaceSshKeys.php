@@ -418,9 +418,10 @@ class WorkspaceSshKeys extends Component
     {
         $this->server->refresh();
         $this->server->load(['authorizedKeys']);
+        $user = Auth::user();
 
         $profileKeys = UserSshKey::query()
-            ->where('user_id', Auth::id())
+            ->where('user_id', $user?->id)
             ->orderBy('name')
             ->get();
 
@@ -450,6 +451,7 @@ class WorkspaceSshKeys extends Component
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
             'profileKeys' => $profileKeys,
+            'serverHasPersonalProfileKey' => $this->server->hasPersonalUserSshKey($user),
             'orgKeys' => $orgKeys,
             'teamKeys' => $teamKeys,
             'auditEvents' => $auditEvents,

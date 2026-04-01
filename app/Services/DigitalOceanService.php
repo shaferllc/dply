@@ -256,6 +256,74 @@ class DigitalOceanService
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getDomainRecords(string $domain, array $query = []): array
+    {
+        $response = $this->request('get', '/domains/'.$domain.'/records', $query);
+        $this->assertSuccess($response, 'list domain records');
+        $data = $response->json();
+        $records = $data['domain_records'] ?? $data['data'] ?? [];
+
+        return is_array($records) ? $records : [];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findDomainRecord(string $domain, string $type, string $name, ?string $data = null): ?array
+    {
+        $records = $this->getDomainRecords($domain, ['type' => strtoupper($type), 'name' => $name]);
+
+        foreach ($records as $record) {
+            if (! is_array($record)) {
+                continue;
+            }
+
+            if ($data !== null && (string) ($record['data'] ?? '') !== $data) {
+                continue;
+            }
+
+            return $record;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createDomainRecord(
+        string $domain,
+        string $type,
+        string $name,
+        string $data,
+        int $ttl = 60
+    ): array {
+        $response = $this->request('post', '/domains/'.$domain.'/records', [
+            'type' => strtoupper($type),
+            'name' => $name,
+            'data' => $data,
+            'ttl' => $ttl,
+        ]);
+        $this->assertSuccess($response, 'create domain record');
+        $payload = $response->json();
+        $record = $payload['domain_record'] ?? $payload;
+
+        if (! is_array($record) || $record === []) {
+            throw new \RuntimeException('DigitalOcean API did not return a domain record.');
+        }
+
+        return $record;
+    }
+
+    public function deleteDomainRecord(string $domain, int $recordId): void
+    {
+        $response = $this->request('delete', '/domains/'.$domain.'/records/'.$recordId);
+        $this->assertSuccess($response, 'delete domain record');
+    }
+
+    /**
      * Delete a droplet by ID.
      */
     public function destroyDroplet(int $id): void

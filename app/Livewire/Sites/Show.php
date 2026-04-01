@@ -4,6 +4,7 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\InstallSiteNginxJob;
 use App\Jobs\IssueSiteSslJob;
+use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\InsightFinding;
@@ -18,12 +19,14 @@ use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteEnvPusher;
+use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteReleaseRollback;
 use App\Support\SiteDeployKeyGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -144,6 +147,27 @@ class Show extends Component
             : '';
     }
 
+    #[On('site-provisioning-updated')]
+    public function refreshProvisioningStatus(string $siteId): void
+    {
+        if ((string) $this->site->id !== $siteId) {
+            return;
+        }
+
+        $this->site->refresh();
+        $this->syncFormFromSite();
+    }
+
+    public function pollProvisioningStatus(): void
+    {
+        if ($this->site->isReadyForTraffic()) {
+            return;
+        }
+
+        $this->site->refresh();
+        $this->syncFormFromSite();
+    }
+
     public function savePhpSettings(ServerPhpManager $phpManager): void
     {
         $this->authorize('update', $this->site);
@@ -254,6 +278,32 @@ class Show extends Component
             $this->site->refresh();
             $this->flash_error = $e->getMessage();
         }
+    }
+
+    public function retryProvisioning(SiteProvisioner $siteProvisioner): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->flash_error = null;
+        $this->flash_success = null;
+
+        $this->site->refresh();
+
+        if ($this->site->isReadyForTraffic()) {
+            $this->flash_success = __('This site is already available.');
+
+            return;
+        }
+
+        $this->site->update([
+            'status' => Site::STATUS_PENDING,
+        ]);
+
+        $siteProvisioner->markQueued($this->site->fresh());
+        ProvisionSiteJob::dispatch($this->site->id);
+
+        $this->site->refresh();
+        $this->flash_success = __('Site provisioning has been queued again.');
     }
 
     public function deployNow(): void
@@ -588,6 +638,11 @@ class Show extends Component
         $domain = SiteDomain::query()->where('site_id', $this->site->id)->findOrFail($domainId);
         if ($domain->is_primary && $this->site->domains()->count() === 1) {
             $this->flash_error = 'Cannot remove the only domain.';
+
+            return;
+        }
+        if ($domain->hostname === $this->site->testingHostname()) {
+            $this->flash_error = 'The generated testing hostname is managed by Dply and cannot be removed here.';
 
             return;
         }

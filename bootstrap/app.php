@@ -9,6 +9,7 @@ use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
@@ -126,6 +127,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->appendToGroup('web', [
             CaptureReferralCode::class,
+            RedirectGuestsToComingSoon::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

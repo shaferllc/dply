@@ -410,6 +410,10 @@ class WorkspaceOverview extends Component
             ? Carbon::parse($this->server->meta['monitoring_last_sample_at'])->timezone(config('app.timezone'))
             : null;
 
+        $currentUser = Auth::user();
+        $hasProfileSshKeys = $currentUser?->sshKeys()->exists() ?? false;
+        $serverHasPersonalProfileKey = $this->server->hasPersonalUserSshKey($currentUser);
+
         $opsSummary = [
             'firewall_rules_enabled' => $this->server->firewallRules()->where('enabled', true)->count(),
             'cron_jobs' => $this->server->cronJobs()->count(),
@@ -455,10 +459,12 @@ class WorkspaceOverview extends Component
             'latestDeployment' => $latestDeployment,
             'opsSummary' => $opsSummary,
             'healthSummary' => $healthSummary,
+            'hasProfileSshKeys' => $hasProfileSshKeys,
             'insightFindings' => $insightFindings,
             'insightSummary' => $insightSummary,
             'assignableChannels' => $assignableChannels,
             'serverEventOptions' => $serverEventOptions,
+            'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
             'quickAddTypes' => $quickAddTypes,
             'canManageOrganizationNotificationChannels' => $this->canManageOrganizationNotificationChannels(),
             'deletionSummary' => $this->showRemoveServerModal

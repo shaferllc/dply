@@ -71,6 +71,8 @@ final class BuildServerCreatePreflight
         array $catalog,
         array $provisionOptions,
         bool $canCreateServer,
+        bool $hasUserSshKeys,
+        bool $hasProvisionableUserSshKeys,
         bool $hasAnyProviderCredentials,
         bool $hasLinkedCredential,
         ?array $providerHealth = null,
@@ -78,8 +80,8 @@ final class BuildServerCreatePreflight
         array $sizeRecommendations = [],
     ): array {
         $checks = $form->type === 'custom'
-            ? $this->customChecks($form, $canCreateServer, $customConnectionTest)
-            : $this->cloudChecks($form, $catalog, $provisionOptions, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth, $sizeRecommendations);
+            ? $this->customChecks($form, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $customConnectionTest)
+            : $this->cloudChecks($form, $catalog, $provisionOptions, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth, $sizeRecommendations);
 
         $blockingFields = [];
         foreach ($checks as $check) {
@@ -117,6 +119,8 @@ final class BuildServerCreatePreflight
         array $catalog,
         array $provisionOptions,
         bool $canCreateServer,
+        bool $hasUserSshKeys,
+        bool $hasProvisionableUserSshKeys,
         bool $hasAnyProviderCredentials,
         bool $hasLinkedCredential,
         ?array $providerHealth,
@@ -126,6 +130,24 @@ final class BuildServerCreatePreflight
 
         if (! $canCreateServer) {
             $checks[] = $this->check('server_limit', 'error', __('Server limit reached'), __('Your organization cannot create another server on the current plan.'), true);
+        }
+
+        if (! $hasUserSshKeys) {
+            $checks[] = $this->check(
+                'user_ssh_keys',
+                'error',
+                __('Add a personal profile SSH key'),
+                __('Add at least one personal SSH public key in your profile before provisioning a server so Dply can place your access on the machine during setup.'),
+                true
+            );
+        } elseif (! $hasProvisionableUserSshKeys) {
+            $checks[] = $this->check(
+                'user_ssh_key_defaults',
+                'warning',
+                __('No personal SSH key is set for new servers'),
+                __('This server will be created without one of your saved personal SSH keys unless you attach one after setup or mark a profile key for new servers.'),
+                false
+            );
         }
 
         if (! $hasAnyProviderCredentials) {
@@ -226,12 +248,30 @@ final class BuildServerCreatePreflight
     /**
      * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
      */
-    private function customChecks(ServerCreateForm $form, bool $canCreateServer, array $customConnectionTest): array
+    private function customChecks(ServerCreateForm $form, bool $canCreateServer, bool $hasUserSshKeys, bool $hasProvisionableUserSshKeys, array $customConnectionTest): array
     {
         $checks = [];
 
         if (! $canCreateServer) {
             $checks[] = $this->check('server_limit', 'error', __('Server limit reached'), __('Your organization cannot create another server on the current plan.'), true);
+        }
+
+        if (! $hasUserSshKeys) {
+            $checks[] = $this->check(
+                'user_ssh_keys',
+                'error',
+                __('Add a personal profile SSH key'),
+                __('Add at least one personal SSH public key in your profile first so Dply can connect your account access to the server workflow.'),
+                true
+            );
+        } elseif (! $hasProvisionableUserSshKeys) {
+            $checks[] = $this->check(
+                'user_ssh_key_defaults',
+                'warning',
+                __('No personal SSH key is set for new servers'),
+                __('This server will be saved without one of your personal profile SSH keys queued for this machine. Mark a profile key for new servers or attach one from the SSH keys page after setup.'),
+                false
+            );
         }
 
         try {
@@ -482,7 +522,7 @@ final class BuildServerCreatePreflight
 
         foreach ($checks as $check) {
             $group = match (true) {
-                in_array($check['key'], ['provider_credentials', 'provider_credential_id', 'provider_health', 'server_limit'], true) => 'account_readiness',
+                in_array($check['key'], ['provider_credentials', 'provider_credential_id', 'provider_health', 'server_limit', 'user_ssh_keys', 'user_ssh_key_defaults'], true) => 'account_readiness',
                 str_starts_with($check['key'], 'region_'), str_starts_with($check['key'], 'size_'), in_array($check['key'], ['regions_unverified', 'sizes_unverified'], true) => 'infrastructure_selection',
                 str_starts_with($check['key'], 'stack_'), $check['key'] === 'stack' => 'stack_readiness',
                 $check['key'] === 'custom_connection' || $check['key'] === 'custom_verification' => 'verification',

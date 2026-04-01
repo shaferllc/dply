@@ -104,7 +104,8 @@
                 </div>
                 <div>
                     <x-input-label for="primary_hostname" :value="__('Primary domain (DNS must point to this server)')" />
-                    <x-text-input id="primary_hostname" wire:model="form.primary_hostname" placeholder="app.example.com" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                    <x-text-input id="primary_hostname" wire:model.live.debounce.300ms="form.primary_hostname" placeholder="app.example.com" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                    <p class="mt-2 text-sm text-brand-moss">{{ __('Use the real customer domain here. Dply can also generate a temporary testing URL on one of your owned domains so you can install nginx before the customer points DNS.') }}</p>
                     <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-2" />
                 </div>
                 <div>
@@ -115,17 +116,54 @@
                         <option value="node">{{ __('Node (Nginx → reverse proxy)') }}</option>
                     </select>
                 </div>
-                <div>
-                    <x-input-label for="document_root" :value="__('Document root (on server)')" />
-                    <x-text-input id="document_root" wire:model="form.document_root" class="mt-1 block w-full font-mono text-sm" required />
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('For Laravel use the') }} <code class="rounded bg-brand-sand/60 px-1 py-0.5 text-xs text-brand-ink">public</code> {{ __('directory.') }}</p>
-                    <x-input-error :messages="$errors->get('form.document_root')" class="mt-2" />
-                </div>
-                <div>
-                    <x-input-label for="repository_path" :value="__('Git / deploy path (optional)')" />
-                    <x-text-input id="repository_path" wire:model="form.repository_path" class="mt-1 block w-full font-mono text-sm" />
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('Where') }} <code class="rounded bg-brand-sand/60 px-1 py-0.5 text-xs text-brand-ink">git pull</code> {{ __('runs; defaults to document root if empty.') }}</p>
-                </div>
+                <section class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy paths') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-6 text-brand-moss">
+                                {{ __('Dply derives these automatically from the primary domain and selected stack.') }}
+                            </p>
+                        </div>
+                        <label class="inline-flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm">
+                            <input type="checkbox" wire:model.live="form.customize_paths" class="rounded border-brand-ink/20 text-brand-ink focus:ring-brand-sage" />
+                            {{ __('Customize paths') }}
+                        </label>
+                    </div>
+
+                    <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                        <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
+                            <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Document root') }}</dt>
+                            <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $form->document_root }}</dd>
+                        </div>
+                        <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
+                            <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy path') }}</dt>
+                            <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $form->repository_path }}</dd>
+                        </div>
+                    </dl>
+
+                    <p class="mt-3 text-sm text-brand-moss">
+                        @if ($form->type === 'php')
+                            {{ __('Laravel and other PHP apps use the deploy path as the app root and') }} <code class="rounded bg-brand-sand/60 px-1 py-0.5 text-xs text-brand-ink">public</code> {{ __('as the web root automatically.') }}
+                        @else
+                            {{ __('Static and Node sites serve directly from the deploy path by default.') }}
+                        @endif
+                    </p>
+
+                    @if ($form->customize_paths)
+                        <div class="mt-5 grid gap-5">
+                            <div>
+                                <x-input-label for="document_root" :value="__('Document root (advanced override)')" />
+                                <x-text-input id="document_root" wire:model="form.document_root" class="mt-1 block w-full font-mono text-sm" required />
+                                <x-input-error :messages="$errors->get('form.document_root')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="repository_path" :value="__('Deploy path (advanced override)')" />
+                                <x-text-input id="repository_path" wire:model="form.repository_path" class="mt-1 block w-full font-mono text-sm" />
+                                <p class="mt-2 text-sm text-brand-moss">{{ __('This is where deploys and git operations run for this site.') }}</p>
+                            </div>
+                        </div>
+                    @endif
+                </section>
                 @if ($form->type === 'php')
                     <div>
                         <x-input-label for="php_version" :value="__('PHP-FPM version (socket path)')" />

@@ -44,6 +44,12 @@ return [
          * uses the selected ProviderCredential.
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
+        'auto_testing_hostname_enabled' => (bool) env('DPLY_AUTO_TESTING_HOSTNAME_ENABLED', false),
+        'testing_domains' => array_values(array_filter(array_map(
+            static fn (string $value): string => trim($value),
+            explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))
+        ))),
+        'testing_domain_strategy' => env('DPLY_TESTING_DOMAIN_STRATEGY', 'deterministic'),
     ],
 
     /*

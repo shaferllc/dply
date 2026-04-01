@@ -3,11 +3,13 @@
 namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
+use App\Jobs\ProvisionSiteJob;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Services\Servers\ServerPhpManager;
+use App\Services\Sites\SiteProvisioner;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -39,6 +41,7 @@ class Create extends Component
 
         $this->authorize('create', Site::class);
         $this->server = $server;
+        $this->form->applyDefaultsForType($this->form->type);
         $phpData = $phpManager->siteCreationPhpData($server);
         $this->phpVersions = $phpData['available_versions'];
         $this->form->php_version = $phpData['preselected_version'];
@@ -54,9 +57,31 @@ class Create extends Component
                 }
             }
         }
+
+        $this->form->applyPathDefaults();
     }
 
-    public function store(): mixed
+    public function updatedFormType(string $value): void
+    {
+        $this->form->applyDefaultsForType($value);
+    }
+
+    public function updatedFormPrimaryHostname(string $value): void
+    {
+        $this->form->primary_hostname = strtolower(trim($value));
+        $this->form->applyPathDefaults();
+    }
+
+    public function updatedFormCustomizePaths(bool $value): void
+    {
+        $this->form->customize_paths = $value;
+
+        if (! $value) {
+            $this->form->applyPathDefaults();
+        }
+    }
+
+    public function store(SiteProvisioner $siteProvisioner): mixed
     {
         $this->authorize('update', $this->server);
         $this->authorize('create', Site::class);
@@ -119,6 +144,10 @@ class Create extends Component
             'is_primary' => true,
             'www_redirect' => false,
         ]);
+
+        $site->loadMissing(['server', 'domains']);
+        $siteProvisioner->markQueued($site);
+        ProvisionSiteJob::dispatch($site->id);
 
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
     }

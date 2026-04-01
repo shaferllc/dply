@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 class Site extends Model
 {
@@ -19,6 +20,10 @@ class Site extends Model
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_NGINX_ACTIVE = 'nginx_active';
+
+    public const STATUS_APACHE_ACTIVE = 'apache_active';
+
+    public const STATUS_CADDY_ACTIVE = 'caddy_active';
 
     public const STATUS_ERROR = 'error';
 
@@ -202,6 +207,153 @@ class Site extends Model
     {
         return $this->domains()->where('is_primary', true)->first()
             ?? $this->domains()->first();
+    }
+
+    public function testingHostname(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $hostname = $meta['testing_hostname']['hostname'] ?? '';
+
+        return is_string($hostname) ? $hostname : '';
+    }
+
+    public function testingHostnameStatus(): ?string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $status = $meta['testing_hostname']['status'] ?? null;
+
+        return is_string($status) ? $status : null;
+    }
+
+    public function webserver(): string
+    {
+        $serverMeta = is_array($this->server?->meta) ? $this->server->meta : [];
+        $webserver = $serverMeta['webserver'] ?? 'nginx';
+
+        return is_string($webserver) && $webserver !== '' ? $webserver : 'nginx';
+    }
+
+    public function provisioningMeta(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $provisioning = $meta['provisioning'] ?? [];
+
+        return is_array($provisioning) ? $provisioning : [];
+    }
+
+    /**
+     * @return list<array{
+     *     at?: string,
+     *     level?: string,
+     *     step?: string,
+     *     message?: string,
+     *     context?: array<string, mixed>
+     * }>
+     */
+    public function provisioningLog(): array
+    {
+        $log = $this->provisioningMeta()['log'] ?? [];
+
+        return collect(is_array($log) ? $log : [])
+            ->filter(fn (mixed $entry): bool => is_array($entry))
+            ->values()
+            ->all();
+    }
+
+    public function provisioningState(): ?string
+    {
+        $state = $this->provisioningMeta()['state'] ?? null;
+
+        return is_string($state) ? $state : null;
+    }
+
+    public function provisioningError(): ?string
+    {
+        $error = $this->provisioningMeta()['error'] ?? null;
+
+        return is_string($error) ? $error : null;
+    }
+
+    public function provisionedHostname(): ?string
+    {
+        $hostname = $this->provisioningMeta()['ready_hostname'] ?? null;
+
+        return is_string($hostname) && $hostname !== '' ? $hostname : null;
+    }
+
+    public function provisionedUrl(): ?string
+    {
+        $hostname = $this->provisionedHostname();
+
+        return $hostname ? 'http://'.$hostname : null;
+    }
+
+    public function visitUrl(): ?string
+    {
+        if ($this->provisionedUrl() !== null) {
+            return $this->provisionedUrl();
+        }
+
+        if (! $this->isReadyForTraffic()) {
+            return null;
+        }
+
+        $hostname = $this->testingHostname();
+        if ($hostname !== '') {
+            return 'http://'.$hostname;
+        }
+
+        return ($this->primaryDomain()?->hostname)
+            ? 'http://'.$this->primaryDomain()->hostname
+            : null;
+    }
+
+    public function isProvisioning(): bool
+    {
+        return $this->status === self::STATUS_PENDING
+            && ! in_array($this->provisioningState(), ['ready', 'failed'], true);
+    }
+
+    public function isReadyForTraffic(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_NGINX_ACTIVE,
+            self::STATUS_APACHE_ACTIVE,
+            self::STATUS_CADDY_ACTIVE,
+        ], true);
+    }
+
+    public function statusLabel(): string
+    {
+        return match ($this->status) {
+            self::STATUS_NGINX_ACTIVE => 'nginx active',
+            self::STATUS_APACHE_ACTIVE => 'apache active',
+            self::STATUS_CADDY_ACTIVE => 'caddy active',
+            default => str_replace('_', ' ', $this->status),
+        };
+    }
+
+    public static function activeStatusForWebserver(string $webserver): string
+    {
+        return match ($webserver) {
+            'apache' => self::STATUS_APACHE_ACTIVE,
+            'caddy' => self::STATUS_CADDY_ACTIVE,
+            default => self::STATUS_NGINX_ACTIVE,
+        };
+    }
+
+    public function sslDomainHostnames(): Collection
+    {
+        $domains = $this->domains instanceof Collection
+            ? $this->domains
+            : $this->domains()->get();
+
+        $testingHostname = $this->testingHostname();
+        if ($testingHostname !== '' && $domains->contains('hostname', $testingHostname)) {
+            return collect([$testingHostname]);
+        }
+
+        return $domains->pluck('hostname')->filter()->unique()->values();
     }
 
     public function effectiveRepositoryPath(): string

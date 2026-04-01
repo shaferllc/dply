@@ -284,7 +284,7 @@
 
                                     <section class="space-y-4">
                                         <div>
-                                            <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('0. Choose an install profile') }}</h4>
+                                            <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('1. Choose an install profile') }}</h4>
                                             <p class="mt-1 text-sm text-slate-600">{{ __('Start with a preset and then fine-tune anything in advanced options.') }}</p>
                                             <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
                                                 <div>
@@ -313,7 +313,7 @@
 
                                         <div class="flex items-center justify-between gap-3">
                                             <div>
-                                                <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('1. Choose the server role') }}</h4>
+                                                <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('2. Choose the server role') }}</h4>
                                                 <p class="mt-1 text-sm text-slate-600">{{ __('Pick what this machine is mainly responsible for. We will adapt the default software stack to match.') }}</p>
                                             </div>
                                         </div>

@@ -2,6 +2,7 @@
 
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\Site;
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
@@ -28,6 +29,15 @@ Broadcast::channel('server.{serverId}', function ($user, string $serverId) {
     }
 
     if ($server->organization_id && $server->organization?->userIsDeployer($user)) {
+        return false;
+    }
+
+    return ['id' => $user->id];
+});
+
+Broadcast::channel('site.{siteId}', function ($user, string $siteId) {
+    $site = Site::query()->find($siteId);
+    if ($site === null || ! $user->can('view', $site)) {
         return false;
     }
 

@@ -2,16 +2,13 @@
 
 namespace App\Services\Sites;
 
+use App\Enums\SiteType;
 use App\Models\Site;
 use App\Services\SshConnection;
 use Illuminate\Support\Str;
 
-class SiteNginxProvisioner
+class SiteCaddyProvisioner
 {
-    public function __construct(
-        protected NginxSiteConfigBuilder $builder
-    ) {}
-
     public function provision(Site $site): string
     {
         $server = $site->server;
@@ -19,34 +16,34 @@ class SiteNginxProvisioner
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $config = $this->builder->build($site);
-        $available = rtrim(config('sites.nginx_sites_available'), '/');
-        $enabled = rtrim(config('sites.nginx_sites_enabled'), '/');
-        $confFile = $available.'/'.$site->nginxConfigBasename().'.conf';
-        $linkFile = $enabled.'/'.$site->nginxConfigBasename().'.conf';
+        $config = $this->build($site);
+        $configFile = '/etc/caddy/sites-enabled/'.$site->nginxConfigBasename().'.caddy';
+        $importLine = 'import /etc/caddy/sites-enabled/*.caddy';
 
         $ssh = $this->systemSsh($site);
-        $this->writeSystemFile($ssh, $confFile, $config);
+        $this->writeSystemFile($ssh, $configFile, $config);
         $out = $ssh->exec(sprintf(
-            '(%s) 2>&1; printf "\nDPLY_NGINX_EXIT:%%s" "$?"',
+            '(%s) 2>&1; printf "\nDPLY_CADDY_EXIT:%%s" "$?"',
             $this->privilegedCommand(
                 $server,
                 sprintf(
-                    'ln -sf %1$s %2$s && nginx -t && (systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || nginx -s reload)',
-                    escapeshellarg($confFile),
-                    escapeshellarg($linkFile)
+                    'mkdir -p /etc/caddy/sites-enabled && touch /etc/caddy/Caddyfile && (grep -Fqx %1$s /etc/caddy/Caddyfile || printf "\n%%s\n" %2$s >> /etc/caddy/Caddyfile) && caddy validate --config /etc/caddy/Caddyfile && (systemctl reload caddy 2>/dev/null || service caddy reload 2>/dev/null || systemctl restart caddy)',
+                    escapeshellarg($importLine),
+                    escapeshellarg($importLine)
                 )
-            ),
+            )
         ), 120);
 
-        $nginxOk = (bool) preg_match('/DPLY_NGINX_EXIT:0\s*$/', $out);
-        if (! $nginxOk) {
-            throw new \RuntimeException('Nginx test or reload failed. Output: '.Str::limit($out, 2000));
+        $caddyOk = (bool) preg_match('/DPLY_CADDY_EXIT:0\s*$/', $out);
+        if (! $caddyOk) {
+            throw new \RuntimeException('Caddy validate or reload failed. Output: '.Str::limit($out, 2000));
         }
 
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['caddy_last_output'] = $out;
+
         $site->update([
-            'nginx_installed_at' => now(),
-            'meta' => array_merge($site->meta ?? [], ['nginx_last_output' => $out]),
+            'meta' => $meta,
         ]);
 
         return $out;
@@ -100,5 +97,47 @@ class SiteNginxProvisioner
         }
 
         return 'sudo -n bash -lc '.escapeshellarg($command);
+    }
+
+    private function build(Site $site): string
+    {
+        $site->loadMissing('domains');
+
+        $hostnames = $site->domains->pluck('hostname')->filter()->unique()->values();
+        if ($hostnames->isEmpty()) {
+            throw new \InvalidArgumentException('Add at least one domain before installing Caddy.');
+        }
+
+        $hosts = $hostnames->implode(', ');
+        $root = $site->effectiveDocumentRootForNginx();
+        $phpSock = str_replace(
+            '{version}',
+            $site->php_version ?? '8.3',
+            config('sites.php_fpm_socket')
+        );
+
+        return match ($site->type) {
+            SiteType::Php => <<<CADDY
+{$hosts} {
+    root * {$root}
+    encode zstd gzip
+    php_fastcgi unix//{$phpSock}
+    file_server
+}
+CADDY,
+            SiteType::Static => <<<CADDY
+{$hosts} {
+    root * {$root}
+    encode zstd gzip
+    file_server
+}
+CADDY,
+            SiteType::Node => <<<CADDY
+{$hosts} {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:{$site->app_port}
+}
+CADDY,
+        };
     }
 }
