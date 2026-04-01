@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -10,7 +11,7 @@ return new class extends Migration
     {
         Schema::create('firewall_rule_templates', function (Blueprint $table) {
             $table->ulid('id')->primary();
-            $table->foreignUlid('organization_id')->constrained()->cascadeOnDelete();
+            $this->addOrganizationReference($table);
             $table->foreignUlid('server_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('name', 160);
             $table->string('description', 500)->nullable();
@@ -59,5 +60,55 @@ return new class extends Migration
         Schema::dropIfExists('server_firewall_audit_events');
         Schema::dropIfExists('server_firewall_snapshots');
         Schema::dropIfExists('firewall_rule_templates');
+    }
+
+    private function addOrganizationReference(Blueprint $table): void
+    {
+        $connection = Schema::getConnection();
+        $driver = $connection->getDriverName();
+
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            $table->foreignUlid('organization_id')->constrained()->cascadeOnDelete();
+
+            return;
+        }
+
+        $column = DB::table('information_schema.columns')
+            ->select(['column_type', 'character_set_name', 'collation_name'])
+            ->where('table_schema', $connection->getDatabaseName())
+            ->where('table_name', 'organizations')
+            ->where('column_name', 'id')
+            ->first();
+
+        if (! $column) {
+            $table->foreignUlid('organization_id')->constrained()->cascadeOnDelete();
+
+            return;
+        }
+
+        $columnType = strtolower((string) $column->column_type);
+
+        if (str_contains($columnType, 'bigint')) {
+            $table->unsignedBigInteger('organization_id');
+        } elseif (str_contains($columnType, 'varchar(')) {
+            preg_match('/varchar\((\d+)\)/', $columnType, $matches);
+            $length = isset($matches[1]) ? (int) $matches[1] : 26;
+            $table->string('organization_id', $length);
+        } else {
+            $table->char('organization_id', 26);
+        }
+
+        if (isset($column->character_set_name) && is_string($column->character_set_name)) {
+            $table->charset($column->character_set_name);
+        }
+
+        if (isset($column->collation_name) && is_string($column->collation_name)) {
+            $table->collation($column->collation_name);
+        }
+
+        $table->foreign('organization_id')
+            ->references('id')
+            ->on('organizations')
+            ->cascadeOnDelete();
     }
 };

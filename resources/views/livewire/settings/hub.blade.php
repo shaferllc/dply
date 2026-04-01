@@ -5,12 +5,11 @@
         <span class="text-brand-ink">{{ __('Settings') }}</span>
     </nav>
 
-    <div class="mb-8">
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Settings') }}</h1>
-        <p class="mt-2 max-w-2xl text-sm text-brand-moss">
-            {{ __('Your profile tab stores personal preferences. Servers & Sites covers organization defaults and team defaults (servers belong to teams).') }}
-        </p>
-    </div>
+    <x-page-header
+        :title="__('Settings')"
+        :description="__('Your profile tab stores personal preferences. Servers & Sites covers organization defaults and team defaults (servers belong to teams).')"
+        flush
+    />
 
     <div class="border-b border-brand-mist/60 mb-6">
         <nav class="-mb-px flex gap-6" aria-label="Settings sections">

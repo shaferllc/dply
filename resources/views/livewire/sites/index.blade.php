@@ -1,25 +1,32 @@
 <div>
-    <header class="border-b border-slate-200 bg-white">
-        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-slate-800 leading-tight">Sites</h2>
-            <a href="{{ route('servers.index') }}" class="text-slate-500 hover:text-slate-700 text-sm">Servers →</a>
-        </div>
-    </header>
-    <div class="py-12">
-        <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
-            <p class="text-slate-600 mb-6">Sites belong to a server. Open a server to create one, or jump from the list below.</p>
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <x-page-header
+            :title="__('Sites')"
+            :description="__('Sites belong to a server. Open a server to create one, or jump from the list below.')"
+            flush
+        >
+            <x-slot name="actions">
+                <a href="{{ route('servers.index') }}" class="inline-flex items-center gap-1 text-sm font-medium text-brand-moss hover:text-brand-ink">Servers <span aria-hidden="true">→</span></a>
+            </x-slot>
+        </x-page-header>
             @if ($sites->isEmpty())
-                <div class="bg-white shadow-sm sm:rounded-lg p-8 text-center text-slate-600">
-                    <p class="mb-4">No sites yet. Provision a server, then add a site from the server page.</p>
-                    <a href="{{ route('servers.index') }}" class="text-slate-800 font-medium hover:underline">Go to servers</a>
-                </div>
+                <x-empty-state
+                    :title="__('No sites yet.')"
+                    :description="__('Provision a server, then add a site from the server page.')"
+                    :dashed="false"
+                >
+                    <x-slot name="actions">
+                        <a href="{{ route('servers.index') }}" class="text-sm font-semibold text-brand-ink hover:underline">{{ __('Go to servers') }}</a>
+                    </x-slot>
+                </x-empty-state>
             @else
-                <ul class="divide-y divide-slate-200 bg-white shadow-sm sm:rounded-lg overflow-hidden">
+                <x-section-card padding="none">
+                <ul class="divide-y divide-brand-ink/10 overflow-hidden">
                     @foreach ($sites as $site)
-                        <li class="p-4 flex flex-wrap justify-between gap-4 items-center hover:bg-slate-50">
+                        <li class="p-4 flex flex-wrap justify-between gap-4 items-center transition-colors hover:bg-brand-sand/20">
                             <div>
-                                <a href="{{ route('sites.show', [$site->server, $site]) }}" class="font-medium text-slate-900 hover:underline">{{ $site->name }}</a>
-                                <p class="text-sm text-slate-500">
+                                <a href="{{ route('sites.show', [$site->server, $site]) }}" class="font-medium text-brand-ink hover:underline">{{ $site->name }}</a>
+                                <p class="text-sm text-brand-moss">
                                     Server: {{ $site->server->name }}
                                     @php $d = $site->domains->firstWhere('is_primary') ?? $site->domains->first(); @endphp
                                     @if ($d)
@@ -28,22 +35,22 @@
                                     · {{ $site->type->label() }}
                                     @if ($site->workspace)
                                         · {{ __('Project:') }}
-                                        <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-slate-700 hover:text-slate-900">
+                                        <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
                                             {{ $site->workspace->name }}
                                         </a>
                                     @endif
                                 </p>
                             </div>
-                            <div class="text-sm text-slate-600">
-                                <span class="capitalize">{{ str_replace('_', ' ', $site->status) }}</span>
+                            <div class="flex flex-wrap items-center gap-2 text-sm text-brand-moss">
+                                <x-badge size="sm">{{ str_replace('_', ' ', $site->status) }}</x-badge>
                                 @if ($site->ssl_status !== 'none')
-                                    · SSL: {{ $site->ssl_status }}
+                                    <x-badge size="sm" tone="accent">{{ __('SSL: :status', ['status' => $site->ssl_status]) }}</x-badge>
                                 @endif
                             </div>
                         </li>
                     @endforeach
                 </ul>
+                </x-section-card>
             @endif
-        </div>
     </div>
 </div>

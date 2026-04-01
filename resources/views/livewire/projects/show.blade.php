@@ -1,69 +1,52 @@
 <div>
-    <header class="border-b border-slate-200 bg-white">
-        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <a href="{{ route('projects.index') }}" class="text-sm text-slate-600 hover:text-slate-900">{{ __('← Projects') }}</a>
-                    <h2 class="font-semibold text-xl text-slate-800 leading-tight mt-2">{{ $workspace->name }}</h2>
-                </div>
-                @can('delete', $workspace)
-                    <button
-                        type="button"
-                        wire:click="openConfirmActionModal('destroyWorkspace', [], @js(__('Delete project')), @js(__('Delete this project? Servers and sites stay in your organization; only the group is removed.')), @js(__('Delete project')), true)"
-                        class="text-sm text-red-600 hover:text-red-800"
-                    >
-                        {{ __('Delete project') }}
-                    </button>
-                @endcan
-            </div>
-        </div>
-    </header>
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            <x-page-header
+                :title="$workspace->name"
+                :description="__('Operate one logical stack, customer, or app family from a shared project workspace.')"
+                flush
+            >
+                <x-slot name="actions">
+                    <a href="{{ route('projects.index') }}" class="inline-flex items-center gap-1 text-sm font-medium text-brand-moss hover:text-brand-ink">{{ __('Projects') }} <span aria-hidden="true">←</span></a>
+                    @can('delete', $workspace)
+                        <button
+                            type="button"
+                            wire:click="openConfirmActionModal('destroyWorkspace', [], @js(__('Delete project')), @js(__('Delete this project? Servers and sites stay in your organization; only the group is removed.')), @js(__('Delete project')), true)"
+                            class="text-sm font-medium text-red-600 hover:text-red-800"
+                        >
+                            {{ __('Delete project') }}
+                        </button>
+                    @endcan
+                </x-slot>
+            </x-page-header>
+
             @if (session('success'))
-                <div class="p-4 rounded-md bg-green-50 text-green-800 text-sm">{{ session('success') }}</div>
+                <x-alert tone="success">{{ session('success') }}</x-alert>
             @endif
             <x-livewire-validation-errors />
 
             <div class="grid gap-4 md:grid-cols-4">
-                <div class="bg-white border border-slate-200 rounded-lg p-5">
-                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Health') }}</p>
-                    <p class="mt-2 text-lg font-semibold text-slate-900">{{ $health['status_label'] }}</p>
-                    <p class="mt-1 text-sm text-slate-500">{{ $health['servers_ready'] }}/{{ $health['servers_total'] }} {{ __('servers ready') }}</p>
-                </div>
-                <div class="bg-white border border-slate-200 rounded-lg p-5">
-                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Sites') }}</p>
-                    <p class="mt-2 text-lg font-semibold text-slate-900">{{ $costSummary['sites_used'] }}</p>
-                    <p class="mt-1 text-sm text-slate-500">{{ __('Remaining in org plan: :count', ['count' => $costSummary['sites_remaining']]) }}</p>
-                </div>
-                <div class="bg-white border border-slate-200 rounded-lg p-5">
-                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Servers') }}</p>
-                    <p class="mt-2 text-lg font-semibold text-slate-900">{{ $costSummary['servers_used'] }}</p>
-                    <p class="mt-1 text-sm text-slate-500">{{ __('Remaining in org plan: :count', ['count' => $costSummary['servers_remaining']]) }}</p>
-                </div>
-                <div class="bg-white border border-slate-200 rounded-lg p-5">
-                    <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Deploy runs') }}</p>
-                    <p class="mt-2 text-lg font-semibold text-slate-900">{{ $costSummary['deploy_runs_count'] }}</p>
-                    <p class="mt-1 text-sm text-slate-500">{{ __('Variables: :count', ['count' => $costSummary['variables_count']]) }}</p>
-                </div>
+                <x-stat-card :label="__('Health')" :value="$health['status_label']" :meta="$health['servers_ready'].'/'.$health['servers_total'].' '.__('servers ready')" />
+                <x-stat-card :label="__('Sites')" :value="$costSummary['sites_used']" :meta="__('Remaining in org plan: :count', ['count' => $costSummary['sites_remaining']])" />
+                <x-stat-card :label="__('Servers')" :value="$costSummary['servers_used']" :meta="__('Remaining in org plan: :count', ['count' => $costSummary['servers_remaining']])" />
+                <x-stat-card :label="__('Deploy runs')" :value="$costSummary['deploy_runs_count']" :meta="__('Variables: :count', ['count' => $costSummary['variables_count']])" />
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-slate-50 p-5">
-                <h3 class="text-sm font-semibold text-slate-900">{{ __('Projects are for day-two operations, not just grouping') }}</h3>
-                <p class="mt-2 text-sm leading-6 text-slate-600">
+            <x-section-card tone="subtle">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Projects are for day-two operations, not just grouping') }}</h3>
+                <p class="mt-2 text-sm leading-6 text-brand-moss">
                     {{ __('Use a project as the shared operating surface for one app, customer, or environment family. Keep runbooks, health, release context, notification routing, and shared variables here so recovery and change management do not depend on one person remembering the setup.') }}
                 </p>
-            </div>
+            </x-section-card>
 
             @if ($health['issues'] !== [])
-                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <x-alert tone="warning">
                     <p class="font-medium">{{ __('Needs attention') }}</p>
                     <ul class="mt-2 space-y-1">
                         @foreach ($health['issues'] as $issue)
                             <li>{{ $issue }}</li>
                         @endforeach
                     </ul>
-                </div>
+                </x-alert>
             @endif
 
             <x-server-workspace-tablist aria-label="{{ __('Project sections') }}">
@@ -111,13 +94,13 @@
                             </div>
                             <div>
                                 <x-input-label for="edit-desc" :value="__('Description')" />
-                                <textarea id="edit-desc" wire:model="editDescription" rows="3" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm focus:border-slate-500 focus:ring-slate-500 text-sm"></textarea>
+                                <x-textarea id="edit-desc" wire:model="editDescription" rows="3" />
                                 <p class="mt-1 text-xs text-slate-500">{{ __('Example: Customer production stack, marketing properties, or internal staging fleet.') }}</p>
                                 <x-input-error :messages="$errors->get('editDescription')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="edit-notes" :value="__('Project notes')" />
-                                <textarea id="edit-notes" wire:model="editNotes" rows="6" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm focus:border-slate-500 focus:ring-slate-500 text-sm"></textarea>
+                                <x-textarea id="edit-notes" wire:model="editNotes" rows="6" />
                                 <p class="mt-1 text-xs text-slate-500">{{ __('Use notes for architecture context, provider quirks, DNS assumptions, incident history, customer handoff details, and anything operators should know before making changes.') }}</p>
                                 <x-input-error :messages="$errors->get('editNotes')" class="mt-2" />
                             </div>
@@ -241,12 +224,12 @@
                                 <div class="flex flex-wrap items-end gap-2">
                                     <div class="flex-1 min-w-[12rem]">
                                         <x-input-label for="server-pick" :value="__('Add server')" />
-                                        <select id="server-pick" wire:model="serverToAttach" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm">
+                                        <x-select id="server-pick" wire:model="serverToAttach">
                                             <option value="">{{ __('Choose...') }}</option>
                                             @foreach ($availableServers as $s)
                                                 <option value="{{ $s->id }}">{{ $s->name }}</option>
                                             @endforeach
-                                        </select>
+                                        </x-select>
                                     </div>
                                     <x-secondary-button type="button" wire:click="attachServer">{{ __('Add') }}</x-secondary-button>
                                 </div>
@@ -287,12 +270,12 @@
                                 <div class="flex flex-wrap items-end gap-2">
                                     <div class="flex-1 min-w-[12rem]">
                                         <x-input-label for="site-pick" :value="__('Add site')" />
-                                        <select id="site-pick" wire:model="siteToAttach" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm">
+                                        <x-select id="site-pick" wire:model="siteToAttach">
                                             <option value="">{{ __('Choose...') }}</option>
                                             @foreach ($availableSites as $s)
                                                 <option value="{{ $s->id }}">{{ $s->name }}</option>
                                             @endforeach
-                                        </select>
+                                        </x-select>
                                     </div>
                                     <x-secondary-button type="button" wire:click="attachSite">{{ __('Add') }}</x-secondary-button>
                                 </div>
@@ -342,20 +325,20 @@
                         <div class="grid gap-3 md:grid-cols-3">
                             <div class="md:col-span-2">
                                 <x-input-label for="member-user" :value="__('Add member')" />
-                                <select id="member-user" wire:model="memberUserId" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm">
+                                <x-select id="member-user" wire:model="memberUserId">
                                     <option value="">{{ __('Choose organization member') }}</option>
                                     @foreach ($orgUsers as $user)
                                         <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->email }})</option>
                                     @endforeach
-                                </select>
+                                </x-select>
                             </div>
                             <div>
                                 <x-input-label for="member-role" :value="__('Role')" />
-                                <select id="member-role" wire:model="memberRole" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm">
+                                <x-select id="member-role" wire:model="memberRole">
                                     @foreach ($workspaceRoles as $role)
                                         <option value="{{ $role }}">{{ ucfirst($role) }}</option>
                                     @endforeach
-                                </select>
+                                </x-select>
                             </div>
                         </div>
                         <div class="mt-3">
@@ -438,7 +421,7 @@
                                     </div>
                                     <div>
                                         <x-input-label for="runbook-body" :value="__('Notes')" />
-                                        <textarea id="runbook-body" wire:model="runbookBody" rows="4" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm"></textarea>
+                                        <x-textarea id="runbook-body" wire:model="runbookBody" rows="4" />
                                     </div>
                                 </div>
                                 <div class="mt-3">

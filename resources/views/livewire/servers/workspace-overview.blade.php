@@ -150,50 +150,27 @@
             </section>
 
             <section class="mt-6 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
-                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Health') }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-brand-ink">
-                        {{ $healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? __('Reachable') : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? __('Unreachable') : __('Not checked yet')) }}
-                    </p>
-                    <p class="mt-2 text-sm text-brand-moss">
-                        @if ($healthSummary['last_checked_at'])
-                            {{ __('Last checked :time', ['time' => $healthSummary['last_checked_at']->diffForHumans()]) }}
-                        @else
-                            {{ __('No health checks recorded yet.') }}
-                        @endif
-                    </p>
-                </div>
-
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Sites') }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-brand-ink">{{ $siteCount }}</p>
-                    <p class="mt-2 text-sm text-brand-moss">
-                        {{ trans_choice('{0} No hosted sites yet.|{1} 1 site connected to this server.|[2,*] :count sites connected to this server.', $siteCount, ['count' => $siteCount]) }}
-                    </p>
-                </div>
-
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Latest deploy') }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-brand-ink">
-                        {{ $latestDeployment?->status ? str($latestDeployment->status)->headline() : __('None yet') }}
-                    </p>
-                    <p class="mt-2 text-sm text-brand-moss">
-                        @if ($latestDeployment?->site)
-                            {{ __('Latest run for :site', ['site' => $latestDeployment->site->name]) }}
-                            @if ($latestDeployment->finished_at)
-                                {{ __('(:time)', ['time' => $latestDeployment->finished_at->diffForHumans()]) }}
-                            @endif
-                        @else
-                            {{ __('No deploys have been recorded for this server yet.') }}
-                        @endif
-                    </p>
-                </div>
-
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Operations') }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-brand-ink">{{ array_sum($opsSummary) }}</p>
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('Configured items across firewall, cron, daemons, and SSH keys.') }}</p>
-                </div>
+                <x-stat-card
+                    :label="__('Health')"
+                    :value="$healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? __('Reachable') : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? __('Unreachable') : __('Not checked yet'))"
+                    :meta="$healthSummary['last_checked_at'] ? __('Last checked :time', ['time' => $healthSummary['last_checked_at']->diffForHumans()]) : __('No health checks recorded yet.')"
+                    tone="subtle"
+                />
+                <x-stat-card
+                    :label="__('Sites')"
+                    :value="$siteCount"
+                    :meta="trans_choice('{0} No hosted sites yet.|{1} 1 site connected to this server.|[2,*] :count sites connected to this server.', $siteCount, ['count' => $siteCount])"
+                />
+                <x-stat-card
+                    :label="__('Latest deploy')"
+                    :value="$latestDeployment?->status ? str($latestDeployment->status)->headline() : __('None yet')"
+                    :meta="$latestDeployment?->site ? __('Latest run for :site', ['site' => $latestDeployment->site->name]).($latestDeployment->finished_at ? ' '.__('(:time)', ['time' => $latestDeployment->finished_at->diffForHumans()]) : '') : __('No deploys have been recorded for this server yet.')"
+                />
+                <x-stat-card
+                    :label="__('Operations')"
+                    :value="array_sum($opsSummary)"
+                    :meta="__('Configured items across firewall, cron, daemons, and SSH keys.')"
+                />
             </section>
 
             <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
@@ -203,28 +180,29 @@
                         <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Open server findings are summarized here so you can spot issues without leaving overview.') }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <span class="rounded-full border border-brand-ink/10 bg-brand-sand/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-ink">
+                        <x-badge tone="accent">
                             {{ trans_choice('{0} No open findings|{1} :count open finding|[2,*] :count open findings', $insightSummary['open_count'], ['count' => $insightSummary['open_count']]) }}
-                        </span>
+                        </x-badge>
                         @if ($insightSummary['critical_count'] > 0)
-                            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-900">
+                            <x-badge tone="danger">
                                 {{ trans_choice('{1} :count critical|[2,*] :count critical', $insightSummary['critical_count'], ['count' => $insightSummary['critical_count']]) }}
-                            </span>
+                            </x-badge>
                         @endif
                         @if ($insightSummary['warning_count'] > 0)
-                            <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-950">
+                            <x-badge tone="warning">
                                 {{ trans_choice('{1} :count warning|[2,*] :count warnings', $insightSummary['warning_count'], ['count' => $insightSummary['warning_count']]) }}
-                            </span>
+                            </x-badge>
                         @endif
                         <a href="{{ route('servers.insights', $server) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Open Insights') }}</a>
                     </div>
                 </div>
 
                 @if ($insightFindings->isEmpty())
-                    <div class="mt-5 rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/10 px-5 py-6">
-                        <p class="text-sm font-medium text-brand-ink">{{ __('No open server insights right now.') }}</p>
-                        <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('If you expected to see something here, open Insights to refresh checks, review enabled settings, and confirm this server has recent metrics when metric-based checks are enabled.') }}</p>
-                    </div>
+                    <x-empty-state
+                        :title="__('No open server insights right now.')"
+                        :description="__('If you expected to see something here, open Insights to refresh checks, review enabled settings, and confirm this server has recent metrics when metric-based checks are enabled.')"
+                        class="mt-5"
+                    />
                 @else
                     <div class="mt-5 grid gap-3 lg:grid-cols-3">
                         @foreach ($insightFindings as $finding)

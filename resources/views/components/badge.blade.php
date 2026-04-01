@@ -1,6 +1,7 @@
 @props([
     'tone' => 'neutral',
     'size' => 'md',
+    'caps' => true,
 ])
 
 @php
@@ -19,6 +20,9 @@
     };
 @endphp
 
-<span {{ $attributes->class(["inline-flex items-center rounded-full border font-semibold uppercase tracking-wide $toneClasses $sizeClasses"]) }}>
+<span {{ $attributes->class([
+    "inline-flex items-center rounded-full border font-semibold $toneClasses $sizeClasses",
+    'uppercase tracking-wide' => $caps,
+]) }}>
     {{ $slot }}
 </span>

@@ -45,7 +45,7 @@
         </nav>
 
         @if (session('success'))
-            <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ session('success') }}</div>
+            <x-alert tone="success" class="mb-6">{{ session('success') }}</x-alert>
         @endif
 
         <section class="relative mb-8 overflow-hidden rounded-[2rem] border border-brand-ink/10 bg-brand-ink text-brand-cream shadow-xl shadow-brand-ink/10">
@@ -55,16 +55,16 @@
                 <div class="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
                     <div class="max-w-3xl">
                         <div class="flex flex-wrap items-center gap-3">
-                            <span class="inline-flex items-center rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-brand-sand">
+                            <x-badge class="border-white/15 bg-white/8 text-brand-sand">
                                 {{ __('Fleet control') }}
-                            </span>
-                            <span class="inline-flex items-center rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-medium text-brand-cream/85">
+                            </x-badge>
+                            <x-badge :caps="false" class="border-white/15 bg-white/8 text-brand-cream/85">
                                 {{ __('Full filtered dataset') }}
-                            </span>
+                            </x-badge>
                             @if ($openInsights > 0)
-                                <span class="inline-flex items-center rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-100">
+                                <x-badge :caps="false" class="border-amber-300/20 bg-amber-400/10 text-amber-100">
                                     {{ trans_choice(':count open insight|:count open insights', $openInsights, ['count' => $openInsights]) }}
-                                </span>
+                                </x-badge>
                             @endif
                         </div>
 
@@ -136,17 +136,19 @@
         @endunless
 
         @if (! $hasServersInScope)
-            <div class="rounded-[2rem] border border-brand-ink/10 bg-white shadow-sm p-10 text-center text-sm text-brand-moss">
-                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-brand-sage">{{ __('No servers yet') }}</p>
-                <h2 class="mt-3 text-2xl font-semibold text-brand-ink">{{ __('Create your first server-ready workspace') }}</h2>
-                <p class="mx-auto mt-3 max-w-2xl leading-relaxed">{{ __('Connect a provider, provision infrastructure, and return here to manage sites, SSH, automation, and health from one place.') }}</p>
-                <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <x-empty-state
+                :title="__('Create your first server-ready workspace')"
+                :description="__('Connect a provider, provision infrastructure, and return here to manage sites, SSH, automation, and health from one place.')"
+                :dashed="false"
+                class="rounded-[2rem] p-10 text-center text-sm text-brand-moss"
+            >
+                <x-slot name="actions">
                 @can('create', App\Models\Server::class)
                     <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream transition hover:bg-brand-forest">{{ __('Add your first server') }}</a>
                 @endcan
                     <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-brand-cream px-4 py-2.5 text-sm font-semibold text-brand-ink transition hover:bg-white">{{ __('Connect a provider') }}</a>
-                </div>
-            </div>
+                </x-slot>
+            </x-empty-state>
         @else
             <div class="rounded-[2rem] border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-4 sm:px-6">
@@ -193,30 +195,22 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <label for="servers_status" class="sr-only">{{ __('Options') }}</label>
-                                <select
-                                    id="servers_status"
-                                    wire:model.live="statusFilter"
-                                    class="rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                                >
+                                <x-select id="servers_status" wire:model.live="statusFilter" class="mt-0">
                                     @foreach ($statusOptions as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
-                                </select>
+                                </x-select>
                                 <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
-                                <select
-                                    id="servers_sort"
-                                    wire:model.live="sort"
-                                    class="rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                                >
+                                <x-select id="servers_sort" wire:model.live="sort" class="mt-0">
                                     @foreach ($sortOptions as $value => $label)
                                         <option value="{{ $value }}">{{ __($label) }}</option>
                                     @endforeach
-                                </select>
+                                </x-select>
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-brand-moss">
-                            <span class="rounded-full border border-brand-ink/10 bg-white px-3 py-1.5">{{ trans_choice(':count server|:count servers', $summary['total'], ['count' => $summary['total']]) }}</span>
-                            <span class="rounded-full border border-brand-ink/10 bg-white px-3 py-1.5">{{ trans_choice(':count open insight|:count open insights', $openInsights, ['count' => $openInsights]) }}</span>
+                            <x-badge>{{ trans_choice(':count server|:count servers', $summary['total'], ['count' => $summary['total']]) }}</x-badge>
+                            <x-badge>{{ trans_choice(':count open insight|:count open insights', $openInsights, ['count' => $openInsights]) }}</x-badge>
                         </div>
                     </div>
                 </div>

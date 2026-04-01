@@ -25,24 +25,15 @@
         </ol>
     </nav>
 
-    <header class="mb-8 pb-6 border-b border-brand-ink/10">
-        <h1 class="text-2xl font-bold tracking-tight text-brand-ink">{{ $title }}</h1>
-        @if ($description)
-            <p class="mt-1 text-sm text-brand-moss">{{ $description }}</p>
-        @endif
+    <x-page-header :title="$title" :description="$description" flush>
         @if ($server->workspace)
-            <p class="mt-3 text-sm text-brand-moss">
-                {{ __('Project:') }}
-                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
-                    {{ $server->workspace->name }}
-                </a>
-                <span class="text-brand-mist">·</span>
-                <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
+            <x-slot name="actions">
+                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                     {{ __('Open project workspace') }}
                 </a>
-            </p>
+            </x-slot>
         @endif
-    </header>
+    </x-page-header>
 
     <div class="space-y-8">
         {{ $slot }}

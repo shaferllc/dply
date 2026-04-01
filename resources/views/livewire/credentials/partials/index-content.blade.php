@@ -17,7 +17,7 @@
 >
     @if ($organization)
         <x-slot name="actions">
-            <x-badge tone="accent" class="normal-case tracking-normal text-xs">
+            <x-badge tone="accent" :caps="false" class="text-xs">
                 {{ __('Organization: :name', ['name' => $organization->name]) }}
             </x-badge>
         </x-slot>
