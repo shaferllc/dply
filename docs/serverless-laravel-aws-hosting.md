@@ -1,6 +1,6 @@
-# Hosting the Serverless Laravel app on AWS (Bref vs Laravel Vapor)
+# Hosting Laravel serverless targets on AWS (Bref vs Laravel Vapor)
 
-This note applies to **`apps/dply-serverless`**: where and how we run **our** control-plane Laravel app on **AWS**. It is separate from **customer** FaaS deploys (Lambda/DO Functions), which go through **`ServerlessFunctionProvisioner`** and the AWS/DO SDKs.
+This note now applies to the **root app**: where and how we think about **Laravel/PHP serverless deploys on AWS** after the reusable serverless engine was merged into the main BYO app. It remains separate from DigitalOcean Functions and other provider targets, which still route through the shared serverless deploy layer.
 
 ## Options
 
@@ -27,15 +27,15 @@ This note applies to **`apps/dply-serverless`**: where and how we run **our** co
 | **Fastest** path to production Lambda with Laravel-operated tooling | **Vapor** |
 | **Spike / CI only** | Keep **traditional `php artisan serve` / FPM on a VM** until Phase D needs scale-to-zero |
 
-**Default for Phase D spikes:** run the app on a normal PHP process or container. Add **Bref** (or Vapor) when we explicitly cut over **dply-serverless** production to Lambda.
+**Default path for Laravel/PHP repos on AWS:** use **Bref** conventions for the customer deploy target while keeping the main control plane as a normal Laravel app unless there is a deliberate infrastructure cutover.
 
 ## Laravel 13 in this monorepo
 
-`apps/dply-serverless` tracks **`laravel/framework` ^13** and **already requires** **`bref/bref`** + **`bref/laravel-bridge`** (^3) for Lambda deployability. **`laravel/octane`** is pulled in by the bridge—review Octane/Bref docs if you customize workers.
+The main repo now resolves Laravel/PHP repositories differently by target:
 
-**`shaferllc/dply-core`** is wired as a **path** repository only (`../../packages/dply-core`) in `apps/dply-serverless/composer.json` — no VCS fallback until you opt in.
+- **AWS Lambda**: supported and routed toward a Bref-oriented deploy config.
+- **DigitalOcean Functions**: still detected, but blocked as unsupported for Laravel/PHP.
 
 ## Related
 
 - [MULTI_PRODUCT_PLATFORM_PLAN.md](./MULTI_PRODUCT_PLATFORM_PLAN.md) §6, §9 Phase D
-- [apps/dply-serverless/README.md](../apps/dply-serverless/README.md)

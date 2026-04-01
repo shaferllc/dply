@@ -72,4 +72,37 @@ class ServerlessRuntimeDetectorTest extends TestCase
 
         File::deleteDirectory($path);
     }
+
+    public function test_it_detects_laravel_and_marks_it_supported_for_aws_lambda(): void
+    {
+        $path = storage_path('framework/testing/runtime-detector-laravel-aws-'.uniqid());
+        File::ensureDirectoryExists($path.'/bootstrap');
+        File::ensureDirectoryExists($path.'/routes');
+        File::ensureDirectoryExists($path.'/public');
+        File::put($path.'/artisan', "#!/usr/bin/env php\n");
+        File::put($path.'/bootstrap/app.php', "<?php\n");
+        File::put($path.'/routes/web.php', "<?php\n");
+        File::put($path.'/public/index.php', "<?php\n");
+        File::put($path.'/composer.json', json_encode([
+            'require' => [
+                'laravel/framework' => '^12.0',
+            ],
+        ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+
+        $result = app(ServerlessRuntimeDetector::class)->detect($path, [
+            'supports_php_runtime' => true,
+            'supports_node_runtime' => true,
+            'default_runtime' => 'provided.al2023',
+            'default_entrypoint' => 'public/index.php',
+            'default_package' => '',
+        ]);
+
+        $this->assertSame('laravel', $result['framework']);
+        $this->assertSame('php', $result['language']);
+        $this->assertSame('provided.al2023', $result['runtime']);
+        $this->assertSame('public/index.php', $result['entrypoint']);
+        $this->assertFalse($result['unsupported_for_target']);
+
+        File::deleteDirectory($path);
+    }
 }

@@ -6,6 +6,7 @@ namespace Tests\Unit\Services;
 
 use App\Models\Site;
 use App\Models\SiteDomain;
+use App\Models\SitePreviewDomain;
 use App\Services\Sites\TestingHostnameProvisioner;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
@@ -64,5 +65,28 @@ class TestingHostnameProvisionerTest extends TestCase
         ]));
 
         $this->assertSame(['preview-app.dply.cc'], $site->sslDomainHostnames()->all());
+    }
+
+    public function test_testing_hostname_prefers_primary_preview_domain_over_legacy_meta(): void
+    {
+        $site = new Site([
+            'meta' => [
+                'testing_hostname' => [
+                    'status' => 'ready',
+                    'hostname' => 'legacy-preview.dply.cc',
+                ],
+            ],
+        ]);
+
+        $site->setRelation('previewDomains', new Collection([
+            new SitePreviewDomain([
+                'hostname' => 'preview-app.dply.cc',
+                'dns_status' => 'ready',
+                'is_primary' => true,
+            ]),
+        ]));
+
+        $this->assertSame('preview-app.dply.cc', $site->testingHostname());
+        $this->assertSame('ready', $site->testingHostnameStatus());
     }
 }

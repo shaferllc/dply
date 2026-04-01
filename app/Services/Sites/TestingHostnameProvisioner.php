@@ -3,15 +3,15 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
-use App\Models\SiteDomain;
+use App\Models\SitePreviewDomain;
 use App\Services\DigitalOceanService;
 use Illuminate\Support\Str;
 
 class TestingHostnameProvisioner
 {
-    public function provision(Site $site): ?SiteDomain
+    public function provision(Site $site): ?SitePreviewDomain
     {
-        $site->loadMissing(['server', 'domains']);
+        $site->loadMissing(['server', 'previewDomains']);
 
         if (! $this->isEnabled()) {
             $this->storeResult($site, [
@@ -40,12 +40,32 @@ class TestingHostnameProvisioner
             $record = $service->findDomainRecord($zone, 'A', $recordName, $serverIp)
                 ?? $service->createDomainRecord($zone, 'A', $recordName, $serverIp);
 
-            $domain = SiteDomain::query()->firstOrCreate([
+            SitePreviewDomain::query()
+                ->where('site_id', $site->id)
+                ->where('hostname', '!=', $hostname)
+                ->update(['is_primary' => false]);
+
+            $domain = SitePreviewDomain::query()->updateOrCreate([
                 'site_id' => $site->id,
                 'hostname' => $hostname,
             ], [
-                'is_primary' => false,
-                'www_redirect' => false,
+                'label' => 'Managed preview',
+                'zone' => $zone,
+                'record_name' => $recordName,
+                'provider_type' => 'digitalocean',
+                'provider_record_id' => (string) ($record['id'] ?? ''),
+                'record_type' => 'A',
+                'record_data' => $serverIp,
+                'dns_status' => 'ready',
+                'ssl_status' => 'none',
+                'is_primary' => true,
+                'auto_ssl' => true,
+                'https_redirect' => true,
+                'managed_by_dply' => true,
+                'last_dns_checked_at' => now(),
+                'meta' => [
+                    'provisioned_at' => now()->toIso8601String(),
+                ],
             ]);
 
             $this->storeResult($site, [
@@ -132,7 +152,7 @@ class TestingHostnameProvisioner
 
     public function delete(Site $site): void
     {
-        $site->loadMissing(['server', 'domains']);
+        $site->loadMissing(['server', 'previewDomains']);
 
         $testingMeta = is_array($site->meta['testing_hostname'] ?? null) ? $site->meta['testing_hostname'] : [];
         $hostname = strtolower(trim((string) ($testingMeta['hostname'] ?? $site->testingHostname())));
@@ -164,7 +184,7 @@ class TestingHostnameProvisioner
             $service->deleteDomainRecord($zone, $recordId);
         }
 
-        $site->domains()
+        $site->previewDomains()
             ->where('hostname', $hostname)
             ->delete();
     }

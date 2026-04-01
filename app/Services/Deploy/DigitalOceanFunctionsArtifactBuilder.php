@@ -28,7 +28,7 @@ class DigitalOceanFunctionsArtifactBuilder
 
         $repositoryUrl = trim((string) $site->git_repository_url);
         if ($repositoryUrl === '') {
-            throw new \RuntimeException('Choose a repository before deploying this Functions site.');
+            throw new \RuntimeException('Choose a repository before deploying this serverless site.');
         }
 
         $resolvedConfig = $this->deploymentConfigResolver->resolve($site);
@@ -59,11 +59,11 @@ class DigitalOceanFunctionsArtifactBuilder
         $package = trim((string) ($resolvedConfig['package'] !== '' ? $resolvedConfig['package'] : $detected['package']));
 
         if ($buildCommand === '') {
-            throw new \RuntimeException('Dply could not determine a build command for this Functions site. Open Advanced settings and set one manually.');
+            throw new \RuntimeException('Dply could not determine a build command for this serverless site. Open Advanced settings and set one manually.');
         }
 
         if ($artifactOutputPath === '') {
-            throw new \RuntimeException('Dply could not determine a build output path for this Functions site. Open Advanced settings and set one manually.');
+            throw new \RuntimeException('Dply could not determine a build output path for this serverless site. Open Advanced settings and set one manually.');
         }
 
         $resolvedConfig = $this->deploymentConfigResolver->persistResolvedConfig($site, [
@@ -79,7 +79,7 @@ class DigitalOceanFunctionsArtifactBuilder
 
         $sourcePath = $checkout['working_directory'].'/'.ltrim($artifactOutputPath, '/');
         if (! file_exists($sourcePath)) {
-            throw new \RuntimeException('Functions build output was not found at: '.$artifactOutputPath);
+            throw new \RuntimeException('Serverless build output was not found at: '.$artifactOutputPath);
         }
 
         $artifactDirectory = storage_path('app/serverless-artifacts/'.$site->id);
@@ -147,7 +147,7 @@ class DigitalOceanFunctionsArtifactBuilder
     {
         $zip = new ZipArchive;
         if ($zip->open($artifactPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new \RuntimeException('Unable to create Functions artifact zip.');
+            throw new \RuntimeException('Unable to create serverless artifact zip.');
         }
 
         if (is_dir($sourcePath)) {

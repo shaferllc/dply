@@ -7,12 +7,18 @@ use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Contracts\DeployEngine;
+use App\Services\Deploy\DockerDeployEngine;
 use App\Models\SiteDomain;
+use App\Models\ProviderCredential;
+use App\Models\SiteCertificate;
+use App\Models\SitePreviewDomain;
 use App\Models\SiteRelease;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\Workspace;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -71,6 +77,75 @@ class SiteTest extends TestCase
             ->assertSee('OPcache')
             ->assertSee('Composer auth')
             ->assertSee('Extensions');
+    }
+
+    public function test_site_settings_build_and_deploy_section_shows_docker_runtime_artifacts(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_DOCKER_CONFIGURED,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'docker_runtime' => [
+                    'compose_yaml' => "services:\n  demo:\n    build:\n      context: .\n",
+                    'dockerfile' => "FROM php:8.3-apache\n",
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'build-and-deploy'], false));
+
+        $response->assertOk()
+            ->assertSee('Docker runtime artifact')
+            ->assertSee('docker compose up -d --build')
+            ->assertSee('FROM php:8.3-apache');
+    }
+
+    public function test_site_settings_build_and_deploy_section_shows_kubernetes_runtime_artifacts(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_KUBERNETES,
+                'kubernetes' => [
+                    'namespace' => 'orbit-local',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_KUBERNETES_CONFIGURED,
+            'meta' => [
+                'runtime_profile' => 'kubernetes_web',
+                'kubernetes_runtime' => [
+                    'namespace' => 'orbit-local',
+                    'manifest_yaml' => "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  namespace: orbit-local\n",
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'build-and-deploy'], false));
+
+        $response->assertOk()
+            ->assertSee('Kubernetes manifest artifact')
+            ->assertSee('orbit-local')
+            ->assertSee('kind: Deployment');
     }
 
     public function test_site_settings_runtime_section_shows_php_mismatch_state_and_server_php_remediation_link(): void
@@ -395,13 +470,63 @@ class SiteTest extends TestCase
         $this->assertSame('digitalocean_functions_web', $site->runtimeProfile());
         $this->assertSame($origin, $site->git_repository_url);
         $this->assertSame('main', $site->git_branch);
-        $this->assertSame('nodejs:18', data_get($site->meta, 'digitalocean_functions.runtime'));
-        $this->assertSame('index', data_get($site->meta, 'digitalocean_functions.entrypoint'));
-        $this->assertSame('npm install && npm run build', data_get($site->meta, 'digitalocean_functions.build_command'));
-        $this->assertSame('dist', data_get($site->meta, 'digitalocean_functions.artifact_output_path'));
-        $this->assertSame('vite_static', data_get($site->meta, 'digitalocean_functions.detected_runtime.framework'));
+        $this->assertSame('nodejs:18', data_get($site->meta, 'serverless.runtime'));
+        $this->assertSame('index', data_get($site->meta, 'serverless.entrypoint'));
+        $this->assertSame('npm install && npm run build', data_get($site->meta, 'serverless.build_command'));
+        $this->assertSame('dist', data_get($site->meta, 'serverless.artifact_output_path'));
+        $this->assertSame('vite_static', data_get($site->meta, 'serverless.detected_runtime.framework'));
         $this->assertSame(Site::STATUS_PENDING, $site->status);
         $this->assertSame('queued', $site->provisioningState());
+    }
+
+    public function test_aws_lambda_host_site_creation_marks_laravel_repo_as_supported(): void
+    {
+        Queue::fake();
+
+        $origin = $this->makeGitRepository([
+            'artisan' => "#!/usr/bin/env php\n",
+            'bootstrap/app.php' => "<?php\n",
+            'routes/web.php' => "<?php\n",
+            'public/index.php' => "<?php\n",
+            'composer.json' => json_encode([
+                'require' => [
+                    'laravel/framework' => '^12.0',
+                ],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'aws',
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
+                'aws_lambda' => [
+                    'region' => 'us-east-1',
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.name', 'Laravel Lambda Site')
+            ->set('form.primary_hostname', 'laravel-lambda.example.com')
+            ->set('form.functions_repo_source', 'manual')
+            ->set('form.functions_repository_url', $origin)
+            ->set('form.functions_repository_branch', 'main')
+            ->call('store')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $site = Site::query()->where('name', 'Laravel Lambda Site')->firstOrFail();
+
+        $this->assertTrue($site->usesAwsLambdaRuntime());
+        $this->assertSame('aws_lambda_bref_web', $site->runtimeProfile());
+        $this->assertSame('provided.al2023', data_get($site->meta, 'serverless.runtime'));
+        $this->assertSame('public/index.php', data_get($site->meta, 'serverless.entrypoint'));
+        $this->assertSame('laravel', data_get($site->meta, 'serverless.detected_runtime.framework'));
     }
 
     public function test_docker_host_site_creation_uses_docker_runtime_profile(): void
@@ -532,7 +657,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
             'meta' => [
                 'runtime_profile' => 'digitalocean_functions_web',
-                'digitalocean_functions' => [
+                'serverless' => [
                     'artifact_path' => '/tmp/functions-site.zip',
                     'entrypoint' => 'index',
                 ],
@@ -545,12 +670,52 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'build-and-deploy'], false));
 
         $response->assertOk()
-            ->assertSee('Functions deploy target')
+            ->assertSee('Serverless deploy target')
             ->assertSee('DigitalOcean Functions')
             ->assertDontSee('Install / update Nginx site')
             ->assertDontSee('Issue / renew SSL')
             ->assertDontSee('Push .env to server')
             ->assertDontSee('Generate deploy key');
+    }
+
+    public function test_aws_lambda_site_settings_build_and_deploy_shows_lambda_details(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'aws',
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
+                'aws_lambda' => [
+                    'region' => 'us-east-1',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+            'meta' => [
+                'runtime_profile' => 'aws_lambda_bref_web',
+                'serverless' => [
+                    'runtime' => 'provided.al2023',
+                    'entrypoint' => 'public/index.php',
+                    'artifact_path' => '/tmp/laravel-lambda.zip',
+                    'function_arn' => 'arn:aws:lambda:us-east-1:123456789012:function:laravel-lambda-site',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'build-and-deploy'], false));
+
+        $response->assertOk()
+            ->assertSee('Serverless deploy target')
+            ->assertSee('AWS Lambda')
+            ->assertSee('Function ARN')
+            ->assertSee('provided.al2023');
     }
 
     public function test_functions_host_deploy_uses_digitalocean_functions_engine(): void
@@ -591,7 +756,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
             'meta' => [
                 'runtime_profile' => 'digitalocean_functions_web',
-                'digitalocean_functions' => [
+                'serverless' => [
                     'runtime' => 'nodejs:18',
                     'entrypoint' => 'index',
                     'build_command' => 'mkdir -p dist && printf "exports.main = true;\n" > dist/index.js',
@@ -610,9 +775,69 @@ class SiteTest extends TestCase
         $this->assertSame(SiteDeployment::STATUS_SUCCESS, $deployment->status);
         $this->assertSame('7', $deployment->git_sha);
         $this->assertSame(Site::STATUS_FUNCTIONS_ACTIVE, $site->status);
-        $this->assertSame('7', data_get($site->meta, 'digitalocean_functions.last_revision_id'));
-        $this->assertNotNull(data_get($site->meta, 'digitalocean_functions.artifact_path'));
+        $this->assertSame('7', data_get($site->meta, 'serverless.last_revision_id'));
+        $this->assertNotNull(data_get($site->meta, 'serverless.artifact_path'));
         $this->assertStringContainsString('DigitalOcean Functions deploy completed.', (string) $deployment->log_output);
+    }
+
+    public function test_aws_lambda_host_deploy_uses_aws_lambda_engine(): void
+    {
+        $origin = $this->makeGitRepository([
+            'artisan' => "#!/usr/bin/env php\n",
+            'bootstrap/app.php' => "<?php\n",
+            'routes/web.php' => "<?php\n",
+            'public/index.php' => "<?php\n",
+            'composer.json' => json_encode([
+                'require' => [
+                    'laravel/framework' => '^12.0',
+                ],
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'aws',
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
+                'aws_lambda' => [
+                    'region' => 'us-east-1',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+            'meta' => [
+                'runtime_profile' => 'aws_lambda_bref_web',
+                'serverless' => [
+                    'runtime' => 'provided.al2023',
+                    'entrypoint' => 'public/index.php',
+                    'build_command' => 'mkdir -p dist && printf "exports.main = true;\n" > dist/index.js',
+                    'artifact_output_path' => 'dist',
+                    'function_name' => 'laravel-lambda-site',
+                ],
+            ],
+            'git_repository_url' => $origin,
+            'git_branch' => 'main',
+        ]);
+
+        RunSiteDeploymentJob::dispatchSync($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+
+        $deployment = SiteDeployment::query()->where('site_id', $site->id)->latest()->firstOrFail();
+        $site->refresh();
+
+        $this->assertSame(SiteDeployment::STATUS_SUCCESS, $deployment->status);
+        $this->assertSame('aws-stub-revision-1', $deployment->git_sha);
+        $this->assertSame(Site::STATUS_FUNCTIONS_ACTIVE, $site->status);
+        $this->assertSame(Server::HOST_KIND_AWS_LAMBDA, data_get($site->meta, 'serverless.target'));
+        $this->assertSame('aws-stub-revision-1', data_get($site->meta, 'serverless.last_revision_id'));
+        $this->assertNotNull(data_get($site->meta, 'serverless.artifact_path'));
+        $this->assertStringContainsString('AWS Lambda deploy completed.', (string) $deployment->log_output);
     }
 
     public function test_functions_configured_state_is_ready_for_workspace_but_not_traffic(): void
@@ -665,6 +890,27 @@ class SiteTest extends TestCase
 
     public function test_docker_host_deploy_uses_docker_engine(): void
     {
+        app()->instance(DockerDeployEngine::class, new class implements DeployEngine
+        {
+            public function run(\App\Services\Deploy\DeployContext $context): array
+            {
+                $site = $context->site();
+                $meta = is_array($site->meta) ? $site->meta : [];
+                $dockerRuntime = is_array($meta['docker_runtime'] ?? null) ? $meta['docker_runtime'] : [];
+                $meta['docker_runtime'] = array_merge($dockerRuntime, [
+                    'compose_yaml' => "services:\n  app:\n    image: example\n",
+                    'dockerfile' => "FROM php:8.3-cli\n",
+                    'last_deployed_at' => now()->toIso8601String(),
+                ]);
+                $site->forceFill(['meta' => $meta])->save();
+
+                return [
+                    'output' => 'Docker deploy prepared.',
+                    'sha' => null,
+                ];
+            }
+        });
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -839,10 +1085,43 @@ class SiteTest extends TestCase
         $response->assertOk()
             ->assertSee('Site settings')
             ->assertSee('General')
+            ->assertSee('Project settings')
+            ->assertSee('Save project settings')
             ->assertSee('Domains')
             ->assertSee('Build & deploy')
             ->assertSee('Danger zone')
             ->assertDontSee('Deployment log');
+    }
+
+    public function test_site_settings_general_section_shows_project_context_links(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $workspace = Workspace::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+            'name' => 'Customer Platform',
+        ]);
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'workspace_id' => $workspace->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'general'], false));
+
+        $response->assertOk()
+            ->assertSee('Current project')
+            ->assertSee('Customer Platform')
+            ->assertSee('Open project resources')
+            ->assertSee('Open project operations')
+            ->assertSee('Open project delivery');
     }
 
     public function test_site_settings_component_rejects_unknown_section(): void
@@ -897,6 +1176,120 @@ class SiteTest extends TestCase
             ->assertDontSee('Save PHP settings')
             ->assertDontSee('Deploy webhook')
             ->assertDontSee('Environment (.env)');
+    }
+
+    public function test_site_show_displays_aws_lambda_runtime_target_details(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'aws',
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
+                'aws_lambda' => [
+                    'region' => 'us-east-1',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+            'meta' => [
+                'runtime_profile' => 'aws_lambda_bref_web',
+                'serverless' => [
+                    'runtime' => 'provided.al2023',
+                    'entrypoint' => 'public/index.php',
+                    'last_revision_id' => 'aws-stub-revision-1',
+                    'artifact_path' => '/tmp/laravel-lambda.zip',
+                    'function_arn' => 'arn:aws:lambda:us-east-1:123456789012:function:laravel-lambda-site',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+
+        $response->assertOk()
+            ->assertSee('Runtime target')
+            ->assertSee('AWS Lambda')
+            ->assertSee('aws-stub-revision-1')
+            ->assertSee('Function ARN')
+            ->assertSee('provided.al2023');
+    }
+
+    public function test_site_show_displays_docker_runtime_target_summary(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_DOCKER_ACTIVE,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'docker_runtime' => [
+                    'compose_yaml' => "services:\n  app:\n    image: example\n",
+                    'dockerfile' => "FROM php:8.3-cli\n",
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+
+        $response->assertOk()
+            ->assertSee('Runtime target')
+            ->assertSee('Docker host')
+            ->assertSee('Last generated compose file')
+            ->assertSee('Managed Dockerfile');
+    }
+
+    public function test_site_show_displays_kubernetes_runtime_target_summary(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_KUBERNETES,
+                'kubernetes' => [
+                    'namespace' => 'orbit-local',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_KUBERNETES_CONFIGURED,
+            'meta' => [
+                'runtime_profile' => 'kubernetes_web',
+                'kubernetes_runtime' => [
+                    'namespace' => 'orbit-local',
+                    'manifest_yaml' => "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  namespace: orbit-local\n",
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+
+        $response->assertOk()
+            ->assertSee('Runtime target')
+            ->assertSee('Kubernetes cluster')
+            ->assertSee('Namespace')
+            ->assertSee('orbit-local')
+            ->assertSee('Manifest');
     }
 
     public function test_sites_index_shows_provisioning_badge_and_visit_link_only_when_ready(): void
@@ -1091,5 +1484,190 @@ class SiteTest extends TestCase
 
         $this->assertSame('/srv/new/public', $site->document_root);
         $this->assertSame('new.example.com', $domain->hostname);
+    }
+
+    public function test_site_project_settings_can_assign_workspace(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $workspace = Workspace::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+            'name' => 'Assigned Project',
+        ]);
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'workspace_id' => null,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->set('project_workspace_id', $workspace->id)
+            ->call('saveProjectSettings')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Project settings saved.');
+
+        $site->refresh();
+
+        $this->assertSame($workspace->id, $site->workspace_id);
+    }
+
+    public function test_site_project_settings_reject_workspace_from_another_organization(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $otherUser = User::factory()->create();
+        $otherOrg = Organization::factory()->create();
+        $otherOrg->users()->attach($otherUser->id, ['role' => 'owner']);
+
+        $foreignWorkspace = Workspace::factory()->create([
+            'organization_id' => $otherOrg->id,
+            'user_id' => $otherUser->id,
+        ]);
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->set('project_workspace_id', $foreignWorkspace->id)
+            ->call('saveProjectSettings')
+            ->assertForbidden();
+
+        $site->refresh();
+
+        $this->assertNotSame($foreignWorkspace->id, $site->workspace_id);
+    }
+
+    public function test_site_settings_preview_section_can_save_primary_preview_domain(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'testing_hostname' => [
+                    'hostname' => 'legacy-preview.dply.cc',
+                    'status' => 'pending',
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'preview'])
+            ->set('preview_primary_hostname', 'preview-new.dply.cc')
+            ->set('preview_label', 'Managed preview')
+            ->set('preview_auto_ssl', true)
+            ->set('preview_https_redirect', true)
+            ->call('savePreviewSettings')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Preview settings saved.');
+
+        $site->refresh();
+        $previewDomain = SitePreviewDomain::query()->where('site_id', $site->id)->first();
+
+        $this->assertNotNull($previewDomain);
+        $this->assertSame('preview-new.dply.cc', $previewDomain->hostname);
+        $this->assertTrue($previewDomain->is_primary);
+        $this->assertSame('preview-new.dply.cc', $site->testingHostname());
+    }
+
+    public function test_site_settings_certificates_section_can_create_csr(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'app.example.com',
+            'is_primary' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'certificates'])
+            ->set('new_certificate_provider_type', SiteCertificate::PROVIDER_CSR)
+            ->set('new_certificate_challenge_type', SiteCertificate::CHALLENGE_MANUAL)
+            ->set('new_certificate_domains', 'app.example.com')
+            ->call('createCertificateRequest')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Certificate request saved.');
+
+        $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
+
+        $this->assertNotNull($certificate);
+        $this->assertSame(SiteCertificate::STATUS_ISSUED, $certificate->status);
+        $this->assertStringContainsString('BEGIN CERTIFICATE REQUEST', (string) $certificate->csr_pem);
+    }
+
+    public function test_site_settings_certificates_section_scopes_dns_request_to_preview_domain(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Server::STATUS_READY,
+            'ssh_private_key' => null,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $previewDomain = SitePreviewDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'preview-app.dply.cc',
+            'is_primary' => true,
+            'dns_status' => 'ready',
+        ]);
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'certificates'])
+            ->set('new_certificate_scope', SiteCertificate::SCOPE_PREVIEW)
+            ->set('new_certificate_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+            ->set('new_certificate_challenge_type', SiteCertificate::CHALLENGE_DNS)
+            ->set('new_certificate_preview_domain_id', $previewDomain->id)
+            ->set('new_certificate_provider_credential_id', $credential->id)
+            ->call('createCertificateRequest')
+            ->assertSet('flash_error', 'Server must be ready with an SSH key.');
+
+        $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
+
+        $this->assertNotNull($certificate);
+        $this->assertSame([$previewDomain->hostname], $certificate->domainHostnames());
+        $this->assertSame(SiteCertificate::SCOPE_PREVIEW, $certificate->scope_type);
     }
 }

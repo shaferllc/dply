@@ -4,6 +4,8 @@ return [
     'workspace_tabs' => [
         'general' => ['label' => 'General'],
         'domains' => ['label' => 'Domains'],
+        'preview' => ['label' => 'Preview'],
+        'certificates' => ['label' => 'Certificates'],
         'build-and-deploy' => ['label' => 'Build & deploy'],
         'runtime' => ['label' => 'Runtime'],
         'environment' => ['label' => 'Environment'],

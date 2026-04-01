@@ -184,6 +184,16 @@ class Site extends Model
         return $this->hasMany(SiteDomain::class);
     }
 
+    public function previewDomains(): HasMany
+    {
+        return $this->hasMany(SitePreviewDomain::class)->orderByDesc('is_primary')->orderBy('hostname');
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(SiteCertificate::class)->latest('created_at');
+    }
+
     public function deployments(): HasMany
     {
         return $this->hasMany(SiteDeployment::class)->orderByDesc('id');
@@ -227,6 +237,11 @@ class Site extends Model
 
     public function testingHostname(): string
     {
+        $previewDomain = $this->primaryPreviewDomain();
+        if ($previewDomain) {
+            return (string) $previewDomain->hostname;
+        }
+
         $meta = is_array($this->meta) ? $this->meta : [];
         $hostname = $meta['testing_hostname']['hostname'] ?? '';
 
@@ -235,10 +250,48 @@ class Site extends Model
 
     public function testingHostnameStatus(): ?string
     {
+        $previewDomain = $this->primaryPreviewDomain();
+        if ($previewDomain) {
+            return $previewDomain->dns_status;
+        }
+
         $meta = is_array($this->meta) ? $this->meta : [];
         $status = $meta['testing_hostname']['status'] ?? null;
 
         return is_string($status) ? $status : null;
+    }
+
+    public function primaryPreviewDomain(): ?SitePreviewDomain
+    {
+        $previewDomains = $this->relationLoaded('previewDomains')
+            ? $this->previewDomains
+            : $this->previewDomains()->get();
+
+        return $previewDomains->firstWhere('is_primary', true)
+            ?? $previewDomains->first();
+    }
+
+    public function currentSslSummary(): string
+    {
+        $certificates = $this->relationLoaded('certificates')
+            ? $this->certificates
+            : $this->certificates()->get();
+
+        if ($certificates->contains('status', SiteCertificate::STATUS_ACTIVE)) {
+            return self::SSL_ACTIVE;
+        }
+
+        if ($certificates->contains('status', SiteCertificate::STATUS_PENDING)
+            || $certificates->contains('status', SiteCertificate::STATUS_ISSUED)
+            || $certificates->contains('status', SiteCertificate::STATUS_INSTALLING)) {
+            return self::SSL_PENDING;
+        }
+
+        if ($certificates->contains('status', SiteCertificate::STATUS_FAILED)) {
+            return self::SSL_FAILED;
+        }
+
+        return $this->ssl_status;
     }
 
     public function webserver(): string
@@ -484,6 +537,15 @@ class Site extends Model
 
     public function sslDomainHostnames(): Collection
     {
+        $previewDomains = $this->relationLoaded('previewDomains')
+            ? $this->previewDomains
+            : $this->previewDomains()->get();
+        $primaryPreviewHostname = $previewDomains->firstWhere('is_primary', true)?->hostname
+            ?? $previewDomains->first()?->hostname;
+        if (is_string($primaryPreviewHostname) && $primaryPreviewHostname !== '') {
+            return collect([$primaryPreviewHostname]);
+        }
+
         $domains = $this->domains instanceof Collection
             ? $this->domains
             : $this->domains()->get();
@@ -494,6 +556,23 @@ class Site extends Model
         }
 
         return $domains->pluck('hostname')->filter()->unique()->values();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function customerDomainHostnames(): array
+    {
+        $domains = $this->domains instanceof Collection
+            ? $this->domains
+            : $this->domains()->get();
+
+        return $domains->pluck('hostname')
+            ->filter(fn (mixed $hostname): bool => is_string($hostname) && trim($hostname) !== '')
+            ->map(fn (string $hostname): string => strtolower(trim($hostname)))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function effectiveRepositoryPath(): string

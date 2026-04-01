@@ -12,8 +12,7 @@ final class DigitalOceanFunctionsSiteProvisioner
     public function readyResult(Site $site): array
     {
         $site->loadMissing('domains');
-        $meta = is_array($site->meta) ? $site->meta : [];
-        $config = is_array($meta['digitalocean_functions'] ?? null) ? $meta['digitalocean_functions'] : [];
+        $config = $site->serverlessConfig();
 
         $hostname = optional($site->primaryDomain())->hostname;
         $actionUrl = $config['action_url'] ?? null;

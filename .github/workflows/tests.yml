@@ -19,8 +19,6 @@ jobs:
         include:
           - name: BYO
             directory: .
-          - name: dply-serverless
-            directory: apps/dply-serverless
           - name: dply-cloud
             directory: apps/dply-cloud
           - name: dply-wordpress

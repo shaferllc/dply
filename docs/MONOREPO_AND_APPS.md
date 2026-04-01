@@ -16,17 +16,15 @@ dply/   (clone root — single git repo)
 │   └── dply-core/           ← shared PHP package (webhook signing, etc.)
 └── apps/
     ├── dply-auth/           ← central identity (OAuth / Passport + Fortify); see docs/DPLY_CENTRAL_AUTH.md
-    ├── dply-serverless/     ← product 2 — own composer.json + .env + DB
-    ├── dply-cloud/          ← product 3
-    ├── dply-wordpress/      ← product 4
-    └── dply-edge/           ← product 5
+    ├── dply-cloud/          ← separate product app
+    ├── dply-wordpress/      ← future product app
+    └── dply-edge/           ← future product app
 ```
 
 | Piece | Role |
 | ----- | ---- |
 | **Repository root** | **BYO** — servers, sites, SSH deploys, orgs, billing hooks. This is what most contributors run day to day. |
 | **`packages/dply-core`** | **Library**, not a runnable app. Required by BYO and by apps that list it in `composer.json`. Versioned in-repo; consumed via **path** (`../../packages/dply-core` from an `apps/*` child). |
-| **`apps/dply-serverless`** | **Serverless control plane** — function deploy API, provider adapters, own migrations. |
 | **`apps/dply-cloud`** | **Cloud control plane** — stub deploy engine, projects + deployments API, own migrations. |
 | **`apps/dply-wordpress`** | **WordPress control plane** — managed WP direction; projects + deployments API, stub engine. |
 | **`apps/dply-edge`** | **Edge control plane** — git-native JS/static; projects + deployments API (`framework` slug), stub engine. |
@@ -61,28 +59,6 @@ npm install && npm run build
 ```
 
 Run queue worker + web server as in [BYO_LOCAL_SETUP.md](BYO_LOCAL_SETUP.md).
-
----
-
-## Install: `apps/dply-serverless`
-
-**Directory:** `apps/dply-serverless` — treat it like its **own** Laravel project.
-
-```bash
-cd /path/to/dply/apps/dply-serverless
-composer install
-cp .env.example .env
-php artisan key:generate
-touch database/database.sqlite   # or configure MySQL/Postgres in .env
-php artisan migrate
-npm install && npm run build     # if you use the Vite UI
-```
-
-**Environment:** Use a **different** `DB_DATABASE` (and ideally a different DB server in production) than BYO — see [database isolation runbook](runbooks/database-isolation.md).
-
-**Optional:** Real provider adapters need env vars documented in [apps/dply-serverless/README.md](../apps/dply-serverless/README.md) (`SERVERLESS_*`, `NETLIFY_*`, etc.).
-
-**Bref / Lambda:** That app includes `serverless.yml` and Bref docs for hosting **this** control plane on AWS; that is separate from **customer** function deploys.
 
 ---
 
@@ -138,14 +114,14 @@ Set **`EDGE_API_TOKEN`** for `/api/edge/*`. Details: [apps/dply-edge/README.md](
 
 ## Quick comparison
 
-| | BYO (root) | dply-serverless | dply-cloud | dply-wordpress | dply-edge |
-| --- | --- | --- | --- | --- | --- |
-| **Path** | `./` | `apps/dply-serverless/` | `apps/dply-cloud/` | `apps/dply-wordpress/` | `apps/dply-edge/` |
-| **`composer install`** | At root | In app dir | In app dir | In app dir | In app dir |
-| **`vendor/`** | Root only | App only | App only | App only | App only |
-| **`.env` / `APP_KEY`** | One per env | One per env | One per env | One per env | One per env |
-| **Database** | BYO | Serverless | Cloud | WordPress | Edge |
-| **`dply-core`** | `./packages/dply-core` | `../../packages/dply-core` | (same) | (same) | (same) |
+| | BYO (root) | dply-cloud | dply-wordpress | dply-edge |
+| --- | --- | --- | --- | --- |
+| **Path** | `./` | `apps/dply-cloud/` | `apps/dply-wordpress/` | `apps/dply-edge/` |
+| **`composer install`** | At root | In app dir | In app dir | In app dir |
+| **`vendor/`** | Root only | App only | App only | App only |
+| **`.env` / `APP_KEY`** | One per env | One per env | One per env | One per env |
+| **Database** | BYO | Cloud | WordPress | Edge |
+| **`dply-core`** | `./packages/dply-core` | `../../packages/dply-core` | (same) | (same) |
 
 ---
 
@@ -156,7 +132,6 @@ Each Laravel app is served from its **`public/`** directory only. Nginx **`root`
 | Product | Example `root` (adjust to your deploy path) |
 | ------- | --------------------------------------------- |
 | **BYO** | `/var/www/dply/public` |
-| **dply-serverless** | `/var/www/dply-serverless/public` |
 | **dply-cloud** | `/var/www/dply-cloud/public` |
 | **dply-wordpress** | `/var/www/dply-wordpress/public` |
 | **dply-edge** | `/var/www/dply-edge/public` |
@@ -186,14 +161,14 @@ Use a **separate `server { }` block** (or separate vhost file) per hostname/prod
 
 ## Monorepo vs separate Git repositories
 
-**You can deploy every app independently while keeping one repo.** Separate deploys are about **runtime** (different vhosts, `.env`, `DB_*`, `composer install` in each app directory), not about splitting Git. CI can use a matrix: one job per `working-directory` (`./`, `apps/dply-serverless`, `apps/dply-cloud`, `apps/dply-wordpress`, `apps/dply-edge`), each producing its own artifact.
+**You can deploy every app independently while keeping one repo.** Separate deploys are about **runtime** (different vhosts, `.env`, `DB_*`, `composer install` in each app directory), not about splitting Git. CI can use a matrix: one job per `working-directory` (`./`, `apps/dply-cloud`, `apps/dply-wordpress`, `apps/dply-edge`), each producing its own artifact.
 
 **A “shared repo + apps outside” layout** usually means:
 
 | Piece | Role |
 | ----- | ---- |
 | **`dply-core` (or similar)** | Small library repo; versioned tags; consumed via Composer **VCS or Packagist**. |
-| **`dply` (BYO), `dply-serverless`, …** | Each in its **own** repo; `composer.json` requires `shaferllc/dply-core: ^0.x` from GitHub/Packagist instead of `path`. |
+| **`dply` (BYO), `dply-cloud`, …** | Each in its **own** repo; `composer.json` requires `shaferllc/dply-core: ^0.x` from GitHub/Packagist instead of `path`. |
 
 **When splitting apps out tends to make sense**
 

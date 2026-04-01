@@ -12,10 +12,11 @@ use App\Models\Site;
 final class DeployEngineResolver
 {
     public function __construct(
-        private ByoServerDeployEngine $byoServerDeployEngine,
-        private DigitalOceanFunctionsDeployEngine $digitalOceanFunctionsDeployEngine,
-        private DockerDeployEngine $dockerDeployEngine,
-        private KubernetesDeployEngine $kubernetesDeployEngine,
+        private DeployEngine $byoServerDeployEngine,
+        private DeployEngine $digitalOceanFunctionsDeployEngine,
+        private DeployEngine $awsLambdaDeployEngine,
+        private DeployEngine $dockerDeployEngine,
+        private DeployEngine $kubernetesDeployEngine,
     ) {}
 
     public function forProject(Project $project): DeployEngine
@@ -32,6 +33,10 @@ final class DeployEngineResolver
 
         if ($project->site?->server?->isDigitalOceanFunctionsHost()) {
             return $this->digitalOceanFunctionsDeployEngine;
+        }
+
+        if ($project->site?->server?->isAwsLambdaHost()) {
+            return $this->awsLambdaDeployEngine;
         }
 
         return $this->byoServerDeployEngine;

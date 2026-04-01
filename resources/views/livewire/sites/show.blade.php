@@ -1,5 +1,5 @@
 @php
-    $functionsHost = $server->isDigitalOceanFunctionsHost();
+    $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
     $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
     $supportsNginxProvisioning = $server->hostCapabilities()->supportsNginxProvisioning();
     $supportsEnvPush = $server->hostCapabilities()->supportsEnvPushToHost();
@@ -15,6 +15,9 @@
     $hostChecks = collect($provisioningMeta['host_checks'] ?? [])
         ->filter(fn ($check) => is_array($check) && is_string($check['hostname'] ?? null))
         ->values();
+    $serverlessRuntime = $site->usesFunctionsRuntime() ? $site->serverlessConfig() : [];
+    $dockerRuntime = $site->usesDockerRuntime() && is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
+    $kubernetesRuntime = $site->usesKubernetesRuntime() && is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
     $statusSteps = [
         'queued' => __('Queued'),
         'provisioning_testing_hostname' => __('Assigning testing hostname'),
@@ -564,6 +567,89 @@
                     </ul>
                 @endif
             </div>
+
+            @if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime())
+                <div class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 class="font-medium text-slate-900">{{ __('Runtime target') }}</h3>
+                            <p class="text-sm text-slate-600">{{ __('The latest managed deploy details for this runtime target.') }}</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                            @if ($site->usesAwsLambdaRuntime())
+                                {{ __('AWS Lambda') }}
+                            @elseif ($site->usesFunctionsRuntime())
+                                {{ __('DigitalOcean Functions') }}
+                            @elseif ($site->usesDockerRuntime())
+                                {{ __('Docker host') }}
+                            @else
+                                {{ __('Kubernetes cluster') }}
+                            @endif
+                        </span>
+                    </div>
+
+                    @if ($site->usesFunctionsRuntime())
+                        <dl class="grid gap-4 sm:grid-cols-2">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Runtime') }}</dt>
+                                <dd class="mt-2 font-mono text-sm text-slate-900">{{ $serverlessRuntime['runtime'] ?? '—' }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Entrypoint') }}</dt>
+                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['entrypoint'] ?? '—' }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Revision') }}</dt>
+                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['last_revision_id'] ?? __('Not deployed yet') }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Latest artifact') }}</dt>
+                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['artifact_path'] ?? __('Not built yet') }}</dd>
+                            </div>
+                            @if (! empty($serverlessRuntime['function_arn']))
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Function ARN') }}</dt>
+                                    <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['function_arn'] }}</dd>
+                                </div>
+                            @endif
+                            @if (! empty($serverlessRuntime['function_url']))
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Function URL') }}</dt>
+                                    <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['function_url'] }}</dd>
+                                </div>
+                            @endif
+                            @if (! empty($serverlessRuntime['action_url']))
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Published action URL') }}</dt>
+                                    <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['action_url'] }}</dd>
+                                </div>
+                            @endif
+                        </dl>
+                    @elseif ($site->usesDockerRuntime())
+                        <dl class="grid gap-4 sm:grid-cols-2">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Last generated compose file') }}</dt>
+                                <dd class="mt-2 text-sm text-slate-900">{{ isset($dockerRuntime['compose_yaml']) ? __('Available') : __('Not generated yet') }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Managed Dockerfile') }}</dt>
+                                <dd class="mt-2 text-sm text-slate-900">{{ isset($dockerRuntime['dockerfile']) ? __('Available') : __('Not generated yet') }}</dd>
+                            </div>
+                        </dl>
+                    @else
+                        <dl class="grid gap-4 sm:grid-cols-2">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Namespace') }}</dt>
+                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $kubernetesRuntime['namespace'] ?? __('default') }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Manifest') }}</dt>
+                                <dd class="mt-2 text-sm text-slate-900">{{ isset($kubernetesRuntime['manifest_yaml']) ? __('Generated') : __('Not generated yet') }}</dd>
+                            </div>
+                        </dl>
+                    @endif
+                </div>
+            @endif
 
             <div id="deployment-log" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3" wire:poll.10s>
                 <h3 class="font-medium text-slate-900">Deployment log</h3>

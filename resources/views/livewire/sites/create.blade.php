@@ -1,12 +1,12 @@
 <div>
-    @php($functionsHost = $server->isDigitalOceanFunctionsHost())
+    @php($functionsHost = $server->hostCapabilities()->supportsFunctionDeploy())
     <div class="border-b border-slate-200 bg-white">
         <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <a href="{{ route('servers.sites', $server) }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('← Cancel') }}</a>
             <h1 class="mt-4 text-2xl font-semibold tracking-tight text-slate-900">{{ __('Create site') }}</h1>
             <p class="mt-2 max-w-2xl text-sm text-slate-600">
                 @if ($functionsHost)
-                    {{ __('Set up the domain, runtime, and artifact details for a new site on :server. This host deploys through DigitalOcean Functions instead of an SSH machine.', ['server' => $server->name]) }}
+                    {{ __('Set up the domain, runtime, and artifact details for a new site on :server. This host deploys through a serverless target instead of an SSH machine.', ['server' => $server->name]) }}
                 @else
                     {{ __('Set up the domain, stack, and deploy paths for a new site on :server. Dply will wire a temporary testing hostname during provisioning so you can verify the install before customer DNS is switched.', ['server' => $server->name]) }}
                 @endif
@@ -263,9 +263,9 @@
                                 <summary class="cursor-pointer list-none text-sm font-semibold text-slate-900">{{ __('Advanced runtime overrides') }}</summary>
                                 <div class="mt-4 grid gap-5 md:grid-cols-2">
                                     <div>
-                                        <x-input-label for="functions_runtime" :value="__('Functions runtime')" />
+                                        <x-input-label for="functions_runtime" :value="__('Serverless runtime')" />
                                         <x-text-input id="functions_runtime" wire:model="form.functions_runtime" class="mt-1 block w-full font-mono text-sm" />
-                                        <p class="mt-2 text-sm text-slate-600">{{ __('Example: `nodejs:18` or another OpenWhisk-compatible kind accepted by your namespace.') }}</p>
+                                        <p class="mt-2 text-sm text-slate-600">{{ __('Example: `nodejs:18` for DigitalOcean Functions or `provided.al2023` for AWS Lambda/Bref.') }}</p>
                                         <x-input-error :messages="$errors->get('form.functions_runtime')" class="mt-1" />
                                     </div>
                                     <div>

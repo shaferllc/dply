@@ -4,12 +4,12 @@
 
 > **Start here:** [docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md) — step-by-step local setup for BYO only.
 
-**Monorepo:** This repo also contains `apps/dply-serverless`, `apps/dply-cloud`, and `packages/dply-core`. See **[docs/MONOREPO_AND_APPS.md](docs/MONOREPO_AND_APPS.md)** for how they relate to the root app, **per-app `composer install`**, and separate databases.
+**Monorepo:** This repo also contains `apps/dply-cloud`, `apps/dply-auth`, and `packages/dply-core`. Serverless provider and Lambda/Bref support now live in the root app. See **[docs/MONOREPO_AND_APPS.md](docs/MONOREPO_AND_APPS.md)** for how the remaining apps relate to the root app, **per-app `composer install`**, and separate databases.
 
 ## Product focus
 
 - **Active (default):** **BYO** — develop and run from the repo root with one `.env` and one database.
-- **On hold** for day-to-day onboarding: separate product apps under `apps/` (**Serverless**, **Cloud**) and future **WordPress** / **Edge** lines. They are **not** required to run BYO; each has its own Composer install and database when you choose to work on them.
+- **On hold** for day-to-day onboarding: separate product apps under `apps/` (**Cloud**) and future **WordPress** / **Edge** lines. They are **not** required to run BYO; each has its own Composer install and database when you choose to work on them.
 
 Long-term multi-product context (rollout order, separate DBs): [docs/MULTI_PRODUCT_PLATFORM_PLAN.md](docs/MULTI_PRODUCT_PLATFORM_PLAN.md).
 

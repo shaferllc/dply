@@ -6,6 +6,7 @@ final class KubernetesDeployEngine implements \App\Contracts\DeployEngine
 {
     public function __construct(
         private readonly KubernetesManifestBuilder $manifestBuilder,
+        private readonly KubernetesKubectlExecutor $kubectlExecutor,
     ) {}
 
     public function run(DeployContext $context): array
@@ -16,18 +17,59 @@ final class KubernetesDeployEngine implements \App\Contracts\DeployEngine
         $kubernetesRuntime = is_array($siteMeta['kubernetes_runtime'] ?? null) ? $siteMeta['kubernetes_runtime'] : [];
         $namespace = (string) ($kubernetesRuntime['namespace'] ?? $serverMeta['kubernetes']['namespace'] ?? 'default');
         $manifest = $this->manifestBuilder->build($site, $namespace);
+        $deploymentName = $this->manifestBuilder->deploymentName($site);
+        $kubeconfigPath = $this->resolveKubeconfigPath($serverMeta, $kubernetesRuntime);
+        $contextName = $this->resolveContext($serverMeta, $kubernetesRuntime);
+        $result = $this->kubectlExecutor->deploy(
+            $manifest,
+            $namespace,
+            $deploymentName,
+            $kubeconfigPath,
+            $contextName,
+        );
 
         $siteMeta['kubernetes_runtime'] = array_merge($kubernetesRuntime, [
             'namespace' => $namespace,
             'manifest_yaml' => $manifest,
+            'deployment_name' => $deploymentName,
+            'kubectl_context' => $result['context'],
+            'last_apply_output' => $result['output'],
+            'last_revision_id' => $result['revision'],
+            'applied_at' => now()->toIso8601String(),
             'last_deployed_at' => now()->toIso8601String(),
         ]);
 
         $site->forceFill(['meta' => $siteMeta])->save();
 
         return [
-            'output' => "Kubernetes deploy prepared.\n\n".$manifest,
-            'sha' => null,
+            'output' => implode("\n\n", array_filter([
+                'Kubernetes deploy applied.',
+                $result['output'],
+                $manifest,
+            ])),
+            'sha' => $result['revision'],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $serverMeta
+     * @param  array<string, mixed>  $runtime
+     */
+    private function resolveKubeconfigPath(array $serverMeta, array $runtime): ?string
+    {
+        $path = trim((string) ($runtime['kubeconfig_path'] ?? data_get($serverMeta, 'kubernetes.kubeconfig_path', config('kubernetes.kubeconfig_path'))));
+
+        return $path !== '' ? $path : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $serverMeta
+     * @param  array<string, mixed>  $runtime
+     */
+    private function resolveContext(array $serverMeta, array $runtime): ?string
+    {
+        $context = trim((string) ($runtime['context'] ?? data_get($serverMeta, 'kubernetes.context', config('kubernetes.context'))));
+
+        return $context !== '' ? $context : null;
     }
 }

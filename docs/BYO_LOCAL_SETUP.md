@@ -2,7 +2,7 @@
 
 This guide is the **canonical way to run the main dply product** in the monorepo: the **BYO** Laravel app at the **repository root** (`composer.json` next to `app/`, `routes/`, `resources/`).
 
-**You do not need** `apps/dply-serverless`, `apps/dply-cloud`, or any other product app to develop or use BYO. Those live in `apps/` with **their own** installs, `.env` files, and databases; treat them as **on hold** until you deliberately work on them.
+**You do not need** `apps/dply-cloud` or any other product app to develop or use BYO. Serverless provider support now lives in the root app alongside the main BYO flows. Other product apps under `apps/` still have **their own** installs, `.env` files, and databases; treat them as **on hold** until you deliberately work on them.
 
 ---
 
@@ -71,7 +71,7 @@ Set `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PAS
 php artisan migrate
 ```
 
-**Isolation:** Use a **dedicated** database name for BYO (e.g. `dply_byo`). Do not point BYO at a database used by `apps/dply-serverless` or `apps/dply-cloud`. See [database isolation runbook](runbooks/database-isolation.md).
+**Isolation:** Use a **dedicated** database name for BYO (e.g. `dply_byo`). Do not point BYO at a database used by another app such as `apps/dply-cloud`. See [database isolation runbook](runbooks/database-isolation.md).
 
 ---
 
@@ -206,7 +206,6 @@ For a **full map** of the repo (all apps, `dply-core`, install commands per app)
 | ---- | ---- |
 | **Repository root** | **BYO app** — this guide. |
 | `packages/dply-core/` | Shared library; pulled in via Composer path from the root `composer.json`. |
-| `apps/dply-serverless/` | **Separate product** — own `composer install`, `.env`, DB. **On hold** for BYO-focused work. |
 | `apps/dply-cloud/` | **Separate product** — same as above. **On hold** for BYO-focused work. |
 | `docs/MULTI_PRODUCT_PLATFORM_PLAN.md` | Long-term multi-product blueprint; rollout beyond BYO is paused for **documentation and default local setup** per team focus. |
 

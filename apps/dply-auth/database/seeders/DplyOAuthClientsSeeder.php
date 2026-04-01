@@ -25,13 +25,6 @@ class DplyOAuthClientsSeeder extends Seeder
                 ]),
             ],
             [
-                'name' => 'dply-serverless',
-                'redirect_uris' => array_filter([
-                    env('DPLY_OAUTH_REDIRECT_SERVERLESS', 'https://serverless.dply.io/oauth/callback'),
-                    'http://dply-serverless.test/oauth/callback',
-                ]),
-            ],
-            [
                 'name' => 'dply-cloud',
                 'redirect_uris' => array_filter([
                     env('DPLY_OAUTH_REDIRECT_CLOUD', 'https://cloud.dply.io/oauth/callback'),

@@ -19,14 +19,19 @@ class SiteReachabilityChecker
      */
     public function check(Site $site): array
     {
+        $previewDomains = $site->previewDomains instanceof \Illuminate\Support\Collection
+            ? $site->previewDomains
+            : $site->previewDomains()->get();
         $domains = $site->domains instanceof \Illuminate\Support\Collection
             ? $site->domains
             : $site->domains()->get();
         $primaryHostname = $domains->firstWhere('is_primary', true)?->hostname
             ?? $domains->first()?->hostname;
+        $primaryPreviewHostname = $previewDomains->firstWhere('is_primary', true)?->hostname
+            ?? $previewDomains->first()?->hostname;
 
         $hostnames = collect([
-            $site->testingHostname(),
+            $primaryPreviewHostname ?: $site->testingHostname(),
             $primaryHostname,
         ])->filter(fn (mixed $hostname): bool => is_string($hostname) && $hostname !== '')
             ->unique()

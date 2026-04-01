@@ -4,7 +4,7 @@
 
 **Monorepo:** [docs/MONOREPO_AND_APPS.md](../../docs/MONOREPO_AND_APPS.md) explains how this directory relates to the repo root, `dply-core`, and separate `composer install` / databases.
 
-Third product app in the monorepo: **managed long-lived PHP / Rails** workloads on **your** infrastructure (build/publish TBD). **Separate Laravel install and database** from the BYO app and from `apps/dply-serverless`.
+Third product app in the monorepo: **managed long-lived PHP / Rails** workloads on **your** infrastructure (build/publish TBD). **Separate Laravel install and database** from the BYO app and from the other product apps.
 
 ## Marketing site (`/`)
 

@@ -190,7 +190,7 @@ class Create extends Component
     {
         $this->form->primary_hostname = strtolower(trim($value));
         $this->form->applyPathDefaults();
-        if ($this->server->isDigitalOceanFunctionsHost()) {
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
             $this->form->applyFunctionsDefaults();
         }
     }
@@ -215,7 +215,7 @@ class Create extends Component
         abort_if($this->server->organization_id !== $org->id, 403);
 
         $phpVersionIds = array_column($this->phpVersions, 'id');
-        $functionsHost = $this->server->isDigitalOceanFunctionsHost();
+        $functionsHost = $this->server->hostCapabilities()->supportsFunctionDeploy();
         $dockerHost = $this->server->isDockerHost();
         $kubernetesHost = $this->server->isKubernetesCluster();
         $containerHost = $dockerHost || $kubernetesHost;
@@ -288,11 +288,13 @@ class Create extends Component
         $meta = [];
         if ($functionsHost) {
             $detectedRuntime = is_array($this->functionsDetection) ? $this->functionsDetection : [];
-            $meta['runtime_profile'] = 'digitalocean_functions_web';
-            $meta['digitalocean_functions'] = [
+            $meta['runtime_profile'] = $this->server->isAwsLambdaHost() ? 'aws_lambda_bref_web' : 'digitalocean_functions_web';
+            $meta['serverless'] = [
+                'target' => $this->server->hostKind(),
                 'runtime' => $this->form->functions_runtime,
                 'entrypoint' => trim($this->form->functions_entrypoint),
-                'package' => trim((string) ($detectedRuntime['package'] ?? 'default')),
+                'package' => trim((string) ($detectedRuntime['package'] ?? '')),
+                'function_name' => Str::slug($this->form->name) ?: 'site',
                 'repo_source' => trim($this->form->functions_repo_source),
                 'source_control_account_id' => $this->form->functions_repo_source === 'provider'
                     ? trim($this->form->functions_source_control_account_id)
@@ -323,7 +325,11 @@ class Create extends Component
             'name' => $this->form->name,
             'slug' => Str::slug($this->form->name) ?: 'site',
             'type' => SiteType::from($this->form->type),
-            'document_root' => $functionsHost ? '/functions/'.$this->form->functions_entrypoint : $this->form->document_root,
+            'document_root' => $functionsHost
+                ? ($this->server->isAwsLambdaHost()
+                    ? '/lambda/'.trim($this->form->functions_entrypoint, '/')
+                    : '/functions/'.$this->form->functions_entrypoint)
+                : $this->form->document_root,
             'repository_path' => $functionsHost ? null : ($this->form->repository_path ?: null),
             'php_version' => $this->form->type === 'php' && ! $functionsHost && ! $containerHost ? $this->form->php_version : null,
             'app_port' => $this->form->type === 'node' ? $this->form->app_port : null,
@@ -359,7 +365,7 @@ class Create extends Component
 
     private function refreshFunctionsDetection(): void
     {
-        if (! $this->server->isDigitalOceanFunctionsHost()) {
+        if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
             return;
         }
 

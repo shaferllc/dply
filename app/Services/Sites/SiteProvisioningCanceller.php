@@ -3,6 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Services\Certificates\CertificateRequestService;
 
 class SiteProvisioningCanceller
 {
@@ -10,6 +11,7 @@ class SiteProvisioningCanceller
         private readonly TestingHostnameProvisioner $testingHostnameProvisioner,
         private readonly SiteWebserverProvisionerRegistry $provisionerRegistry,
         private readonly SiteProvisioner $siteProvisioner,
+        private readonly CertificateRequestService $certificateRequestService,
     ) {}
 
     public function cancel(Site $site): void
@@ -19,6 +21,7 @@ class SiteProvisioningCanceller
         $this->siteProvisioner->appendLog($site, 'warning', 'cancelled', 'Cancelling site provisioning and cleaning up created resources.');
 
         $this->removeServerConfig($site);
+        $this->removeCertificates($site);
         $this->removeTestingHostname($site);
 
         $this->siteProvisioner->appendLog($site, 'info', 'cancelled', 'Provisioning cleanup completed. Deleting pending site.');
@@ -61,5 +64,14 @@ class SiteProvisioningCanceller
         $this->siteProvisioner->appendLog($site, 'info', 'cancelled', 'Testing hostname cleanup completed.', [
             'hostname' => $testingHostname,
         ]);
+    }
+
+    private function removeCertificates(Site $site): void
+    {
+        $site->loadMissing('certificates');
+
+        foreach ($site->certificates as $certificate) {
+            $this->certificateRequestService->removeArtifacts($certificate);
+        }
     }
 }

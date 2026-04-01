@@ -873,6 +873,32 @@ CREATE TABLE site_domains (
 	CONSTRAINT site_domains_pkey PRIMARY KEY (id), 
 	CONSTRAINT site_domains_hostname_unique UNIQUE (hostname)
 );
+CREATE TABLE site_preview_domains (
+	id CHAR(26) NOT NULL,
+	site_id CHAR(26) NOT NULL,
+	hostname VARCHAR(255) NOT NULL,
+	label VARCHAR(255),
+	zone VARCHAR(255),
+	record_name VARCHAR(255),
+	provider_type VARCHAR(255),
+	provider_record_id VARCHAR(255),
+	record_type VARCHAR(255),
+	record_data VARCHAR(255),
+	dns_status VARCHAR(255) DEFAULT 'pending' NOT NULL,
+	ssl_status VARCHAR(255) DEFAULT 'none' NOT NULL,
+	is_primary BOOLEAN DEFAULT 0 NOT NULL,
+	auto_ssl BOOLEAN DEFAULT 1 NOT NULL,
+	https_redirect BOOLEAN DEFAULT 1 NOT NULL,
+	managed_by_dply BOOLEAN DEFAULT 1 NOT NULL,
+	last_dns_checked_at TIMESTAMP,
+	last_ssl_checked_at TIMESTAMP,
+	meta JSON,
+	created_at TIMESTAMP,
+	updated_at TIMESTAMP,
+	CONSTRAINT site_preview_domains_pkey PRIMARY KEY (id),
+	CONSTRAINT site_preview_domains_hostname_unique UNIQUE (hostname)
+);
+CREATE INDEX site_preview_domains_site_id_is_primary_index ON site_preview_domains (site_id, is_primary);
 CREATE TABLE site_environment_variables (
 	id CHAR(26) NOT NULL, 
 	site_id CHAR(26) NOT NULL, 
@@ -906,6 +932,40 @@ CREATE TABLE site_releases (
 	CONSTRAINT site_releases_pkey PRIMARY KEY (id), 
 	CONSTRAINT site_releases_site_id_folder_unique UNIQUE (site_id, folder)
 );
+CREATE TABLE site_certificates (
+	id CHAR(26) NOT NULL,
+	site_id CHAR(26) NOT NULL,
+	preview_domain_id CHAR(26),
+	provider_credential_id CHAR(26),
+	scope_type VARCHAR(255) NOT NULL,
+	provider_type VARCHAR(255) NOT NULL,
+	challenge_type VARCHAR(255) NOT NULL,
+	dns_provider VARCHAR(255),
+	credential_reference VARCHAR(255),
+	domains_json JSON NOT NULL,
+	status VARCHAR(255) DEFAULT 'pending' NOT NULL,
+	force_skip_dns_checks BOOLEAN DEFAULT 0 NOT NULL,
+	enable_http3 BOOLEAN DEFAULT 0 NOT NULL,
+	certificate_path VARCHAR(255),
+	private_key_path VARCHAR(255),
+	chain_path VARCHAR(255),
+	certificate_pem TEXT,
+	private_key_pem TEXT,
+	chain_pem TEXT,
+	csr_pem TEXT,
+	last_output TEXT,
+	requested_settings JSON,
+	applied_settings JSON,
+	meta JSON,
+	expires_at TIMESTAMP,
+	last_requested_at TIMESTAMP,
+	last_installed_at TIMESTAMP,
+	created_at TIMESTAMP,
+	updated_at TIMESTAMP,
+	CONSTRAINT site_certificates_pkey PRIMARY KEY (id)
+);
+CREATE INDEX site_certificates_site_id_status_index ON site_certificates (site_id, status);
+CREATE INDEX site_certificates_scope_type_provider_type_index ON site_certificates (scope_type, provider_type);
 CREATE TABLE sites (
 	id CHAR(26) NOT NULL, 
 	server_id CHAR(26) NOT NULL, 

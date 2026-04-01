@@ -97,4 +97,9 @@ final class HostCapabilities
     {
         return $this->supportsSsh();
     }
+
+    public function supportsHttp3Certificates(): bool
+    {
+        return $this->supportsSsh();
+    }
 }

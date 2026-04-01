@@ -39,12 +39,19 @@ use App\Policies\TeamPolicy;
 use App\Policies\UserSshKeyPolicy;
 use App\Policies\WorkspacePolicy;
 use App\Services\Deploy\ByoServerDeployEngine;
+use App\Services\Deploy\AwsLambdaDeployEngine;
 use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
 use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
 use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesDeployEngine;
 use App\Services\Deploy\ServerlessProvisionerFactory;
+use App\Services\Certificates\CertificateEngineResolver;
+use App\Services\Certificates\CertificateRequestService;
+use App\Services\Certificates\CertificateSigningRequestGenerator;
+use App\Services\Certificates\ImportedCertificateInstaller;
+use App\Services\Certificates\LetsEncryptDnsCertificateEngine;
+use App\Services\Certificates\LetsEncryptHttpCertificateEngine;
 use App\Services\Servers\ServerMetricsGuestScript;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
@@ -88,10 +95,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
         $this->app->singleton(ServerlessProvisionerFactory::class);
+        $this->app->singleton(CertificateEngineResolver::class, function ($app) {
+            return new CertificateEngineResolver($app->tagged('site.certificate.engines'));
+        });
+        $this->app->singleton(CertificateRequestService::class);
         $this->app->singleton(DeployEngineResolver::class, function ($app) {
             return new DeployEngineResolver(
                 $app->make(ByoServerDeployEngine::class),
                 $app->make(DigitalOceanFunctionsDeployEngine::class),
+                $app->make(AwsLambdaDeployEngine::class),
                 $app->make(DockerDeployEngine::class),
                 $app->make(KubernetesDeployEngine::class),
             );
@@ -127,6 +139,13 @@ class AppServiceProvider extends ServiceProvider
             DockerRuntimeSiteProvisioner::class,
             KubernetesRuntimeSiteProvisioner::class,
         ], 'site.runtime.provisioners');
+
+        $this->app->tag([
+            LetsEncryptHttpCertificateEngine::class,
+            LetsEncryptDnsCertificateEngine::class,
+            ImportedCertificateInstaller::class,
+            CertificateSigningRequestGenerator::class,
+        ], 'site.certificate.engines');
     }
 
     /**
@@ -220,13 +239,23 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Site::deleting(function (Site $site): void {
+            $site->loadMissing(['certificates', 'previewDomains']);
             $primary = $site->primaryDomain();
             $svIds = SupervisorProgram::query()->where('site_id', $site->id)->pluck('id')->all();
+            foreach ($site->certificates as $certificate) {
+                rescue(
+                    fn () => app(CertificateRequestService::class)->removeArtifacts($certificate),
+                    report: false,
+                );
+            }
+            $site->previewDomains()->delete();
             if ($site->server?->isDigitalOceanFunctionsHost()) {
                 rescue(
                     fn () => app(DigitalOceanFunctionsActionDeployer::class)->delete($site),
                     report: false,
                 );
+            } elseif ($site->server?->hostCapabilities()->supportsFunctionDeploy()) {
+                // Non-DO serverless targets do not have remote SSH artifacts to clean up here.
             } else {
                 CleanupRemoteSiteArtifactsJob::dispatch([
                     'server_id' => $site->server_id,

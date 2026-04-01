@@ -80,8 +80,9 @@ final class DigitalOceanFunctionsActionDeployer
         $json = $response->json();
         $revisionId = is_array($json) && isset($json['version']) ? (string) $json['version'] : null;
 
-        $functionsConfig = $site->functionsConfig();
-        $siteMeta['digitalocean_functions'] = array_merge($functionsConfig, [
+        $functionsConfig = $site->serverlessConfig();
+        $siteMeta['serverless'] = array_merge($functionsConfig, [
+            'target' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
             'package' => $package,
             'runtime' => $kind,
             'entrypoint' => $entrypoint,
@@ -105,7 +106,7 @@ final class DigitalOceanFunctionsActionDeployer
                 $revisionId ? 'Revision: '.$revisionId : null,
             ])),
             'revision_id' => $revisionId,
-            'url' => $siteMeta['digitalocean_functions']['action_url'],
+            'url' => $siteMeta['serverless']['action_url'],
         ];
     }
 
@@ -126,7 +127,7 @@ final class DigitalOceanFunctionsActionDeployer
         $namespace = trim((string) ($hostConfig['namespace'] ?? ''));
         $accessKey = trim((string) ($hostConfig['access_key'] ?? ''));
         $package = trim((string) ($resolvedConfig['package'] ?? 'default'));
-        $actionName = trim((string) ($site->functionsConfig()['action_name'] ?? $this->actionName($site)));
+        $actionName = trim((string) ($site->serverlessConfig()['action_name'] ?? $this->actionName($site)));
 
         if ($apiHost === '' || $namespace === '' || $accessKey === '' || $actionName === '') {
             return;

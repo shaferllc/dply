@@ -115,7 +115,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $siteUpdates = [
                     'last_deploy_at' => now(),
                 ];
-                if ($this->site->server?->isDigitalOceanFunctionsHost()) {
+                if ($this->site->server?->hostCapabilities()->supportsFunctionDeploy()) {
                     $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
                 }
                 $this->site->update($siteUpdates);

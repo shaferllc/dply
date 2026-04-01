@@ -243,6 +243,7 @@
                         <div class="mb-4">
                             <h3 class="font-medium text-slate-900">{{ __('Sites in this project') }}</h3>
                             <p class="mt-1 text-sm text-slate-500">{{ __('Attach sites that should deploy, alert, and be reviewed alongside this project. This is useful for multi-site apps, customer estates, and grouped environments.') }}</p>
+                            <p class="mt-2 text-sm text-slate-500">{{ __('You can manage project membership here or from each site\\'s settings page.') }}</p>
                         </div>
                         @if ($workspace->sites->isEmpty())
                             <p class="text-sm text-slate-500 mb-4">{{ __('No sites yet.') }}</p>
@@ -254,6 +255,7 @@
                                             <a href="{{ route('sites.show', [$site->server, $site]) }}" class="text-slate-900 font-medium hover:underline">{{ $site->name }}</a>
                                             <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
                                                 <a href="{{ route('sites.show', [$site->server, $site]) }}" class="hover:text-slate-800">{{ __('Overview') }}</a>
+                                                <a href="{{ route('sites.settings', [$site->server, $site, 'section' => 'general']) }}" wire:navigate class="hover:text-slate-800">{{ __('Site settings') }}</a>
                                                 <a href="{{ route('sites.insights', [$site->server, $site]) }}" wire:navigate class="hover:text-slate-800">{{ __('Insights') }}</a>
                                             </div>
                                         </div>

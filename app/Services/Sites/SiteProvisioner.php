@@ -3,7 +3,9 @@
 namespace App\Services\Sites;
 
 use App\Events\Sites\SiteProvisioningUpdatedBroadcast;
+use App\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Site;
+use App\Services\Certificates\CertificateRequestService;
 
 class SiteProvisioner
 {
@@ -15,6 +17,7 @@ class SiteProvisioner
         private readonly SiteRuntimeProvisionerRegistry $runtimeProvisionerRegistry,
         private readonly SiteReachabilityChecker $siteReachabilityChecker,
         private readonly DigitalOceanFunctionsSiteProvisioner $digitalOceanFunctionsSiteProvisioner,
+        private readonly CertificateRequestService $certificateRequestService,
     ) {}
 
     public function begin(Site $site): void
@@ -22,7 +25,7 @@ class SiteProvisioner
         $site->loadMissing(['server', 'domains']);
 
         if ($site->usesFunctionsRuntime()) {
-            $this->appendLog($site, 'info', 'queued', 'Functions host provisioning worker started.', [
+            $this->appendLog($site, 'info', 'queued', 'Serverless host provisioning worker started.', [
                 'runtime_profile' => $site->runtimeProfile(),
                 'server_id' => (string) $site->server_id,
             ]);
@@ -34,7 +37,7 @@ class SiteProvisioner
                 'error' => null,
             ]);
 
-            $this->appendLog($site, 'info', 'configuring_functions_runtime', 'DigitalOcean Functions runtime metadata saved. Waiting for the first deploy to publish a live endpoint.');
+            $this->appendLog($site, 'info', 'configuring_functions_runtime', 'Serverless runtime metadata saved. Waiting for the first deploy to publish a live endpoint.');
 
             return;
         }
@@ -161,7 +164,7 @@ class SiteProvisioner
                 'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
             ]);
 
-            $this->appendLog($site, 'info', 'awaiting_first_deploy', 'Functions host is configured. Run the first deploy to publish a live endpoint.', [
+            $this->appendLog($site, 'info', 'awaiting_first_deploy', 'Serverless host is configured. Run the first deploy to publish a live endpoint.', [
                 'hostname' => $result['hostname'],
                 'url' => $result['url'],
             ]);
@@ -215,6 +218,13 @@ class SiteProvisioner
                 'status' => Site::activeStatusForWebserver($site->webserver()),
             ]);
 
+            if ($previewDomain = $site->primaryPreviewDomain()) {
+                $previewDomain->update([
+                    'dns_status' => 'ready',
+                    'last_dns_checked_at' => now(),
+                ]);
+            }
+
             $this->appendLog($site, 'info', 'waiting_for_http', 'Hostname responded successfully.', [
                 'hostname' => $result['hostname'],
                 'url' => $result['url'],
@@ -229,6 +239,17 @@ class SiteProvisioner
                 'host_checks' => $result['checks'],
                 'error' => null,
             ]);
+
+            if ($site->primaryPreviewDomain()?->hostname === $result['hostname']) {
+                $certificate = $this->certificateRequestService->queuePrimaryPreviewAutoSsl($site->fresh(['previewDomains']));
+                if ($certificate) {
+                    $this->appendLog($site, 'info', 'ready', 'Queued automatic preview SSL after reachability succeeded.', [
+                        'hostname' => $result['hostname'],
+                        'certificate_id' => $certificate->id,
+                    ]);
+                    ExecuteSiteCertificateJob::dispatch($certificate->id);
+                }
+            }
 
             return $result;
         }

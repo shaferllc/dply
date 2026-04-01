@@ -1,13 +1,16 @@
 @php
-    $functionsHost = $server->isDigitalOceanFunctionsHost();
+    $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
     $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
     $supportsNginxProvisioning = $server->hostCapabilities()->supportsNginxProvisioning();
+    $supportsHttp3Certificates = $server->hostCapabilities()->supportsHttp3Certificates();
     $supportsEnvPush = $server->hostCapabilities()->supportsEnvPushToHost();
     $supportsSshDeployHooks = $server->hostCapabilities()->supportsSshDeployHooks();
     $testingHostname = $site->testingHostname();
     $settingsSidebarItems = [
         ['id' => 'general', 'label' => __('General'), 'icon' => 'heroicon-o-rectangle-stack'],
         ['id' => 'domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-share'],
+        ['id' => 'preview', 'label' => __('Preview'), 'icon' => 'heroicon-o-sparkles'],
+        ['id' => 'certificates', 'label' => __('Certificates'), 'icon' => 'heroicon-o-shield-check'],
         ['id' => 'build-and-deploy', 'label' => __('Build & deploy'), 'icon' => 'heroicon-o-code-bracket-square'],
         ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent'],
         ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line'],
@@ -64,8 +67,8 @@
             </x-slot>
         </x-page-header>
 
-        <div class="space-y-6 lg:flex lg:items-start lg:gap-8 lg:space-y-0">
-            <aside class="lg:sticky lg:top-8 lg:w-[17rem] lg:flex-none">
+        <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+            <aside class="lg:col-span-3 lg:sticky lg:top-8">
                 <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div class="border-b border-slate-200 px-5 py-4">
                         <div class="flex items-center justify-between gap-3">
@@ -113,64 +116,112 @@
                 </div>
             </aside>
 
-            <main class="min-w-0 space-y-6 lg:flex-1">
-                <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar">
+            <main class="min-w-0 space-y-6 lg:col-span-9">
+                <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
                     @if ($section === 'general')
-                        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-5">
-                            <div>
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('General') }}</h2>
-                                <p class="mt-1 text-sm text-brand-moss">{{ __('A site-level summary before you move into domains, runtime, and deploy configuration.') }}</p>
-                            </div>
+                        <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                            <form wire:submit="saveGeneralSettings">
+                                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+                                    <div class="border-b border-brand-ink/10 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site domain') }}</h2>
+                                        <p class="mt-3 text-sm leading-6 text-brand-moss">
+                                            {{ __('Update the primary domain and web directory for this site here. Changing the primary hostname updates the site record Dply uses for routing and future server automation.') }}
+                                        </p>
+                                        @if ($testingHostname !== '')
+                                            <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white p-4">
+                                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Testing URL') }}</p>
+                                                <p class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $testingHostname }}</p>
+                                            </div>
+                                        @endif
+                                    </div>
 
-                            @if ($site->workspace)
-                                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 text-sm text-brand-moss">
-                                    <p class="font-medium text-brand-ink">{{ __('Project context') }}</p>
-                                    <p class="mt-1">
-                                        {{ __('This site rolls up into the :project project.', ['project' => $site->workspace->name]) }}
-                                        <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('Open project operations') }}</a>
-                                        {{ __('for grouped health and activity, or') }}
-                                        <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('open project delivery') }}</a>
-                                        {{ __('to coordinate releases and shared variables.') }}
-                                    </p>
-                                </div>
-                            @endif
+                                    <div class="p-6 sm:p-8">
+                                        <div class="grid gap-5">
+                                            <div>
+                                                <x-input-label for="settings_primary_domain" value="Root domain" />
+                                                <x-text-input id="settings_primary_domain" wire:model="settings_primary_domain" class="mt-2 block w-full font-mono text-sm" placeholder="app.example.com" />
+                                                <x-input-error :messages="$errors->get('settings_primary_domain')" class="mt-2" />
+                                            </div>
 
-                            <dl class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                                <div>
-                                    <dt class="text-brand-moss">{{ __('Provisioning') }}</dt>
-                                    <dd class="mt-1 font-medium text-brand-ink capitalize">{{ $site->statusLabel() }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-brand-moss">{{ __('Provisioning step') }}</dt>
-                                    <dd class="mt-1 font-medium text-brand-ink capitalize">{{ str_replace('_', ' ', $site->provisioningState() ?? 'queued') }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-brand-moss">{{ __('SSL') }}</dt>
-                                    <dd class="mt-1 font-medium text-brand-ink capitalize">{{ $site->ssl_status }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-brand-moss">{{ __('Deploy strategy') }}</dt>
-                                    <dd class="mt-1 font-medium text-brand-ink">{{ $site->deploy_strategy }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-brand-moss">{{ __('Document root') }}</dt>
-                                    <dd class="mt-1 break-all font-mono text-xs text-brand-ink">{{ $site->document_root }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-brand-moss">{{ __('Deploy path') }}</dt>
-                                    <dd class="mt-1 break-all font-mono text-xs text-brand-ink">{{ $site->effectiveRepositoryPath() }}</dd>
-                                </div>
-                            </dl>
+                                            <div>
+                                                <x-input-label for="settings_document_root" value="Web directory" />
+                                                <x-text-input id="settings_document_root" wire:model="settings_document_root" class="mt-2 block w-full font-mono text-sm" placeholder="/var/www/app/public" />
+                                                <x-input-error :messages="$errors->get('settings_document_root')" class="mt-2" />
+                                            </div>
 
-                            <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
-                                <p class="text-sm font-medium text-brand-ink">{{ __('Testing URL') }}</p>
-                                @if ($testingHostname !== '')
-                                    <p class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $testingHostname }}</p>
-                                    <p class="mt-2 text-sm text-brand-moss">{{ __('Use this URL to test the site before the customer domain points here.') }}</p>
-                                @else
-                                    <p class="mt-2 text-sm text-brand-moss">{{ __('No temporary testing hostname is configured for this site yet.') }}</p>
-                                @endif
-                            </div>
+                                            <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-slate-50/60 p-4 text-sm sm:grid-cols-2">
+                                                <div>
+                                                    <dt class="text-brand-moss">{{ __('Provisioning') }}</dt>
+                                                    <dd class="mt-1 font-medium text-brand-ink capitalize">{{ $site->statusLabel() }}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt class="text-brand-moss">{{ __('SSL') }}</dt>
+                                                    <dd class="mt-1 font-medium text-brand-ink capitalize">{{ $site->currentSslSummary() }}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt class="text-brand-moss">{{ __('Deploy path') }}</dt>
+                                                    <dd class="mt-1 break-all font-mono text-xs text-brand-ink">{{ $site->effectiveRepositoryPath() }}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt class="text-brand-moss">{{ __('Deploy strategy') }}</dt>
+                                                    <dd class="mt-1 font-medium text-brand-ink">{{ $site->deploy_strategy }}</dd>
+                                                </div>
+                                            </dl>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end border-t border-brand-ink/10 bg-slate-50/40 px-6 py-4 sm:px-8">
+                                    <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                            <form wire:submit="saveProjectSettings">
+                                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+                                    <div class="border-b border-brand-ink/10 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Project settings') }}</h2>
+                                        <p class="mt-3 text-sm leading-6 text-brand-moss">
+                                            {{ __('Choose which project this site belongs to for grouped resources, shared variables, operations, and coordinated delivery.') }}
+                                        </p>
+                                    </div>
+
+                                    <div class="space-y-5 p-6 sm:p-8">
+                                        <div>
+                                            <x-input-label for="project_workspace_id" value="Project" />
+                                            <select id="project_workspace_id" wire:model="project_workspace_id" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                                <option value="">{{ __('No project') }}</option>
+                                                @foreach ($availableWorkspaces as $workspace)
+                                                    <option value="{{ $workspace->id }}">{{ $workspace->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <x-input-error :messages="$errors->get('project_workspace_id')" class="mt-2" />
+                                            <p class="mt-2 text-sm text-brand-moss">
+                                                {{ __('Project membership can be managed here or from the project resources page.') }}
+                                            </p>
+                                        </div>
+
+                                        @if ($site->workspace)
+                                            <div class="rounded-xl border border-brand-ink/10 bg-slate-50/60 p-4">
+                                                <p class="text-sm font-semibold text-brand-ink">{{ __('Current project') }}</p>
+                                                <p class="mt-1 text-sm text-brand-moss">
+                                                    {{ __('This site currently rolls up into :project.', ['project' => $site->workspace->name]) }}
+                                                </p>
+                                                <div class="mt-3 flex flex-wrap gap-3 text-sm">
+                                                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('Open project resources') }}</a>
+                                                    <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('Open project operations') }}</a>
+                                                    <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('Open project delivery') }}</a>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end border-t border-brand-ink/10 bg-slate-50/40 px-6 py-4 sm:px-8">
+                                    <x-primary-button type="submit">{{ __('Save project settings') }}</x-primary-button>
+                                </div>
+                            </form>
                         </section>
                     @elseif ($section === 'domains')
                         <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
@@ -266,6 +317,221 @@
                                 </form>
                             </section>
                         @endif
+                    @elseif ($section === 'preview')
+                        <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                            <form wire:submit="savePreviewSettings">
+                                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+                                    <div class="border-b border-brand-ink/10 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Preview domains') }}</h2>
+                                        <p class="mt-3 text-sm leading-6 text-brand-moss">
+                                            {{ __('Keep preview hostnames separate from customer domains so reachability, auto-SSL, and cleanup stay scoped to testing traffic only.') }}
+                                        </p>
+                                    </div>
+
+                                    <div class="space-y-5 p-6 sm:p-8">
+                                        <div>
+                                            <x-input-label for="preview_primary_hostname" value="Primary preview domain" />
+                                            <x-text-input id="preview_primary_hostname" wire:model="preview_primary_hostname" class="mt-2 block w-full font-mono text-sm" placeholder="preview.example.dply.cc" />
+                                            <x-input-error :messages="$errors->get('preview_primary_hostname')" class="mt-2" />
+                                        </div>
+
+                                        <div>
+                                            <x-input-label for="preview_label" value="Label" />
+                                            <x-text-input id="preview_label" wire:model="preview_label" class="mt-2 block w-full text-sm" />
+                                            <x-input-error :messages="$errors->get('preview_label')" class="mt-2" />
+                                        </div>
+
+                                        <div class="grid gap-4 sm:grid-cols-2">
+                                            <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 text-sm text-brand-ink">
+                                                <input type="checkbox" wire:model="preview_auto_ssl" class="mt-1 rounded border-slate-300 text-brand-ink shadow-sm" />
+                                                <span>{{ __('Automatically request SSL after the preview domain is reachable.') }}</span>
+                                            </label>
+                                            <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 text-sm text-brand-ink">
+                                                <input type="checkbox" wire:model="preview_https_redirect" class="mt-1 rounded border-slate-300 text-brand-ink shadow-sm" />
+                                                <span>{{ __('Redirect preview traffic to HTTPS when a preview certificate is active.') }}</span>
+                                            </label>
+                                        </div>
+
+                                        @if ($site->previewDomains->isNotEmpty())
+                                            <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/50 p-4">
+                                                <p class="text-sm font-semibold text-brand-ink">{{ __('Known preview domains') }}</p>
+                                                <ul class="mt-3 space-y-3">
+                                                    @foreach ($site->previewDomains as $previewDomain)
+                                                        <li class="flex items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
+                                                            <div class="min-w-0">
+                                                                <p class="truncate font-mono text-sm text-brand-ink">{{ $previewDomain->hostname }}</p>
+                                                                <p class="mt-1 text-xs text-brand-moss">
+                                                                    {{ __('DNS: :dns, SSL: :ssl', ['dns' => $previewDomain->dns_status, 'ssl' => $previewDomain->ssl_status]) }}
+                                                                </p>
+                                                            </div>
+                                                            @if (! $previewDomain->is_primary)
+                                                                <button type="button" wire:click="removePreviewDomain('{{ $previewDomain->id }}')" class="text-sm font-medium text-red-700 hover:underline">{{ __('Remove') }}</button>
+                                                            @endif
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end border-t border-brand-ink/10 bg-slate-50/40 px-6 py-4 sm:px-8">
+                                    <x-primary-button type="submit">{{ __('Save preview settings') }}</x-primary-button>
+                                </div>
+                            </form>
+                        </section>
+                    @elseif ($section === 'certificates')
+                        <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                            <form wire:submit="createCertificateRequest">
+                                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+                                    <div class="border-b border-brand-ink/10 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Request or install certificates') }}</h2>
+                                        <p class="mt-3 text-sm leading-6 text-brand-moss">
+                                            {{ __('Create certificates against explicit customer or preview scopes so Dply never guesses which domains should receive SSL.') }}
+                                        </p>
+                                    </div>
+
+                                    <div class="space-y-5 p-6 sm:p-8">
+                                        <div class="grid gap-4 md:grid-cols-2">
+                                            <div>
+                                                <x-input-label for="new_certificate_scope" value="Scope" />
+                                                <select id="new_certificate_scope" wire:model.live="new_certificate_scope" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                                    <option value="customer">{{ __('Customer domains') }}</option>
+                                                    <option value="preview">{{ __('Preview domain') }}</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <x-input-label for="new_certificate_provider_type" value="Certificate type" />
+                                                <select id="new_certificate_provider_type" wire:model.live="new_certificate_provider_type" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                                    <option value="letsencrypt">{{ __('Let\'s Encrypt') }}</option>
+                                                    <option value="imported">{{ __('Install existing certificate') }}</option>
+                                                    <option value="csr">{{ __('Create CSR') }}</option>
+                                                    <option value="zerossl">{{ __('ZeroSSL (coming next)') }}</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        @if ($new_certificate_scope === 'preview')
+                                            <div>
+                                                <x-input-label for="new_certificate_preview_domain_id" value="Preview domain" />
+                                                <select id="new_certificate_preview_domain_id" wire:model="new_certificate_preview_domain_id" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                                    <option value="">{{ __('Select a preview domain') }}</option>
+                                                    @foreach ($site->previewDomains as $previewDomain)
+                                                        <option value="{{ $previewDomain->id }}">{{ $previewDomain->hostname }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <x-input-error :messages="$errors->get('new_certificate_preview_domain_id')" class="mt-2" />
+                                            </div>
+                                        @else
+                                            <div>
+                                                <x-input-label for="new_certificate_domains" value="Domains" />
+                                                <textarea id="new_certificate_domains" wire:model="new_certificate_domains" rows="3" class="mt-2 block w-full rounded-md border-slate-300 font-mono text-sm shadow-sm" placeholder="app.example.com&#10;www.example.com"></textarea>
+                                                <x-input-error :messages="$errors->get('new_certificate_domains')" class="mt-2" />
+                                                <p class="mt-2 text-sm text-brand-moss">{{ __('Leave empty to use the site’s current customer domains.') }}</p>
+                                            </div>
+                                        @endif
+
+                                        <div class="grid gap-4 md:grid-cols-2">
+                                            <div>
+                                                <x-input-label for="new_certificate_challenge_type" value="Challenge flow" />
+                                                <select id="new_certificate_challenge_type" wire:model.live="new_certificate_challenge_type" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                                    <option value="http">{{ __('HTTP challenge') }}</option>
+                                                    <option value="dns">{{ __('DNS provider challenge') }}</option>
+                                                    <option value="imported">{{ __('Imported certificate') }}</option>
+                                                    <option value="manual">{{ __('Manual / CSR') }}</option>
+                                                </select>
+                                            </div>
+                                            @if ($new_certificate_challenge_type === 'dns')
+                                                <div>
+                                                    <x-input-label for="new_certificate_dns_provider" value="DNS provider" />
+                                                    <select id="new_certificate_dns_provider" wire:model="new_certificate_dns_provider" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                                        <option value="digitalocean">{{ __('DigitalOcean') }}</option>
+                                                    </select>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        @if ($new_certificate_challenge_type === 'dns')
+                                            <div>
+                                                <x-input-label for="new_certificate_provider_credential_id" value="Provider credential" />
+                                                <select id="new_certificate_provider_credential_id" wire:model="new_certificate_provider_credential_id" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                                    <option value="">{{ __('Select a credential') }}</option>
+                                                    @foreach ($providerCredentials as $credential)
+                                                        <option value="{{ $credential->id }}">{{ $credential->name }} ({{ ucfirst($credential->provider) }})</option>
+                                                    @endforeach
+                                                </select>
+                                                <x-input-error :messages="$errors->get('new_certificate_provider_credential_id')" class="mt-2" />
+                                            </div>
+                                        @endif
+
+                                        @if (in_array($new_certificate_provider_type, ['imported', 'csr'], true))
+                                            <div class="grid gap-4">
+                                                @if ($new_certificate_provider_type === 'imported')
+                                                    <div>
+                                                        <x-input-label for="new_certificate_certificate_pem" value="Certificate PEM" />
+                                                        <textarea id="new_certificate_certificate_pem" wire:model="new_certificate_certificate_pem" rows="6" class="mt-2 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm"></textarea>
+                                                    </div>
+                                                    <div>
+                                                        <x-input-label for="new_certificate_private_key_pem" value="Private key PEM" />
+                                                        <textarea id="new_certificate_private_key_pem" wire:model="new_certificate_private_key_pem" rows="6" class="mt-2 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm"></textarea>
+                                                    </div>
+                                                    <div>
+                                                        <x-input-label for="new_certificate_chain_pem" value="Chain PEM" />
+                                                        <textarea id="new_certificate_chain_pem" wire:model="new_certificate_chain_pem" rows="4" class="mt-2 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm"></textarea>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
+
+                                        <div class="grid gap-4 sm:grid-cols-2">
+                                            <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 text-sm text-brand-ink">
+                                                <input type="checkbox" wire:model="new_certificate_force_skip_dns_checks" class="mt-1 rounded border-slate-300 text-brand-ink shadow-sm" />
+                                                <span>{{ __('Skip DNS preflight checks when the selected challenge path allows it.') }}</span>
+                                            </label>
+                                            @if ($supportsHttp3Certificates)
+                                                <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 text-sm text-brand-ink">
+                                                    <input type="checkbox" wire:model="new_certificate_enable_http3" class="mt-1 rounded border-slate-300 text-brand-ink shadow-sm" />
+                                                    <span>{{ __('Record HTTP/3 intent for this certificate on hosts that support it.') }}</span>
+                                                </label>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end border-t border-brand-ink/10 bg-slate-50/40 px-6 py-4 sm:px-8">
+                                    <x-primary-button type="submit">{{ __('Save certificate request') }}</x-primary-button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
+                            <div>
+                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Existing certificates') }}</h2>
+                                <p class="mt-1 text-sm text-brand-moss">{{ __('Each certificate keeps its own scope, provider, challenge path, and last output for safer retries and cleanup.') }}</p>
+                            </div>
+
+                            @if ($site->certificates->isEmpty())
+                                <p class="text-sm text-brand-moss">{{ __('No certificates have been requested for this site yet.') }}</p>
+                            @else
+                                <ul class="space-y-3">
+                                    @foreach ($site->certificates as $certificate)
+                                        <li class="rounded-2xl border border-brand-ink/10 px-4 py-4">
+                                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                                <div class="space-y-1">
+                                                    <p class="font-medium text-brand-ink">{{ ucfirst($certificate->provider_type) }} · {{ ucfirst($certificate->scope_type) }}</p>
+                                                    <p class="font-mono text-xs text-brand-moss">{{ implode(', ', $certificate->domainHostnames()) }}</p>
+                                                    <p class="text-xs text-brand-moss">{{ __('Status: :status | Challenge: :challenge', ['status' => $certificate->status, 'challenge' => $certificate->challenge_type]) }}</p>
+                                                    @if ($certificate->last_output)
+                                                        <p class="text-xs text-brand-moss">{{ \Illuminate\Support\Str::limit($certificate->last_output, 180) }}</p>
+                                                    @endif
+                                                </div>
+                                                <button type="button" wire:click="removeCertificate('{{ $certificate->id }}')" class="text-sm font-medium text-red-700 hover:underline">{{ __('Remove') }}</button>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </section>
                     @elseif ($section === 'build-and-deploy')
                         <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
                             <div>
@@ -276,8 +542,8 @@
                             <form wire:submit="saveGit" class="space-y-4">
                                 @if ($functionsHost)
                                     <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-                                        <p class="font-medium">{{ __('Functions deploy target') }}</p>
-                                        <p class="mt-1">{{ __('DigitalOcean Functions deploys clone the repository on the queue worker, run the configured build command, package the build output, and publish the resulting zip artifact.') }}</p>
+                                        <p class="font-medium">{{ __('Serverless deploy target') }}</p>
+                                        <p class="mt-1">{{ __('Serverless deploys clone the repository on the queue worker, run the configured build command, package the build output, and publish the resulting artifact for the selected target.') }}</p>
                                     </div>
 
                                     <div>
@@ -375,7 +641,7 @@
                                             <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Advanced runtime overrides') }}</summary>
                                             <div class="mt-4 grid gap-3 md:grid-cols-2">
                                                 <div>
-                                                    <x-input-label for="functions_runtime" value="Functions runtime" />
+                                                    <x-input-label for="functions_runtime" value="Serverless runtime" />
                                                     <x-text-input id="functions_runtime" wire:model="functions_runtime" class="mt-1 block w-full font-mono text-sm" />
                                                     <x-input-error :messages="$errors->get('functions_runtime')" class="mt-1" />
                                                 </div>
@@ -410,9 +676,14 @@
 
                             @if ($functionsHost)
                                 @php
-                                    $functionsConfig = $site->functionsConfig();
+                                    $functionsConfig = $site->serverlessConfig();
+                                    $serverlessTargetLabel = $server->isAwsLambdaHost() ? __('AWS Lambda') : __('DigitalOcean Functions');
                                 @endphp
                                 <div class="grid gap-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 md:grid-cols-2">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Target') }}</p>
+                                        <p class="mt-1 text-sm font-medium text-brand-ink">{{ $serverlessTargetLabel }}</p>
+                                    </div>
                                     <div>
                                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Runtime') }}</p>
                                         <p class="mt-1 font-mono text-sm text-brand-ink">{{ $functionsConfig['runtime'] ?? $functions_runtime ?? '—' }}</p>
@@ -425,6 +696,18 @@
                                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Latest managed artifact') }}</p>
                                         <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['artifact_path'] ?? __('Not built yet') }}</p>
                                     </div>
+                                    @if (! empty($functionsConfig['function_arn']))
+                                        <div class="md:col-span-2">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Function ARN') }}</p>
+                                            <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['function_arn'] }}</p>
+                                        </div>
+                                    @endif
+                                    @if (! empty($functionsConfig['function_url']))
+                                        <div class="md:col-span-2">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Function URL') }}</p>
+                                            <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['function_url'] }}</p>
+                                        </div>
+                                    @endif
                                     @if (! empty($functionsConfig['action_url']))
                                         <div class="md:col-span-2">
                                             <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Published action URL') }}</p>
@@ -436,6 +719,49 @@
                                 <div>
                                     <p class="text-sm text-brand-moss">{{ __('Public key (add to your Git provider deploy keys):') }}</p>
                                     <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-green-400">{{ $site->git_deploy_key_public }}</pre>
+                                </div>
+                            @endif
+
+                            @if ($site->usesDockerRuntime())
+                                @php
+                                    $dockerRuntime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
+                                @endphp
+                                <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                                    <div>
+                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Docker runtime artifact') }}</p>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Deploys sync the repository to the Docker host, write these managed files, and run `docker compose up -d --build`.') }}</p>
+                                    </div>
+                                    <div class="grid gap-4 xl:grid-cols-2">
+                                        <div>
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Compose file') }}</p>
+                                            <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['compose_yaml'] ?? __('Not generated yet') }}</pre>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Managed Dockerfile') }}</p>
+                                            <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">{{ $dockerRuntime['dockerfile'] ?? __('Not generated yet') }}</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if ($site->usesKubernetesRuntime())
+                                @php
+                                    $kubernetesRuntime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
+                                @endphp
+                                <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Kubernetes manifest artifact') }}</p>
+                                            <p class="mt-1 text-sm text-brand-moss">{{ __('This runtime currently stores the generated manifest and namespace so the cluster apply step stays inspectable while live execution work continues.') }}</p>
+                                        </div>
+                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
+                                            {{ $kubernetesRuntime['namespace'] ?? __('default') }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Manifest') }}</p>
+                                        <pre class="mt-2 max-h-96 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-violet-100">{{ $kubernetesRuntime['manifest_yaml'] ?? __('Not generated yet') }}</pre>
+                                    </div>
                                 </div>
                             @endif
                         </section>

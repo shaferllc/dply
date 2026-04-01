@@ -452,7 +452,7 @@ class Show extends Component
             'post_deploy_command' => 'nullable|string|max:4000',
         ];
 
-        if ($this->server->isDigitalOceanFunctionsHost()) {
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
             if (($this->functionsDetection['unsupported_for_target'] ?? false) === true) {
                 $this->flash_error = (string) ($this->functionsDetection['warnings'][0] ?? __('This repository runtime is not supported by the selected target.'));
                 $this->flash_success = null;
@@ -486,10 +486,10 @@ class Show extends Component
             'post_deploy_command' => trim($this->post_deploy_command) ?: null,
         ];
 
-        if ($this->server->isDigitalOceanFunctionsHost()) {
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
             $meta = is_array($this->site->meta) ? $this->site->meta : [];
-            $functionsConfig = is_array($meta['digitalocean_functions'] ?? null) ? $meta['digitalocean_functions'] : [];
-            $meta['digitalocean_functions'] = array_merge($functionsConfig, [
+            $functionsConfig = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+            $meta['serverless'] = array_merge($functionsConfig, [
                 'repo_source' => trim($this->functions_repo_source),
                 'source_control_account_id' => $this->functions_repo_source === 'provider'
                     ? trim($this->functions_source_control_account_id)
@@ -601,7 +601,7 @@ class Show extends Component
 
     private function refreshFunctionsDetection(): void
     {
-        if (! $this->server->isDigitalOceanFunctionsHost()) {
+        if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
             return;
         }
 
@@ -661,8 +661,8 @@ class Show extends Component
     public function generateDeployKey(): void
     {
         $this->authorize('update', $this->site);
-        if ($this->server->isDigitalOceanFunctionsHost()) {
-            $this->flash_error = __('Functions-backed sites deploy from the configured artifact zip instead of a server-side git checkout.');
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
+            $this->flash_error = __('Serverless-backed sites deploy from the configured artifact zip instead of a server-side git checkout.');
 
             return;
         }
@@ -1043,7 +1043,7 @@ class Show extends Component
 
     private function loadFunctionsSourceControlState(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
-        if (! $this->server->isDigitalOceanFunctionsHost()) {
+        if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
             return;
         }
 

@@ -9,7 +9,7 @@ final class KubernetesManifestBuilder
 {
     public function build(Site $site, string $namespace): string
     {
-        $name = $this->resourceName($site);
+        $name = $this->deploymentName($site);
         $port = $site->type?->value === 'node'
             ? (int) ($site->app_port ?: 3000)
             : 8080;
@@ -51,7 +51,7 @@ spec:
 YAML;
     }
 
-    private function resourceName(Site $site): string
+    public function deploymentName(Site $site): string
     {
         $name = Str::slug($site->slug ?: $site->name ?: 'site');
         $name = trim(substr($name, 0, 63), '-');

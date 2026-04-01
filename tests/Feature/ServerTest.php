@@ -313,6 +313,37 @@ class ServerTest extends TestCase
         $this->assertNull(data_get($server->meta, 'digitalocean_functions.action_main'));
     }
 
+    public function test_servers_create_can_store_an_aws_lambda_host_without_profile_ssh_keys(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'organization_id' => $org->id,
+            'provider' => 'aws',
+            'credentials' => [
+                'access_key_id' => 'AKIA123456789',
+                'secret_access_key' => 'secret',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.type', 'aws_lambda')
+            ->set('form.name', 'laravel-lambda')
+            ->set('form.provider_credential_id', (string) $credential->id)
+            ->set('form.aws_lambda_region', 'us-east-1')
+            ->call('store')
+            ->assertRedirect();
+
+        $server = Server::query()->where('name', 'laravel-lambda')->firstOrFail();
+
+        $this->assertSame(Server::STATUS_READY, $server->status);
+        $this->assertSame(Server::HEALTH_REACHABLE, $server->health_status);
+        $this->assertTrue($server->isAwsLambdaHost());
+        $this->assertSame('aws', $server->provider->value);
+        $this->assertSame('us-east-1', data_get($server->meta, 'aws_lambda.region'));
+    }
+
     public function test_servers_create_prompts_to_add_provider_when_none_exist(): void
     {
         $user = $this->userWithOrganization();

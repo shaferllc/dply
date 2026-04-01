@@ -13,12 +13,13 @@ final class DockerComposeArtifactBuilder
         $port = $site->type?->value === 'node'
             ? (int) ($site->app_port ?: 3000)
             : 8080;
-        $image = 'dply/'.($site->slug ?: 'site').':latest';
 
         return <<<YAML
 services:
   {$service}:
-    image: {$image}
+    build:
+      context: .
+      dockerfile: Dockerfile.dply
     restart: unless-stopped
     ports:
       - "80:{$port}"
