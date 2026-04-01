@@ -137,8 +137,8 @@
 
         @if (! $hasServersInScope)
             <x-empty-state
-                :title="__('Create your first server-ready workspace')"
-                :description="__('Connect a provider, provision infrastructure, and return here to manage sites, SSH, automation, and health from one place.')"
+                :title="__('No servers yet')"
+                :description="__('Create your first server-ready workspace. Connect a provider, provision infrastructure, and return here to manage sites, SSH, automation, and health from one place.')"
                 :dashed="false"
                 class="rounded-[2rem] p-10 text-center text-sm text-brand-moss"
             >

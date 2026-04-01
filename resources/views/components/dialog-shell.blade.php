@@ -2,6 +2,7 @@
     'title',
     'description' => null,
     'maxWidth' => 'md',
+    'titleId' => null,
 ])
 
 @php
@@ -18,7 +19,7 @@
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-7">
         <div class="flex items-start justify-between gap-4">
             <div>
-                <h2 class="text-lg font-semibold text-brand-ink">{{ $title }}</h2>
+                <h2 @if($titleId) id="{{ $titleId }}" @endif class="text-lg font-semibold text-brand-ink">{{ $title }}</h2>
                 @if ($description)
                     <p class="mt-1 text-sm text-brand-moss">{{ $description }}</p>
                 @endif

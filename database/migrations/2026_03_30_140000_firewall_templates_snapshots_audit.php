@@ -86,7 +86,8 @@ return new class extends Migration
             return;
         }
 
-        $columnType = strtolower((string) $column->column_type);
+        $columnMeta = array_change_key_case(get_object_vars($column), CASE_LOWER);
+        $columnType = strtolower((string) ($columnMeta['column_type'] ?? ''));
 
         if (str_contains($columnType, 'bigint')) {
             $table->unsignedBigInteger('organization_id');
@@ -98,12 +99,14 @@ return new class extends Migration
             $table->char('organization_id', 26);
         }
 
-        if (isset($column->character_set_name) && is_string($column->character_set_name)) {
-            $table->charset($column->character_set_name);
+        $characterSet = $columnMeta['character_set_name'] ?? null;
+        if (is_string($characterSet) && $characterSet !== '') {
+            $table->charset($characterSet);
         }
 
-        if (isset($column->collation_name) && is_string($column->collation_name)) {
-            $table->collation($column->collation_name);
+        $collation = $columnMeta['collation_name'] ?? null;
+        if (is_string($collation) && $collation !== '') {
+            $table->collation($collation);
         }
 
         $table->foreign('organization_id')
