@@ -1,16 +1,14 @@
 <x-livewire-validation-errors />
 
-@if (empty($useOrgShell))
-    <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('settings.index') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Settings') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('Provider credentials') }}</li>
-        </ol>
-    </nav>
-@endif
+<nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-2">
+        <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
+        <li class="text-brand-mist" aria-hidden="true">/</li>
+        <li><a href="{{ route('settings.index') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Settings') }}</a></li>
+        <li class="text-brand-mist" aria-hidden="true">/</li>
+        <li class="text-brand-ink font-medium">{{ __('Provider credentials') }}</li>
+    </ol>
+</nav>
 
 <header class="mb-8">
     <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Provider credentials') }}</h1>

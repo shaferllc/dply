@@ -108,7 +108,7 @@ class ProviderOAuthTest extends TestCase
         $response = $this->actingAs($user)
             ->withSession([
                 'current_organization_id' => $org->id,
-                'credentials_oauth:digitalocean:'.$nonce => $oauthState,
+                'credentials_oauth_digitalocean_'.$nonce => $oauthState,
             ])
             ->get(route('credentials.oauth.digitalocean.callback', [
                 'code' => 'auth-code-xyz',

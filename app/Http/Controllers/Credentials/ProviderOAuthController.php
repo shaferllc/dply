@@ -47,7 +47,7 @@ class ProviderOAuthController extends Controller
         }
 
         $nonce = Str::random(40);
-        $request->session()->put('credentials_oauth:digitalocean:'.$nonce, [
+        $request->session()->put($this->digitalOceanStateSessionKey($nonce), [
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'label' => $label !== '' ? $label : null,
@@ -83,7 +83,7 @@ class ProviderOAuthController extends Controller
         ]);
 
         $nonce = $request->string('state')->toString();
-        $payload = $request->session()->pull('credentials_oauth:digitalocean:'.$nonce);
+        $payload = $request->session()->pull($this->digitalOceanStateSessionKey($nonce));
 
         if (! is_array($payload)) {
             return redirect()
@@ -95,11 +95,16 @@ class ProviderOAuthController extends Controller
         $organizationId = $payload['organization_id'] ?? null;
         $issuedAt = $payload['issued_at'] ?? 0;
 
-        if (! is_int($userId) || ! is_string($organizationId) || $organizationId === '' || ! is_int($issuedAt)) {
+        if ((! is_int($userId) && ! (is_string($userId) && ctype_digit($userId)))
+            || ! is_string($organizationId) || $organizationId === ''
+            || (! is_int($issuedAt) && ! (is_string($issuedAt) && ctype_digit($issuedAt)))) {
             return redirect()
                 ->route('credentials.index', ['provider' => 'digitalocean'])
                 ->with('error', __('Invalid or expired OAuth state. Please try again.'));
         }
+
+        $userId = (int) $userId;
+        $issuedAt = (int) $issuedAt;
 
         if (now()->timestamp - $issuedAt > 900) {
             return redirect()
@@ -208,5 +213,10 @@ class ProviderOAuthController extends Controller
         }
 
         return route('credentials.oauth.digitalocean.callback', [], true);
+    }
+
+    protected function digitalOceanStateSessionKey(string $nonce): string
+    {
+        return 'credentials_oauth_digitalocean_'.$nonce;
     }
 }

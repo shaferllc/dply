@@ -25,7 +25,7 @@ class Index extends Component
 
     public function render(): View
     {
-        $organizations = auth()->user()->organizations()->withCount(['users', 'teams'])->get();
+        $organizations = auth()->user()->organizations()->withCount(['users', 'teams', 'servers', 'sites', 'workspaces'])->get();
 
         return view('livewire.organizations.index', ['organizations' => $organizations]);
     }

@@ -113,69 +113,6 @@
         <svg class="h-5 w-5 shrink-0 opacity-90" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008H17.25v-.008zm0 3h.008v.008H17.25v-.008zm0 3h.008v.008H17.25v-.008z"/></svg>
         <span>{{ __('Organizations') }}</span>
     </a>
-    @if ($currentOrg)
-        <p class="flex items-center gap-2 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">
-            <svg class="h-3.5 w-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
-            <span>{{ __('Current organization') }}</span>
-        </p>
-        <a
-            href="{{ route('organizations.show', $currentOrg) }}"
-            @class([
-                $link,
-                'bg-brand-sand/60 text-brand-ink' => request()->routeIs('organizations.show') && optional(request()->route('organization'))?->is($currentOrg),
-                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! (request()->routeIs('organizations.show') && optional(request()->route('organization'))?->is($currentOrg)),
-            ])
-        >
-            <svg class="h-5 w-5 shrink-0 opacity-90" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006a2.194 2.194 0 01-1.868 2.118m0 0a6.056 6.056 0 01-2.012 0M1.25 8.706v4.018a2.212 2.212 0 001.237 1.967c.6.351 1.007.925 1.107 1.592a.375.375 0 01-.297.449H5.11M15 9.75a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            <span class="truncate">{{ $currentOrg->name }}</span>
-        </a>
-        <a
-            href="{{ route('organizations.webserver-templates', $currentOrg) }}"
-            @class([
-                $link,
-                'bg-brand-sand/60 text-brand-ink' => request()->routeIs('organizations.webserver-templates'),
-                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! request()->routeIs('organizations.webserver-templates'),
-            ])
-        >
-            <svg class="h-5 w-5 shrink-0 opacity-90" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3V4.875c0-.621.504-1.125 1.125-1.125h4.125c.621 0 1.125.504 1.125 1.125v4.125c0 .621.504 1.125 1.125 1.125h4.125m-9.75-6.75h9.75m-9.75 0a3 3 0 00-3 3v9.75c0 .621.504 1.125 1.125 1.125h4.125c.621 0 1.125-.504 1.125-1.125v-4.125c0-.621.504-1.125 1.125-1.125h4.125c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H9.375c-.621 0-1.125.504-1.125 1.125v3.75z"/></svg>
-            <span>{{ __('Webserver templates') }}</span>
-        </a>
-        @if ($currentOrg->hasAdminAccess(auth()->user()))
-            <a
-                href="{{ route('subscription.show', $currentOrg) }}"
-                @class([
-                    $link,
-                    'bg-brand-sand/60 text-brand-ink' => request()->routeIs('subscription.show', 'billing.show'),
-                    'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! request()->routeIs('subscription.show', 'billing.show'),
-                ])
-            >
-                <svg class="h-5 w-5 shrink-0 opacity-90" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
-                <span>{{ __('Subscription') }}</span>
-            </a>
-            <a
-                href="{{ route('billing.invoices', $currentOrg) }}"
-                @class([
-                    $link,
-                    'bg-brand-sand/60 text-brand-ink' => request()->routeIs('billing.invoices'),
-                    'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! request()->routeIs('billing.invoices'),
-                ])
-            >
-                <svg class="h-5 w-5 shrink-0 opacity-90" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
-                <span>{{ __('Invoices') }}</span>
-            </a>
-        @endif
-        <a
-            href="{{ route('organizations.credentials', $currentOrg) }}"
-            @class([
-                $link,
-                'bg-brand-sand/60 text-brand-ink' => request()->routeIs('credentials.*', 'organizations.credentials'),
-                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! request()->routeIs('credentials.*', 'organizations.credentials'),
-            ])
-        >
-            <svg class="h-5 w-5 shrink-0 opacity-90" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"/></svg>
-            <span>{{ __('Server providers') }}</span>
-        </a>
-    @endif
     <p class="flex items-center gap-2 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">
         <svg class="h-3.5 w-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
         <span>{{ __('Guides') }}</span>
