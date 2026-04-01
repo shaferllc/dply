@@ -8,7 +8,7 @@
     <div class="mb-8">
         <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Settings') }}</h1>
         <p class="mt-2 max-w-2xl text-sm text-brand-moss">
-            {{ __('Your profile tab stores personal preferences. Servers & Sites covers organization and firewall policies plus team defaults (servers belong to teams).') }}
+            {{ __('Your profile tab stores personal preferences. Servers & Sites covers organization defaults and team defaults (servers belong to teams).') }}
         </p>
     </div>
 
@@ -218,66 +218,6 @@
                         class="inline-flex items-center rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {{ __('Save organization settings') }}
-                    </button>
-                </div>
-            </form>
-
-            <form wire:submit="saveOrganizationFirewall" class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden">
-                <div class="lg:grid lg:grid-cols-12 lg:gap-10 p-6 lg:p-8">
-                    <div class="lg:col-span-4 mb-8 lg:mb-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Firewall') }}</h2>
-                        <p class="mt-2 text-sm text-brand-moss">{{ __('Organization-wide options for server firewall workflows (UFW).') }}</p>
-                    </div>
-                    <div class="lg:col-span-8 space-y-6 min-w-0">
-                        @if (! $currentOrg)
-                            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                                {{ __('Create or join an organization to configure these options.') }}
-                            </div>
-                        @elseif (! $canEditOrgPrefs)
-                            <div class="rounded-lg border border-brand-mist bg-brand-cream px-4 py-3 text-sm text-brand-moss">
-                                {{ __('Only organization admins can change firewall policies.') }}
-                            </div>
-                        @else
-                            <div class="space-y-5">
-                                <label class="flex gap-3 cursor-pointer group">
-                                    <input type="checkbox" wire:model.boolean="organizationFirewall.require_second_approval" class="mt-1 rounded border-brand-mist text-brand-ink focus:ring-brand-sage" />
-                                    <span>
-                                        <span class="block text-sm font-medium text-brand-ink">{{ __('Require two people to apply firewall rules') }}</span>
-                                        <span class="block text-sm text-brand-moss mt-0.5">{{ __('After one member saves changes, a different member must click apply in the server firewall workspace before rules are pushed to the host.') }}</span>
-                                    </span>
-                                </label>
-                                <label class="flex gap-3 cursor-pointer group">
-                                    <input type="checkbox" wire:model.boolean="organizationFirewall.notify_drift_webhook" class="mt-1 rounded border-brand-mist text-brand-ink focus:ring-brand-sage" />
-                                    <span>
-                                        <span class="block text-sm font-medium text-brand-ink">{{ __('Notify integration webhooks on UFW drift') }}</span>
-                                        <span class="block text-sm text-brand-moss mt-0.5">{{ __('When drift is detected in the firewall workspace, send a webhook if your organization has outbound integrations configured.') }}</span>
-                                    </span>
-                                </label>
-                                <div>
-                                    <label for="org-firewall-synthetic-url" class="block text-sm font-medium text-brand-ink">{{ __('Synthetic probe URL (optional)') }}</label>
-                                    <p class="mt-1 text-sm text-brand-moss">{{ __('After a firewall apply, optionally GET this URL from the control plane to verify reachability (for example a health check). Leave blank to disable.') }}</p>
-                                    <input
-                                        id="org-firewall-synthetic-url"
-                                        type="text"
-                                        inputmode="url"
-                                        autocomplete="off"
-                                        placeholder="https://"
-                                        wire:model="organizationFirewall.synthetic_probe_url"
-                                        class="mt-3 block w-full max-w-xl rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                                    />
-                                    @error('organizationFirewall.synthetic_probe_url') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-                <div class="flex justify-end border-t border-brand-mist/60 bg-brand-sand/30 px-6 py-4">
-                    <button
-                        type="submit"
-                        @disabled(! $currentOrg || ! $canEditOrgPrefs)
-                        class="inline-flex items-center rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {{ __('Save firewall settings') }}
                     </button>
                 </div>
             </form>
@@ -492,7 +432,7 @@
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Personal access tokens for the HTTP API.') }}</p>
             </a>
             @if ($currentOrg)
-                <a href="{{ route('credentials.index') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
+                <a href="{{ route('organizations.credentials', $currentOrg) }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
                     <h3 class="font-medium text-brand-ink">{{ __('Server providers') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Cloud API tokens to create and manage infrastructure.') }}</p>
                 </a>
@@ -527,5 +467,23 @@
             </li>
             <li><span class="font-medium text-brand-ink">{{ __('SSH keys') }}</span> — <a href="{{ route('profile.ssh-keys') }}" class="font-medium text-brand-sage underline underline-offset-2 hover:text-brand-ink" wire:navigate>{{ __('Save keys on your account') }}</a> {{ __('and deploy to servers, or add keys on each server’s page.') }}</li>
         </ul>
+    </section>
+
+    <section class="mt-10 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-brand-mist">{{ __('Operational trust') }}</h2>
+        <div class="mt-4 grid gap-4 md:grid-cols-3">
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Recovery paths') }}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Keep backups, storage destinations, and restore notes current before the next production incident. Settings link you into those workflows, while projects and server pages carry them into operations.') }}</p>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Governed changes') }}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Firewall approvals, notification routing, and org defaults help teams make changes with clearer ownership and less hidden machine state.') }}</p>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Team-wide visibility') }}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Preferences here shape how the wider workspace behaves, but the goal is simple: fewer surprises when someone else has to deploy, recover, or audit the stack.') }}</p>
+            </div>
+        </div>
     </section>
 </div>

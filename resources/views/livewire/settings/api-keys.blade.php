@@ -230,8 +230,7 @@
                                 </div>
                                 <button
                                     type="button"
-                                    wire:click="revokeToken({{ $t->id }})"
-                                    wire:confirm="{{ __('Revoke this token? It will stop working immediately.') }}"
+                                    wire:click="openConfirmActionModal('revokeToken', [{{ $t->id }}], @js(__('Revoke token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)"
                                     class="shrink-0 text-sm font-medium text-red-700 hover:text-red-900"
                                 >
                                     {{ __('Revoke') }}
@@ -243,4 +242,8 @@
             </section>
         </div>
     @endif
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesServerSystemdServices;
@@ -15,6 +16,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceServices extends Component
 {
+    use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesServerSystemdServices;

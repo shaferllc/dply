@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\AwsEc2Service;
+use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -27,6 +28,7 @@ class ProvisionAwsEc2ServerJob implements ShouldQueue
         }
 
         $aws = new AwsEc2Service($credential, $this->server->region);
+        $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
         $keyName = 'dply-'.$this->server->id.'-'.substr(uniqid(), -6);
         $keyPair = $aws->createKeyPair($keyName);
@@ -46,6 +48,8 @@ class ProvisionAwsEc2ServerJob implements ShouldQueue
             'provider_id' => $instanceId,
             'status' => Server::STATUS_PROVISIONING,
             'ssh_private_key' => $privateKey,
+            'ssh_recovery_private_key' => $privateKey,
+            'ssh_operational_private_key' => $keys['operational_private_key'],
             'ssh_user' => config('services.aws.ssh_user', 'ubuntu'),
             'meta' => array_merge($this->server->meta ?? [], ['key_name' => $keyName]),
         ]);

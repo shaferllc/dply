@@ -1,0 +1,40 @@
+---
+description: Use app-styled confirmation modals instead of browser alerts or wire:confirm
+alwaysApply: true
+---
+
+# Confirmation UI
+
+- Never use browser-native `alert()`, `confirm()`, or `prompt()` in this project.
+- Never introduce `wire:confirm` for destructive or high-impact actions.
+- Use a proper app-styled modal or equivalent in-product confirmation flow instead.
+- Confirmation copy should explain what will happen and what the user is confirming.
+
+## Examples
+
+### Avoid
+
+```blade
+<button wire:click="deleteSite" wire:confirm="Delete this site?">
+    Delete
+</button>
+```
+
+```javascript
+if (confirm('Delete this site?')) {
+  destroySite()
+}
+```
+
+### Prefer
+
+```blade
+<button type="button" wire:click="openDeleteSiteModal">
+    Delete
+</button>
+
+<x-modal name="delete-site-confirmation">
+    <p>Delete this site from Dply?</p>
+    <x-danger-button wire:click="deleteSite">Delete site</x-danger-button>
+</x-modal>
+```

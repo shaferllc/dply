@@ -4,8 +4,13 @@ namespace Tests\Feature;
 
 use App\Livewire\Backups\Databases;
 use App\Livewire\Backups\Files;
+use App\Models\BackupConfiguration;
 use App\Models\Organization;
+use App\Models\Server;
+use App\Models\ServerDatabase;
+use App\Models\ServerDatabaseBackup;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -70,5 +75,111 @@ class BackupsTest extends TestCase
         Livewire::actingAs($user)
             ->test(Files::class)
             ->assertOk();
+    }
+
+    public function test_database_backups_page_shows_storage_destinations_and_latest_exports(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        BackupConfiguration::query()->create([
+            'user_id' => $user->id,
+            'name' => 'Primary S3',
+            'provider' => BackupConfiguration::PROVIDER_CUSTOM_S3,
+            'config' => [
+                'access_key' => 'abc',
+                'secret' => 'def',
+                'bucket' => 'backups',
+            ],
+        ]);
+
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+
+        $site = \App\Models\Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Marketing',
+        ]);
+
+        $database = ServerDatabase::query()->create([
+            'server_id' => $server->id,
+            'name' => 'app_db',
+            'engine' => 'mysql',
+            'username' => 'app',
+            'password' => 'secret',
+            'host' => '127.0.0.1',
+        ]);
+
+        ServerDatabaseBackup::query()->create([
+            'server_database_id' => $database->id,
+            'user_id' => $user->id,
+            'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+            'disk_path' => 'backups/app_db.sql',
+            'bytes' => 12345,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('backups.databases'))
+            ->assertOk()
+            ->assertSee('Primary S3', false)
+            ->assertSee('Latest export: Completed', false)
+            ->assertSee('app_db', false)
+            ->assertSee('1 tracked database on this server.', false);
+    }
+
+    public function test_file_backups_page_shows_storage_destinations_and_runbook_readiness(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        BackupConfiguration::query()->create([
+            'user_id' => $user->id,
+            'name' => 'Archive Bucket',
+            'provider' => BackupConfiguration::PROVIDER_AWS_S3,
+            'config' => [
+                'access_key' => 'abc',
+                'secret' => 'def',
+                'bucket' => 'archives',
+            ],
+        ]);
+
+        $workspace = Workspace::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+            'name' => 'Customer Stack',
+        ]);
+
+        $workspace->runbooks()->create([
+            'title' => 'Restore uploads',
+            'body' => 'Restore uploads from object storage and clear caches.',
+            'sort_order' => 1,
+        ]);
+
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'workspace_id' => $workspace->id,
+        ]);
+
+        \App\Models\Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'workspace_id' => $workspace->id,
+            'name' => 'Docs',
+            'document_root' => '/var/www/docs/current/public',
+            'repository_path' => '/var/www/docs',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('backups.files'))
+            ->assertOk()
+            ->assertSee('Archive Bucket', false)
+            ->assertSee('Document root: /var/www/docs/current/public', false)
+            ->assertSee('1 project runbook is already attached to this site workspace.', false);
     }
 }

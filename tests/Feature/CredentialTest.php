@@ -35,11 +35,23 @@ class CredentialTest extends TestCase
     public function test_credentials_index_is_displayed(): void
     {
         $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
 
         $response = $this->actingAs($user)->get(route('credentials.index'));
 
+        $response->assertRedirect(route('organizations.credentials', $org, false));
+    }
+
+    public function test_organization_credentials_page_is_displayed(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $response = $this->actingAs($user)->get(route('organizations.credentials', $org));
+
         $response->assertOk();
         $response->assertSee('Provider credentials');
+        $response->assertSee('Server providers');
     }
 
     public function test_credentials_index_forbidden_for_deployer(): void

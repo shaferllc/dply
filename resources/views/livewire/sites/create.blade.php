@@ -129,8 +129,18 @@
                 @if ($form->type === 'php')
                     <div>
                         <x-input-label for="php_version" :value="__('PHP-FPM version (socket path)')" />
-                        <x-text-input id="php_version" wire:model="form.php_version" class="mt-1 block w-full max-w-[8rem]" />
-                        <p class="mt-2 text-sm text-brand-moss">{{ __('Matches') }} <code class="rounded bg-brand-sand/60 px-1 py-0.5 text-xs text-brand-ink">/run/php/php{version}-fpm.sock</code> {{ __('on Ubuntu.') }}</p>
+                        <select id="php_version" wire:model="form.php_version" class="mt-1 block w-full max-w-xs rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30">
+                            <option value="">{{ __('Select a PHP version') }}</option>
+                            @foreach ($phpVersions as $version)
+                                <option value="{{ $version['id'] }}">{{ $version['label'] }}</option>
+                            @endforeach
+                        </select>
+                        @if ($phpVersions !== [])
+                            <p class="mt-2 text-sm text-brand-moss">{{ __('Matches') }} <code class="rounded bg-brand-sand/60 px-1 py-0.5 text-xs text-brand-ink">/run/php/php{version}-fpm.sock</code> {{ __('on Ubuntu.') }}</p>
+                        @else
+                            <p class="mt-2 text-sm text-brand-moss">{{ __('No supported PHP versions are currently installed on this server. Install one from the server PHP workspace before creating a PHP site.') }}</p>
+                        @endif
+                        <x-input-error :messages="$errors->get('form.php_version')" class="mt-2" />
                     </div>
                 @endif
                 @if ($form->type === 'node')

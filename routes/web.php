@@ -15,8 +15,8 @@ use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
+use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
-use App\Livewire\Organizations\Daemons as OrganizationsDaemons;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Livewire\Organizations\Show as OrganizationsShow;
@@ -42,6 +42,7 @@ use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
+use App\Livewire\Servers\WorkspacePhp;
 use App\Livewire\Servers\WorkspaceRecipes;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
@@ -111,6 +112,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('/docs/source-control', [DocsController::class, 'sourceControl'])->name('docs.source-control');
 
     Route::livewire('/settings', SettingsHub::class)->name('settings.index');
+    Route::livewire('/notifications', NotificationsIndex::class)->name('notifications.index');
 
     Route::livewire('/profile', ProfileEdit::class)->name('profile.edit');
     Route::livewire('/profile/referrals', ProfileReferrals::class)->name('profile.referrals');
@@ -127,13 +129,13 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
     Route::livewire('organizations', OrganizationsIndex::class)->name('organizations.index');
     Route::livewire('organizations/create', OrganizationsCreate::class)->name('organizations.create');
-    Route::livewire('organizations/{organization}/daemons', OrganizationsDaemons::class)->name('organizations.daemons');
     Route::livewire('organizations/{organization}', OrganizationsShow::class)->name('organizations.show');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
     Route::livewire('organizations/{organization}/billing', BillingShow::class)->name('billing.show');
     Route::livewire('organizations/{organization}/subscription', BillingShow::class)->name('subscription.show');
     Route::livewire('organizations/{organization}/invoices', BillingInvoices::class)->name('billing.invoices');
+    Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');
 
     Route::redirect('/backups', '/backups/databases')->name('backups.index');
@@ -181,6 +183,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
     Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
+    Route::livewire('servers/{server}/php', WorkspacePhp::class)->name('servers.php');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->name('servers.daemons');
@@ -193,7 +196,18 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/manage', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
 
-    Route::livewire('credentials', CredentialsIndex::class)->name('credentials.index');
+    Route::get('credentials', function () {
+        $user = auth()->user();
+        $organization = $user?->currentOrganization();
+
+        app(\Illuminate\Contracts\Auth\Access\Gate::class)->authorize('viewAny', \App\Models\ProviderCredential::class);
+        abort_unless($organization, 404);
+
+        $params = request()->query();
+        $params['organization'] = $organization;
+
+        return redirect()->route('organizations.credentials', $params);
+    })->name('credentials.index');
     Route::get('credentials/oauth/digitalocean', [ProviderOAuthController::class, 'redirectDigitalOcean'])
         ->name('credentials.oauth.digitalocean.redirect');
     Route::get('credentials/oauth/digitalocean/callback', [ProviderOAuthController::class, 'callbackDigitalOcean'])

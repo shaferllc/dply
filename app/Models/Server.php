@@ -58,6 +58,8 @@ class Server extends Model
         'ssh_port',
         'ssh_user',
         'ssh_private_key',
+        'ssh_operational_private_key',
+        'ssh_recovery_private_key',
         'status',
         'region',
         'size',
@@ -76,6 +78,8 @@ class Server extends Model
         return [
             'provider' => ServerProvider::class,
             'ssh_private_key' => 'encrypted',
+            'ssh_operational_private_key' => 'encrypted',
+            'ssh_recovery_private_key' => 'encrypted',
             'meta' => 'array',
             'last_health_check_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
@@ -217,7 +221,59 @@ class Server extends Model
      */
     public function openSshPublicKeyFromPrivate(): ?string
     {
-        $priv = $this->ssh_private_key;
+        return $this->openSshPublicKeyFromKey($this->operationalSshPrivateKey());
+    }
+
+    public function openSshPublicKeyFromOperationalPrivate(): ?string
+    {
+        return $this->openSshPublicKeyFromKey($this->operationalSshPrivateKey());
+    }
+
+    public function openSshPublicKeyFromRecoveryPrivate(): ?string
+    {
+        return $this->openSshPublicKeyFromKey($this->recoverySshPrivateKey());
+    }
+
+    public function operationalSshPrivateKey(): ?string
+    {
+        $key = $this->ssh_operational_private_key;
+
+        if (is_string($key) && trim($key) !== '') {
+            return $key;
+        }
+
+        $legacy = $this->ssh_private_key;
+
+        return is_string($legacy) && trim($legacy) !== '' ? $legacy : null;
+    }
+
+    public function recoverySshPrivateKey(): ?string
+    {
+        $key = $this->ssh_recovery_private_key;
+
+        if (is_string($key) && trim($key) !== '') {
+            return $key;
+        }
+
+        $legacy = $this->ssh_private_key;
+
+        return is_string($legacy) && trim($legacy) !== '' ? $legacy : null;
+    }
+
+    public function hasAnySshPrivateKey(): bool
+    {
+        return $this->operationalSshPrivateKey() !== null || $this->recoverySshPrivateKey() !== null;
+    }
+
+    public function hasDedicatedOperationalSshPrivateKey(): bool
+    {
+        $key = $this->ssh_operational_private_key;
+
+        return is_string($key) && trim($key) !== '';
+    }
+
+    protected function openSshPublicKeyFromKey(?string $priv): ?string
+    {
         if (! is_string($priv) || trim($priv) === '') {
             return null;
         }
@@ -248,12 +304,17 @@ class Server extends Model
      */
     public function connectionAsUser(): TaskRunnerConnection
     {
+        return $this->connectionAsOperationalUser();
+    }
+
+    public function connectionAsOperationalUser(): TaskRunnerConnection
+    {
         $user = trim((string) $this->ssh_user);
         if ($user === '') {
             throw new \RuntimeException('Server has no SSH user configured.');
         }
 
-        return $this->taskRunnerConnectionAs($user);
+        return $this->taskRunnerConnectionAs($user, $this->operationalSshPrivateKey());
     }
 
     /**
@@ -261,12 +322,16 @@ class Server extends Model
      */
     public function connectionAsRoot(): TaskRunnerConnection
     {
-        return $this->taskRunnerConnectionAs('root');
+        return $this->connectionAsRecoveryRoot();
     }
 
-    protected function taskRunnerConnectionAs(string $username): TaskRunnerConnection
+    public function connectionAsRecoveryRoot(): TaskRunnerConnection
     {
-        $key = $this->ssh_private_key;
+        return $this->taskRunnerConnectionAs('root', $this->recoverySshPrivateKey());
+    }
+
+    protected function taskRunnerConnectionAs(string $username, ?string $key): TaskRunnerConnection
+    {
         if ($key === null || trim((string) $key) === '') {
             throw new \RuntimeException('Server has no SSH private key configured.');
         }

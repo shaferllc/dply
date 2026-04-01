@@ -14,6 +14,8 @@ use Livewire\Attributes\Computed;
 
 trait ManagesNotificationChannels
 {
+    use ConfirmsActionWithModal;
+
     public string $new_type = NotificationChannel::TYPE_SLACK;
 
     public string $new_label = '';
@@ -82,7 +84,7 @@ trait ManagesNotificationChannels
 
     public string $edit_webhook_url = '';
 
-    public ?int $testing_id = null;
+    public ?string $testing_id = null;
 
     public ?string $flash_success = null;
 
@@ -260,7 +262,7 @@ trait ManagesNotificationChannels
         $this->flash_error = null;
     }
 
-    public function deleteChannel(int $id): void
+    public function deleteChannel(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
         Gate::authorize('delete', $channel);
@@ -270,11 +272,11 @@ trait ManagesNotificationChannels
         $this->flash_error = null;
     }
 
-    public function sendTest(int $id): void
+    public function sendTest(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
         Gate::authorize('update', $channel);
-        $this->testing_id = $id;
+        $this->testing_id = (string) $id;
         $result = $channel->sendTest(Auth::user());
         $this->testing_id = null;
         if ($result['ok']) {

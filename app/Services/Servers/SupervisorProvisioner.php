@@ -4,7 +4,6 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Models\SupervisorProgram;
-use App\Services\SshConnection;
 use App\Support\SupervisorEnvFormatter;
 
 class SupervisorProvisioner
@@ -19,9 +18,12 @@ class SupervisorProvisioner
         }
 
         try {
-            $ssh = new SshConnection($server);
-            $out = $ssh->exec('dpkg-query -W -f=\'${Status}\' supervisor 2>/dev/null || true', 30);
-            $ssh->disconnect();
+            $out = app(ServerSshConnectionRunner::class)->run(
+                $server,
+                fn ($ssh): string => $ssh->exec('dpkg-query -W -f=\'${Status}\' supervisor 2>/dev/null || true', 30),
+                $this->useRootSsh(),
+                $this->fallbackToDeployUserSsh()
+            );
         } catch (\Throwable) {
             return false;
         }
@@ -40,16 +42,15 @@ class SupervisorProvisioner
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $ssh = new SshConnection($server);
         $inner = 'export DEBIAN_FRONTEND=noninteractive && apt-get update -y && apt-get install -y --no-install-recommends supervisor && systemctl enable --now supervisor';
         $cmd = $this->privilegedBash($server, $inner);
-        try {
-            $out = $ssh->exec($cmd.' 2>&1', 900);
-        } finally {
-            $ssh->disconnect();
-        }
 
-        return $out;
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => $ssh->exec($cmd.' 2>&1', 900),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     public function sync(Server $server): string
@@ -66,31 +67,37 @@ class SupervisorProvisioner
             );
         }
 
-        $ssh = new SshConnection($server);
         $dir = rtrim(config('sites.supervisor_conf_d'), '/');
-        $log = $this->removeOrphanConfigsForServer($ssh, $server, $dir);
-
         $programs = $server->supervisorPrograms()->where('is_active', true)->get();
         $rereadUpdate = $this->supervisorRereadUpdateExecLine($server);
 
-        if ($programs->isEmpty()) {
-            $log .= "No active Supervisor programs configured.\n";
-            $log .= $ssh->exec($rereadUpdate, 180);
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($server, $dir, $programs, $rereadUpdate): string {
+                $log = $this->removeOrphanConfigsForServer($ssh, $server, $dir);
 
-            return $log;
-        }
+                if ($programs->isEmpty()) {
+                    $log .= "No active Supervisor programs configured.\n";
+                    $log .= $ssh->exec($rereadUpdate, 180);
 
-        foreach ($programs as $program) {
-            /** @var SupervisorProgram $program */
-            $ini = $this->buildIni($program);
-            $path = $dir.'/dply-sv-'.$program->id.'.conf';
-            $ssh->putFile($path, $ini);
-            $log .= "Wrote {$path}\n";
-        }
+                    return $log;
+                }
 
-        $log .= $ssh->exec($rereadUpdate, 180);
+                foreach ($programs as $program) {
+                    /** @var SupervisorProgram $program */
+                    $ini = $this->buildIni($program);
+                    $path = $dir.'/dply-sv-'.$program->id.'.conf';
+                    $ssh->putFile($path, $ini);
+                    $log .= "Wrote {$path}\n";
+                }
 
-        return $log;
+                $log .= $ssh->exec($rereadUpdate, 180);
+
+                return $log;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -106,29 +113,33 @@ class SupervisorProvisioner
             return "No active programs — sync would only run supervisorctl reread/update.\n";
         }
 
-        $ssh = new SshConnection($server);
         $dir = rtrim(config('sites.supervisor_conf_d'), '/');
-        $out = '';
-        try {
-            foreach ($programs as $program) {
-                $local = $this->buildIni($program);
-                $path = $dir.'/dply-sv-'.$program->id.'.conf';
-                $remote = $ssh->exec('if test -f '.escapeshellarg($path).' ; then cat '.escapeshellarg($path).'; else echo __DPLY_MISSING__; fi', 60);
-                $remote = trim((string) $remote);
-                $out .= "--- {$path} ---\n";
-                if ($remote === '__DPLY_MISSING__') {
-                    $out .= "Remote: (file missing)\nLocal would be:\n".$local."\n";
-                } elseif ($remote === $local) {
-                    $out .= "No difference.\n";
-                } else {
-                    $out .= $this->unifiedDiffSnippet($remote, $local);
-                }
-            }
-        } finally {
-            $ssh->disconnect();
-        }
 
-        return $out;
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($programs, $dir): string {
+                $out = '';
+
+                foreach ($programs as $program) {
+                    $local = $this->buildIni($program);
+                    $path = $dir.'/dply-sv-'.$program->id.'.conf';
+                    $remote = $ssh->exec('if test -f '.escapeshellarg($path).' ; then cat '.escapeshellarg($path).'; else echo __DPLY_MISSING__; fi', 60);
+                    $remote = trim((string) $remote);
+                    $out .= "--- {$path} ---\n";
+                    if ($remote === '__DPLY_MISSING__') {
+                        $out .= "Remote: (file missing)\nLocal would be:\n".$local."\n";
+                    } elseif ($remote === $local) {
+                        $out .= "No difference.\n";
+                    } else {
+                        $out .= $this->unifiedDiffSnippet($remote, $local);
+                    }
+                }
+
+                return $out;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -140,12 +151,15 @@ class SupervisorProvisioner
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $ssh = new SshConnection($server);
         $dir = rtrim(config('sites.supervisor_conf_d'), '/');
         $ids = $server->supervisorPrograms()->pluck('id')->map(fn ($id) => (string) $id)->all();
         $dirEsc = escapeshellarg($dir);
-
-        $listRaw = trim((string) $ssh->exec('ls -1 '.$dirEsc.'/dply-sv-*.conf 2>/dev/null || true', 30));
+        $listRaw = app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => trim((string) $ssh->exec('ls -1 '.$dirEsc.'/dply-sv-*.conf 2>/dev/null || true', 30)),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
         $remoteIds = [];
         foreach (preg_split('/\r\n|\r|\n/', $listRaw) as $line) {
             $line = trim($line);
@@ -171,8 +185,6 @@ class SupervisorProvisioner
                 $out .= "Missing on server: dply-sv-{$id}.conf — run Sync.\n";
             }
         }
-
-        $ssh->disconnect();
 
         return $out;
     }
@@ -205,15 +217,16 @@ class SupervisorProvisioner
             throw new \RuntimeException('Program not found.');
         }
         $group = 'dply-sv-'.$prog->id;
-        $ssh = new SshConnection($server);
-        try {
-            $sc = $this->supervisorctlInv($server);
-            $out = $ssh->exec($sc.' '.$verb.' '.escapeshellarg($group).' 2>&1', 120);
-        } finally {
-            $ssh->disconnect();
-        }
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($server, $verb, $group): string {
+                $sc = $this->supervisorctlInv($server);
 
-        return trim($out);
+                return trim($ssh->exec($sc.' '.$verb.' '.escapeshellarg($group).' 2>&1', 120));
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -228,19 +241,21 @@ class SupervisorProvisioner
         if ($programs->isEmpty()) {
             return 'No active programs to restart.';
         }
-        $ssh = new SshConnection($server);
-        try {
-            $sc = $this->supervisorctlInv($server);
-            $chunks = [];
-            foreach ($programs as $p) {
-                $group = 'dply-sv-'.$p->id;
-                $chunks[] = trim((string) $ssh->exec($sc.' restart '.escapeshellarg($group).' 2>&1', 120));
-            }
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($server, $programs): string {
+                $sc = $this->supervisorctlInv($server);
+                $chunks = [];
+                foreach ($programs as $p) {
+                    $group = 'dply-sv-'.$p->id;
+                    $chunks[] = trim((string) $ssh->exec($sc.' restart '.escapeshellarg($group).' 2>&1', 120));
+                }
 
-            return implode("\n", $chunks);
-        } finally {
-            $ssh->disconnect();
-        }
+                return implode("\n", $chunks);
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     public function tailProgramStdoutLog(Server $server, SupervisorProgram $program, int $lines = 200): string
@@ -269,17 +284,14 @@ class SupervisorProvisioner
                 ? $program->stderr_logfile
                 : $defaultStdout;
         }
-        $ssh = new SshConnection($server);
-        try {
-            $lines = max(10, min(2000, $lines));
+        $lines = max(10, min(2000, $lines));
 
-            return trim((string) $ssh->exec(
-                'tail -n '.(int) $lines.' '.escapeshellarg($path).' 2>&1',
-                60
-            ));
-        } finally {
-            $ssh->disconnect();
-        }
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => trim((string) $ssh->exec('tail -n '.(int) $lines.' '.escapeshellarg($path).' 2>&1', 60)),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -290,14 +302,16 @@ class SupervisorProvisioner
         if (! $server->isReady() || empty($server->ssh_private_key)) {
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
-        $ssh = new SshConnection($server);
-        try {
-            $sc = $this->supervisorctlInv($server);
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($server): string {
+                $sc = $this->supervisorctlInv($server);
 
-            return trim((string) $ssh->exec($sc.' status 2>&1', 120));
-        } finally {
-            $ssh->disconnect();
-        }
+                return trim((string) $ssh->exec($sc.' status 2>&1', 120));
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -348,12 +362,12 @@ class SupervisorProvisioner
             default => '(systemctl '.$action.' '.$unitEsc.' 2>&1) || (service '.$unitEsc.' '.$action.' 2>&1); printf \'\nDPLY_EXIT:%s\' "$?"',
         };
 
-        $ssh = new SshConnection($server);
-        try {
-            return trim((string) $ssh->exec($this->privilegedBash($server, $inner), 180));
-        } finally {
-            $ssh->disconnect();
-        }
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => trim((string) $ssh->exec($this->privilegedBash($server, $inner), 180)),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -412,22 +426,25 @@ class SupervisorProvisioner
             return false;
         }
 
-        $ssh = new SshConnection($server);
         $dir = rtrim(config('sites.supervisor_conf_d'), '/');
-        try {
-            foreach ($programs as $program) {
-                $local = $this->buildIni($program);
-                $path = $dir.'/dply-sv-'.$program->id.'.conf';
-                $remote = trim((string) $ssh->exec('if test -f '.escapeshellarg($path).' ; then cat '.escapeshellarg($path).'; else echo __DPLY_MISSING__; fi', 60));
-                if ($remote === '__DPLY_MISSING__' || $remote !== $local) {
-                    return true;
-                }
-            }
-        } finally {
-            $ssh->disconnect();
-        }
 
-        return false;
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($programs, $dir): bool {
+                foreach ($programs as $program) {
+                    $local = $this->buildIni($program);
+                    $path = $dir.'/dply-sv-'.$program->id.'.conf';
+                    $remote = trim((string) $ssh->exec('if test -f '.escapeshellarg($path).' ; then cat '.escapeshellarg($path).'; else echo __DPLY_MISSING__; fi', 60));
+                    if ($remote === '__DPLY_MISSING__' || $remote !== $local) {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -443,21 +460,27 @@ class SupervisorProvisioner
             return ['messages' => [__('No active programs to check.')], 'ok' => true];
         }
 
-        $ssh = new SshConnection($server);
         $messages = [];
-        try {
-            foreach ($programs as $program) {
-                $dir = $program->directory;
-                $check = trim((string) $ssh->exec('if test -d '.escapeshellarg($dir).' ; then echo ok; elif test -e '.escapeshellarg($dir).' ; then echo notdir; else echo missing; fi', 30));
-                if ($check !== 'ok') {
-                    $messages[] = $check === 'missing'
-                        ? __('Program :slug: working directory does not exist: :path', ['slug' => $program->slug, 'path' => $dir])
-                        : __('Program :slug: working directory is not a directory: :path', ['slug' => $program->slug, 'path' => $dir]);
+        $messages = app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($programs): array {
+                $messages = [];
+
+                foreach ($programs as $program) {
+                    $dir = $program->directory;
+                    $check = trim((string) $ssh->exec('if test -d '.escapeshellarg($dir).' ; then echo ok; elif test -e '.escapeshellarg($dir).' ; then echo notdir; else echo missing; fi', 30));
+                    if ($check !== 'ok') {
+                        $messages[] = $check === 'missing'
+                            ? __('Program :slug: working directory does not exist: :path', ['slug' => $program->slug, 'path' => $dir])
+                            : __('Program :slug: working directory is not a directory: :path', ['slug' => $program->slug, 'path' => $dir]);
+                    }
                 }
-            }
-        } finally {
-            $ssh->disconnect();
-        }
+
+                return $messages;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
 
         return ['messages' => $messages, 'ok' => $messages === []];
     }
@@ -534,7 +557,7 @@ class SupervisorProvisioner
     /**
      * Remove conf files on the server for programs that no longer exist in the database for this server.
      */
-    public function removeOrphanConfigsForServer(SshConnection $ssh, Server $server, ?string $confDir = null): string
+    public function removeOrphanConfigsForServer($ssh, Server $server, ?string $confDir = null): string
     {
         $dir = $confDir ?? rtrim(config('sites.supervisor_conf_d'), '/');
         $validIds = $server->supervisorPrograms()->pluck('id')->map(fn ($id) => (string) $id)->all();
@@ -559,10 +582,18 @@ class SupervisorProvisioner
             return;
         }
 
-        $ssh = new SshConnection($server);
         $dir = rtrim(config('sites.supervisor_conf_d'), '/');
         $path = $dir.'/dply-sv-'.$programId.'.conf';
-        $ssh->exec('rm -f '.escapeshellarg($path), 30);
+        app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($path): null {
+                $ssh->exec('rm -f '.escapeshellarg($path), 30);
+
+                return null;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     public function buildIni(SupervisorProgram $program): string
@@ -651,5 +682,15 @@ INI;
         }
 
         return $out;
+    }
+
+    protected function useRootSsh(): bool
+    {
+        return (bool) config('server_services.use_root_ssh', true);
+    }
+
+    protected function fallbackToDeployUserSsh(): bool
+    {
+        return (bool) config('server_services.fallback_to_deploy_user_ssh', true);
     }
 }

@@ -64,4 +64,57 @@ class ServerTaskRunnerConnectionTest extends TestCase
 
         $server->connectionAsUser();
     }
+
+    public function test_connection_as_operational_user_prefers_operational_private_key(): void
+    {
+        $server = Server::factory()->create([
+            'ip_address' => '203.0.113.30',
+            'ssh_port' => 2222,
+            'ssh_user' => 'deploy',
+            'ssh_private_key' => 'legacy-key',
+            'ssh_operational_private_key' => $this->validPrivateKey(),
+        ]);
+
+        $connection = $server->connectionAsOperationalUser();
+
+        $this->assertInstanceOf(Connection::class, $connection);
+        $this->assertSame('deploy', $connection->username);
+        $this->assertSame($this->validPrivateKey(), $connection->privateKey);
+        $this->assertSame('/home/deploy/.dply-task-runner', $connection->scriptPath);
+    }
+
+    public function test_connection_as_recovery_root_prefers_recovery_private_key(): void
+    {
+        $server = Server::factory()->create([
+            'ip_address' => '203.0.113.40',
+            'ssh_port' => 22,
+            'ssh_user' => 'deploy',
+            'ssh_private_key' => 'legacy-key',
+            'ssh_recovery_private_key' => $this->validPrivateKey(),
+        ]);
+
+        $connection = $server->connectionAsRecoveryRoot();
+
+        $this->assertSame('root', $connection->username);
+        $this->assertSame($this->validPrivateKey(), $connection->privateKey);
+        $this->assertSame('/root/.dply-task-runner', $connection->scriptPath);
+    }
+
+    public function test_connection_helpers_fall_back_to_legacy_private_key_during_rollout(): void
+    {
+        $server = Server::factory()->create([
+            'ip_address' => '203.0.113.50',
+            'ssh_port' => 22,
+            'ssh_user' => 'deploy',
+            'ssh_private_key' => $this->validPrivateKey(),
+            'ssh_operational_private_key' => null,
+            'ssh_recovery_private_key' => null,
+        ]);
+
+        $operational = $server->connectionAsOperationalUser();
+        $recovery = $server->connectionAsRecoveryRoot();
+
+        $this->assertSame($this->validPrivateKey(), $operational->privateKey);
+        $this->assertSame($this->validPrivateKey(), $recovery->privateKey);
+    }
 }

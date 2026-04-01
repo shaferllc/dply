@@ -2,13 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\NotificationChannel;
+use App\Models\NotificationSubscription;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class WorkspaceMonitorTest extends TestCase
@@ -182,9 +186,115 @@ class WorkspaceMonitorTest extends TestCase
         $response->assertSee('Memory headroom');
         $response->assertSee('Swap pressure');
         $response->assertSee('Disk headroom');
+        $response->assertSee('Sample freshness');
+        $response->assertSee('Server notification routes');
+        $response->assertSee('Project escalation routes');
         $response->assertSee('Site and deployment context');
         $response->assertSee('Latest deployment');
         $response->assertSee('Marketing App');
         $response->assertSee('Hover the graph for fuller sample details.');
+    }
+
+    public function test_monitor_page_shows_server_and_project_routing_counts(): void
+    {
+        Carbon::setTestNow('2026-03-31 12:10:00');
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $workspace = Workspace::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+        ]);
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'workspace_id' => $workspace->id,
+            'status' => Server::STATUS_READY,
+            'ssh_private_key' => 'test-private-key',
+            'meta' => [
+                'monitoring_ssh_reachable' => true,
+                'monitoring_python_installed' => true,
+                'monitoring_guest_push_token_hash' => hash('sha256', 'secret'),
+                'monitoring_callback_env_deployed' => true,
+                'monitoring_guest_cron_installed_at' => '2026-03-31T12:01:00Z',
+                'monitoring_guest_push_cron_expression' => '* * * * *',
+                'monitoring_callback_env_present_remote' => true,
+                'monitoring_guest_cron_present_remote' => true,
+                'monitoring_guest_script_sha' => app(\App\Services\Servers\ServerMetricsGuestScript::class)->bundledSha256(),
+            ],
+        ]);
+        $channel = NotificationChannel::factory()->create([
+            'owner_type' => User::class,
+            'owner_id' => $user->id,
+        ]);
+        NotificationSubscription::query()->create([
+            'notification_channel_id' => $channel->id,
+            'subscribable_type' => Server::class,
+            'subscribable_id' => $server->id,
+            'event_key' => 'server.systemd.failed',
+        ]);
+        NotificationSubscription::query()->create([
+            'notification_channel_id' => $channel->id,
+            'subscribable_type' => Workspace::class,
+            'subscribable_id' => $workspace->id,
+            'event_key' => 'project.health',
+        ]);
+
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now()->subMinutes(3),
+            'payload' => ['cpu_pct' => 11],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.monitor', $server));
+
+        $response->assertOk();
+        $response->assertSee('Aging');
+        $response->assertSee('Latest metric sample is 3 minutes old.');
+        $response->assertSee('1 saved');
+        $response->assertSee('Project routes are where grouped health and deploy signals should land.');
+
+        Carbon::setTestNow();
+    }
+
+    public function test_monitor_page_shows_clock_skew_message_for_future_sample_timestamp(): void
+    {
+        Carbon::setTestNow('2026-03-31 12:10:00');
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Server::STATUS_READY,
+            'ssh_private_key' => 'test-private-key',
+            'meta' => [
+                'monitoring_ssh_reachable' => true,
+                'monitoring_python_installed' => true,
+                'monitoring_guest_push_token_hash' => hash('sha256', 'secret'),
+                'monitoring_callback_env_deployed' => true,
+                'monitoring_guest_cron_installed_at' => '2026-03-31T12:01:00Z',
+                'monitoring_guest_push_cron_expression' => '* * * * *',
+                'monitoring_callback_env_present_remote' => true,
+                'monitoring_guest_cron_present_remote' => true,
+                'monitoring_guest_script_sha' => app(\App\Services\Servers\ServerMetricsGuestScript::class)->bundledSha256(),
+            ],
+        ]);
+
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now()->addMinutes(7),
+            'payload' => ['cpu_pct' => 10],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.monitor', $server));
+
+        $response->assertOk();
+        $response->assertSee('Clock skew detected');
+        $response->assertSee('Check the server timezone or clock sync');
+        $response->assertDontSee('Age: -');
+
+        Carbon::setTestNow();
     }
 }

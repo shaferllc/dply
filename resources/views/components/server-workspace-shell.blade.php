@@ -118,6 +118,9 @@
                                 @case('rectangle-stack')
                                     <x-heroicon-o-rectangle-stack class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('command-line')
+                                    <x-heroicon-o-command-line class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                             @endswitch
                             {{ $label }}
                         </a>

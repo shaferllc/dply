@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Scripts;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\Server;
@@ -16,6 +17,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Edit extends Component
 {
+    use ConfirmsActionWithModal;
+
     public Script $script;
 
     public string $name = '';

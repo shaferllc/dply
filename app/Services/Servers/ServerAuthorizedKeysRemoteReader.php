@@ -17,20 +17,24 @@ class ServerAuthorizedKeysRemoteReader
     public function readAuthorizedKeysFile(Server $server, string $targetUser): ProcessOutput
     {
         $connectionUser = (string) $server->ssh_user;
+        $asRoot = $targetUser === 'root';
 
-        $readBash = $targetUser === $connectionUser
+        $readBash = $targetUser === 'root'
+            ? 'test -f ~/.ssh/authorized_keys && cat ~/.ssh/authorized_keys || true'
+            : ($targetUser === $connectionUser
             ? 'test -f ~/.ssh/authorized_keys && cat ~/.ssh/authorized_keys || true'
             : sprintf(
                 'sudo -n -u %s bash -lc %s',
                 escapeshellarg($targetUser),
                 escapeshellarg('test -f ~/.ssh/authorized_keys && cat ~/.ssh/authorized_keys || true')
-            );
+            ));
 
         return $this->remote->runInlineBash(
             $server,
             'Read authorized_keys ('.$targetUser.')',
             $readBash,
             30,
+            $asRoot,
         );
     }
 

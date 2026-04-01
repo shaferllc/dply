@@ -4,7 +4,6 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Models\ServerFirewallRule;
-use App\Services\SshConnection;
 
 class ServerFirewallProvisioner
 {
@@ -55,12 +54,22 @@ class ServerFirewallProvisioner
             return 'No enabled firewall rules to apply.';
         }
 
-        $ssh = new SshConnection($server);
         $log = "Applying UFW rules (ensure SSH is reachable before tightening UFW).\n";
 
-        foreach ($rules as $rule) {
-            $log .= $this->applyRuleViaSsh($ssh, $server, $rule);
-        }
+        $log .= app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($rules, $server): string {
+                $output = '';
+
+                foreach ($rules as $rule) {
+                    $output .= $this->applyRuleViaSsh($ssh, $server, $rule);
+                }
+
+                return $output;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
 
         return $log;
     }
@@ -77,37 +86,12 @@ class ServerFirewallProvisioner
             return 'Skipped (rule disabled).';
         }
 
-        $ssh = new SshConnection($server);
-
-        return $this->applyRuleViaSsh($ssh, $server, $rule);
-    }
-
-    /**
-     * Full shell lines (with sudo when needed) that would be run for each enabled rule — for preview / dry-run.
-     *
-     * @return list<string>
-     */
-    public function previewApplyCommands(Server $server): array
-    {
-        $out = [];
-        foreach ($server->firewallRules()->where('enabled', true)->orderBy('sort_order')->get() as $rule) {
-            $out[] = $this->previewShellLine($server, $this->ufwRuleFragment($rule));
-        }
-
-        return $out;
-    }
-
-    public function previewDeleteCommand(Server $server, ServerFirewallRule $rule): string
-    {
-        return $this->previewShellLine($server, 'delete '.$this->ufwRuleFragment($rule));
-    }
-
-    /**
-     * Shell line as executed over SSH (includes stderr redirect).
-     */
-    public function previewShellLine(Server $server, string $ufwArguments): string
-    {
-        return $this->ufwExecLine($server, $ufwArguments);
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => $this->applyRuleViaSsh($ssh, $server, $rule),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -128,7 +112,7 @@ class ServerFirewallProvisioner
         return $this->ufwBinaryPrefix($server).' '.$arguments.' 2>&1';
     }
 
-    private function applyRuleViaSsh(SshConnection $ssh, Server $server, ServerFirewallRule $rule): string
+    private function applyRuleViaSsh($ssh, Server $server, ServerFirewallRule $rule): string
     {
         return $ssh->exec($this->ufwExecLine($server, $this->ufwRuleFragment($rule)), 60);
     }
@@ -142,10 +126,14 @@ class ServerFirewallProvisioner
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $ssh = new SshConnection($server);
         $fragment = $this->ufwRuleFragment($rule);
 
-        return $ssh->exec($this->ufwExecLine($server, 'delete '.$fragment), 60);
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => $ssh->exec($this->ufwExecLine($server, 'delete '.$fragment), 60),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     public function status(Server $server): string
@@ -154,9 +142,12 @@ class ServerFirewallProvisioner
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $ssh = new SshConnection($server);
-
-        return trim($ssh->exec($this->ufwExecLine($server, 'status verbose'), 60));
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => trim($ssh->exec($this->ufwExecLine($server, 'status verbose'), 60)),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -180,22 +171,13 @@ class ServerFirewallProvisioner
         return ! $has;
     }
 
-    /**
-     * Read-only snapshot of iptables counters (first rows). Guarded by config — can be heavy / sensitive.
-     */
-    public function iptablesCountersSnapshot(Server $server): string
+    private function useRootSsh(): bool
     {
-        if (! config('server_firewall.danger_zone.iptables_counters_enabled', false)) {
-            return 'Disabled in config (server_firewall.danger_zone.iptables_counters_enabled).';
-        }
-        if (! $server->isReady() || empty($server->ssh_private_key)) {
-            throw new \RuntimeException('Server must be ready with an SSH key.');
-        }
+        return (bool) config('server_firewall.use_root_ssh', true);
+    }
 
-        $ssh = new SshConnection($server);
-        $prefix = $this->ufwBinaryPrefix($server);
-        $sudo = str_starts_with($prefix, 'sudo') ? 'sudo -n ' : '';
-
-        return trim($ssh->exec($sudo.'iptables -L -n -v 2>&1 | head -n 80', 45));
+    private function fallbackToDeployUserSsh(): bool
+    {
+        return (bool) config('server_firewall.fallback_to_deploy_user_ssh', true);
     }
 }

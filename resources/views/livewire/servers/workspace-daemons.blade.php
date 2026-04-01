@@ -337,7 +337,7 @@
                                         <span class="font-medium text-brand-ink">{{ $tpl->name }}</span>
                                         <span class="flex gap-2">
                                             <button type="button" wire:click="applyOrgTemplate('{{ $tpl->id }}')" class="text-brand-forest hover:underline">{{ __('Apply') }}</button>
-                                            <button type="button" wire:click="deleteOrgTemplate('{{ $tpl->id }}')" wire:confirm="{{ __('Delete this template?') }}" class="text-red-600 hover:underline">{{ __('Delete') }}</button>
+                                            <button type="button" wire:click="openConfirmActionModal('deleteOrgTemplate', ['{{ $tpl->id }}'], @js(__('Delete template')), @js(__('Delete this template?')), @js(__('Delete')), true)" class="text-red-600 hover:underline">{{ __('Delete') }}</button>
                                         </span>
                                     </li>
                                 @endforeach
@@ -528,8 +528,7 @@
                                     </button>
                                     <button
                                         type="button"
-                                        wire:click="deleteSupervisorProgram('{{ $sp->id }}')"
-                                        wire:confirm="{{ __('Delete this program? Sync Supervisor afterward to remove its config from the server.') }}"
+                                        wire:click="openConfirmActionModal('deleteSupervisorProgram', ['{{ $sp->id }}'], @js(__('Delete program')), @js(__('Delete this program? Sync Supervisor afterward to remove its config from the server.')), @js(__('Delete program')), true)"
                                         class="rounded-lg p-2 text-red-600 hover:bg-red-50"
                                         title="{{ __('Delete') }}"
                                     >
@@ -945,6 +944,7 @@
     @endif
 
     <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,

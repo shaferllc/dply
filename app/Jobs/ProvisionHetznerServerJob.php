@@ -4,9 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\HetznerService;
+use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use phpseclib3\Crypt\RSA;
 
 class ProvisionHetznerServerJob implements ShouldQueue
 {
@@ -29,9 +29,7 @@ class ProvisionHetznerServerJob implements ShouldQueue
 
         $hetzner = new HetznerService($credential);
 
-        $key = RSA::createKey(2048);
-        $privateKey = $key->toString('OpenSSH');
-        $publicKey = $key->getPublicKey()->toString('OpenSSH');
+        $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
         $image = config('services.hetzner.default_image', 'ubuntu-24.04');
 
@@ -40,14 +38,16 @@ class ProvisionHetznerServerJob implements ShouldQueue
             location: $this->server->region,
             serverType: $this->server->size,
             image: $image,
-            sshPublicKeys: [$publicKey],
+            sshPublicKeys: [$keys['recovery_public_key']],
             userData: ''
         );
 
         $this->server->update([
             'provider_id' => (string) $id,
             'status' => Server::STATUS_PROVISIONING,
-            'ssh_private_key' => $privateKey,
+            'ssh_private_key' => $keys['recovery_private_key'],
+            'ssh_recovery_private_key' => $keys['recovery_private_key'],
+            'ssh_operational_private_key' => $keys['operational_private_key'],
             'ssh_user' => config('services.hetzner.ssh_user', 'root'),
         ]);
 

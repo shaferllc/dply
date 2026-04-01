@@ -76,6 +76,20 @@ class OrganizationTest extends TestCase
         $response->assertSee('Members');
     }
 
+    public function test_organization_show_uses_universal_notification_language_for_admins(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+
+        $response = $this->actingAs($user)->get(route('organizations.show', $org));
+
+        $response->assertOk();
+        $response->assertSee('Notification destinations & preferences');
+        $response->assertSee('Webhook destinations');
+        $response->assertSee('Manage saved destinations');
+    }
+
     public function test_organization_show_returns_403_for_non_member(): void
     {
         $user = User::factory()->create();

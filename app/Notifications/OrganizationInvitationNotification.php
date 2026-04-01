@@ -2,7 +2,7 @@
 
 namespace App\Notifications;
 
-use App\Models\OrganizationInvitation;
+use App\Models\NotificationEvent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -13,7 +13,7 @@ class OrganizationInvitationNotification extends Notification implements ShouldQ
     use Queueable;
 
     public function __construct(
-        public OrganizationInvitation $invitation
+        public NotificationEvent $event
     ) {}
 
     public function via(object $notifiable): array
@@ -23,12 +23,17 @@ class OrganizationInvitationNotification extends Notification implements ShouldQ
 
     public function toMail(object $notifiable): MailMessage
     {
-        $url = route('invitations.accept', ['token' => $this->invitation->token]);
+        $metadata = $this->event->metadata ?? [];
+        $orgName = (string) ($metadata['organization_name'] ?? __('your organization'));
+        $inviterName = (string) ($metadata['inviter_name'] ?? __('Someone'));
+        $role = (string) ($metadata['role'] ?? __('member'));
+        $token = (string) ($metadata['invitation_token'] ?? '');
+        $url = route('invitations.accept', ['token' => $token]);
 
         return (new MailMessage)
-            ->subject('Invitation to join '.$this->invitation->organization->name)
-            ->line($this->invitation->inviter->name.' has invited you to join **'.$this->invitation->organization->name.'** on '.config('app.name').'.')
-            ->line('You will be added as a '.$this->invitation->role.')
+            ->subject($this->event->title ?: 'Invitation to join '.$orgName)
+            ->line($inviterName.' has invited you to join **'.$orgName.'** on '.config('app.name').'.')
+            ->line('You will be added as a '.$role)
             ->action('Accept invitation', $url)
             ->line('This invitation expires in 7 days.')
             ->line('If you did not expect this invitation, you can ignore this email.');

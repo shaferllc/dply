@@ -127,7 +127,7 @@
                                             <button type="button" wire:click="startDeploy({{ $key->id }})" class="text-brand-sage font-medium hover:text-brand-ink text-xs">{{ __('Deploy on servers') }}</button>
                                         @endif
                                         <button type="button" wire:click="startEdit({{ $key->id }})" class="text-brand-sage font-medium hover:text-brand-ink text-xs">{{ __('Edit') }}</button>
-                                        <button type="button" wire:click="deleteKey({{ $key->id }})" wire:confirm="{{ __('Remove this key from your account? Linked copies on servers will be removed on the next sync.') }}" class="text-red-600 font-medium hover:underline text-xs">{{ __('Delete') }}</button>
+                                        <button type="button" wire:click="openConfirmActionModal('deleteKey', [{{ $key->id }}], @js(__('Delete SSH key')), @js(__('Remove this key from your account? Linked copies on servers will be removed on the next sync.')), @js(__('Delete')), true)" class="text-red-600 font-medium hover:underline text-xs">{{ __('Delete') }}</button>
                                     </td>
                                 </tr>
                             @endforeach
@@ -207,4 +207,8 @@
             </div>
         </div>
     @endif
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

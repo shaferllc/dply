@@ -7,8 +7,10 @@ use App\Livewire\Projects\Index as ProjectsIndex;
 use App\Livewire\Projects\Show as ProjectsShow;
 use App\Models\AuditLog;
 use App\Models\NotificationChannel;
+use App\Models\NotificationSubscription;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\Workspace;
@@ -340,6 +342,27 @@ class ProjectsTest extends TestCase
             ->assertSee(route('projects.access', $workspace), escape: false);
     }
 
+    public function test_project_operations_and_delivery_pages_show_readiness_guidance(): void
+    {
+        $owner = $this->userWithOrganization();
+        $org = $owner->currentOrganization();
+        $workspace = Workspace::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $owner->id,
+            'name' => 'Operations Stack',
+        ]);
+
+        $operations = $this->actingAs($owner)->get(route('projects.operations', $workspace));
+        $operations->assertOk()
+            ->assertSee('Operational readiness')
+            ->assertSee('Notification routes');
+
+        $delivery = $this->actingAs($owner)->get(route('projects.delivery', $workspace));
+        $delivery->assertOk()
+            ->assertSee('Recovery and migration checklist')
+            ->assertSee('Shared config is ready');
+    }
+
     public function test_audit_log_action_summary_humanizes_project_events(): void
     {
         $log = new AuditLog([
@@ -411,5 +434,56 @@ class ProjectsTest extends TestCase
             ->assertSee('Docs Site')
             ->assertSee(route('sites.show', [$site->server, $site]), escape: false)
             ->assertSee(route('sites.insights', [$site->server, $site]), escape: false);
+    }
+
+    public function test_project_operations_page_shows_routing_and_monitoring_rollups(): void
+    {
+        $owner = $this->userWithOrganization();
+        $org = $owner->currentOrganization();
+        $workspace = Workspace::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $owner->id,
+        ]);
+        $server = Server::factory()->create([
+            'user_id' => $owner->id,
+            'organization_id' => $org->id,
+            'workspace_id' => $workspace->id,
+            'status' => Server::STATUS_READY,
+            'meta' => [
+                'monitoring_python_installed' => true,
+            ],
+        ]);
+        Site::factory()->create([
+            'user_id' => $owner->id,
+            'organization_id' => $org->id,
+            'server_id' => $server->id,
+            'workspace_id' => $workspace->id,
+        ]);
+        $channel = NotificationChannel::factory()->create([
+            'owner_type' => User::class,
+            'owner_id' => $owner->id,
+        ]);
+        NotificationSubscription::query()->create([
+            'notification_channel_id' => $channel->id,
+            'subscribable_type' => Workspace::class,
+            'subscribable_id' => $workspace->id,
+            'event_key' => 'project.health',
+        ]);
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now()->subMinute(),
+            'payload' => ['cpu_pct' => 10],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('projects.operations', $workspace));
+
+        $response->assertOk()
+            ->assertSee('Notification routes')
+            ->assertSee('1 saved')
+            ->assertSee('1 event covered')
+            ->assertSee('Monitored servers: 1')
+            ->assertSee('Servers with samples')
+            ->assertSee('1 / 1')
+            ->assertSee('Escalation ready');
     }
 }

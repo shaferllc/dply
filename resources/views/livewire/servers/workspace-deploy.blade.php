@@ -7,7 +7,7 @@
     :server="$server"
     active="deploy"
     :title="__('Deploy')"
-    :description="__('Manage sites, databases, automation, and deploy tools for this server.')"
+    :description="__('Manage the release command for this server and run deploy-focused actions when you are shipping code.')"
 >
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null, 'command_error' => $command_error ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -30,6 +30,13 @@
             @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 18])
             <div class="{{ $card }} p-6 sm:p-8">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Deploy') }}</h2>
+                <p class="mt-1 text-sm text-brand-moss">
+                    {{ __('Use Deploy for release flow. Saved commands are for server-local maintenance, diagnostics, and operational runbooks that should not become the default release command.') }}
+                </p>
+                <div class="mt-3 flex flex-wrap gap-3 text-sm font-medium">
+                    <a href="{{ route('servers.recipes', $server) }}" wire:navigate class="text-brand-ink hover:text-brand-sage">{{ __('Open saved commands') }}</a>
+                    <a href="{{ route('marketplace.index') }}" wire:navigate class="text-brand-ink hover:text-brand-sage">{{ __('Browse marketplace') }}</a>
+                </div>
                 @if ($server->deploy_command)
                     <button type="button" wire:click="deploy" class="mt-4 inline-flex rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream hover:bg-brand-forest">{{ __('Deploy') }}</button>
                     <p class="mt-2 text-sm text-brand-moss">{{ __('Runs the configured deploy command.') }}</p>
@@ -39,6 +46,9 @@
             </div>
             <div class="{{ $card }} p-6 sm:p-8">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Deploy command') }}</h2>
+                <p class="mt-1 text-sm text-brand-moss">
+                    {{ __('Marketplace deploy starters import here. If a saved command graduates into release automation, copy it into Deploy on purpose rather than running it as an ad hoc server command forever.') }}
+                </p>
                 @php $deployTemplates = config('deploy_templates.templates', []); @endphp
                 @if (count($deployTemplates) > 0)
                     <div class="mt-4 flex flex-wrap gap-2">
@@ -53,7 +63,10 @@
                 </form>
             </div>
             <div class="{{ $card }} p-6 sm:p-8">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Run command') }}</h2>
+                <h2 class="text-lg font-semibold text-brand-ink">{{ __('One-off command') }}</h2>
+                <p class="mt-1 text-sm text-brand-moss">
+                    {{ __('For a command you plan to keep, store it in Saved commands instead. This box is only for one-off server work.') }}
+                </p>
                 <form wire:submit="runCommand" class="mt-4 flex flex-col gap-3 sm:flex-row">
                     <input type="text" wire:model="command" placeholder="uptime" class="flex-1 rounded-lg border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30" required />
                     <x-primary-button type="submit" class="shrink-0">{{ __('Run') }}</x-primary-button>

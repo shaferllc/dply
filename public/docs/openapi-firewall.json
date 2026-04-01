@@ -3,7 +3,7 @@
   "info": {
     "title": "dply Server Firewall API",
     "version": "1.0.0",
-    "description": "HTTP API v1 firewall endpoints under /api/v1. Requires auth.api with network.read / network.write abilities as noted. ETag on GET /servers/{server}/firewall is the SHA-256 of the ordered rule set (use If-None-Match for 304). Dual-approver workflow applies to the web UI only, not API applies. Organization-level firewall options (drift webhooks, synthetic probe URL, second approval) are stored in organizations.firewall_settings JSON and merged with config server_firewall.organization_settings for app behavior; those flags are not exposed on this REST surface."
+    "description": "HTTP API v1 firewall endpoints under /api/v1. Requires auth.api with network.read / network.write abilities as noted. The basics-first API supports listing a server's rules and templates, applying the current enabled rules, and adding bundled or saved templates. ETag on GET /servers/{server}/firewall is the SHA-256 of the ordered rule set (use If-None-Match for 304)."
   },
   "servers": [{ "url": "/api/v1" }],
   "paths": {
@@ -37,31 +37,6 @@
         }
       }
     },
-    "/servers/{server}/firewall/preview": {
-      "get": {
-        "summary": "Preview UFW shell commands for enabled rules",
-        "operationId": "firewallPreview"
-      }
-    },
-    "/servers/{server}/firewall/drift": {
-      "get": {
-        "summary": "Compare Dply rules to ufw status verbose",
-        "operationId": "firewallDrift"
-      }
-    },
-    "/servers/{server}/firewall/terraform": {
-      "get": {
-        "summary": "Terraform-style HCL snippet (documentation)",
-        "operationId": "firewallTerraform"
-      }
-    },
-    "/servers/{server}/firewall/iptables": {
-      "get": {
-        "summary": "iptables -L -n -v snapshot (first rows)",
-        "description": "403 when SERVER_FIREWALL_IPTABLES_COUNTERS is not enabled.",
-        "operationId": "firewallIptables"
-      }
-    },
     "/servers/{server}/firewall/apply": {
       "post": {
         "summary": "Apply enabled rules via UFW",
@@ -84,21 +59,20 @@
         "responses": {
           "200": { "description": "Applied" },
           "422": { "description": "SSH ack required (code ssh_lockout_ack_required)" },
-          "423": { "description": "Maintenance window (code maintenance)" },
           "500": { "description": "Apply failed on host" }
         }
       }
     },
-    "/servers/{server}/firewall/export": {
-      "get": {
-        "summary": "Download JSON export (version 2)",
-        "operationId": "firewallExport"
+    "/servers/{server}/firewall/bundled/{key}": {
+      "post": {
+        "summary": "Apply a bundled firewall template",
+        "operationId": "firewallBundledApply"
       }
     },
-    "/servers/{server}/firewall/import": {
+    "/servers/{server}/firewall/templates/{template}": {
       "post": {
-        "summary": "Import JSON (replace or merge per body)",
-        "operationId": "firewallImport"
+        "summary": "Apply a saved firewall template",
+        "operationId": "firewallTemplateApply"
       }
     }
   }

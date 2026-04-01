@@ -183,6 +183,7 @@ class ProvisionTaskCompletionTest extends TestCase
             'setup_status' => Server::SETUP_STATUS_RUNNING,
             'ssh_user' => 'root',
             'ssh_private_key' => file_get_contents($keyPath),
+            'ssh_operational_private_key' => file_get_contents($keyPath),
         ]);
 
         $this->assertNotNull($server->openSshPublicKeyFromPrivate());
@@ -195,5 +196,25 @@ class ProvisionTaskCompletionTest extends TestCase
         if ($deployUser !== '' && $deployUser !== 'root') {
             $this->assertSame($deployUser, $server->ssh_user);
         }
+    }
+
+    public function test_apply_provision_outcome_requires_operational_key_before_switching_to_deploy_user(): void
+    {
+        $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+        $this->assertFileExists($keyPath);
+
+        $server = Server::factory()->create([
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+            'ssh_user' => 'root',
+            'ssh_private_key' => file_get_contents($keyPath),
+            'ssh_recovery_private_key' => file_get_contents($keyPath),
+            'ssh_operational_private_key' => null,
+        ]);
+
+        RunSetupScriptJob::applyProvisionOutcomeToServer($server, true);
+
+        $server->refresh();
+        $this->assertSame(Server::SETUP_STATUS_DONE, $server->setup_status);
+        $this->assertSame('root', $server->ssh_user);
     }
 }

@@ -134,7 +134,7 @@
                                         <td class="px-4 py-3 text-brand-moss">{{ \App\Models\BackupConfiguration::labelForProvider($row->provider) }}</td>
                                         <td class="px-4 py-3 text-right whitespace-nowrap">
                                             <button type="button" wire:click="startEdit({{ $row->id }})" class="text-sm font-medium text-brand-sage hover:text-brand-ink mr-4">{{ __('Edit') }}</button>
-                                            <button type="button" wire:click="deleteConfiguration({{ $row->id }})" wire:confirm="{{ __('Remove this backup configuration?') }}" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Delete') }}</button>
+                                            <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', [{{ $row->id }}], @js(__('Delete backup configuration')), @js(__('Remove this backup configuration?')), @js(__('Delete')), true)" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Delete') }}</button>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -145,4 +145,8 @@
             </div>
         </section>
     </div>
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Livewire\Forms\FirewallRuleForm;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesFirewallWorkspaceAdvanced;
@@ -10,8 +11,6 @@ use App\Models\FirewallRuleTemplate;
 use App\Models\Server;
 use App\Models\ServerFirewallAuditEvent;
 use App\Models\ServerFirewallRule;
-use App\Services\Servers\FirewallDualApprovalService;
-use App\Services\Servers\FirewallMaintenanceGate;
 use App\Services\Servers\ServerFirewallApplyRecorder;
 use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;
@@ -24,6 +23,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceFirewall extends Component
 {
+    use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesFirewallWorkspaceAdvanced;
@@ -95,6 +95,25 @@ class WorkspaceFirewall extends Component
         $tags = FirewallRuleForm::tagsStringToArray($this->form->tags);
         $profile = $this->form->profile ? trim((string) $this->form->profile) : null;
         $runbook = $this->form->runbook_url ? trim((string) $this->form->runbook_url) : null;
+        $source = strtolower(trim($this->form->source)) === 'any' ? 'any' : trim($this->form->source);
+
+        $duplicateRuleQuery = ServerFirewallRule::query()
+            ->where('server_id', $this->server->id)
+            ->where('port', $port)
+            ->where('protocol', $this->form->protocol)
+            ->where('source', $source)
+            ->where('action', $this->form->action)
+            ->where('site_id', $this->form->site_id ?: null);
+
+        if ($this->editing_rule_id) {
+            $duplicateRuleQuery->whereKeyNot($this->editing_rule_id);
+        }
+
+        if ($duplicateRuleQuery->exists()) {
+            $this->addError('form.port', __('A matching firewall rule already exists on this server.'));
+
+            return;
+        }
 
         if ($this->editing_rule_id) {
             $rule = ServerFirewallRule::query()
@@ -106,7 +125,7 @@ class WorkspaceFirewall extends Component
                 'name' => $this->form->name ? trim((string) $this->form->name) : null,
                 'port' => $port,
                 'protocol' => $this->form->protocol,
-                'source' => strtolower(trim($this->form->source)) === 'any' ? 'any' : trim($this->form->source),
+                'source' => $source,
                 'action' => $this->form->action,
                 'enabled' => $this->form->enabled,
                 'profile' => $profile,
@@ -130,7 +149,7 @@ class WorkspaceFirewall extends Component
                 'name' => $this->form->name ? trim((string) $this->form->name) : null,
                 'port' => $port,
                 'protocol' => $this->form->protocol,
-                'source' => strtolower(trim($this->form->source)) === 'any' ? 'any' : trim($this->form->source),
+                'source' => $source,
                 'action' => $this->form->action,
                 'enabled' => $this->form->enabled,
                 'sort_order' => (int) ($this->server->firewallRules()->max('sort_order') ?? 0) + 1,
@@ -231,38 +250,6 @@ class WorkspaceFirewall extends Component
         } catch (\Throwable $e) {
             $this->flash_error = $e->getMessage();
         }
-    }
-
-    public function moveFirewallRuleUp(string $id): void
-    {
-        $this->authorize('update', $this->server);
-        $rules = $this->server->firewallRules()->orderBy('sort_order')->orderBy('id')->get();
-        $idx = $rules->search(fn (ServerFirewallRule $r) => $r->id === $id);
-        if ($idx === false || $idx < 1) {
-            return;
-        }
-        $above = $rules[$idx - 1];
-        $current = $rules[$idx];
-        $tmp = $above->sort_order;
-        $above->update(['sort_order' => $current->sort_order]);
-        $current->update(['sort_order' => $tmp]);
-        $this->flash_success = __('Order updated.');
-    }
-
-    public function moveFirewallRuleDown(string $id): void
-    {
-        $this->authorize('update', $this->server);
-        $rules = $this->server->firewallRules()->orderBy('sort_order')->orderBy('id')->get();
-        $idx = $rules->search(fn (ServerFirewallRule $r) => $r->id === $id);
-        if ($idx === false || $idx >= $rules->count() - 1) {
-            return;
-        }
-        $current = $rules[$idx];
-        $below = $rules[$idx + 1];
-        $tmp = $below->sort_order;
-        $below->update(['sort_order' => $current->sort_order]);
-        $current->update(['sort_order' => $tmp]);
-        $this->flash_success = __('Order updated.');
     }
 
     public function deleteFirewallRule(string $id, ServerFirewallProvisioner $firewall, ServerFirewallAuditLogger $audit): void
@@ -395,33 +382,84 @@ class WorkspaceFirewall extends Component
         $this->flash_success = __('Removed :n rule(s).', ['n' => count($ruleIds)]);
     }
 
+    public function trimDuplicateFirewallRules(ServerFirewallProvisioner $firewall, ServerFirewallAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        $rules = $this->server->firewallRules()->orderBy('sort_order')->orderBy('id')->get();
+        if ($rules->isEmpty()) {
+            $this->flash_error = __('There are no firewall rules to trim.');
+
+            return;
+        }
+
+        $duplicates = $rules
+            ->groupBy(fn (ServerFirewallRule $rule) => implode('|', [
+                $rule->protocol,
+                $rule->port ?? '',
+                $rule->source,
+                $rule->action,
+            ]))
+            ->flatMap(function ($group) {
+                if ($group->count() < 2) {
+                    return [];
+                }
+
+                $ordered = $group->sortBy([
+                    ['enabled', 'desc'],
+                    ['sort_order', 'asc'],
+                    ['id', 'asc'],
+                ])->values();
+
+                return $ordered->slice(1);
+            })
+            ->values();
+
+        if ($duplicates->isEmpty()) {
+            $this->flash_success = __('No duplicate firewall rules were found.');
+
+            return;
+        }
+
+        $removedRuleIds = [];
+
+        foreach ($duplicates as $rule) {
+            if ($this->opsReady() && $rule->enabled) {
+                try {
+                    $this->server->refresh();
+                    $firewall->removeFromHost($this->server, $rule);
+                } catch (\Throwable) {
+                }
+            }
+
+            if ($this->editing_rule_id === $rule->id) {
+                $this->cancelEditRule();
+            }
+
+            $removedRuleIds[] = $rule->id;
+            $rule->delete();
+        }
+
+        $this->firewall_bulk_ids = array_values(array_diff($this->firewall_bulk_ids, $removedRuleIds));
+
+        $audit->record($this->server, ServerFirewallAuditEvent::EVENT_RULE_DELETED, [
+            'bulk' => 'trim_duplicates',
+            'rule_ids' => $removedRuleIds,
+            'count' => count($removedRuleIds),
+        ], auth()->user());
+
+        $this->flash_success = __('Trimmed :n duplicate rule(s).', ['n' => count($removedRuleIds)]);
+    }
+
     public function applyFirewall(
         ServerFirewallProvisioner $firewall,
         ServerFirewallAuditLogger $audit,
-        FirewallMaintenanceGate $maintenance,
-        FirewallDualApprovalService $dualApproval,
         ServerFirewallApplyRecorder $recorder,
     ): void {
         $this->authorize('update', $this->server);
         $this->flash_success = null;
         $this->flash_error = null;
         $this->server->refresh();
-
-        if ($reason = $maintenance->blockedReason($this->server)) {
-            $this->flash_error = $reason;
-
-            return;
-        }
-        $dual = $dualApproval->evaluateWebApply($this->server, auth()->user());
-        if (! $dual['proceed']) {
-            if ($dual['tone'] === 'success') {
-                $this->flash_success = $dual['message'];
-            } else {
-                $this->flash_error = $dual['message'];
-            }
-
-            return;
-        }
 
         $sshWarn = $firewall->sshAccessNotExplicitlyAllowed($this->server)
             ? ' '.__('Warning: no enabled Dply rule allows TCP :port from “any” — confirm SSH access before locking yourself out.', ['port' => $this->server->ssh_port ?: 22])
@@ -484,9 +522,7 @@ class WorkspaceFirewall extends Component
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
             'bundledTemplates' => config('server_firewall.bundled_templates', []),
-            'policyPacks' => config('server_firewall.policy_packs', []),
             'savedTemplates' => $savedTemplates,
-            'snapshots' => $this->server->firewallSnapshots()->limit(25)->get(),
             'auditEvents' => $this->server->firewallAuditEvents()->with('user')->limit(40)->get(),
             'applyLogs' => $this->server->firewallApplyLogs()->with(['user'])->limit(25)->get(),
             'sshNotCovered' => $provisioner->sshAccessNotExplicitlyAllowed($this->server),

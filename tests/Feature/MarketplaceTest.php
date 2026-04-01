@@ -6,6 +6,7 @@ use App\Livewire\Marketplace\Index;
 use App\Models\MarketplaceItem;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerRecipe;
 use App\Models\User;
 use App\Models\WebserverTemplate;
 use Database\Seeders\MarketplaceItemSeeder;
@@ -35,7 +36,8 @@ class MarketplaceTest extends TestCase
         $this->actingAs($user)
             ->get(route('marketplace.index'))
             ->assertOk()
-            ->assertSee('Marketplace');
+            ->assertSee('Marketplace')
+            ->assertSee('Saved commands');
     }
 
     public function test_org_admin_can_import_webserver_recipe(): void
@@ -96,5 +98,34 @@ class MarketplaceTest extends TestCase
 
         $server->refresh();
         $this->assertStringContainsString('git pull', (string) $server->deploy_command);
+    }
+
+    public function test_user_can_import_server_recipe_to_server_saved_commands(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'admin']);
+        session(['current_organization_id' => $org->id]);
+
+        $server = Server::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+        ]);
+
+        $item = MarketplaceItem::query()->where('slug', 'server-disk-usage-summary')->firstOrFail();
+
+        Livewire::actingAs($user)
+            ->test(Index::class)
+            ->set('serverRecipeModalItemId', $item->id)
+            ->set('deployServerId', $server->id)
+            ->call('confirmServerRecipeImport');
+
+        $this->assertDatabaseHas('server_recipes', [
+            'server_id' => $server->id,
+            'name' => 'Disk usage summary',
+        ]);
+
+        $recipe = ServerRecipe::query()->where('server_id', $server->id)->firstOrFail();
+        $this->assertStringContainsString('df -hT', $recipe->script);
     }
 }

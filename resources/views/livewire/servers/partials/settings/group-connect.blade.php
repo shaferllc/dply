@@ -151,6 +151,20 @@
                     </div>
                 @endif
             </dl>
+
+            @if ($server->isReady() && filled($server->ip_address) && $server->recoverySshPrivateKey() !== null && ($server->ssh_user ?? 'root') !== 'root')
+                <div class="mt-6 rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
+                    <h4 class="text-sm font-semibold text-brand-ink">{{ __('Reconnect SSH access') }}</h4>
+                    <p class="mt-1 text-sm text-brand-moss">
+                        {{ __('If the deploy user no longer accepts Dply’s operational key, repair access from the hidden root recovery key without changing your saved connection details.') }}
+                    </p>
+                    <div class="mt-4 flex justify-end">
+                        <x-primary-button type="button" wire:click="repairSshAccess" wire:loading.attr="disabled">
+                            {{ __('Repair SSH access') }}
+                        </x-primary-button>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </section>

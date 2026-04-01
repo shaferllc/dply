@@ -2,6 +2,7 @@
 
 namespace App\Livewire\StatusPages;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\Incident;
 use App\Models\Server;
 use App\Models\Site;
@@ -14,6 +15,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Manage extends Component
 {
+    use ConfirmsActionWithModal;
+
     public StatusPage $statusPage;
 
     public string $editName = '';

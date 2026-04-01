@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Jobs\SyncServerAuthorizedKeysJob;
 use App\Models\Server;
 use App\Models\UserSshKey;
@@ -16,6 +17,8 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class SshKeys extends Component
 {
+    use ConfirmsActionWithModal;
+
     public string $new_name = '';
 
     public string $new_public_key = '';

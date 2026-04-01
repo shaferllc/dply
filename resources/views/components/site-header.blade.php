@@ -1,6 +1,8 @@
 @props(['active' => null])
 
 @php
+    $notificationTablesReady = \Illuminate\Support\Facades\Schema::hasTable('notification_inbox_items')
+        && \Illuminate\Support\Facades\Schema::hasTable('notification_events');
     $featuresActive = $active === 'features' || request()->routeIs('features');
     $pricingActive = $active === 'pricing' || request()->routeIs('pricing');
     $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));
@@ -20,6 +22,13 @@
             || request()->is('horizon*')
             || request()->is('pulse*')
         );
+    $notificationMenuActive = request()->routeIs('notifications.*');
+    $notificationUnreadCount = auth()->check() && $notificationTablesReady
+        ? auth()->user()->notificationInboxItems()->whereNull('read_at')->count()
+        : 0;
+    $recentNotificationItems = auth()->check() && $notificationTablesReady
+        ? auth()->user()->notificationInboxItems()->limit(5)->get()
+        : collect();
 @endphp
 
 <header x-data="{ open: false }" class="border-b border-brand-ink/10 bg-brand-cream/85 backdrop-blur-xl sticky top-0 z-30">
@@ -173,6 +182,64 @@
                             </x-dropdown>
                         </div>
                     @endcan
+                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('Notifications') }}">
+                        <x-dropdown align="right" width="w-80" contentClasses="py-1 bg-white">
+                            <x-slot name="trigger">
+                                <button
+                                    type="button"
+                                    class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $notificationMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
+                                    aria-haspopup="menu"
+                                >
+                                    <span class="relative inline-flex">
+                                        <x-heroicon-o-bell class="h-5 w-5 shrink-0 opacity-90" />
+                                        @if ($notificationUnreadCount > 0)
+                                            <span class="absolute -right-1.5 -top-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-brand-gold px-1 text-[10px] font-semibold text-brand-ink">
+                                                {{ $notificationUnreadCount > 9 ? '9+' : $notificationUnreadCount }}
+                                            </span>
+                                        @endif
+                                    </span>
+                                    <span>{{ __('Notifications') }}</span>
+                                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <div class="border-b border-brand-ink/10 px-4 py-3">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Notifications') }}</p>
+                                            <p class="text-xs text-brand-moss">{{ __('Unread: :count', ['count' => $notificationUnreadCount]) }}</p>
+                                        </div>
+                                        @if ($notificationTablesReady)
+                                            <a href="{{ route('notifications.index') }}" class="text-xs font-medium text-brand-forest hover:text-brand-ink">
+                                                {{ __('Open inbox') }}
+                                            </a>
+                                        @endif
+                                    </div>
+                                </div>
+                                @forelse ($recentNotificationItems as $notificationItem)
+                                    <a href="{{ $notificationItem->url ?: route('notifications.index') }}" class="block border-b border-brand-ink/5 px-4 py-3 last:border-b-0 hover:bg-brand-sand/20">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p class="text-sm font-medium text-brand-ink">{{ $notificationItem->title }}</p>
+                                                @if ($notificationItem->body)
+                                                    <p class="mt-1 line-clamp-2 text-xs text-brand-moss">{{ $notificationItem->body }}</p>
+                                                @endif
+                                            </div>
+                                            @if (! $notificationItem->read_at)
+                                                <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-brand-gold"></span>
+                                            @endif
+                                        </div>
+                                    </a>
+                                @empty
+                                    <div class="px-4 py-4 text-sm text-brand-moss">
+                                        {{ $notificationTablesReady
+                                            ? __('No notifications yet.')
+                                            : __('Notifications will appear here after the latest database migrations are applied.') }}
+                                    </div>
+                                @endforelse
+                            </x-slot>
+                        </x-dropdown>
+                    </div>
                     <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('More navigation') }}">
                         <x-dropdown align="right" width="w-56" contentClasses="py-1 bg-white">
                             <x-slot name="trigger">

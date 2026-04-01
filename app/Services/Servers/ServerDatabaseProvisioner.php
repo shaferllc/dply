@@ -140,6 +140,32 @@ class ServerDatabaseProvisioner
         return $out;
     }
 
+    public function createMysqlDatabaseForExistingUser(ServerDatabase $db, string $grantHost = 'localhost'): string
+    {
+        if ($db->engine !== 'mysql') {
+            throw new \InvalidArgumentException('Existing user selection is currently supported for MySQL only.');
+        }
+
+        $server = $db->server;
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $name = $db->name;
+        $user = str_replace(['\\', "'"], ['\\\\', "\\'"], $db->username);
+        $host = str_replace(['\\', "'"], ['\\\\', "\\'"], $grantHost !== '' ? $grantHost : 'localhost');
+        $charset = $this->sanitizeMysqlIdentifier((string) ($db->mysql_charset ?: 'utf8mb4'), 'utf8mb4');
+        $coll = $this->sanitizeMysqlIdentifier((string) ($db->mysql_collation ?: 'utf8mb4_unicode_ci'), 'utf8mb4_unicode_ci');
+
+        $sql =
+            "CREATE DATABASE IF NOT EXISTS `{$name}` CHARACTER SET {$charset} COLLATE {$coll}; ".
+            "GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$user}'@'{$host}'; FLUSH PRIVILEGES;";
+
+        [$out] = $this->remoteExec->mysqlRunWithExit($server, $sql, 120);
+
+        return $out;
+    }
+
     /**
      * Grant an additional MySQL user on an existing database.
      */

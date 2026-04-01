@@ -11,12 +11,18 @@ use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Jobs\WaitForServerSshReadyJob;
-use App\Models\LogViewerShare;
 use App\Models\Organization;
+use App\Models\Project;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\ServerAuthorizedKey;
+use App\Models\ServerCronJob;
+use App\Models\ServerFirewallRule;
 use App\Models\ServerProvisionRun;
 use App\Models\Site;
+use App\Models\SiteDeployment;
+use App\Models\SiteDomain;
+use App\Models\SupervisorProgram;
 use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
@@ -1358,6 +1364,129 @@ class ServerTest extends TestCase
         $response->assertSee(route('servers.journey', $server), false);
     }
 
+    public function test_servers_overview_renders_dashboard_summary_for_ready_server(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'App Server',
+            'region' => 'nyc1',
+            'size' => 's-2vcpu-4gb',
+            'ip_address' => '203.0.113.10',
+            'ssh_user' => 'forge',
+            'ssh_port' => 2222,
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+            'setup_status' => Server::SETUP_STATUS_DONE,
+            'health_status' => Server::HEALTH_REACHABLE,
+            'last_health_check_at' => now()->subMinutes(10),
+            'meta' => [
+                'monitoring_last_sample_at' => now()->subMinutes(5)->toIso8601String(),
+            ],
+        ]);
+
+        $alpha = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Alpha Site',
+            'slug' => 'alpha-site',
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        $beta = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Beta Site',
+            'slug' => 'beta-site',
+            'status' => Site::STATUS_PENDING,
+        ]);
+
+        $alphaProject = Project::query()->create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+            'name' => 'Alpha Project',
+            'slug' => 'alpha-project',
+            'kind' => Project::KIND_BYO_SITE,
+        ]);
+        $alpha->forceFill(['project_id' => $alphaProject->id])->save();
+
+        SiteDomain::query()->create([
+            'site_id' => $alpha->id,
+            'hostname' => 'alpha.test',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        SiteDeployment::query()->create([
+            'site_id' => $alpha->id,
+            'project_id' => $alphaProject->id,
+            'trigger' => SiteDeployment::TRIGGER_MANUAL,
+            'status' => SiteDeployment::STATUS_SUCCESS,
+            'git_sha' => 'abc123',
+            'started_at' => now()->subMinutes(20),
+            'finished_at' => now()->subMinutes(19),
+        ]);
+
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id,
+            'name' => 'HTTPS',
+            'port' => 443,
+            'protocol' => 'tcp',
+            'source' => 'any',
+            'action' => 'allow',
+            'enabled' => true,
+            'sort_order' => 1,
+        ]);
+
+        ServerCronJob::query()->create([
+            'server_id' => $server->id,
+            'cron_expression' => '* * * * *',
+            'command' => 'php artisan schedule:run',
+            'user' => 'forge',
+            'enabled' => true,
+        ]);
+
+        SupervisorProgram::query()->create([
+            'server_id' => $server->id,
+            'slug' => 'queue-worker',
+            'program_type' => 'queue',
+            'command' => 'php artisan queue:work',
+            'directory' => '/var/www/app',
+            'user' => 'forge',
+            'is_active' => true,
+        ]);
+
+        ServerAuthorizedKey::query()->create([
+            'server_id' => $server->id,
+            'name' => 'Deploy key',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest deploy@example',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        $response->assertSee('Overview');
+        $response->assertSee('development-facing summary');
+        $response->assertSee('Open Sites');
+        $response->assertSee('Open Deploy');
+        $response->assertSee('Health');
+        $response->assertSee('Sites');
+        $response->assertSee('Latest deploy');
+        $response->assertSee('Operations');
+        $response->assertSee('Alpha Site');
+        $response->assertSee('alpha.test');
+        $response->assertSee('Beta Site');
+        $response->assertSee('1 enabled firewall rule');
+        $response->assertSee('1 cron job');
+        $response->assertSee('1 daemon');
+        $response->assertSee('1 SSH key');
+        $response->assertSee('Check health now');
+        $response->assertSee('Checking…');
+        $response->assertSee('status page');
+    }
+
     public function test_server_show_logs_tab_renders(): void
     {
         $user = $this->userWithOrganization();
@@ -1372,60 +1501,22 @@ class ServerTest extends TestCase
             ->assertSee('Log source')
             ->assertSee('Dply activity')
             ->assertSee(__('Options'))
+            ->assertSee(__('Refresh'))
+            ->assertSee(__('Regex'))
+            ->assertSee(__('Time'))
+            ->assertDontSee(__('Copy'))
+            ->assertDontSee(__('Download'))
+            ->assertDontSee(__('Export & share'))
+            ->assertDontSee(__('Saved views'))
+            ->assertDontSee(__('Pinned lines'))
+            ->assertDontSee(__('Line hints (visible fetch)'))
+            ->assertDontSee(__('How this viewer works'))
+            ->call('toggleLogOptionsMenu')
             ->assertSee(__('Lines to tail'))
             ->assertSee(__('Lines visible'))
-            ->assertSee(__('Clear display'))
-            ->assertSee(__('Copy'))
-            ->assertSee(__('Regex'))
-            ->assertSee(__('Time range'));
-    }
-
-    public function test_log_viewer_share_link_can_be_created_and_viewed(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceLogs::class, ['server' => $server])
-            ->set('remoteLogRaw', 'snapshot line')
-            ->call('createLogShareLink');
-
-        $share = LogViewerShare::query()->where('server_id', $server->id)->latest('id')->first();
-        $this->assertNotNull($share);
-        $this->assertSame('snapshot line', $share->content);
-
-        $this->actingAs($user)
-            ->get(route('log-viewer-shares.show', ['token' => $share->token]))
-            ->assertOk()
-            ->assertSee('snapshot line', false)
-            ->assertSee(__('Shared log snapshot'), false);
-    }
-
-    public function test_log_viewer_pin_line_creates_database_row(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-        ]);
-
-        $fingerprint = str_repeat('a', 64);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceLogs::class, ['server' => $server])
-            ->call('pinLogLine', $fingerprint, 'pinned note');
-
-        $this->assertDatabaseHas('server_log_pins', [
-            'server_id' => $server->id,
-            'user_id' => $user->id,
-            'line_fingerprint' => $fingerprint,
-            'note' => 'pinned note',
-        ]);
+            ->assertSee(__('Auto-refresh'))
+            ->assertSee(__('Reset filter'))
+            ->assertSee(__('Clear display'));
     }
 
     public function test_server_logs_select_log_source_updates_active_key(): void

@@ -14,6 +14,7 @@ use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
+use App\Services\Notifications\NotificationPublisher;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
@@ -22,6 +23,10 @@ use Illuminate\Support\Facades\Notification;
 
 final class DeleteServerAction
 {
+    public function __construct(
+        private readonly NotificationPublisher $publisher,
+    ) {}
+
     /**
      * Destroy cloud resources (best effort), audit, delete the server row, and optionally email org admins.
      *
@@ -45,10 +50,24 @@ final class DeleteServerAction
         if ($emailContext !== null && $org && config('dply.server_deletion_notify_org_admins', true)) {
             $recipients = $org->users()->wherePivotIn('role', ['owner', 'admin'])->get();
             if ($recipients->isNotEmpty()) {
-                Notification::send(
-                    $recipients,
-                    new ServerRemovalExecutedNotification($serverName, $organizationName, $emailContext)
+                $event = $this->publisher->publish(
+                    eventKey: 'server.removal.executed',
+                    subject: null,
+                    title: '['.config('app.name').'] '.$serverName.' removed',
+                    body: $emailContext,
+                    url: null,
+                    metadata: [
+                        'server_name' => $serverName,
+                        'organization_name' => $organizationName,
+                    ],
+                    contextOverrides: [
+                        'organization_id' => $org->id,
+                    ],
+                    actor: $actor,
+                    recipientUsers: $recipients->pluck('id')->all(),
                 );
+
+                Notification::send($recipients, new ServerRemovalExecutedNotification($event));
             }
         }
     }

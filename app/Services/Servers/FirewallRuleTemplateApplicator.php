@@ -88,6 +88,23 @@ class FirewallRuleTemplateApplicator
             if ($siteId && ! $server->sites()->whereKey($siteId)->exists()) {
                 $siteId = null;
             }
+            $source = strtolower(trim((string) ($row['source'] ?? 'any'))) === 'any'
+                ? 'any'
+                : trim((string) ($row['source'] ?? 'any'));
+            $action = in_array($row['action'] ?? 'allow', ['allow', 'deny'], true) ? $row['action'] : 'allow';
+
+            $duplicateRuleExists = ServerFirewallRule::query()
+                ->where('server_id', $server->id)
+                ->where('port', $port)
+                ->where('protocol', (string) ($row['protocol'] ?? 'tcp'))
+                ->where('source', $source)
+                ->where('action', $action)
+                ->where('site_id', $siteId)
+                ->exists();
+
+            if ($duplicateRuleExists) {
+                continue;
+            }
 
             ServerFirewallRule::query()->create([
                 'server_id' => $server->id,
@@ -98,10 +115,10 @@ class FirewallRuleTemplateApplicator
                 'runbook_url' => isset($row['runbook_url']) && is_string($row['runbook_url']) ? $row['runbook_url'] : null,
                 'port' => $port,
                 'protocol' => (string) ($row['protocol'] ?? 'tcp'),
-                'source' => (string) ($row['source'] ?? 'any'),
-                'action' => in_array($row['action'] ?? 'allow', ['allow', 'deny'], true) ? $row['action'] : 'allow',
+                'source' => $source,
+                'action' => $action,
                 'enabled' => (bool) ($row['enabled'] ?? true),
-                'sort_order' => $baseOrder + $i + 1,
+                'sort_order' => $baseOrder + $n + 1,
             ]);
             $n++;
         }

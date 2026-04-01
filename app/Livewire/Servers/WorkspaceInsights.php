@@ -28,6 +28,10 @@ class WorkspaceInsights extends Component
 
     public bool $running = false;
 
+    public bool $showApplyFixModal = false;
+
+    public ?int $applyFixFindingId = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -133,11 +137,55 @@ class WorkspaceInsights extends Component
         $this->flash_success = __('Insights check queued. Refresh in a moment for results.');
     }
 
+    public function openApplyFixModal(int $findingId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->whereKey($findingId)
+            ->first();
+
+        if ($finding === null) {
+            return;
+        }
+
+        $fix = config('insights.insights.'.$finding->insight_key.'.fix');
+        $canFix = is_array($fix) && ($fix['action'] ?? null);
+        if (! $canFix) {
+            return;
+        }
+
+        $this->applyFixFindingId = $finding->id;
+        $this->showApplyFixModal = true;
+    }
+
+    public function closeApplyFixModal(): void
+    {
+        $this->showApplyFixModal = false;
+        $this->applyFixFindingId = null;
+    }
+
+    public function confirmApplyFix(): void
+    {
+        if ($this->applyFixFindingId === null) {
+            return;
+        }
+
+        $findingId = $this->applyFixFindingId;
+        $this->closeApplyFixModal();
+        $this->applyFix($findingId);
+    }
+
     public function applyFix(int $findingId): void
     {
         $this->authorize('update', $this->server);
         $finding = InsightFinding::query()
             ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
             ->whereKey($findingId)
             ->first();
         if ($finding === null || ! $finding->isOpen()) {
@@ -158,26 +206,44 @@ class WorkspaceInsights extends Component
         $org = $this->server->organization;
         $orgHasPro = $org?->onProSubscription() ?? false;
 
-        $findings = InsightFinding::query()
-            ->where('server_id', $this->server->id)
-            ->whereNull('site_id')
-            ->orderByDesc('detected_at')
-            ->limit(100)
-            ->get();
-
         $catalog = [];
+        $enabledChecks = 0;
+        $implementedChecks = 0;
         foreach (config('insights.insights', []) as $key => $def) {
             $scope = $def['scope'] ?? 'server';
             if (! in_array($scope, ['server', 'both'], true)) {
                 continue;
             }
             $catalog[$key] = $def;
+
+            $enabled = (bool) ($this->enabled_map[$key] ?? false);
+            if ($enabled) {
+                $enabledChecks++;
+            }
+
+            $runnerClass = $def['runner'] ?? null;
+            if ($enabled && is_string($runnerClass) && class_exists($runnerClass)) {
+                $implementedChecks++;
+            }
         }
+
+        $findings = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->orderByDesc('detected_at')
+            ->limit(100)
+            ->get();
 
         return view('livewire.servers.workspace-insights', [
             'orgHasPro' => $orgHasPro,
             'findings' => $findings,
             'insightsCatalog' => $catalog,
+            'enabledChecks' => $enabledChecks,
+            'implementedChecks' => $implementedChecks,
+            'selectedFixFinding' => $this->applyFixFindingId === null
+                ? null
+                : $findings->firstWhere('id', $this->applyFixFindingId),
         ]);
     }
 }

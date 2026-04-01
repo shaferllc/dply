@@ -9,8 +9,7 @@
                 @can('delete', $statusPage)
                     <button
                         type="button"
-                        wire:click="destroyPage"
-                        wire:confirm="{{ __('Delete this status page? Monitors and incidents are removed.') }}"
+                        wire:click="openConfirmActionModal('destroyPage', [], @js(__('Delete status page')), @js(__('Delete this status page? Monitors and incidents are removed.')), @js(__('Delete')), true)"
                         class="text-sm text-red-600 hover:text-red-800"
                     >
                         {{ __('Delete') }}
@@ -170,4 +169,8 @@
             </div>
         </div>
     </div>
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

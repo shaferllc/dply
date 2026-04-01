@@ -7,6 +7,7 @@ use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
+use App\Services\Servers\ServerPhpManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -19,7 +20,12 @@ class Create extends Component
 
     public SiteCreateForm $form;
 
-    public function mount(Server $server): void
+    /**
+     * @var list<array{id: string, label: string}>
+     */
+    public array $phpVersions = [];
+
+    public function mount(Server $server, ServerPhpManager $phpManager): void
     {
         $this->authorize('view', $server);
         $this->authorize('update', $server);
@@ -33,6 +39,9 @@ class Create extends Component
 
         $this->authorize('create', Site::class);
         $this->server = $server;
+        $phpData = $phpManager->siteCreationPhpData($server);
+        $this->phpVersions = $phpData['available_versions'];
+        $this->form->php_version = $phpData['preselected_version'];
 
         $hostname = request()->query('hostname');
         if (is_string($hostname) && $hostname !== '') {
@@ -57,7 +66,9 @@ class Create extends Component
         abort_if($this->server->organization_id === null, 403);
         abort_if($this->server->organization_id !== $org->id, 403);
 
-        $this->form->validate([
+        $phpVersionIds = array_column($this->phpVersions, 'id');
+
+        $rules = [
             'name' => 'required|string|max:120',
             'type' => 'required|in:php,static,node',
             'document_root' => 'required|string|max:500',
@@ -65,6 +76,19 @@ class Create extends Component
             'php_version' => 'nullable|string|max:10',
             'app_port' => 'nullable|integer|min:1|max:65535',
             'primary_hostname' => ['required', 'string', 'max:255', 'unique:site_domains,hostname', 'regex:/^[a-zA-Z0-9\.\-]+$/'],
+        ];
+
+        if ($this->form->type === 'php') {
+            $rules['php_version'] = ['required', 'string', 'max:10'];
+
+            if ($phpVersionIds !== []) {
+                $rules['php_version'][] = 'in:'.implode(',', $phpVersionIds);
+            }
+        }
+
+        $this->form->validate($rules, [
+            'php_version.required' => __('Choose a PHP version for this site.'),
+            'php_version.in' => __('Choose a PHP version that is currently installed on this server.'),
         ]);
 
         $org = $this->server->organization;
@@ -79,7 +103,7 @@ class Create extends Component
             'type' => SiteType::from($this->form->type),
             'document_root' => $this->form->document_root,
             'repository_path' => $this->form->repository_path ?: null,
-            'php_version' => $this->form->type === 'php' ? ($this->form->php_version ?: '8.3') : null,
+            'php_version' => $this->form->type === 'php' ? $this->form->php_version : null,
             'app_port' => $this->form->type === 'node' ? $this->form->app_port : null,
             'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
@@ -104,6 +128,8 @@ class Create extends Component
         $this->server->refresh();
         $this->server->loadCount('sites');
 
-        return view('livewire.sites.create');
+        return view('livewire.sites.create', [
+            'phpVersions' => $this->phpVersions,
+        ]);
     }
 }

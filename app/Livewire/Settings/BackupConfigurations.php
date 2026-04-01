@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\BackupConfiguration;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,8 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class BackupConfigurations extends Component
 {
+    use ConfirmsActionWithModal;
+
     /** @var array<string, mixed> */
     public array $createForm = [];
 

@@ -21,9 +21,6 @@
             <x-server-workspace-tab id="ssh-tab-preview" :active="$ssh_workspace_tab === 'preview'" wire:click="$set('ssh_workspace_tab', 'preview')">
                 {{ __('Preview') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab id="ssh-tab-audit" :active="$ssh_workspace_tab === 'audit'" wire:click="$set('ssh_workspace_tab', 'audit')">
-                {{ __('Audit') }}
-            </x-server-workspace-tab>
             <x-server-workspace-tab id="ssh-tab-advanced" :active="$ssh_workspace_tab === 'advanced'" wire:click="$set('ssh_workspace_tab', 'advanced')">
                 {{ __('Advanced') }}
             </x-server-workspace-tab>
@@ -36,7 +33,7 @@
             panel-class="space-y-6"
         >
             <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('New SSH key') }}</h2>
                         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
@@ -44,9 +41,25 @@
                             <a href="https://www.ssh.com/academy/ssh/public-key-authentication" target="_blank" rel="noopener" class="font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more about SSH') }}</a>
                         </p>
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" wire:click="exportKeysCsv" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm">{{ __('Export CSV') }}</button>
-                        <button type="button" wire:click="previewDiff" class="rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm">{{ __('Dry run') }}</button>
+                    <div class="rounded-2xl border border-brand-sage/15 bg-brand-sage/5 p-4 text-sm text-brand-moss lg:max-w-xs">
+                        <p class="font-medium text-brand-ink">{{ __('Core flow') }}</p>
+                        <p class="mt-1">{{ __('Add or attach a key here, then sync when you are ready to write the server’s authorized_keys file.') }}</p>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <button type="button" wire:click="syncAuthorizedKeys" wire:loading.attr="disabled" wire:target="syncAuthorizedKeys" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm disabled:opacity-50">
+                                <span wire:loading.remove wire:target="syncAuthorizedKeys">{{ __('Sync authorized_keys') }}</span>
+                                <span wire:loading wire:target="syncAuthorizedKeys" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Syncing…') }}
+                                </span>
+                            </button>
+                            <button type="button" wire:click="$set('ssh_workspace_tab', 'preview')" wire:loading.attr="disabled" wire:target="$set('ssh_workspace_tab', 'preview')" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm disabled:opacity-50">
+                                <span wire:loading.remove wire:target="$set('ssh_workspace_tab', 'preview')">{{ __('Review drift') }}</span>
+                                <span wire:loading wire:target="$set('ssh_workspace_tab', 'preview')" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Opening…') }}
+                                </span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -120,16 +133,27 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <button type="button" wire:click="loadSystemUsers" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50">
-                                {{ __('Load system users') }}
+                            <button type="button" wire:click="loadSystemUsers" wire:loading.attr="disabled" wire:target="loadSystemUsers" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="loadSystemUsers">{{ __('Load system users') }}</span>
+                                <span wire:loading wire:target="loadSystemUsers" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Loading…') }}
+                                </span>
                             </button>
                         </div>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('“Load system users” reads /etc/passwd over SSH. Writing keys for another user still needs passwordless sudo.') }}</p>
                     </div>
                     <div class="flex flex-wrap gap-2 pt-2">
-                        <x-primary-button type="submit" class="!py-2">{{ __('Add SSH key') }}</x-primary-button>
-                        <button type="button" wire:click="syncAuthorizedKeys" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm">
-                            {{ __('Sync authorized_keys') }}
+                        <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="addAuthorizedKey">{{ __('Add SSH key') }}</span>
+                            <span wire:loading wire:target="addAuthorizedKey">{{ __('Adding…') }}</span>
+                        </x-primary-button>
+                        <button type="button" wire:click="syncAuthorizedKeys" wire:loading.attr="disabled" wire:target="syncAuthorizedKeys" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm disabled:opacity-50">
+                            <span wire:loading.remove wire:target="syncAuthorizedKeys">{{ __('Sync authorized_keys') }}</span>
+                            <span wire:loading wire:target="syncAuthorizedKeys" class="inline-flex items-center gap-2">
+                                <x-spinner variant="forest" size="sm" />
+                                {{ __('Syncing…') }}
+                            </span>
                         </button>
                     </div>
                 </form>
@@ -138,7 +162,7 @@
             @if ($orgKeys->isNotEmpty() || $teamKeys->isNotEmpty())
                 <div class="{{ $card }} mt-6 p-6 sm:p-8">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Organization & team keys') }}</h2>
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('Attach an org or team key to this server and sync in one step.') }}</p>
+                    <p class="mt-2 text-sm text-brand-moss">{{ __('Use saved organization or team keys when you want a shared key on this server without pasting it again.') }}</p>
                     <div class="mt-4 grid gap-6 lg:grid-cols-2">
                         @if ($orgKeys->isNotEmpty())
                             <form wire:submit="deployOrganizationKey" class="space-y-3 rounded-xl border border-brand-ink/10 p-4">
@@ -155,7 +179,10 @@
                                         <option value="{{ $u }}">{{ $u }}</option>
                                     @endforeach
                                 </select>
-                                <x-primary-button type="submit" class="!py-2">{{ __('Deploy org key') }}</x-primary-button>
+                                <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
+                                    <span wire:loading.remove wire:target="deployOrganizationKey">{{ __('Deploy org key') }}</span>
+                                    <span wire:loading wire:target="deployOrganizationKey">{{ __('Deploying…') }}</span>
+                                </x-primary-button>
                             </form>
                         @endif
                         @if ($teamKeys->isNotEmpty())
@@ -173,7 +200,10 @@
                                         <option value="{{ $u }}">{{ $u }}</option>
                                     @endforeach
                                 </select>
-                                <x-primary-button type="submit" class="!py-2">{{ __('Deploy team key') }}</x-primary-button>
+                                <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
+                                    <span wire:loading.remove wire:target="deployTeamKey">{{ __('Deploy team key') }}</span>
+                                    <span wire:loading wire:target="deployTeamKey">{{ __('Deploying…') }}</span>
+                                </x-primary-button>
                             </form>
                         @endif
                     </div>
@@ -181,16 +211,8 @@
             @endif
 
             <div class="{{ $card }} mt-6 p-6 sm:p-8">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Bulk import') }}</h2>
-                <p class="mt-2 text-sm text-brand-moss">{{ __('One key per line:') }} <code class="rounded bg-brand-sand/60 px-1 text-xs">Name|system_user|ssh-…</code></p>
-                <form wire:submit="bulkImportKeys" class="mt-4 space-y-3">
-                    <textarea wire:model="bulk_import_text" rows="5" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs" placeholder="Laptop|dply|ssh-ed25519 AAAA…"></textarea>
-                    <x-primary-button type="submit" class="!py-2">{{ __('Import rows') }}</x-primary-button>
-                </form>
-            </div>
-
-            <div class="{{ $card }} mt-6 p-6 sm:p-8">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Keys on this server') }}</h2>
+                <p class="mt-2 text-sm text-brand-moss">{{ __('Review fingerprints, adjust reminder dates, and remove keys that should no longer be part of the next sync.') }}</p>
                 @if ($server->authorizedKeys->isEmpty())
                     <p class="mt-3 text-sm text-brand-moss">{{ __('No keys stored yet.') }}</p>
                 @else
@@ -219,19 +241,27 @@
                                                 wire:model="reviewDates.{{ $ak->id }}"
                                                 class="rounded border border-brand-ink/15 px-2 py-1 text-xs"
                                             />
-                                            <button type="button" wire:click="updateKeyReviewFromInput('{{ $ak->id }}')" class="rounded border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/50">
-                                                {{ __('Save') }}
+                                            <button type="button" wire:click="updateKeyReviewFromInput('{{ $ak->id }}')" wire:loading.attr="disabled" wire:target="updateKeyReviewFromInput('{{ $ak->id }}')" class="inline-flex items-center justify-center rounded border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/50 disabled:opacity-50">
+                                                <span wire:loading.remove wire:target="updateKeyReviewFromInput('{{ $ak->id }}')">{{ __('Save') }}</span>
+                                                <span wire:loading wire:target="updateKeyReviewFromInput('{{ $ak->id }}')" class="inline-flex items-center gap-1.5">
+                                                    <x-spinner variant="forest" size="sm" />
+                                                    {{ __('Saving…') }}
+                                                </span>
                                             </button>
                                         </div>
                                     </div>
                                     <button
                                         type="button"
-                                        wire:click="deleteAuthorizedKey('{{ $ak->id }}')"
-                                        wire:confirm="{{ __('Remove this key from the panel? Sync to apply on the server.') }}"
-                                        class="shrink-0 rounded-lg p-2 text-red-600 hover:bg-red-50"
+                                        wire:click="openConfirmActionModal('deleteAuthorizedKey', ['{{ $ak->id }}'], @js(__('Delete authorized key')), @js(__('Remove this key from the panel? Sync to apply on the server.')), @js(__('Delete key')), true)"
+                                        wire:loading.attr="disabled"
+                                        wire:target="deleteAuthorizedKey('{{ $ak->id }}')"
+                                        class="shrink-0 rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
                                         title="{{ __('Remove') }}"
                                     >
-                                        <x-heroicon-o-trash class="h-5 w-5" />
+                                        <x-heroicon-o-trash class="h-5 w-5" wire:loading.remove wire:target="deleteAuthorizedKey('{{ $ak->id }}')" />
+                                        <span wire:loading wire:target="deleteAuthorizedKey('{{ $ak->id }}')" class="inline-flex items-center">
+                                            <x-spinner variant="forest" size="sm" />
+                                        </span>
                                     </button>
                                 </div>
                             </li>
@@ -239,6 +269,45 @@
                     </ul>
                 @endif
             </div>
+
+            <details class="{{ $card }} mt-6 group">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 text-left sm:px-8">
+                    <div>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Recent audit history') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('See who changed server SSH keys without giving audit its own full tab.') }}</p>
+                    </div>
+                    <span class="text-sm font-medium text-brand-sage group-open:hidden">{{ __('Show') }}</span>
+                    <span class="hidden text-sm font-medium text-brand-sage group-open:inline">{{ __('Hide') }}</span>
+                </summary>
+                <div class="border-t border-brand-ink/10 px-6 py-6 sm:px-8">
+                    <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
+                        <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                            <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase text-brand-moss">
+                                <tr>
+                                    <th class="px-3 py-2">{{ __('When') }}</th>
+                                    <th class="px-3 py-2">{{ __('Event') }}</th>
+                                    <th class="px-3 py-2">{{ __('Actor') }}</th>
+                                    <th class="px-3 py-2">{{ __('IP') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/10">
+                                @forelse ($auditEvents as $ev)
+                                    <tr>
+                                        <td class="whitespace-nowrap px-3 py-2 text-xs text-brand-moss">{{ $ev->created_at?->format('Y-m-d H:i:s') }}</td>
+                                        <td class="px-3 py-2 font-mono text-xs">{{ $ev->event }}</td>
+                                        <td class="px-3 py-2 text-xs">{{ $ev->user?->email ?? '—' }}</td>
+                                        <td class="px-3 py-2 font-mono text-xs">{{ $ev->ip_address ?? '—' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="px-3 py-6 text-center text-sm text-brand-moss">{{ __('No events yet.') }}</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
         </x-server-workspace-tab-panel>
 
         <x-server-workspace-tab-panel
@@ -249,11 +318,17 @@
             <div class="{{ $card }} p-6 sm:p-8">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Drift preview') }}</h2>
-                    <button type="button" wire:click="previewDiff" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm">{{ __('Refresh preview') }}</button>
+                    <button type="button" wire:click="previewDiff" wire:loading.attr="disabled" wire:target="previewDiff" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm disabled:opacity-50">
+                        <span wire:loading.remove wire:target="previewDiff">{{ __('Refresh preview') }}</span>
+                        <span wire:loading wire:target="previewDiff" class="inline-flex items-center gap-2">
+                            <x-spinner variant="forest" size="sm" />
+                            {{ __('Refreshing…') }}
+                        </span>
+                    </button>
                 </div>
                 <p class="mt-2 text-sm text-brand-moss">{{ __('Compares the panel’s desired keys with what is on the server now (read-only).') }}</p>
                 @if ($diff_result === null)
-                    <p class="mt-6 text-sm text-brand-moss">{{ __('Click “Dry run” or “Refresh preview” to load.') }}</p>
+                    <p class="mt-6 text-sm text-brand-moss">{{ __('Use “Review drift” from Keys or “Refresh preview” here to load the latest comparison.') }}</p>
                 @else
                     <div class="mt-6 space-y-6">
                         @foreach ($diff_result as $user => $block)
@@ -282,45 +357,6 @@
                         @endforeach
                     </div>
                 @endif
-            </div>
-        </x-server-workspace-tab-panel>
-
-        <x-server-workspace-tab-panel
-            id="ssh-panel-audit"
-            labelled-by="ssh-tab-audit"
-            :hidden="$ssh_workspace_tab !== 'audit'"
-        >
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
-                    <button type="button" wire:click="exportAuditCsv" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm">{{ __('Export audit CSV') }}</button>
-                </div>
-                <div class="mt-6 overflow-x-auto rounded-xl border border-brand-ink/10">
-                    <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                        <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase text-brand-moss">
-                            <tr>
-                                <th class="px-3 py-2">{{ __('When') }}</th>
-                                <th class="px-3 py-2">{{ __('Event') }}</th>
-                                <th class="px-3 py-2">{{ __('Actor') }}</th>
-                                <th class="px-3 py-2">{{ __('IP') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-brand-ink/10">
-                            @forelse ($auditEvents as $ev)
-                                <tr>
-                                    <td class="whitespace-nowrap px-3 py-2 text-xs text-brand-moss">{{ $ev->created_at?->format('Y-m-d H:i:s') }}</td>
-                                    <td class="px-3 py-2 font-mono text-xs">{{ $ev->event }}</td>
-                                    <td class="px-3 py-2 text-xs">{{ $ev->user?->email ?? '—' }}</td>
-                                    <td class="px-3 py-2 font-mono text-xs">{{ $ev->ip_address ?? '—' }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="px-3 py-6 text-center text-sm text-brand-moss">{{ __('No events yet.') }}</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
             </div>
         </x-server-workspace-tab-panel>
 
@@ -354,7 +390,10 @@
                             {{ __('Organization default: set the ssh_key_label_template key in organization server site preferences; per-server meta overrides it.') }}
                         </p>
                     </div>
-                    <x-primary-button type="submit" class="!py-2">{{ __('Save advanced settings') }}</x-primary-button>
+                    <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="saveAdvancedSettings">{{ __('Save advanced settings') }}</span>
+                        <span wire:loading wire:target="saveAdvancedSettings">{{ __('Saving…') }}</span>
+                    </x-primary-button>
                 </form>
                 <p class="text-xs text-brand-moss">{{ __('Outbound webhooks: configure the server “Outbound webhook” URL in Settings to receive JSON when sync completes (signed with your webhook secret).') }}</p>
             </div>
@@ -365,6 +404,7 @@
     @endif
 
     <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Models\SocialAccount;
 use Illuminate\Contracts\View\View;
@@ -11,6 +12,8 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class SourceControl extends Component
 {
+    use ConfirmsActionWithModal;
+
     public ?int $editingId = null;
 
     public string $editLabel = '';
@@ -74,7 +77,7 @@ class SourceControl extends Component
         $this->editLabel = '';
     }
 
-    public function unlinkAccount(int $accountId): void
+    public function unlinkAccount(int|string $accountId): void
     {
         $user = auth()->user();
         $account = SocialAccount::query()

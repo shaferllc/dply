@@ -33,7 +33,69 @@ class BulkNotificationAssignments extends Component
     /** @var list<int|string> */
     public array $selected_site_ids = [];
 
+    public ?string $context_server_id = null;
+
+    public ?string $context_site_id = null;
+
     public ?string $flash_success = null;
+
+    public bool $showQuickNotificationChannelModal = false;
+
+    public string $quick_new_owner_scope = 'personal';
+
+    public string $quick_new_type = NotificationChannel::TYPE_SLACK;
+
+    public string $quick_new_label = '';
+
+    public string $quick_new_slack_webhook_url = '';
+
+    public string $quick_new_slack_channel = '';
+
+    public string $quick_new_discord_webhook_url = '';
+
+    public string $quick_new_email_address = '';
+
+    public string $quick_new_telegram_bot_token = '';
+
+    public string $quick_new_telegram_chat_id = '';
+
+    public string $quick_new_pushover_app_token = '';
+
+    public string $quick_new_pushover_user_key = '';
+
+    public string $quick_new_teams_webhook_url = '';
+
+    public string $quick_new_rocketchat_webhook_url = '';
+
+    public string $quick_new_google_chat_webhook_url = '';
+
+    public string $quick_new_mobile_device_token = '';
+
+    public string $quick_new_mobile_platform = 'ios';
+
+    public string $quick_new_webhook_url = '';
+
+    public function mount(): void
+    {
+        $org = Auth::user()?->currentOrganization();
+        $types = NotificationChannel::typesForUi();
+        if ($types !== []) {
+            $this->quick_new_type = $types[0];
+        }
+        $this->quick_new_owner_scope = $this->canManageOrganizationNotificationChannels() ? 'organization' : 'personal';
+        $serverId = request()->string('server')->toString();
+        $siteId = request()->string('site')->toString();
+
+        if ($org && $serverId !== '' && Server::query()->where('organization_id', $org->id)->whereKey($serverId)->exists()) {
+            $this->context_server_id = $serverId;
+            $this->selected_server_ids = [$serverId];
+        }
+
+        if ($org && $siteId !== '' && Site::query()->where('organization_id', $org->id)->whereKey($siteId)->exists()) {
+            $this->context_site_id = $siteId;
+            $this->selected_site_ids = [$siteId];
+        }
+    }
 
     /**
      * @return Collection<int, NotificationChannel>
@@ -270,6 +332,200 @@ class BulkNotificationAssignments extends Component
         $this->flash_success = __('Assignments saved. :count new subscription(s) added.', ['count' => $created]);
     }
 
+    public function createQuickNotificationChannel(): void
+    {
+        $owner = $this->quickNotificationChannelOwner();
+
+        Gate::authorize('manageNotificationChannels', $owner);
+
+        $rules = array_merge(
+            [
+                'quick_new_type' => ['required', 'string', \Illuminate\Validation\Rule::in(NotificationChannel::typesForUi())],
+                'quick_new_owner_scope' => ['required', 'string', \Illuminate\Validation\Rule::in($this->quickAddOwnerScopes())],
+            ],
+            $this->quickChannelValidationRulesForType($this->quick_new_type)
+        );
+
+        $this->validate($rules, [], $this->quickChannelValidationAttributes());
+
+        $channel = $owner->notificationChannels()->create([
+            'type' => $this->quick_new_type,
+            'label' => $this->quick_new_label,
+            'config' => $this->quickChannelConfigFromInput(),
+        ]);
+
+        $this->selected_channel_ids = array_values(array_unique([
+            ...$this->selected_channel_ids,
+            (string) $channel->id,
+        ]));
+
+        $this->resetQuickNotificationChannelFields();
+        $this->showQuickNotificationChannelModal = false;
+        $this->flash_success = __('Channel created and selected for assignment.');
+    }
+
+    public function openQuickNotificationChannelModal(): void
+    {
+        $this->resetErrorBag();
+        $this->showQuickNotificationChannelModal = true;
+    }
+
+    public function closeQuickNotificationChannelModal(): void
+    {
+        $this->showQuickNotificationChannelModal = false;
+    }
+
+    protected function quickNotificationChannelOwner(): \App\Models\User|Organization
+    {
+        $org = Auth::user()?->currentOrganization();
+
+        if ($this->quick_new_owner_scope === 'organization' && $org && $this->canManageOrganizationNotificationChannels()) {
+            return $org;
+        }
+
+        return Auth::user();
+    }
+
+    protected function canManageOrganizationNotificationChannels(): bool
+    {
+        $org = Auth::user()?->currentOrganization();
+
+        return $org instanceof Organization && Gate::allows('manageNotificationChannels', $org);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function quickAddOwnerScopes(): array
+    {
+        return $this->canManageOrganizationNotificationChannels()
+            ? ['personal', 'organization']
+            : ['personal'];
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    protected function quickChannelValidationRulesForType(string $type): array
+    {
+        $base = [
+            'quick_new_label' => ['required', 'string', 'max:255'],
+        ];
+
+        return match ($type) {
+            NotificationChannel::TYPE_SLACK => $base + [
+                'quick_new_slack_webhook_url' => ['required', 'url', 'max:2000'],
+                'quick_new_slack_channel' => ['nullable', 'string', 'max:255'],
+            ],
+            NotificationChannel::TYPE_DISCORD => $base + [
+                'quick_new_discord_webhook_url' => ['required', 'url', 'max:2000'],
+            ],
+            NotificationChannel::TYPE_EMAIL => $base + [
+                'quick_new_email_address' => ['required', 'email:rfc', 'max:255'],
+            ],
+            NotificationChannel::TYPE_TELEGRAM => $base + [
+                'quick_new_telegram_bot_token' => ['required', 'string', 'max:255'],
+                'quick_new_telegram_chat_id' => ['required', 'string', 'max:255'],
+            ],
+            NotificationChannel::TYPE_PUSHOVER => $base + [
+                'quick_new_pushover_app_token' => ['required', 'string', 'max:255'],
+                'quick_new_pushover_user_key' => ['required', 'string', 'max:255'],
+            ],
+            NotificationChannel::TYPE_MICROSOFT_TEAMS => $base + [
+                'quick_new_teams_webhook_url' => ['required', 'url', 'max:2000'],
+            ],
+            NotificationChannel::TYPE_ROCKETCHAT => $base + [
+                'quick_new_rocketchat_webhook_url' => ['required', 'url', 'max:2000'],
+            ],
+            NotificationChannel::TYPE_GOOGLE_CHAT => $base + [
+                'quick_new_google_chat_webhook_url' => ['required', 'url', 'max:2000'],
+            ],
+            NotificationChannel::TYPE_MOBILE_APP => $base + [
+                'quick_new_mobile_device_token' => ['required', 'string', 'max:4000'],
+                'quick_new_mobile_platform' => ['required', 'string', 'in:ios,android'],
+            ],
+            default => $base + [
+                'quick_new_webhook_url' => ['required', 'url', 'max:2000'],
+            ],
+        };
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function quickChannelValidationAttributes(): array
+    {
+        return [
+            'quick_new_owner_scope' => __('owner'),
+            'quick_new_type' => __('type'),
+            'quick_new_label' => __('label'),
+            'quick_new_slack_webhook_url' => __('webhook URL'),
+            'quick_new_slack_channel' => __('channel'),
+            'quick_new_discord_webhook_url' => __('webhook URL'),
+            'quick_new_email_address' => __('email address'),
+            'quick_new_telegram_bot_token' => __('bot token'),
+            'quick_new_telegram_chat_id' => __('chat ID'),
+            'quick_new_pushover_app_token' => __('application token'),
+            'quick_new_pushover_user_key' => __('user key'),
+            'quick_new_teams_webhook_url' => __('webhook URL'),
+            'quick_new_rocketchat_webhook_url' => __('webhook URL'),
+            'quick_new_google_chat_webhook_url' => __('webhook URL'),
+            'quick_new_mobile_device_token' => __('device token'),
+            'quick_new_mobile_platform' => __('platform'),
+            'quick_new_webhook_url' => __('URL'),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function quickChannelConfigFromInput(): array
+    {
+        return match ($this->quick_new_type) {
+            NotificationChannel::TYPE_SLACK => array_filter([
+                'webhook_url' => $this->quick_new_slack_webhook_url,
+                'channel' => trim($this->quick_new_slack_channel) ?: null,
+            ], fn ($value) => $value !== null && $value !== ''),
+            NotificationChannel::TYPE_DISCORD => ['webhook_url' => $this->quick_new_discord_webhook_url],
+            NotificationChannel::TYPE_EMAIL => ['email' => $this->quick_new_email_address],
+            NotificationChannel::TYPE_TELEGRAM => [
+                'bot_token' => $this->quick_new_telegram_bot_token,
+                'chat_id' => $this->quick_new_telegram_chat_id,
+            ],
+            NotificationChannel::TYPE_PUSHOVER => [
+                'app_token' => $this->quick_new_pushover_app_token,
+                'user_key' => $this->quick_new_pushover_user_key,
+            ],
+            NotificationChannel::TYPE_MICROSOFT_TEAMS => ['webhook_url' => $this->quick_new_teams_webhook_url],
+            NotificationChannel::TYPE_ROCKETCHAT => ['webhook_url' => $this->quick_new_rocketchat_webhook_url],
+            NotificationChannel::TYPE_GOOGLE_CHAT => ['webhook_url' => $this->quick_new_google_chat_webhook_url],
+            NotificationChannel::TYPE_MOBILE_APP => [
+                'device_token' => $this->quick_new_mobile_device_token,
+                'platform' => $this->quick_new_mobile_platform,
+            ],
+            default => ['url' => $this->quick_new_webhook_url],
+        };
+    }
+
+    protected function resetQuickNotificationChannelFields(): void
+    {
+        $this->quick_new_label = '';
+        $this->quick_new_slack_webhook_url = '';
+        $this->quick_new_slack_channel = '';
+        $this->quick_new_discord_webhook_url = '';
+        $this->quick_new_email_address = '';
+        $this->quick_new_telegram_bot_token = '';
+        $this->quick_new_telegram_chat_id = '';
+        $this->quick_new_pushover_app_token = '';
+        $this->quick_new_pushover_user_key = '';
+        $this->quick_new_teams_webhook_url = '';
+        $this->quick_new_rocketchat_webhook_url = '';
+        $this->quick_new_google_chat_webhook_url = '';
+        $this->quick_new_mobile_device_token = '';
+        $this->quick_new_mobile_platform = 'ios';
+        $this->quick_new_webhook_url = '';
+    }
+
     public function render(): View
     {
         $org = Auth::user()->currentOrganization();
@@ -280,6 +536,10 @@ class BulkNotificationAssignments extends Component
             'servers' => $this->serversForCurrentOrg($org),
             'sites' => $this->sitesForCurrentOrg($org),
             'currentOrganization' => $org,
+            'contextServer' => $this->context_server_id ? Server::query()->find($this->context_server_id) : null,
+            'contextSite' => $this->context_site_id ? Site::query()->find($this->context_site_id) : null,
+            'quickAddTypes' => NotificationChannel::typesForUi(),
+            'canManageOrganizationNotificationChannels' => $this->canManageOrganizationNotificationChannels(),
         ]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -19,6 +20,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceManage extends Component
 {
+    use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use StreamsRemoteSshLivewire;

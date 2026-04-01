@@ -11,6 +11,10 @@ use Illuminate\Support\Str;
 
 final class ServerSystemdNotificationDispatcher
 {
+    public function __construct(
+        private readonly NotificationPublisher $publisher,
+    ) {}
+
     /**
      * @param  array{kind: string, unit: string, label: string, detail?: string|null}  $event
      */
@@ -52,6 +56,21 @@ final class ServerSystemdNotificationDispatcher
         }
         $text = implode("\n", $lines);
         $url = self::servicesWorkspaceUrl($server, $unit, 'alerts', $detail);
+
+        $this->publisher->publish(
+            eventKey: $eventKey,
+            subject: $server,
+            title: $subject,
+            body: $text,
+            url: $url,
+            metadata: [
+                'server_id' => $server->id,
+                'unit' => $unit,
+                'kind' => $kind,
+                'label' => $label,
+                'detail' => $detail,
+            ],
+        );
 
         $org = $server->organization;
         $digest = $org !== null

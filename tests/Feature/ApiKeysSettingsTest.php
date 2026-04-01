@@ -123,4 +123,45 @@ class ApiKeysSettingsTest extends TestCase
             ->call('createToken')
             ->assertHasErrors(['token_name']);
     }
+
+    public function test_revoke_token_uses_confirmation_modal_before_deleting(): void
+    {
+        $user = $this->ownerWithOrg();
+        $org = $user->currentOrganization();
+        $this->assertNotNull($org);
+
+        ['token' => $token] = ApiToken::createToken($user, $org, 'CLI token', null, ['servers.read']);
+
+        Livewire::actingAs($user)
+            ->test(ApiKeys::class)
+            ->call(
+                'openConfirmActionModal',
+                'revokeToken',
+                [$token->id],
+                'Revoke token',
+                'Revoke this token? It will stop working immediately.',
+                'Revoke',
+                true
+            )
+            ->assertSet('showConfirmActionModal', true)
+            ->assertSet('confirmActionModalMethod', 'revokeToken')
+            ->assertSet('confirmActionModalArguments', [$token->id]);
+
+        $this->assertDatabaseHas('api_tokens', ['id' => $token->id]);
+
+        Livewire::actingAs($user)
+            ->test(ApiKeys::class)
+            ->call(
+                'openConfirmActionModal',
+                'revokeToken',
+                [$token->id],
+                'Revoke token',
+                'Revoke this token? It will stop working immediately.',
+                'Revoke',
+                true
+            )
+            ->call('confirmActionModal');
+
+        $this->assertDatabaseMissing('api_tokens', ['id' => $token->id]);
+    }
 }

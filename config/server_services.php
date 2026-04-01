@@ -10,6 +10,14 @@
 return [
 
     /**
+     * Try root SSH first for privileged service and supervisor actions, then fall back to the
+     * configured SSH user when needed.
+     */
+    'use_root_ssh' => (bool) env('SERVER_SERVICES_USE_ROOT_SSH', true),
+
+    'fallback_to_deploy_user_ssh' => (bool) env('SERVER_SERVICES_FALLBACK_TO_DEPLOY_SSH', true),
+
+    /**
      * Default systemd units shown on Services (inventory + actions). PHP-FPM uses
      * `default_php_version` from server meta when resolving `php-fpm`.
      *

@@ -3,7 +3,9 @@
 use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\Runners\CpuRamUsageInsightRunner;
 use App\Services\Insights\Runners\DiskCapacityInsightRunner;
+use App\Services\Insights\Runners\HealthCheckUrlMissingInsightRunner;
 use App\Services\Insights\Runners\LoadAverageInsightRunner;
+use App\Services\Insights\Runners\MetricsMissingInsightRunner;
 use App\Services\Insights\Runners\PhpEolSitesInsightRunner;
 use App\Services\Insights\Runners\PipelineHeartbeatInsightRunner;
 use App\Services\Insights\Runners\SslCertificateInsightRunner;
@@ -29,6 +31,7 @@ return [
         'cpu_warn_pct' => (float) env('INSIGHTS_CPU_WARN_PCT', 85),
         'mem_warn_pct' => (float) env('INSIGHTS_MEM_WARN_PCT', 85),
         'load_warn' => (float) env('INSIGHTS_LOAD_WARN', 4.0),
+        'metrics_missing_minutes' => max(5, (int) env('INSIGHTS_METRICS_MISSING_MINUTES', 15)),
     ],
 
     /*
@@ -100,6 +103,33 @@ return [
             'scope' => 'server',
             'requires_pro' => false,
             'runner' => DiskCapacityInsightRunner::class,
+            'fix' => null,
+        ],
+
+        'metrics_missing_or_stale' => [
+            'label' => 'Metrics missing or stale',
+            'description' => 'Warn when server monitoring has not stored a recent metrics sample.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => MetricsMissingInsightRunner::class,
+            'fix' => null,
+            'parameters' => [
+                'stale_after_minutes' => [
+                    'type' => 'number',
+                    'label' => 'Warn after minutes without metrics',
+                    'min' => 5,
+                    'max' => 1440,
+                    'default' => 15,
+                ],
+            ],
+        ],
+
+        'health_check_url_missing' => [
+            'label' => 'HTTP health check URL missing',
+            'description' => 'Remind you to add an app-level health check URL when the server hosts sites.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => HealthCheckUrlMissingInsightRunner::class,
             'fix' => null,
         ],
 

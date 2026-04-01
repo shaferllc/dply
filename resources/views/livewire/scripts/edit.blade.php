@@ -18,7 +18,7 @@
                 </p>
             </div>
             @can('delete', $script)
-                <button type="button" wire:click="deleteScript" wire:confirm="{{ __('Delete this script? Sites using it as a deploy script will stop referencing it.') }}" class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 hover:bg-red-100 self-start">
+                <button type="button" wire:click="openConfirmActionModal('deleteScript', [], @js(__('Delete script')), @js(__('Delete this script? Sites using it as a deploy script will stop referencing it.')), @js(__('Delete')), true)" class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 hover:bg-red-100 self-start">
                     {{ __('Delete') }}
                 </button>
             @endcan
@@ -110,4 +110,8 @@
             </section>
         </div>
     </div>
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

@@ -4,9 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\VultrService;
+use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use phpseclib3\Crypt\RSA;
 
 class ProvisionVultrServerJob implements ShouldQueue
 {
@@ -29,12 +29,10 @@ class ProvisionVultrServerJob implements ShouldQueue
 
         $vultr = new VultrService($credential);
 
-        $key = RSA::createKey(2048);
-        $privateKey = $key->toString('OpenSSH');
-        $publicKey = $key->getPublicKey()->toString('OpenSSH');
+        $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
         $sshKeyName = 'dply-'.$this->server->id.'-'.substr(uniqid(), -6);
-        $sshKeyId = $vultr->createSshKey($sshKeyName, $publicKey);
+        $sshKeyId = $vultr->createSshKey($sshKeyName, $keys['recovery_public_key']);
 
         $osId = (int) config('services.vultr.default_os_id', 2152);
 
@@ -49,7 +47,9 @@ class ProvisionVultrServerJob implements ShouldQueue
         $this->server->update([
             'provider_id' => $id,
             'status' => Server::STATUS_PROVISIONING,
-            'ssh_private_key' => $privateKey,
+            'ssh_private_key' => $keys['recovery_private_key'],
+            'ssh_recovery_private_key' => $keys['recovery_private_key'],
+            'ssh_operational_private_key' => $keys['operational_private_key'],
             'ssh_user' => config('services.vultr.ssh_user', 'root'),
         ]);
 

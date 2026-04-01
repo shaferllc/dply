@@ -49,14 +49,16 @@
                         {{ __('Notification channels') }}
                     </a>
                 @endcan
-                @can('view', $org)
+                @can('viewAny', \App\Models\ProviderCredential::class)
                     <a
-                        href="{{ route('organizations.daemons', $org) }}"
+                        href="{{ route('organizations.credentials', $org) }}"
                         wire:navigate
-                        @class(['block rounded-lg px-3 py-2 text-sm font-medium transition-colors', $link('daemons')])
+                        @class(['block rounded-lg px-3 py-2 text-sm font-medium transition-colors', $link('providers')])
                     >
-                        {{ __('Supervisor (Daemons)') }}
+                        {{ __('Server providers') }}
                     </a>
+                @endcan
+                @can('view', $org)
                     <a
                         href="{{ route('organizations.webserver-templates', $org) }}"
                         wire:navigate

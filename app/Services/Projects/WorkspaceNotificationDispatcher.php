@@ -2,29 +2,27 @@
 
 namespace App\Services\Projects;
 
-use App\Models\NotificationChannel;
-use App\Models\NotificationSubscription;
 use App\Models\Workspace;
+use App\Services\Notifications\NotificationPublisher;
 
 class WorkspaceNotificationDispatcher
 {
+    public function __construct(
+        private readonly NotificationPublisher $publisher,
+    ) {}
+
     public function notify(Workspace $workspace, string $eventKey, string $subject, string $text, ?string $url = null, ?string $actionLabel = null): void
     {
-        $subs = NotificationSubscription::query()
-            ->where('event_key', $eventKey)
-            ->where('subscribable_type', Workspace::class)
-            ->where('subscribable_id', $workspace->id)
-            ->with('channel')
-            ->get()
-            ->unique('notification_channel_id');
-
-        foreach ($subs as $sub) {
-            $channel = $sub->channel;
-            if (! $channel instanceof NotificationChannel) {
-                continue;
-            }
-
-            $channel->sendOperationalMessage($subject, $text, $url, $actionLabel);
-        }
+        $this->publisher->publish(
+            eventKey: $eventKey,
+            subject: $workspace,
+            title: $subject,
+            body: $text,
+            url: $url,
+            metadata: [
+                'action_label' => $actionLabel,
+                'workspace_id' => $workspace->id,
+            ],
+        );
     }
 }
