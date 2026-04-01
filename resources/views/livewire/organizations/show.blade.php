@@ -439,7 +439,6 @@
                     </section>
                 @endif
             </div>
-            </div>
         </x-organization-shell>
 
         <x-slot name="modals">
