@@ -31,6 +31,7 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
 
         $ssh = $this->systemSsh($site);
         $this->installPlaceholderPage($site, $ssh);
+        $this->ensureSuspendedPage($site, $ssh);
         $this->writeSystemFile($ssh, $confFile, $config);
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_APACHE_EXIT:%%s" "$?"',

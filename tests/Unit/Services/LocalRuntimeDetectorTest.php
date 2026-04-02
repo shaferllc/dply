@@ -36,6 +36,31 @@ class LocalRuntimeDetectorTest extends TestCase
         $this->assertSame('/var/www/laravel-app/public', $result['document_root']);
         $this->assertSame('.env.example', $result['env_template']['path']);
         $this->assertContains('APP_NAME', $result['env_template']['keys']);
+        $this->assertFalse($result['laravel_octane']);
+
+        File::deleteDirectory($path);
+    }
+
+    public function test_it_sets_laravel_octane_when_composer_requires_octane_package(): void
+    {
+        $path = storage_path('framework/testing/local-runtime-laravel-octane-'.uniqid());
+        File::ensureDirectoryExists($path.'/bootstrap');
+        File::ensureDirectoryExists($path.'/routes');
+        File::ensureDirectoryExists($path.'/public');
+        File::put($path.'/artisan', "#!/usr/bin/env php\n");
+        File::put($path.'/bootstrap/app.php', "<?php\n");
+        File::put($path.'/routes/web.php', "<?php\n");
+        File::put($path.'/public/index.php', "<?php\n");
+        File::put($path.'/composer.json', json_encode([
+            'require' => [
+                'laravel/framework' => '^12.0',
+                'laravel/octane' => '^2.0',
+            ],
+        ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+
+        $result = app(LocalRuntimeDetector::class)->detect($path, 'laravel-octane-app');
+
+        $this->assertTrue($result['laravel_octane']);
 
         File::deleteDirectory($path);
     }
@@ -49,7 +74,7 @@ class LocalRuntimeDetectorTest extends TestCase
                 'start' => 'node server.js',
             ],
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
-        File::put($path.'/k8s/deployment.yaml', <<<YAML
+        File::put($path.'/k8s/deployment.yaml', <<<'YAML'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -89,6 +114,23 @@ YAML);
         $this->assertSame(SiteType::Node, $result['site_type']);
         $this->assertSame(3010, $result['app_port']);
         $this->assertContains('Dockerfile', $result['detected_files']);
+
+        File::deleteDirectory($path);
+    }
+
+    public function test_it_detects_python_django_and_default_port_without_package_json(): void
+    {
+        $path = storage_path('framework/testing/local-runtime-django-'.uniqid());
+        File::ensureDirectoryExists($path);
+        File::put($path.'/manage.py', "#!/usr/bin/env python\n");
+        File::put($path.'/requirements.txt', "django>=4.2\n");
+
+        $result = app(LocalRuntimeDetector::class)->detect($path, 'django-app');
+
+        $this->assertSame('django', $result['framework']);
+        $this->assertSame('python', $result['language']);
+        $this->assertSame(SiteType::Node, $result['site_type']);
+        $this->assertSame(8000, $result['app_port']);
 
         File::deleteDirectory($path);
     }

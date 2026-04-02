@@ -92,6 +92,12 @@ class CreateContainerSiteFromInspection
             'env_template' => $detection['env_template'] ?? ['path' => null, 'keys' => []],
         ];
 
+        foreach (['laravel_octane', 'laravel_horizon', 'laravel_pulse', 'laravel_reverb'] as $laravelPkgKey) {
+            if (! empty($detection[$laravelPkgKey])) {
+                $detected[$laravelPkgKey] = true;
+            }
+        }
+
         $mode = str_contains($targetFamily, 'kubernetes') ? 'kubernetes' : 'docker';
         $platform = str_starts_with($targetFamily, 'local_') ? 'local'
             : (str_starts_with($targetFamily, 'digitalocean_') ? 'digitalocean'

@@ -98,6 +98,35 @@
         </div>
         @break
 
+    @case('cloudflare')
+        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Use an API token with Zone:DNS:Edit (and Zone:Zone:Read) for the zones Dply should manage. This is independent of where servers are hosted.') }}
+                </p>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="cloudflare_name" :value="__('Label (optional)')" />
+                        <x-text-input id="cloudflare_name" wire:model="cloudflare_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production DNS') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="cloudflare_api_token" :value="__('API token')" />
+                        <x-text-input id="cloudflare_api_token" wire:model="cloudflare_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in the :link with DNS permissions for your zones.', ['link' => '<a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener" class="'.$link.'">Cloudflare dashboard</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('cloudflare_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeCloudflare" wire:loading.attr="disabled" wire:target="storeCloudflare">
+                        <span wire:loading.remove wire:target="storeCloudflare">{{ __('Connect Cloudflare') }}</span>
+                        <span wire:loading wire:target="storeCloudflare" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
     @case('hetzner')
         <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">

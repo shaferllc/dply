@@ -5,10 +5,11 @@ namespace App\Services\Sites;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
+use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentRevisionTracker;
 use App\Services\DigitalOceanService;
-use App\Services\Sites\Dns\DigitalOceanDnsProvider;
+use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use Illuminate\Support\Str;
 
 class TestingHostnameProvisioner
@@ -20,9 +21,9 @@ class TestingHostnameProvisioner
 
     public function provision(Site $site): ?SitePreviewDomain
     {
-        $site->loadMissing(['server', 'previewDomains', 'organization']);
+        $site->loadMissing(['server', 'previewDomains', 'organization', 'dnsProviderCredential']);
 
-        if (! $this->isEnabled()) {
+        if (! $this->isEnabledForSite($site)) {
             $this->storeResult($site, [
                 'status' => 'skipped',
                 'reason' => 'disabled',
@@ -43,8 +44,19 @@ class TestingHostnameProvisioner
 
         [$hostname, $zone] = $this->resolveHostnameAndZone($site);
         $recordName = $this->relativeRecordName($hostname, $zone);
-        $service = new DigitalOceanService($this->tokenForSite($site));
-        $dnsProvider = new DigitalOceanDnsProvider($service);
+
+        $credential = $site->dnsAutomationCredential();
+        if ($credential !== null) {
+            $dnsProvider = SiteDnsProviderFactory::forCredential($credential);
+            $dnsProviderKey = $credential->provider;
+        } else {
+            $fallbackToken = trim((string) config('services.digitalocean.token'));
+            if ($fallbackToken === '') {
+                throw new \RuntimeException('DigitalOcean preview DNS requires an organization credential or app-level token.');
+            }
+            $dnsProvider = SiteDnsProviderFactory::forDigitalOceanAppConfigToken($fallbackToken);
+            $dnsProviderKey = 'digitalocean';
+        }
 
         try {
             $record = $dnsProvider->upsertRecord($zone, 'A', $recordName, $serverIp);
@@ -61,7 +73,7 @@ class TestingHostnameProvisioner
                 'label' => 'Managed preview',
                 'zone' => $zone,
                 'record_name' => $recordName,
-                'provider_type' => 'digitalocean',
+                'provider_type' => $dnsProviderKey,
                 'provider_record_id' => (string) ($record['id'] ?? ''),
                 'record_type' => 'A',
                 'record_data' => $serverIp,
@@ -112,7 +124,18 @@ class TestingHostnameProvisioner
      */
     private function resolveHostnameAndZone(Site $site): array
     {
+        $site->loadMissing(['previewDomains']);
+        $customZone = $this->normalizedSiteDnsZone($site);
         $existingHostname = strtolower(trim($site->testingHostname()));
+
+        if ($customZone !== null) {
+            if ($existingHostname !== '' && str_ends_with($existingHostname, '.'.$customZone)) {
+                return [$existingHostname, $customZone];
+            }
+
+            return [$this->buildHostname($site, $customZone), $customZone];
+        }
+
         if ($existingHostname !== '') {
             $existingZone = $this->configuredZoneForHostname($existingHostname);
             if ($existingZone !== null) {
@@ -123,6 +146,13 @@ class TestingHostnameProvisioner
         $zone = $this->chooseZone($site);
 
         return [$this->buildHostname($site, $zone), $zone];
+    }
+
+    private function normalizedSiteDnsZone(Site $site): ?string
+    {
+        $z = strtolower(trim((string) ($site->dns_zone ?? '')));
+
+        return $z !== '' ? $z : null;
     }
 
     public function chooseZone(Site $site): string
@@ -154,16 +184,26 @@ class TestingHostnameProvisioner
         return $label.'.'.$zone;
     }
 
-    public function isEnabled(): bool
+    public function isEnabledForSite(Site $site): bool
     {
-        return (bool) config('services.digitalocean.auto_testing_hostname_enabled')
-            && $this->hasAvailableToken()
-            && $this->configuredDomains() !== [];
+        if (! (bool) config('services.digitalocean.auto_testing_hostname_enabled')) {
+            return false;
+        }
+
+        if (! $this->hasAvailableToken()) {
+            return false;
+        }
+
+        if ($this->normalizedSiteDnsZone($site) !== null) {
+            return true;
+        }
+
+        return $this->configuredDomains() !== [];
     }
 
     public function delete(Site $site): void
     {
-        $site->loadMissing(['server', 'previewDomains']);
+        $site->loadMissing(['server', 'previewDomains', 'dnsProviderCredential']);
 
         $testingMeta = is_array($site->meta['testing_hostname'] ?? null) ? $site->meta['testing_hostname'] : [];
         $hostname = strtolower(trim((string) ($testingMeta['hostname'] ?? $site->testingHostname())));
@@ -173,7 +213,18 @@ class TestingHostnameProvisioner
 
         $zone = is_string($testingMeta['zone'] ?? null) && $testingMeta['zone'] !== ''
             ? (string) $testingMeta['zone']
-            : $this->configuredZoneForHostname($hostname);
+            : null;
+        if ($zone === null || trim($zone) === '') {
+            $zone = $this->normalizedSiteDnsZone($site);
+        }
+        if ($zone === null || trim($zone) === '') {
+            $preview = $site->primaryPreviewDomain();
+            $z = is_string($preview?->zone) ? trim($preview->zone) : '';
+            $zone = $z !== '' ? strtolower($z) : null;
+        }
+        if ($zone === null || trim($zone) === '') {
+            $zone = $this->configuredZoneForHostname($hostname);
+        }
         if ($zone === null || ! $this->hasAvailableToken()) {
             return;
         }
@@ -183,16 +234,41 @@ class TestingHostnameProvisioner
             : $this->relativeRecordName($hostname, $zone);
         $serverIp = trim((string) ($testingMeta['record_data'] ?? $site->server?->ip_address ?? ''));
 
-        $service = new DigitalOceanService($this->tokenForSite($site));
-        $recordId = (int) ($testingMeta['record_id'] ?? 0);
+        $previewRow = $site->previewDomains()->where('hostname', $hostname)->first();
+        $providerType = is_string($previewRow?->provider_type) && $previewRow->provider_type !== ''
+            ? $previewRow->provider_type
+            : ($site->dnsAutomationCredential()?->provider ?? 'digitalocean');
 
-        if ($recordId <= 0) {
-            $record = $service->findDomainRecord($zone, 'A', $recordName, $serverIp !== '' ? $serverIp : null);
-            $recordId = (int) ($record['id'] ?? 0);
-        }
+        if ($providerType === 'cloudflare') {
+            $site->loadMissing('dnsProviderCredential');
+            $credential = $site->dnsProviderCredential;
+            if ($credential === null || $credential->provider !== 'cloudflare') {
+                $credential = ProviderCredential::query()
+                    ->where('organization_id', $site->organization_id)
+                    ->where('provider', 'cloudflare')
+                    ->latest('updated_at')
+                    ->first();
+            }
+            if ($credential === null) {
+                return;
+            }
+            $recordId = (string) ($testingMeta['record_id'] ?? $previewRow?->provider_record_id ?? '');
+            if ($recordId === '') {
+                return;
+            }
+            (new CloudflareDnsService($credential))->deleteDnsRecord($zone, $recordId);
+        } else {
+            $service = new DigitalOceanService($this->tokenForSite($site));
+            $recordId = (int) ($testingMeta['record_id'] ?? 0);
 
-        if ($recordId > 0) {
-            $service->deleteDomainRecord($zone, $recordId);
+            if ($recordId <= 0) {
+                $record = $service->findDomainRecord($zone, 'A', $recordName, $serverIp !== '' ? $serverIp : null);
+                $recordId = (int) ($record['id'] ?? 0);
+            }
+
+            if ($recordId > 0) {
+                $service->deleteDomainRecord($zone, $recordId);
+            }
         }
 
         $site->previewDomains()
@@ -254,16 +330,25 @@ class TestingHostnameProvisioner
         }
 
         return ProviderCredential::query()
-            ->where('provider', 'digitalocean')
+            ->whereIn('provider', ProviderCredential::dnsAutomationProviderKeys())
             ->whereNotNull('organization_id')
             ->exists();
     }
 
+    /**
+     * DigitalOcean DNS delete path (preview rows created with app-level DO token use DO API).
+     */
     private function tokenForSite(Site $site): string
     {
-        $credential = $this->organizationCredentialForSite($site);
-        $token = $credential?->getApiToken() ?: trim((string) config('services.digitalocean.token'));
+        $credential = $site->dnsAutomationCredential();
+        if ($credential !== null && $credential->provider === 'digitalocean') {
+            $token = $credential->getApiToken();
+            if (is_string($token) && $token !== '') {
+                return $token;
+            }
+        }
 
+        $token = trim((string) config('services.digitalocean.token'));
         if ($token === '') {
             throw new \RuntimeException('DigitalOcean preview DNS requires an organization credential or app-level token.');
         }
@@ -273,19 +358,15 @@ class TestingHostnameProvisioner
 
     private function credentialSourceForSite(Site $site): string
     {
-        return $this->organizationCredentialForSite($site) ? 'organization_credential' : 'app_config';
-    }
-
-    private function organizationCredentialForSite(Site $site): ?ProviderCredential
-    {
-        if (! $site->organization_id) {
-            return null;
+        $credential = $site->dnsAutomationCredential();
+        if ($credential === null) {
+            return trim((string) config('services.digitalocean.token')) !== '' ? 'app_config' : 'none';
         }
 
-        return ProviderCredential::query()
-            ->where('organization_id', $site->organization_id)
-            ->where('provider', 'digitalocean')
-            ->latest('updated_at')
-            ->first();
+        if ($site->dns_provider_credential_id && $credential->id === $site->dns_provider_credential_id) {
+            return 'site_credential';
+        }
+
+        return 'organization_credential';
     }
 }

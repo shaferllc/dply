@@ -29,6 +29,8 @@ use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesKubectlExecutor;
 use App\Services\Deploy\SiteRuntimeActionExecutor;
+use App\Services\Sites\LaravelSiteSshSetupRunner;
+use App\Services\Sites\SiteWebserverConfigApplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -883,6 +885,7 @@ class SiteTest extends TestCase
             'server_id' => $server->id,
             'user_id' => $user->id,
             'organization_id' => $org->id,
+            'git_repository_url' => 'https://github.com/example/laravel-app.git',
             'meta' => [
                 'runtime_profile' => 'docker_web',
             ],
@@ -1299,7 +1302,8 @@ class SiteTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Deploy')
-            ->assertSee('No downtime')
+            ->assertSee('Zero downtime deployment')
+            ->assertSee('After deploy verification')
             ->assertSee('Pre-deploy script')
             ->assertSee('Main deploy script')
             ->assertSee('Post-deploy script')
@@ -1313,6 +1317,8 @@ class SiteTest extends TestCase
 
     public function test_site_settings_deploy_section_can_save_repository_and_strategy_settings(): void
     {
+        Bus::fake();
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -1327,6 +1333,16 @@ class SiteTest extends TestCase
             'releases_to_keep' => 3,
             'deployment_environment' => 'production',
             'status' => Site::STATUS_NGINX_ACTIVE,
+            'meta' => [
+                'docker_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                        'confidence' => 'high',
+                        'laravel_octane' => true,
+                    ],
+                ],
+            ],
         ]);
 
         Livewire::actingAs($user)
@@ -1337,7 +1353,10 @@ class SiteTest extends TestCase
             ->call('saveGit')
             ->assertHasNoErrors()
             ->assertSet('flash_success', 'Git settings saved.')
-            ->set('deploy_strategy', 'atomic')
+            ->set('zero_downtime_enabled', true)
+            ->call('saveZeroDowntimeDeployment')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Zero downtime deployment settings saved. Webserver config reloaded.')
             ->set('releases_to_keep', 8)
             ->set('deployment_environment', 'staging')
             ->set('octane_port', '8080')
@@ -1348,6 +1367,8 @@ class SiteTest extends TestCase
             ->call('saveDeploymentSettings')
             ->assertHasNoErrors()
             ->assertSet('flash_success', 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.');
+
+        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 
         $site->refresh();
 
@@ -1362,6 +1383,10 @@ class SiteTest extends TestCase
         $this->assertTrue($site->laravel_scheduler);
         $this->assertTrue($site->restart_supervisor_programs_after_deploy);
         $this->assertSame('location /health { return 200; }', $site->nginx_extra_raw);
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $this->assertSame(200, $meta['deploy_health_expect_status'] ?? null);
+        $this->assertSame(5, $meta['deploy_health_attempts'] ?? null);
+        $this->assertFalse((bool) ($meta['deploy_health_enabled'] ?? false));
     }
 
     public function test_site_settings_general_section_uses_certificate_summary_for_ssl_status(): void
@@ -2477,9 +2502,9 @@ class SiteTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Logs')
-            ->assertSee('Recent deploys')
+            ->assertSee('Site logs')
+            ->assertSee('Platform activity')
             ->assertSee('Deploy completed successfully.')
-            ->assertSee('Webhook delivery log')
             ->assertSee('Accepted deploy webhook.')
             ->assertSee(route('servers.logs', $server, false), escape: false);
     }
@@ -2973,5 +2998,287 @@ class SiteTest extends TestCase
         $this->assertNotNull($certificate);
         $this->assertSame([$previewDomain->hostname], $certificate->domainHostnames());
         $this->assertSame(SiteCertificate::SCOPE_PREVIEW, $certificate->scope_type);
+    }
+
+    public function test_site_dns_settings_page_renders_and_saves_credential(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'dns'], false))
+            ->assertOk()
+            ->assertSee('DNS settings', escape: false);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])
+            ->set('settings_dns_zone', '')
+            ->set('settings_dns_provider_credential_id', $credential->id)
+            ->call('saveDnsSettings')
+            ->assertHasNoErrors();
+
+        $this->assertSame($credential->id, $site->fresh()->dns_provider_credential_id);
+        $this->assertNull($site->fresh()->dns_zone);
+    }
+
+    public function test_site_dns_settings_rejects_credential_from_another_organization(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $otherOrg = Organization::factory()->create();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        $foreignCredential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $otherOrg->id,
+            'provider' => 'digitalocean',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])
+            ->set('settings_dns_zone', '')
+            ->set('settings_dns_provider_credential_id', $foreignCredential->id)
+            ->call('saveDnsSettings')
+            ->assertHasErrors(['settings_dns_provider_credential_id']);
+
+        $this->assertNull($site->fresh()->dns_provider_credential_id);
+    }
+
+    public function test_site_dns_settings_saves_zone_when_domain_exists_in_digitalocean(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/domains/example.com' => Http::response([
+                'domain' => ['name' => 'example.com'],
+            ], 200),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])
+            ->set('settings_dns_zone', 'example.com')
+            ->set('settings_dns_provider_credential_id', $credential->id)
+            ->call('saveDnsSettings')
+            ->assertHasNoErrors();
+
+        $this->assertSame('example.com', $site->fresh()->dns_zone);
+    }
+
+    public function test_site_dns_settings_rejects_zone_not_in_digitalocean_account(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/domains/missing.example' => Http::response(['message' => 'Not found'], 404),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])
+            ->set('settings_dns_zone', 'missing.example')
+            ->call('saveDnsSettings')
+            ->assertHasErrors(['settings_dns_zone']);
+
+        $this->assertNull($site->fresh()->dns_zone);
+    }
+
+    public function test_site_guess_dns_zone_from_primary_hostname(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'app.example.com',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $this->assertSame('example.com', $site->fresh()->guessDnsZoneFromPrimaryHostname());
+    }
+
+    public function test_site_settings_open_laravel_ssh_setup_modal_sets_pending_action_and_command_preview(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        $test = Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'laravel-stack']);
+
+        $test->call('openLaravelSshSetupModal', LaravelSiteSshSetupRunner::ACTION_COMPOSER_INSTALL)
+            ->assertSet('laravel_ssh_setup_pending_action', LaravelSiteSshSetupRunner::ACTION_COMPOSER_INSTALL)
+            ->assertSet('laravel_ssh_setup_error', null);
+
+        $preview = $test->instance()->laravelSshSetupPendingCommandPreview();
+        $this->assertIsString($preview);
+        $this->assertStringContainsString('composer install --no-dev', $preview);
+        $this->assertStringContainsString(escapeshellarg($site->effectiveEnvDirectory()), $preview);
+    }
+
+    public function test_site_settings_laravel_ssh_setup_confirm_is_blocked_for_deployer(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'deployer']);
+        session(['current_organization_id' => $org->id]);
+
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'laravel-stack'])
+            ->set('laravel_ssh_setup_pending_action', LaravelSiteSshSetupRunner::ACTION_COMPOSER_INSTALL)
+            ->call('confirmLaravelSshSetup')
+            ->assertSet('laravel_ssh_setup_error', __('Deployers cannot run remote setup commands on servers.'));
+    }
+
+    public function test_site_settings_suspend_and_resume_updates_site_and_applies_webserver_config(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'app.example.test',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $this->mock(SiteWebserverConfigApplier::class, function ($mock): void {
+            $mock->shouldReceive('apply')->twice()->andReturn('ok');
+        });
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'danger'])
+            ->set('settings_suspended_message', 'Payment pending')
+            ->call('suspendSite')
+            ->assertHasNoErrors();
+
+        $site->refresh();
+        $this->assertNotNull($site->suspended_at);
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $this->assertSame('Payment pending', $meta['suspended_message'] ?? null);
+        $this->assertNull($site->suspended_reason);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site->fresh(), 'section' => 'danger'])
+            ->call('resumeSite')
+            ->assertHasNoErrors();
+
+        $site->refresh();
+        $this->assertNull($site->suspended_at);
+        $this->assertNull($site->suspended_reason);
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $this->assertArrayNotHasKey('suspended_message', $meta);
     }
 }

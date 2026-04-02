@@ -28,6 +28,12 @@ class SiteDeployStep extends Model
 
     public const TYPE_ARTISAN_OPTIMIZE = 'artisan_optimize';
 
+    /** One-shot Laravel Octane scaffolding (`php artisan octane:install`). Add after composer install when adopting Octane. */
+    public const TYPE_ARTISAN_OCTANE_INSTALL = 'artisan_octane_install';
+
+    /** One-shot Laravel Reverb scaffolding (`php artisan reverb:install`). */
+    public const TYPE_ARTISAN_REVERB_INSTALL = 'artisan_reverb_install';
+
     public const TYPE_CUSTOM = 'custom';
 
     protected $fillable = [
@@ -55,6 +61,8 @@ class SiteDeployStep extends Model
             self::TYPE_ARTISAN_ROUTE_CACHE => 'php artisan route:cache',
             self::TYPE_ARTISAN_VIEW_CACHE => 'php artisan view:cache',
             self::TYPE_ARTISAN_OPTIMIZE => 'php artisan optimize',
+            self::TYPE_ARTISAN_OCTANE_INSTALL => 'php artisan octane:install --no-interaction',
+            self::TYPE_ARTISAN_REVERB_INSTALL => 'php artisan reverb:install --no-interaction',
             self::TYPE_CUSTOM => 'Custom shell command',
         ];
     }

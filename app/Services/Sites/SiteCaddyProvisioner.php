@@ -30,6 +30,7 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
 
         $ssh = $this->systemSsh($site);
         $this->installPlaceholderPage($site, $ssh);
+        $this->ensureSuspendedPage($site, $ssh);
         $this->writeSystemFile($ssh, $configFile, $config);
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_CADDY_EXIT:%%s" "$?"',

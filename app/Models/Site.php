@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use App\Enums\SiteType;
+use App\Livewire\Sites\Settings;
+use App\Services\Deploy\DeploymentSecretInventory;
+use App\Services\Deploy\LaravelComposerPackageDetector;
+use App\Services\Deploy\ServerlessDeploymentConfigResolver;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,8 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class Site extends Model
 {
@@ -56,6 +60,8 @@ class Site extends Model
         'user_id',
         'organization_id',
         'workspace_id',
+        'dns_provider_credential_id',
+        'dns_zone',
         'name',
         'slug',
         'type',
@@ -68,6 +74,8 @@ class Site extends Model
         'nginx_installed_at',
         'ssl_installed_at',
         'last_deploy_at',
+        'suspended_at',
+        'suspended_reason',
         'git_repository_url',
         'git_branch',
         'git_deploy_key_private',
@@ -102,6 +110,7 @@ class Site extends Model
             'nginx_installed_at' => 'datetime',
             'ssl_installed_at' => 'datetime',
             'last_deploy_at' => 'datetime',
+            'suspended_at' => 'datetime',
         ];
     }
 
@@ -177,6 +186,58 @@ class Site extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function dnsProviderCredential(): BelongsTo
+    {
+        return $this->belongsTo(ProviderCredential::class, 'dns_provider_credential_id');
+    }
+
+    /**
+     * Provider credential used for DNS automation on this site (preview hostnames, DNS-01 defaults, etc.).
+     * Uses the site override when set and DNS-capable; otherwise the latest DNS-capable credential for the organization (any provider).
+     */
+    public function dnsAutomationCredential(): ?ProviderCredential
+    {
+        $this->loadMissing('dnsProviderCredential');
+
+        if ($this->dns_provider_credential_id) {
+            $explicit = $this->dnsProviderCredential;
+            if ($explicit !== null
+                && $explicit->organization_id === $this->organization_id
+                && $explicit->supportsDnsAutomation()) {
+                return $explicit;
+            }
+        }
+
+        if ($this->organization_id === null) {
+            return null;
+        }
+
+        return ProviderCredential::query()
+            ->where('organization_id', $this->organization_id)
+            ->whereIn('provider', ProviderCredential::dnsAutomationProviderKeys())
+            ->latest('updated_at')
+            ->first();
+    }
+
+    /**
+     * Naive apex guess from the primary site hostname (last two labels), e.g. app.example.com → example.com.
+     */
+    public function guessDnsZoneFromPrimaryHostname(): ?string
+    {
+        $this->loadMissing('domains');
+        $host = strtolower(trim((string) optional($this->primaryDomain())->hostname));
+        if ($host === '' || ! str_contains($host, '.')) {
+            return null;
+        }
+
+        $parts = explode('.', $host);
+        if (count($parts) < 2) {
+            return null;
+        }
+
+        return $parts[count($parts) - 2].'.'.$parts[count($parts) - 1];
     }
 
     public function domains(): HasMany
@@ -494,6 +555,118 @@ class Site extends Model
         return 'vm_web';
     }
 
+    public function runtimeProfileLabel(): string
+    {
+        return match ($this->runtimeProfile()) {
+            'docker_web' => __('Docker'),
+            'kubernetes_web' => __('Kubernetes'),
+            'digitalocean_functions_web' => __('DigitalOcean Functions'),
+            'aws_lambda_bref_web' => __('AWS Lambda'),
+            'vm_web' => __('BYO VM'),
+            default => (string) str($this->runtimeProfile())->replace('_', ' ')->title(),
+        };
+    }
+
+    public function runtimeExecutionModeLabel(): string
+    {
+        return match ($this->runtimeTargetMode()) {
+            'docker' => __('Container'),
+            'kubernetes' => __('Kubernetes'),
+            'serverless' => __('Serverless'),
+            default => __('VM'),
+        };
+    }
+
+    /**
+     * App/stack detection from persisted meta. Priority matches
+     * {@see DeploymentSecretInventory::detectedFramework}:
+     * Docker → Kubernetes → serverless → VM (composer.json on deploy).
+     *
+     * @return array{
+     *     source: 'docker'|'kubernetes'|'serverless'|'vm',
+     *     framework: string,
+     *     language: string,
+     *     confidence?: string,
+     *     warnings?: list<string>,
+     *     detected_files?: list<string>,
+     *     laravel_octane?: bool,
+     *     laravel_horizon?: bool,
+     *     laravel_pulse?: bool,
+     *     laravel_reverb?: bool
+     * }|null
+     */
+    public function resolvedRuntimeAppDetection(): ?array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        $candidates = [
+            ['source' => 'docker', 'blob' => data_get($meta, 'docker_runtime.detected')],
+            ['source' => 'kubernetes', 'blob' => data_get($meta, 'kubernetes_runtime.detected')],
+            ['source' => 'serverless', 'blob' => data_get($meta, 'serverless.detected_runtime') ?: data_get($meta, 'serverless.detected')],
+            ['source' => 'vm', 'blob' => data_get($meta, 'vm_runtime.detected')],
+        ];
+
+        foreach ($candidates as $candidate) {
+            $blob = $candidate['blob'];
+            if (! is_array($blob) || $blob === []) {
+                continue;
+            }
+
+            if (! $this->runtimeAppDetectionIsMeaningful($blob)) {
+                continue;
+            }
+
+            $out = [
+                'source' => $candidate['source'],
+                'framework' => (string) ($blob['framework'] ?? 'unknown'),
+                'language' => (string) ($blob['language'] ?? 'unknown'),
+            ];
+
+            if (isset($blob['confidence']) && is_string($blob['confidence']) && $blob['confidence'] !== '') {
+                $out['confidence'] = $blob['confidence'];
+            }
+
+            if (isset($blob['warnings']) && is_array($blob['warnings'])) {
+                $warnings = array_values(array_filter($blob['warnings'], static fn ($w) => is_string($w) && $w !== ''));
+                if ($warnings !== []) {
+                    $out['warnings'] = $warnings;
+                }
+            }
+
+            if (isset($blob['detected_files']) && is_array($blob['detected_files'])) {
+                $files = array_values(array_filter($blob['detected_files'], static fn ($f) => is_string($f) && $f !== ''));
+                if ($files !== []) {
+                    $out['detected_files'] = $files;
+                }
+            }
+
+            foreach (['laravel_octane', 'laravel_horizon', 'laravel_pulse', 'laravel_reverb'] as $laravelPkgKey) {
+                if (! empty($blob[$laravelPkgKey])) {
+                    $out[$laravelPkgKey] = true;
+                }
+            }
+
+            return $out;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $blob
+     */
+    private function runtimeAppDetectionIsMeaningful(array $blob): bool
+    {
+        $fw = strtolower(trim((string) ($blob['framework'] ?? '')));
+        $lang = strtolower(trim((string) ($blob['language'] ?? '')));
+
+        if ($fw !== '' && $fw !== 'unknown') {
+            return true;
+        }
+
+        return $lang !== '' && $lang !== 'unknown';
+    }
+
     public function usesFunctionsRuntime(): bool
     {
         return in_array($this->runtimeProfile(), [
@@ -515,6 +688,288 @@ class Site extends Model
     public function usesKubernetesRuntime(): bool
     {
         return $this->runtimeProfile() === 'kubernetes_web';
+    }
+
+    /**
+     * PHP / Laravel / Symfony rollout fields (Octane, PHP-FPM, scheduler, etc.).
+     * Matches {@see Settings::shouldShowRuntimePhpRolloutFields()}.
+     */
+    public function shouldShowPhpOctaneRolloutSettings(): bool
+    {
+        $this->loadMissing('server');
+        if ($this->server?->hostCapabilities()->supportsFunctionDeploy()) {
+            return false;
+        }
+
+        $resolved = $this->resolvedRuntimeAppDetection();
+        $fw = strtolower((string) ($resolved['framework'] ?? ''));
+
+        return $this->type === SiteType::Php
+            || in_array($fw, ['laravel', 'php_generic', 'symfony'], true);
+    }
+
+    /**
+     * Heading for the Runtime "PHP process" block — only includes "Laravel" when Laravel is the detected framework.
+     */
+    public function runtimePhpProcessSectionTitle(): string
+    {
+        $fw = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+
+        return match ($fw) {
+            'laravel' => __('PHP process & Laravel'),
+            'symfony' => __('PHP process & Symfony'),
+            'wordpress' => __('PHP process'),
+            'php_generic' => __('PHP process'),
+            '' => __('PHP process'),
+            default => __('PHP process (:stack)', ['stack' => str($fw)->replace('_', ' ')->title()]),
+        };
+    }
+
+    /**
+     * Label for the per-minute cron / scheduler checkbox (word "Laravel" only when detection says Laravel).
+     */
+    public function runtimeSchedulerCheckboxLabel(): string
+    {
+        $fw = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+
+        return $fw === 'laravel'
+            ? __('Laravel scheduler (cron)')
+            : __('Per-minute cron task');
+    }
+
+    /**
+     * Helper text when Laravel is not the detected framework but the cron option is still shown (PHP site).
+     */
+    public function runtimeSchedulerCheckboxHelp(): ?string
+    {
+        $fw = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+
+        return $fw === 'laravel'
+            ? null
+            : __('Adds `php artisan schedule:run` each minute. Enable only for Laravel apps that use the scheduler; leave off for Symfony, WordPress, and other stacks.');
+    }
+
+    /**
+     * Full single-line label for the scheduler checkbox on Deploy → Rollout (includes schedule:run hint for Laravel).
+     */
+    public function runtimeSchedulerRolloutFormLabel(): string
+    {
+        $fw = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+
+        return $fw === 'laravel'
+            ? __('Laravel scheduler (schedule:run every minute via server crontab)')
+            : __('Per-minute cron task (via server crontab)');
+    }
+
+    /**
+     * Whether one-shot Laravel SSH setup from Site settings is allowed (BYO VM, SSH ready, Laravel detected).
+     */
+    public function canRunLaravelSshSetupActions(): bool
+    {
+        $this->loadMissing('server');
+        $server = $this->server;
+        if ($server === null || ! $server->isVmHost() || ! $server->isReady()) {
+            return false;
+        }
+
+        if (trim((string) $server->ssh_private_key) === '') {
+            return false;
+        }
+
+        if ($server->hostCapabilities()->supportsFunctionDeploy()) {
+            return false;
+        }
+
+        $resolved = $this->resolvedRuntimeAppDetection();
+        if ($resolved === null || strtolower((string) ($resolved['framework'] ?? '')) !== 'laravel') {
+            return false;
+        }
+
+        if ($this->type !== SiteType::Php) {
+            return false;
+        }
+
+        if (trim($this->effectiveEnvDirectory()) === '') {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Rails-specific fields (e.g. RAILS_ENV in meta).
+     * Matches {@see Settings::shouldShowRailsRuntimeFields()}.
+     */
+    public function shouldShowRailsRuntimeSettings(): bool
+    {
+        $this->loadMissing('server');
+        if ($this->server?->hostCapabilities()->supportsFunctionDeploy()) {
+            return false;
+        }
+
+        $resolved = $this->resolvedRuntimeAppDetection();
+        $fw = strtolower((string) ($resolved['framework'] ?? ''));
+
+        return $fw === 'rails';
+    }
+
+    /**
+     * Laravel Octane application server choices (see `php artisan octane:start --help`).
+     *
+     * @var list<string>
+     */
+    public const OCTANE_SERVERS = ['swoole', 'roadrunner', 'frankenphp'];
+
+    public function octaneServer(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $lo = is_array($meta['laravel_octane'] ?? null) ? $meta['laravel_octane'] : [];
+        $s = strtolower((string) ($lo['server'] ?? 'swoole'));
+
+        return in_array($s, self::OCTANE_SERVERS, true) ? $s : 'swoole';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function detectedLaravelPackageKeys(): array
+    {
+        $resolved = $this->resolvedRuntimeAppDetection();
+        if ($resolved === null || strtolower((string) ($resolved['framework'] ?? '')) !== 'laravel') {
+            return [];
+        }
+
+        $keys = [];
+        foreach (LaravelComposerPackageDetector::PACKAGE_KEYS as $short => $_) {
+            $blobKey = 'laravel_'.$short;
+            if (($resolved[$blobKey] ?? false) === true) {
+                $keys[] = $short;
+            }
+        }
+
+        return $keys;
+    }
+
+    public function resolvedLaravelPackageFlag(string $short): bool
+    {
+        $resolved = $this->resolvedRuntimeAppDetection();
+        if ($resolved === null || strtolower((string) ($resolved['framework'] ?? '')) !== 'laravel') {
+            return false;
+        }
+
+        if (! array_key_exists($short, LaravelComposerPackageDetector::PACKAGE_KEYS)) {
+            return false;
+        }
+
+        $blobKey = 'laravel_'.$short;
+
+        return ($resolved[$blobKey] ?? false) === true;
+    }
+
+    /**
+     * Octane settings UI when repository inspection found Laravel and a laravel/octane Composer dependency.
+     */
+    public function shouldShowOctaneRuntimeUi(): bool
+    {
+        return $this->resolvedLaravelPackageFlag('octane');
+    }
+
+    /**
+     * Local port for Reverb WebSocket server (Supervisor / reverse proxy); stored in meta.laravel_reverb.port.
+     */
+    public function reverbLocalPort(): int
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $r = is_array($meta['laravel_reverb'] ?? null) ? $meta['laravel_reverb'] : [];
+        $p = $r['port'] ?? 8080;
+
+        return is_numeric($p) ? max(1, min(65535, (int) $p)) : 8080;
+    }
+
+    public function shouldShowLaravelReverbRuntimeUi(): bool
+    {
+        return $this->resolvedLaravelPackageFlag('reverb');
+    }
+
+    /**
+     * Include Nginx/Caddy/Apache Reverb WebSocket proxy when Reverb is detected or port was saved in meta.
+     */
+    public function shouldProxyReverbInWebserver(): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $hasSavedPort = is_array($meta['laravel_reverb'] ?? null)
+            && array_key_exists('port', $meta['laravel_reverb']);
+
+        return $this->resolvedLaravelPackageFlag('reverb') || $hasSavedPort;
+    }
+
+    /**
+     * URL path prefix for Laravel Echo + Reverb (default /app).
+     */
+    public function reverbWebSocketPath(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $r = is_array($meta['laravel_reverb'] ?? null) ? $meta['laravel_reverb'] : [];
+        $p = trim((string) ($r['ws_path'] ?? '/app'));
+        if ($p === '' || $p[0] !== '/') {
+            return '/app';
+        }
+        if (! preg_match('#^/[a-zA-Z0-9/_\-]+$#', $p)) {
+            return '/app';
+        }
+
+        return rtrim($p, '/') === '' ? '/app' : rtrim($p, '/');
+    }
+
+    public function horizonDashboardPath(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $h = is_array($meta['laravel_horizon'] ?? null) ? $meta['laravel_horizon'] : [];
+        $p = trim((string) ($h['path'] ?? '/horizon'));
+        if ($p === '' || $p[0] !== '/') {
+            return '/horizon';
+        }
+
+        return preg_match('#^/[a-zA-Z0-9/_\-]+$#', $p) ? rtrim($p, '/') ?: '/horizon' : '/horizon';
+    }
+
+    public function pulseDashboardPath(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $h = is_array($meta['laravel_pulse'] ?? null) ? $meta['laravel_pulse'] : [];
+        $p = trim((string) ($h['path'] ?? '/pulse'));
+        if ($p === '' || $p[0] !== '/') {
+            return '/pulse';
+        }
+
+        return preg_match('#^/[a-zA-Z0-9/_\-]+$#', $p) ? rtrim($p, '/') ?: '/pulse' : '/pulse';
+    }
+
+    /**
+     * Suggested Supervisor command for Reverb; optional port override for form preview before save.
+     */
+    public function reverbSupervisorCommandLine(?int $portOverride = null): string
+    {
+        $p = $portOverride ?? $this->reverbLocalPort();
+
+        return sprintf('php artisan reverb:start --host=0.0.0.0 --port=%d', max(1, min(65535, $p)));
+    }
+
+    /**
+     * Supervisor command line for Octane (run with `directory` = deploy root, e.g. current release).
+     */
+    public function octaneSupervisorCommand(): string
+    {
+        $port = $this->octane_port;
+        if ($port === null || $port < 1) {
+            $port = 8000;
+        }
+
+        return sprintf(
+            'php artisan octane:start --server=%s --host=127.0.0.1 --port=%d',
+            $this->octaneServer(),
+            (int) $port
+        );
     }
 
     /**
@@ -667,7 +1122,7 @@ class Site extends Model
      */
     public function serverlessResolvedConfig(): array
     {
-        return app(\App\Services\Deploy\ServerlessDeploymentConfigResolver::class)
+        return app(ServerlessDeploymentConfigResolver::class)
             ->resolve($this);
     }
 
@@ -764,6 +1219,20 @@ class Site extends Model
         return $path !== null && $path !== '' ? $path : $this->document_root;
     }
 
+    /**
+     * Linux account for this site's files / PHP-FPM: explicit {@see $php_fpm_user} or the server's deploy SSH user.
+     */
+    public function effectiveSystemUser(Server $server): string
+    {
+        $explicit = trim((string) ($this->php_fpm_user ?? ''));
+
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        return trim((string) ($server->ssh_user ?? ''));
+    }
+
     public function isAtomicDeploys(): bool
     {
         return $this->deploy_strategy === 'atomic';
@@ -796,6 +1265,35 @@ class Site extends Model
         }
 
         return rtrim($this->effectiveRepositoryPath(), '/');
+    }
+
+    public function isSuspended(): bool
+    {
+        return $this->suspended_at !== null;
+    }
+
+    /**
+     * Static web root for the suspended HTML page (outside public/).
+     */
+    public function suspendedStaticRoot(): string
+    {
+        return rtrim($this->effectiveEnvDirectory(), '/').'/.dply/suspended';
+    }
+
+    /**
+     * Optional text shown on the public suspended HTML page (escaped when rendered).
+     * Prefers {@see Site::$meta} `suspended_message`, then legacy {@see Site::$suspended_reason}.
+     */
+    public function suspendedPublicMessage(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $fromMeta = trim((string) ($meta['suspended_message'] ?? ''));
+
+        if ($fromMeta !== '') {
+            return $fromMeta;
+        }
+
+        return trim((string) ($this->suspended_reason ?? ''));
     }
 
     public function nginxConfigBasename(): string

@@ -256,6 +256,36 @@ class DigitalOceanService
     }
 
     /**
+     * Whether the domain exists in this DigitalOcean account (Networking → Domains).
+     */
+    public function domainExistsInAccount(string $domain): bool
+    {
+        return $this->fetchDomain($domain) !== null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function fetchDomain(string $domain): ?array
+    {
+        $domain = strtolower(trim($domain));
+        if ($domain === '') {
+            return null;
+        }
+
+        $encoded = rawurlencode($domain);
+        $response = $this->request('get', '/domains/'.$encoded);
+        if ($response->status() === 404) {
+            return null;
+        }
+        $this->assertSuccess($response, 'get domain');
+        $data = $response->json();
+        $payload = $data['domain'] ?? null;
+
+        return is_array($payload) ? $payload : null;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function getDomainRecords(string $domain, array $query = []): array

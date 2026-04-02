@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Enums\SiteType;
 use App\Models\Site;
+use Illuminate\Support\Collection;
 
 class OpenLiteSpeedSiteConfigBuilder
 {
@@ -19,9 +20,18 @@ class OpenLiteSpeedSiteConfigBuilder
             throw new \InvalidArgumentException('Add at least one domain before installing OpenLiteSpeed.');
         }
 
+        $vhostRoot = rtrim($site->effectiveRepositoryPath(), '/');
+
+        if ($site->isSuspended()) {
+            return $this->buildSuspendedVhost($site, $hostnames, $vhostRoot);
+        }
+
         $root = $site->effectiveDocumentRoot();
         $phpBinary = '/usr/local/lsws/lsphp'.str_replace('.', '', (string) ($site->php_version ?? '83')).'/bin/lsphp';
-        $vhostRoot = rtrim($site->effectiveRepositoryPath(), '/');
+
+        if ($site->type === SiteType::Php && $site->octane_port) {
+            return $this->buildPhpOctaneProxy($site, $hostnames, $vhostRoot);
+        }
 
         return match ($site->type) {
             SiteType::Php => <<<CONF
@@ -104,12 +114,57 @@ CONF,
         };
     }
 
+    private function buildSuspendedVhost(Site $site, Collection $hostnames, string $vhostRoot): string
+    {
+        $root = $site->suspendedStaticRoot();
+
+        return <<<CONF
+docRoot                   {$root}/
+vhDomain                  {$hostnames->implode(',')}
+adminEmails               root@localhost
+enableGzip                1
+index  {
+  useServer               0
+  indexFiles              index.html
+}
+errorlog {$vhostRoot}/logs/error.log {
+  useServer               0
+  logLevel                WARN
+}
+accesslog {$vhostRoot}/logs/access.log {
+  useServer               0
+  logFormat               "%h %l %u %t \"%r\" %>s %b"
+}
+CONF;
+    }
+
+    private function buildPhpOctaneProxy(Site $site, Collection $hostnames, string $vhostRoot): string
+    {
+        $oct = (int) $site->octane_port;
+
+        return <<<CONF
+docRoot                   {$vhostRoot}/
+vhDomain                  {$hostnames->implode(',')}
+adminEmails               root@localhost
+enableGzip                1
+{$this->rewriteBlock($site, $oct)}
+errorlog {$vhostRoot}/logs/error.log {
+  useServer               0
+  logLevel                WARN
+}
+accesslog {$vhostRoot}/logs/access.log {
+  useServer               0
+  logFormat               "%h %l %u %t \"%r\" %>s %b"
+}
+CONF;
+    }
+
     private function configName(Site $site): string
     {
         return str_replace(['.', '-'], '_', $site->webserverConfigBasename());
     }
 
-    private function rewriteBlock(Site $site, ?int $appPort = null): string
+    private function rewriteBlock(Site $site, ?int $proxyPort = null): string
     {
         $rules = $site->redirects
             ->map(fn ($redirect): string => sprintf(
@@ -120,8 +175,19 @@ CONF,
             ))
             ->values();
 
-        if ($appPort !== null) {
-            $rules->push(sprintf('RewriteRule ^(.*)$ http://127.0.0.1:%d$1 [P,L]', $appPort));
+        if ($site->type === SiteType::Php && $site->shouldProxyReverbInWebserver()) {
+            $ws = trim($site->reverbWebSocketPath(), '/');
+            $rp = $site->reverbLocalPort();
+            $rules->push(sprintf(
+                'RewriteRule ^%s(.*)$ http://127.0.0.1:%d/%s$1 [P,L]',
+                preg_quote($ws, '/'),
+                $rp,
+                $ws
+            ));
+        }
+
+        if ($proxyPort !== null) {
+            $rules->push(sprintf('RewriteRule ^(.*)$ http://127.0.0.1:%d/$1 [P,L]', $proxyPort));
         }
 
         if ($rules->isEmpty()) {

@@ -21,6 +21,10 @@ final class LocalRuntimeDetector
      *     site_type: SiteType,
      *     framework: string,
      *     language: string,
+     *     laravel_octane: bool,
+     *     laravel_horizon: bool,
+     *     laravel_pulse: bool,
+     *     laravel_reverb: bool,
      *     confidence: string,
      *     document_root: string,
      *     repository_path: string,
@@ -40,7 +44,9 @@ final class LocalRuntimeDetector
         $appDetection = $this->serverlessRuntimeDetector->detect($workingDirectory, [
             'supports_php_runtime' => true,
             'supports_node_runtime' => true,
+            'supports_python_runtime' => true,
             'default_runtime' => 'nodejs:20',
+            'default_python_runtime' => 'python3.12',
             'default_entrypoint' => 'index',
             'default_package' => 'default',
         ]);
@@ -70,6 +76,10 @@ final class LocalRuntimeDetector
             'site_type' => $siteType,
             'framework' => (string) ($appDetection['framework'] ?? 'unknown'),
             'language' => (string) ($appDetection['language'] ?? 'unknown'),
+            'laravel_octane' => (bool) ($appDetection['laravel_octane'] ?? false),
+            'laravel_horizon' => (bool) ($appDetection['laravel_horizon'] ?? false),
+            'laravel_pulse' => (bool) ($appDetection['laravel_pulse'] ?? false),
+            'laravel_reverb' => (bool) ($appDetection['laravel_reverb'] ?? false),
             'confidence' => $this->mergeConfidence(
                 (string) ($containerSignals['confidence'] ?? 'medium'),
                 (string) ($appDetection['confidence'] ?? 'low'),
@@ -158,8 +168,9 @@ final class LocalRuntimeDetector
         return match ($appDetection['framework'] ?? null) {
             'vite_static', 'static' => SiteType::Static,
             'nextjs', 'nuxt', 'node_generic' => SiteType::Node,
+            'django', 'flask', 'fastapi', 'python_generic' => SiteType::Node,
             default => match ($appDetection['language'] ?? null) {
-                'node' => SiteType::Node,
+                'node', 'python' => SiteType::Node,
                 'static' => SiteType::Static,
                 default => SiteType::Php,
             },
@@ -182,6 +193,17 @@ final class LocalRuntimeDetector
         }
 
         $packageJson = $this->readJson($workingDirectory.'/package.json');
+        if ($packageJson === null) {
+            if (is_file($workingDirectory.'/manage.py')
+                || is_file($workingDirectory.'/requirements.txt')
+                || is_file($workingDirectory.'/pyproject.toml')
+                || is_file($workingDirectory.'/Pipfile')) {
+                return 8000;
+            }
+
+            return 3000;
+        }
+
         $scripts = is_array($packageJson['scripts'] ?? null) ? $packageJson['scripts'] : [];
 
         foreach (['start', 'dev', 'preview'] as $scriptKey) {
@@ -248,6 +270,7 @@ final class LocalRuntimeDetector
         return match ($framework) {
             'vite_static' => ['This repository looks like a Vite-style static app. Dply will build it into a static container automatically.'],
             'nextjs', 'nuxt' => ['Framework-specific Node repos may still need follow-up runtime tuning after the first auto-launch.'],
+            'django', 'flask', 'fastapi', 'python_generic' => ['Align gunicorn, uvicorn, or your app server with the app port nginx proxies to.'],
             default => [],
         };
     }
@@ -317,7 +340,6 @@ final class LocalRuntimeDetector
     }
 
     /**
-     * @param  mixed  $value
      * @return list<string>
      */
     private function stringKeys(mixed $value): array

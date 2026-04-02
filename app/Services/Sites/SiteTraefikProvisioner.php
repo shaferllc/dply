@@ -32,6 +32,7 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
 
         $ssh = $this->systemSsh($site);
         $this->installPlaceholderPage($site, $ssh);
+        $this->ensureSuspendedPage($site, $ssh);
         $this->writeSystemFile($ssh, $caddyConfig, $this->caddyBuilder->build($site, $backendPort));
         $this->writeSystemFile($ssh, $dynamicConfig, $this->builder->build($site, $backendPort));
 

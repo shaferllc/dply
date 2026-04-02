@@ -16,8 +16,13 @@ class NginxSiteConfigBuilder
         }
 
         $names = $hostnames->implode(' ');
-        $root = $site->effectiveDocumentRootForNginx();
         $basename = $site->nginxConfigBasename();
+
+        if ($site->isSuspended()) {
+            return $this->suspendedBlock($site, $basename, $names);
+        }
+
+        $root = $site->effectiveDocumentRootForNginx();
         $phpSock = str_replace(
             '{version}',
             $site->php_version ?? '8.3',
@@ -38,8 +43,10 @@ class NginxSiteConfigBuilder
         $extra = trim((string) ($site->nginx_extra_raw ?? ''));
         $extraBlock = $extra !== '' ? "\n    ".$extra."\n" : '';
 
-        $poolNote = $site->php_fpm_user
-            ? "\n    # php-fpm pool user (configure pool on server): {$site->php_fpm_user}\n"
+        $site->loadMissing('server');
+        $poolUser = $site->server ? $site->effectiveSystemUser($site->server) : trim((string) ($site->php_fpm_user ?? ''));
+        $poolNote = $poolUser !== ''
+            ? "\n    # php-fpm pool user (configure pool on server): {$poolUser}\n"
             : '';
 
         return match ($site->type) {
@@ -47,6 +54,35 @@ class NginxSiteConfigBuilder
             SiteType::Static => $this->staticBlock($basename, $names, $root, $redirectBlock, $extraBlock),
             SiteType::Node => $this->nodeBlock($basename, $names, (int) ($site->app_port ?? 3000), $redirectBlock, $extraBlock),
         };
+    }
+
+    /**
+     * Static-only vhost serving {@see Site::suspendedStaticRoot()} (no PHP, proxy, or redirects).
+     */
+    protected function suspendedBlock(Site $site, string $basename, string $serverNames): string
+    {
+        $root = $site->suspendedStaticRoot();
+
+        return <<<NGINX
+# Managed by Dply — {$basename} (suspended)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {$serverNames};
+    root {$root};
+    index index.html;
+    access_log /var/log/nginx/{$basename}-access.log;
+    error_log /var/log/nginx/{$basename}-error.log;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+NGINX;
     }
 
     protected function phpBlock(
@@ -61,6 +97,7 @@ class NginxSiteConfigBuilder
     ): string {
         if ($site->octane_port) {
             $port = (int) $site->octane_port;
+            $reverb = $this->reverbProxyLocationBlock($site);
 
             return <<<NGINX
 # Managed by Dply — {$basename} (Laravel Octane)
@@ -72,8 +109,7 @@ server {
     index index.php index.html;
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$poolNote}{$redirectBlock}
-    location / {
+{$poolNote}{$redirectBlock}{$reverb}    location / {
         try_files \$uri @octane;
     }
 
@@ -82,6 +118,8 @@ server {
         proxy_set_header Host \$http_host;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_pass http://127.0.0.1:{$port};
     }
 
@@ -92,6 +130,8 @@ server {
 }
 NGINX;
         }
+
+        $reverbPlain = $this->reverbProxyLocationBlock($site);
 
         return <<<NGINX
 # Managed by Dply — {$basename}
@@ -106,8 +146,7 @@ server {
 
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-{$poolNote}{$redirectBlock}
-    location / {
+{$poolNote}{$redirectBlock}{$reverbPlain}    location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
 
@@ -180,6 +219,29 @@ server {
     }
 {$extraBlock}
 }
+NGINX;
+    }
+
+    protected function reverbProxyLocationBlock(Site $site): string
+    {
+        if (! $site->shouldProxyReverbInWebserver()) {
+            return '';
+        }
+
+        $port = $site->reverbLocalPort();
+        $loc = $site->reverbWebSocketPath();
+
+        return <<<NGINX
+    location ^~ {$loc} {
+        proxy_http_version 1.1;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_pass http://127.0.0.1:{$port};
+    }
+
 NGINX;
     }
 

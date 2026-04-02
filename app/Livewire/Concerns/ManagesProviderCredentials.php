@@ -4,6 +4,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
+use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
@@ -21,6 +22,10 @@ trait ManagesProviderCredentials
     public string $do_name = '';
 
     public string $do_api_token = '';
+
+    public string $cloudflare_name = '';
+
+    public string $cloudflare_api_token = '';
 
     public string $hetzner_name = '';
 
@@ -124,6 +129,21 @@ trait ManagesProviderCredentials
         $this->storeProviderCredential('digitalocean', $this->do_name, $this->do_api_token, 'do_api_token');
         if (! $this->flash_error) {
             $this->reset('do_name', 'do_api_token');
+        }
+    }
+
+    public function storeCloudflare(): void
+    {
+        if (! $this->ensureProviderEnabled('cloudflare')) {
+            return;
+        }
+        $this->validate([
+            'cloudflare_name' => 'nullable|string|max:255',
+            'cloudflare_api_token' => 'required|string',
+        ], [], ['cloudflare_api_token' => 'API token']);
+        $this->storeProviderCredential('cloudflare', $this->cloudflare_name, $this->cloudflare_api_token, 'cloudflare_api_token');
+        if (! $this->flash_error) {
+            $this->reset('cloudflare_name', 'cloudflare_api_token');
         }
     }
 
@@ -578,14 +598,14 @@ trait ManagesProviderCredentials
         }
 
         $defaultNames = [
-            'digitalocean' => 'DigitalOcean', 'hetzner' => 'Hetzner', 'linode' => 'Linode', 'vultr' => 'Vultr',
+            'digitalocean' => 'DigitalOcean', 'cloudflare' => 'Cloudflare', 'hetzner' => 'Hetzner', 'linode' => 'Linode', 'vultr' => 'Vultr',
             'akamai' => 'Akamai', 'ovh' => 'OVH', 'rackspace' => 'Rackspace', 'render' => 'Render', 'railway' => 'Railway',
             'gcp' => 'GCP', 'azure' => 'Azure', 'oracle' => 'Oracle Cloud',
         ];
         $credential = auth()->user()->providerCredentials()->create([
             'organization_id' => $org->id,
             'provider' => $provider,
-            'name' => trim($name) ?: $defaultNames[$provider],
+            'name' => trim($name) ?: ($defaultNames[$provider] ?? ucfirst($provider)),
             'credentials' => ['api_token' => $apiToken],
         ]);
 
@@ -602,6 +622,8 @@ trait ManagesProviderCredentials
             } elseif ($provider === 'vultr') {
                 $vultr = new VultrService($credential);
                 $vultr->validateToken();
+            } elseif ($provider === 'cloudflare') {
+                (new CloudflareDnsService($credential))->verifyToken();
             } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
@@ -630,7 +652,7 @@ trait ManagesProviderCredentials
     public function canVerifyCredentialProvider(string $provider): bool
     {
         return in_array($provider, [
-            'digitalocean', 'hetzner', 'linode', 'akamai', 'vultr',
+            'digitalocean', 'cloudflare', 'hetzner', 'linode', 'akamai', 'vultr',
             'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws',
         ], true);
     }
@@ -653,6 +675,7 @@ trait ManagesProviderCredentials
         try {
             match ($credential->provider) {
                 'digitalocean' => (new DigitalOceanService($credential))->getDroplets(),
+                'cloudflare' => (new CloudflareDnsService($credential))->verifyToken(),
                 'hetzner' => (new HetznerService($credential))->validateToken(),
                 'linode', 'akamai' => (new LinodeService($credential))->validateToken(),
                 'vultr' => (new VultrService($credential))->validateToken(),

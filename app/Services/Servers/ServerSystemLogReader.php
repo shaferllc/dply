@@ -5,6 +5,8 @@ namespace App\Services\Servers;
 use App\Models\AuditLog;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployment;
+use App\Models\WebhookDeliveryLog;
 use App\Services\SshConnection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -87,6 +89,19 @@ class ServerSystemLogReader
             );
         }
 
+        $platformSite = $this->resolveSiteForPlatformLog($server, $key);
+        if ($platformSite !== null) {
+            $output = $this->sitePlatformActivityLog($platformSite, $tailLimit, $sinceMinutes);
+            if ($onStreamStart !== null) {
+                $onStreamStart(__('Dply site activity (database query)'));
+            }
+            if ($onOutputChunk !== null && $output !== '') {
+                $onOutputChunk($output);
+            }
+
+            return ['output' => $output, 'error' => null];
+        }
+
         $sitePath = $this->resolveSitePerHostLogPath($server, $key);
         if ($sitePath !== null) {
             if (! $this->pathMatchesAllowlist($sitePath)) {
@@ -157,6 +172,108 @@ class ServerSystemLogReader
                 $log->user?->name ?? '—',
                 Str::limit((string) ($log->subject_summary ?? ''), 120)
             );
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Merges audit entries, deployments, and webhook delivery rows for one site (newest first).
+     */
+    public function sitePlatformActivityLog(Site $site, int $maxLines = 300, ?int $sinceMinutes = null): string
+    {
+        if ($site->organization_id === null) {
+            return __('No organization — no activity log.');
+        }
+
+        $limit = max(1, min(5000, $maxLines));
+        $tz = config('app.timezone');
+        $since = ($sinceMinutes !== null && $sinceMinutes > 0)
+            ? Carbon::now()->subMinutes($sinceMinutes)
+            : null;
+
+        $entries = [];
+
+        $audits = AuditLog::query()
+            ->where('organization_id', $site->organization_id)
+            ->where('subject_type', Site::class)
+            ->where('subject_id', $site->getKey())
+            ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->with('user')
+            ->get();
+
+        foreach ($audits as $log) {
+            $at = $log->created_at;
+            $entries[] = [
+                'at' => $at,
+                'line' => sprintf(
+                    '%s  audit  %s  %s  %s',
+                    $at->timezone($tz)->format('Y-m-d H:i:s'),
+                    $log->action,
+                    $log->user?->name ?? '—',
+                    Str::limit((string) ($log->subject_summary ?? ''), 120)
+                ),
+            ];
+        }
+
+        $deployments = SiteDeployment::query()
+            ->where('site_id', $site->getKey())
+            ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        foreach ($deployments as $deployment) {
+            $at = $deployment->created_at ?? $deployment->started_at ?? Carbon::now();
+            $entries[] = [
+                'at' => $at,
+                'line' => sprintf(
+                    '%s  deploy  %s · %s  %s  %s',
+                    $at->timezone($tz)->format('Y-m-d H:i:s'),
+                    $deployment->trigger,
+                    $deployment->status,
+                    $deployment->git_sha !== null && $deployment->git_sha !== ''
+                        ? Str::limit($deployment->git_sha, 12)
+                        : '—',
+                    Str::limit((string) ($deployment->log_output ?? ''), 100)
+                ),
+            ];
+        }
+
+        $webhooks = WebhookDeliveryLog::query()
+            ->where('site_id', $site->getKey())
+            ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        foreach ($webhooks as $webhook) {
+            $at = $webhook->created_at ?? Carbon::now();
+            $entries[] = [
+                'at' => $at,
+                'line' => sprintf(
+                    '%s  webhook  %s · %s  %s  %s',
+                    $at->timezone($tz)->format('Y-m-d H:i:s'),
+                    $webhook->http_status,
+                    $webhook->outcome,
+                    $webhook->request_ip ?? '—',
+                    Str::limit((string) ($webhook->detail ?? ''), 120)
+                ),
+            ];
+        }
+
+        if ($entries === []) {
+            return __('No platform activity recorded for this site yet.');
+        }
+
+        usort($entries, fn (array $a, array $b): int => $b['at']->getTimestamp() <=> $a['at']->getTimestamp());
+
+        $lines = [];
+        foreach (array_slice($entries, 0, $limit) as $row) {
+            $lines[] = $row['line'];
         }
 
         return implode("\n", $lines);
@@ -332,13 +449,27 @@ class ServerSystemLogReader
         return null;
     }
 
-    private function resolveSitePerHostLogPath(Server $server, string $key): ?string
+    private function resolveSiteForPlatformLog(Server $server, string $key): ?Site
     {
-        if (! preg_match('/^site_([0-7][0-9A-HJKMNP-TV-Z]{25})_(access|error)$/i', $key, $m)) {
+        if (! preg_match('/^site_([0-9A-HJKMNP-TV-Z]{26})_platform$/i', $key, $m)) {
             return null;
         }
 
-        $siteId = strtoupper($m[1]);
+        $siteId = strtolower($m[1]);
+
+        return Site::query()
+            ->where('server_id', $server->id)
+            ->whereKey($siteId)
+            ->first();
+    }
+
+    private function resolveSitePerHostLogPath(Server $server, string $key): ?string
+    {
+        if (! preg_match('/^site_([0-9A-HJKMNP-TV-Z]{26})_(access|error)$/i', $key, $m)) {
+            return null;
+        }
+
+        $siteId = strtolower($m[1]);
         $which = strtolower($m[2]);
 
         $site = Site::query()

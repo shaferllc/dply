@@ -26,6 +26,7 @@ final class ServerWorkspaceLogSnapshotBroadcast implements ShouldBroadcastNow
         public readonly bool $logLastFetchTruncated,
         public readonly int $logLastFetchRawBytes,
         public readonly bool $broadcastPayloadTruncated,
+        public readonly ?string $siteId = null,
     ) {}
 
     /**
@@ -57,6 +58,7 @@ final class ServerWorkspaceLogSnapshotBroadcast implements ShouldBroadcastNow
             'log_last_fetch_truncated' => $this->logLastFetchTruncated,
             'log_last_fetch_raw_bytes' => $this->logLastFetchRawBytes,
             'broadcast_payload_truncated' => $this->broadcastPayloadTruncated,
+            'site_id' => $this->siteId,
         ];
     }
 }

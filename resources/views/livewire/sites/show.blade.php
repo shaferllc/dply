@@ -447,7 +447,12 @@
                         <div class="border-b border-slate-200 px-5 py-4">
                             <div class="flex items-center justify-between gap-3">
                                 <div>
-                                    <p class="text-base font-semibold text-slate-900">{{ optional($site->primaryDomain())->hostname ?? $site->name }}</p>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-base font-semibold text-slate-900">{{ optional($site->primaryDomain())->hostname ?? $site->name }}</p>
+                                        @if ($site->isSuspended())
+                                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">{{ __('Suspended') }}</span>
+                                        @endif
+                                    </div>
                                     <p class="mt-1 text-sm text-slate-500">{{ $server->ip_address ?? __('No IP recorded') }}</p>
                                 </div>
                                 @if ($site->visitUrl())
@@ -501,6 +506,9 @@
                 </p>
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div><dt class="text-slate-500">Provisioning</dt><dd class="font-medium capitalize">{{ $site->statusLabel() }}</dd></div>
+                    @if ($site->isSuspended())
+                        <div><dt class="text-slate-500">{{ __('Public traffic') }}</dt><dd class="font-medium text-amber-800">{{ __('Suspended — visitors see the suspended page') }}</dd></div>
+                    @endif
                     <div><dt class="text-slate-500">Provisioning step</dt><dd class="font-medium capitalize">{{ str_replace('_', ' ', $site->provisioningState() ?? 'queued') }}</dd></div>
                     <div><dt class="text-slate-500">Contract revision</dt><dd class="font-mono text-xs break-all">{{ \Illuminate\Support\Str::limit((string) ($foundationStatus['current_runtime_revision'] ?? '—'), 20) }}</dd></div>
                     <div><dt class="text-slate-500">Runtime drift</dt><dd class="font-medium {{ ($foundationStatus['runtime_drifted'] ?? false) ? 'text-amber-700' : 'text-emerald-700' }}">{{ ($foundationStatus['runtime_drifted'] ?? false) ? __('Detected') : __('In sync') }}</dd></div>
@@ -515,7 +523,7 @@
                         <div><dt class="text-slate-500">Document root (configured)</dt><dd class="font-mono text-xs break-all">{{ $site->document_root }}</dd></div>
                         <div><dt class="text-slate-500">Deploy path</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveRepositoryPath() }}</dd></div>
                         <div><dt class="text-slate-500">Web root</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveDocumentRoot() }}</dd></div>
-                        <div><dt class="text-slate-500">Deploy strategy</dt><dd class="font-medium">{{ $site->deploy_strategy }}</dd></div>
+                        <div><dt class="text-slate-500">{{ __('Zero downtime') }}</dt><dd class="font-medium">{{ $site->deploy_strategy === 'atomic' ? __('Enabled') : __('Disabled') }}</dd></div>
                     @endif
                     @if (!empty($site->meta['site_health_last_check_at']))
                         <div><dt class="text-slate-500">URL health (scheduler)</dt><dd class="font-medium">
@@ -680,25 +688,8 @@
                 </div>
             @endif
 
-            <div id="logs" class="bg-white p-6 shadow-sm sm:rounded-lg space-y-3">
-                <h3 class="font-medium text-slate-900">Webhook delivery log</h3>
-                <p class="text-sm text-slate-600">Recent inbound deploy webhook attempts (signature checks, IP allow list, etc.).</p>
-                @if ($site->webhookDeliveryLogs->isEmpty())
-                    <p class="text-sm text-slate-500">No deliveries recorded yet.</p>
-                @else
-                    <ul class="text-xs font-mono space-y-1 border border-slate-100 rounded-md divide-y divide-slate-100">
-                        @foreach ($site->webhookDeliveryLogs as $log)
-                            <li class="px-3 py-2 flex flex-wrap gap-2 justify-between">
-                                <span>{{ $log->created_at->diffForHumans() }}</span>
-                                <span class="text-slate-600">{{ $log->request_ip ?? '—' }}</span>
-                                <span class="text-slate-800">{{ $log->http_status }} · {{ $log->outcome }}</span>
-                                @if ($log->detail)
-                                    <span class="text-slate-500 w-full">{{ $log->detail }}</span>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
+            <div id="logs" class="bg-white p-6 shadow-sm sm:rounded-lg">
+                <livewire:sites.site-log-viewer :server="$server" :site="$site" wire:key="site-log-show-{{ $site->id }}" />
             </div>
 
             @if (! $site->usesDockerRuntime() && ($previewDomain || $site->certificates->isNotEmpty()))

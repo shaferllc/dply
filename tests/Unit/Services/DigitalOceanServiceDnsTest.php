@@ -10,6 +10,36 @@ use Tests\TestCase;
 
 class DigitalOceanServiceDnsTest extends TestCase
 {
+    public function test_it_fetches_domain_when_present_in_account(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/domains/example.com' => Http::response([
+                'domain' => [
+                    'name' => 'example.com',
+                    'ttl' => 1800,
+                ],
+            ], 200),
+        ]);
+
+        $service = new DigitalOceanService('dop_v1_test');
+        $payload = $service->fetchDomain('example.com');
+
+        $this->assertNotNull($payload);
+        $this->assertSame('example.com', $payload['name']);
+        $this->assertTrue($service->domainExistsInAccount('example.com'));
+    }
+
+    public function test_it_returns_null_when_domain_missing_in_account(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/domains/unknown.test' => Http::response(['message' => 'Not found'], 404),
+        ]);
+
+        $service = new DigitalOceanService('dop_v1_test');
+        $this->assertNull($service->fetchDomain('unknown.test'));
+        $this->assertFalse($service->domainExistsInAccount('unknown.test'));
+    }
+
     public function test_it_can_find_a_matching_domain_record(): void
     {
         Http::fake([

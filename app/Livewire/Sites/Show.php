@@ -36,6 +36,7 @@ use App\Support\SiteDeployKeyGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -83,11 +84,59 @@ class Show extends Component
 
     public string $deploy_strategy = 'simple';
 
+    /** Mirrors {@see Site::$deploy_strategy} `atomic` for the zero-downtime card UI. */
+    public bool $zero_downtime_enabled = false;
+
+    public bool $deploy_health_enabled = false;
+
+    public bool $deploy_health_auto_rollback = false;
+
+    public string $deploy_health_path = '/health';
+
+    public int $deploy_health_expect_status = 200;
+
+    public int $deploy_health_attempts = 5;
+
+    public int $deploy_health_delay_ms = 500;
+
+    /** http|https — stored in meta `deploy_health_scheme`. */
+    public string $deploy_health_scheme = 'http';
+
+    /** Target host for curl (default loopback). */
+    public string $deploy_health_host = '127.0.0.1';
+
+    /** Optional TCP port; empty = default for scheme (80/443). */
+    public string $deploy_health_port = '';
+
+    /** Recorded in site meta for Rails apps (e.g. production, staging). */
+    public string $rails_env = 'production';
+
     public int $releases_to_keep = 5;
 
     public string $nginx_extra_raw = '';
 
+    /** Optional message shown on the public suspended page; stored in meta `suspended_message` (VM sites only). */
+    public string $settings_suspended_message = '';
+
     public string $octane_port = '';
+
+    /** Laravel Octane application server: swoole, roadrunner, or frankenphp (stored in meta.laravel_octane). */
+    public string $octane_server = 'swoole';
+
+    /** Local port for Laravel Reverb (meta.laravel_reverb.port); used with Supervisor / proxies. */
+    public string $laravel_reverb_port = '';
+
+    /** WebSocket path for Laravel Echo + Reverb (meta.laravel_reverb.ws_path). */
+    public string $laravel_reverb_ws_path = '/app';
+
+    /** Dashboard paths and notes (meta.laravel_horizon, meta.laravel_pulse). */
+    public string $laravel_horizon_path = '/horizon';
+
+    public string $laravel_horizon_notes = '';
+
+    public string $laravel_pulse_path = '/pulse';
+
+    public string $laravel_pulse_notes = '';
 
     public bool $laravel_scheduler = false;
 
@@ -104,6 +153,9 @@ class Show extends Component
     public string $php_upload_max_filesize = '';
 
     public string $php_max_execution_time = '';
+
+    /** Localhost port for reverse-proxy runtimes (Node, Rails, Puma, containers, etc.). */
+    public string $runtime_app_port = '';
 
     public string $new_env_key = '';
 
@@ -187,9 +239,38 @@ class Show extends Component
         $this->post_deploy_command = (string) ($this->site->post_deploy_command ?? '');
         $this->env_file_content = (string) ($this->site->env_file_content ?? '');
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
+        $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
+        $dm = is_array($this->site->meta) ? $this->site->meta : [];
+        $this->deploy_health_enabled = (bool) ($dm['deploy_health_enabled'] ?? false);
+        $this->deploy_health_auto_rollback = (bool) ($dm['deploy_health_auto_rollback'] ?? false);
+        $this->deploy_health_path = (string) ($dm['deploy_health_path'] ?? '/health');
+        $this->deploy_health_expect_status = (int) ($dm['deploy_health_expect_status'] ?? 200);
+        $this->deploy_health_attempts = (int) ($dm['deploy_health_attempts'] ?? 5);
+        $this->deploy_health_delay_ms = (int) ($dm['deploy_health_delay_ms'] ?? 500);
+        $scheme = strtolower((string) ($dm['deploy_health_scheme'] ?? 'http'));
+        $this->deploy_health_scheme = in_array($scheme, ['http', 'https'], true) ? $scheme : 'http';
+        $this->deploy_health_host = trim((string) ($dm['deploy_health_host'] ?? '127.0.0.1'));
+        if ($this->deploy_health_host === '') {
+            $this->deploy_health_host = '127.0.0.1';
+        }
+        $p = $dm['deploy_health_port'] ?? null;
+        $this->deploy_health_port = $p !== null && $p !== '' && is_numeric($p)
+            ? (string) max(1, min(65535, (int) $p))
+            : '';
+        $railsRuntime = is_array($dm['rails_runtime'] ?? null) ? $dm['rails_runtime'] : [];
+        $this->rails_env = (string) ($railsRuntime['env'] ?? 'production');
         $this->releases_to_keep = (int) ($this->site->releases_to_keep ?? 5);
         $this->nginx_extra_raw = (string) ($this->site->nginx_extra_raw ?? '');
         $this->octane_port = $this->site->octane_port !== null ? (string) $this->site->octane_port : '';
+        $this->octane_server = $this->site->octaneServer();
+        $this->laravel_reverb_port = (string) $this->site->reverbLocalPort();
+        $this->laravel_reverb_ws_path = $this->site->reverbWebSocketPath();
+        $lh = is_array($dm['laravel_horizon'] ?? null) ? $dm['laravel_horizon'] : [];
+        $this->laravel_horizon_path = (string) ($lh['path'] ?? '/horizon');
+        $this->laravel_horizon_notes = (string) ($lh['notes'] ?? '');
+        $lp = is_array($dm['laravel_pulse'] ?? null) ? $dm['laravel_pulse'] : [];
+        $this->laravel_pulse_path = (string) ($lp['path'] ?? '/pulse');
+        $this->laravel_pulse_notes = (string) ($lp['notes'] ?? '');
         $this->laravel_scheduler = (bool) $this->site->laravel_scheduler;
         $this->restart_supervisor_programs_after_deploy = (bool) ($this->site->restart_supervisor_programs_after_deploy ?? false);
         $this->deployment_environment = (string) ($this->site->deployment_environment ?? 'production');
@@ -199,10 +280,12 @@ class Show extends Component
         $this->php_memory_limit = (string) ($phpRuntime['memory_limit'] ?? '');
         $this->php_upload_max_filesize = (string) ($phpRuntime['upload_max_filesize'] ?? '');
         $this->php_max_execution_time = (string) ($phpRuntime['max_execution_time'] ?? '');
+        $this->runtime_app_port = $this->site->app_port !== null ? (string) $this->site->app_port : '';
         $ips = $this->site->webhook_allowed_ips;
         $this->webhook_allowed_ips_text = is_array($ips) && $ips !== []
             ? implode("\n", $ips)
             : '';
+        $this->settings_suspended_message = $this->site->suspendedPublicMessage();
     }
 
     #[On('site-provisioning-updated')]
@@ -314,14 +397,19 @@ class Show extends Component
         return (bool) filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6);
     }
 
+    public function shouldAutoReapplyManagedWebserverConfig(): bool
+    {
+        return $this->server->hostCapabilities()->supportsNginxProvisioning()
+            && ! $this->site->usesFunctionsRuntime()
+            && ! $this->site->usesDockerRuntime()
+            && ! $this->site->usesKubernetesRuntime();
+    }
+
     protected function finalizeRoutingMutation(string $successMessage): void
     {
         $this->flash_error = null;
 
-        if (! $this->server->hostCapabilities()->supportsNginxProvisioning()
-            || $this->site->usesFunctionsRuntime()
-            || $this->site->usesDockerRuntime()
-            || $this->site->usesKubernetesRuntime()) {
+        if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
             $this->flash_success = $successMessage;
 
             return;
@@ -877,29 +965,167 @@ class Show extends Component
         }
     }
 
-    public function saveDeploymentSettings(): void
+    public function saveZeroDowntimeDeployment(): void
     {
         $this->authorize('update', $this->site);
         $this->validate([
-            'deploy_strategy' => 'required|in:simple,atomic',
+            'zero_downtime_enabled' => 'boolean',
+        ]);
+
+        $previousStrategy = (string) ($this->site->deploy_strategy ?? 'simple');
+        $newStrategy = $this->zero_downtime_enabled ? 'atomic' : 'simple';
+
+        $this->site->update(['deploy_strategy' => $newStrategy]);
+        $this->site->refresh();
+        $this->deploy_strategy = $newStrategy;
+
+        $message = __('Zero downtime deployment settings saved.');
+
+        if ($previousStrategy === $newStrategy) {
+            $this->flash_success = $message;
+            $this->flash_error = null;
+
+            return;
+        }
+
+        $this->flash_error = null;
+
+        if ($this->shouldAutoReapplyManagedWebserverConfig()) {
+            try {
+                ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
+                $this->site->refresh();
+                $this->flash_success = $message.' '.__('Webserver config reloaded.');
+            } catch (\Throwable $e) {
+                $this->flash_success = $message.' '.__('Saved, but the webserver config could not be re-applied automatically.');
+                $this->flash_error = $e->getMessage();
+            }
+
+            return;
+        }
+
+        $this->flash_success = $message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this strategy.');
+    }
+
+    public function shouldShowSystemUserPanel(): bool
+    {
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
+            return false;
+        }
+
+        return $this->site->shouldShowPhpOctaneRolloutSettings();
+    }
+
+    public function saveDeploymentSettings(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->site->refresh();
+        $showPhpOctane = $this->site->shouldShowPhpOctaneRolloutSettings();
+        $showOctane = $showPhpOctane && $this->site->shouldShowOctaneRuntimeUi();
+        $showReverb = $showPhpOctane && $this->site->shouldShowLaravelReverbRuntimeUi();
+        $showRails = $this->site->shouldShowRailsRuntimeSettings();
+
+        $rules = [
             'releases_to_keep' => 'required|integer|min:1|max:50',
             'nginx_extra_raw' => 'nullable|string|max:16000',
-            'octane_port' => 'nullable|integer|min:1|max:65535',
             'laravel_scheduler' => 'boolean',
             'restart_supervisor_programs_after_deploy' => 'boolean',
             'deployment_environment' => 'required|string|max:32',
-            'php_fpm_user' => 'nullable|string|max:64',
-        ]);
-        $this->site->update([
-            'deploy_strategy' => $this->deploy_strategy,
+            'deploy_health_enabled' => 'boolean',
+            'deploy_health_auto_rollback' => 'boolean',
+            'deploy_health_path' => 'nullable|string|max:512',
+            'deploy_health_expect_status' => 'required|integer|min:100|max:599',
+            'deploy_health_attempts' => 'required|integer|min:1|max:30',
+            'deploy_health_delay_ms' => 'required|integer|min:0|max:10000',
+            'deploy_health_scheme' => ['required', Rule::in(['http', 'https'])],
+            'deploy_health_host' => ['required', 'string', 'max:255'],
+            'deploy_health_port' => [
+                'nullable',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+                    if (! is_numeric($value) || (int) $value < 1 || (int) $value > 65535) {
+                        $fail(__('Enter a valid port between 1 and 65535, or leave empty for the default for your scheme.'));
+                    }
+                },
+            ],
+        ];
+
+        if ($showOctane) {
+            $rules['octane_port'] = 'nullable|integer|min:1|max:65535';
+            $rules['octane_server'] = ['required', Rule::in(Site::OCTANE_SERVERS)];
+        }
+
+        if ($showReverb) {
+            $rules['laravel_reverb_port'] = 'nullable|integer|min:1|max:65535';
+            $rules['laravel_reverb_ws_path'] = ['nullable', 'string', 'max:128'];
+        }
+
+        if ($showRails) {
+            $rules['rails_env'] = 'nullable|string|max:32';
+        }
+
+        if (! $this->shouldShowSystemUserPanel()) {
+            $rules['php_fpm_user'] = 'nullable|string|max:64';
+        }
+
+        $this->validate($rules);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $path = trim($this->deploy_health_path);
+        if ($path === '') {
+            $path = '/health';
+        }
+        $meta['deploy_health_enabled'] = $this->deploy_health_enabled;
+        $meta['deploy_health_auto_rollback'] = $this->deploy_health_auto_rollback;
+        $meta['deploy_health_path'] = $path[0] === '/' ? $path : '/'.$path;
+        $meta['deploy_health_expect_status'] = $this->deploy_health_expect_status;
+        $meta['deploy_health_attempts'] = $this->deploy_health_attempts;
+        $meta['deploy_health_delay_ms'] = $this->deploy_health_delay_ms;
+        $meta['deploy_health_scheme'] = $this->deploy_health_scheme;
+        $meta['deploy_health_host'] = trim($this->deploy_health_host) !== '' ? trim($this->deploy_health_host) : '127.0.0.1';
+        $meta['deploy_health_port'] = $this->deploy_health_port !== '' ? (int) $this->deploy_health_port : null;
+
+        if ($showOctane) {
+            $lo = is_array($meta['laravel_octane'] ?? null) ? $meta['laravel_octane'] : [];
+            $lo['server'] = $this->octane_server;
+            $meta['laravel_octane'] = $lo;
+        }
+
+        if ($showReverb) {
+            $rv = is_array($meta['laravel_reverb'] ?? null) ? $meta['laravel_reverb'] : [];
+            $rv['port'] = $this->laravel_reverb_port !== '' ? (int) $this->laravel_reverb_port : 8080;
+            $ws = trim($this->laravel_reverb_ws_path);
+            $rv['ws_path'] = $ws !== '' ? $ws : '/app';
+            $meta['laravel_reverb'] = $rv;
+        }
+
+        if ($showRails) {
+            $railsRuntime = is_array($meta['rails_runtime'] ?? null) ? $meta['rails_runtime'] : [];
+            $env = trim($this->rails_env);
+            $railsRuntime['env'] = $env !== '' ? $env : 'production';
+            $meta['rails_runtime'] = $railsRuntime;
+        }
+
+        $update = [
             'releases_to_keep' => $this->releases_to_keep,
             'nginx_extra_raw' => $this->nginx_extra_raw !== '' ? $this->nginx_extra_raw : null,
-            'octane_port' => $this->octane_port !== '' ? (int) $this->octane_port : null,
             'laravel_scheduler' => $this->laravel_scheduler,
             'restart_supervisor_programs_after_deploy' => $this->restart_supervisor_programs_after_deploy,
             'deployment_environment' => $this->deployment_environment,
-            'php_fpm_user' => $this->php_fpm_user !== '' ? $this->php_fpm_user : null,
-        ]);
+            'meta' => $meta,
+        ];
+
+        if (! $this->shouldShowSystemUserPanel()) {
+            $update['php_fpm_user'] = $this->php_fpm_user !== '' ? $this->php_fpm_user : null;
+        }
+
+        if ($showOctane) {
+            $update['octane_port'] = $this->octane_port !== '' ? (int) $this->octane_port : null;
+        }
+
+        $this->site->update($update);
+        $this->syncFormFromSite();
         $this->flash_success = 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.';
         $this->flash_error = null;
     }
@@ -1167,6 +1393,104 @@ class Show extends Component
         $this->site->delete();
 
         return $this->redirect(route('servers.show', $this->server), navigate: true);
+    }
+
+    public function confirmSuspendSite(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
+            $this->flash_error = __('Site suspension requires managed web server configuration on this host.');
+            $this->flash_success = null;
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'suspendSite',
+            [],
+            __('Suspend site'),
+            __('Visitors will see a suspended page instead of your application until you resume. SSL and domains are unchanged.'),
+            __('Suspend site'),
+            true,
+        );
+    }
+
+    /**
+     * Suspension only swaps managed HTTP vhost config; deploy hooks and deployments are unchanged (MVP).
+     */
+    public function suspendSite(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
+            $this->flash_error = __('Site suspension is not available for this runtime.');
+
+            return;
+        }
+
+        $this->validate([
+            'settings_suspended_message' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $message = trim($this->settings_suspended_message);
+        if ($message !== '') {
+            $meta['suspended_message'] = $message;
+        } else {
+            unset($meta['suspended_message']);
+        }
+
+        $this->site->update([
+            'suspended_at' => now(),
+            'suspended_reason' => null,
+            'meta' => $meta,
+        ]);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+
+        $this->flash_error = null;
+
+        try {
+            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
+            $this->site->refresh();
+            $this->flash_success = __('Site suspended. Webserver config reloaded.');
+        } catch (\Throwable $e) {
+            $this->flash_success = __('Suspension saved, but the webserver config could not be re-applied automatically.');
+            $this->flash_error = $e->getMessage();
+        }
+    }
+
+    public function resumeSite(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
+            $this->flash_error = __('Resuming requires managed web server configuration on this host.');
+
+            return;
+        }
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta['suspended_message']);
+
+        $this->site->update([
+            'suspended_at' => null,
+            'suspended_reason' => null,
+            'meta' => $meta,
+        ]);
+        $this->site->refresh();
+        $this->settings_suspended_message = '';
+        $this->flash_error = null;
+
+        try {
+            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
+            $this->site->refresh();
+            $this->flash_success = __('Site resumed. Webserver config reloaded.');
+        } catch (\Throwable $e) {
+            $this->flash_success = __('Resume saved, but the webserver config could not be re-applied automatically.');
+            $this->flash_error = $e->getMessage();
+        }
     }
 
     public function render(): View

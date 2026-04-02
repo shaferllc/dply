@@ -30,6 +30,7 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
 
         $ssh = $this->systemSsh($site);
         $this->installPlaceholderPage($site, $ssh);
+        $this->ensureSuspendedPage($site, $ssh);
         $this->writeSystemFile($ssh, $configFile, $this->builder->build($site));
 
         $includeBlock = sprintf(

@@ -98,6 +98,24 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         $this->writeSystemFile($ssh, $root.'/index.html', $builder->render($site));
     }
 
+    /**
+     * Writes {@see SiteSuspendedPageBuilder} HTML under {@see Site::suspendedStaticRoot()}.
+     */
+    protected function ensureSuspendedPage(Site $site, SshConnection $ssh): void
+    {
+        if (! $site->isSuspended()) {
+            return;
+        }
+
+        $dir = rtrim($site->suspendedStaticRoot(), '/');
+        if ($dir === '') {
+            return;
+        }
+
+        $builder = new SiteSuspendedPageBuilder;
+        $this->writeSystemFile($ssh, $dir.'/index.html', $builder->render($site));
+    }
+
     protected function privilegedCommand(Server $server, string $command): string
     {
         $user = trim((string) $server->ssh_user);

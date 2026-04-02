@@ -20,6 +20,7 @@ class DeployHookRunner
             if ($script === '') {
                 continue;
             }
+            $script = app(DeployHookScriptExpander::class)->expand($script, $site);
             $default = (int) config('dply.default_deploy_hook_timeout_seconds', 900);
             $timeout = max(30, min(3600, (int) ($hook->timeout_seconds ?? $default)));
             $log .= "\n--- hook {$phase} #{$hook->id} ---\n";

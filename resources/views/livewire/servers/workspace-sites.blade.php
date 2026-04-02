@@ -106,7 +106,7 @@
                                 @endif
                                 <span class="inline-flex items-center gap-1">
                                     <x-heroicon-o-user class="h-3.5 w-3.5 opacity-80" />
-                                    {{ $s->php_fpm_user ?: $server->ssh_user }}
+                                    {{ $s->effectiveSystemUser($server) }}
                                 </span>
                                 @if ($s->type?->value === 'php' && $s->php_version)
                                     <span class="inline-flex items-center gap-1 font-mono text-brand-ink/80">PHP {{ $s->php_version }}</span>

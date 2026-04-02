@@ -67,6 +67,12 @@ class Index extends Component
                 ],
             ],
             [
+                'label' => __('DNS & CDN'),
+                'items' => [
+                    ['id' => 'cloudflare', 'label' => 'Cloudflare'],
+                ],
+            ],
+            [
                 'label' => __('Infrastructure'),
                 'items' => [
                     ['id' => 'equinix_metal', 'label' => 'Equinix Metal'],

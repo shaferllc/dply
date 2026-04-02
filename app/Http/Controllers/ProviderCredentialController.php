@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\ServerProvider;
 use App\Models\ProviderCredential;
+use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
@@ -73,6 +74,8 @@ class ProviderCredentialController extends Controller
             } elseif ($validated['provider'] === 'vultr') {
                 $vultr = new VultrService($credential);
                 $vultr->validateToken();
+            } elseif ($validated['provider'] === 'cloudflare') {
+                (new CloudflareDnsService($credential))->verifyToken();
             } else {
                 throw new \InvalidArgumentException('Unknown provider: '.$validated['provider']);
             }

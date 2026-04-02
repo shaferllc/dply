@@ -13,6 +13,7 @@
         '{BRANCH}' => __('Configured Git branch.'),
         '{DEPLOY_ENV}' => __('Selected environment group used for key/value vars.'),
         '{PHP_VERSION}' => __('Site PHP version when the runtime is PHP-backed.'),
+        '{RAILS_ENV}' => __('Rails env from site settings (Settings → Runtime / Deploy); substituted in hook scripts before run.'),
     ];
     $deployHookPhaseLabels = [
         \App\Models\SiteDeployHook::PHASE_BEFORE_CLONE => __('Before clone'),
@@ -27,9 +28,12 @@
         ? [
             ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home'],
             ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent'],
+            ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user'],
+            ['id' => 'laravel-stack', 'label' => __('Laravel stack'), 'icon' => 'heroicon-o-bolt'],
             ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square'],
             ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line'],
             ['id' => 'routing', 'label' => __('Networking'), 'icon' => 'heroicon-o-globe-alt'],
+            ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-signal'],
             ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list'],
             ['id' => 'webhooks', 'label' => __('Automation'), 'icon' => 'heroicon-o-bolt'],
             ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box'],
@@ -37,9 +41,12 @@
         : [
             ['id' => 'general', 'label' => __('General'), 'icon' => 'heroicon-o-rectangle-stack'],
             ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share'],
+            ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-signal'],
             ['id' => 'certificates', 'label' => __('Certificates'), 'icon' => 'heroicon-o-shield-check'],
             ['id' => 'deploy', 'label' => __('Deploy'), 'icon' => 'heroicon-o-code-bracket-square'],
             ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent'],
+            ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user'],
+            ['id' => 'laravel-stack', 'label' => __('Laravel stack'), 'icon' => 'heroicon-o-bolt'],
             ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line'],
             ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list'],
             ['id' => 'webhooks', 'label' => __('Webhooks'), 'icon' => 'heroicon-o-clipboard-document-list'],
@@ -150,7 +157,7 @@
             ['label' => __('Provisioning'), 'value' => $site->statusLabel()],
             ['label' => __('SSL'), 'value' => $site->currentSslSummary()],
             ['label' => __('Deploy path'), 'value' => $site->effectiveRepositoryPath()],
-            ['label' => __('Deploy strategy'), 'value' => $site->deploy_strategy],
+            ['label' => __('Zero downtime'), 'value' => $site->deploy_strategy === 'atomic' ? __('Enabled') : __('Disabled')],
         ];
 @endphp
 
@@ -637,6 +644,8 @@
                         </section>
                     @elseif ($section === 'routing')
                         @include('livewire.sites.settings.partials.routing')
+                    @elseif ($section === 'dns')
+                        @include('livewire.sites.settings.partials.dns')
                     @elseif ($section === 'certificates')
                         @include('livewire.sites.settings.partials.certificates')
                     @elseif ($section === 'deploy')
@@ -841,55 +850,154 @@
                             @endif
 
                             @if (! $functionsHost)
-                                <form wire:submit="saveDeploymentSettings" class="space-y-4 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                        <div>
-                                            <h3 class="text-base font-semibold text-brand-ink">{{ __('No downtime and rollout settings') }}</h3>
-                                            <p class="mt-1 text-sm text-brand-moss">{{ __('Atomic deploys keep a releases history, run scripts in the new release, then flip `current` only after success. Simple deploys update the live path directly.') }}</p>
+                                <form wire:submit="saveZeroDowntimeDeployment" class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                                    <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0 flex-1">
+                                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Zero downtime deployment') }}</h3>
+                                            <p class="mt-1 text-sm text-brand-moss">{{ __('When enabled, each deploy goes to a new release directory, then traffic switches to it in one step so the app stays up during builds. Disable to run simple git-based deploys in the deploy path.') }}</p>
+                                            <x-input-error :messages="$errors->get('zero_downtime_enabled')" class="mt-2" />
                                         </div>
-                                        <span class="inline-flex items-center rounded-full bg-brand-sand/50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
-                                            {{ $deploy_strategy === 'atomic' ? __('No downtime') : __('Simple') }}
-                                        </span>
+                                        <label class="flex shrink-0 items-center gap-2 text-sm font-medium text-brand-ink">
+                                            <input type="checkbox" wire:model="zero_downtime_enabled" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
+                                            {{ __('Enable') }}
+                                        </label>
+                                    </div>
+                                    <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/30 px-5 py-3">
+                                        <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+                                    </div>
+                                </form>
+
+                                <form wire:submit="saveDeploymentSettings" class="mt-6 space-y-4 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                                    @if ($zero_downtime_enabled)
+                                        <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                            <div>
+                                                <h3 class="text-base font-semibold text-brand-ink">{{ __('After deploy verification') }}</h3>
+                                                <p class="mt-1 text-sm text-brand-moss">{{ __('Optional HTTP(S) check from the server to a local address with your primary hostname as the Host header after the new release is active. Defaults to http://127.0.0.1. Requires a primary domain and a route that returns the expected status (for example Laravel /up).') }}</p>
+                                            </div>
+                                            <label class="flex items-center gap-2 text-sm font-medium text-brand-ink">
+                                                <input type="checkbox" wire:model="deploy_health_enabled" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
+                                                {{ __('Run health check after each atomic deploy') }}
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm font-medium text-brand-ink">
+                                                <input type="checkbox" wire:model="deploy_health_auto_rollback" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest" @disabled(! $deploy_health_enabled)>
+                                                {{ __('Automatically point current back at the previous release if the check fails') }}
+                                            </label>
+                                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                                <div>
+                                                    <x-input-label for="deploy_health_scheme" value="{{ __('URL scheme') }}" />
+                                                    <select id="deploy_health_scheme" wire:model="deploy_health_scheme" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" @disabled(! $deploy_health_enabled)>
+                                                        <option value="http">http</option>
+                                                        <option value="https">https</option>
+                                                    </select>
+                                                    <x-input-error :messages="$errors->get('deploy_health_scheme')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_host" value="{{ __('Target host') }}" />
+                                                    <x-text-input id="deploy_health_host" wire:model="deploy_health_host" class="font-mono text-sm" placeholder="127.0.0.1" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_host')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_port" value="{{ __('Target port (optional)') }}" />
+                                                    <x-text-input id="deploy_health_port" type="number" wire:model="deploy_health_port" class="font-mono text-sm" placeholder="80 / 443 / custom" min="1" max="65535" :disabled="! $deploy_health_enabled" />
+                                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Leave empty to use the default port for the scheme (80 or 443).') }}</p>
+                                                    <x-input-error :messages="$errors->get('deploy_health_port')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_path" value="{{ __('Health path') }}" />
+                                                    <x-text-input id="deploy_health_path" wire:model="deploy_health_path" class="font-mono text-sm" placeholder="/health" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_path')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_expect_status" value="{{ __('Expected HTTP status') }}" />
+                                                    <x-text-input id="deploy_health_expect_status" type="number" wire:model="deploy_health_expect_status" class="w-24" min="100" max="599" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_expect_status')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_attempts" value="{{ __('Attempts') }}" />
+                                                    <x-text-input id="deploy_health_attempts" type="number" wire:model="deploy_health_attempts" class="w-24" min="1" max="30" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_attempts')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_delay_ms" value="{{ __('Delay between attempts (ms)') }}" />
+                                                    <x-text-input id="deploy_health_delay_ms" type="number" wire:model="deploy_health_delay_ms" class="w-28" min="0" max="10000" step="50" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_delay_ms')" class="mt-1" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <div>
+                                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Rollout and web server') }}</h3>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Releases to keep, environment group, PHP-FPM, cron, Supervisor, and extra Nginx directives. Stack-specific options (for example Octane) appear when detection matches.') }}</p>
                                     </div>
 
                                     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                         <div>
-                                            <x-input-label value="Deploy strategy" />
-                                            <select wire:model="deploy_strategy" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                <option value="simple">{{ __('Simple (git in deploy path)') }}</option>
-                                                <option value="atomic">{{ __('Atomic (releases + current symlink)') }}</option>
-                                            </select>
-                                            <p class="mt-2 text-sm text-brand-moss">{{ __('Choose `Atomic` for no-downtime releases with rollback-friendly history.') }}</p>
-                                        </div>
-                                        <div>
                                             <x-input-label for="releases_to_keep" value="Releases to keep" />
                                             <x-text-input id="releases_to_keep" type="number" wire:model="releases_to_keep" class="mt-1 w-28" min="1" max="50" />
-                                            <p class="mt-2 text-sm text-brand-moss">{{ __('Applies when atomic deploys are enabled.') }}</p>
+                                            <p class="mt-2 text-sm text-brand-moss">{{ __('Applies when zero downtime deployment is enabled.') }}</p>
                                         </div>
                                         <div>
                                             <x-input-label for="deployment_environment" value="Environment group" />
                                             <x-text-input id="deployment_environment" wire:model="deployment_environment" class="mt-1 block w-full text-sm" />
                                             <p class="mt-2 text-sm text-brand-moss">{{ __('Used when resolving key/value environment variables for deploys.') }}</p>
                                         </div>
-                                        <div>
-                                            <x-input-label for="octane_port" value="Octane port" />
-                                            <x-text-input id="octane_port" wire:model="octane_port" placeholder="8000" class="mt-1 block w-full font-mono text-sm" />
-                                        </div>
-                                        <div>
-                                            <x-input-label for="php_fpm_user" value="PHP-FPM pool user" />
-                                            <x-text-input id="php_fpm_user" wire:model="php_fpm_user" class="mt-1 block w-full text-sm" placeholder="www-data" />
-                                        </div>
-                                        <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                        @if ($site->shouldShowPhpOctaneRolloutSettings() && $site->shouldShowOctaneRuntimeUi())
+                                            <div>
+                                                <x-input-label for="octane_port" value="Octane port" />
+                                                <x-text-input id="octane_port" wire:model="octane_port" placeholder="8000" class="mt-1 block w-full font-mono text-sm" />
+                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Mirrors Runtime settings; used for Supervisor `octane:start` command line.') }}</p>
+                                            </div>
+                                            <div>
+                                                <x-input-label for="octane_server" value="{{ __('Octane application server') }}" />
+                                                <select id="octane_server" wire:model="octane_server" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                                                    @foreach (\App\Models\Site::OCTANE_SERVERS as $server)
+                                                        <option value="{{ $server }}">{{ str($server)->replace('_', ' ')->title() }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        @endif
+                                        @if ($site->shouldShowPhpOctaneRolloutSettings() && $site->shouldShowLaravelReverbRuntimeUi())
+                                            <div>
+                                                <x-input-label for="laravel_reverb_port_deploy" value="{{ __('Reverb port') }}" />
+                                                <x-text-input id="laravel_reverb_port_deploy" type="number" wire:model="laravel_reverb_port" placeholder="8080" class="mt-1 block w-full max-w-xs font-mono text-sm" min="1" max="65535" />
+                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Mirrors Laravel stack settings; used for Supervisor and managed web server WebSocket proxies.') }}</p>
+                                            </div>
+                                            <div>
+                                                <x-input-label for="laravel_reverb_ws_path_deploy" value="{{ __('Reverb WebSocket path') }}" />
+                                                <x-text-input id="laravel_reverb_ws_path_deploy" wire:model="laravel_reverb_ws_path" placeholder="/app" class="mt-1 block w-full max-w-xs font-mono text-sm" />
+                                            </div>
+                                        @endif
+                                        @if ($site->shouldShowRailsRuntimeSettings())
+                                            <div class="sm:col-span-2">
+                                                <x-input-label for="rails_env_deploy" value="RAILS_ENV" />
+                                                <x-text-input id="rails_env_deploy" wire:model="rails_env" class="mt-1 block w-full max-w-md font-mono text-sm" placeholder="production" />
+                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Same value as Settings → Runtime. Stored for deploy scripts and operator reference.') }}</p>
+                                                <x-input-error :messages="$errors->get('rails_env')" class="mt-1" />
+                                            </div>
+                                        @endif
+                                        @if (! $this->shouldShowSystemUserPanel())
+                                            <div>
+                                                <x-input-label for="php_fpm_user" value="PHP-FPM pool user" />
+                                                <x-text-input id="php_fpm_user" wire:model="php_fpm_user" class="mt-1 block w-full text-sm" placeholder="www-data" />
+                                            </div>
+                                        @endif
+                                        <div class="lg:col-span-2 rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
                                             <p class="text-sm font-semibold text-brand-ink">{{ __('Rollback context') }}</p>
                                             <p class="mt-1 text-sm text-brand-moss">{{ __('Deploy history and release rollback stay on the site overview page so operators can launch, inspect, and recover from one place.') }}</p>
                                         </div>
                                     </div>
 
                                     <div class="grid gap-3">
-                                        <label class="flex items-center gap-2 text-sm text-brand-ink">
-                                            <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-slate-300">
-                                            {{ __('Laravel scheduler (schedule:run every minute via server crontab)') }}
-                                        </label>
+                                        <div>
+                                            <label class="flex items-center gap-2 text-sm text-brand-ink">
+                                                <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-slate-300">
+                                                {{ $site->runtimeSchedulerRolloutFormLabel() }}
+                                            </label>
+                                            @if ($site->runtimeSchedulerCheckboxHelp())
+                                                <p class="mt-1 pl-6 text-xs text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</p>
+                                            @endif
+                                        </div>
                                         <label class="flex items-center gap-2 text-sm text-brand-ink">
                                             <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="rounded border-slate-300">
                                             {{ __('Restart Supervisor programs after successful deploy') }}
@@ -900,7 +1008,7 @@
                                         </div>
                                     </div>
 
-                                    <x-primary-button type="submit">{{ __('Save deploy strategy') }}</x-primary-button>
+                                    <x-primary-button type="submit">{{ __('Save rollout settings') }}</x-primary-button>
                                 </form>
                             @endif
 
@@ -1097,6 +1205,10 @@
                         </section>
                     @elseif ($section === 'runtime')
                         @include('livewire.sites.settings.partials.runtime')
+                    @elseif ($section === 'system-user')
+                        @include('livewire.sites.settings.partials.system-user')
+                    @elseif ($section === 'laravel-stack')
+                        @include('livewire.sites.settings.partials.laravel-stack')
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'logs')
@@ -1169,6 +1281,164 @@
                         {{ __('Working…') }}
                     </span>
                 </x-primary-button>
+            </div>
+        </x-modal>
+
+        <x-modal
+            name="laravel-ssh-setup-modal"
+            :show="false"
+            maxWidth="lg"
+            overlayClass="bg-brand-ink/30"
+            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            focusable
+        >
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Remote setup') }}</p>
+                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Run this command on the server?') }}</h2>
+                <p class="mt-2 text-sm leading-6 text-brand-moss">
+                    {{ __('This executes once over SSH in your site’s deploy directory. Ensure backups and that you trust this environment.') }}
+                </p>
+            </div>
+
+            <div class="space-y-4 px-6 py-6">
+                @if ($this->laravelSshSetupPendingCommandPreview())
+                    <div class="rounded-xl border border-brand-ink/10 bg-slate-50/70 px-4 py-3">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Command') }}</p>
+                        <pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-brand-ink">{{ $this->laravelSshSetupPendingCommandPreview() }}</pre>
+                    </div>
+                @endif
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                <x-secondary-button type="button" wire:click="closeLaravelSshSetupModal">
+                    {{ __('Cancel') }}
+                </x-secondary-button>
+                <x-primary-button type="button" wire:click="confirmLaravelSshSetup" wire:loading.attr="disabled" wire:target="confirmLaravelSshSetup">
+                    <span wire:loading.remove wire:target="confirmLaravelSshSetup">{{ __('Run command') }}</span>
+                    <span wire:loading wire:target="confirmLaravelSshSetup" class="inline-flex items-center justify-center gap-2">
+                        <x-spinner variant="cream" />
+                        {{ __('Running…') }}
+                    </span>
+                </x-primary-button>
+            </div>
+        </x-modal>
+
+        <x-modal
+            name="site-system-user-create-modal"
+            :show="false"
+            maxWidth="lg"
+            overlayClass="bg-brand-ink/30"
+            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            focusable
+        >
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('System user') }}</p>
+                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Create system user') }}</h2>
+                <p class="mt-2 text-sm leading-6 text-brand-moss">
+                    {{ __('Creates a Linux account on the server, assigns this site’s files to it, and sets the PHP-FPM pool user. Ensure you have backups; ownership changes affect the site directory tree.') }}
+                </p>
+            </div>
+
+            <div class="space-y-4 px-6 py-6">
+                <div>
+                    <x-input-label for="system_user_new_username" :value="__('System user name')" />
+                    <x-text-input id="system_user_new_username" wire:model="system_user_new_username" class="mt-1 block w-full font-mono text-sm" placeholder="app-user" autocomplete="off" />
+                    <x-input-error :messages="$errors->get('system_user_new_username')" class="mt-1" />
+                </div>
+                <label class="flex items-center gap-2 text-sm text-brand-ink">
+                    <input type="checkbox" wire:model="system_user_new_sudo" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
+                    {{ __('Sudo access') }}
+                </label>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                <x-secondary-button type="button" wire:click="closeSystemUserCreateModal">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button type="button" wire:click="queueCreateSystemUser" wire:loading.attr="disabled" wire:target="queueCreateSystemUser">
+                    <span wire:loading.remove wire:target="queueCreateSystemUser">{{ __('Save') }}</span>
+                    <span wire:loading wire:target="queueCreateSystemUser" class="inline-flex items-center gap-2">
+                        <x-spinner variant="cream" />
+                        {{ __('Queueing…') }}
+                    </span>
+                </x-primary-button>
+            </div>
+        </x-modal>
+
+        <x-modal
+            name="site-system-user-assign-modal"
+            :show="false"
+            maxWidth="lg"
+            overlayClass="bg-brand-ink/30"
+            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            focusable
+        >
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('System user') }}</p>
+                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Assign existing user') }}</h2>
+                <p class="mt-2 text-sm leading-6 text-brand-moss">
+                    {{ __('This updates file ownership under this site’s repository path and sets the PHP-FPM pool user. Ensure you have backups.') }}
+                </p>
+            </div>
+
+            <div class="px-6 py-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Selected user') }}</p>
+                <p class="mt-2 font-mono text-sm text-brand-ink">{{ $system_user_assign_username }}</p>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                <x-secondary-button type="button" wire:click="closeSystemUserAssignModal">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button type="button" wire:click="queueAssignSystemUser" wire:loading.attr="disabled" wire:target="queueAssignSystemUser">
+                    <span wire:loading.remove wire:target="queueAssignSystemUser">{{ __('Confirm') }}</span>
+                    <span wire:loading wire:target="queueAssignSystemUser" class="inline-flex items-center gap-2">
+                        <x-spinner variant="cream" />
+                        {{ __('Queueing…') }}
+                    </span>
+                </x-primary-button>
+            </div>
+        </x-modal>
+
+        <x-modal
+            name="site-system-user-remove-modal"
+            :show="false"
+            maxWidth="lg"
+            overlayClass="bg-brand-ink/30"
+            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            focusable
+        >
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('System user') }}</p>
+                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Remove user from server') }}</h2>
+                <p class="mt-2 text-sm leading-6 text-brand-moss">
+                    {{ __('Deletes the Linux account from the host when policy allows. root, dply, and the deploy user cannot be removed. Type the username to confirm.') }}
+                </p>
+            </div>
+
+            <div class="space-y-4 px-6 py-6">
+                <div>
+                    <x-input-label for="system_user_remove_username" :value="__('User to remove')" />
+                    <select id="system_user_remove_username" wire:model="system_user_remove_username" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                        <option value="">{{ __('Choose…') }}</option>
+                        @foreach ($system_user_remote_rows as $row)
+                            <option value="{{ $row['username'] }}">{{ $row['username'] }}</option>
+                        @endforeach
+                    </select>
+                    <x-input-error :messages="$errors->get('system_user_remove_username')" class="mt-1" />
+                </div>
+                <div>
+                    <x-input-label for="system_user_remove_confirm" :value="__('Type the username to confirm')" />
+                    <x-text-input id="system_user_remove_confirm" wire:model="system_user_remove_confirm" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                    <x-input-error :messages="$errors->get('system_user_remove_confirm')" class="mt-1" />
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                <x-secondary-button type="button" wire:click="closeSystemUserRemoveModal">{{ __('Cancel') }}</x-secondary-button>
+                <x-danger-button type="button" wire:click="queueRemoveSystemUser" wire:loading.attr="disabled" wire:target="queueRemoveSystemUser">
+                    <span wire:loading.remove wire:target="queueRemoveSystemUser">{{ __('Remove user') }}</span>
+                    <span wire:loading wire:target="queueRemoveSystemUser" class="inline-flex items-center gap-2">
+                        <x-spinner variant="cream" />
+                        {{ __('Queueing…') }}
+                    </span>
+                </x-danger-button>
             </div>
         </x-modal>
         @include('livewire.partials.confirm-action-modal')

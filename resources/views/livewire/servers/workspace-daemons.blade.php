@@ -102,6 +102,11 @@
                         >{{ __('Preset: schedule:work') }}</button>
                         <button
                             type="button"
+                            wire:click="applySupervisorPreset('laravel-octane')"
+                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
+                        >{{ __('Preset: Laravel Octane') }}</button>
+                        <button
+                            type="button"
                             wire:click="applySupervisorPreset('nodejs')"
                             class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
                         >{{ __('Preset: Node') }}</button>

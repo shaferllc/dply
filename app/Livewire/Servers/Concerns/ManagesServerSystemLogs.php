@@ -4,6 +4,7 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Events\Servers\ServerWorkspaceLogSnapshotBroadcast;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
+use App\Models\Site;
 use App\Services\Servers\ServerSystemLogReader;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -61,6 +62,9 @@ trait ManagesServerSystemLogs
     /** null = no time filter; 5 / 15 / 60 = minutes */
     public ?int $logTimeRangeMinutes = null;
 
+    /** When set, the log viewer only lists this site’s platform + access/error sources. */
+    public ?Site $scopedSite = null;
+
     /**
      * @return array<string, array<string, mixed>>
      */
@@ -70,6 +74,33 @@ trait ManagesServerSystemLogs
         $server = $this->server ?? null;
         if ($server === null) {
             return $sources;
+        }
+
+        if ($this->scopedSite !== null) {
+            $site = $this->scopedSite;
+            $id = (string) $site->getKey();
+            $logDirectory = $site->webserverLogDirectory();
+            $basename = $site->webserverConfigBasename();
+
+            return [
+                'site_'.$id.'_platform' => [
+                    'type' => 'dply_site',
+                    'label' => __('Platform activity'),
+                    'group' => 'site',
+                ],
+                'site_'.$id.'_access' => [
+                    'type' => 'file',
+                    'label' => __('Site access log'),
+                    'path' => $logDirectory.'/'.$basename.'-access.log',
+                    'group' => 'site',
+                ],
+                'site_'.$id.'_error' => [
+                    'type' => 'file',
+                    'label' => __('Site error log'),
+                    'path' => $logDirectory.'/'.$basename.'-error.log',
+                    'group' => 'site',
+                ],
+            ];
         }
 
         $server->loadMissing('sites');
@@ -105,6 +136,10 @@ trait ManagesServerSystemLogs
             return false;
         }
 
+        if ($this->scopedSite !== null && ! $user->can('view', $this->scopedSite)) {
+            return false;
+        }
+
         $this->server->loadMissing('organization');
 
         if ($this->server->organization_id && $this->server->organization?->userIsDeployer($user)) {
@@ -125,6 +160,9 @@ trait ManagesServerSystemLogs
     public function selectLogSource(string $key): void
     {
         $this->authorize('view', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         $keys = array_keys($this->availableLogSources());
         if (! in_array($key, $keys, true)) {
@@ -182,6 +220,9 @@ trait ManagesServerSystemLogs
     public function clearLogDisplay(): void
     {
         $this->authorize('view', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         $this->remoteLogRaw = '';
         $this->remoteLogOutput = '';
@@ -199,6 +240,9 @@ trait ManagesServerSystemLogs
     public function applyLogTailLines(): void
     {
         $this->authorize('update', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         $n = max(50, min(5000, (int) $this->logTailLines));
         $this->logTailLines = $n;
@@ -228,6 +272,9 @@ trait ManagesServerSystemLogs
     public function loadSystemLog(bool $fromPoll = false): void
     {
         $this->authorize('view', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         if (! $fromPoll) {
             $this->logPollBackoffUntil = null;
@@ -248,9 +295,10 @@ trait ManagesServerSystemLogs
         }
 
         $def = $this->availableLogSources()[$this->logKey] ?? [];
-        $isDply = ($def['type'] ?? '') === 'dply';
+        $type = (string) ($def['type'] ?? 'file');
+        $isDbOnly = in_array($type, ['dply', 'dply_site'], true);
 
-        if (! $isDply) {
+        if (! $isDbOnly) {
             if (auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user())) {
                 $this->remoteLogRaw = null;
                 $this->remoteLogOutput = '';
@@ -277,7 +325,8 @@ trait ManagesServerSystemLogs
             (int) config('server_system_logs.fetch_lock_seconds', 120),
             $budget > 0 ? $budget + 30 : 120,
         );
-        $lock = Cache::lock('log-viewer-fetch:'.(string) $this->server->id.':'.$this->logKey, $lockTtl);
+        $siteLockSegment = $this->scopedSite !== null ? (string) $this->scopedSite->getKey() : '0';
+        $lock = Cache::lock('log-viewer-fetch:'.(string) $this->server->id.':'.$siteLockSegment.':'.$this->logKey, $lockTtl);
         $waitSeconds = $fromPoll
             ? max(1, (int) config('server_system_logs.fetch_lock_wait_poll_seconds', 10))
             : max(1, (int) config('server_system_logs.fetch_lock_wait_manual_seconds', 15));
@@ -363,7 +412,7 @@ trait ManagesServerSystemLogs
     {
         $logKeys = array_keys($this->availableLogSources());
         if (! in_array($this->logKey, $logKeys, true)) {
-            $this->logKey = $logKeys[0] ?? 'dply_activity';
+            $this->logKey = $logKeys[0] ?? ($this->scopedSite !== null ? 'site_'.$this->scopedSite->getKey().'_platform' : 'dply_activity');
         }
 
         $this->syncLogViewerPreferencesFromServer();
@@ -414,6 +463,9 @@ trait ManagesServerSystemLogs
     public function setLogTimeRange(?int $minutes): void
     {
         $this->authorize('view', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         if ($minutes !== null && ! in_array($minutes, [5, 15, 60], true)) {
             $minutes = null;
@@ -477,6 +529,17 @@ trait ManagesServerSystemLogs
             return;
         }
 
+        $rawSiteId = $payload['site_id'] ?? null;
+        $payloadSiteId = is_string($rawSiteId) && $rawSiteId !== '' ? $rawSiteId : null;
+
+        if ($this->scopedSite === null) {
+            if ($payloadSiteId !== null) {
+                return;
+            }
+        } elseif ($payloadSiteId !== (string) $this->scopedSite->getKey()) {
+            return;
+        }
+
         if (($payload['log_key'] ?? '') !== $this->logKey) {
             return;
         }
@@ -537,6 +600,7 @@ trait ManagesServerSystemLogs
             logLastFetchTruncated: $this->logLastFetchTruncated,
             logLastFetchRawBytes: $this->logLastFetchRawBytes,
             broadcastPayloadTruncated: $broadcastPayloadTruncated,
+            siteId: $this->scopedSite !== null ? (string) $this->scopedSite->getKey() : null,
         ))->toOthers();
     }
 

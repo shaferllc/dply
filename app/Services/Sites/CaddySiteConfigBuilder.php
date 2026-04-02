@@ -22,8 +22,13 @@ class CaddySiteConfigBuilder
         }
 
         $hosts = $listenPort === null ? $hostnames->implode(', ') : ':'.$listenPort;
-        $root = $site->effectiveDocumentRoot();
         $basename = $site->webserverConfigBasename();
+
+        if ($site->isSuspended()) {
+            return $this->suspendedSiteBlock($hosts, $basename, $site);
+        }
+
+        $root = $site->effectiveDocumentRoot();
         $phpSock = str_replace(
             '{version}',
             $site->php_version ?? '8.3',
@@ -31,10 +36,27 @@ class CaddySiteConfigBuilder
         );
         $redirectLines = $this->redirectLines($site);
 
+        if ($site->type === SiteType::Php && $site->octane_port) {
+            $port = (int) $site->octane_port;
+            $reverb = $this->reverbHandleDirective($site);
+
+            return <<<CADDY
+{$hosts} {
+{$redirectLines}{$reverb}    encode zstd gzip
+    log {
+        output file /var/log/caddy/{$basename}-access.log
+    }
+    reverse_proxy 127.0.0.1:{$port}
+}
+CADDY;
+        }
+
+        $reverbPhp = $site->type === SiteType::Php ? $this->reverbHandleDirective($site) : '';
+
         return match ($site->type) {
             SiteType::Php => <<<CADDY
 {$hosts} {
-{$redirectLines}    root * {$root}
+{$redirectLines}{$reverbPhp}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -63,6 +85,34 @@ CADDY,
 }
 CADDY,
         };
+    }
+
+    private function suspendedSiteBlock(string $hosts, string $basename, Site $site): string
+    {
+        $root = $site->suspendedStaticRoot();
+
+        return <<<CADDY
+{$hosts} {
+    root * {$root}
+    encode zstd gzip
+    log {
+        output file /var/log/caddy/{$basename}-access.log
+    }
+    file_server
+}
+CADDY;
+    }
+
+    private function reverbHandleDirective(Site $site): string
+    {
+        if (! $site->shouldProxyReverbInWebserver()) {
+            return '';
+        }
+
+        $path = $site->reverbWebSocketPath();
+        $port = $site->reverbLocalPort();
+
+        return "    handle {$path}* {\n        reverse_proxy 127.0.0.1:{$port}\n    }\n";
     }
 
     private function redirectLines(Site $site): string

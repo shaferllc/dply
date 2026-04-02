@@ -10,6 +10,7 @@ use App\Models\SiteRedirect;
 use App\Models\SiteTenantDomain;
 use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\CaddySiteConfigBuilder;
+use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\Sites\TraefikSiteConfigBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -67,6 +68,83 @@ class RoutingConfigBuilderParityTest extends TestCase
         $config = app(TraefikSiteConfigBuilder::class)->build($site, 23001);
 
         $this->assertStringContainsString('Host(`example.test`) || Host(`www.example.test`) || Host(`tenant.example.test`)', $config);
+    }
+
+    public function test_apache_builder_proxies_to_octane_port_for_php(): void
+    {
+        $site = $this->routingSite();
+        $site->update([
+            'type' => SiteType::Php,
+            'octane_port' => 8010,
+        ]);
+
+        $config = app(ApacheSiteConfigBuilder::class)->build($site->fresh(['domains', 'domainAliases', 'tenantDomains', 'redirects']));
+
+        $this->assertStringContainsString('(Laravel Octane)', $config);
+        $this->assertStringContainsString('ProxyPass / http://127.0.0.1:8010/', $config);
+    }
+
+    public function test_caddy_builder_proxies_to_octane_port_for_php(): void
+    {
+        $site = $this->routingSite();
+        $site->update([
+            'type' => SiteType::Php,
+            'octane_port' => 8011,
+        ]);
+
+        $config = app(CaddySiteConfigBuilder::class)->build($site->fresh(['domains', 'domainAliases', 'tenantDomains', 'redirects']));
+
+        $this->assertStringContainsString('reverse_proxy 127.0.0.1:8011', $config);
+    }
+
+    public function test_suspended_nginx_apache_caddy_ols_use_suspended_static_root_without_proxy(): void
+    {
+        $site = $this->routingSite();
+        $site->update([
+            'suspended_at' => now(),
+            'type' => SiteType::Php,
+            'octane_port' => 8010,
+            'app_port' => 4000,
+        ]);
+        $site = $site->fresh(['domains', 'domainAliases', 'tenantDomains', 'redirects']);
+        $suspendedRoot = $site->suspendedStaticRoot();
+
+        $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+        $this->assertStringContainsString($suspendedRoot, $nginx);
+        $this->assertStringContainsString('(suspended)', $nginx);
+        $this->assertStringNotContainsString('proxy_pass', $nginx);
+        $this->assertStringNotContainsString('fastcgi_pass', $nginx);
+
+        $apache = app(ApacheSiteConfigBuilder::class)->build($site);
+        $this->assertStringContainsString($suspendedRoot, $apache);
+        $this->assertStringContainsString('(suspended)', $apache);
+        $this->assertStringNotContainsString('ProxyPass', $apache);
+
+        $caddy = app(CaddySiteConfigBuilder::class)->build($site);
+        $this->assertStringContainsString($suspendedRoot, $caddy);
+        $this->assertStringNotContainsString('reverse_proxy', $caddy);
+
+        $ols = app(OpenLiteSpeedSiteConfigBuilder::class)->build($site);
+        $this->assertStringContainsString($suspendedRoot, $ols);
+        $this->assertStringNotContainsString('extprocessor', $ols);
+    }
+
+    public function test_suspended_caddy_backend_block_for_traefik_uses_file_server(): void
+    {
+        $site = $this->routingSite();
+        $site->update([
+            'suspended_at' => now(),
+            'type' => SiteType::Node,
+            'app_port' => 3000,
+        ]);
+        $site = $site->fresh(['domains', 'domainAliases', 'tenantDomains', 'redirects']);
+        $suspendedRoot = $site->suspendedStaticRoot();
+
+        $backend = app(CaddySiteConfigBuilder::class)->build($site, 23001);
+        $this->assertStringContainsString(':23001', $backend);
+        $this->assertStringContainsString($suspendedRoot, $backend);
+        $this->assertStringContainsString('file_server', $backend);
+        $this->assertStringNotContainsString('reverse_proxy', $backend);
     }
 
     private function routingSite(): Site

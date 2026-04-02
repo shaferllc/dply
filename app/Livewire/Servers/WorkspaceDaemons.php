@@ -7,6 +7,7 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\OrganizationSupervisorProgramTemplate;
 use App\Models\Server;
+use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
 use App\Services\Servers\ServerRemovalAdvisor;
@@ -168,6 +169,7 @@ class WorkspaceDaemons extends Component
                 'php artisan schedule:work',
                 '/var/www/app/current'
             ),
+            'laravel-octane' => $this->applyLaravelOctanePreset(),
             'nodejs' => $this->applySupervisorPresetValues(
                 'nodejs-app',
                 'custom',
@@ -184,6 +186,29 @@ class WorkspaceDaemons extends Component
         };
         $this->flash_success = __('Preset loaded — adjust directory if needed, then add the program.');
         $this->flash_error = null;
+    }
+
+    protected function applyLaravelOctanePreset(): void
+    {
+        $command = 'php artisan octane:start --server=swoole --host=127.0.0.1 --port=8000';
+        $directory = '/var/www/app/current';
+
+        if ($this->new_sv_site_id !== null && $this->new_sv_site_id !== '') {
+            $site = Site::query()
+                ->where('server_id', $this->server->id)
+                ->find($this->new_sv_site_id);
+            if ($site !== null && $site->shouldShowOctaneRuntimeUi()) {
+                $command = $site->octaneSupervisorCommand();
+                $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+            }
+        }
+
+        $this->applySupervisorPresetValues(
+            'laravel-octane',
+            'custom',
+            $command,
+            $directory
+        );
     }
 
     protected function applySupervisorPresetValues(string $slug, string $type, string $command, string $directory): void

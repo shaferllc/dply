@@ -25,6 +25,8 @@ return [
         'coolify' => env('DPLY_SERVER_PROVIDER_COOLIFY', false),
         'cap_rover' => env('DPLY_SERVER_PROVIDER_CAP_ROVER', false),
         'aws' => env('DPLY_SERVER_PROVIDER_AWS', false),
+        /** DNS / API token only (not a compute host in v1). */
+        'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true),
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true),
         'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false),
         'azure' => env('DPLY_SERVER_PROVIDER_AZURE', false),
