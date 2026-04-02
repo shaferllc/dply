@@ -118,6 +118,9 @@ class RunSiteDeploymentJob implements ShouldQueue
                 if ($this->site->server?->hostCapabilities()->supportsFunctionDeploy()) {
                     $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
                 }
+                if ($this->site->server?->hostCapabilities()->supportsClusterDeploy()) {
+                    $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
+                }
                 $this->site->update($siteUpdates);
                 $this->cacheIdempotencySuccess($deployment);
                 if (config('insights.queue_after_deploy', true) && $this->site->server?->isVmHost()) {

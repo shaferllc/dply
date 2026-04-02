@@ -3,12 +3,12 @@
 return [
     'workspace_tabs' => [
         'general' => ['label' => 'General'],
-        'domains' => ['label' => 'Domains'],
-        'preview' => ['label' => 'Preview'],
+        'routing' => ['label' => 'Routing'],
         'certificates' => ['label' => 'Certificates'],
-        'build-and-deploy' => ['label' => 'Build & deploy'],
+        'deploy' => ['label' => 'Deploy'],
         'runtime' => ['label' => 'Runtime'],
         'environment' => ['label' => 'Environment'],
+        'logs' => ['label' => 'Logs'],
         'webhooks' => ['label' => 'Webhooks'],
         'danger' => ['label' => 'Danger zone'],
     ],

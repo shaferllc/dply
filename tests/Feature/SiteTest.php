@@ -5,15 +5,19 @@ namespace Tests\Feature;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;
+use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Contracts\DeployEngine;
 use App\Services\Deploy\DockerDeployEngine;
+use App\Services\Deploy\KubernetesKubectlExecutor;
+use App\Models\SiteDomainAlias;
 use App\Models\SiteDomain;
 use App\Models\ProviderCredential;
 use App\Models\SiteCertificate;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteRelease;
+use App\Models\SiteTenantDomain;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -21,6 +25,7 @@ use App\Models\SiteDeployment;
 use App\Models\Workspace;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -79,7 +84,7 @@ class SiteTest extends TestCase
             ->assertSee('Extensions');
     }
 
-    public function test_site_settings_build_and_deploy_section_shows_docker_runtime_artifacts(): void
+    public function test_site_settings_deploy_section_shows_docker_runtime_artifacts(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -104,15 +109,16 @@ class SiteTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'build-and-deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
-            ->assertSee('Docker runtime artifact')
+            ->assertSee('Deploy')
+            ->assertSee('Runtime target')
             ->assertSee('docker compose up -d --build')
             ->assertSee('FROM php:8.3-apache');
     }
 
-    public function test_site_settings_build_and_deploy_section_shows_kubernetes_runtime_artifacts(): void
+    public function test_site_settings_deploy_section_shows_kubernetes_runtime_artifacts(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -140,10 +146,11 @@ class SiteTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'build-and-deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
-            ->assertSee('Kubernetes manifest artifact')
+            ->assertSee('Deploy')
+            ->assertSee('Runtime target')
             ->assertSee('orbit-local')
             ->assertSee('kind: Deployment');
     }
@@ -639,7 +646,7 @@ class SiteTest extends TestCase
         Queue::assertNotPushed(ProvisionSiteJob::class);
     }
 
-    public function test_functions_host_site_settings_build_and_deploy_hides_server_only_controls(): void
+    public function test_functions_host_site_settings_deploy_hides_server_only_controls(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -667,7 +674,7 @@ class SiteTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'build-and-deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
             ->assertSee('Serverless deploy target')
@@ -678,7 +685,7 @@ class SiteTest extends TestCase
             ->assertDontSee('Generate deploy key');
     }
 
-    public function test_aws_lambda_site_settings_build_and_deploy_shows_lambda_details(): void
+    public function test_aws_lambda_site_settings_deploy_shows_lambda_details(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -709,7 +716,7 @@ class SiteTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'build-and-deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
             ->assertSee('Serverless deploy target')
@@ -943,6 +950,23 @@ class SiteTest extends TestCase
 
     public function test_kubernetes_host_deploy_uses_kubernetes_engine(): void
     {
+        app()->instance(KubernetesKubectlExecutor::class, new class extends KubernetesKubectlExecutor
+        {
+            public function deploy(
+                string $manifest,
+                string $namespace,
+                string $deploymentName,
+                ?string $kubeconfigPath = null,
+                ?string $context = null,
+            ): array {
+                return [
+                    'output' => "namespace/{$namespace} unchanged\ndeployment.apps/{$deploymentName} configured\ndeployment \"{$deploymentName}\" successfully rolled out",
+                    'revision' => '3',
+                    'context' => $context ?? 'orbit-local',
+                ];
+            }
+        });
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -972,10 +996,14 @@ class SiteTest extends TestCase
         $site->refresh();
 
         $this->assertSame(SiteDeployment::STATUS_SUCCESS, $deployment->status);
-        $this->assertSame(Site::STATUS_KUBERNETES_CONFIGURED, $site->status);
-        $this->assertStringContainsString('Kubernetes deploy prepared.', (string) $deployment->log_output);
+        $this->assertSame('3', $deployment->git_sha);
+        $this->assertSame(Site::STATUS_KUBERNETES_ACTIVE, $site->status);
+        $this->assertStringContainsString('Kubernetes deploy applied.', (string) $deployment->log_output);
         $this->assertSame('dply-tests', data_get($site->meta, 'kubernetes_runtime.namespace'));
         $this->assertNotEmpty(data_get($site->meta, 'kubernetes_runtime.manifest_yaml'));
+        $this->assertSame(\Illuminate\Support\Str::slug($site->slug ?: $site->name), data_get($site->meta, 'kubernetes_runtime.deployment_name'));
+        $this->assertSame('3', data_get($site->meta, 'kubernetes_runtime.last_revision_id'));
+        $this->assertSame('orbit-local', data_get($site->meta, 'kubernetes_runtime.kubectl_context'));
     }
 
     /**
@@ -1087,10 +1115,171 @@ class SiteTest extends TestCase
             ->assertSee('General')
             ->assertSee('Project settings')
             ->assertSee('Save project settings')
-            ->assertSee('Domains')
-            ->assertSee('Build & deploy')
+            ->assertSee('Routing')
+            ->assertSee('Certificates')
+            ->assertSee('Deploy')
             ->assertSee('Danger zone')
+            ->assertDontSee('Aliases')
+            ->assertDontSee('Redirects')
+            ->assertDontSee('Tenants')
             ->assertDontSee('Deployment log');
+    }
+
+    public function test_site_settings_legacy_routing_section_redirects_to_routing_tab(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'aliases'], false));
+
+        $response->assertRedirect(route('sites.settings', [
+            $server,
+            $site,
+            'section' => 'routing',
+            'tab' => 'aliases',
+        ], false));
+    }
+
+    public function test_site_settings_deploy_section_shows_no_downtime_scripts_hooks_variables_and_log_links(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'deploy_strategy' => 'atomic',
+            'releases_to_keep' => 8,
+            'git_repository_url' => 'git@github.com:org/repo.git',
+            'git_branch' => 'main',
+            'post_deploy_command' => 'php artisan optimize',
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        \App\Models\SiteDeployStep::query()->create([
+            'site_id' => $site->id,
+            'sort_order' => 1,
+            'step_type' => \App\Models\SiteDeployStep::TYPE_NPM_CI,
+            'timeout_seconds' => 900,
+        ]);
+        \App\Models\SiteDeployHook::query()->create([
+            'site_id' => $site->id,
+            'phase' => \App\Models\SiteDeployHook::PHASE_AFTER_CLONE,
+            'script' => 'php artisan migrate --force',
+            'sort_order' => 1,
+            'timeout_seconds' => 900,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
+
+        $response->assertOk()
+            ->assertSee('Deploy')
+            ->assertSee('No downtime')
+            ->assertSee('Pre-deploy script')
+            ->assertSee('Main deploy script')
+            ->assertSee('Post-deploy script')
+            ->assertSee('Deploy hooks')
+            ->assertSee('Deploy script variables')
+            ->assertSee('{SITE_DOMAIN}')
+            ->assertSee('{BRANCH}')
+            ->assertSee(route('sites.settings', [$server, $site, 'section' => 'logs'], false), escape: false)
+            ->assertSee(route('servers.logs', $server, false), escape: false);
+    }
+
+    public function test_site_settings_deploy_section_can_save_repository_and_strategy_settings(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'deploy_strategy' => 'simple',
+            'releases_to_keep' => 3,
+            'deployment_environment' => 'production',
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'deploy'])
+            ->set('git_repository_url', 'git@github.com:acme/example.git')
+            ->set('git_branch', 'release')
+            ->set('post_deploy_command', 'php artisan optimize')
+            ->call('saveGit')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Git settings saved.')
+            ->set('deploy_strategy', 'atomic')
+            ->set('releases_to_keep', 8)
+            ->set('deployment_environment', 'staging')
+            ->set('octane_port', '8080')
+            ->set('php_fpm_user', 'deploy')
+            ->set('laravel_scheduler', true)
+            ->set('restart_supervisor_programs_after_deploy', true)
+            ->set('nginx_extra_raw', 'location /health { return 200; }')
+            ->call('saveDeploymentSettings')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.');
+
+        $site->refresh();
+
+        $this->assertSame('git@github.com:acme/example.git', $site->git_repository_url);
+        $this->assertSame('release', $site->git_branch);
+        $this->assertSame('php artisan optimize', $site->post_deploy_command);
+        $this->assertSame('atomic', $site->deploy_strategy);
+        $this->assertSame(8, $site->releases_to_keep);
+        $this->assertSame('staging', $site->deployment_environment);
+        $this->assertSame(8080, $site->octane_port);
+        $this->assertSame('deploy', $site->php_fpm_user);
+        $this->assertTrue($site->laravel_scheduler);
+        $this->assertTrue($site->restart_supervisor_programs_after_deploy);
+        $this->assertSame('location /health { return 200; }', $site->nginx_extra_raw);
+    }
+
+    public function test_site_settings_general_section_uses_certificate_summary_for_ssl_status(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+            'ssl_status' => Site::SSL_NONE,
+        ]);
+        SiteCertificate::query()->create([
+            'site_id' => $site->id,
+            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+            'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+            'domains_json' => ['app.example.com'],
+            'status' => SiteCertificate::STATUS_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'general'], false));
+
+        $response->assertOk()
+            ->assertSee('SSL')
+            ->assertSee('active');
     }
 
     public function test_site_settings_general_section_shows_project_context_links(): void
@@ -1122,6 +1311,45 @@ class SiteTest extends TestCase
             ->assertSee('Open project resources')
             ->assertSee('Open project operations')
             ->assertSee('Open project delivery');
+    }
+
+    public function test_site_settings_general_section_shows_site_details_and_notes(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'php_inventory' => [
+                    'supported' => true,
+                    'installed_versions' => ['8.4', '8.3'],
+                    'detected_default_version' => '8.4',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'php_version' => '8.4',
+            'meta' => [
+                'notes' => 'Important operator notes.',
+                'disk_usage' => [
+                    'bytes' => 174325760,
+                ],
+            ],
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'general'], false));
+
+        $response->assertOk()
+            ->assertSee('Site details')
+            ->assertSee('Site ID')
+            ->assertSee('Site notes')
+            ->assertSee('Important operator notes.')
+            ->assertDontSee('Save PHP settings');
     }
 
     public function test_site_settings_component_rejects_unknown_section(): void
@@ -1292,6 +1520,134 @@ class SiteTest extends TestCase
             ->assertSee('Manifest');
     }
 
+    public function test_site_show_displays_preview_and_certificate_summary(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+            'ssl_status' => Site::SSL_NONE,
+        ]);
+        SitePreviewDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'preview-app.dply.cc',
+            'label' => 'Managed preview',
+            'dns_status' => 'ready',
+            'ssl_status' => 'pending',
+            'is_primary' => true,
+            'auto_ssl' => true,
+            'https_redirect' => true,
+            'managed_by_dply' => true,
+        ]);
+        SiteCertificate::query()->create([
+            'site_id' => $site->id,
+            'scope_type' => SiteCertificate::SCOPE_PREVIEW,
+            'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+            'domains_json' => ['preview-app.dply.cc'],
+            'status' => SiteCertificate::STATUS_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+
+        $response->assertOk()
+            ->assertSee('Preview & SSL')
+            ->assertSee('preview-app.dply.cc')
+            ->assertSee('ready')
+            ->assertSee('Letsencrypt')
+            ->assertSee('Preview')
+            ->assertSee('active');
+    }
+
+    public function test_site_show_displays_certificate_retry_affordance_for_failed_certificate(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        SiteCertificate::query()->create([
+            'site_id' => $site->id,
+            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+            'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+            'domains_json' => ['app.example.com'],
+            'status' => SiteCertificate::STATUS_FAILED,
+            'last_output' => 'DNS validation failed for app.example.com',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+
+        $response->assertOk()
+            ->assertSee('Latest certificate output')
+            ->assertSee('DNS validation failed for app.example.com')
+            ->assertSee('Retry certificate')
+            ->assertSee('Open certificate settings');
+    }
+
+    public function test_site_show_can_retry_a_failed_certificate(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        $certificate = SiteCertificate::query()->create([
+            'site_id' => $site->id,
+            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+            'provider_type' => SiteCertificate::PROVIDER_CSR,
+            'challenge_type' => SiteCertificate::CHALLENGE_MANUAL,
+            'domains_json' => ['app.example.com'],
+            'status' => SiteCertificate::STATUS_FAILED,
+            'last_output' => 'Initial failure',
+        ]);
+
+        $this->mock(\App\Services\Certificates\CertificateRequestService::class, function ($mock) use ($certificate): void {
+            $mock->shouldReceive('execute')
+                ->once()
+                ->withArgs(fn (SiteCertificate $passed): bool => $passed->is($certificate))
+                ->andReturnUsing(function (SiteCertificate $passed): SiteCertificate {
+                    $passed->forceFill([
+                        'status' => SiteCertificate::STATUS_ISSUED,
+                        'last_output' => 'CSR regenerated successfully',
+                    ])->save();
+
+                    return $passed->fresh();
+                });
+        });
+
+        Livewire::actingAs($user)
+            ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+            ->call('retryCertificate', $certificate->id)
+            ->assertSet('flash_success', 'Certificate retry finished.');
+
+        $certificate->refresh();
+
+        $this->assertSame(SiteCertificate::STATUS_ISSUED, $certificate->status);
+        $this->assertSame('CSR regenerated successfully', $certificate->last_output);
+    }
+
     public function test_sites_index_shows_provisioning_badge_and_visit_link_only_when_ready(): void
     {
         $user = $this->userWithOrganization();
@@ -1388,6 +1744,8 @@ class SiteTest extends TestCase
 
     public function test_site_settings_domains_section_can_remove_domain_through_modal_state(): void
     {
+        Bus::fake();
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -1406,7 +1764,8 @@ class SiteTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'domains'])
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+            ->set('routingTab', 'domains')
             ->call(
                 'openConfirmActionModal',
                 'removeDomain',
@@ -1421,6 +1780,101 @@ class SiteTest extends TestCase
             ->call('confirmActionModal');
 
         $this->assertDatabaseMissing('site_domains', ['id' => $domain->id]);
+        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+    }
+
+    public function test_site_settings_aliases_section_can_add_alias(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+            ->set('routingTab', 'aliases')
+            ->set('new_alias_hostname', 'www.example.com')
+            ->set('new_alias_label', 'Marketing alias')
+            ->call('addAlias')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Alias added. Webserver config reloaded.');
+
+        $this->assertDatabaseHas('site_domain_aliases', [
+            'site_id' => $site->id,
+            'hostname' => 'www.example.com',
+            'label' => 'Marketing alias',
+        ]);
+        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+    }
+
+    public function test_site_settings_tenants_section_can_add_tenant_domain(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+            ->set('routingTab', 'tenants')
+            ->set('new_tenant_hostname', 'acme.example.com')
+            ->set('new_tenant_key', 'acme')
+            ->set('new_tenant_label', 'Acme')
+            ->set('new_tenant_notes', 'App resolver uses the hostname.')
+            ->call('addTenantDomain')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Tenant domain added. Webserver config reloaded.');
+
+        $this->assertDatabaseHas('site_tenant_domains', [
+            'site_id' => $site->id,
+            'hostname' => 'acme.example.com',
+            'tenant_key' => 'acme',
+            'label' => 'Acme',
+        ]);
+        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+    }
+
+    public function test_site_settings_redirects_section_renders_separately(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'routing', 'tab' => 'redirects'], false));
+
+        $response->assertOk()
+            ->assertSee('Redirects')
+            ->assertSee('Add redirect')
+            ->assertSee('Apply webserver config now');
     }
 
     public function test_site_settings_webhooks_section_can_save_ip_allow_list(): void
@@ -1450,8 +1904,53 @@ class SiteTest extends TestCase
         $this->assertSame(['203.0.113.10', '192.0.2.0/24'], $site->webhook_allowed_ips);
     }
 
+    public function test_site_settings_logs_section_renders_site_deployments_and_webhook_deliveries(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        SiteDeployment::query()->create([
+            'site_id' => $site->id,
+            'project_id' => $site->project_id,
+            'trigger' => SiteDeployment::TRIGGER_MANUAL,
+            'status' => SiteDeployment::STATUS_SUCCESS,
+            'git_sha' => 'abc123',
+            'log_output' => 'Deploy completed successfully.',
+            'started_at' => now()->subMinutes(5),
+            'finished_at' => now()->subMinutes(4),
+        ]);
+        \App\Models\WebhookDeliveryLog::query()->create([
+            'site_id' => $site->id,
+            'request_ip' => '203.0.113.10',
+            'http_status' => 202,
+            'outcome' => \App\Models\WebhookDeliveryLog::OUTCOME_ACCEPTED,
+            'detail' => 'Accepted deploy webhook.',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'logs'], false));
+
+        $response->assertOk()
+            ->assertSee('Logs')
+            ->assertSee('Recent deploys')
+            ->assertSee('Deploy completed successfully.')
+            ->assertSee('Webhook delivery log')
+            ->assertSee('Accepted deploy webhook.')
+            ->assertSee(route('servers.logs', $server, false), escape: false);
+    }
+
     public function test_site_settings_general_section_can_save_primary_domain_and_web_directory(): void
     {
+        Bus::fake();
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -1477,13 +1976,14 @@ class SiteTest extends TestCase
             ->set('settings_document_root', '/srv/new/public')
             ->call('saveGeneralSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Site settings saved.');
+            ->assertSet('flash_success', 'Site settings saved. Webserver config reloaded.');
 
         $site->refresh();
         $domain->refresh();
 
         $this->assertSame('/srv/new/public', $site->document_root);
         $this->assertSame('new.example.com', $domain->hostname);
+        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_project_settings_can_assign_workspace(): void
@@ -1553,8 +2053,105 @@ class SiteTest extends TestCase
         $this->assertNotSame($foreignWorkspace->id, $site->workspace_id);
     }
 
+    public function test_site_settings_runtime_section_can_save_php_version(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'php_inventory' => [
+                    'supported' => true,
+                    'installed_versions' => ['8.4', '8.3'],
+                    'detected_default_version' => '8.4',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'php_version' => '8.3',
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
+            ->set('php_version', '8.4')
+            ->call('savePhpSettings')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'PHP settings saved.');
+
+        $site->refresh();
+
+        $this->assertSame('8.4', $site->php_version);
+    }
+
+    public function test_site_settings_runtime_section_hides_php_workspace_for_non_php_sites(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'php_inventory' => [
+                    'supported' => true,
+                    'installed_versions' => ['8.4', '8.3'],
+                    'detected_default_version' => '8.4',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'type' => \App\Enums\SiteType::Node,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'runtime'], false));
+
+        $response->assertOk()
+            ->assertDontSee('Save PHP settings')
+            ->assertDontSee('Current site version')
+            ->assertDontSee('Deploy strategy')
+            ->assertSee('Runtime');
+    }
+
+    public function test_site_settings_general_section_can_save_site_notes(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [],
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->set('site_notes', 'Remember the vendor firewall allow list.')
+            ->call('saveSiteNotes')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'Site notes saved.');
+
+        $site->refresh();
+
+        $this->assertSame('Remember the vendor firewall allow list.', data_get($site->meta, 'notes'));
+    }
+
     public function test_site_settings_preview_section_can_save_primary_preview_domain(): void
     {
+        Bus::fake();
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -1574,14 +2171,15 @@ class SiteTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'preview'])
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+            ->set('routingTab', 'preview')
             ->set('preview_primary_hostname', 'preview-new.dply.cc')
             ->set('preview_label', 'Managed preview')
             ->set('preview_auto_ssl', true)
             ->set('preview_https_redirect', true)
             ->call('savePreviewSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Preview settings saved.');
+            ->assertSet('flash_success', 'Preview settings saved. Webserver config reloaded.');
 
         $site->refresh();
         $previewDomain = SitePreviewDomain::query()->where('site_id', $site->id)->first();
@@ -1590,6 +2188,175 @@ class SiteTest extends TestCase
         $this->assertSame('preview-new.dply.cc', $previewDomain->hostname);
         $this->assertTrue($previewDomain->is_primary);
         $this->assertSame('preview-new.dply.cc', $site->testingHostname());
+        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+    }
+
+    public function test_site_settings_domains_section_shows_quick_ssl_action_only_for_uncovered_domains(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'app.example.com',
+            'is_primary' => true,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'www.example.com',
+            'is_primary' => false,
+        ]);
+        SiteCertificate::query()->create([
+            'site_id' => $site->id,
+            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+            'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+            'domains_json' => ['app.example.com'],
+            'status' => SiteCertificate::STATUS_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'routing', 'tab' => 'domains'], false));
+
+        $response->assertOk()
+            ->assertSee('SSL configured')
+            ->assertSee('SSL missing')
+            ->assertSee("openQuickDomainSslModal('www.example.com')", escape: false)
+            ->assertDontSee("openQuickDomainSslModal('app.example.com')", escape: false);
+    }
+
+    public function test_site_settings_domains_section_can_quick_add_letsencrypt_ssl(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'app.example.com',
+            'is_primary' => true,
+        ]);
+
+        $this->mock(\App\Services\Certificates\CertificateRequestService::class, function ($mock) use ($site): void {
+            $mock->shouldReceive('create')
+                ->once()
+                ->withArgs(function (array $attributes) use ($site): bool {
+                    return $attributes['site_id'] === $site->id
+                        && $attributes['scope_type'] === SiteCertificate::SCOPE_CUSTOMER
+                        && $attributes['provider_type'] === SiteCertificate::PROVIDER_LETSENCRYPT
+                        && $attributes['challenge_type'] === SiteCertificate::CHALLENGE_HTTP
+                        && $attributes['domains_json'] === ['app.example.com'];
+                })
+                ->andReturnUsing(function (array $attributes): SiteCertificate {
+                    return SiteCertificate::query()->create($attributes);
+                });
+
+            $mock->shouldReceive('execute')
+                ->once()
+                ->andReturnUsing(function (SiteCertificate $certificate): SiteCertificate {
+                    $certificate->forceFill([
+                        'status' => SiteCertificate::STATUS_ACTIVE,
+                        'last_output' => 'Issued successfully',
+                    ])->save();
+
+                    return $certificate->fresh();
+                });
+        });
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+            ->set('routingTab', 'domains')
+            ->call('openQuickDomainSslModal', 'app.example.com')
+            ->assertSet('quick_ssl_domain_hostname', 'app.example.com')
+            ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+            ->call('quickAddDomainSsl')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'SSL request started for app.example.com via Let\'s Encrypt.');
+
+        $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
+
+        $this->assertNotNull($certificate);
+        $this->assertSame(SiteCertificate::STATUS_ACTIVE, $certificate->status);
+        $this->assertSame(['app.example.com'], $certificate->domainHostnames());
+    }
+
+    public function test_site_settings_domains_section_can_quick_add_zerossl_ssl(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'api.example.com',
+            'is_primary' => true,
+        ]);
+
+        $this->mock(\App\Services\Certificates\CertificateRequestService::class, function ($mock) use ($site): void {
+            $mock->shouldReceive('create')
+                ->once()
+                ->withArgs(function (array $attributes) use ($site): bool {
+                    return $attributes['site_id'] === $site->id
+                        && $attributes['scope_type'] === SiteCertificate::SCOPE_CUSTOMER
+                        && $attributes['provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
+                        && $attributes['challenge_type'] === SiteCertificate::CHALLENGE_HTTP
+                        && $attributes['domains_json'] === ['api.example.com'];
+                })
+                ->andReturnUsing(function (array $attributes): SiteCertificate {
+                    return SiteCertificate::query()->create($attributes);
+                });
+
+            $mock->shouldReceive('execute')
+                ->once()
+                ->andReturnUsing(function (SiteCertificate $certificate): SiteCertificate {
+                    $certificate->forceFill([
+                        'status' => SiteCertificate::STATUS_ACTIVE,
+                        'last_output' => 'ZeroSSL certificate issued and installed.',
+                    ])->save();
+
+                    return $certificate->fresh();
+                });
+        });
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+            ->set('routingTab', 'domains')
+            ->call('openQuickDomainSslModal', 'api.example.com')
+            ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_ZEROSSL)
+            ->call('quickAddDomainSsl')
+            ->assertHasNoErrors()
+            ->assertSet('flash_success', 'SSL request started for api.example.com via ZeroSSL.');
+
+        $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
+
+        $this->assertNotNull($certificate);
+        $this->assertSame(SiteCertificate::PROVIDER_ZEROSSL, $certificate->provider_type);
+        $this->assertSame(SiteCertificate::STATUS_ACTIVE, $certificate->status);
+        $this->assertSame(['api.example.com'], $certificate->domainHostnames());
     }
 
     public function test_site_settings_certificates_section_can_create_csr(): void

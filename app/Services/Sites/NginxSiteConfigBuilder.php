@@ -9,8 +9,8 @@ class NginxSiteConfigBuilder
 {
     public function build(Site $site): string
     {
-        $site->loadMissing(['domains', 'redirects']);
-        $hostnames = $site->domains->pluck('hostname')->filter()->unique()->values();
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects']);
+        $hostnames = collect($site->webserverHostnames());
         if ($hostnames->isEmpty()) {
             throw new \InvalidArgumentException('Add at least one domain before installing Nginx.');
         }

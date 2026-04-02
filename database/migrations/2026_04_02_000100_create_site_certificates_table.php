@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('site_certificates')) {
+            return;
+        }
+
         Schema::create('site_certificates', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->foreignUlid('site_id')->constrained()->cascadeOnDelete();

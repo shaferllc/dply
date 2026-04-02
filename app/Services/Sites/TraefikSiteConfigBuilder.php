@@ -8,9 +8,12 @@ class TraefikSiteConfigBuilder
 {
     public function build(Site $site, int $backendPort): string
     {
-        $site->loadMissing('domains');
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains']);
 
-        $hostnames = $site->domains->pluck('hostname')->filter()->unique()->values();
+        $hostnames = collect($site->webserverHostnames())
+            ->filter()
+            ->unique()
+            ->values();
         if ($hostnames->isEmpty()) {
             throw new \InvalidArgumentException('Add at least one domain before installing Traefik.');
         }

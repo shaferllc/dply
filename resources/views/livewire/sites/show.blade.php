@@ -18,6 +18,16 @@
     $serverlessRuntime = $site->usesFunctionsRuntime() ? $site->serverlessConfig() : [];
     $dockerRuntime = $site->usesDockerRuntime() && is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
     $kubernetesRuntime = $site->usesKubernetesRuntime() && is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
+    $previewDomain = $site->primaryPreviewDomain();
+    $activeCertificate = $site->certificates->firstWhere('status', \App\Models\SiteCertificate::STATUS_ACTIVE);
+    $pendingCertificate = $activeCertificate
+        ? null
+        : $site->certificates->first(fn ($certificate) => in_array($certificate->status, [
+            \App\Models\SiteCertificate::STATUS_PENDING,
+            \App\Models\SiteCertificate::STATUS_ISSUED,
+            \App\Models\SiteCertificate::STATUS_INSTALLING,
+        ], true));
+    $latestCertificate = $activeCertificate ?? $pendingCertificate ?? $site->certificates->first();
     $statusSteps = [
         'queued' => __('Queued'),
         'provisioning_testing_hostname' => __('Assigning testing hostname'),
@@ -468,10 +478,10 @@
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <h3 class="text-lg font-semibold text-slate-900">{{ __('Site settings') }}</h3>
-                            <p class="mt-1 text-sm text-slate-600">{{ __('Domains, runtime, environment, webhooks, and destructive actions now live in the dedicated site settings workspace.') }}</p>
+                            <p class="mt-1 text-sm text-slate-600">{{ __('Routing, certificates, deploy settings, runtime, environment, webhooks, and destructive actions now live in the dedicated site settings workspace.') }}</p>
                         </div>
-                        <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                            {{ __('Open site settings') }}
+                        <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'routing']) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                            {{ __('Open routing settings') }}
                         </a>
                     </div>
                 </div>
@@ -482,8 +492,8 @@
                             <h3 class="font-medium text-slate-900">{{ __('Deploy operations') }}</h3>
                             <p class="mt-1 text-sm text-slate-600">{{ __('Use the dedicated settings workspace for repository and runtime configuration. This page keeps the deploy actions and output close together.') }}</p>
                         </div>
-                        <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'build-and-deploy']) }}" wire:navigate class="text-sm font-medium text-slate-700 underline">
-                            {{ __('Open build & deploy settings') }}
+                        <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="text-sm font-medium text-slate-700 underline">
+                            {{ __('Open deploy settings') }}
                         </a>
                     </div>
 
@@ -567,6 +577,82 @@
                     </ul>
                 @endif
             </div>
+
+            @if ($previewDomain || $site->certificates->isNotEmpty())
+                <div class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 class="font-medium text-slate-900">{{ __('Preview & SSL') }}</h3>
+                            <p class="text-sm text-slate-600">{{ __('Preview hostname reachability and the latest certificate state for this site.') }}</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                            {{ $site->currentSslSummary() }}
+                        </span>
+                    </div>
+
+                    <dl class="grid gap-4 sm:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Preview hostname') }}</dt>
+                            <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $previewDomain?->hostname ?? __('No preview domain') }}</dd>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Preview DNS') }}</dt>
+                            <dd class="mt-2 text-sm text-slate-900">{{ $previewDomain?->dns_status ?? __('Not configured') }}</dd>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Latest certificate') }}</dt>
+                            <dd class="mt-2 text-sm text-slate-900">
+                                @if ($latestCertificate)
+                                    {{ ucfirst($latestCertificate->provider_type) }} · {{ $latestCertificate->status }}
+                                @else
+                                    {{ __('No certificates requested') }}
+                                @endif
+                            </dd>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Certificate scope') }}</dt>
+                            <dd class="mt-2 text-sm text-slate-900">{{ $latestCertificate ? ucfirst($latestCertificate->scope_type) : __('—') }}</dd>
+                        </div>
+                        @if ($latestCertificate)
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Certificate domains') }}</dt>
+                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ implode(', ', $latestCertificate->domainHostnames()) }}</dd>
+                            </div>
+                            @if (! empty($latestCertificate->last_output))
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Latest certificate output') }}</dt>
+                                    <dd class="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-slate-900">{{ \Illuminate\Support\Str::limit($latestCertificate->last_output, 800) }}</dd>
+                                </div>
+                            @endif
+                        @endif
+                    </dl>
+
+                    @if ($latestCertificate && in_array($latestCertificate->status, [
+                        \App\Models\SiteCertificate::STATUS_FAILED,
+                        \App\Models\SiteCertificate::STATUS_PENDING,
+                        \App\Models\SiteCertificate::STATUS_ISSUED,
+                    ], true))
+                        <div class="flex flex-wrap gap-3">
+                            <button
+                                type="button"
+                                wire:click="retryCertificate('{{ $latestCertificate->id }}')"
+                                wire:loading.attr="disabled"
+                                class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+                            >
+                                <span wire:loading.remove wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retry certificate') }}</span>
+                                <span wire:loading wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retrying...') }}</span>
+                            </button>
+                            <a
+                                href="{{ route('sites.settings', [$server, $site, 'section' => 'certificates']) }}"
+                                wire:navigate
+                                class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            >
+                                {{ __('Open certificate settings') }}
+                            </a>
+                        </div>
+                    @endif
+                </div>
+            @endif
 
             @if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime())
                 <div class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">

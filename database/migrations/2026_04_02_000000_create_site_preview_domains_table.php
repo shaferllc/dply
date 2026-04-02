@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('site_preview_domains')) {
+            return;
+        }
+
         Schema::create('site_preview_domains', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->foreignUlid('site_id')->constrained()->cascadeOnDelete();

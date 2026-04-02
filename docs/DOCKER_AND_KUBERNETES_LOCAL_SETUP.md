@@ -47,12 +47,13 @@ For local cluster work:
 2. Create a Kubernetes-backed target in Dply.
 3. Create a site on that target.
 4. Run site provisioning once so Dply writes the initial manifest artifact.
-5. Run a deploy to refresh the rendered manifest and deployment metadata.
+5. Run a deploy to refresh the rendered manifest, apply it with `kubectl`, and wait for rollout status.
 
 What Dply does today:
 - assigns the `kubernetes_web` runtime profile to sites on Kubernetes hosts
 - prepares deployment and service manifests
-- stores the rendered manifest and namespace metadata on the site
+- applies the manifest to the current local kubeconfig or configured context with `kubectl`
+- stores the rendered manifest, namespace, context, and rollout metadata on the site
 - uses the Kubernetes deploy engine instead of the SSH deploy pipeline
 
 ## DigitalOcean Kubernetes notes
@@ -67,6 +68,5 @@ What is captured:
 What is not validated yet:
 - cluster existence via the DigitalOcean API
 - kubeconfig retrieval
-- live `kubectl apply` from the control plane
 
-That means the current implementation is a clean runtime boundary and artifact-generation path first, with provider-backed cluster execution ready to deepen from there.
+That means local Orbit or OrbStack clusters can now be exercised end to end from the BYO control plane, while provider-backed kubeconfig retrieval and deeper DOKS validation still need to be added.

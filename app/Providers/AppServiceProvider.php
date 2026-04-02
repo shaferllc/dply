@@ -52,6 +52,7 @@ use App\Services\Certificates\CertificateSigningRequestGenerator;
 use App\Services\Certificates\ImportedCertificateInstaller;
 use App\Services\Certificates\LetsEncryptDnsCertificateEngine;
 use App\Services\Certificates\LetsEncryptHttpCertificateEngine;
+use App\Services\Certificates\ZeroSslHttpCertificateEngine;
 use App\Services\Servers\ServerMetricsGuestScript;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
@@ -143,6 +144,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->tag([
             LetsEncryptHttpCertificateEngine::class,
             LetsEncryptDnsCertificateEngine::class,
+            ZeroSslHttpCertificateEngine::class,
             ImportedCertificateInstaller::class,
             CertificateSigningRequestGenerator::class,
         ], 'site.certificate.engines');

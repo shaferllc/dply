@@ -9,9 +9,9 @@ class ApacheSiteConfigBuilder
 {
     public function build(Site $site): string
     {
-        $site->loadMissing('domains');
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects']);
 
-        $hostnames = $site->domains->pluck('hostname')->filter()->unique()->values();
+        $hostnames = collect($site->webserverHostnames());
         if ($hostnames->isEmpty()) {
             throw new \InvalidArgumentException('Add at least one domain before installing Apache.');
         }
@@ -28,6 +28,7 @@ class ApacheSiteConfigBuilder
         $aliasLines = $aliases->isNotEmpty()
             ? '    ServerAlias '.$aliases->implode(' ')."\n"
             : '';
+        $redirectLines = $this->redirectLines($site);
 
         return match ($site->type) {
             SiteType::Php => <<<APACHE
@@ -38,7 +39,7 @@ class ApacheSiteConfigBuilder
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
 
-    <Directory {$root}>
+{$redirectLines}    <Directory {$root}>
         AllowOverride All
         Require all granted
         Options FollowSymLinks
@@ -59,7 +60,7 @@ APACHE,
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
 
-    <Directory {$root}>
+{$redirectLines}    <Directory {$root}>
         AllowOverride All
         Require all granted
         Options FollowSymLinks
@@ -74,10 +75,26 @@ APACHE,
 {$aliasLines}    ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
     ProxyPreserveHost On
-    ProxyPass / http://127.0.0.1:{$site->app_port}/
+{$redirectLines}    ProxyPass / http://127.0.0.1:{$site->app_port}/
     ProxyPassReverse / http://127.0.0.1:{$site->app_port}/
 </VirtualHost>
 APACHE,
         };
+    }
+
+    private function redirectLines(Site $site): string
+    {
+        if ($site->redirects->isEmpty()) {
+            return '';
+        }
+
+        return $site->redirects
+            ->map(fn ($redirect): string => sprintf(
+                '    Redirect %d %s %s',
+                $redirect->status_code,
+                $redirect->from_path,
+                $redirect->to_url,
+            ))
+            ->implode("\n")."\n\n";
     }
 }

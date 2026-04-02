@@ -9,9 +9,12 @@ class OpenLiteSpeedSiteConfigBuilder
 {
     public function build(Site $site): string
     {
-        $site->loadMissing('domains');
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects']);
 
-        $hostnames = $site->domains->pluck('hostname')->filter()->unique()->values();
+        $hostnames = collect($site->webserverHostnames())
+            ->filter()
+            ->unique()
+            ->values();
         if ($hostnames->isEmpty()) {
             throw new \InvalidArgumentException('Add at least one domain before installing OpenLiteSpeed.');
         }
@@ -57,6 +60,7 @@ extprocessor {$this->configName($site)} {
   extGroup                nogroup
   runOnStartUp            3
 }
+{$this->rewriteBlock($site)}
 context / {
   type                    appserver
   location                {$root}
@@ -72,6 +76,7 @@ index  {
   useServer               0
   indexFiles              index.html
 }
+{$this->rewriteBlock($site)}
 errorlog {$vhostRoot}/logs/error.log {
   useServer               0
   logLevel                WARN
@@ -86,12 +91,7 @@ docRoot                   {$vhostRoot}/
 vhDomain                  {$hostnames->implode(',')}
 adminEmails               root@localhost
 enableGzip                1
-rewrite  {
-  enable                  1
-  rules                   <<<END_rules
-RewriteRule ^(.*)$ http://127.0.0.1:{$site->app_port}\$1 [P,L]
-END_rules
-}
+{$this->rewriteBlock($site, $site->app_port)}
 errorlog {$vhostRoot}/logs/error.log {
   useServer               0
   logLevel                WARN
@@ -107,5 +107,34 @@ CONF,
     private function configName(Site $site): string
     {
         return str_replace(['.', '-'], '_', $site->webserverConfigBasename());
+    }
+
+    private function rewriteBlock(Site $site, ?int $appPort = null): string
+    {
+        $rules = $site->redirects
+            ->map(fn ($redirect): string => sprintf(
+                'RewriteRule ^%s$ %s [R=%d,L]',
+                ltrim($redirect->from_path, '/'),
+                $redirect->to_url,
+                $redirect->status_code,
+            ))
+            ->values();
+
+        if ($appPort !== null) {
+            $rules->push(sprintf('RewriteRule ^(.*)$ http://127.0.0.1:%d$1 [P,L]', $appPort));
+        }
+
+        if ($rules->isEmpty()) {
+            return '';
+        }
+
+        return <<<CONF
+rewrite  {
+  enable                  1
+  rules                   <<<END_rules
+{$rules->implode("\n")}
+END_rules
+}
+CONF;
     }
 }

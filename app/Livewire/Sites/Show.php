@@ -2,14 +2,16 @@
 
 namespace App\Livewire\Sites;
 
-use App\Jobs\InstallSiteNginxJob;
+use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Jobs\ExecuteSiteCertificateJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteCertificate;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
@@ -309,11 +311,34 @@ class Show extends Component
         return (bool) filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6);
     }
 
+    protected function finalizeRoutingMutation(string $successMessage): void
+    {
+        $this->flash_error = null;
+
+        if (! $this->server->hostCapabilities()->supportsNginxProvisioning()
+            || $this->site->usesFunctionsRuntime()
+            || $this->site->usesDockerRuntime()
+            || $this->site->usesKubernetesRuntime()) {
+            $this->flash_success = $successMessage;
+
+            return;
+        }
+
+        try {
+            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
+            $this->site->refresh();
+            $this->flash_success = $successMessage.' Webserver config reloaded.';
+        } catch (\Throwable $e) {
+            $this->flash_success = $successMessage.' Saved, but the webserver config could not be re-applied automatically.';
+            $this->flash_error = $e->getMessage();
+        }
+    }
+
     public function installNginx(): void
     {
         $this->authorize('update', $this->site);
         if (! $this->server->hostCapabilities()->supportsNginxProvisioning()) {
-            $this->flash_error = __('This host runtime does not use nginx site installs.');
+            $this->flash_error = __('This host runtime does not use managed webserver config.');
 
             return;
         }
@@ -321,9 +346,9 @@ class Show extends Component
         $this->flash_error = null;
         $this->flash_success = null;
         try {
-            InstallSiteNginxJob::dispatchSync($this->site);
+            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
             $this->site->refresh();
-            $this->flash_success = 'Nginx site config written and reloaded.';
+            $this->flash_success = 'Webserver config written and reloaded.';
         } catch (\Throwable $e) {
             $this->flash_error = $e->getMessage();
         }
@@ -441,6 +466,26 @@ class Show extends Component
         Cache::forget('site-deploy-active:'.$this->site->id);
         $this->flash_success = 'Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.';
         $this->flash_error = null;
+    }
+
+    public function retryCertificate(string $certificateId): void
+    {
+        $this->authorize('update', $this->site);
+        $certificate = SiteCertificate::query()
+            ->where('site_id', $this->site->id)
+            ->findOrFail($certificateId);
+
+        $this->flash_error = null;
+        $this->flash_success = null;
+
+        try {
+            ExecuteSiteCertificateJob::dispatchSync($certificate->id);
+            $this->site->refresh();
+            $this->flash_success = __('Certificate retry finished.');
+        } catch (\Throwable $e) {
+            $this->site->refresh();
+            $this->flash_error = $e->getMessage();
+        }
     }
 
     public function saveGit(): void
@@ -793,16 +838,14 @@ class Show extends Component
         $this->new_redirect_from = '';
         $this->new_redirect_to = '';
         $this->new_redirect_code = 301;
-        $this->flash_success = 'Redirect added. Re-run Install Nginx to apply.';
-        $this->flash_error = null;
+        $this->finalizeRoutingMutation('Redirect added.');
     }
 
     public function deleteRedirectRule(int $id): void
     {
         $this->authorize('update', $this->site);
         SiteRedirect::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->flash_success = 'Redirect removed. Re-run Install Nginx.';
-        $this->flash_error = null;
+        $this->finalizeRoutingMutation('Redirect removed.');
     }
 
     public function addDeployHook(): void
@@ -964,8 +1007,7 @@ class Show extends Component
             'www_redirect' => false,
         ]);
         $this->new_domain_hostname = '';
-        $this->flash_success = 'Domain added. Re-run “Install Nginx” if the site is already provisioned.';
-        $this->flash_error = null;
+        $this->finalizeRoutingMutation('Domain added.');
     }
 
     public function confirmRemoveDomain(int|string $domainId): void
@@ -1002,8 +1044,7 @@ class Show extends Component
             return;
         }
         $domain->delete();
-        $this->flash_success = 'Domain removed.';
-        $this->flash_error = null;
+        $this->finalizeRoutingMutation('Domain removed.');
     }
 
     public function deleteSite(): mixed
@@ -1018,6 +1059,10 @@ class Show extends Component
     {
         $this->site->load([
             'domains',
+            'domainAliases',
+            'tenantDomains',
+            'previewDomains',
+            'certificates',
             'deployments' => fn ($q) => $q->limit(25),
             'webhookDeliveryLogs' => fn ($q) => $q->limit(30),
             'environmentVariables',
@@ -1025,6 +1070,8 @@ class Show extends Component
             'deployHooks',
             'deploySteps',
             'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
+            'previewDomains',
+            'certificates.previewDomain',
         ]);
 
         $openSiteInsightsCount = InsightFinding::query()

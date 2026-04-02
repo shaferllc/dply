@@ -5,7 +5,7 @@ namespace App\Services\Deploy;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
-final class KubernetesKubectlExecutor
+class KubernetesKubectlExecutor
 {
     /**
      * @return array{output: string, revision: ?string, context: ?string}

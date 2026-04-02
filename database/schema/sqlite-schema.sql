@@ -873,6 +873,19 @@ CREATE TABLE site_domains (
 	CONSTRAINT site_domains_pkey PRIMARY KEY (id), 
 	CONSTRAINT site_domains_hostname_unique UNIQUE (hostname)
 );
+CREATE TABLE site_domain_aliases (
+	id CHAR(26) NOT NULL,
+	site_id CHAR(26) NOT NULL,
+	hostname VARCHAR(255) NOT NULL,
+	label VARCHAR(255),
+	sort_order INTEGER DEFAULT 0 NOT NULL,
+	meta JSON,
+	created_at TIMESTAMP,
+	updated_at TIMESTAMP,
+	CONSTRAINT site_domain_aliases_pkey PRIMARY KEY (id),
+	CONSTRAINT site_domain_aliases_hostname_unique UNIQUE (hostname)
+);
+CREATE INDEX site_domain_aliases_site_id_sort_order_index ON site_domain_aliases (site_id, sort_order);
 CREATE TABLE site_preview_domains (
 	id CHAR(26) NOT NULL,
 	site_id CHAR(26) NOT NULL,
@@ -899,6 +912,21 @@ CREATE TABLE site_preview_domains (
 	CONSTRAINT site_preview_domains_hostname_unique UNIQUE (hostname)
 );
 CREATE INDEX site_preview_domains_site_id_is_primary_index ON site_preview_domains (site_id, is_primary);
+CREATE TABLE site_tenant_domains (
+	id CHAR(26) NOT NULL,
+	site_id CHAR(26) NOT NULL,
+	hostname VARCHAR(255) NOT NULL,
+	tenant_key VARCHAR(255),
+	label VARCHAR(255),
+	notes TEXT,
+	sort_order INTEGER DEFAULT 0 NOT NULL,
+	meta JSON,
+	created_at TIMESTAMP,
+	updated_at TIMESTAMP,
+	CONSTRAINT site_tenant_domains_pkey PRIMARY KEY (id),
+	CONSTRAINT site_tenant_domains_hostname_unique UNIQUE (hostname)
+);
+CREATE INDEX site_tenant_domains_site_id_sort_order_index ON site_tenant_domains (site_id, sort_order);
 CREATE TABLE site_environment_variables (
 	id CHAR(26) NOT NULL, 
 	site_id CHAR(26) NOT NULL, 

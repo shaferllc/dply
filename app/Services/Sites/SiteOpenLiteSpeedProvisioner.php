@@ -36,7 +36,7 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
             "\nvhTemplate %s {\n  templateFile %s\n  listeners Default\n  vhDomain %s\n}\n",
             $basename,
             $configFile,
-            $site->domains->pluck('hostname')->filter()->implode(',')
+            implode(',', $site->webserverHostnames())
         );
 
         $out = $ssh->exec(sprintf(

@@ -5,10 +5,12 @@ namespace App\Livewire\Sites;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Models\ProviderCredential;
 use App\Models\SiteCertificate;
+use App\Models\SiteDomainAlias;
 use App\Models\SiteDomain;
 use App\Models\SitePreviewDomain;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteTenantDomain;
 use App\Models\Workspace;
 use App\Services\Certificates\CertificateRequestService;
 use App\Support\HostnameValidator;
@@ -17,13 +19,39 @@ use Illuminate\Validation\Rule;
 
 class Settings extends Show
 {
+    private const ROUTING_TABS = ['domains', 'aliases', 'redirects', 'preview', 'tenants'];
+
+    private const LEGACY_ROUTING_SECTIONS = [
+        'domains' => 'domains',
+        'aliases' => 'aliases',
+        'redirects' => 'redirects',
+        'preview' => 'preview',
+        'tenants' => 'tenants',
+    ];
+
     public string $section = 'general';
+
+    public string $routingTab = 'domains';
 
     public string $settings_primary_domain = '';
 
     public string $settings_document_root = '';
 
     public ?string $project_workspace_id = null;
+
+    public string $site_notes = '';
+
+    public string $new_alias_hostname = '';
+
+    public string $new_alias_label = '';
+
+    public string $new_tenant_hostname = '';
+
+    public string $new_tenant_key = '';
+
+    public string $new_tenant_label = '';
+
+    public string $new_tenant_notes = '';
 
     public string $preview_primary_hostname = '';
 
@@ -57,6 +85,10 @@ class Settings extends Show
 
     public string $new_certificate_chain_pem = '';
 
+    public ?string $quick_ssl_domain_hostname = null;
+
+    public string $quick_ssl_provider_type = SiteCertificate::PROVIDER_LETSENCRYPT;
+
     public function mount(Server $server, Site $site, ?string $section = null): void
     {
         if ($site->server_id !== $server->id) {
@@ -73,6 +105,17 @@ class Settings extends Show
             return;
         }
 
+        if (array_key_exists($section, self::LEGACY_ROUTING_SECTIONS)) {
+            $this->redirect(route('sites.settings', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'routing',
+                'tab' => self::LEGACY_ROUTING_SECTIONS[$section],
+            ]), navigate: true);
+
+            return;
+        }
+
         $allowed = array_keys(config('site_settings.workspace_tabs', []));
 
         if (! in_array($section, $allowed, true)) {
@@ -80,10 +123,18 @@ class Settings extends Show
         }
 
         $this->section = $section;
+        $this->routingTab = $this->resolveRoutingTab(request()->query('tab'));
 
         parent::mount($server, $site);
         $this->syncGeneralSettingsForm();
         $this->syncPreviewSettingsForm();
+    }
+
+    private function resolveRoutingTab(mixed $tab): string
+    {
+        return is_string($tab) && in_array($tab, self::ROUTING_TABS, true)
+            ? $tab
+            : self::ROUTING_TABS[0];
     }
 
     private function syncGeneralSettingsForm(): void
@@ -92,6 +143,7 @@ class Settings extends Show
         $this->settings_primary_domain = (string) optional($this->site->primaryDomain())->hostname;
         $this->settings_document_root = (string) ($this->site->document_root ?? '');
         $this->project_workspace_id = $this->site->workspace_id;
+        $this->site_notes = (string) data_get($this->site->meta, 'notes', '');
     }
 
     private function syncPreviewSettingsForm(): void
@@ -142,10 +194,9 @@ class Settings extends Show
             ]);
         }
 
-        $this->flash_success = 'Site settings saved.';
-        $this->flash_error = null;
         $this->site->load('domains');
         $this->syncGeneralSettingsForm();
+        $this->finalizeRoutingMutation('Site settings saved.');
     }
 
     public function saveProjectSettings(): void
@@ -175,6 +226,124 @@ class Settings extends Show
             : 'Project settings saved.';
         $this->flash_error = null;
         $this->syncGeneralSettingsForm();
+    }
+
+    public function saveSiteNotes(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $validated = $this->validate([
+            'site_notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['notes'] = trim((string) ($validated['site_notes'] ?? '')) ?: null;
+
+        if ($meta['notes'] === null) {
+            unset($meta['notes']);
+        }
+
+        $this->site->update([
+            'meta' => $meta,
+        ]);
+
+        $this->flash_success = 'Site notes saved.';
+        $this->flash_error = null;
+        $this->syncGeneralSettingsForm();
+    }
+
+    public function addAlias(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $validated = $this->validate([
+            'new_alias_hostname' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('site_domain_aliases', 'hostname'),
+                Rule::unique('site_domains', 'hostname'),
+                Rule::unique('site_preview_domains', 'hostname'),
+                Rule::unique('site_tenant_domains', 'hostname'),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                        $fail('Enter a valid alias like www.example.com.');
+                    }
+                },
+            ],
+            'new_alias_label' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        SiteDomainAlias::query()->create([
+            'site_id' => $this->site->id,
+            'hostname' => strtolower(trim($validated['new_alias_hostname'])),
+            'label' => trim((string) ($validated['new_alias_label'] ?? '')) ?: null,
+            'sort_order' => (int) ($this->site->domainAliases()->max('sort_order') ?? 0) + 1,
+        ]);
+
+        $this->new_alias_hostname = '';
+        $this->new_alias_label = '';
+        $this->site->load('domainAliases');
+        $this->finalizeRoutingMutation('Alias added.');
+    }
+
+    public function removeAlias(string $aliasId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->site->domainAliases()->findOrFail($aliasId)->delete();
+        $this->site->load('domainAliases');
+        $this->finalizeRoutingMutation('Alias removed.');
+    }
+
+    public function addTenantDomain(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $validated = $this->validate([
+            'new_tenant_hostname' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('site_tenant_domains', 'hostname'),
+                Rule::unique('site_domains', 'hostname'),
+                Rule::unique('site_domain_aliases', 'hostname'),
+                Rule::unique('site_preview_domains', 'hostname'),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                        $fail('Enter a valid tenant domain like customer.example.com.');
+                    }
+                },
+            ],
+            'new_tenant_key' => ['nullable', 'string', 'max:255'],
+            'new_tenant_label' => ['nullable', 'string', 'max:255'],
+            'new_tenant_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        SiteTenantDomain::query()->create([
+            'site_id' => $this->site->id,
+            'hostname' => strtolower(trim($validated['new_tenant_hostname'])),
+            'tenant_key' => trim((string) ($validated['new_tenant_key'] ?? '')) ?: null,
+            'label' => trim((string) ($validated['new_tenant_label'] ?? '')) ?: null,
+            'notes' => trim((string) ($validated['new_tenant_notes'] ?? '')) ?: null,
+            'sort_order' => (int) ($this->site->tenantDomains()->max('sort_order') ?? 0) + 1,
+        ]);
+
+        $this->new_tenant_hostname = '';
+        $this->new_tenant_key = '';
+        $this->new_tenant_label = '';
+        $this->new_tenant_notes = '';
+        $this->site->load('tenantDomains');
+        $this->finalizeRoutingMutation('Tenant domain added.');
+    }
+
+    public function removeTenantDomain(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->site->tenantDomains()->findOrFail($tenantDomainId)->delete();
+        $this->site->load('tenantDomains');
+        $this->finalizeRoutingMutation('Tenant domain removed.');
     }
 
     public function savePreviewSettings(): void
@@ -222,10 +391,9 @@ class Settings extends Show
         ]);
         $this->site->update(['meta' => $meta]);
 
-        $this->flash_success = 'Preview settings saved.';
-        $this->flash_error = null;
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
+        $this->finalizeRoutingMutation('Preview settings saved.');
     }
 
     public function removePreviewDomain(string $previewDomainId): void
@@ -235,10 +403,97 @@ class Settings extends Show
         $previewDomain = $this->site->previewDomains()->findOrFail($previewDomainId);
         $previewDomain->delete();
 
-        $this->flash_success = 'Preview domain removed.';
-        $this->flash_error = null;
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
+        $this->finalizeRoutingMutation('Preview domain removed.');
+    }
+
+    public function openQuickDomainSslModal(string $hostname): void
+    {
+        $this->authorize('update', $this->site);
+        $this->site->loadMissing('domains');
+
+        $normalized = strtolower(trim($hostname));
+        if (! $this->site->domains->contains(fn (SiteDomain $domain): bool => strtolower($domain->hostname) === $normalized)) {
+            abort(404);
+        }
+
+        $this->quick_ssl_domain_hostname = $normalized;
+        $this->quick_ssl_provider_type = SiteCertificate::PROVIDER_LETSENCRYPT;
+        $this->dispatch('open-modal', 'quick-domain-ssl-modal');
+    }
+
+    public function closeQuickDomainSslModal(): void
+    {
+        $this->dispatch('close-modal', 'quick-domain-ssl-modal');
+    }
+
+    public function quickAddDomainSsl(CertificateRequestService $certificateRequestService): void
+    {
+        $this->authorize('update', $this->site);
+        $this->site->loadMissing(['domains', 'certificates']);
+
+        $validated = $this->validate([
+            'quick_ssl_domain_hostname' => ['required', 'string'],
+            'quick_ssl_provider_type' => ['required', Rule::in([
+                SiteCertificate::PROVIDER_LETSENCRYPT,
+                SiteCertificate::PROVIDER_ZEROSSL,
+            ])],
+        ]);
+
+        $hostname = strtolower(trim($validated['quick_ssl_domain_hostname']));
+        if (! $this->site->domains->contains(fn (SiteDomain $domain): bool => strtolower($domain->hostname) === $hostname)) {
+            $this->addError('quick_ssl_domain_hostname', __('Choose a domain that belongs to this site.'));
+
+            return;
+        }
+
+        $existing = $this->site->certificates->contains(function (SiteCertificate $certificate) use ($hostname): bool {
+            return in_array($certificate->status, [
+                SiteCertificate::STATUS_PENDING,
+                SiteCertificate::STATUS_ISSUED,
+                SiteCertificate::STATUS_INSTALLING,
+                SiteCertificate::STATUS_ACTIVE,
+            ], true) && in_array($hostname, $certificate->domainHostnames(), true);
+        });
+
+        if ($existing) {
+            $this->flash_error = __('SSL is already configured or in progress for :domain.', ['domain' => $hostname]);
+            $this->flash_success = null;
+            $this->closeQuickDomainSslModal();
+
+            return;
+        }
+
+        $certificate = $certificateRequestService->create([
+            'site_id' => $this->site->id,
+            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+            'provider_type' => $validated['quick_ssl_provider_type'],
+            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+            'domains_json' => [$hostname],
+            'status' => SiteCertificate::STATUS_PENDING,
+            'requested_settings' => [
+                'source' => 'quick_domain_ssl_modal',
+            ],
+        ]);
+
+        try {
+            ExecuteSiteCertificateJob::dispatchSync($certificate->id);
+            $providerLabel = $validated['quick_ssl_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
+                ? 'ZeroSSL'
+                : 'Let\'s Encrypt';
+            $this->flash_success = __('SSL request started for :domain via :provider.', [
+                'domain' => $hostname,
+                'provider' => $providerLabel,
+            ]);
+            $this->flash_error = null;
+        } catch (\Throwable $e) {
+            $this->flash_error = $e->getMessage();
+            $this->flash_success = null;
+        }
+
+        $this->site->load('certificates');
+        $this->closeQuickDomainSslModal();
     }
 
     public function createCertificateRequest(CertificateRequestService $certificateRequestService): void
@@ -277,8 +532,11 @@ class Settings extends Show
             return;
         }
 
-        if ($validated['new_certificate_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL) {
-            $this->flash_error = 'ZeroSSL is modeled in the new certificate system, but execution is not enabled yet.';
+        if (
+            $validated['new_certificate_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
+            && $validated['new_certificate_challenge_type'] !== SiteCertificate::CHALLENGE_HTTP
+        ) {
+            $this->flash_error = 'ZeroSSL currently supports the HTTP challenge flow only.';
             $this->flash_success = null;
 
             return;
@@ -311,10 +569,18 @@ class Settings extends Show
             ],
         ]);
 
-        if (in_array($certificate->provider_type, [SiteCertificate::PROVIDER_IMPORTED, SiteCertificate::PROVIDER_CSR], true)) {
-            $certificateRequestService->execute($certificate);
-        } else {
-            ExecuteSiteCertificateJob::dispatchSync($certificate->id);
+        try {
+            if (in_array($certificate->provider_type, [SiteCertificate::PROVIDER_IMPORTED, SiteCertificate::PROVIDER_CSR], true)) {
+                $certificateRequestService->execute($certificate);
+            } else {
+                ExecuteSiteCertificateJob::dispatchSync($certificate->id);
+            }
+        } catch (\Throwable $e) {
+            $this->flash_error = $e->getMessage();
+            $this->flash_success = null;
+            $this->site->load('certificates');
+
+            return;
         }
 
         $this->resetCertificateRequestForm();
@@ -382,17 +648,22 @@ class Settings extends Show
     {
         $this->site->load([
             'domains',
+            'domainAliases',
             'previewDomains',
             'certificates.previewDomain',
+            'deployments',
             'environmentVariables',
             'redirects',
+            'tenantDomains',
             'deployHooks',
             'deploySteps',
+            'webhookDeliveryLogs',
             'workspace.variables',
         ]);
 
         return view('livewire.sites.settings', [
             'tabs' => config('site_settings.workspace_tabs', []),
+            'routingTabs' => self::ROUTING_TABS,
             'deployHookUrl' => $this->site->deployHookUrl(),
             'availableWorkspaces' => Workspace::query()
                 ->where('organization_id', $this->site->organization_id)

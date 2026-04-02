@@ -64,6 +64,12 @@ return [
         'redirect' => env('DIGITALOCEAN_OAUTH_REDIRECT_URI'),
     ],
 
+    'zerossl' => [
+        'access_key' => env('ZEROSSL_ACCESS_KEY'),
+        'poll_attempts' => (int) env('ZEROSSL_POLL_ATTEMPTS', 10),
+        'poll_sleep_ms' => (int) env('ZEROSSL_POLL_SLEEP_MS', 2000),
+    ],
+
     'hetzner' => [
         'default_image' => env('HETZNER_DEFAULT_IMAGE', 'ubuntu-24.04'),
         'ssh_user' => env('HETZNER_SSH_USER', 'root'),

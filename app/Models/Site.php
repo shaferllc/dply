@@ -189,6 +189,16 @@ class Site extends Model
         return $this->hasMany(SitePreviewDomain::class)->orderByDesc('is_primary')->orderBy('hostname');
     }
 
+    public function domainAliases(): HasMany
+    {
+        return $this->hasMany(SiteDomainAlias::class)->orderBy('sort_order')->orderBy('hostname');
+    }
+
+    public function tenantDomains(): HasMany
+    {
+        return $this->hasMany(SiteTenantDomain::class)->orderBy('sort_order')->orderBy('hostname');
+    }
+
     public function certificates(): HasMany
     {
         return $this->hasMany(SiteCertificate::class)->latest('created_at');
@@ -573,6 +583,52 @@ class Site extends Model
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function aliasHostnames(): array
+    {
+        $aliases = $this->relationLoaded('domainAliases')
+            ? $this->domainAliases
+            : $this->domainAliases()->get();
+
+        return $aliases->pluck('hostname')
+            ->filter(fn (mixed $hostname): bool => is_string($hostname) && trim($hostname) !== '')
+            ->map(fn (string $hostname): string => strtolower(trim($hostname)))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function tenantHostnames(): array
+    {
+        $tenantDomains = $this->relationLoaded('tenantDomains')
+            ? $this->tenantDomains
+            : $this->tenantDomains()->get();
+
+        return $tenantDomains->pluck('hostname')
+            ->filter(fn (mixed $hostname): bool => is_string($hostname) && trim($hostname) !== '')
+            ->map(fn (string $hostname): string => strtolower(trim($hostname)))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function webserverHostnames(): array
+    {
+        return collect([
+            ...$this->customerDomainHostnames(),
+            ...$this->aliasHostnames(),
+            ...$this->tenantHostnames(),
+        ])->unique()->values()->all();
     }
 
     public function effectiveRepositoryPath(): string

@@ -9,11 +9,16 @@ class CaddySiteConfigBuilder
 {
     public function build(Site $site, ?int $listenPort = null): string
     {
-        $site->loadMissing('domains');
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects']);
 
-        $hostnames = $site->domains->pluck('hostname')->filter()->unique()->values();
+        $hostnames = collect($listenPort === null ? $site->webserverHostnames() : [])
+            ->filter()
+            ->unique()
+            ->values();
         if ($hostnames->isEmpty()) {
-            throw new \InvalidArgumentException('Add at least one domain before installing Caddy.');
+            if ($listenPort === null) {
+                throw new \InvalidArgumentException('Add at least one domain before installing Caddy.');
+            }
         }
 
         $hosts = $listenPort === null ? $hostnames->implode(', ') : ':'.$listenPort;
@@ -24,11 +29,12 @@ class CaddySiteConfigBuilder
             $site->php_version ?? '8.3',
             config('sites.php_fpm_socket')
         );
+        $redirectLines = $this->redirectLines($site);
 
         return match ($site->type) {
             SiteType::Php => <<<CADDY
 {$hosts} {
-    root * {$root}
+{$redirectLines}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -39,7 +45,7 @@ class CaddySiteConfigBuilder
 CADDY,
             SiteType::Static => <<<CADDY
 {$hosts} {
-    root * {$root}
+{$redirectLines}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -49,7 +55,7 @@ CADDY,
 CADDY,
             SiteType::Node => <<<CADDY
 {$hosts} {
-    encode zstd gzip
+{$redirectLines}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -57,5 +63,21 @@ CADDY,
 }
 CADDY,
         };
+    }
+
+    private function redirectLines(Site $site): string
+    {
+        if ($site->redirects->isEmpty()) {
+            return '';
+        }
+
+        return $site->redirects
+            ->map(fn ($redirect): string => sprintf(
+                '    redir %s %s %d',
+                $redirect->from_path,
+                $redirect->to_url,
+                $redirect->status_code,
+            ))
+            ->implode("\n")."\n";
     }
 }

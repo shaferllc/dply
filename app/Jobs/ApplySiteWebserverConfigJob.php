@@ -5,37 +5,51 @@ namespace App\Jobs;
 use App\Models\Site;
 use App\Services\Sites\SiteWebserverConfigApplier;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class InstallSiteNginxJob implements ShouldQueue
+class ApplySiteWebserverConfigJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 1;
 
     public function __construct(
-        public Site $site
+        public string $siteId,
     ) {}
+
+    public function uniqueId(): string
+    {
+        return 'site-webserver-config:'.$this->siteId;
+    }
 
     public function handle(SiteWebserverConfigApplier $applier): void
     {
-        $this->site = $this->site->fresh();
-        if (! $this->site) {
+        $site = Site::query()->find($this->siteId);
+        if (! $site) {
             return;
         }
 
         try {
-            $applier->apply($this->site);
+            $applier->apply($site);
         } catch (\Throwable $e) {
-            $this->site->update([
+            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta['webserver_config_error'] = $e->getMessage();
+
+            $site->update([
                 'status' => Site::STATUS_ERROR,
-                'meta' => array_merge($this->site->meta ?? [], ['nginx_error' => $e->getMessage()]),
+                'meta' => $meta,
             ]);
-            Log::warning('InstallSiteNginxJob failed', ['site_id' => $this->site->id, 'error' => $e->getMessage()]);
+
+            Log::warning('ApplySiteWebserverConfigJob failed', [
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+
             throw $e;
         }
     }
