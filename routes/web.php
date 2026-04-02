@@ -68,6 +68,7 @@ use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Livewire\StatusPages\Manage as StatusPagesManage;
 use App\Livewire\Teams\NotificationChannels as TeamsNotificationChannels;
 use App\Livewire\TwoFactor\Page as TwoFactorPage;
+use App\Models\Site;
 use App\Models\Server;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
@@ -182,8 +183,25 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
-    Route::livewire('servers/{server}/sites/{site}/settings/{section?}', SiteSettings::class)->name('sites.settings');
-    Route::livewire('servers/{server}/sites/{site}', SitesShow::class)->name('sites.show');
+    Route::get('servers/{server}/sites/{site}/settings/{section?}', function (Server $server, Site $site, ?string $section = null) {
+        $targetSection = $section;
+        $query = request()->query();
+
+        if ($targetSection === null) {
+            $targetSection = 'general';
+        } elseif (in_array($targetSection, ['domains', 'aliases', 'redirects', 'preview', 'tenants'], true)) {
+            $query['tab'] = $targetSection;
+            $targetSection = 'routing';
+        }
+
+        return redirect()->route('sites.show', [
+            'server' => $server,
+            'site' => $site,
+            'section' => $targetSection,
+            ...$query,
+        ]);
+    })->name('sites.settings');
+    Route::livewire('servers/{server}/sites/{site}', SiteSettings::class)->defaults('section', 'general')->name('sites.show');
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
     Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');

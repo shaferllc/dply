@@ -68,7 +68,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
 
         $response->assertOk()
             ->assertSee('PHP')
@@ -109,7 +109,7 @@ class SiteTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
             ->assertSee('Deploy')
@@ -146,7 +146,7 @@ class SiteTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
             ->assertSee('Deploy')
@@ -178,7 +178,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
 
         $response->assertOk()
             ->assertSee('PHP version mismatch')
@@ -210,7 +210,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
 
         $response->assertOk()
             ->assertSee('PHP 8.4')
@@ -674,7 +674,7 @@ class SiteTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
             ->assertSee('Serverless deploy target')
@@ -716,7 +716,7 @@ class SiteTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
             ->assertSee('Serverless deploy target')
@@ -1073,7 +1073,7 @@ class SiteTest extends TestCase
             ->assertSee('preview-app.dply.cc');
     }
 
-    public function test_site_settings_route_redirects_to_general_section(): void
+    public function test_site_settings_route_redirects_to_site_show_general_section(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -1090,10 +1090,10 @@ class SiteTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site], false));
 
-        $response->assertRedirect(route('sites.settings', [$server, $site, 'section' => 'general'], false));
+        $response->assertRedirect(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
     }
 
-    public function test_site_settings_general_section_renders_dedicated_workspace(): void
+    public function test_site_show_defaults_to_general_site_workspace(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -1108,10 +1108,10 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'general'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
         $response->assertOk()
-            ->assertSee('Site settings')
+            ->assertSee('Site workspace')
             ->assertSee('General')
             ->assertSee('Project settings')
             ->assertSee('Save project settings')
@@ -1119,10 +1119,10 @@ class SiteTest extends TestCase
             ->assertSee('Certificates')
             ->assertSee('Deploy')
             ->assertSee('Danger zone')
+            ->assertSee('Deployment log')
             ->assertDontSee('Aliases')
             ->assertDontSee('Redirects')
-            ->assertDontSee('Tenants')
-            ->assertDontSee('Deployment log');
+            ->assertDontSee('Tenants');
     }
 
     public function test_site_settings_legacy_routing_section_redirects_to_routing_tab(): void
@@ -1141,7 +1141,7 @@ class SiteTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'aliases'], false));
 
-        $response->assertRedirect(route('sites.settings', [
+        $response->assertRedirect(route('sites.show', [
             $server,
             $site,
             'section' => 'routing',
@@ -1182,7 +1182,7 @@ class SiteTest extends TestCase
             'timeout_seconds' => 900,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'deploy'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
             ->assertSee('Deploy')
@@ -1194,7 +1194,7 @@ class SiteTest extends TestCase
             ->assertSee('Deploy script variables')
             ->assertSee('{SITE_DOMAIN}')
             ->assertSee('{BRANCH}')
-            ->assertSee(route('sites.settings', [$server, $site, 'section' => 'logs'], false), escape: false)
+            ->assertSee(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs'], false), escape: false)
             ->assertSee(route('servers.logs', $server, false), escape: false);
     }
 
@@ -1275,7 +1275,7 @@ class SiteTest extends TestCase
             'status' => SiteCertificate::STATUS_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'general'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
 
         $response->assertOk()
             ->assertSee('SSL')
@@ -1303,7 +1303,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'general'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
 
         $response->assertOk()
             ->assertSee('Current project')
@@ -1342,7 +1342,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'general'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
 
         $response->assertOk()
             ->assertSee('Site details')
@@ -1398,7 +1398,7 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
         $response->assertOk()
-            ->assertSee(route('sites.settings', [$server, $site, 'section' => 'general'], false), escape: false)
+            ->assertSee(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false), escape: false)
             ->assertSee('Site settings')
             ->assertSee('Deployment log')
             ->assertDontSee('Save PHP settings')
@@ -1869,7 +1869,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'routing', 'tab' => 'redirects'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'redirects'], false));
 
         $response->assertOk()
             ->assertSee('Redirects')
@@ -1936,7 +1936,7 @@ class SiteTest extends TestCase
             'detail' => 'Accepted deploy webhook.',
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'logs'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs'], false));
 
         $response->assertOk()
             ->assertSee('Logs')
@@ -2111,7 +2111,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
 
         $response->assertOk()
             ->assertDontSee('Save PHP settings')
@@ -2224,7 +2224,7 @@ class SiteTest extends TestCase
             'status' => SiteCertificate::STATUS_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site, 'section' => 'routing', 'tab' => 'domains'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains'], false));
 
         $response->assertOk()
             ->assertSee('SSL configured')

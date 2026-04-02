@@ -254,8 +254,8 @@
                                         <div>
                                             <a href="{{ route('sites.show', [$site->server, $site]) }}" class="text-slate-900 font-medium hover:underline">{{ $site->name }}</a>
                                             <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                                                <a href="{{ route('sites.show', [$site->server, $site]) }}" class="hover:text-slate-800">{{ __('Overview') }}</a>
-                                                <a href="{{ route('sites.settings', [$site->server, $site, 'section' => 'general']) }}" wire:navigate class="hover:text-slate-800">{{ __('Site settings') }}</a>
+                                                <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="hover:text-slate-800">{{ __('General') }}</a>
+                                                <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="hover:text-slate-800">{{ __('Deploy') }}</a>
                                                 <a href="{{ route('sites.insights', [$site->server, $site]) }}" wire:navigate class="hover:text-slate-800">{{ __('Insights') }}</a>
                                             </div>
                                         </div>

@@ -99,14 +99,20 @@ class Settings extends Show
             abort(404);
         }
 
+        $requestedSection = request()->query('section');
+
+        if (is_string($requestedSection) && $requestedSection !== '') {
+            $section = $requestedSection;
+        }
+
         if ($section === null) {
-            $this->redirect(route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'general']), navigate: true);
+            $this->redirect(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']), navigate: true);
 
             return;
         }
 
         if (array_key_exists($section, self::LEGACY_ROUTING_SECTIONS)) {
-            $this->redirect(route('sites.settings', [
+            $this->redirect(route('sites.show', [
                 'server' => $server,
                 'site' => $site,
                 'section' => 'routing',
@@ -646,6 +652,10 @@ class Settings extends Show
 
     public function render(): View
     {
+        if (! $this->site->isReadyForWorkspace()) {
+            return parent::render();
+        }
+
         $this->site->load([
             'domains',
             'domainAliases',
