@@ -59,7 +59,7 @@ class PersonalSshKeyModal extends Component
         ]);
 
         $message = $this->source === 'servers.create'
-            ? __('SSH key saved. You can continue creating your server now.')
+            ? __('SSH key saved. You can continue creating your BYO server now.')
             : __('SSH key saved.');
 
         $this->resetForm();

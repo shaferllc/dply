@@ -5,6 +5,7 @@ namespace App\Services\Sites;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
 use App\Services\DigitalOceanService;
+use App\Services\Sites\Dns\DigitalOceanDnsProvider;
 use Illuminate\Support\Str;
 
 class TestingHostnameProvisioner
@@ -35,10 +36,10 @@ class TestingHostnameProvisioner
         [$hostname, $zone] = $this->resolveHostnameAndZone($site);
         $recordName = $this->relativeRecordName($hostname, $zone);
         $service = new DigitalOceanService((string) config('services.digitalocean.token'));
+        $dnsProvider = new DigitalOceanDnsProvider($service);
 
         try {
-            $record = $service->findDomainRecord($zone, 'A', $recordName, $serverIp)
-                ?? $service->createDomainRecord($zone, 'A', $recordName, $serverIp);
+            $record = $dnsProvider->upsertRecord($zone, 'A', $recordName, $serverIp);
 
             SitePreviewDomain::query()
                 ->where('site_id', $site->id)

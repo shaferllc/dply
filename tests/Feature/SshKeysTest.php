@@ -46,7 +46,7 @@ class SshKeysTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('Add at least one SSH key to your profile first')
-            ->assertSee('Back to create server')
+            ->assertSee('Back to create BYO server')
             ->assertSee('ssh-keygen -t ed25519 -C "you@example.com"');
     }
 

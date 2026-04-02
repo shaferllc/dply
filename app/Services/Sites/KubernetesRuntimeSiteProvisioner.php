@@ -10,6 +10,7 @@ final class KubernetesRuntimeSiteProvisioner implements SiteRuntimeProvisioner
 {
     public function __construct(
         private readonly KubernetesManifestBuilder $manifestBuilder,
+        private readonly ContainerPublicationManager $publicationManager,
     ) {}
 
     public function runtimeProfile(): string
@@ -31,19 +32,13 @@ final class KubernetesRuntimeSiteProvisioner implements SiteRuntimeProvisioner
         ]);
 
         $site->forceFill(['meta' => $meta])->save();
+        $this->publicationManager->provision($site->fresh());
     }
 
     public function readyResult(Site $site): array
     {
-        $site->loadMissing('domains');
+        $site->loadMissing(['domains', 'previewDomains']);
 
-        return [
-            'ok' => true,
-            'hostname' => optional($site->primaryDomain())->hostname,
-            'url' => null,
-            'error' => null,
-            'checked_at' => now()->toIso8601String(),
-            'checks' => [],
-        ];
+        return $this->publicationManager->readyResult($site);
     }
 }

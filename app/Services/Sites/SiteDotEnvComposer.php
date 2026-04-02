@@ -6,7 +6,10 @@ use App\Models\Site;
 
 class SiteDotEnvComposer
 {
-    public function compose(Site $site): string
+    /**
+     * @return array<string, string>
+     */
+    public function composeMap(Site $site): array
     {
         $site->loadMissing(['environmentVariables', 'workspace.variables']);
         $envName = $site->deployment_environment ?: 'production';
@@ -24,6 +27,13 @@ class SiteDotEnvComposer
                 $map[$row->env_key] = (string) $row->env_value;
             }
         }
+
+        return $map;
+    }
+
+    public function compose(Site $site): string
+    {
+        $map = $this->composeMap($site);
 
         ksort($map);
 

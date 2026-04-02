@@ -520,6 +520,132 @@ class Site extends Model
     /**
      * @return array<string, mixed>
      */
+    public function runtimeTarget(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $target = $meta['runtime_target'] ?? null;
+
+        if (is_array($target) && ($target['family'] ?? null)) {
+            return $target;
+        }
+
+        return [
+            'family' => $this->runtimeTargetFamily(),
+            'platform' => $this->runtimeTargetPlatform(),
+            'mode' => $this->runtimeTargetMode(),
+            'provider' => $this->runtimeTargetProvider(),
+            'status' => null,
+            'logs' => [],
+        ];
+    }
+
+    public function runtimeTargetFamily(): string
+    {
+        $target = is_array($this->meta['runtime_target'] ?? null) ? $this->meta['runtime_target'] : [];
+        $family = $target['family'] ?? null;
+        if (is_string($family) && $family !== '') {
+            return $family;
+        }
+
+        if ($this->usesDockerRuntime()) {
+            return match (true) {
+                data_get($this->server?->meta, 'local_runtime.provider') === 'orbstack' => 'local_orbstack_docker',
+                $this->server?->provider?->value === 'digitalocean' => 'digitalocean_docker',
+                $this->server?->provider?->value === 'aws' => 'aws_docker',
+                default => 'docker',
+            };
+        }
+
+        if ($this->usesKubernetesRuntime()) {
+            return match (true) {
+                data_get($this->server?->meta, 'local_runtime.provider') === 'orbstack' => 'local_orbstack_kubernetes',
+                $this->server?->provider?->value === 'digitalocean' => 'digitalocean_kubernetes',
+                $this->server?->provider?->value === 'aws' => 'aws_kubernetes',
+                default => 'kubernetes',
+            };
+        }
+
+        if ($this->usesAwsLambdaRuntime()) {
+            return 'aws_lambda';
+        }
+
+        if ($this->usesFunctionsRuntime()) {
+            return 'digitalocean_functions';
+        }
+
+        return 'byo_vm';
+    }
+
+    public function runtimeTargetPlatform(): string
+    {
+        return match ($this->runtimeTargetFamily()) {
+            'local_orbstack_docker', 'local_orbstack_kubernetes' => 'local',
+            'digitalocean_docker', 'digitalocean_kubernetes', 'digitalocean_functions' => 'digitalocean',
+            'aws_docker', 'aws_kubernetes', 'aws_lambda' => 'aws',
+            default => 'byo',
+        };
+    }
+
+    public function runtimeTargetProvider(): string
+    {
+        return match ($this->runtimeTargetPlatform()) {
+            'local' => 'orbstack',
+            'digitalocean' => 'digitalocean',
+            'aws' => 'aws',
+            default => 'byo',
+        };
+    }
+
+    public function runtimeTargetMode(): string
+    {
+        return match ($this->runtimeTargetFamily()) {
+            'local_orbstack_kubernetes', 'digitalocean_kubernetes', 'aws_kubernetes', 'kubernetes' => 'kubernetes',
+            'local_orbstack_docker', 'digitalocean_docker', 'aws_docker', 'docker' => 'docker',
+            'digitalocean_functions', 'aws_lambda' => 'serverless',
+            default => 'vm',
+        };
+    }
+
+    public function usesLocalDockerHostRuntime(): bool
+    {
+        return in_array($this->runtimeTargetFamily(), [
+            'local_orbstack_docker',
+            'local_orbstack_kubernetes',
+        ], true);
+    }
+
+    public function runtimeTargetLabel(): string
+    {
+        return match ($this->runtimeTargetFamily()) {
+            'local_orbstack_docker' => 'Local Docker',
+            'local_orbstack_kubernetes' => 'Local Kubernetes',
+            'digitalocean_docker' => 'DigitalOcean Docker',
+            'digitalocean_kubernetes' => 'DigitalOcean Kubernetes',
+            'aws_docker' => 'AWS Docker',
+            'aws_kubernetes' => 'AWS Kubernetes',
+            'digitalocean_functions' => 'DigitalOcean Functions',
+            'aws_lambda' => 'AWS Lambda',
+            default => 'BYO runtime',
+        };
+    }
+
+    public function runtimeRepositorySubdirectory(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $subdirectory = data_get($meta, 'runtime_target.repository_subdirectory');
+
+        if (! is_string($subdirectory) || trim($subdirectory) === '') {
+            $subdirectory = $this->usesKubernetesRuntime()
+                ? data_get($meta, 'kubernetes_runtime.repository_subdirectory')
+                : data_get($meta, 'docker_runtime.repository_subdirectory');
+        }
+
+        return is_string($subdirectory) ? trim($subdirectory, '/') : '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function functionsConfig(): array
     {
         return $this->serverlessConfig();

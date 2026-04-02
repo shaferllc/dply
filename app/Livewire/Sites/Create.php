@@ -3,6 +3,7 @@
 namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
+use App\Enums\ServerProvider;
 use App\Jobs\ProvisionSiteJob;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
@@ -306,11 +307,55 @@ class Create extends Component
             ];
         } elseif ($dockerHost) {
             $meta['runtime_profile'] = 'docker_web';
+            $meta['runtime_target'] = [
+                'family' => match ($this->server->provider) {
+                    ServerProvider::DigitalOcean => 'digitalocean_docker',
+                    ServerProvider::Aws => 'aws_docker',
+                    default => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
+                        ? 'local_orbstack_docker'
+                        : 'docker',
+                },
+                'platform' => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
+                    ? 'local'
+                    : match ($this->server->provider) {
+                        ServerProvider::DigitalOcean => 'digitalocean',
+                        ServerProvider::Aws => 'aws',
+                        default => 'byo',
+                    },
+                'provider' => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
+                    ? 'orbstack'
+                    : ($this->server->provider?->value ?? 'byo'),
+                'mode' => 'docker',
+                'status' => 'pending',
+                'logs' => [],
+            ];
             $meta['docker_runtime'] = [
                 'app_type' => $this->form->type,
             ];
         } elseif ($kubernetesHost) {
             $meta['runtime_profile'] = 'kubernetes_web';
+            $meta['runtime_target'] = [
+                'family' => match ($this->server->provider) {
+                    ServerProvider::DigitalOcean => 'digitalocean_kubernetes',
+                    ServerProvider::Aws => 'aws_kubernetes',
+                    default => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
+                        ? 'local_orbstack_kubernetes'
+                        : 'kubernetes',
+                },
+                'platform' => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
+                    ? 'local'
+                    : match ($this->server->provider) {
+                        ServerProvider::DigitalOcean => 'digitalocean',
+                        ServerProvider::Aws => 'aws',
+                        default => 'byo',
+                    },
+                'provider' => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
+                    ? 'orbstack'
+                    : ($this->server->provider?->value ?? 'byo'),
+                'mode' => 'kubernetes',
+                'status' => 'pending',
+                'logs' => [],
+            ];
             $meta['kubernetes_runtime'] = [
                 'app_type' => $this->form->type,
                 'namespace' => (string) data_get($this->server->meta, 'kubernetes.namespace', 'default'),

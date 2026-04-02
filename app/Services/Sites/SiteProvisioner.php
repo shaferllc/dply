@@ -47,6 +47,7 @@ class SiteProvisioner
             $state = $site->usesDockerRuntime()
                 ? 'configuring_docker_runtime'
                 : 'configuring_kubernetes_runtime';
+            $runtimeTarget = $site->runtimeTarget();
 
             $this->appendLog($site, 'info', 'queued', 'Runtime provisioning worker started.', [
                 'runtime_profile' => $runtimeProfile,
@@ -54,14 +55,50 @@ class SiteProvisioner
             ]);
 
             $this->updateProvisioning($site, [
-                'state' => $state,
+                'state' => 'preparing_runtime_artifacts',
                 'webserver' => $site->webserver(),
                 'started_at' => now()->toIso8601String(),
                 'error' => null,
             ]);
 
+            $this->appendLog($site, 'info', 'preparing_runtime_artifacts', 'Preparing runtime artifacts for the selected container target.', [
+                'runtime_profile' => $runtimeProfile,
+                'target_family' => (string) ($runtimeTarget['family'] ?? 'unknown'),
+                'target_platform' => (string) ($runtimeTarget['platform'] ?? 'unknown'),
+                'target_provider' => (string) ($runtimeTarget['provider'] ?? 'unknown'),
+                'target_mode' => (string) ($runtimeTarget['mode'] ?? 'unknown'),
+                'app_port' => $site->app_port,
+            ]);
+
             $this->runtimeProvisionerRegistry->for($runtimeProfile)->provision($site);
             $site->refresh();
+            $runtimeTarget = $site->runtimeTarget();
+            $publication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
+            $dockerRuntime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
+            $kubernetesRuntime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
+
+            $this->appendLog($site, 'info', $state, 'Runtime artifact generation finished.', [
+                'runtime_profile' => $runtimeProfile,
+                'compose_generated' => array_key_exists('compose_yaml', $dockerRuntime),
+                'dockerfile_generated' => array_key_exists('dockerfile', $dockerRuntime),
+                'manifest_generated' => array_key_exists('manifest_yaml', $kubernetesRuntime),
+                'workspace_path' => $dockerRuntime['workspace_path'] ?? $kubernetesRuntime['workspace_path'] ?? null,
+            ]);
+
+            $this->updateProvisioning($site, [
+                'state' => 'configuring_publication',
+                'webserver' => $site->webserver(),
+                'error' => null,
+            ]);
+
+            $this->appendLog($site, 'info', 'configuring_publication', 'Publication target prepared for the first deploy.', [
+                'publication_kind' => (string) ($publication['kind'] ?? 'unknown'),
+                'publication_status' => (string) ($publication['status'] ?? 'pending'),
+                'publication_hostname' => (string) ($publication['hostname'] ?? ''),
+                'published_url' => (string) ($publication['url'] ?? ''),
+                'published_port' => $publication['port'] ?? null,
+                'dns_provider' => (string) ($publication['dns_provider'] ?? ''),
+            ]);
 
             $this->appendLog($site, 'info', $state, 'Runtime deployment artifacts prepared. Waiting for the first deploy to publish the workload.', [
                 'runtime_profile' => $runtimeProfile,
@@ -189,11 +226,17 @@ class SiteProvisioner
                 ? Site::STATUS_DOCKER_CONFIGURED
                 : Site::STATUS_KUBERNETES_CONFIGURED;
 
-            $site->update([
-                'status' => $configuredStatus,
-            ]);
+            if ($result['ok']) {
+                $site->update([
+                    'status' => $configuredStatus,
+                ]);
+            }
 
-            $this->appendLog($site, 'info', 'awaiting_first_deploy', 'Runtime target is configured. Run the first deploy to publish a live workload.', [
+            $message = $result['ok']
+                ? 'Runtime target is configured. Run the first deploy to publish a live workload.'
+                : 'Runtime target metadata is prepared. Waiting for the publication endpoint to become reachable.';
+
+            $this->appendLog($site, 'info', 'awaiting_first_deploy', $message, [
                 'hostname' => $result['hostname'],
                 'url' => $result['url'],
             ]);

@@ -9,8 +9,6 @@ use App\Notifications\ServerRemovalScheduledNotification;
 use App\Services\Notifications\NotificationPublisher;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Validation\Rule;
-
 trait ManagesServerRemovalForm
 {
     public string $deletionReason = '';
@@ -61,18 +59,7 @@ trait ManagesServerRemovalForm
      */
     protected function immediateServerRemovalRules(array $summary): array
     {
-        $rules = [
-            'deletePhraseControl' => ['required', 'string', Rule::in(['DELETE'])],
-            'currentPassword' => ['required', 'current_password'],
-        ];
-        if ($summary['will_destroy_cloud']) {
-            $rules['deleteAckCloud'] = ['accepted'];
-        }
-        if ($summary['sites'] > 0) {
-            $rules['deleteAckSites'] = ['accepted'];
-        }
-
-        return $rules;
+        return [];
     }
 
     protected function notifyOrgAdminsOfScheduledRemoval(Server $server, Carbon $at, ?string $reason): void

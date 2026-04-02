@@ -1,6 +1,26 @@
 @php
     $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
     $setupIncomplete = $server->status !== \App\Models\Server::STATUS_READY || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE;
+    $containerLaunchTranscript = collect($containerLaunch['events'] ?? [])->map(function (array $event): string {
+        $timestamp = (string) ($event['at'] ?? '');
+        $level = strtoupper((string) ($event['level'] ?? 'info'));
+        $message = (string) ($event['message'] ?? 'Container launch update');
+        $lines = [];
+
+        $prefixParts = array_values(array_filter([$timestamp, $level]));
+        $lines[] = ($prefixParts !== [] ? '['.implode('] [', $prefixParts).'] ' : '').$message;
+
+        foreach (collect($event['context'] ?? [])->filter(fn ($value) => ! is_array($value)) as $contextKey => $contextValue) {
+            $rendered = is_bool($contextValue) ? ($contextValue ? 'true' : 'false') : (string) $contextValue;
+            if ($rendered === '') {
+                continue;
+            }
+
+            $lines[] = '  > '.str_replace('_', ' ', (string) $contextKey).': '.$rendered;
+        }
+
+        return implode("\n", $lines);
+    })->implode("\n\n");
 @endphp
 
 <x-server-workspace-layout
@@ -172,6 +192,58 @@
                                     {{ __('Add profile key') }}
                                 </a>
                             @endif
+                        </div>
+                    </div>
+                </section>
+            @endif
+
+            @if ($containerLaunch)
+                <section class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-brand-sand/20 p-6 shadow-sm">
+                    <div class="mx-auto flex max-w-5xl flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+                        <div class="max-w-3xl">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-700">
+                                    <span class="inline-flex h-2 w-2 rounded-full bg-sky-500 shadow-[0_0_0_4px_rgba(14,165,233,0.16)]"></span>
+                                    {{ __('Container launch in progress') }}
+                                </span>
+                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-moss">
+                                    {{ $containerLaunch['target_family'] }}
+                                </span>
+                            </div>
+
+                            <div class="mt-5">
+                                <h3 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ $containerLaunch['current_step_label'] }}</h3>
+                                <p class="mt-2 max-w-2xl text-sm leading-6 text-brand-moss">{{ $containerLaunch['summary'] }}</p>
+                                @if ($containerLaunch['updated_at'])
+                                    <p class="mt-3 text-xs text-brand-mist">{{ __('Updated :time', ['time' => $containerLaunch['updated_at']->diffForHumans()]) }}</p>
+                                @endif
+                            </div>
+
+                            <dl class="mt-6 grid gap-4 md:grid-cols-3">
+                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Repository') }}</dt>
+                                    <dd class="mt-2 break-all text-sm font-medium text-brand-ink">{{ $containerLaunch['repository_url'] !== '' ? $containerLaunch['repository_url'] : __('Not recorded') }}</dd>
+                                </div>
+                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Branch') }}</dt>
+                                    <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $containerLaunch['repository_branch'] !== '' ? $containerLaunch['repository_branch'] : '—' }}</dd>
+                                </div>
+                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Subdirectory') }}</dt>
+                                    <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $containerLaunch['repository_subdirectory'] !== '' ? $containerLaunch['repository_subdirectory'] : __('Repo root') }}</dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        <div class="w-full max-w-xl">
+                            @include('livewire.partials.deployment-activity-console', [
+                                'title' => __('Install activity'),
+                                'meta' => __('last :count entries', ['count' => count($containerLaunch['events'])]),
+                                'transcript' => $containerLaunchTranscript,
+                                'maxHeight' => '26rem',
+                                'linkHref' => $containerLaunch['site_route'],
+                                'linkLabel' => $containerLaunch['site_route'] ? __('Open site') : null,
+                            ])
                         </div>
                     </div>
                 </section>

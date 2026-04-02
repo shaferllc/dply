@@ -426,6 +426,7 @@ class WorkspaceOverview extends Component
             'last_checked_at' => $this->server->last_health_check_at,
             'monitor_last_sample_at' => $monitorLastSampleAt,
         ];
+        $containerLaunch = $this->containerLaunchSummary();
 
         $insightFindings = InsightFinding::query()
             ->where('server_id', $this->server->id)
@@ -459,6 +460,7 @@ class WorkspaceOverview extends Component
             'latestDeployment' => $latestDeployment,
             'opsSummary' => $opsSummary,
             'healthSummary' => $healthSummary,
+            'containerLaunch' => $containerLaunch,
             'hasProfileSshKeys' => $hasProfileSshKeys,
             'insightFindings' => $insightFindings,
             'insightSummary' => $insightSummary,
@@ -471,5 +473,44 @@ class WorkspaceOverview extends Component
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function containerLaunchSummary(): ?array
+    {
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $launch = is_array($meta['container_launch'] ?? null) ? $meta['container_launch'] : [];
+        if ($launch === []) {
+            return null;
+        }
+
+        $status = (string) ($launch['status'] ?? '');
+        if ($status === '' || $status === 'completed') {
+            return null;
+        }
+
+        $siteId = is_string($launch['site_id'] ?? null) ? $launch['site_id'] : null;
+        $site = $siteId ? $this->server->sites()->with('domains')->find($siteId) : null;
+        $events = collect(is_array($launch['events'] ?? null) ? $launch['events'] : [])
+            ->filter(fn (mixed $event): bool => is_array($event) && is_string($event['message'] ?? null))
+            ->take(-5)
+            ->values()
+            ->all();
+
+        return [
+            'status' => $status,
+            'target_family' => (string) ($launch['target_family'] ?? 'container'),
+            'repository_url' => (string) ($launch['repository_url'] ?? ''),
+            'repository_branch' => (string) ($launch['repository_branch'] ?? ''),
+            'repository_subdirectory' => (string) ($launch['repository_subdirectory'] ?? ''),
+            'current_step_label' => (string) ($launch['current_step_label'] ?? 'Container launch in progress'),
+            'summary' => (string) ($launch['summary'] ?? 'Dply is still preparing this container launch.'),
+            'updated_at' => isset($launch['updated_at']) ? Carbon::parse((string) $launch['updated_at']) : null,
+            'events' => $events,
+            'site' => $site,
+            'site_route' => $site ? route('sites.show', ['server' => $this->server, 'site' => $site]) : null,
+        ];
     }
 }

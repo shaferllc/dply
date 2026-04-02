@@ -3,6 +3,11 @@
 namespace Tests\Feature;
 
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Jobs\ProvisionSiteJob;
+use App\Jobs\FinalizeContainerCloudLaunchJob;
+use App\Jobs\ProvisionAwsEc2ServerJob;
+use App\Jobs\ProvisionDigitalOceanDropletJob;
+use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Servers\Create as ServersCreate;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney;
@@ -28,6 +33,11 @@ use App\Models\UserSshKey;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
+use App\Services\Deploy\LocalRepositoryInspector;
+use App\Services\Sites\Contracts\SiteRuntimeProvisioner;
+use App\Services\Sites\SiteProvisioner;
+use App\Services\Sites\SiteRuntimeProvisionerRegistry;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -64,9 +74,10 @@ class ServerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Fleet control');
-        $response->assertSee('Create server');
+        $response->assertSee('Open launchpad');
+        $response->assertSee(route('launches.create'), false);
         $response->assertSee('No servers yet');
-        $response->assertSee('Create your first server-ready workspace');
+        $response->assertSee('Choose a launch path for your first infrastructure workflow');
     }
 
     public function test_servers_index_prompts_for_provider_setup_when_no_provider_credentials_exist(): void
@@ -172,9 +183,6 @@ class ServerTest extends TestCase
         Livewire::actingAs($user)
             ->test(ServersIndex::class)
             ->call('openRemoveServerModal', $id)
-            ->set('deleteConfirmName', $server->name)
-            ->set('deletePhraseControl', 'DELETE')
-            ->set('currentPassword', 'password')
             ->call('submitRemoveServer');
 
         $this->assertModelMissing($server);
@@ -190,6 +198,66 @@ class ServerTest extends TestCase
         $response->assertForbidden();
     }
 
+    public function test_launchpad_is_displayed_with_organization(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('launches.create'));
+
+        $response->assertOk();
+        $response->assertSee('Launch setup');
+        $response->assertSee('Bring your own server');
+        $response->assertSee('Containers');
+        $response->assertSee('Edge');
+        $response->assertSee('Cloud');
+        $response->assertSee('Serverless');
+        $response->assertSee(route('servers.create'), false);
+        $response->assertSee(route('launches.containers'), false);
+        $response->assertSee(route('launches.serverless'), false);
+        $response->assertSee(route('launches.edge-network'), false);
+        $response->assertSee(route('launches.cloud-network'), false);
+    }
+
+    public function test_serverless_launch_path_is_displayed_with_organization(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('launches.serverless'));
+
+        $response->assertOk();
+        $response->assertSee('Serverless');
+        $response->assertSee('AWS Lambda');
+        $response->assertSee('DigitalOcean Functions');
+    }
+
+    public function test_kubernetes_launch_path_is_displayed_with_organization(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('launches.kubernetes'));
+
+        $response->assertOk();
+        $response->assertSee('Kubernetes');
+        $response->assertSee('DigitalOcean Kubernetes');
+        $response->assertSee('Remote Kubernetes');
+    }
+
+    public function test_containers_launch_path_is_displayed_with_organization(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('launches.containers'));
+
+        $response->assertOk();
+        $response->assertSee('Containers');
+        $response->assertSee('Shared runtime model');
+        $response->assertSee('Local Docker');
+        $response->assertSee('Remote Kubernetes');
+        $response->assertSee(route('launches.local-docker', absolute: false), false);
+        $response->assertDontSee('host_target=docker', false);
+        $response->assertDontSee('source=launches.containers', false);
+    }
+
     public function test_servers_create_is_displayed_with_organization(): void
     {
         $user = $this->userWithOrganization();
@@ -201,27 +269,720 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.create'));
 
         $response->assertOk();
-        $response->assertSee('Create server');
+        $response->assertSee('Create BYO server');
+        $response->assertSee('Bring your own server');
+        $response->assertSee('Use an existing server');
+        $response->assertSee('Provision with a provider');
     }
 
-    public function test_servers_create_redirects_to_profile_ssh_keys_when_user_has_no_key(): void
+    public function test_servers_create_can_start_from_containers_docker_path(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('servers.create', [
+            'host_target' => 'docker',
+            'source' => 'launches.containers',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Remote Docker path');
+        $response->assertSee('Create the remote Docker host first');
+        $response->assertSee('Docker host');
+    }
+
+    public function test_containers_launch_path_lists_existing_local_targets(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+
+        $dockerHost = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'name' => 'orbstack-docker',
+            'provider' => 'custom',
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('launches.containers'));
+
+        $response->assertOk();
+        $response->assertSee('Continue on an existing local target');
+        $response->assertSee('orbstack-docker');
+        $response->assertSee(route('sites.create', $dockerHost), false);
+    }
+
+    public function test_containers_launch_path_links_to_repo_first_local_docker_flow(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('launches.containers'));
+
+        $response->assertOk();
+        $response->assertSee(route('launches.local-docker', absolute: false), false);
+        $response->assertSee('Open local Docker');
+    }
+
+    public function test_local_docker_repo_first_page_is_displayed(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $response = $this->actingAs($user)->get(route('launches.local-docker'));
+
+        $response->assertOk();
+        $response->assertSee('Repo-first containers');
+        $response->assertSee('Repository URL');
+        $response->assertSee('Inspect repository');
+        $response->assertDontSee('IP address');
+        $response->assertDontSee('SSH private key');
+    }
+
+    public function test_local_docker_repo_first_flow_auto_creates_hidden_host_and_site(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
+        {
+            /**
+             * @param  array<string, mixed>  $result
+             */
+            public function __construct(private array $result) {}
+
+            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
+            {
+                return $this->result;
+            }
+        });
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->set('repository_url', 'https://github.com/acme/demo.git')
+            ->set('repository_branch', 'main')
+            ->call('launch')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $server = Server::query()
+            ->where('organization_id', $organization->id)
+            ->where('provider', 'custom')
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($server);
+        $this->assertTrue($server->isDockerHost());
+
+        $site = Site::query()
+            ->where('server_id', $server->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($site);
+        $this->assertTrue($site->usesDockerRuntime());
+        $this->assertSame('https://github.com/acme/demo.git', $site->git_repository_url);
+        $this->assertSame('main', $site->git_branch);
+        $this->assertSame('laravel', data_get($site->meta, 'docker_runtime.detected.framework'));
+        $this->assertStringContainsString('APP_KEY=base64:', (string) $site->env_file_content);
+        $this->assertSame('docker', data_get($server->meta, 'local_runtime.mode'));
+
+        Bus::assertChained([
+            ProvisionSiteJob::class,
+            RunSiteDeploymentJob::class,
+        ]);
+    }
+
+    public function test_local_docker_repo_first_flow_creates_kubernetes_target_when_repo_detects_cluster_markers(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult([
+            'target_runtime' => 'kubernetes_web',
+            'target_kind' => 'kubernetes',
+            'kubernetes_namespace' => 'local-kube',
+            'detected_files' => ['k8s/deployment.yaml'],
+        ])) extends LocalRepositoryInspector
+        {
+            /**
+             * @param  array<string, mixed>  $result
+             */
+            public function __construct(private array $result) {}
+
+            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
+            {
+                return $this->result;
+            }
+        });
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->set('repository_url', 'https://github.com/acme/demo.git')
+            ->set('repository_branch', 'main')
+            ->call('launch')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $server = Server::query()
+            ->where('organization_id', $organization->id)
+            ->latest('created_at')
+            ->first();
+
+        $site = Site::query()
+            ->where('server_id', $server?->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($server);
+        $this->assertSame(Server::HOST_KIND_KUBERNETES, data_get($server->meta, 'host_kind'));
+        $this->assertNotNull($site);
+        $this->assertTrue($site->usesKubernetesRuntime());
+        $this->assertSame('local-kube', data_get($site->meta, 'kubernetes_runtime.namespace'));
+
+        Bus::assertChained([
+            ProvisionSiteJob::class,
+            RunSiteDeploymentJob::class,
+        ]);
+    }
+
+    public function test_local_docker_repo_first_flow_stores_low_confidence_detection_metadata(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult([
+            'framework' => 'unknown',
+            'language' => 'unknown',
+            'confidence' => 'low',
+            'warnings' => ['Review runtime details after launch.'],
+            'reasons' => ['No clear framework markers were detected in the repository root.'],
+            'env_template' => [
+                'path' => '.env.example',
+                'keys' => ['APP_NAME'],
+            ],
+        ])) extends LocalRepositoryInspector
+        {
+            /**
+             * @param  array<string, mixed>  $result
+             */
+            public function __construct(private array $result) {}
+
+            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
+            {
+                return $this->result;
+            }
+        });
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->set('repository_url', 'https://github.com/acme/demo.git')
+            ->set('repository_branch', 'main')
+            ->call('launch')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $site = Site::query()->latest('created_at')->first();
+
+        $this->assertNotNull($site);
+        $this->assertSame('low', data_get($site->meta, 'docker_runtime.detected.confidence'));
+        $this->assertSame('.env.example', data_get($site->meta, 'docker_runtime.detected.env_template.path'));
+    }
+
+    public function test_local_docker_repo_first_flow_persists_repository_subdirectory_for_runtime_checkout(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult([
+            'repository_subdirectory' => 'apps/web',
+        ])) extends LocalRepositoryInspector
+        {
+            /**
+             * @param  array<string, mixed>  $result
+             */
+            public function __construct(private array $result) {}
+
+            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
+            {
+                return $this->result;
+            }
+        });
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->set('repository_url', 'https://github.com/acme/monorepo.git')
+            ->set('repository_branch', 'main')
+            ->set('repository_subdirectory', 'apps/web')
+            ->call('launch')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $site = Site::query()->latest('created_at')->first();
+
+        $this->assertNotNull($site);
+        $this->assertSame('apps/web', data_get($site->meta, 'docker_runtime.repository_subdirectory'));
+        $this->assertSame('apps/web', data_get($site->meta, 'runtime_target.repository_subdirectory'));
+    }
+
+    public function test_local_docker_launch_redirects_to_site_workspace(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
+        {
+            /**
+             * @param  array<string, mixed>  $result
+             */
+            public function __construct(private array $result) {}
+
+            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
+            {
+                return $this->result;
+            }
+        });
+
+        $component = Livewire::actingAs($user)
+            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->set('repository_url', 'https://github.com/acme/demo.git')
+            ->set('repository_branch', 'main')
+            ->call('launch')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $site = Site::query()->latest('created_at')->firstOrFail();
+        $server = $site->server()->firstOrFail();
+
+        $component
+            ->assertRedirect(route('sites.show', [$server, $site], false));
+    }
+
+    public function test_local_docker_page_shows_cloud_target_choices_after_inspection(): void
+    {
+        $user = $this->userWithOrganization();
+
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
+        {
+            public function __construct(private array $result) {}
+
+            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
+            {
+                return $this->result;
+            }
+        });
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->set('repository_url', 'https://github.com/acme/demo.git')
+            ->call('inspectRepository')
+            ->assertSee('Choose the container target')
+            ->assertSee('Remote Docker (DigitalOcean)')
+            ->assertSee('Remote Kubernetes (AWS)');
+    }
+
+    public function test_local_docker_can_launch_digitalocean_docker_target_and_queue_finalizer(): void
+    {
+        Queue::fake();
+
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
+        {
+            public function __construct(private array $result) {}
+
+            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
+            {
+                return $this->result;
+            }
+        });
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->set('repository_url', 'https://github.com/acme/demo.git')
+            ->set('target_family', 'digitalocean_docker')
+            ->set('provider_credential_id', (string) $credential->id)
+            ->set('cloud_region', 'nyc3')
+            ->set('cloud_size', 's-1vcpu-1gb')
+            ->call('launch')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $server = Server::query()->where('provider', 'digitalocean')->latest('created_at')->first();
+
+        $this->assertNotNull($server);
+        $this->assertSame(Server::HOST_KIND_DOCKER, data_get($server->meta, 'host_kind'));
+
+        Queue::assertPushed(ProvisionDigitalOceanDropletJob::class);
+        Queue::assertPushed(FinalizeContainerCloudLaunchJob::class);
+    }
+
+    public function test_finalize_container_cloud_launch_job_creates_site_after_server_is_ready(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'provider' => 'aws',
+            'credentials' => [
+                'access_key_id' => 'key',
+                'secret_access_key' => 'secret',
+            ],
+        ]);
+
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'provider' => 'aws',
+            'provider_credential_id' => $credential->id,
+            'status' => Server::STATUS_READY,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+            ],
+        ]);
+
+        $inspection = $this->localInspectionResult();
+
+        $job = new FinalizeContainerCloudLaunchJob(
+            (string) $server->id,
+            (string) $user->id,
+            (string) $organization->id,
+            $inspection,
+            'aws_docker',
+        );
+
+        $job->handle(app(\App\Actions\Sites\CreateContainerSiteFromInspection::class));
+
+        $site = Site::query()->where('server_id', $server->id)->latest('created_at')->first();
+
+        $this->assertNotNull($site);
+        $this->assertSame('aws_docker', data_get($site->meta, 'runtime_target.family'));
+
+        Bus::assertChained([
+            ProvisionSiteJob::class,
+            RunSiteDeploymentJob::class,
+        ]);
+    }
+
+    public function test_finalize_container_cloud_launch_job_tracks_waiting_for_server_progress(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'provider' => 'digitalocean',
+            'provider_credential_id' => $credential->id,
+            'status' => Server::STATUS_PROVISIONING,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'container_launch' => [
+                    'status' => 'waiting_for_server',
+                    'target_family' => 'digitalocean_docker',
+                    'events' => [],
+                ],
+            ],
+        ]);
+
+        $job = new FinalizeContainerCloudLaunchJob(
+            (string) $server->id,
+            (string) $user->id,
+            (string) $organization->id,
+            $this->localInspectionResult(),
+            'digitalocean_docker',
+        );
+
+        $job->handle(app(\App\Actions\Sites\CreateContainerSiteFromInspection::class));
+
+        $server->refresh();
+
+        $this->assertSame('waiting_for_server', data_get($server->meta, 'container_launch.status'));
+        $this->assertSame('Provisioning server', data_get($server->meta, 'container_launch.current_step_label'));
+        $this->assertSame('digitalocean_docker', data_get($server->meta, 'container_launch.target_family'));
+        $this->assertNotEmpty(data_get($server->meta, 'container_launch.events', []));
+        $this->assertSame(
+            'Waiting for the remote server to finish provisioning before creating the site.',
+            data_get($server->meta, 'container_launch.events.0.message')
+        );
+    }
+
+    public function test_pending_site_install_page_shows_install_activity_log(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'status' => Server::STATUS_READY,
+        ]);
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'status' => Site::STATUS_PENDING,
+            'meta' => [
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'pending',
+                    'logs' => [],
+                ],
+                'docker_runtime' => [
+                    'app_type' => 'php',
+                    'auto_created' => true,
+                ],
+                'provisioning' => [
+                    'state' => 'awaiting_first_deploy',
+                    'log' => [
+                        [
+                            'at' => now()->subMinute()->toIso8601String(),
+                            'level' => 'info',
+                            'step' => 'preparing_runtime_artifacts',
+                            'message' => 'Preparing runtime artifacts for the selected container target.',
+                            'context' => [
+                                'runtime_profile' => 'docker_web',
+                                'target_family' => 'local_orbstack_docker',
+                            ],
+                        ],
+                        [
+                            'at' => now()->toIso8601String(),
+                            'level' => 'info',
+                            'step' => 'configuring_publication',
+                            'message' => 'Publication target prepared for the first deploy.',
+                            'context' => [
+                                'published_url' => 'http://127.0.0.1:8080',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sites.show', [$server, $site]))
+            ->assertOk()
+            ->assertSee('Install activity')
+            ->assertSee('Preparing runtime artifacts for the selected container target.')
+            ->assertSee('Publication target prepared for the first deploy.')
+            ->assertSee('target family')
+            ->assertSee('local_orbstack_docker')
+            ->assertSee('published url')
+            ->assertSee('http://127.0.0.1:8080');
+    }
+
+    public function test_servers_overview_shows_container_launch_progress_card_before_site_is_ready(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'setup_status' => Server::SETUP_STATUS_DONE,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'container_launch' => [
+                    'status' => 'waiting_for_site_provisioning',
+                    'target_family' => 'digitalocean_docker',
+                    'repository_url' => 'https://github.com/acme/demo.git',
+                    'repository_branch' => 'main',
+                    'repository_subdirectory' => 'apps/web',
+                    'current_step_label' => 'Provisioning site workspace',
+                    'summary' => 'The server is ready. Dply is now creating the site and preparing the first deployment workflow.',
+                    'events' => [
+                        [
+                            'at' => now()->subMinute()->toIso8601String(),
+                            'level' => 'info',
+                            'message' => 'Remote server is ready. Creating the site from the inspected repository.',
+                        ],
+                        [
+                            'at' => now()->toIso8601String(),
+                            'level' => 'info',
+                            'message' => 'Site created. Provisioning and first deployment have been queued.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        $response->assertSee('Container launch in progress');
+        $response->assertSee('Provisioning site workspace');
+        $response->assertSee('digitalocean_docker');
+        $response->assertSee('apps/web');
+        $response->assertSee('Remote server is ready. Creating the site from the inspected repository.');
+        $response->assertSee('Site created. Provisioning and first deployment have been queued.');
+    }
+
+    public function test_site_provisioner_records_docker_runtime_activity_details(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'status' => Server::STATUS_READY,
+        ]);
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'status' => Site::STATUS_PENDING,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'pending',
+                    'logs' => [],
+                ],
+                'docker_runtime' => [
+                    'app_type' => 'php',
+                    'auto_created' => true,
+                ],
+            ],
+        ]);
+
+        app()->instance(SiteRuntimeProvisionerRegistry::class, new SiteRuntimeProvisionerRegistry([
+            new class implements SiteRuntimeProvisioner
+            {
+                public function runtimeProfile(): string
+                {
+                    return 'docker_web';
+                }
+
+                public function provision(Site $site): void
+                {
+                    $meta = is_array($site->meta) ? $site->meta : [];
+                    $meta['docker_runtime'] = array_merge(
+                        is_array($meta['docker_runtime'] ?? null) ? $meta['docker_runtime'] : [],
+                        ['compose_yaml' => "services:\n  app:\n    image: demo\n"]
+                    );
+                    $meta['runtime_target'] = array_merge(
+                        is_array($meta['runtime_target'] ?? null) ? $meta['runtime_target'] : [],
+                        [
+                            'publication' => [
+                                'status' => 'pending',
+                                'hostname' => 'demo.local.dply.test',
+                                'url' => 'http://127.0.0.1:8080',
+                                'port' => 8080,
+                            ],
+                        ]
+                    );
+
+                    $site->forceFill(['meta' => $meta])->save();
+                }
+
+                public function readyResult(Site $site): array
+                {
+                    return [
+                        'ok' => false,
+                        'hostname' => 'demo.local.dply.test',
+                        'url' => 'http://127.0.0.1:8080',
+                        'error' => 'Waiting for first deploy.',
+                        'checked_at' => now()->toIso8601String(),
+                        'checks' => [],
+                    ];
+                }
+            },
+        ]));
+
+        app(SiteProvisioner::class)->begin($site->fresh());
+
+        $messages = collect($site->fresh()->provisioningLog())->pluck('message')->all();
+
+        $this->assertContains('Preparing runtime artifacts for the selected container target.', $messages);
+        $this->assertContains('Runtime artifact generation finished.', $messages);
+        $this->assertContains('Publication target prepared for the first deploy.', $messages);
+
+        $publicationLog = collect($site->fresh()->provisioningLog())
+            ->firstWhere('message', 'Publication target prepared for the first deploy.');
+
+        $this->assertSame('http://127.0.0.1:8080', data_get($publicationLog, 'context.published_url'));
+        $this->assertSame(8080, data_get($publicationLog, 'context.published_port'));
+        $this->assertSame('demo.local.dply.test', data_get($publicationLog, 'context.publication_hostname'));
+    }
+
+    public function test_servers_create_shows_profile_ssh_key_management_link_when_user_has_no_key(): void
     {
         $user = $this->userWithOrganization();
 
         $this->actingAs($user)
             ->get(route('servers.create'))
             ->assertOk()
-            ->assertSee('Create server');
+            ->assertSee('Create BYO server')
+            ->assertSee(route('profile.ssh-keys', absolute: false), false)
+            ->assertSee('Manage profile SSH keys');
     }
 
-    public function test_servers_create_shows_add_ssh_key_modal_trigger_when_profile_key_is_missing(): void
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function localInspectionResult(array $overrides = []): array
     {
-        Http::fake([
-            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
-            'https://api.digitalocean.com/v2/regions' => Http::response(['regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]]]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response(['sizes' => [['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true]]]),
+        return array_replace_recursive([
+            'repository_url' => 'https://github.com/acme/demo.git',
+            'repository_branch' => 'main',
+            'slug' => 'demo',
+            'name' => 'Demo',
+            'inspection_output' => 'ok',
+            'detection' => [
+                'target_runtime' => 'docker_web',
+                'target_kind' => 'docker',
+                'site_type' => \App\Enums\SiteType::Php,
+                'framework' => 'laravel',
+                'language' => 'php',
+                'confidence' => 'high',
+                'document_root' => '/var/www/demo/public',
+                'repository_path' => '/var/www/demo',
+                'app_port' => null,
+                'kubernetes_namespace' => null,
+                'reasons' => ['Detected Laravel project files.'],
+                'warnings' => [],
+                'detected_files' => ['artisan', 'composer.json'],
+                'env_template' => [
+                    'path' => null,
+                    'keys' => [],
+                ],
+            ],
+        ], [
+            'detection' => $overrides,
         ]);
+    }
 
+    public function test_servers_create_shows_provider_provisioning_option_when_provider_credentials_exist(): void
+    {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
 
@@ -236,115 +997,14 @@ class ServerTest extends TestCase
         $this->actingAs($user)
             ->get(route('servers.create'))
             ->assertOk()
-            ->assertSee('Add a personal profile SSH key')
-            ->assertSee('Add SSH key');
+            ->assertSee('Bring your own server')
+            ->assertSee('Provision with a provider')
+            ->assertSee('DigitalOcean')
+            ->assertSee('Choose provider')
+            ->assertSee('Choose account');
     }
 
-    public function test_servers_create_shows_digitalocean_functions_path_without_requiring_profile_ssh_keys(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        ProviderCredential::factory()->create([
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(ServersCreate::class)
-            ->assertSee('DigitalOcean Functions')
-            ->set('form.type', 'digitalocean_functions')
-            ->assertSee('DigitalOcean Functions setup')
-            ->assertDontSee('Default package')
-            ->assertDontSee('Default action kind')
-            ->assertDontSee('Default action entrypoint');
-    }
-
-    public function test_servers_create_shows_digitalocean_kubernetes_path_without_requiring_profile_ssh_keys(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        ProviderCredential::factory()->create([
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(ServersCreate::class)
-            ->assertSee('DigitalOcean Kubernetes')
-            ->set('form.type', 'digitalocean_kubernetes')
-            ->assertSee('DigitalOcean Kubernetes setup')
-            ->assertSee('Cluster name')
-            ->assertSee('Namespace');
-    }
-
-    public function test_servers_create_can_store_a_digitalocean_functions_host_without_profile_ssh_keys(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
-        ]);
-
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $credential = ProviderCredential::factory()->create([
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(ServersCreate::class)
-            ->set('form.type', 'digitalocean_functions')
-            ->set('form.name', 'edge-fns')
-            ->set('form.provider_credential_id', (string) $credential->id)
-            ->set('form.do_functions_api_host', 'https://faas-nyc1-example.doserverless.co')
-            ->set('form.do_functions_namespace', 'fn-namespace')
-            ->set('form.do_functions_access_key', 'dof_v1_test:secret')
-            ->call('store')
-            ->assertRedirect();
-
-        $server = Server::query()->where('name', 'edge-fns')->firstOrFail();
-
-        $this->assertSame(Server::STATUS_READY, $server->status);
-        $this->assertSame(Server::HEALTH_REACHABLE, $server->health_status);
-        $this->assertTrue($server->isDigitalOceanFunctionsHost());
-        $this->assertSame('digitalocean', $server->provider->value);
-        $this->assertSame('fn-namespace', data_get($server->meta, 'digitalocean_functions.namespace'));
-        $this->assertNull(data_get($server->meta, 'digitalocean_functions.package'));
-        $this->assertNull(data_get($server->meta, 'digitalocean_functions.action_kind'));
-        $this->assertNull(data_get($server->meta, 'digitalocean_functions.action_main'));
-    }
-
-    public function test_servers_create_can_store_an_aws_lambda_host_without_profile_ssh_keys(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $credential = ProviderCredential::factory()->create([
-            'organization_id' => $org->id,
-            'provider' => 'aws',
-            'credentials' => [
-                'access_key_id' => 'AKIA123456789',
-                'secret_access_key' => 'secret',
-            ],
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(ServersCreate::class)
-            ->set('form.type', 'aws_lambda')
-            ->set('form.name', 'laravel-lambda')
-            ->set('form.provider_credential_id', (string) $credential->id)
-            ->set('form.aws_lambda_region', 'us-east-1')
-            ->call('store')
-            ->assertRedirect();
-
-        $server = Server::query()->where('name', 'laravel-lambda')->firstOrFail();
-
-        $this->assertSame(Server::STATUS_READY, $server->status);
-        $this->assertSame(Server::HEALTH_REACHABLE, $server->health_status);
-        $this->assertTrue($server->isAwsLambdaHost());
-        $this->assertSame('aws', $server->provider->value);
-        $this->assertSame('us-east-1', data_get($server->meta, 'aws_lambda.region'));
-    }
-
-    public function test_servers_create_prompts_to_add_provider_when_none_exist(): void
+    public function test_servers_create_shows_provider_provisioning_option_even_without_provider_credentials(): void
     {
         $user = $this->userWithOrganization();
         UserSshKey::factory()->create([
@@ -355,58 +1015,15 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.create'));
 
         $response->assertOk();
-        $response->assertSee('Add a provider before you create a cloud server.');
-        $response->assertSee('Connect DigitalOcean');
-        $response->assertSee('Custom server');
+        $response->assertSee('Bring your own server');
+        $response->assertSee('Provision with a provider');
         $response->assertSee('Custom server details');
-        $response->assertDontSee('Provision a new server with a connected provider');
-        $response->assertDontSee('Choose server type');
-        $response->assertDontSee('Cloud server setup');
-        $response->assertDontSee('No credentials');
+        $response->assertSee('SSH private key (PEM / OpenSSH)');
+        $response->assertSee('Add a provider credential');
+        $response->assertSee('Choose provider');
     }
 
-    public function test_servers_create_warns_when_no_personal_key_is_set_to_provision_on_new_servers(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
-            'https://api.digitalocean.com/v2/regions' => Http::response([
-                'regions' => [
-                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
-                ],
-            ]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response([
-                'sizes' => [
-                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
-                ],
-            ]),
-        ]);
-
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-
-        UserSshKey::factory()->create([
-            'user_id' => $user->id,
-            'name' => 'Work laptop',
-            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('m', 43).' no-default',
-            'provision_on_new_servers' => false,
-        ]);
-
-        ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'name' => 'Primary DO',
-            'credentials' => ['api_token' => 'token'],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('servers.create'));
-
-        $response->assertOk();
-        $response->assertSee('No personal SSH key is set for new servers');
-        $response->assertSee('This server will be created without one of your saved personal SSH keys unless you attach one after setup or mark a profile key for new servers.');
-    }
-
-    public function test_servers_create_uses_two_path_flow(): void
+    public function test_servers_create_defaults_to_existing_server_form_while_showing_provider_path(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -426,14 +1043,45 @@ class ServerTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(ServersCreate::class)
-            ->assertSee('Cloud server')
-            ->assertSee('Custom server')
-            ->assertSee('Core server config')
-            ->assertSee('Advanced options')
-            ->set('form.type', 'custom')
+            ->assertSee('Use an existing server')
+            ->assertSee('Provision with a provider')
+            ->assertSee('Bring your own server')
             ->assertSee('SSH private key (PEM / OpenSSH)')
-            ->assertDontSee('Core server config')
-            ->assertDontSee('Advanced options');
+            ->assertSee('Test connection')
+            ->assertSee('Choose provider')
+            ->assertSee('Choose account')
+            ->assertSet('form.type', 'custom');
+    }
+
+    public function test_servers_create_can_switch_to_provider_provisioning_path(): void
+    {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+            'https://api.digitalocean.com/v2/regions' => Http::response(['regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]]]),
+            'https://api.digitalocean.com/v2/sizes' => Http::response(['sizes' => [['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true]]]),
+        ]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean',
+            'name' => 'Primary DO',
+            'credentials' => ['api_token' => 'token'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.type', 'digitalocean')
+            ->set('form.provider_credential_id', (string) $credential->id)
+            ->assertSet('form.type', 'digitalocean')
+            ->assertSee('Choose account')
+            ->assertSee('Region')
+            ->assertSee('Droplet size')
+            ->assertSee('Core server config')
+            ->assertSee('Advanced options');
     }
 
     public function test_servers_create_generates_a_name_and_can_regenerate_it(): void
@@ -463,200 +1111,6 @@ class ServerTest extends TestCase
         $this->assertNotSame($initial, $regenerated);
     }
 
-    public function test_servers_create_defaults_to_cloud_first_provider_closest_region_and_smallest_size_after_connecting_provider(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
-            'https://api.digitalocean.com/v2/regions' => Http::response([
-                'regions' => [
-                    ['slug' => 'fra1', 'name' => 'Frankfurt 1', 'available' => true],
-                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
-                    ['slug' => 'sfo3', 'name' => 'San Francisco 3', 'available' => true],
-                ],
-            ]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response([
-                'sizes' => [
-                    ['slug' => 's-2vcpu-4gb', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true],
-                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
-                    ['slug' => 's-1vcpu-2gb', 'memory' => 2048, 'vcpus' => 1, 'disk' => 50, 'price_monthly' => 12, 'available' => true],
-                ],
-            ]),
-        ]);
-
-        $user = $this->userWithOrganization();
-        $user->forceFill(['country_code' => 'US'])->save();
-
-        $component = Livewire::actingAs($user)
-            ->test(ServersCreate::class)
-            ->set('do_name', 'Primary DO')
-            ->set('do_api_token', 'dop_v1_test')
-            ->call('storeDigitalOcean');
-
-        $credential = ProviderCredential::query()
-            ->where('organization_id', $user->currentOrganization()?->id)
-            ->where('provider', 'digitalocean')
-            ->first();
-
-        $this->assertNotNull($credential);
-
-        $component
-            ->assertSet('form.type', 'digitalocean')
-            ->assertSet('active_provider', 'digitalocean')
-            ->assertSet('form.provider_credential_id', (string) $credential->id)
-            ->assertSet('form.region', 'nyc3')
-            ->assertSet('form.size', 's-2vcpu-4gb');
-    }
-
-    public function test_servers_create_renders_plan_picker_columns_for_cloud_sizes(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
-            'https://api.digitalocean.com/v2/regions' => Http::response([
-                'regions' => [
-                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
-                ],
-            ]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response([
-                'sizes' => [
-                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
-                    ['slug' => 's-2vcpu-4gb', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true],
-                ],
-            ]),
-        ]);
-
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-
-        ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'name' => 'Primary DO',
-            'credentials' => ['api_token' => 'token'],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('servers.create'));
-
-        $response->assertOk();
-        $response->assertSee('Price / mo');
-        $response->assertSee('RAM');
-        $response->assertSee('CPU');
-        $response->assertSee('Disk');
-        $response->assertSee('s-1vcpu-1gb');
-        $response->assertSee('$6');
-        $response->assertSee('Good starting point');
-    }
-
-    public function test_servers_create_renders_digitalocean_region_picker_map_and_list(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
-            'https://api.digitalocean.com/v2/regions' => Http::response([
-                'regions' => [
-                    ['slug' => 'fra1', 'name' => 'Frankfurt 1', 'available' => true],
-                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
-                    ['slug' => 'sfo3', 'name' => 'San Francisco 3', 'available' => true],
-                ],
-            ]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response([
-                'sizes' => [
-                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
-                ],
-            ]),
-        ]);
-
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-
-        ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'name' => 'Primary DO',
-            'credentials' => ['api_token' => 'token'],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('servers.create'));
-
-        $response->assertOk();
-        $response->assertSee('View map');
-        $response->assertSee('Open the full map modal for easier geographic selection.');
-        $response->assertSee('data-region-map', false);
-        $response->assertSee('"value":"nyc3"', false);
-        $response->assertSee('New York 3');
-        $response->assertSee('Frankfurt 1');
-    }
-
-    public function test_servers_create_shows_preflight_cost_preview_for_catalog_pricing(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
-            'https://api.digitalocean.com/v2/regions' => Http::response([
-                'regions' => [
-                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
-                ],
-            ]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response([
-                'sizes' => [
-                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'price_hourly' => 0.00893, 'available' => true],
-                ],
-            ]),
-        ]);
-
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-
-        ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'name' => 'Primary DO',
-            'credentials' => ['api_token' => 'token'],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('servers.create'));
-
-        $response->assertOk();
-        $response->assertSee('Preflight and cost preview');
-        $response->assertSee('$6.00/mo');
-        $response->assertSee('Hourly: $0.0089/hr');
-        $response->assertSee('Provider Catalog');
-    }
-
-    public function test_servers_create_shows_provider_health_failure_when_credential_is_rejected(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/account' => Http::response(['message' => 'Forbidden'], 403),
-            'https://api.digitalocean.com/v2/regions' => Http::response([
-                'regions' => [
-                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
-                ],
-            ]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response([
-                'sizes' => [
-                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
-                ],
-            ]),
-        ]);
-
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-
-        ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'name' => 'Primary DO',
-            'credentials' => ['api_token' => 'token'],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('servers.create'));
-
-        $response->assertOk();
-        $response->assertSee('Credential health');
-        $response->assertSee('Credential lacks required access');
-        $response->assertSee('Blocked');
-    }
 
     public function test_servers_create_install_profile_updates_stack_defaults(): void
     {
@@ -685,81 +1139,6 @@ class ServerTest extends TestCase
             ->assertSet('form.database', 'none');
     }
 
-    public function test_servers_create_exposes_expanded_webserver_choices(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
-            'https://api.digitalocean.com/v2/regions' => Http::response(['regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]]]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response(['sizes' => [['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true]]]),
-        ]);
-
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-
-        ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'name' => 'Primary DO',
-            'credentials' => ['api_token' => 'token'],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('servers.create'));
-
-        $response->assertOk();
-        $response->assertSee('Choose the web server');
-        $response->assertSee('Recommended default for most PHP and Laravel apps.');
-        $response->assertSee('Battle-tested default');
-        $response->assertSee('Tradeoffs');
-        $response->assertSee('OpenLiteSpeed');
-        $response->assertSee('Traefik');
-        $response->assertSee('Apache (httpd)');
-    }
-
-    public function test_servers_create_blocks_store_when_preflight_finds_missing_size(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/droplets' => Http::response(['droplets' => []]),
-            'https://api.digitalocean.com/v2/regions' => Http::response([
-                'regions' => [
-                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
-                ],
-            ]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response([
-                'sizes' => [
-                    ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
-                ],
-            ]),
-        ]);
-
-        Queue::fake();
-
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-
-        ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'name' => 'Primary DO',
-            'credentials' => ['api_token' => 'token'],
-        ]);
-
-        $component = Livewire::actingAs($user)
-            ->test(ServersCreate::class)
-            ->set('form.name', 'Blocked Box')
-            ->set('form.region', 'nyc3')
-            ->set('form.size', 'missing-size');
-
-        $component->call('store');
-
-        $component->assertSee('The selected size is not available for the current catalog response.');
-
-        $this->assertDatabaseMissing('servers', [
-            'organization_id' => $org->id,
-            'name' => 'Blocked Box',
-        ]);
-    }
 
     public function test_servers_can_be_stored_as_custom(): void
     {
@@ -809,34 +1188,6 @@ class ServerTest extends TestCase
         $this->assertTrue($server->isDockerHost());
     }
 
-    public function test_servers_create_can_store_a_digitalocean_kubernetes_host_without_profile_ssh_keys(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $credential = ProviderCredential::factory()->create([
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(ServersCreate::class)
-            ->set('form.type', 'digitalocean_kubernetes')
-            ->set('form.name', 'DOKS Cluster')
-            ->set('form.provider_credential_id', (string) $credential->id)
-            ->set('form.do_kubernetes_cluster_name', 'prod-cluster')
-            ->set('form.do_kubernetes_namespace', 'apps')
-            ->call('store')
-            ->assertRedirect();
-
-        $server = Server::query()->where('name', 'DOKS Cluster')->firstOrFail();
-
-        $this->assertSame(Server::HOST_KIND_KUBERNETES, data_get($server->meta, 'host_kind'));
-        $this->assertSame('prod-cluster', data_get($server->meta, 'kubernetes.cluster_name'));
-        $this->assertSame('apps', data_get($server->meta, 'kubernetes.namespace'));
-        $this->assertSame('digitalocean', data_get($server->meta, 'kubernetes.provider'));
-        $this->assertSame(Server::STATUS_PENDING, $server->status);
-        $this->assertNull($server->health_status);
-    }
 
     public function test_servers_create_custom_path_shows_warning_preflight_and_unavailable_cost(): void
     {
@@ -871,24 +1222,8 @@ class ServerTest extends TestCase
             ->assertSee('SSH connection verified as root.');
     }
 
-    public function test_servers_create_renders_role_aware_size_recommendations(): void
+    public function test_servers_create_defaults_to_custom_type_even_when_provider_credentials_exist(): void
     {
-        Http::fake([
-            'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
-            'https://api.digitalocean.com/v2/regions' => Http::response([
-                'regions' => [
-                    ['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true],
-                ],
-            ]),
-            'https://api.digitalocean.com/v2/sizes' => Http::response([
-                'sizes' => [
-                    ['slug' => 'tiny', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
-                    ['slug' => 'balanced', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true],
-                    ['slug' => 'huge', 'memory' => 16384, 'vcpus' => 8, 'disk' => 320, 'price_monthly' => 96, 'available' => true],
-                ],
-            ]),
-        ]);
-
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
 
@@ -900,12 +1235,33 @@ class ServerTest extends TestCase
             'credentials' => ['api_token' => 'token'],
         ]);
 
-        $response = $this->actingAs($user)->get(route('servers.create'));
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->assertSet('form.type', 'custom')
+            ->assertSet('form.custom_host_kind', 'vm')
+            ->assertSet('form.ssh_port', '22')
+            ->assertSet('form.ssh_user', 'root');
+    }
 
-        $response->assertOk();
-        $response->assertSee('Good starting point');
-        $response->assertSee('Too small');
-        $response->assertSee('Overkill');
+    public function test_servers_create_blocks_store_when_required_connection_details_are_missing(): void
+    {
+        Queue::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $component = Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->set('form.name', 'Blocked Box');
+
+        $component
+            ->call('store')
+            ->assertHasErrors(['ip_address', 'ssh_private_key']);
+
+        $this->assertDatabaseMissing('servers', [
+            'organization_id' => $org->id,
+            'name' => 'Blocked Box',
+        ]);
     }
 
     public function test_servers_show_routes_provisioning_server_to_journey_page(): void
@@ -2135,9 +2491,6 @@ class ServerTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceSites::class, ['server' => $server])
             ->call('openRemoveServerModal')
-            ->set('deleteConfirmName', $server->name)
-            ->set('deletePhraseControl', 'DELETE')
-            ->set('currentPassword', 'password')
             ->call('submitRemoveServer')
             ->assertRedirect(route('servers.index'));
 

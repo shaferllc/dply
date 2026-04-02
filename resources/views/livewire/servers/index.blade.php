@@ -77,8 +77,8 @@
 
                         <div class="mt-8 flex flex-wrap gap-3">
                             @can('create', App\Models\Server::class)
-                                <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
-                                    {{ __('Create server') }}
+                                <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
+                                    {{ __('Open launchpad') }}
                                 </a>
                             @endcan
                             <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/8 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/12">
@@ -138,13 +138,13 @@
         @if (! $hasServersInScope)
             <x-empty-state
                 :title="__('No servers yet')"
-                :description="__('Create your first server-ready workspace. Connect a provider, provision infrastructure, and return here to manage sites, SSH, automation, and health from one place.')"
+                :description="__('Choose a launch path for your first infrastructure workflow. Start with the launchpad, then move into BYO, local Docker, remote Docker, serverless, Kubernetes, edge, or cloud network setup as needed.')"
                 :dashed="false"
                 class="rounded-[2rem] p-10 text-center text-sm text-brand-moss"
             >
                 <x-slot name="actions">
                 @can('create', App\Models\Server::class)
-                    <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream transition hover:bg-brand-forest">{{ __('Add your first server') }}</a>
+                    <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream transition hover:bg-brand-forest">{{ __('Open launchpad') }}</a>
                 @endcan
                     <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-brand-cream px-4 py-2.5 text-sm font-semibold text-brand-ink transition hover:bg-white">{{ __('Connect a provider') }}</a>
                 </x-slot>

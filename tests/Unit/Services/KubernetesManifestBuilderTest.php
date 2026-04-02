@@ -22,6 +22,6 @@ class KubernetesManifestBuilderTest extends TestCase
         $this->assertStringContainsString('namespace: apps', $yaml);
         $this->assertStringContainsString('name: cluster-site', $yaml);
         $this->assertStringContainsString('image: dply/cluster-site:latest', $yaml);
-        $this->assertStringContainsString('targetPort: 8080', $yaml);
+        $this->assertStringContainsString('targetPort: 80', $yaml);
     }
 }

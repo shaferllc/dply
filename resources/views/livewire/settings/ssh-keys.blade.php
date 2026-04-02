@@ -33,16 +33,16 @@
         <section class="mb-6 rounded-2xl border border-brand-gold/30 bg-brand-sand/35 px-5 py-5 shadow-sm">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Before you create a server') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Before you create a BYO server') }}</p>
                     <h2 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('Add at least one SSH key to your profile first') }}</h2>
                     <p class="mt-2 text-sm leading-6 text-brand-moss">
-                        {{ __('Dply uses your saved public key to place account access on new servers during setup. Add a key from the modal here, optionally enable "Always provision to new servers," then go back to the server form.') }}
+                        {{ __('Dply can keep your personal public key ready for access workflows on connected hosts. Add a key from the modal here, optionally enable "Always provision to new servers," then go back to the BYO server form.') }}
                     </p>
                     <ol class="mt-4 space-y-2 text-sm leading-6 text-brand-moss">
                         <li>{{ __('1. Generate or copy your SSH public key from your machine.') }}</li>
                         <li>{{ __('2. Open the add key modal and give the key a clear name like "Work laptop."') }}</li>
                         <li>{{ __('3. Turn on "Always provision to new servers" if this key should be added automatically.') }}</li>
-                        <li>{{ __('4. Save the key, then return to create your server.') }}</li>
+                        <li>{{ __('4. Save the key, then return to create your BYO server.') }}</li>
                     </ol>
                     <p class="mt-4 text-sm text-brand-moss">
                         {{ __('Need help generating a key? Run `ssh-keygen -t ed25519 -C "you@example.com"` in your terminal, then paste the contents of your `.pub` file here.') }}
@@ -54,7 +54,7 @@
                         wire:navigate
                         class="inline-flex items-center justify-center rounded-xl border border-brand-ink/10 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-cream"
                     >
-                        {{ __('Back to create server') }}
+                        {{ __('Back to create BYO server') }}
                     </a>
                 @endif
             </div>

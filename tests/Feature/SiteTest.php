@@ -11,6 +11,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Contracts\DeployEngine;
 use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesKubectlExecutor;
+use App\Services\Deploy\SiteRuntimeActionExecutor;
 use App\Models\SiteDomainAlias;
 use App\Models\SiteDomain;
 use App\Models\ProviderCredential;
@@ -1466,20 +1467,42 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_DOCKER_ACTIVE,
             'meta' => [
                 'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'running',
+                    'publication' => [
+                        'hostname' => 'laravel.repo.orb.local',
+                        'url' => 'http://laravel.repo.orb.local',
+                        'container_ip' => '192.168.107.2',
+                    ],
+                ],
                 'docker_runtime' => [
                     'compose_yaml' => "services:\n  app:\n    image: example\n",
                     'dockerfile' => "FROM php:8.3-cli\n",
+                    'runtime_details' => [
+                        'containers' => [[
+                            'name' => 'laravel.repo',
+                            'service' => 'app',
+                            'orb_hostname' => 'laravel.repo.orb.local',
+                            'ipv4' => '192.168.107.2',
+                        ]],
+                    ],
                 ],
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
-
-        $response->assertOk()
+        Livewire::actingAs($user)
+            ->test(SitesShow::class, ['server' => $server, 'site' => $site])
             ->assertSee('Runtime target')
-            ->assertSee('Docker host')
             ->assertSee('Last generated compose file')
-            ->assertSee('Managed Dockerfile');
+            ->assertSee('Managed Dockerfile')
+            ->assertSee('Docker discovery')
+            ->assertSee('laravel.repo.orb.local')
+            ->assertSee('192.168.107.2')
+            ->assertSee('laravel.repo');
     }
 
     public function test_site_show_displays_kubernetes_runtime_target_summary(): void
@@ -1518,6 +1541,356 @@ class SiteTest extends TestCase
             ->assertSee('Namespace')
             ->assertSee('orbit-local')
             ->assertSee('Manifest');
+    }
+
+    public function test_runtime_target_model_maps_local_and_cloud_container_families(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $localServer = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => \App\Enums\ServerProvider::Custom,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'local_runtime' => [
+                    'provider' => 'orbstack',
+                ],
+            ],
+        ]);
+        $localSite = Site::factory()->create([
+            'server_id' => $localServer->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+            ],
+        ]);
+
+        $digitalOceanServer = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => \App\Enums\ServerProvider::DigitalOcean,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_KUBERNETES,
+            ],
+        ]);
+        $digitalOceanSite = Site::factory()->create([
+            'server_id' => $digitalOceanServer->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'runtime_profile' => 'kubernetes_web',
+            ],
+        ]);
+
+        $this->assertSame('local_orbstack_docker', $localSite->runtimeTargetFamily());
+        $this->assertSame('local', $localSite->runtimeTargetPlatform());
+        $this->assertTrue($localSite->usesLocalDockerHostRuntime());
+
+        $this->assertSame('digitalocean_kubernetes', $digitalOceanSite->runtimeTargetFamily());
+        $this->assertSame('digitalocean', $digitalOceanSite->runtimeTargetPlatform());
+        $this->assertSame('kubernetes', $digitalOceanSite->runtimeTargetMode());
+    }
+
+    public function test_site_show_exposes_orbstack_runtime_controls_and_records_runtime_actions(): void
+    {
+        app()->instance(SiteRuntimeActionExecutor::class, new class extends SiteRuntimeActionExecutor
+        {
+            public function __construct() {}
+
+            public function run(Site $site, string $action): array
+            {
+                return [
+                    'status' => 'running',
+                    'output' => 'Stub runtime action output for '.$action,
+                ];
+            }
+        });
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => \App\Enums\ServerProvider::Custom,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'local_runtime' => [
+                    'provider' => 'orbstack',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_DOCKER_ACTIVE,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'running',
+                    'logs' => [],
+                ],
+                'docker_runtime' => [
+                    'workspace_path' => storage_path('app/local-runtimes/'.$server->id),
+                    'compose_yaml' => "services:\n  app:\n    image: example\n",
+                    'dockerfile' => "FROM php:8.3-cli\n",
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+            ->assertSee('Runtime controls')
+            ->assertSee('Rebuild')
+            ->assertSee('Refresh Docker details')
+            ->assertSee('Destroy')
+            ->call('runRuntimeAction', 'status')
+            ->assertSet('flash_success', 'Runtime status refreshed.');
+
+        $site->refresh();
+
+        $this->assertSame('status', data_get($site->meta, 'runtime_target.last_operation'));
+        $this->assertStringContainsString('Stub runtime action output', (string) data_get($site->meta, 'runtime_target.last_operation_output'));
+        $this->assertNotEmpty(data_get($site->meta, 'runtime_target.logs'));
+    }
+
+    public function test_site_settings_runtime_section_shows_docker_management_and_discovery(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => \App\Enums\ServerProvider::Custom,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'local_runtime' => [
+                    'provider' => 'orbstack',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_DOCKER_ACTIVE,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'running',
+                    'publication' => [
+                        'hostname' => 'laravel.repo.orb.local',
+                        'container_ip' => '192.168.107.2',
+                        'container_name' => 'laravel.repo',
+                        'docker_service' => 'app',
+                    ],
+                    'logs' => [],
+                ],
+                'docker_runtime' => [
+                    'compose_yaml' => "services:\n  app:\n    image: example\n",
+                    'dockerfile' => "FROM php:8.3-cli\n",
+                    'runtime_details' => [
+                        'collected_at' => now()->toIso8601String(),
+                        'containers' => [[
+                            'name' => 'laravel.repo',
+                            'service' => 'app',
+                            'orb_hostname' => 'laravel.repo.orb.local',
+                            'ipv4' => '192.168.107.2',
+                            'state' => 'running',
+                        ]],
+                    ],
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
+
+        $response->assertOk()
+            ->assertSee('Container app workspace')
+            ->assertSee('Back to apps')
+            ->assertSee('Docker discovery')
+            ->assertSee('Runtime management')
+            ->assertSee('Refresh Docker details')
+            ->assertSee('laravel.repo.orb.local')
+            ->assertSee('192.168.107.2')
+            ->assertSee('laravel.repo');
+    }
+
+    public function test_site_settings_general_section_uses_app_language_for_cloud_runtime_paths(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => \App\Enums\ServerProvider::DigitalOcean,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_DOCKER_CONFIGURED,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'digitalocean_docker',
+                    'platform' => 'digitalocean',
+                    'provider' => 'digitalocean',
+                    'mode' => 'docker',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
+
+        $response->assertOk()
+            ->assertSee('Cloud app workspace')
+            ->assertSee('Primary hostname')
+            ->assertSee('App project settings')
+            ->assertSee('App details');
+    }
+
+    public function test_refresh_docker_details_persists_discovered_runtime_metadata(): void
+    {
+        app()->instance(SiteRuntimeActionExecutor::class, new class extends SiteRuntimeActionExecutor
+        {
+            public function __construct() {}
+
+            public function run(Site $site, string $action): array
+            {
+                return [
+                    'status' => 'running',
+                    'output' => 'Docker details refreshed.',
+                    'publication' => [
+                        'hostname' => 'laravel.repo.orb.local',
+                        'url' => 'http://laravel.repo.orb.local',
+                        'container_ip' => '192.168.107.2',
+                    ],
+                    'runtime_details' => [
+                        'containers' => [[
+                            'name' => 'laravel.repo',
+                            'service' => 'app',
+                            'orb_hostname' => 'laravel.repo.orb.local',
+                            'ipv4' => '192.168.107.2',
+                        ]],
+                    ],
+                ];
+            }
+        });
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => \App\Enums\ServerProvider::Custom,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'local_runtime' => [
+                    'provider' => 'orbstack',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_DOCKER_ACTIVE,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'running',
+                    'logs' => [],
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+            ->call('runRuntimeAction', 'inspect')
+            ->assertSet('flash_success', 'Docker details refreshed.');
+
+        $site->refresh();
+
+        $this->assertSame('inspect', data_get($site->meta, 'runtime_target.last_operation'));
+        $this->assertSame('laravel.repo.orb.local', data_get($site->meta, 'runtime_target.publication.hostname'));
+        $this->assertSame('192.168.107.2', data_get($site->meta, 'runtime_target.publication.container_ip'));
+        $this->assertSame('laravel.repo.orb.local', data_get($site->meta, 'docker_runtime.runtime_details.containers.0.orb_hostname'));
+    }
+
+    public function test_site_show_records_failed_orbstack_runtime_actions_with_debug_output(): void
+    {
+        app()->instance(SiteRuntimeActionExecutor::class, new class extends SiteRuntimeActionExecutor
+        {
+            public function __construct() {}
+
+            public function run(Site $site, string $action): array
+            {
+                throw new \RuntimeException("docker compose failed\n\nWorking directory: /tmp/demo\nCommand: docker compose up -d");
+            }
+        });
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => \App\Enums\ServerProvider::Custom,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'local_runtime' => [
+                    'provider' => 'orbstack',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_DOCKER_ACTIVE,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'running',
+                    'logs' => [],
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+            ->call('runRuntimeAction', 'rebuild')
+            ->assertSet('flash_error', "docker compose failed\n\nWorking directory: /tmp/demo\nCommand: docker compose up -d");
+
+        $site->refresh();
+
+        $this->assertSame('failed', data_get($site->meta, 'runtime_target.last_operation_status'));
+        $this->assertSame('rebuild', data_get($site->meta, 'runtime_target.last_operation'));
+        $this->assertStringContainsString('Working directory: /tmp/demo', (string) data_get($site->meta, 'runtime_target.last_operation_output'));
+        $this->assertNotEmpty(data_get($site->meta, 'runtime_target.logs'));
+        $this->assertSame('failed', data_get($site->meta, 'runtime_target.logs.0.status'));
     }
 
     public function test_site_show_displays_preview_and_certificate_summary(): void

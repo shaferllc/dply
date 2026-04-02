@@ -8,7 +8,7 @@ Use the BYO guide for:
 
 Use this guide for:
 - Docker runtime targets
-- local Kubernetes runtime targets with Orbit or OrbStack
+- local Kubernetes runtime targets with Docker-backed local clusters
 - the first managed-cluster path that mirrors DigitalOcean Kubernetes in the app
 
 ## Two local loops
@@ -37,13 +37,13 @@ Current expectation:
 - Dply prepares runtime artifacts inside site metadata
 - you can inspect the generated Compose configuration from the site record and deployment logs
 
-## Orbit or OrbStack Kubernetes target
+## Docker-backed local Kubernetes target
 
 Create a `DigitalOcean Kubernetes` server target in the app for managed-cluster metadata, or use a Kubernetes-backed host in tests and seeds.
 
 For local cluster work:
 
-1. Start Kubernetes in Orbit or OrbStack.
+1. Start Kubernetes in your local Docker-backed cluster runtime.
 2. Create a Kubernetes-backed target in Dply.
 3. Create a site on that target.
 4. Run site provisioning once so Dply writes the initial manifest artifact.
@@ -69,4 +69,4 @@ What is not validated yet:
 - cluster existence via the DigitalOcean API
 - kubeconfig retrieval
 
-That means local Orbit or OrbStack clusters can now be exercised end to end from the BYO control plane, while provider-backed kubeconfig retrieval and deeper DOKS validation still need to be added.
+That means local Docker-backed clusters can now be exercised end to end from the BYO control plane, while provider-backed kubeconfig retrieval and deeper DOKS validation still need to be added.

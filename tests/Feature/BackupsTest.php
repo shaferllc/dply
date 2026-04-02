@@ -51,7 +51,8 @@ class BackupsTest extends TestCase
         $this->actingAs($user)
             ->get(route('backups.databases'))
             ->assertOk()
-            ->assertSee('Database backups', false);
+            ->assertSee('Database backups', false)
+            ->assertSee(route('launches.create'), false);
     }
 
     public function test_authenticated_user_can_view_file_backups_page(): void
@@ -61,7 +62,8 @@ class BackupsTest extends TestCase
         $this->actingAs($user)
             ->get(route('backups.files'))
             ->assertOk()
-            ->assertSee('File backups', false);
+            ->assertSee('File backups', false)
+            ->assertSee(route('launches.create'), false);
     }
 
     public function test_backups_livewire_components_render(): void

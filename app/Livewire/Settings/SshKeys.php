@@ -116,7 +116,7 @@ class SshKeys extends Component
         $this->flash_error = null;
 
         if ($this->setup_source === 'servers.create') {
-            $this->flash_success .= ' '.__('You can go back to create your server now.');
+            $this->flash_success .= ' '.__('You can go back to create your BYO server now.');
         }
     }
 

@@ -167,7 +167,7 @@ To stop and remove the container:
 docker compose -f docker-compose.ssh-dev.yml down
 ```
 
-If you are working on the newer Docker or Kubernetes runtime targets, keep using this SSH target for **VM provisioning-script validation** only. Use [DOCKER_AND_KUBERNETES_LOCAL_SETUP.md](DOCKER_AND_KUBERNETES_LOCAL_SETUP.md) for Orbit or OrbStack and container-runtime workflows.
+If you are working on the newer Docker or Kubernetes runtime targets, keep using this SSH target for **VM provisioning-script validation** only. Use [DOCKER_AND_KUBERNETES_LOCAL_SETUP.md](DOCKER_AND_KUBERNETES_LOCAL_SETUP.md) for Docker-backed local container-runtime workflows.
 
 ---
 

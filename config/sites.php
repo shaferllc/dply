@@ -42,4 +42,8 @@ return [
 
     'webhook_max_attempts_per_minute' => (int) env('DPLY_WEBHOOK_MAX_ATTEMPTS_PER_MINUTE', 30),
 
+    'local_runtime_git_timeout_seconds' => max(30, (int) env('DPLY_LOCAL_RUNTIME_GIT_TIMEOUT_SECONDS', 900)),
+
+    'local_runtime_docker_timeout_seconds' => max(30, (int) env('DPLY_LOCAL_RUNTIME_DOCKER_TIMEOUT_SECONDS', 1800)),
+
 ];

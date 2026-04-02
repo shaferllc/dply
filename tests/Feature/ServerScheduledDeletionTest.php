@@ -67,7 +67,7 @@ class ServerScheduledDeletionTest extends TestCase
         ]);
     }
 
-    public function test_wrong_confirm_name_is_rejected(): void
+    public function test_scheduling_removal_no_longer_requires_name_confirmation(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -80,11 +80,15 @@ class ServerScheduledDeletionTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceOverview::class, ['server' => $server])
             ->call('openRemoveServerModal')
-            ->set('deleteConfirmName', 'wrong')
+            ->set('removeMode', 'scheduled')
+            ->set('scheduledRemovalDate', now()->addDays(3)->toDateString())
             ->call('submitRemoveServer')
-            ->assertHasErrors('deleteConfirmName');
+            ->assertHasNoErrors();
 
-        $this->assertModelExists($server->fresh());
+        $server->refresh();
+
+        $this->assertNotNull($server->scheduled_deletion_at);
+        $this->assertTrue($server->scheduled_deletion_at->isFuture());
     }
 
     public function test_process_scheduled_deletions_command_removes_due_servers(): void

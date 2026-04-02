@@ -31,7 +31,8 @@ class DashboardTest extends TestCase
         $response->assertSee('Workspace command deck');
         $response->assertSee('Quick actions');
         $response->assertSee('Platform surfaces');
-        $response->assertSee('Create your first server');
+        $response->assertSee('Open launchpad');
+        $response->assertSee(route('launches.create'), false);
     }
 
     public function test_dashboard_prompts_for_provider_setup_when_no_provider_credentials_exist(): void

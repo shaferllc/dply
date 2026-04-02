@@ -11,7 +11,7 @@
         <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add a personal SSH key') }}</h2>
         <p class="mt-2 text-sm leading-6 text-brand-moss">
             @if ($source === 'servers.create')
-                {{ __('Save one of your own public keys here so Dply can place your access on new servers during provisioning.') }}
+                {{ __('Save one of your own public keys here so Dply can keep your access ready while you connect a BYO server.') }}
             @else
                 {{ __('Save a public key on your profile so you can provision it onto new servers and deploy it to existing ones later.') }}
             @endif

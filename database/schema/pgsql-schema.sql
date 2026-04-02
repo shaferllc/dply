@@ -556,7 +556,7 @@ CREATE TABLE public.notifications (
     id uuid NOT NULL,
     type character varying(255) NOT NULL,
     notifiable_type character varying(255) NOT NULL,
-    notifiable_id bigint NOT NULL,
+    notifiable_id character varying(255) NOT NULL,
     data text NOT NULL,
     read_at timestamp(0) without time zone,
     created_at timestamp(0) without time zone,

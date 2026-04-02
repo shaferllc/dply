@@ -21,7 +21,7 @@ trait InteractsWithServerWorkspace
         $this->server = $server;
 
         if (! $server->isVmHost()) {
-            $allowedRoutes = ['servers.show', 'servers.sites'];
+            $allowedRoutes = ['servers.show', 'servers.overview', 'servers.sites'];
             $currentRoute = request()->route()?->getName();
             if (is_string($currentRoute) && ! in_array($currentRoute, $allowedRoutes, true)) {
                 $this->redirect(route('servers.show', $server), navigate: true);

@@ -94,12 +94,6 @@ class Index extends Component
         $server = Server::query()->findOrFail($this->deleteModalServerId);
         $this->authorize('delete', $server);
 
-        if (! hash_equals($server->name, trim($this->deleteConfirmName))) {
-            $this->addError('deleteConfirmName', __('The name does not match exactly.'));
-
-            return;
-        }
-
         if ($this->removeMode === 'scheduled') {
             $this->validate([
                 'scheduledRemovalDate' => ['required', 'date'],
@@ -153,7 +147,10 @@ class Index extends Component
         }
 
         $summary = ServerRemovalAdvisor::summary($server);
-        $this->validate($this->immediateServerRemovalRules($summary));
+        $rules = $this->immediateServerRemovalRules($summary);
+        if ($rules !== []) {
+            $this->validate($rules);
+        }
 
         $reason = trim($this->deletionReason);
         $auditExtras = ['immediate' => true];

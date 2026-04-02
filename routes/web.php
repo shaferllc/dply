@@ -14,6 +14,9 @@ use App\Livewire\Billing\Show as BillingShow;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
+use App\Livewire\Launches\Create as LaunchesCreate;
+use App\Livewire\Launches\LocalDocker as LaunchesLocalDocker;
+use App\Livewire\Launches\Path as LaunchesPath;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
@@ -163,6 +166,13 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('projects/{workspace}/delivery', ProjectsShow::class)->defaults('section', 'delivery')->name('projects.delivery');
     Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
     Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
+    Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
+    Route::livewire('launches/containers', LaunchesPath::class)->defaults('path', 'containers')->name('launches.containers');
+    Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
+    Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
+    Route::livewire('launches/local/docker', LaunchesLocalDocker::class)->name('launches.local-docker');
+    Route::livewire('launches/edge-network', LaunchesPath::class)->defaults('path', 'edge-network')->name('launches.edge-network');
+    Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
     Route::livewire('servers/create', ServersCreate::class)->name('servers.create');
     Route::get('servers/{server}', function (Server $server) {

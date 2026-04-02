@@ -34,6 +34,8 @@ class Create extends Component
 
     public ServerCreateForm $form;
 
+    public string $createMode = 'existing';
+
     public string $active_provider = 'digitalocean';
 
     public string $customConnectionTestState = 'idle';
@@ -44,42 +46,38 @@ class Create extends Component
 
     public ?string $customConnectionTestSignature = null;
 
+    public ?string $launchSource = null;
+
     public function mount(): void
     {
         $user = auth()->user();
         $org = $user?->currentOrganization();
+
+        $this->form->type = 'custom';
+        $this->createMode = 'existing';
 
         $ids = CredentialsIndex::credentialProviderIds();
         if ($ids !== [] && ! in_array($this->active_provider, $ids, true)) {
             $this->active_provider = $ids[0];
         }
 
-        if (! ServerProviderGate::enabled($this->form->type)) {
-            $this->form->type = ServerProviderGate::defaultServerCreateType();
-        }
-
-        $hasAnyProviderCredentials = $org
-            ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
-            : false;
-        if (! $hasAnyProviderCredentials) {
-            $this->form->type = 'custom';
-        } elseif ($this->form->provider_credential_id === '') {
-            $this->applyCloudDefaults();
-        }
         if ($this->form->name === '') {
             $this->form->name = $this->generateServerName();
         }
 
-        if (! $org || $this->form->type === 'custom') {
+        $requestedHostTarget = request()->query('host_target');
+        if ($requestedHostTarget === 'docker') {
+            $this->form->custom_host_kind = 'docker';
+        }
+
+        $requestedSource = request()->query('source');
+        if (is_string($requestedSource) && $requestedSource !== '') {
+            $this->launchSource = $requestedSource;
+        }
+
+        if (! $org) {
             return;
         }
-
-        $credentials = GetProviderCredentialsForServerType::run($org, $this->form->type);
-        if ($credentials->isNotEmpty() && $this->form->provider_credential_id === '') {
-            $this->form->provider_credential_id = (string) $credentials->first()->id;
-        }
-
-        $this->syncProvisionPreferenceFields();
     }
 
     public function updatedActiveProvider(mixed $value): void
@@ -90,6 +88,29 @@ class Create extends Component
         }
     }
 
+    public function useExistingServerPath(): void
+    {
+        $this->createMode = 'existing';
+        $this->form->type = 'custom';
+        $this->form->provider_credential_id = '';
+        $this->resetCustomConnectionTestState();
+    }
+
+    public function useProviderProvisioningPath(?string $provider = null): void
+    {
+        $provider = is_string($provider) && $provider !== ''
+            ? $provider
+            : $this->defaultProvisionProvider();
+
+        if (! is_string($provider) || $provider === '') {
+            return;
+        }
+
+        $this->createMode = 'provider';
+        $this->active_provider = $provider;
+        $this->applyCloudDefaults($provider);
+    }
+
     public function regenerateServerName(): void
     {
         $this->form->name = $this->generateServerName();
@@ -98,7 +119,10 @@ class Create extends Component
     public function afterProviderCredentialStored(string $provider): void
     {
         $this->active_provider = $provider;
-        $this->applyCloudDefaults($provider);
+
+        if ($this->createMode === 'provider') {
+            $this->applyCloudDefaults($provider);
+        }
     }
 
     public function updatedFormInstallProfile(): void
@@ -169,34 +193,26 @@ class Create extends Component
 
     public function updatedFormType(): void
     {
-        $this->form->provider_credential_id = '';
-        $this->form->region = '';
-        $this->form->size = '';
-        $this->resetCustomConnectionTestState();
+        if ($this->form->type === 'custom') {
+            $this->createMode = 'existing';
+            $this->resetCustomConnectionTestState();
 
-        $org = auth()->user()?->currentOrganization();
-        if (! $org || $this->form->type === 'custom') {
             return;
         }
 
-        $credentials = GetProviderCredentialsForServerType::run($org, $this->form->type);
-        if ($credentials->isNotEmpty()) {
-            $this->form->provider_credential_id = (string) $credentials->first()->id;
-        }
-
+        $this->createMode = 'provider';
         $this->syncProvisionPreferenceFields();
     }
 
     public function updatedFormProviderCredentialId(): void
     {
-        $this->form->region = '';
-        $this->form->size = '';
-        $this->syncProvisionPreferenceFields();
+        if ($this->form->type !== 'custom') {
+            $this->syncProvisionPreferenceFields();
+        }
     }
 
     public function updatedFormServerRole(): void
     {
-        $this->syncProvisionPreferenceFields();
     }
 
     public function updatedFormRegion(): void
@@ -306,6 +322,7 @@ class Create extends Component
         return view('livewire.servers.create', [
             'catalog' => $catalog,
             'providerCards' => ListServerProviderCards::run($org),
+            'provisionProviderCards' => $this->provisionProviderCards($org),
             'providerNav' => CredentialsIndex::credentialProviderNav(),
             'setupScripts' => $setupScripts,
             'installProfiles' => $installProfiles,
@@ -332,6 +349,39 @@ class Create extends Component
                 : $this->active_provider,
             'digitalOceanOAuthConfigured' => filled(config('services.digitalocean_oauth.client_id')) && filled(config('services.digitalocean_oauth.client_secret')),
         ]);
+    }
+
+    /**
+     * @return list<array{id: string, label: string, linked: bool}>
+     */
+    protected function provisionProviderCards($org): array
+    {
+        return array_values(array_filter(
+            ListServerProviderCards::run($org),
+            fn (array $card): bool => in_array($card['id'], [
+                'digitalocean',
+                'hetzner',
+                'vultr',
+                'linode',
+                'akamai',
+                'scaleway',
+                'upcloud',
+                'equinix_metal',
+                'fly_io',
+                'aws',
+            ], true)
+        ));
+    }
+
+    protected function defaultProvisionProvider(): string
+    {
+        foreach ($this->provisionProviderCards(auth()->user()?->currentOrganization()) as $card) {
+            if (($card['linked'] ?? false) === true) {
+                return $card['id'];
+            }
+        }
+
+        return 'digitalocean';
     }
 
     protected function syncProvisionPreferenceFields(): void

@@ -10,6 +10,27 @@
     $provisioningMeta = $site->provisioningMeta();
     $provisioningState = $site->provisioningState() ?? 'queued';
     $provisioningError = $site->provisioningError();
+    $provisioningLog = collect($site->provisioningLog())->reverse()->values();
+    $provisioningTranscript = $provisioningLog->take(8)->map(function (array $entry): string {
+        $timestamp = (string) ($entry['at'] ?? '');
+        $level = strtoupper((string) ($entry['level'] ?? 'info'));
+        $message = (string) ($entry['message'] ?? 'Provisioning update');
+        $lines = [];
+
+        $prefixParts = array_values(array_filter([$timestamp, $level]));
+        $lines[] = ($prefixParts !== [] ? '['.implode('] [', $prefixParts).'] ' : '').$message;
+
+        foreach (collect($entry['context'] ?? [])->filter(fn ($value) => ! is_array($value)) as $contextKey => $contextValue) {
+            $rendered = is_bool($contextValue) ? ($contextValue ? 'true' : 'false') : (string) $contextValue;
+            if ($rendered === '') {
+                continue;
+            }
+
+            $lines[] = '  > '.str_replace('_', ' ', (string) $contextKey).': '.$rendered;
+        }
+
+        return implode("\n", $lines);
+    })->implode("\n\n");
     $targetUrl = $testingHostname ? 'http://'.$testingHostname : ($site->visitUrl() ?? null);
     $readyForWorkspace = $site->isReadyForWorkspace();
     $hostChecks = collect($provisioningMeta['host_checks'] ?? [])
@@ -18,6 +39,29 @@
     $serverlessRuntime = $site->usesFunctionsRuntime() ? $site->serverlessConfig() : [];
     $dockerRuntime = $site->usesDockerRuntime() && is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
     $kubernetesRuntime = $site->usesKubernetesRuntime() && is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
+    $runtimeTarget = $site->runtimeTarget();
+    $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
+    $dockerRuntimeDetails = $site->usesDockerRuntime() && is_array($dockerRuntime['runtime_details'] ?? null) ? $dockerRuntime['runtime_details'] : [];
+    $dockerContainers = collect($dockerRuntimeDetails['containers'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
+    $runtimeLogs = collect($runtimeTarget['logs'] ?? [])->filter(fn ($entry) => is_array($entry))->reverse()->values();
+    $runtimeOperationConsoles = $runtimeLogs->map(function (array $runtimeLog): array {
+        $timestamp = (string) ($runtimeLog['ran_at'] ?? '');
+        $status = strtoupper((string) ($runtimeLog['status'] ?? 'unknown'));
+        $action = ucfirst((string) ($runtimeLog['action'] ?? 'runtime'));
+        $headerParts = array_values(array_filter([$timestamp, $status]));
+        $transcript = ($headerParts !== [] ? '['.implode('] [', $headerParts).'] ' : '').$action;
+        $output = trim((string) ($runtimeLog['output'] ?? ''));
+
+        if ($output !== '') {
+            $transcript .= "\n\n".$output;
+        }
+
+        return [
+            'title' => __('Runtime activity'),
+            'meta' => $action,
+            'transcript' => $transcript,
+        ];
+    });
     $previewDomain = $site->primaryPreviewDomain();
     $activeCertificate = $site->certificates->firstWhere('status', \App\Models\SiteCertificate::STATUS_ACTIVE);
     $pendingCertificate = $activeCertificate
@@ -30,6 +74,8 @@
     $latestCertificate = $activeCertificate ?? $pendingCertificate ?? $site->certificates->first();
     $statusSteps = [
         'queued' => __('Queued'),
+        'preparing_runtime_artifacts' => __('Preparing runtime artifacts'),
+        'configuring_publication' => __('Preparing publication target'),
         'provisioning_testing_hostname' => __('Assigning testing hostname'),
         'writing_site_config' => __('Writing site config'),
         'waiting_for_http' => __('Checking reachability'),
@@ -40,6 +86,23 @@
     $stepKeys = array_keys($statusSteps);
     $currentStepIndex = array_search($provisioningState, $stepKeys, true);
     $currentStepIndex = $currentStepIndex === false ? 0 : $currentStepIndex;
+    $deploymentConsoles = $site->deployments->map(function ($deployment): array {
+        $status = strtoupper((string) $deployment->status);
+        $trigger = strtoupper((string) $deployment->trigger);
+        $createdAt = $deployment->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') ?? '';
+        $prefix = array_filter([$createdAt, $status, $trigger]);
+        $transcript = trim(implode("\n", array_filter([
+            $prefix !== [] ? '['.implode('] [', $prefix).'] Deployment record' : 'Deployment record',
+            $deployment->git_sha ? 'SHA: '.$deployment->git_sha : null,
+            trim((string) $deployment->log_output) !== '' ? trim((string) $deployment->log_output) : null,
+        ])));
+
+        return [
+            'title' => __('Deployment log'),
+            'meta' => $deployment->created_at?->diffForHumans(),
+            'transcript' => $transcript,
+        ];
+    });
     $sidebarItems = [
         ['id' => 'general', 'label' => __('General'), 'icon' => 'heroicon-o-rectangle-stack'],
         ['id' => 'settings', 'label' => __('Site settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'href' => route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'general'])],
@@ -199,6 +262,16 @@
                                                 <p class="mt-3 break-all font-mono text-xs leading-6 text-slate-700">{{ $provisioningError }}</p>
                                             </div>
                                         </div>
+                                    </div>
+                                @endif
+
+                                @if ($provisioningLog->isNotEmpty())
+                                    <div class="mt-6">
+                                        @include('livewire.partials.deployment-activity-console', [
+                                            'title' => __('Install activity'),
+                                            'meta' => ($statusSteps[$provisioningState] ?? str_replace('_', ' ', $provisioningState)).' · '.__('last :count entries', ['count' => min(8, $provisioningLog->count())]),
+                                            'transcript' => $provisioningTranscript,
+                                        ])
                                     </div>
                                 @endif
                             </div>
@@ -662,17 +735,41 @@
                             <p class="text-sm text-slate-600">{{ __('The latest managed deploy details for this runtime target.') }}</p>
                         </div>
                         <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                            @if ($site->usesAwsLambdaRuntime())
-                                {{ __('AWS Lambda') }}
-                            @elseif ($site->usesFunctionsRuntime())
-                                {{ __('DigitalOcean Functions') }}
-                            @elseif ($site->usesDockerRuntime())
-                                {{ __('Docker host') }}
-                            @else
-                                {{ __('Kubernetes cluster') }}
-                            @endif
+                            {{ $site->runtimeTargetLabel() }}
                         </span>
                     </div>
+
+                    <dl class="grid gap-4 sm:grid-cols-3">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Platform') }}</dt>
+                            <dd class="mt-2 text-sm text-slate-900">{{ ucfirst((string) ($runtimeTarget['platform'] ?? 'unknown')) }}</dd>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Mode') }}</dt>
+                            <dd class="mt-2 text-sm text-slate-900">{{ ucfirst((string) ($runtimeTarget['mode'] ?? 'unknown')) }}</dd>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Status') }}</dt>
+                            <dd class="mt-2 text-sm text-slate-900">{{ ucfirst(str_replace('_', ' ', (string) ($runtimeTarget['status'] ?? 'unknown'))) }}</dd>
+                        </div>
+                    </dl>
+
+                    @if ($runtimePublication !== [])
+                        <dl class="grid gap-4 sm:grid-cols-3">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Publication status') }}</dt>
+                                <dd class="mt-2 text-sm text-slate-900">{{ ucfirst((string) ($runtimePublication['status'] ?? 'pending')) }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Publication hostname') }}</dt>
+                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $runtimePublication['hostname'] ?? '—' }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Published URL') }}</dt>
+                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $runtimePublication['url'] ?? '—' }}</dd>
+                            </div>
+                        </dl>
+                    @endif
 
                     @if ($site->usesFunctionsRuntime())
                         <dl class="grid gap-4 sm:grid-cols-2">
@@ -721,6 +818,76 @@
                                 <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Managed Dockerfile') }}</dt>
                                 <dd class="mt-2 text-sm text-slate-900">{{ isset($dockerRuntime['dockerfile']) ? __('Available') : __('Not generated yet') }}</dd>
                             </div>
+                            @if (! empty($dockerRuntime['workspace_path']))
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Local workspace') }}</dt>
+                                    <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $dockerRuntime['workspace_path'] }}</dd>
+                                </div>
+                            @endif
+                            @if ($dockerContainers->isNotEmpty() || $runtimePublication !== [])
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2 space-y-4">
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Docker discovery') }}</dt>
+                                            <dd class="mt-1 text-sm text-slate-600">{{ __('Saved from the live Docker runtime so hostname, IP, and container identity stay referenceable later.') }}</dd>
+                                        </div>
+                                        @if (! empty($dockerRuntimeDetails['collected_at']))
+                                            <p class="font-mono text-[11px] text-slate-500">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
+                                        @endif
+                                    </div>
+
+                                    <dl class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Hostname') }}</dt>
+                                            <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $runtimePublication['hostname'] ?? '—' }}</dd>
+                                        </div>
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Container IP') }}</dt>
+                                            <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $runtimePublication['container_ip'] ?? '—' }}</dd>
+                                        </div>
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Container name') }}</dt>
+                                            <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $runtimePublication['container_name'] ?? '—' }}</dd>
+                                        </div>
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Service') }}</dt>
+                                            <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $runtimePublication['docker_service'] ?? '—' }}</dd>
+                                        </div>
+                                    </dl>
+
+                                    @if ($dockerContainers->isNotEmpty())
+                                        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                                            <div class="border-b border-slate-200 px-4 py-3">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Containers') }}</p>
+                                            </div>
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full divide-y divide-slate-200 text-left">
+                                                    <thead class="bg-slate-50">
+                                                        <tr>
+                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Name') }}</th>
+                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Service') }}</th>
+                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Hostname') }}</th>
+                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('IP') }}</th>
+                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('State') }}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody class="divide-y divide-slate-200 bg-white">
+                                                        @foreach ($dockerContainers as $container)
+                                                            <tr>
+                                                                <td class="px-4 py-3 font-mono text-sm text-slate-900">{{ $container['name'] ?? '—' }}</td>
+                                                                <td class="px-4 py-3 font-mono text-sm text-slate-700">{{ $container['service'] ?? '—' }}</td>
+                                                                <td class="px-4 py-3 font-mono text-sm text-slate-700">{{ $container['orb_hostname'] ?? $container['hostname'] ?? '—' }}</td>
+                                                                <td class="px-4 py-3 font-mono text-sm text-slate-700">{{ $container['ipv4'] ?? '—' }}</td>
+                                                                <td class="px-4 py-3 font-mono text-sm text-slate-700">{{ $container['state'] ?? '—' }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
                         </dl>
                     @else
                         <dl class="grid gap-4 sm:grid-cols-2">
@@ -732,7 +899,46 @@
                                 <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Manifest') }}</dt>
                                 <dd class="mt-2 text-sm text-slate-900">{{ isset($kubernetesRuntime['manifest_yaml']) ? __('Generated') : __('Not generated yet') }}</dd>
                             </div>
+                            @if (! empty($kubernetesRuntime['workspace_path']))
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Local workspace') }}</dt>
+                                    <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $kubernetesRuntime['workspace_path'] }}</dd>
+                                </div>
+                            @endif
                         </dl>
+                    @endif
+
+                    @if ($site->usesLocalDockerHostRuntime())
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+                            <div>
+                                <h4 class="font-medium text-slate-900">{{ __('Runtime controls') }}</h4>
+                                <p class="mt-1 text-sm text-slate-600">{{ __('Manage the real local runtime behind this site without going through the old SSH bridge.') }}</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" wire:click="runRuntimeAction('rebuild')" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">{{ __('Rebuild') }}</button>
+                                <button type="button" wire:click="runRuntimeAction('start')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Start') }}</button>
+                                <button type="button" wire:click="runRuntimeAction('stop')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Stop') }}</button>
+                                <button type="button" wire:click="runRuntimeAction('restart')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Restart') }}</button>
+                                <button type="button" wire:click="runRuntimeAction('inspect')" class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100">{{ __('Refresh Docker details') }}</button>
+                                <button type="button" wire:click="runRuntimeAction('status')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Status') }}</button>
+                                <button type="button" wire:click="runRuntimeAction('logs')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Logs') }}</button>
+                                <button type="button" wire:click="openConfirmActionModal('runRuntimeAction', ['destroy'], @js(__('Destroy runtime')), @js(__('Destroy the managed local runtime artifacts and containers for this site?')), @js(__('Destroy runtime')), true)" class="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">{{ __('Destroy') }}</button>
+                            </div>
+
+                            @if ($runtimeOperationConsoles->isNotEmpty())
+                                <div class="space-y-3">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Recent runtime operations') }}</p>
+                                    @foreach ($runtimeOperationConsoles as $runtimeConsole)
+                                        @include('livewire.partials.deployment-activity-console', [
+                                            'title' => $runtimeConsole['title'],
+                                            'meta' => $runtimeConsole['meta'],
+                                            'transcript' => $runtimeConsole['transcript'],
+                                            'maxHeight' => '18rem',
+                                        ])
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
                     @endif
                 </div>
             @endif
@@ -749,35 +955,19 @@
                         </p>
                     </div>
                 @endif
-                @if ($site->deployments->isEmpty())
+                @if ($deploymentConsoles->isEmpty())
                     <p class="text-sm text-slate-500">No deployments yet.</p>
                 @else
-                    <ul class="space-y-4">
-                        @foreach ($site->deployments as $dep)
-                            <li class="border border-slate-200 rounded-md p-3 text-sm">
-                                <div class="flex flex-wrap justify-between gap-2 mb-2">
-                                    @php
-                                        $st = $dep->status;
-                                        $cls = match ($st) {
-                                            'success' => 'text-green-700',
-                                            'failed' => 'text-red-700',
-                                            'skipped' => 'text-amber-700',
-                                            'running' => 'text-blue-700',
-                                            default => 'text-slate-700',
-                                        };
-                                    @endphp
-                                    <span class="font-medium capitalize">{{ $dep->trigger }} · <span class="{{ $cls }}">{{ $st }}</span></span>
-                                    <span class="text-slate-500 text-xs">{{ $dep->created_at->diffForHumans() }}</span>
-                                </div>
-                                @if ($dep->git_sha)
-                                    <p class="text-xs font-mono text-slate-600 mb-1">{{ $dep->git_sha }}</p>
-                                @endif
-                                @if ($dep->log_output)
-                                    <pre class="bg-slate-900 text-slate-200 p-2 rounded text-xs overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap">{{ \Illuminate\Support\Str::limit($dep->log_output, 8000) }}</pre>
-                                @endif
-                            </li>
+                    <div class="space-y-4">
+                        @foreach ($deploymentConsoles as $deploymentConsole)
+                            @include('livewire.partials.deployment-activity-console', [
+                                'title' => $deploymentConsole['title'],
+                                'meta' => $deploymentConsole['meta'],
+                                'transcript' => \Illuminate\Support\Str::limit($deploymentConsole['transcript'], 8000),
+                                'maxHeight' => '20rem',
+                            ])
                         @endforeach
-                    </ul>
+                    </div>
                 @endif
             </div>
 

@@ -20,7 +20,8 @@ final class ServerlessRepositoryCheckout
      *     workspace_path: string,
      *     repository_path: string,
      *     working_directory: string,
-     *     output: string
+     *     output: string,
+     *     branch: string
      * }
      */
     public function checkout(
@@ -45,15 +46,28 @@ final class ServerlessRepositoryCheckout
 
         $cloneUrl = $this->cloneUrl($repositoryUrl, $userId, $sourceControlAccountId);
         $log = [];
+        $resolvedBranch = $branch;
 
         if (is_dir($repositoryPath.'/.git')) {
             $log[] = $this->run(['git', '-C', $repositoryPath, 'remote', 'set-url', 'origin', $cloneUrl], $workspacePath);
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--depth', '1', 'origin', $branch], $workspacePath);
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '-B', $branch, 'FETCH_HEAD'], $workspacePath);
+            $resolvedBranch = $this->fetchBranch($repositoryPath, $workspacePath, $cloneUrl, $branch, $log);
+            $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '-B', $resolvedBranch, 'FETCH_HEAD'], $workspacePath);
             $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath);
         } else {
             File::deleteDirectory($repositoryPath);
-            $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $branch, $cloneUrl, $repositoryPath], $workspacePath);
+            try {
+                $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $branch, $cloneUrl, $repositoryPath], $workspacePath);
+            } catch (\RuntimeException $e) {
+                $fallbackBranch = $this->defaultBranchForCloneUrl($cloneUrl, $workspacePath);
+                if ($fallbackBranch === null || $fallbackBranch === $branch) {
+                    throw $e;
+                }
+
+                $resolvedBranch = $fallbackBranch;
+                $log[] = sprintf('Requested branch "%s" was unavailable. Falling back to remote default branch "%s".', $branch, $fallbackBranch);
+                File::deleteDirectory($repositoryPath);
+                $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $fallbackBranch, $cloneUrl, $repositoryPath], $workspacePath);
+            }
         }
 
         $workingDirectory = $repositoryPath;
@@ -70,6 +84,7 @@ final class ServerlessRepositoryCheckout
             'repository_path' => $repositoryPath,
             'working_directory' => $workingDirectory,
             'output' => trim(implode("\n", array_filter($log))),
+            'branch' => $resolvedBranch,
         ];
     }
 
@@ -112,5 +127,45 @@ final class ServerlessRepositoryCheckout
         }
 
         return trim($process->getOutput());
+    }
+
+    /**
+     * @param  list<string>  $log
+     */
+    private function fetchBranch(
+        string $repositoryPath,
+        string $workspacePath,
+        string $cloneUrl,
+        string $branch,
+        array &$log,
+    ): string {
+        try {
+            $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--depth', '1', 'origin', $branch], $workspacePath);
+
+            return $branch;
+        } catch (\RuntimeException $e) {
+            $fallbackBranch = $this->defaultBranchForCloneUrl($cloneUrl, $workspacePath);
+            if ($fallbackBranch === null || $fallbackBranch === $branch) {
+                throw $e;
+            }
+
+            $log[] = sprintf('Requested branch "%s" was unavailable. Falling back to remote default branch "%s".', $branch, $fallbackBranch);
+            $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--depth', '1', 'origin', $fallbackBranch], $workspacePath);
+
+            return $fallbackBranch;
+        }
+    }
+
+    private function defaultBranchForCloneUrl(string $cloneUrl, string $workspacePath): ?string
+    {
+        $output = $this->run(['git', 'ls-remote', '--symref', $cloneUrl, 'HEAD'], $workspacePath);
+
+        foreach (preg_split("/\r\n|\n|\r/", $output) ?: [] as $line) {
+            if (preg_match('#^ref:\s+refs/heads/([^\s]+)\s+HEAD$#', trim($line), $matches) === 1) {
+                return $matches[1];
+            }
+        }
+
+        return null;
     }
 }

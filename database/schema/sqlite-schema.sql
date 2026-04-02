@@ -286,7 +286,7 @@ CREATE TABLE notifications (
 	id UUID NOT NULL, 
 	type VARCHAR(255) NOT NULL, 
 	notifiable_type VARCHAR(255) NOT NULL, 
-	notifiable_id BIGINT NOT NULL, 
+	notifiable_id VARCHAR(255) NOT NULL, 
 	data TEXT NOT NULL, 
 	read_at TIMESTAMP, 
 	created_at TIMESTAMP, 

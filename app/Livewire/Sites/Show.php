@@ -22,6 +22,7 @@ use App\Models\SiteRelease;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
+use App\Services\Deploy\SiteRuntimeActionExecutor;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteEnvPusher;
 use App\Services\Sites\SiteProvisioningCanceller;
@@ -454,6 +455,34 @@ class Show extends Component
         $this->flash_error = null;
     }
 
+    public function runRuntimeAction(string $action, SiteRuntimeActionExecutor $executor): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->flash_error = null;
+        $this->flash_success = null;
+
+        try {
+            $result = $executor->run($this->site->fresh(), $action);
+            $this->storeRuntimeActionResult($action, $result);
+            $this->site->refresh();
+            $this->flash_success = match ($action) {
+                'rebuild' => __('Runtime rebuilt.'),
+                'start' => __('Runtime started.'),
+                'stop' => __('Runtime stopped.'),
+                'restart' => __('Runtime restarted.'),
+                'inspect' => __('Docker details refreshed.'),
+                'logs' => __('Runtime logs refreshed.'),
+                'destroy' => __('Runtime destroyed.'),
+                default => __('Runtime status refreshed.'),
+            };
+        } catch (\Throwable $e) {
+            $this->storeRuntimeActionFailure($action, $e->getMessage());
+            $this->site->refresh();
+            $this->flash_error = $e->getMessage();
+        }
+    }
+
     public function getDeployLockInfoProperty(): ?array
     {
         return Cache::get('site-deploy-active:'.$this->site->id);
@@ -466,6 +495,88 @@ class Show extends Component
         Cache::forget('site-deploy-active:'.$this->site->id);
         $this->flash_success = 'Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.';
         $this->flash_error = null;
+    }
+
+    /**
+     * @param  array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}  $result
+     */
+    private function storeRuntimeActionResult(string $action, array $result): void
+    {
+        $site = $this->site->fresh();
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $runtimeTarget = is_array($meta['runtime_target'] ?? null) ? $meta['runtime_target'] : $site->runtimeTarget();
+        $dockerRuntime = is_array($meta['docker_runtime'] ?? null) ? $meta['docker_runtime'] : [];
+        $logs = collect($runtimeTarget['logs'] ?? [])
+            ->filter(fn (mixed $log): bool => is_array($log))
+            ->push([
+                'action' => $action,
+                'status' => $result['status'],
+                'output' => $result['output'],
+                'ran_at' => now()->toIso8601String(),
+            ])
+            ->take(-10)
+            ->values()
+            ->all();
+
+        $runtimeTargetUpdates = [
+            'status' => $result['status'],
+            'last_operation' => $action,
+            'last_operation_status' => $result['status'],
+            'last_operation_at' => now()->toIso8601String(),
+            'last_operation_output' => $result['output'],
+            'logs' => $logs,
+        ];
+
+        if ($action === 'destroy') {
+            $runtimeTargetUpdates['publication'] = [];
+            $dockerRuntime['runtime_details'] = [];
+        } else {
+            if (is_array($result['publication'] ?? null)) {
+                $runtimeTargetUpdates['publication'] = $result['publication'];
+            }
+
+            if (is_array($result['runtime_details'] ?? null)) {
+                $dockerRuntime['runtime_details'] = $result['runtime_details'];
+            }
+        }
+
+        $runtimeTarget = array_merge($runtimeTarget, $runtimeTargetUpdates);
+
+        $meta['runtime_target'] = $runtimeTarget;
+        if ($dockerRuntime !== []) {
+            $meta['docker_runtime'] = $dockerRuntime;
+        }
+
+        $site->forceFill(['meta' => $meta])->save();
+    }
+
+    private function storeRuntimeActionFailure(string $action, string $message): void
+    {
+        $site = $this->site->fresh();
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $runtimeTarget = is_array($meta['runtime_target'] ?? null) ? $meta['runtime_target'] : $site->runtimeTarget();
+        $logs = collect($runtimeTarget['logs'] ?? [])
+            ->filter(fn (mixed $log): bool => is_array($log))
+            ->push([
+                'action' => $action,
+                'status' => 'failed',
+                'output' => $message,
+                'ran_at' => now()->toIso8601String(),
+            ])
+            ->take(-10)
+            ->values()
+            ->all();
+
+        $runtimeTarget = array_merge($runtimeTarget, [
+            'last_operation' => $action,
+            'last_operation_status' => 'failed',
+            'last_operation_at' => now()->toIso8601String(),
+            'last_operation_output' => $message,
+            'logs' => $logs,
+        ]);
+
+        $meta['runtime_target'] = $runtimeTarget;
+        $site->forceFill(['meta' => $meta])->save();
     }
 
     public function retryCertificate(string $certificateId): void

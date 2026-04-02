@@ -51,6 +51,55 @@
     $serverlessRuntime = $site->usesFunctionsRuntime() ? $site->serverlessConfig() : [];
     $dockerRuntime = $site->usesDockerRuntime() && is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
     $kubernetesRuntime = $site->usesKubernetesRuntime() && is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
+    $runtimeTarget = $site->runtimeTarget();
+    $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
+    $dockerRuntimeDetails = $site->usesDockerRuntime() && is_array($dockerRuntime['runtime_details'] ?? null) ? $dockerRuntime['runtime_details'] : [];
+    $dockerContainers = collect($dockerRuntimeDetails['containers'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
+    $runtimeLogs = collect($runtimeTarget['logs'] ?? [])->filter(fn ($entry) => is_array($entry))->reverse()->values();
+    $runtimeOperationConsoles = $runtimeLogs->map(function (array $runtimeLog): array {
+        $timestamp = (string) ($runtimeLog['ran_at'] ?? '');
+        $status = strtoupper((string) ($runtimeLog['status'] ?? 'unknown'));
+        $action = ucfirst((string) ($runtimeLog['action'] ?? 'runtime'));
+        $headerParts = array_values(array_filter([$timestamp, $status]));
+        $transcript = ($headerParts !== [] ? '['.implode('] [', $headerParts).'] ' : '').$action;
+        $output = trim((string) ($runtimeLog['output'] ?? ''));
+
+        if ($output !== '') {
+            $transcript .= "\n\n".$output;
+        }
+
+        return [
+            'title' => __('Runtime activity'),
+            'meta' => $action,
+            'transcript' => $transcript,
+        ];
+    });
+    $runtimeMode = $site->runtimeTargetMode();
+    $runtimePlatform = $site->runtimeTargetPlatform();
+    $runtimeFamily = $site->runtimeTargetFamily();
+    $resourceNoun = $runtimeMode === 'vm' ? __('Site') : __('App');
+    $resourceNounLower = strtolower($resourceNoun);
+    $resourcePlural = $runtimeMode === 'vm' ? __('sites') : __('apps');
+    $workspacePrefix = match (true) {
+        str_contains($runtimeFamily, 'edge') || str_contains($runtimePlatform, 'edge') => __('Edge'),
+        in_array($runtimePlatform, ['aws', 'digitalocean'], true) => __('Cloud'),
+        $runtimeMode === 'docker' => __('Container'),
+        $runtimeMode === 'kubernetes' => __('Kubernetes'),
+        $runtimeMode === 'serverless' => __('Function'),
+        default => null,
+    };
+    $workspaceTitle = $workspacePrefix ? $workspacePrefix.' '.$resourceNounLower.' '.__('workspace') : $resourceNoun.' '.__('workspace');
+    $workspaceDescription = $workspacePrefix
+        ? __('Manage this :resource from one workspace tuned for its :prefix runtime path, with General as the default landing section.', ['resource' => strtolower($resourceNoun), 'prefix' => strtolower($workspacePrefix)])
+        : __('Manage this :resource from one workspace with General as the default landing section.', ['resource' => strtolower($resourceNoun)]);
+    $generalOverviewTitle = $runtimeMode === 'vm' ? __('Site domain') : __('Primary hostname');
+    $generalOverviewDescription = $runtimeMode === 'vm'
+        ? __('Update the primary domain and web directory for this site here. Changing the primary hostname updates the site record Dply uses for routing and future server automation.')
+        : __('Update the primary hostname and working directory for this app here. Changing the primary hostname updates the routing and publication details Dply uses for future automation.');
+    $projectSettingsTitle = $resourceNoun.' '.__('project settings');
+    $projectSettingsDescription = __('Choose which project this :resource belongs to for grouped resources, shared variables, operations, and coordinated delivery.', ['resource' => strtolower($resourceNoun)]);
+    $detailsTitle = $resourceNoun.' '.__('details');
+    $detailsDescription = __('Use this reference block for the stable :resource metadata operators usually need when checking ownership, age, and basic inventory.', ['resource' => strtolower($resourceNoun)]);
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
@@ -64,7 +113,7 @@
             <li class="text-brand-mist" aria-hidden="true">/</li>
             <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-brand-ink">{{ $site->name }}</a></li>
             <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="font-medium text-brand-ink">{{ __('Site workspace') }}</li>
+            <li class="font-medium text-brand-ink">{{ $workspaceTitle }}</li>
         </ol>
     </nav>
 
@@ -77,8 +126,8 @@
         @endif
 
         <x-page-header
-            :title="__('Site workspace')"
-            :description="__('Manage this site from one workspace with General as the default landing section.')"
+            :title="$workspaceTitle"
+            :description="$workspaceDescription"
             flush
         >
             <x-slot name="actions">
@@ -104,9 +153,9 @@
                             <form wire:submit="saveGeneralSettings">
                                 <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
                                     <div class="border-b border-brand-ink/10 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site domain') }}</h2>
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
                                         <p class="mt-3 text-sm leading-6 text-brand-moss">
-                                            {{ __('Update the primary domain and web directory for this site here. Changing the primary hostname updates the site record Dply uses for routing and future server automation.') }}
+                                            {{ $generalOverviewDescription }}
                                         </p>
                                         @if ($testingHostname !== '')
                                             <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white p-4">
@@ -162,9 +211,9 @@
                             <form wire:submit="saveProjectSettings">
                                 <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
                                     <div class="border-b border-brand-ink/10 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Project settings') }}</h2>
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ $projectSettingsTitle }}</h2>
                                         <p class="mt-3 text-sm leading-6 text-brand-moss">
-                                            {{ __('Choose which project this site belongs to for grouped resources, shared variables, operations, and coordinated delivery.') }}
+                                            {{ $projectSettingsDescription }}
                                         </p>
                                     </div>
 
@@ -208,9 +257,9 @@
                         <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                             <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
                                 <div class="border-b border-brand-ink/10 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
-                                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site details') }}</h2>
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ $detailsTitle }}</h2>
                                     <p class="mt-3 text-sm leading-6 text-brand-moss">
-                                        {{ __('Use this reference block for the stable site metadata operators usually need when checking ownership, age, and basic inventory.') }}
+                                            {{ $detailsDescription }}
                                     </p>
                                 </div>
 
