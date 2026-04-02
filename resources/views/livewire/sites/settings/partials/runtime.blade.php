@@ -91,9 +91,9 @@
     </section>
 @endif
 
-<section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
+<section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-4">
     <div>
-        <h2 class="text-lg font-semibold text-brand-ink">
+        <h2 class="text-lg font-semibold text-slate-900">
             @if ($site->usesDockerRuntime())
                 {{ __('Container runtime') }}
             @elseif ($site->usesKubernetesRuntime())
@@ -104,7 +104,7 @@
                 {{ __('Runtime') }}
             @endif
         </h2>
-        <p class="mt-1 text-sm text-brand-moss">
+        <p class="mt-1 text-sm text-slate-600">
             @if ($functionsHost)
                 {{ __('Functions-backed apps expose inspectable runtime details here. Repository controls, build output, and rollout behavior now live in Deploy.') }}
             @else
@@ -114,17 +114,17 @@
     </div>
 
     <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-            <dt class="text-brand-moss">{{ __('Runtime profile') }}</dt>
-            <dd class="mt-1 font-medium text-brand-ink">{{ str((string) ($site->meta['runtime_profile'] ?? $site->type->value ?? __('Unknown')))->replace('_', ' ')->title() }}</dd>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <dt class="text-slate-500">{{ __('Runtime profile') }}</dt>
+            <dd class="mt-1 font-medium text-slate-900">{{ str((string) ($site->meta['runtime_profile'] ?? $site->type->value ?? __('Unknown')))->replace('_', ' ')->title() }}</dd>
         </div>
-        <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-            <dt class="text-brand-moss">{{ __('Deploy path') }}</dt>
-            <dd class="mt-1 break-all font-mono text-xs text-brand-ink">{{ $site->effectiveRepositoryPath() }}</dd>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <dt class="text-slate-500">{{ __('Working directory') }}</dt>
+            <dd class="mt-1 break-all font-mono text-xs text-slate-900">{{ $site->effectiveRepositoryPath() }}</dd>
         </div>
-        <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-            <dt class="text-brand-moss">{{ __('Env group') }}</dt>
-            <dd class="mt-1 font-medium text-brand-ink">{{ $deployment_environment !== '' ? $deployment_environment : __('production') }}</dd>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <dt class="text-slate-500">{{ __('Env group') }}</dt>
+            <dd class="mt-1 font-medium text-slate-900">{{ $deployment_environment !== '' ? $deployment_environment : __('production') }}</dd>
         </div>
         @if (! $functionsHost)
             <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
@@ -142,21 +142,39 @@
         @endif
     </dl>
 
-    <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4 text-sm text-brand-moss">
-        <p class="font-medium text-brand-ink">{{ __('Runtime editing moved') }}</p>
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        <p class="font-medium text-slate-900">{{ __('Runtime editing moved') }}</p>
         <p class="mt-1">{{ __('Repository changes, rollout strategy, hooks, and deploy scripts now live in the Deploy tab so this page can stay focused on how the app runs once it is live.') }}</p>
     </div>
 
     @if ($site->usesDockerRuntime())
+        @if ($runtimeErrorConsole)
+            <div class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Runtime errors') }}</h3>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('The latest failure or error-focused diagnostics captured for this runtime.') }}</p>
+                    </div>
+                </div>
+
+                @include('livewire.partials.deployment-activity-console', [
+                    'title' => __('Runtime errors'),
+                    'meta' => $runtimeErrorConsole['meta'],
+                    'transcript' => $runtimeErrorConsole['transcript'],
+                    'maxHeight' => '20rem',
+                ])
+            </div>
+        @endif
+
         @if ($dockerContainers->isNotEmpty() || $runtimePublication !== [])
-            <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4 space-y-4">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Docker discovery') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Saved from the live Docker runtime so hostname, IP, and container identity stay referenceable later.') }}</p>
+                        <h3 class="text-base font-semibold text-slate-900">{{ __('Docker discovery') }}</h3>
+                        <p class="mt-1 text-sm text-slate-600">{{ __('Saved from the live Docker runtime so hostname, IP, and container identity stay referenceable later.') }}</p>
                     </div>
                     @if (! empty($dockerRuntimeDetails['collected_at']))
-                        <p class="font-mono text-[11px] text-brand-moss">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
+                        <p class="font-mono text-[11px] text-slate-500">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
                     @endif
                 </div>
 
@@ -214,10 +232,10 @@
         @endif
 
         @if ($site->usesLocalDockerHostRuntime())
-            <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4 space-y-4">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                 <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Runtime management') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Manage the real local runtime behind this app without going through the old SSH bridge.') }}</p>
+                    <h3 class="text-base font-semibold text-slate-900">{{ __('Runtime management') }}</h3>
+                    <p class="mt-1 text-sm text-slate-600">{{ __('Manage the real local runtime behind this app without going through the old SSH bridge.') }}</p>
                 </div>
 
                 <div class="flex flex-wrap gap-2">
@@ -226,6 +244,7 @@
                     <button type="button" wire:click="runRuntimeAction('stop')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Stop') }}</button>
                     <button type="button" wire:click="runRuntimeAction('restart')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Restart') }}</button>
                     <button type="button" wire:click="runRuntimeAction('inspect')" class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100">{{ __('Refresh Docker details') }}</button>
+                    <button type="button" wire:click="runRuntimeAction('errors')" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">{{ __('Errors') }}</button>
                     <button type="button" wire:click="runRuntimeAction('status')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Status') }}</button>
                     <button type="button" wire:click="runRuntimeAction('logs')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Logs') }}</button>
                     <button type="button" wire:click="openConfirmActionModal('runRuntimeAction', ['destroy'], @js(__('Destroy runtime')), @js(__('Destroy the managed local runtime artifacts and containers for this app?')), @js(__('Destroy runtime')), true)" class="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">{{ __('Destroy') }}</button>
@@ -233,7 +252,7 @@
 
                 @if ($runtimeOperationConsoles->isNotEmpty())
                     <div class="space-y-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-moss">{{ __('Recent runtime operations') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Recent runtime operations') }}</p>
                         @foreach ($runtimeOperationConsoles as $runtimeConsole)
                             @include('livewire.partials.deployment-activity-console', [
                                 'title' => $runtimeConsole['title'],

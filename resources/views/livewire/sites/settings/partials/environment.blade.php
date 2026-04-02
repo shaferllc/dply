@@ -1,7 +1,35 @@
-<section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
+@php
+    $workspaceVariableCount = $site->workspace?->variables?->count() ?? 0;
+    $siteVariableCount = $site->environmentVariables->count();
+@endphp
+
+<section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-4">
     <div>
-        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Merged with project-level variables and the raw .env draft below for the selected environment. Values are encrypted in Dply.') }}</p>
+        <h2 class="text-lg font-semibold text-slate-900">{{ __('Shared environment inventory') }}</h2>
+        <p class="mt-1 text-sm text-slate-600">{{ __('Use this page to manage the inputs that feed the shared deployment contract. Dply merges project variables, site variables, and the encrypted .env draft into the runtime-specific delivery path for this site.') }}</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-3">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Project variables') }}</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $workspaceVariableCount }}</p>
+            <p class="mt-1 text-sm text-slate-600">{{ __('Inherited from the project workspace.') }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Site variables') }}</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $siteVariableCount }}</p>
+            <p class="mt-1 text-sm text-slate-600">{{ __('Scoped to this site and selected environment group.') }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Final inventory') }}</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $secretConfigEntries->count() }}</p>
+            <p class="mt-1 text-sm text-slate-600">{{ __('Shared secrets and config values visible in Deployment foundation.') }}</p>
+        </div>
+    </div>
+
+    <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+        <p class="font-medium">{{ __('Runtime delivery') }}</p>
+        <p class="mt-1">{{ $secretDeliveryLabel }}</p>
     </div>
 
     @if ($site->workspace && $site->workspace->variables->isNotEmpty())
@@ -12,10 +40,10 @@
     @endif
 
     @if ($site->environmentVariables->isNotEmpty())
-        <ul class="divide-y divide-brand-ink/10 text-sm">
+        <ul class="divide-y divide-slate-200 text-sm">
             @foreach ($site->environmentVariables as $variable)
                 <li class="flex justify-between gap-3 py-3">
-                    <span><span class="font-mono">{{ $variable->env_key }}</span> <span class="text-brand-moss">({{ $variable->environment }})</span> = <span class="text-brand-moss">••••</span></span>
+                    <span><span class="font-mono">{{ $variable->env_key }}</span> <span class="text-slate-500">({{ $variable->environment }})</span> = <span class="text-slate-500">••••</span></span>
                     <button type="button" wire:click="deleteEnvironmentVariable({{ $variable->id }})" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
                 </li>
             @endforeach
@@ -42,10 +70,10 @@
     </form>
 </section>
 
-<section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
+<section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-4">
     <div>
-        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Environment (.env)') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">
+        <h2 class="text-lg font-semibold text-slate-900">{{ __('Environment (.env)') }}</h2>
+        <p class="mt-1 text-sm text-slate-600">
             @if ($supportsEnvPush)
                 {{ __('Draft is stored encrypted. Push merges project variables, site key/value variables for the active environment, and this draft before writing the server .env file.') }}
             @else
@@ -63,5 +91,51 @@
                 <span wire:loading wire:target="pushEnvToServer">{{ __('Pushing...') }}</span>
             </button>
         @endif
+    </div>
+</section>
+
+<section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-4">
+    <div>
+        <h2 class="text-lg font-semibold text-slate-900">{{ __('Shared inventory preview') }}</h2>
+        <p class="mt-1 text-sm text-slate-600">{{ __('This is the merged inventory from the deployment contract for the selected environment group. Secrets stay redacted here and on the General foundation summary.') }}</p>
+    </div>
+
+    <div class="grid gap-4 xl:grid-cols-2">
+        <div class="space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Secrets') }}</p>
+            @forelse ($secretEntries as $entry)
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="font-mono text-sm font-medium text-slate-900">{{ $entry['key'] }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ str($entry['scope'] ?? 'site')->headline() }} · {{ str_replace('_', ' ', (string) ($entry['source'] ?? 'managed')) }}</p>
+                        </div>
+                        <span class="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700">{{ __('Redacted') }}</span>
+                    </div>
+                </div>
+            @empty
+                <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                    {{ __('No shared secrets are inventoried yet.') }}
+                </div>
+            @endforelse
+        </div>
+        <div class="space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Config values') }}</p>
+            @forelse ($configEntries as $entry)
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="font-mono text-sm font-medium text-slate-900">{{ $entry['key'] }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ str($entry['scope'] ?? 'site')->headline() }} · {{ str_replace('_', ' ', (string) ($entry['source'] ?? 'managed')) }}</p>
+                        </div>
+                        <p class="max-w-[16rem] break-all text-right font-mono text-xs text-slate-700">{{ \Illuminate\Support\Str::limit((string) ($entry['value'] ?? ''), 80) }}</p>
+                    </div>
+                </div>
+            @empty
+                <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                    {{ __('No non-secret config values are inventoried yet.') }}
+                </div>
+            @endforelse
+        </div>
     </div>
 </section>

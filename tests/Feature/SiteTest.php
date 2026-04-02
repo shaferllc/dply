@@ -2,34 +2,40 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\Sites\Create as SitesCreate;
-use App\Livewire\Sites\Settings as SiteSettings;
-use App\Livewire\Sites\Show as SitesShow;
+use App\Contracts\DeployEngine;
+use App\Enums\ServerProvider;
+use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
-use App\Contracts\DeployEngine;
+use App\Livewire\Sites\Create as SitesCreate;
+use App\Livewire\Sites\Settings as SiteSettings;
+use App\Livewire\Sites\Show as SitesShow;
+use App\Models\Organization;
+use App\Models\ProviderCredential;
+use App\Models\Server;
+use App\Models\Site;
+use App\Models\SiteCertificate;
+use App\Models\SiteDeployHook;
+use App\Models\SiteDeployment;
+use App\Models\SiteDeployStep;
+use App\Models\SiteDomain;
+use App\Models\SitePreviewDomain;
+use App\Models\User;
+use App\Models\WebhookDeliveryLog;
+use App\Models\Workspace;
+use App\Services\Certificates\CertificateRequestService;
+use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesKubectlExecutor;
 use App\Services\Deploy\SiteRuntimeActionExecutor;
-use App\Models\SiteDomainAlias;
-use App\Models\SiteDomain;
-use App\Models\ProviderCredential;
-use App\Models\SiteCertificate;
-use App\Models\SitePreviewDomain;
-use App\Models\SiteRelease;
-use App\Models\SiteTenantDomain;
-use App\Models\Organization;
-use App\Models\Server;
-use App\Models\Site;
-use App\Models\SiteDeployment;
-use App\Models\Workspace;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class SiteTest extends TestCase
@@ -736,12 +742,12 @@ class SiteTest extends TestCase
 
         $origin = storage_path('framework/testing/functions-deploy-repo-'.uniqid());
         mkdir($origin, 0777, true);
-        (new \Symfony\Component\Process\Process(['git', 'init', '-b', 'main'], $origin))->mustRun();
+        (new Process(['git', 'init', '-b', 'main'], $origin))->mustRun();
         file_put_contents($origin.'/README.md', "hello\n");
-        (new \Symfony\Component\Process\Process(['git', 'add', '.'], $origin))->mustRun();
-        (new \Symfony\Component\Process\Process(['git', 'config', 'user.email', 'tests@example.com'], $origin))->mustRun();
-        (new \Symfony\Component\Process\Process(['git', 'config', 'user.name', 'Tests'], $origin))->mustRun();
-        (new \Symfony\Component\Process\Process(['git', 'commit', '-m', 'Initial commit'], $origin))->mustRun();
+        (new Process(['git', 'add', '.'], $origin))->mustRun();
+        (new Process(['git', 'config', 'user.email', 'tests@example.com'], $origin))->mustRun();
+        (new Process(['git', 'config', 'user.name', 'Tests'], $origin))->mustRun();
+        (new Process(['git', 'commit', '-m', 'Initial commit'], $origin))->mustRun();
 
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -900,7 +906,7 @@ class SiteTest extends TestCase
     {
         app()->instance(DockerDeployEngine::class, new class implements DeployEngine
         {
-            public function run(\App\Services\Deploy\DeployContext $context): array
+            public function run(DeployContext $context): array
             {
                 $site = $context->site();
                 $meta = is_array($site->meta) ? $site->meta : [];
@@ -1002,7 +1008,7 @@ class SiteTest extends TestCase
         $this->assertStringContainsString('Kubernetes deploy applied.', (string) $deployment->log_output);
         $this->assertSame('dply-tests', data_get($site->meta, 'kubernetes_runtime.namespace'));
         $this->assertNotEmpty(data_get($site->meta, 'kubernetes_runtime.manifest_yaml'));
-        $this->assertSame(\Illuminate\Support\Str::slug($site->slug ?: $site->name), data_get($site->meta, 'kubernetes_runtime.deployment_name'));
+        $this->assertSame(Str::slug($site->slug ?: $site->name), data_get($site->meta, 'kubernetes_runtime.deployment_name'));
         $this->assertSame('3', data_get($site->meta, 'kubernetes_runtime.last_revision_id'));
         $this->assertSame('orbit-local', data_get($site->meta, 'kubernetes_runtime.kubectl_context'));
     }
@@ -1026,11 +1032,11 @@ class SiteTest extends TestCase
             file_put_contents($absolutePath, $contents);
         }
 
-        (new \Symfony\Component\Process\Process(['git', 'init', '-b', 'main'], $origin))->mustRun();
-        (new \Symfony\Component\Process\Process(['git', 'add', '.'], $origin))->mustRun();
-        (new \Symfony\Component\Process\Process(['git', 'config', 'user.email', 'tests@example.com'], $origin))->mustRun();
-        (new \Symfony\Component\Process\Process(['git', 'config', 'user.name', 'Tests'], $origin))->mustRun();
-        (new \Symfony\Component\Process\Process(['git', 'commit', '-m', 'Initial commit'], $origin))->mustRun();
+        (new Process(['git', 'init', '-b', 'main'], $origin))->mustRun();
+        (new Process(['git', 'add', '.'], $origin))->mustRun();
+        (new Process(['git', 'config', 'user.email', 'tests@example.com'], $origin))->mustRun();
+        (new Process(['git', 'config', 'user.name', 'Tests'], $origin))->mustRun();
+        (new Process(['git', 'commit', '-m', 'Initial commit'], $origin))->mustRun();
 
         return $origin;
     }
@@ -1114,16 +1120,122 @@ class SiteTest extends TestCase
         $response->assertOk()
             ->assertSee('Site workspace')
             ->assertSee('General')
-            ->assertSee('Project settings')
+            ->assertSee('Site project settings')
             ->assertSee('Save project settings')
-            ->assertSee('Routing')
-            ->assertSee('Certificates')
-            ->assertSee('Deploy')
-            ->assertSee('Danger zone')
+            ->assertSee('Deployment foundation')
             ->assertSee('Deployment log')
-            ->assertDontSee('Aliases')
-            ->assertDontSee('Redirects')
-            ->assertDontSee('Tenants');
+            ->assertSee('Site notes');
+    }
+
+    public function test_site_show_surfaces_deployment_foundation_preflight_and_resource_state(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_NGINX_ACTIVE,
+            'git_repository_url' => null,
+            'env_file_content' => "APP_KEY=base64:test-key\nAPP_NAME=Dply Demo\n",
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'pending',
+                    'logs' => [],
+                ],
+                'docker_runtime' => [
+                    'app_type' => 'php',
+                ],
+                'deployment_foundation' => [
+                    'applied_revisions' => [
+                        'runtime' => 'old-runtime-revision',
+                    ],
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+
+        $response->assertOk()
+            ->assertSee('Launch preflight')
+            ->assertSee('A repository URL is required for this runtime target.')
+            ->assertSee('Attached resources')
+            ->assertSee('Publication')
+            ->assertSee('Deployment foundation')
+            ->assertSee('Shared secrets &amp; config', false)
+            ->assertSee('1 secret')
+            ->assertSee('1 config value')
+            ->assertSee('APP_KEY')
+            ->assertSee('Redacted')
+            ->assertSee('APP_NAME')
+            ->assertSee('Dply Demo')
+            ->assertSee('Injected into the managed Docker runtime inputs Dply builds for this site.')
+            ->assertSee('Current revision')
+            ->assertSee('Last applied revision')
+            ->assertSee('Detected');
+    }
+
+    public function test_site_environment_section_uses_shared_inventory_for_serverless_sites(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+            'env_file_content' => "APP_KEY=base64:serverless-key\nAPP_NAME=Functions Demo\n",
+            'meta' => [
+                'runtime_profile' => 'digitalocean_functions_web',
+                'runtime_target' => [
+                    'family' => 'digitalocean_functions',
+                    'platform' => 'digitalocean',
+                    'provider' => 'digitalocean',
+                    'mode' => 'serverless',
+                    'status' => 'configured',
+                    'logs' => [],
+                ],
+                'serverless' => [
+                    'runtime' => 'php-8.3',
+                    'entrypoint' => 'index',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [
+            'server' => $server,
+            'site' => $site,
+            'section' => 'environment',
+        ], false));
+
+        $response->assertOk()
+            ->assertSee('Shared environment inventory')
+            ->assertSee('Final inventory')
+            ->assertSee('2')
+            ->assertSee('Runtime delivery')
+            ->assertSee('Injected into the provider runtime environment payload during publish.')
+            ->assertSee('Shared inventory preview')
+            ->assertSee('APP_KEY')
+            ->assertSee('Redacted')
+            ->assertSee('APP_NAME')
+            ->assertSee('Functions Demo')
+            ->assertDontSee('Push .env to server');
     }
 
     public function test_site_settings_legacy_routing_section_redirects_to_routing_tab(): void
@@ -1169,15 +1281,15 @@ class SiteTest extends TestCase
             'post_deploy_command' => 'php artisan optimize',
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
-        \App\Models\SiteDeployStep::query()->create([
+        SiteDeployStep::query()->create([
             'site_id' => $site->id,
             'sort_order' => 1,
-            'step_type' => \App\Models\SiteDeployStep::TYPE_NPM_CI,
+            'step_type' => SiteDeployStep::TYPE_NPM_CI,
             'timeout_seconds' => 900,
         ]);
-        \App\Models\SiteDeployHook::query()->create([
+        SiteDeployHook::query()->create([
             'site_id' => $site->id,
-            'phase' => \App\Models\SiteDeployHook::PHASE_AFTER_CLONE,
+            'phase' => SiteDeployHook::PHASE_AFTER_CLONE,
             'script' => 'php artisan migrate --force',
             'sort_order' => 1,
             'timeout_seconds' => 900,
@@ -1551,7 +1663,7 @@ class SiteTest extends TestCase
         $localServer = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'provider' => \App\Enums\ServerProvider::Custom,
+            'provider' => ServerProvider::Custom,
             'meta' => [
                 'host_kind' => Server::HOST_KIND_DOCKER,
                 'local_runtime' => [
@@ -1571,7 +1683,7 @@ class SiteTest extends TestCase
         $digitalOceanServer = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'provider' => \App\Enums\ServerProvider::DigitalOcean,
+            'provider' => ServerProvider::DigitalOcean,
             'meta' => [
                 'host_kind' => Server::HOST_KIND_KUBERNETES,
             ],
@@ -1614,7 +1726,7 @@ class SiteTest extends TestCase
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'provider' => \App\Enums\ServerProvider::Custom,
+            'provider' => ServerProvider::Custom,
             'meta' => [
                 'host_kind' => Server::HOST_KIND_DOCKER,
                 'local_runtime' => [
@@ -1661,6 +1773,50 @@ class SiteTest extends TestCase
         $this->assertNotEmpty(data_get($site->meta, 'runtime_target.logs'));
     }
 
+    public function test_site_show_surfaces_runtime_error_console_from_error_diagnostics(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => ServerProvider::Custom,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'local_runtime' => [
+                    'provider' => 'orbstack',
+                ],
+            ],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_DOCKER_ACTIVE,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'local_orbstack_docker',
+                    'platform' => 'local',
+                    'provider' => 'orbstack',
+                    'mode' => 'docker',
+                    'status' => 'error_diagnostics',
+                    'logs' => [[
+                        'action' => 'errors',
+                        'status' => 'error_diagnostics',
+                        'output' => "Runtime error diagnostics refreshed.\n\n--- laravel.log tail ---\nproduction.ERROR: Database file does not exist.",
+                        'ran_at' => now()->toIso8601String(),
+                    ]],
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+            ->assertSee('Runtime errors')
+            ->assertSee('Database file does not exist');
+    }
+
     public function test_site_settings_runtime_section_shows_docker_management_and_discovery(): void
     {
         $user = $this->userWithOrganization();
@@ -1668,7 +1824,7 @@ class SiteTest extends TestCase
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'provider' => \App\Enums\ServerProvider::Custom,
+            'provider' => ServerProvider::Custom,
             'meta' => [
                 'host_kind' => Server::HOST_KIND_DOCKER,
                 'local_runtime' => [
@@ -1719,8 +1875,14 @@ class SiteTest extends TestCase
         $response->assertOk()
             ->assertSee('Container app workspace')
             ->assertSee('Back to apps')
+            ->assertSee('Overview')
+            ->assertSee('Deployments')
+            ->assertSee('Networking')
+            ->assertSee('Automation')
+            ->assertDontSee('Certificates')
             ->assertSee('Docker discovery')
             ->assertSee('Runtime management')
+            ->assertSee('Errors')
             ->assertSee('Refresh Docker details')
             ->assertSee('laravel.repo.orb.local')
             ->assertSee('192.168.107.2')
@@ -1734,7 +1896,7 @@ class SiteTest extends TestCase
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'provider' => \App\Enums\ServerProvider::DigitalOcean,
+            'provider' => ServerProvider::DigitalOcean,
             'meta' => [
                 'host_kind' => Server::HOST_KIND_DOCKER,
             ],
@@ -1760,6 +1922,8 @@ class SiteTest extends TestCase
         $response->assertOk()
             ->assertSee('Cloud app workspace')
             ->assertSee('Primary hostname')
+            ->assertSee('Overview')
+            ->assertSee('Networking')
             ->assertSee('App project settings')
             ->assertSee('App details');
     }
@@ -1797,7 +1961,7 @@ class SiteTest extends TestCase
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'provider' => \App\Enums\ServerProvider::Custom,
+            'provider' => ServerProvider::Custom,
             'meta' => [
                 'host_kind' => Server::HOST_KIND_DOCKER,
                 'local_runtime' => [
@@ -1853,7 +2017,7 @@ class SiteTest extends TestCase
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'provider' => \App\Enums\ServerProvider::Custom,
+            'provider' => ServerProvider::Custom,
             'meta' => [
                 'host_kind' => Server::HOST_KIND_DOCKER,
                 'local_runtime' => [
@@ -1996,7 +2160,7 @@ class SiteTest extends TestCase
             'last_output' => 'Initial failure',
         ]);
 
-        $this->mock(\App\Services\Certificates\CertificateRequestService::class, function ($mock) use ($certificate): void {
+        $this->mock(CertificateRequestService::class, function ($mock) use ($certificate): void {
             $mock->shouldReceive('execute')
                 ->once()
                 ->withArgs(fn (SiteCertificate $passed): bool => $passed->is($certificate))
@@ -2301,11 +2465,11 @@ class SiteTest extends TestCase
             'started_at' => now()->subMinutes(5),
             'finished_at' => now()->subMinutes(4),
         ]);
-        \App\Models\WebhookDeliveryLog::query()->create([
+        WebhookDeliveryLog::query()->create([
             'site_id' => $site->id,
             'request_ip' => '203.0.113.10',
             'http_status' => 202,
-            'outcome' => \App\Models\WebhookDeliveryLog::OUTCOME_ACCEPTED,
+            'outcome' => WebhookDeliveryLog::OUTCOME_ACCEPTED,
             'detail' => 'Accepted deploy webhook.',
         ]);
 
@@ -2480,7 +2644,7 @@ class SiteTest extends TestCase
             'server_id' => $server->id,
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'type' => \App\Enums\SiteType::Node,
+            'type' => SiteType::Node,
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
@@ -2626,7 +2790,7 @@ class SiteTest extends TestCase
             'is_primary' => true,
         ]);
 
-        $this->mock(\App\Services\Certificates\CertificateRequestService::class, function ($mock) use ($site): void {
+        $this->mock(CertificateRequestService::class, function ($mock) use ($site): void {
             $mock->shouldReceive('create')
                 ->once()
                 ->withArgs(function (array $attributes) use ($site): bool {
@@ -2689,7 +2853,7 @@ class SiteTest extends TestCase
             'is_primary' => true,
         ]);
 
-        $this->mock(\App\Services\Certificates\CertificateRequestService::class, function ($mock) use ($site): void {
+        $this->mock(CertificateRequestService::class, function ($mock) use ($site): void {
             $mock->shouldReceive('create')
                 ->once()
                 ->withArgs(function (array $attributes) use ($site): bool {

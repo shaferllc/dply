@@ -6,6 +6,10 @@ use App\Events\Sites\SiteProvisioningUpdatedBroadcast;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Site;
 use App\Services\Certificates\CertificateRequestService;
+use App\Services\Deploy\DeploymentContractBuilder;
+use App\Services\Deploy\DeploymentPreflightValidator;
+use App\Services\Deploy\DeploymentRevisionTracker;
+use App\Services\Deploy\DeploymentValueRedactor;
 
 class SiteProvisioner
 {
@@ -18,11 +22,16 @@ class SiteProvisioner
         private readonly SiteReachabilityChecker $siteReachabilityChecker,
         private readonly DigitalOceanFunctionsSiteProvisioner $digitalOceanFunctionsSiteProvisioner,
         private readonly CertificateRequestService $certificateRequestService,
+        private readonly DeploymentPreflightValidator $preflightValidator,
+        private readonly DeploymentContractBuilder $contractBuilder,
+        private readonly DeploymentRevisionTracker $revisionTracker,
+        private readonly DeploymentValueRedactor $valueRedactor,
     ) {}
 
     public function begin(Site $site): void
     {
         $site->loadMissing(['server', 'domains']);
+        $this->runPreflight($site);
 
         if ($site->usesFunctionsRuntime()) {
             $this->appendLog($site, 'info', 'queued', 'Serverless host provisioning worker started.', [
@@ -103,6 +112,7 @@ class SiteProvisioner
             $this->appendLog($site, 'info', $state, 'Runtime deployment artifacts prepared. Waiting for the first deploy to publish the workload.', [
                 'runtime_profile' => $runtimeProfile,
             ]);
+            $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
             return;
         }
@@ -177,6 +187,7 @@ class SiteProvisioner
         $this->appendLog($site, 'info', 'writing_site_config', 'Web server configuration written.', [
             'webserver' => $site->webserver(),
         ]);
+        $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
         $this->updateProvisioning($site, [
             'state' => 'waiting_for_http',
@@ -336,14 +347,14 @@ class SiteProvisioner
         ]);
 
         $this->appendLog($site, 'error', 'failed', 'Provisioning failed.', [
-            'error' => $e->getMessage(),
+            'error' => $this->valueRedactor->redactMessage($e->getMessage()),
         ]);
 
         $this->updateProvisioning($site, [
             'state' => 'failed',
             'webserver' => $site->webserver(),
             'failed_at' => now()->toIso8601String(),
-            'error' => $e->getMessage(),
+            'error' => $this->valueRedactor->redactMessage($e->getMessage()),
         ]);
     }
 
@@ -354,14 +365,14 @@ class SiteProvisioner
         ]);
 
         $this->appendLog($site, 'error', 'failed', 'Provisioning timed out before any hostname responded.', [
-            'error' => $message,
+            'error' => $this->valueRedactor->redactMessage($message),
         ]);
 
         $this->updateProvisioning($site, [
             'state' => 'failed',
             'webserver' => $site->webserver(),
             'failed_at' => now()->toIso8601String(),
-            'error' => $message,
+            'error' => $this->valueRedactor->redactMessage($message),
         ]);
     }
 
@@ -416,7 +427,7 @@ class SiteProvisioner
      */
     private function filterLogContext(array $context): array
     {
-        return collect($context)
+        return collect($this->valueRedactor->redactContext($context))
             ->reject(function (mixed $value): bool {
                 if ($value === null || $value === '') {
                     return true;
@@ -429,5 +440,26 @@ class SiteProvisioner
                 return false;
             })
             ->all();
+    }
+
+    private function runPreflight(Site $site): void
+    {
+        $result = $this->preflightValidator->validate($site);
+
+        foreach ($result['warnings'] as $warning) {
+            $this->appendLog($site, 'warning', 'preflight', $warning);
+        }
+
+        if ($result['ok']) {
+            $this->appendLog($site, 'info', 'preflight', 'Deployment preflight checks passed.');
+
+            return;
+        }
+
+        foreach ($result['errors'] as $error) {
+            $this->appendLog($site, 'error', 'preflight', $error);
+        }
+
+        throw new \RuntimeException(implode(' ', $result['errors']));
     }
 }

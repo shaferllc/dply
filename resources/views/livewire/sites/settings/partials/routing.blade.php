@@ -1,11 +1,21 @@
-<section class="rounded-2xl border border-brand-ink/10 bg-white p-3 shadow-sm sm:p-4">
+<section class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Routing') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Manage customer domains, aliases, redirects, preview hostnames, and tenant publishing from one routing workspace while keeping certificates separate.') }}</p>
+            <h2 class="text-lg font-semibold text-slate-900">{{ $site->usesDockerRuntime() ? __('Networking') : __('Routing') }}</h2>
+            <p class="mt-1 text-sm text-slate-600">
+                @if ($site->usesDockerRuntime())
+                    {{ __('Manage published hostnames, custom domains, redirects, and preview endpoints from one networking workspace.') }}
+                @else
+                    {{ __('Manage customer domains, aliases, redirects, preview hostnames, and tenant publishing from one routing workspace while keeping certificates separate.') }}
+                @endif
+            </p>
         </div>
-        <div class="text-xs text-brand-moss">
-            {{ __('Routing updates re-apply the active VM webserver automatically when this site supports managed webserver config.') }}
+        <div class="text-xs text-slate-500">
+            @if ($site->usesDockerRuntime())
+                {{ __('Hostname and redirect changes flow through the managed publication layer for this app.') }}
+            @else
+                {{ __('Routing updates re-apply the active VM webserver automatically when this site supports managed webserver config.') }}
+            @endif
         </div>
     </div>
 

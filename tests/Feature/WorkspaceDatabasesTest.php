@@ -9,9 +9,9 @@ use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\User;
-use App\Support\ServerDatabaseNotificationKeys;
 use App\Services\Servers\ServerDatabaseHostCapabilities;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Support\ServerDatabaseNotificationKeys;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -210,6 +210,7 @@ class WorkspaceDatabasesTest extends TestCase
             ->test(WorkspaceDatabases::class, ['server' => $server])
             ->assertSet('workspace_tab', 'databases')
             ->assertSee('Create and connect to databases')
+            ->assertSee('Redis, queues, object storage, and other app resources now live in the site deployment contract.')
             ->assertSee('Basics')
             ->assertSee('Advanced')
             ->assertSee('See credentials')

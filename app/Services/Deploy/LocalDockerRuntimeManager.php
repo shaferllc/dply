@@ -126,6 +126,45 @@ class LocalDockerRuntimeManager
     }
 
     /**
+     * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
+     */
+    public function errors(Site $site): array
+    {
+        $runtime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
+        $repositoryPath = (string) ($runtime['repository_checkout_path'] ?? '');
+        $workingDirectory = (string) ($runtime['working_directory'] ?? $repositoryPath);
+        $composePath = (string) ($runtime['generated_compose_path'] ?? '');
+
+        if ($workingDirectory === '' || $composePath === '') {
+            throw new \RuntimeException($this->missingRuntimeMessage($site, ['logs'], $repositoryPath, $workingDirectory, $composePath));
+        }
+
+        $runtimeDetails = $this->collectRuntimeDetails($composePath, $workingDirectory);
+        $sections = array_filter([
+            $this->inspectCompose(
+                ['docker', 'compose', '-f', $composePath, 'ps', '--all'],
+                $workingDirectory,
+                'docker compose ps --all',
+            ),
+            $this->inspectCompose(
+                ['docker', 'compose', '-f', $composePath, 'logs', '--tail', '200', '--no-color'],
+                $workingDirectory,
+                'docker compose logs --tail 200',
+            ),
+            $this->applicationErrorLogs($site, $workingDirectory, $runtimeDetails),
+        ]);
+
+        return [
+            'status' => 'error_diagnostics',
+            'output' => trim(implode("\n\n", array_merge([
+                'Runtime error diagnostics refreshed.',
+            ], $sections))),
+            'runtime_details' => $runtimeDetails,
+            'publication' => $this->publicationFromRuntimeDetails($runtimeDetails),
+        ];
+    }
+
+    /**
      * @param  list<string>  $subCommand
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
@@ -136,8 +175,7 @@ class LocalDockerRuntimeManager
         string $prefix,
         bool $allowFailure = false,
         bool $refreshRuntimeDetails = false,
-    ): array
-    {
+    ): array {
         $runtime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
         $repositoryPath = (string) ($runtime['repository_checkout_path'] ?? '');
         $workingDirectory = (string) ($runtime['working_directory'] ?? $repositoryPath);
@@ -426,6 +464,41 @@ class LocalDockerRuntimeManager
             'container_name' => $container['name'] ?? null,
             'docker_service' => $container['service'] ?? null,
         ], fn (mixed $value): bool => $value !== null && $value !== '');
+    }
+
+    /**
+     * @param  array<string, mixed>  $runtimeDetails
+     */
+    private function applicationErrorLogs(Site $site, string $workingDirectory, array $runtimeDetails): string
+    {
+        if ((string) data_get($site->meta, 'docker_runtime.detected.framework') !== 'laravel') {
+            return '';
+        }
+
+        $container = collect($runtimeDetails['containers'] ?? [])->first(fn (mixed $entry): bool => is_array($entry) && filled($entry['name'] ?? null));
+        if (! is_array($container)) {
+            return '';
+        }
+
+        $containerName = (string) ($container['name'] ?? '');
+        if ($containerName === '') {
+            return '';
+        }
+
+        try {
+            $output = $this->run([
+                'docker',
+                'exec',
+                $containerName,
+                'sh',
+                '-lc',
+                'test -f /var/www/html/storage/logs/laravel.log && tail -n 200 /var/www/html/storage/logs/laravel.log || echo "Laravel log not found."',
+            ], $workingDirectory, allowFailure: true);
+
+            return $output !== '' ? "--- laravel.log tail ---\n".$output : '';
+        } catch (\Throwable $e) {
+            return "--- laravel.log tail ---\n".$e->getMessage();
+        }
     }
 
     /**

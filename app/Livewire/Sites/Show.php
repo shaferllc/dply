@@ -3,10 +3,10 @@
 namespace App\Livewire\Sites;
 
 use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
-use App\Jobs\ExecuteSiteCertificateJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\InsightFinding;
 use App\Models\Server;
@@ -19,14 +19,16 @@ use App\Models\SiteDomain;
 use App\Models\SiteEnvironmentVariable;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
+use App\Services\Deploy\DeploymentContractBuilder;
+use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Deploy\SiteRuntimeActionExecutor;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteEnvPusher;
-use App\Services\Sites\SiteProvisioningCanceller;
 use App\Services\Sites\SiteProvisioner;
+use App\Services\Sites\SiteProvisioningCanceller;
 use App\Services\Sites\SiteReleaseRollback;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
@@ -472,6 +474,7 @@ class Show extends Component
                 'stop' => __('Runtime stopped.'),
                 'restart' => __('Runtime restarted.'),
                 'inspect' => __('Docker details refreshed.'),
+                'errors' => __('Runtime errors refreshed.'),
                 'logs' => __('Runtime logs refreshed.'),
                 'destroy' => __('Runtime destroyed.'),
                 default => __('Runtime status refreshed.'),
@@ -1193,6 +1196,8 @@ class Show extends Component
         return view('livewire.sites.show', [
             'deployHookUrl' => $this->site->deployHookUrl(),
             'openSiteInsightsCount' => $openSiteInsightsCount,
+            'deploymentContract' => app(DeploymentContractBuilder::class)->build($this->site),
+            'deploymentPreflight' => app(DeploymentPreflightValidator::class)->validate($this->site),
             'sitePhpData' => $this->server->hostCapabilities()->supportsMachinePhpManagement()
                 ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
                 : null,

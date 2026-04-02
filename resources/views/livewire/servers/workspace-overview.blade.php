@@ -273,6 +273,97 @@
                 />
             </section>
 
+            <section class="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div class="max-w-2xl">
+                        <h3 class="text-lg font-semibold text-slate-900">{{ __('Deployment foundation') }}</h3>
+                        <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('Shared preflight, runtime drift, and attached resource state aggregated across sites on this server.') }}</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-badge tone="{{ ($foundationSummary['preflight_blocked_count'] ?? 0) > 0 ? 'danger' : 'accent' }}">
+                            {{ trans_choice('{0} No blocked sites|{1} :count blocked site|[2,*] :count blocked sites', $foundationSummary['preflight_blocked_count'] ?? 0, ['count' => $foundationSummary['preflight_blocked_count'] ?? 0]) }}
+                        </x-badge>
+                        @if (($foundationSummary['drifted_count'] ?? 0) > 0)
+                            <x-badge tone="warning">
+                                {{ trans_choice('{1} :count drifted runtime|[2,*] :count drifted runtimes', $foundationSummary['drifted_count'], ['count' => $foundationSummary['drifted_count']]) }}
+                            </x-badge>
+                        @endif
+                        @if (($foundationSummary['warning_site_count'] ?? 0) > 0)
+                            <x-badge tone="warning">
+                                {{ trans_choice('{1} :count site with warnings|[2,*] :count sites with warnings', $foundationSummary['warning_site_count'], ['count' => $foundationSummary['warning_site_count']]) }}
+                            </x-badge>
+                        @endif
+                    </div>
+                </div>
+
+                @if (($foundationSummary['site_count'] ?? 0) === 0)
+                    <x-empty-state
+                        :title="__('No site foundation data yet.')"
+                        :description="__('Attach a site to this server and Dply will summarize preflight and resource state here.')"
+                        class="mt-5"
+                    />
+                @else
+                    <div class="mt-5 grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
+                        <div class="space-y-4">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <h4 class="text-sm font-semibold text-slate-900">{{ __('Attached resources') }}</h4>
+                                <div class="mt-3 space-y-2">
+                                    @forelse ($resourceSummary as $resource)
+                                        <div class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                            <div>
+                                                <p class="text-sm font-medium text-slate-900">{{ str($resource['type'])->headline() }}</p>
+                                                <p class="mt-1 text-xs text-slate-500">
+                                                    {{ trans_choice('{1} :count site|[2,*] :count sites', $resource['site_count'], ['count' => $resource['site_count']]) }}
+                                                </p>
+                                            </div>
+                                            <div class="text-right text-xs">
+                                                <p class="font-medium text-sky-700">{{ __('Configured: :count', ['count' => $resource['configured_count']]) }}</p>
+                                                @if ($resource['pending_count'] > 0)
+                                                    <p class="mt-1 text-amber-700">{{ __('Pending: :count', ['count' => $resource['pending_count']]) }}</p>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
+                                            {{ __('No resource bindings are summarized yet.') }}
+                                        </div>
+                                    @endforelse
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            @foreach ($siteFoundationSummaries as $siteFoundation)
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <a href="{{ $siteFoundation['route'] }}" wire:navigate class="font-semibold text-slate-900 hover:text-sky-700">{{ $siteFoundation['name'] }}</a>
+                                            <p class="mt-1 text-sm text-slate-600">
+                                                @if (! $siteFoundation['preflight_ok'])
+                                                    {{ trans_choice('{1} :count blocking preflight issue|[2,*] :count blocking preflight issues', $siteFoundation['error_count'], ['count' => $siteFoundation['error_count']]) }}
+                                                @elseif ($siteFoundation['warning_count'] > 0)
+                                                    {{ trans_choice('{1} :count warning|[2,*] :count warnings', $siteFoundation['warning_count'], ['count' => $siteFoundation['warning_count']]) }}
+                                                @else
+                                                    {{ __('Preflight clear') }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="rounded-full px-3 py-1 text-xs font-medium {{ $siteFoundation['preflight_ok'] ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800' }}">
+                                                {{ $siteFoundation['preflight_ok'] ? __('Ready') : __('Blocked') }}
+                                            </span>
+                                            <span class="rounded-full px-3 py-1 text-xs font-medium {{ $siteFoundation['runtime_drifted'] ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700' }}">
+                                                {{ $siteFoundation['runtime_drifted'] ? __('Drift detected') : __('In sync') }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </section>
+
             <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
                 <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div class="max-w-2xl">

@@ -11,6 +11,8 @@ final class DigitalOceanFunctionsActionDeployer
     public function __construct(
         private readonly DigitalOceanFunctionsArtifactBuilder $artifactBuilder,
         private readonly ServerlessDeploymentConfigResolver $deploymentConfigResolver,
+        private readonly DeploymentContractBuilder $contractBuilder,
+        private readonly DeploymentRevisionTracker $revisionTracker,
     ) {}
 
     /**
@@ -94,6 +96,7 @@ final class DigitalOceanFunctionsActionDeployer
         ]);
 
         $site->forceFill(['meta' => $siteMeta])->save();
+        $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
         return [
             'output' => implode("\n", array_filter([

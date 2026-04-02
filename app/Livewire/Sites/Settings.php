@@ -4,15 +4,18 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Models\ProviderCredential;
-use App\Models\SiteCertificate;
-use App\Models\SiteDomainAlias;
-use App\Models\SiteDomain;
-use App\Models\SitePreviewDomain;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteCertificate;
+use App\Models\SiteDomain;
+use App\Models\SiteDomainAlias;
+use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
 use App\Models\Workspace;
 use App\Services\Certificates\CertificateRequestService;
+use App\Services\Deploy\DeploymentContractBuilder;
+use App\Services\Deploy\DeploymentPreflightValidator;
+use App\Services\Servers\ServerPhpManager;
 use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
@@ -675,6 +678,8 @@ class Settings extends Show
             'tabs' => config('site_settings.workspace_tabs', []),
             'routingTabs' => self::ROUTING_TABS,
             'deployHookUrl' => $this->site->deployHookUrl(),
+            'deploymentContract' => app(DeploymentContractBuilder::class)->build($this->site),
+            'deploymentPreflight' => app(DeploymentPreflightValidator::class)->validate($this->site),
             'availableWorkspaces' => Workspace::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->orderBy('name')
@@ -685,7 +690,7 @@ class Settings extends Show
                 ->orderBy('name')
                 ->get(['id', 'name', 'provider']),
             'sitePhpData' => $this->server->hostCapabilities()->supportsMachinePhpManagement()
-                ? app(\App\Services\Servers\ServerPhpManager::class)->sitePhpData($this->server, $this->site)
+                ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
                 : null,
         ]);
     }

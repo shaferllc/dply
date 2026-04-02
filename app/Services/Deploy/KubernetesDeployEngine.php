@@ -2,12 +2,16 @@
 
 namespace App\Services\Deploy;
 
-final class KubernetesDeployEngine implements \App\Contracts\DeployEngine
+use App\Contracts\DeployEngine;
+
+final class KubernetesDeployEngine implements DeployEngine
 {
     public function __construct(
         private readonly KubernetesManifestBuilder $manifestBuilder,
         private readonly KubernetesKubectlExecutor $kubectlExecutor,
         private readonly LocalDockerKubernetesRuntimeManager $localRuntimeManager,
+        private readonly DeploymentContractBuilder $contractBuilder,
+        private readonly DeploymentRevisionTracker $revisionTracker,
     ) {}
 
     public function run(DeployContext $context): array
@@ -41,6 +45,7 @@ final class KubernetesDeployEngine implements \App\Contracts\DeployEngine
             ]);
 
             $site->forceFill(['meta' => $siteMeta])->save();
+            $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
             return [
                 'output' => $result['output'],
@@ -83,6 +88,7 @@ final class KubernetesDeployEngine implements \App\Contracts\DeployEngine
         ]);
 
         $site->forceFill(['meta' => $siteMeta])->save();
+        $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
         return [
             'output' => implode("\n\n", array_filter([

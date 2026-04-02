@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\ServerManageRemoteSshJob;
-use App\Jobs\ProvisionSiteJob;
+use App\Actions\Sites\CreateContainerSiteFromInspection;
+use App\Enums\SiteType;
 use App\Jobs\FinalizeContainerCloudLaunchJob;
-use App\Jobs\ProvisionAwsEc2ServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
+use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Jobs\ServerManageRemoteSshJob;
+use App\Jobs\WaitForServerSshReadyJob;
+use App\Livewire\Launches\LocalDocker;
 use App\Livewire\Servers\Create as ServersCreate;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney;
@@ -15,13 +18,13 @@ use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
-use App\Jobs\WaitForServerSshReadyJob;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Models\ServerCronJob;
+use App\Models\ServerDatabase;
 use App\Models\ServerFirewallRule;
 use App\Models\ServerProvisionRun;
 use App\Models\Site;
@@ -37,10 +40,11 @@ use App\Services\Deploy\LocalRepositoryInspector;
 use App\Services\Sites\Contracts\SiteRuntimeProvisioner;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
 use Tests\TestCase;
@@ -359,7 +363,7 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->test(LocalDocker::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('repository_branch', 'main')
             ->call('launch')
@@ -401,12 +405,7 @@ class ServerTest extends TestCase
         $user = $this->userWithOrganization();
         $organization = $user->currentOrganization();
 
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult([
-            'target_runtime' => 'kubernetes_web',
-            'target_kind' => 'kubernetes',
-            'kubernetes_namespace' => 'local-kube',
-            'detected_files' => ['k8s/deployment.yaml'],
-        ])) extends LocalRepositoryInspector
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult(['target_runtime' => 'kubernetes_web', 'target_kind' => 'kubernetes', 'kubernetes_namespace' => 'local-kube', 'detected_files' => ['k8s/deployment.yaml']])) extends LocalRepositoryInspector
         {
             /**
              * @param  array<string, mixed>  $result
@@ -420,7 +419,7 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->test(LocalDocker::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('repository_branch', 'main')
             ->call('launch')
@@ -455,17 +454,7 @@ class ServerTest extends TestCase
 
         $user = $this->userWithOrganization();
 
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult([
-            'framework' => 'unknown',
-            'language' => 'unknown',
-            'confidence' => 'low',
-            'warnings' => ['Review runtime details after launch.'],
-            'reasons' => ['No clear framework markers were detected in the repository root.'],
-            'env_template' => [
-                'path' => '.env.example',
-                'keys' => ['APP_NAME'],
-            ],
-        ])) extends LocalRepositoryInspector
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult(['framework' => 'unknown', 'language' => 'unknown', 'confidence' => 'low', 'warnings' => ['Review runtime details after launch.'], 'reasons' => ['No clear framework markers were detected in the repository root.'], 'env_template' => ['path' => '.env.example', 'keys' => ['APP_NAME']]])) extends LocalRepositoryInspector
         {
             /**
              * @param  array<string, mixed>  $result
@@ -479,7 +468,7 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->test(LocalDocker::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('repository_branch', 'main')
             ->call('launch')
@@ -499,9 +488,7 @@ class ServerTest extends TestCase
 
         $user = $this->userWithOrganization();
 
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult([
-            'repository_subdirectory' => 'apps/web',
-        ])) extends LocalRepositoryInspector
+        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult(['repository_subdirectory' => 'apps/web'])) extends LocalRepositoryInspector
         {
             /**
              * @param  array<string, mixed>  $result
@@ -515,7 +502,7 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->test(LocalDocker::class)
             ->set('repository_url', 'https://github.com/acme/monorepo.git')
             ->set('repository_branch', 'main')
             ->set('repository_subdirectory', 'apps/web')
@@ -550,7 +537,7 @@ class ServerTest extends TestCase
         });
 
         $component = Livewire::actingAs($user)
-            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->test(LocalDocker::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('repository_branch', 'main')
             ->call('launch')
@@ -579,7 +566,7 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->test(LocalDocker::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->call('inspectRepository')
             ->assertSee('Choose the container target')
@@ -611,7 +598,7 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(\App\Livewire\Launches\LocalDocker::class)
+            ->test(LocalDocker::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('target_family', 'digitalocean_docker')
             ->set('provider_credential_id', (string) $credential->id)
@@ -667,7 +654,7 @@ class ServerTest extends TestCase
             'aws_docker',
         );
 
-        $job->handle(app(\App\Actions\Sites\CreateContainerSiteFromInspection::class));
+        $job->handle(app(CreateContainerSiteFromInspection::class));
 
         $site = Site::query()->where('server_id', $server->id)->latest('created_at')->first();
 
@@ -715,7 +702,7 @@ class ServerTest extends TestCase
             'digitalocean_docker',
         );
 
-        $job->handle(app(\App\Actions\Sites\CreateContainerSiteFromInspection::class));
+        $job->handle(app(CreateContainerSiteFromInspection::class));
 
         $server->refresh();
 
@@ -856,6 +843,8 @@ class ServerTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $organization->id,
             'status' => Site::STATUS_PENDING,
+            'git_repository_url' => 'https://github.com/acme/demo.git',
+            'git_branch' => 'main',
             'meta' => [
                 'runtime_profile' => 'docker_web',
                 'runtime_target' => [
@@ -960,7 +949,7 @@ class ServerTest extends TestCase
             'detection' => [
                 'target_runtime' => 'docker_web',
                 'target_kind' => 'docker',
-                'site_type' => \App\Enums\SiteType::Php,
+                'site_type' => SiteType::Php,
                 'framework' => 'laravel',
                 'language' => 'php',
                 'confidence' => 'high',
@@ -1111,7 +1100,6 @@ class ServerTest extends TestCase
         $this->assertNotSame($initial, $regenerated);
     }
 
-
     public function test_servers_create_install_profile_updates_stack_defaults(): void
     {
         Http::fake([
@@ -1138,7 +1126,6 @@ class ServerTest extends TestCase
             ->assertSet('form.webserver', 'none')
             ->assertSet('form.database', 'none');
     }
-
 
     public function test_servers_can_be_stored_as_custom(): void
     {
@@ -1187,7 +1174,6 @@ class ServerTest extends TestCase
         $this->assertSame(Server::HOST_KIND_DOCKER, data_get($server->meta, 'host_kind'));
         $this->assertTrue($server->isDockerHost());
     }
-
 
     public function test_servers_create_custom_path_shows_warning_preflight_and_unavailable_cost(): void
     {
@@ -1536,7 +1522,7 @@ class ServerTest extends TestCase
         ]);
 
         $task = Task::query()->create([
-            'id' => (string) \Illuminate\Support\Str::ulid(),
+            'id' => (string) Str::ulid(),
             'name' => 'Server stack provision',
             'action' => 'provision_stack',
             'script' => 'dply-provision-stack.sh',
@@ -1897,7 +1883,7 @@ class ServerTest extends TestCase
             ]),
         ]);
 
-        $taskRunner = \Mockery::mock(TaskRunnerService::class);
+        $taskRunner = Mockery::mock(TaskRunnerService::class);
         $taskRunner->shouldReceive('cancelTask')
             ->once()
             ->with((string) $task->id)
@@ -2149,6 +2135,83 @@ class ServerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Add your personal SSH key before you need this server');
         $response->assertSee(route('servers.ssh-keys', $server), false);
+    }
+
+    public function test_servers_overview_summarizes_foundation_state_across_attached_sites(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'setup_status' => Server::SETUP_STATUS_DONE,
+            'ip_address' => '203.0.113.44',
+            'ssh_user' => 'forge',
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+        ]);
+
+        $blockedSite = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Blocked Docker Site',
+            'status' => Site::STATUS_DOCKER_CONFIGURED,
+            'git_repository_url' => null,
+            'meta' => [
+                'runtime_profile' => 'docker_web',
+                'runtime_target' => [
+                    'family' => 'docker',
+                    'platform' => 'byo',
+                    'mode' => 'docker',
+                    'provider' => 'byo',
+                    'status' => 'configured',
+                ],
+            ],
+        ]);
+
+        $driftedSite = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Drifted App',
+            'status' => Site::STATUS_NGINX_ACTIVE,
+            'meta' => [
+                'deployment_foundation' => [
+                    'applied_revisions' => [
+                        'runtime' => 'outdated-runtime-revision',
+                    ],
+                ],
+            ],
+        ]);
+
+        SiteDomain::query()->create([
+            'site_id' => $driftedSite->id,
+            'hostname' => 'drifted.example.test',
+            'is_primary' => true,
+        ]);
+
+        ServerDatabase::query()->create([
+            'server_id' => $server->id,
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => 'app',
+            'password' => 'secret',
+            'host' => '127.0.0.1',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        $response->assertSee('Deployment foundation');
+        $response->assertSee('1 blocked site');
+        $response->assertSee('1 drifted runtime');
+        $response->assertSee('Database');
+        $response->assertSee('Configured: 2');
+        $response->assertSee('Blocked Docker Site');
+        $response->assertSee('1 blocking preflight issue');
+        $response->assertSee('Blocked');
+        $response->assertSee('Drifted App');
+        $response->assertSee('Drift detected');
     }
 
     public function test_servers_overview_hides_personal_key_reminder_once_server_has_current_users_key(): void

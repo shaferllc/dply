@@ -13,6 +13,8 @@ final class AwsLambdaFunctionDeployer
         private readonly DigitalOceanFunctionsArtifactBuilder $artifactBuilder,
         private readonly ServerlessDeploymentConfigResolver $deploymentConfigResolver,
         private readonly ServerlessProvisionerFactory $provisionerFactory,
+        private readonly DeploymentContractBuilder $contractBuilder,
+        private readonly DeploymentRevisionTracker $revisionTracker,
     ) {}
 
     /**
@@ -63,6 +65,7 @@ final class AwsLambdaFunctionDeployer
             'function_url' => null,
         ]);
         $site->forceFill(['meta' => $siteMeta])->save();
+        $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
         return [
             'output' => implode("\n", array_filter([

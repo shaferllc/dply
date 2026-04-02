@@ -2,11 +2,15 @@
 
 namespace App\Services\Deploy;
 
-final class DockerDeployEngine implements \App\Contracts\DeployEngine
+use App\Contracts\DeployEngine;
+
+final class DockerDeployEngine implements DeployEngine
 {
     public function __construct(
         private readonly DockerSiteDeployer $dockerSiteDeployer,
         private readonly LocalDockerRuntimeManager $localRuntimeManager,
+        private readonly DeploymentContractBuilder $contractBuilder,
+        private readonly DeploymentRevisionTracker $revisionTracker,
     ) {}
 
     public function run(DeployContext $context): array
@@ -44,6 +48,7 @@ final class DockerDeployEngine implements \App\Contracts\DeployEngine
         ]);
 
         $site->forceFill(['meta' => $meta])->save();
+        $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
         return [
             'output' => $result['output'],

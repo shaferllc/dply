@@ -33,6 +33,7 @@ class SiteRuntimeActionExecutor
             'start' => $this->localDockerManager->start($site),
             'stop' => $this->localDockerManager->stop($site),
             'restart' => $this->localDockerManager->restart($site),
+            'errors' => $this->localDockerManager->errors($site),
             'logs' => $this->localDockerManager->logs($site),
             'destroy' => $this->localDockerManager->destroy($site),
             'inspect' => $this->localDockerManager->inspect($site),

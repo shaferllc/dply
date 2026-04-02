@@ -2,17 +2,25 @@
 
 namespace App\Services\Sites;
 
+use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
+use App\Services\Deploy\DeploymentContractBuilder;
+use App\Services\Deploy\DeploymentRevisionTracker;
 use App\Services\DigitalOceanService;
 use App\Services\Sites\Dns\DigitalOceanDnsProvider;
 use Illuminate\Support\Str;
 
 class TestingHostnameProvisioner
 {
+    public function __construct(
+        private readonly DeploymentContractBuilder $contractBuilder,
+        private readonly DeploymentRevisionTracker $revisionTracker,
+    ) {}
+
     public function provision(Site $site): ?SitePreviewDomain
     {
-        $site->loadMissing(['server', 'previewDomains']);
+        $site->loadMissing(['server', 'previewDomains', 'organization']);
 
         if (! $this->isEnabled()) {
             $this->storeResult($site, [
@@ -35,7 +43,7 @@ class TestingHostnameProvisioner
 
         [$hostname, $zone] = $this->resolveHostnameAndZone($site);
         $recordName = $this->relativeRecordName($hostname, $zone);
-        $service = new DigitalOceanService((string) config('services.digitalocean.token'));
+        $service = new DigitalOceanService($this->tokenForSite($site));
         $dnsProvider = new DigitalOceanDnsProvider($service);
 
         try {
@@ -78,7 +86,9 @@ class TestingHostnameProvisioner
                 'record_type' => 'A',
                 'record_data' => $serverIp,
                 'provisioned_at' => now()->toIso8601String(),
+                'credential_source' => $this->credentialSourceForSite($site),
             ]);
+            $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'publication');
 
             return $domain;
         } catch (\Throwable $e) {
@@ -147,7 +157,7 @@ class TestingHostnameProvisioner
     public function isEnabled(): bool
     {
         return (bool) config('services.digitalocean.auto_testing_hostname_enabled')
-            && trim((string) config('services.digitalocean.token')) !== ''
+            && $this->hasAvailableToken()
             && $this->configuredDomains() !== [];
     }
 
@@ -164,7 +174,7 @@ class TestingHostnameProvisioner
         $zone = is_string($testingMeta['zone'] ?? null) && $testingMeta['zone'] !== ''
             ? (string) $testingMeta['zone']
             : $this->configuredZoneForHostname($hostname);
-        if ($zone === null || trim((string) config('services.digitalocean.token')) === '') {
+        if ($zone === null || ! $this->hasAvailableToken()) {
             return;
         }
 
@@ -173,7 +183,7 @@ class TestingHostnameProvisioner
             : $this->relativeRecordName($hostname, $zone);
         $serverIp = trim((string) ($testingMeta['record_data'] ?? $site->server?->ip_address ?? ''));
 
-        $service = new DigitalOceanService((string) config('services.digitalocean.token'));
+        $service = new DigitalOceanService($this->tokenForSite($site));
         $recordId = (int) ($testingMeta['record_id'] ?? 0);
 
         if ($recordId <= 0) {
@@ -235,5 +245,47 @@ class TestingHostnameProvisioner
 
         $site->forceFill(['meta' => $meta])->save();
         $site->setAttribute('meta', $meta);
+    }
+
+    private function hasAvailableToken(): bool
+    {
+        if (trim((string) config('services.digitalocean.token')) !== '') {
+            return true;
+        }
+
+        return ProviderCredential::query()
+            ->where('provider', 'digitalocean')
+            ->whereNotNull('organization_id')
+            ->exists();
+    }
+
+    private function tokenForSite(Site $site): string
+    {
+        $credential = $this->organizationCredentialForSite($site);
+        $token = $credential?->getApiToken() ?: trim((string) config('services.digitalocean.token'));
+
+        if ($token === '') {
+            throw new \RuntimeException('DigitalOcean preview DNS requires an organization credential or app-level token.');
+        }
+
+        return $token;
+    }
+
+    private function credentialSourceForSite(Site $site): string
+    {
+        return $this->organizationCredentialForSite($site) ? 'organization_credential' : 'app_config';
+    }
+
+    private function organizationCredentialForSite(Site $site): ?ProviderCredential
+    {
+        if (! $site->organization_id) {
+            return null;
+        }
+
+        return ProviderCredential::query()
+            ->where('organization_id', $site->organization_id)
+            ->where('provider', 'digitalocean')
+            ->latest('updated_at')
+            ->first();
     }
 }

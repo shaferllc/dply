@@ -44,6 +44,11 @@
     $dockerRuntimeDetails = $site->usesDockerRuntime() && is_array($dockerRuntime['runtime_details'] ?? null) ? $dockerRuntime['runtime_details'] : [];
     $dockerContainers = collect($dockerRuntimeDetails['containers'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
     $runtimeLogs = collect($runtimeTarget['logs'] ?? [])->filter(fn ($entry) => is_array($entry))->reverse()->values();
+    $foundationStatus = is_array($deploymentContract->status ?? null) ? $deploymentContract->status : [];
+    $resourceBindings = collect($deploymentContract->resourceBindingArrays() ?? [])->filter(fn ($entry) => is_array($entry))->values();
+    $preflightChecks = collect($deploymentPreflight['checks'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
+    $preflightErrors = collect($deploymentPreflight['errors'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
+    $preflightWarnings = collect($deploymentPreflight['warnings'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
     $runtimeOperationConsoles = $runtimeLogs->map(function (array $runtimeLog): array {
         $timestamp = (string) ($runtimeLog['ran_at'] ?? '');
         $status = strtoupper((string) ($runtimeLog['status'] ?? 'unknown'));
@@ -60,8 +65,11 @@
             'title' => __('Runtime activity'),
             'meta' => $action,
             'transcript' => $transcript,
+            'action' => strtolower((string) ($runtimeLog['action'] ?? '')),
+            'status' => strtolower((string) ($runtimeLog['status'] ?? '')),
         ];
     });
+    $runtimeErrorConsole = $runtimeOperationConsoles->first(fn (array $console): bool => in_array($console['action'], ['errors'], true) || $console['status'] === 'failed');
     $previewDomain = $site->primaryPreviewDomain();
     $activeCertificate = $site->certificates->firstWhere('status', \App\Models\SiteCertificate::STATUS_ACTIVE);
     $pendingCertificate = $activeCertificate
@@ -494,11 +502,21 @@
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div><dt class="text-slate-500">Provisioning</dt><dd class="font-medium capitalize">{{ $site->statusLabel() }}</dd></div>
                     <div><dt class="text-slate-500">Provisioning step</dt><dd class="font-medium capitalize">{{ str_replace('_', ' ', $site->provisioningState() ?? 'queued') }}</dd></div>
-                    <div><dt class="text-slate-500">SSL</dt><dd class="font-medium capitalize">{{ $site->ssl_status }}</dd></div>
-                    <div><dt class="text-slate-500">Document root (configured)</dt><dd class="font-mono text-xs break-all">{{ $site->document_root }}</dd></div>
-                    <div><dt class="text-slate-500">Deploy path</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveRepositoryPath() }}</dd></div>
-                    <div><dt class="text-slate-500">Web root</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveDocumentRoot() }}</dd></div>
-                    <div><dt class="text-slate-500">Deploy strategy</dt><dd class="font-medium">{{ $site->deploy_strategy }}</dd></div>
+                    <div><dt class="text-slate-500">Contract revision</dt><dd class="font-mono text-xs break-all">{{ \Illuminate\Support\Str::limit((string) ($foundationStatus['current_runtime_revision'] ?? '—'), 20) }}</dd></div>
+                    <div><dt class="text-slate-500">Runtime drift</dt><dd class="font-medium {{ ($foundationStatus['runtime_drifted'] ?? false) ? 'text-amber-700' : 'text-emerald-700' }}">{{ ($foundationStatus['runtime_drifted'] ?? false) ? __('Detected') : __('In sync') }}</dd></div>
+                    @if ($site->usesDockerRuntime())
+                        <div><dt class="text-slate-500">Published URL</dt><dd class="font-mono text-xs break-all">{{ $runtimePublication['url'] ?? ($runtimePublication['hostname'] ?? 'Not published yet') }}</dd></div>
+                        <div><dt class="text-slate-500">Container service</dt><dd class="font-medium">{{ $runtimePublication['docker_service'] ?? 'Not recorded yet' }}</dd></div>
+                        <div><dt class="text-slate-500">Working directory</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveRepositoryPath() }}</dd></div>
+                        <div><dt class="text-slate-500">Published path</dt><dd class="font-mono text-xs break-all">{{ $site->document_root }}</dd></div>
+                        <div><dt class="text-slate-500">Runtime mode</dt><dd class="font-medium">{{ ucfirst((string) ($runtimeTarget['mode'] ?? 'docker')) }}</dd></div>
+                    @else
+                        <div><dt class="text-slate-500">SSL</dt><dd class="font-medium capitalize">{{ $site->ssl_status }}</dd></div>
+                        <div><dt class="text-slate-500">Document root (configured)</dt><dd class="font-mono text-xs break-all">{{ $site->document_root }}</dd></div>
+                        <div><dt class="text-slate-500">Deploy path</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveRepositoryPath() }}</dd></div>
+                        <div><dt class="text-slate-500">Web root</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveDocumentRoot() }}</dd></div>
+                        <div><dt class="text-slate-500">Deploy strategy</dt><dd class="font-medium">{{ $site->deploy_strategy }}</dd></div>
+                    @endif
                     @if (!empty($site->meta['site_health_last_check_at']))
                         <div><dt class="text-slate-500">URL health (scheduler)</dt><dd class="font-medium">
                             @if (!empty($site->meta['site_health_last_ok']))
@@ -510,20 +528,52 @@
                         </dd></div>
                     @endif
                 </dl>
+
+                <div class="mt-6 grid gap-4 lg:grid-cols-2">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <h4 class="text-sm font-semibold text-slate-900">{{ __('Launch preflight') }}</h4>
+                        <p class="mt-1 text-sm text-slate-600">{{ __('Shared deployment checks for config, publication, and attached resources.') }}</p>
+                        @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
+                            <p class="mt-3 text-sm font-medium text-emerald-700">{{ __('No blocking preflight issues.') }}</p>
+                        @else
+                            <div class="mt-3 space-y-2">
+                                @foreach ($preflightErrors as $error)
+                                    <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $error }}</p>
+                                @endforeach
+                                @foreach ($preflightWarnings as $warning)
+                                    <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ $warning }}</p>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <h4 class="text-sm font-semibold text-slate-900">{{ __('Attached resources') }}</h4>
+                        <p class="mt-1 text-sm text-slate-600">{{ __('What this site expects around the app runtime, even when provisioning stays attach-only.') }}</p>
+                        <div class="mt-3 space-y-2">
+                            @foreach ($resourceBindings as $binding)
+                                @include('livewire.sites.partials.resource-binding-row', [
+                                    'binding' => $binding,
+                                    'configuredClass' => 'bg-emerald-100 text-emerald-700',
+                                ])
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="bg-white p-6 shadow-sm sm:rounded-lg">
-                <h3 class="font-medium text-slate-900 mb-3">{{ __('Testing URL') }}</h3>
+                <h3 class="font-medium text-slate-900 mb-3">{{ $site->usesDockerRuntime() ? __('Published hostname') : __('Testing URL') }}</h3>
 
                 @if ($testingHostname !== '')
-                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                        <p class="text-sm font-medium text-emerald-900">
+                    <div class="rounded-lg border border-sky-200 bg-sky-50 p-4">
+                        <p class="text-sm font-medium text-sky-900">
                             {{ $site->isReadyForTraffic() ? __('Temporary hostname ready') : __('Temporary hostname assigned') }}
                         </p>
-                        <p class="mt-2 break-all font-mono text-sm text-emerald-950">{{ $testingHostname }}</p>
-                        <p class="mt-2 text-sm text-emerald-900">
+                        <p class="mt-2 break-all font-mono text-sm text-sky-950">{{ $testingHostname }}</p>
+                        <p class="mt-2 text-sm text-sky-900">
                             @if ($site->isReadyForTraffic())
-                                {{ __('Use this URL to test the site before the customer domain points here.') }}
+                                {{ $site->usesDockerRuntime() ? __('Use this hostname to verify the container app before adding custom domains.') : __('Use this URL to test the site before the customer domain points here.') }}
                             @else
                                 {{ __('Dply will keep checking this hostname and mark the site ready once it starts responding.') }}
                             @endif
@@ -550,11 +600,11 @@
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <h3 class="text-lg font-semibold text-slate-900">{{ __('Site settings') }}</h3>
-                            <p class="mt-1 text-sm text-slate-600">{{ __('Routing, certificates, deploy settings, runtime, environment, webhooks, and destructive actions now live in the dedicated site settings workspace.') }}</p>
+                            <h3 class="text-lg font-semibold text-slate-900">{{ $site->usesDockerRuntime() ? __('App workspace') : __('Site settings') }}</h3>
+                            <p class="mt-1 text-sm text-slate-600">{{ $site->usesDockerRuntime() ? __('Runtime, deployments, environment, networking, automation, and destructive actions now live in the dedicated app workspace.') : __('Routing, certificates, deploy settings, runtime, environment, webhooks, and destructive actions now live in the dedicated site settings workspace.') }}</p>
                         </div>
-                        <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'routing']) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                            {{ __('Open routing settings') }}
+                        <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => $site->usesDockerRuntime() ? 'runtime' : 'routing']) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50">
+                            {{ $site->usesDockerRuntime() ? __('Open runtime workspace') : __('Open routing settings') }}
                         </a>
                     </div>
                 </div>
@@ -651,7 +701,7 @@
                 @endif
             </div>
 
-            @if ($previewDomain || $site->certificates->isNotEmpty())
+            @if (! $site->usesDockerRuntime() && ($previewDomain || $site->certificates->isNotEmpty()))
                 <div class="bg-white p-6 shadow-sm sm:rounded-lg space-y-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -753,6 +803,34 @@
                             <dd class="mt-2 text-sm text-slate-900">{{ ucfirst(str_replace('_', ' ', (string) ($runtimeTarget['status'] ?? 'unknown'))) }}</dd>
                         </div>
                     </dl>
+
+                    @if ($preflightChecks->isNotEmpty())
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <h4 class="text-sm font-semibold text-slate-900">{{ __('Deployment foundation') }}</h4>
+                            <dl class="mt-3 grid gap-4 sm:grid-cols-3">
+                                <div>
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Current revision') }}</dt>
+                                    <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $foundationStatus['current_runtime_revision'] ?? '—' }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Last applied revision') }}</dt>
+                                    <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $foundationStatus['last_applied_runtime_revision'] ?? __('Not applied yet') }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Drift') }}</dt>
+                                    <dd class="mt-2 text-sm {{ ($foundationStatus['runtime_drifted'] ?? false) ? 'text-amber-700' : 'text-emerald-700' }}">{{ ($foundationStatus['runtime_drifted'] ?? false) ? __('Detected') : __('In sync') }}</dd>
+                                </div>
+                            </dl>
+                            <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                                @foreach ($preflightChecks as $check)
+                                    <div class="rounded-lg border px-3 py-2 text-sm {{ ($check['level'] ?? 'ok') === 'error' ? 'border-red-200 bg-red-50 text-red-800' : (($check['level'] ?? 'ok') === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800') }}">
+                                        <span class="font-medium">{{ str($check['key'] ?? 'check')->headline() }}</span>
+                                        <p class="mt-1 text-xs leading-5">{{ $check['message'] ?? '' }}</p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
                     @if ($runtimePublication !== [])
                         <dl class="grid gap-4 sm:grid-cols-3">
@@ -920,10 +998,20 @@
                                 <button type="button" wire:click="runRuntimeAction('stop')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Stop') }}</button>
                                 <button type="button" wire:click="runRuntimeAction('restart')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Restart') }}</button>
                                 <button type="button" wire:click="runRuntimeAction('inspect')" class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100">{{ __('Refresh Docker details') }}</button>
+                                <button type="button" wire:click="runRuntimeAction('errors')" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">{{ __('Errors') }}</button>
                                 <button type="button" wire:click="runRuntimeAction('status')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Status') }}</button>
                                 <button type="button" wire:click="runRuntimeAction('logs')" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ __('Logs') }}</button>
                                 <button type="button" wire:click="openConfirmActionModal('runRuntimeAction', ['destroy'], @js(__('Destroy runtime')), @js(__('Destroy the managed local runtime artifacts and containers for this site?')), @js(__('Destroy runtime')), true)" class="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">{{ __('Destroy') }}</button>
                             </div>
+
+                            @if ($runtimeErrorConsole)
+                                @include('livewire.partials.deployment-activity-console', [
+                                    'title' => __('Runtime errors'),
+                                    'meta' => $runtimeErrorConsole['meta'],
+                                    'transcript' => $runtimeErrorConsole['transcript'],
+                                    'maxHeight' => '20rem',
+                                ])
+                            @endif
 
                             @if ($runtimeOperationConsoles->isNotEmpty())
                                 <div class="space-y-3">

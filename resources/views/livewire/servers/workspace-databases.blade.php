@@ -54,6 +54,9 @@
             <p class="mt-1 leading-relaxed text-brand-moss">
                 {{ __('Keep the basics here: create a database, review what Dply tracks on this server, and copy the connection details your app needs.') }}
             </p>
+            <p class="mt-2 leading-relaxed text-brand-moss">
+                {{ __('Redis, queues, object storage, and other app resources now live in the site deployment contract. This workspace stays focused on server databases while those other attachments show up from each site workspace.') }}
+            </p>
         </div>
 
         <x-resource-notification-summary
