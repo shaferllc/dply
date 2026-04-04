@@ -138,14 +138,7 @@
                 Livewire.on('provision-journey-complete', (e) => {
                     const url = e.url ?? e.detail?.url;
 
-                    // #region agent log
-                    fetch('http://127.0.0.1:7652/ingest/ff63025e-790d-4d37-ad99-1fc12ab824d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'182f08'},body:JSON.stringify({sessionId:'182f08',runId:'pre-fix',hypothesisId:'H3',location:'resources/views/layouts/app.blade.php:116',message:'Received provision completion browser event',data:{url:url ?? null,href:window.location.href,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
-
                     if (url) {
-                        // #region agent log
-                        fetch('http://127.0.0.1:7652/ingest/ff63025e-790d-4d37-ad99-1fc12ab824d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'182f08'},body:JSON.stringify({sessionId:'182f08',runId:'pre-fix',hypothesisId:'H5',location:'resources/views/layouts/app.blade.php:120',message:'About to navigate after provision completion event',data:{url,href:window.location.href},timestamp:Date.now()})}).catch(()=>{});
-                        // #endregion
                         window.location.assign(url);
                     }
                 });

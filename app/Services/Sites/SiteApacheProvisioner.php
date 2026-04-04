@@ -32,6 +32,7 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
         $ssh = $this->systemSsh($site);
         $this->installPlaceholderPage($site, $ssh);
         $this->ensureSuspendedPage($site, $ssh);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
         $this->writeSystemFile($ssh, $confFile, $config);
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_APACHE_EXIT:%%s" "$?"',
@@ -79,5 +80,49 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
         $this->updateSiteMeta($site, 'apache_cleanup_output', $out);
 
         return $out;
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    public function readCurrentSiteConfig(Site $site): ?string
+    {
+        $server = $this->ensureServerReady($site);
+        $ssh = $this->systemSsh($site);
+        $available = rtrim(config('sites.apache_sites_available'), '/');
+        $confFile = $available.'/'.$this->configBasename($site).'.conf';
+
+        return $this->readRemoteFile($server, $ssh, $confFile);
+    }
+
+    public function validatePendingOnServer(Site $site, string $pendingConfig): array
+    {
+        $server = $this->ensureServerReady($site);
+        $ssh = $this->systemSsh($site);
+        $available = rtrim(config('sites.apache_sites_available'), '/');
+        $confFile = $available.'/'.$this->configBasename($site).'.conf';
+        $prevMain = $this->readRemoteFile($server, $ssh, $confFile);
+
+        $ok = false;
+        $message = '';
+
+        try {
+            $this->writeSystemFile($ssh, $confFile, $pendingConfig);
+            $out = $ssh->exec(sprintf(
+                '(%s) 2>&1; printf "\nDPLY_APACHE_TEST_EXIT:%%s" "$?"',
+                $this->privilegedCommand($server, 'apachectl configtest')
+            ), 120);
+            $ok = (bool) preg_match('/DPLY_APACHE_TEST_EXIT:0\s*$/', $out);
+            $message = trim($out);
+        } catch (\Throwable $e) {
+            $message = $e->getMessage();
+        } finally {
+            $this->restoreRemoteFile($ssh, $server, $confFile, $prevMain);
+        }
+
+        return [
+            'ok' => $ok,
+            'message' => $message !== '' ? $message : ($ok ? __('Apache configuration is valid.') : __('Apache validation failed.')),
+        ];
     }
 }

@@ -37,6 +37,18 @@
                 <p class="font-mono text-sm text-brand-ink">{{ $site->effectiveSystemUser($this->server) }}</p>
             </div>
 
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:p-5">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="max-w-xl space-y-1">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Reset file permissions') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Reapply default ownership and chmods on this site’s repository path over SSH (effective user + web group). Use after permission mistakes or access issues.') }}</p>
+                    </div>
+                    <x-secondary-button type="button" wire:click="openSystemUserResetPermissionsModal">
+                        {{ __('Reset permissions…') }}
+                    </x-secondary-button>
+                </div>
+            </div>
+
             <div class="grid gap-3 sm:grid-cols-2">
                 <button
                     type="button"
@@ -82,7 +94,7 @@
                             <option value="{{ $row['username'] }}">{{ $row['username'] }} ({{ $row['site_count'] }} {{ __('sites') }})</option>
                         @endforeach
                     </select>
-                    <x-primary-button type="button" class="mt-2" wire:click="openSystemUserAssignModal" @if (count($system_user_remote_rows) === 0) disabled @endif>
+                    <x-primary-button type="button" class="mt-2" wire:click="openSystemUserAssignModal" :disabled="count($system_user_remote_rows) === 0">
                         {{ __('Apply selection…') }}
                     </x-primary-button>
                 </div>
@@ -92,7 +104,7 @@
                 <p class="text-sm font-semibold text-brand-ink">{{ __('Remove a user from the server') }}</p>
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Allowed only when no site on this server uses that account. root, dply, and the deploy user cannot be removed.') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
-                    <x-secondary-button type="button" wire:click="openSystemUserRemoveModal" @if (count($system_user_remote_rows) === 0) disabled @endif>
+                    <x-secondary-button type="button" wire:click="openSystemUserRemoveModal" :disabled="count($system_user_remote_rows) === 0">
                         {{ __('Remove user…') }}
                     </x-secondary-button>
                 </div>

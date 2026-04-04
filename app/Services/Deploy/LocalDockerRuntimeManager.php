@@ -314,6 +314,23 @@ class LocalDockerRuntimeManager
     }
 
     /**
+     * @return array{compose_ps_json: ?string, containers: list<array<string, mixed>>, collected_at: string}
+     */
+    public function collectRuntimeDetailsForSite(Site $site): array
+    {
+        $runtime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
+        $repositoryPath = (string) ($runtime['repository_checkout_path'] ?? '');
+        $workingDirectory = (string) ($runtime['working_directory'] ?? $repositoryPath);
+        $composePath = (string) ($runtime['generated_compose_path'] ?? '');
+
+        if ($workingDirectory === '' || $composePath === '') {
+            throw new \RuntimeException(__('This Docker runtime has not been deployed yet.'));
+        }
+
+        return $this->collectRuntimeDetails($composePath, $workingDirectory);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function collectRuntimeDetails(string $composePath, string $workingDirectory): array
@@ -499,6 +516,50 @@ class LocalDockerRuntimeManager
         } catch (\Throwable $e) {
             return "--- laravel.log tail ---\n".$e->getMessage();
         }
+    }
+
+    /**
+     * Run a shell command inside the first app container (same resolution as runtime diagnostics).
+     *
+     * @param  callable(string): void  $onChunk
+     */
+    public function execInPrimaryContainer(Site $site, string $shellCommand, int $timeoutSeconds, callable $onChunk): int
+    {
+        $runtime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
+        $repositoryPath = (string) ($runtime['repository_checkout_path'] ?? '');
+        $workingDirectory = (string) ($runtime['working_directory'] ?? $repositoryPath);
+        $composePath = (string) ($runtime['generated_compose_path'] ?? '');
+
+        if ($workingDirectory === '' || $composePath === '') {
+            throw new \RuntimeException(__('This Docker runtime has not been deployed yet.'));
+        }
+
+        $runtimeDetails = $this->collectRuntimeDetails($composePath, $workingDirectory);
+        $container = collect($runtimeDetails['containers'] ?? [])->first(fn (mixed $entry): bool => is_array($entry) && filled($entry['name'] ?? null));
+        if (! is_array($container)) {
+            throw new \RuntimeException(__('No running Docker container was found for this site.'));
+        }
+
+        $containerName = (string) ($container['name'] ?? '');
+        if ($containerName === '') {
+            throw new \RuntimeException(__('No running Docker container was found for this site.'));
+        }
+
+        $process = new Process(
+            ['docker', 'exec', $containerName, 'sh', '-lc', $shellCommand],
+            $workingDirectory
+        );
+        $process->setTimeout($timeoutSeconds);
+
+        try {
+            $process->run(function (string $type, string $buffer) use ($onChunk): void {
+                $onChunk($buffer);
+            });
+        } catch (ProcessTimedOutException $e) {
+            throw new \RuntimeException($this->timedOutMessage($process, ['docker', 'exec', $containerName, 'sh', '-lc', $shellCommand]), previous: $e);
+        }
+
+        return $process->getExitCode() ?? 1;
     }
 
     /**

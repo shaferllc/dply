@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Contracts\AwsLambdaGateway;
+use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ProcessReferralInvoicePayment;
@@ -38,14 +38,6 @@ use App\Policies\StatusPagePolicy;
 use App\Policies\TeamPolicy;
 use App\Policies\UserSshKeyPolicy;
 use App\Policies\WorkspacePolicy;
-use App\Services\Deploy\ByoServerDeployEngine;
-use App\Services\Deploy\AwsLambdaDeployEngine;
-use App\Services\Deploy\DeployEngineResolver;
-use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
-use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
-use App\Services\Deploy\DockerDeployEngine;
-use App\Services\Deploy\KubernetesDeployEngine;
-use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Certificates\CertificateEngineResolver;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Certificates\CertificateSigningRequestGenerator;
@@ -53,20 +45,35 @@ use App\Services\Certificates\ImportedCertificateInstaller;
 use App\Services\Certificates\LetsEncryptDnsCertificateEngine;
 use App\Services\Certificates\LetsEncryptHttpCertificateEngine;
 use App\Services\Certificates\ZeroSslHttpCertificateEngine;
-use App\Services\Servers\ServerMetricsGuestScript;
+use App\Services\Deploy\AwsLambdaDeployEngine;
+use App\Services\Deploy\ByoServerDeployEngine;
+use App\Services\Deploy\DeployEngineResolver;
+use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
+use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
+use App\Services\Deploy\DockerDeployEngine;
+use App\Services\Deploy\KubernetesDeployEngine;
+use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\Bootstrap\VmServerBootstrapStrategy;
-use App\Services\Sites\SiteApacheProvisioner;
-use App\Services\Sites\SiteCaddyProvisioner;
+use App\Services\Servers\ServerMetricsGuestScript;
 use App\Services\Sites\DockerRuntimeSiteProvisioner;
 use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
+use App\Services\Sites\RepositoryWebhookProvisioner;
+use App\Services\Sites\SiteApacheProvisioner;
+use App\Services\Sites\SiteCaddyProvisioner;
 use App\Services\Sites\SiteNginxProvisioner;
 use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
+use App\Services\Sites\WebserverConfig\ApacheWebserverConfigEngine;
+use App\Services\Sites\WebserverConfig\CaddyWebserverConfigEngine;
+use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
+use App\Services\Sites\WebserverConfig\OpenLiteSpeedWebserverConfigEngine;
+use App\Services\Sites\WebserverConfig\TraefikWebserverConfigEngine;
+use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
 use Dply\Core\Auth\CentralOAuthClient;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -123,6 +130,18 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SiteWebserverProvisionerRegistry::class, function ($app) {
             return new SiteWebserverProvisionerRegistry($app->tagged('site.webserver.provisioners'));
         });
+
+        $this->app->singleton(WebserverConfigEngineRegistry::class, function ($app) {
+            return new WebserverConfigEngineRegistry($app->tagged('site.webserver.config.engines'));
+        });
+
+        $this->app->tag([
+            NginxWebserverConfigEngine::class,
+            ApacheWebserverConfigEngine::class,
+            CaddyWebserverConfigEngine::class,
+            TraefikWebserverConfigEngine::class,
+            OpenLiteSpeedWebserverConfigEngine::class,
+        ], 'site.webserver.config.engines');
 
         $this->app->singleton(SiteRuntimeProvisionerRegistry::class, function ($app) {
             return new SiteRuntimeProvisionerRegistry($app->tagged('site.runtime.provisioners'));
@@ -241,6 +260,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Site::deleting(function (Site $site): void {
+            rescue(
+                fn () => app(RepositoryWebhookProvisioner::class)->disable($site),
+                report: false,
+            );
             $site->loadMissing(['certificates', 'previewDomains']);
             $primary = $site->primaryDomain();
             $svIds = SupervisorProgram::query()->where('site_id', $site->id)->pluck('id')->all();

@@ -10,11 +10,13 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
+use App\Services\Servers\LaravelQueueWorkCommandBuilder;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorProvisioner;
 use App\Support\SupervisorEnvFormatter;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -44,6 +46,37 @@ class WorkspaceDaemons extends Component
     public string $new_sv_stdout_logfile = '';
 
     public ?string $new_sv_site_id = null;
+
+    /** @var 'quick'|'advanced' When {@see $new_sv_type} is queue, structured builder vs raw command. */
+    public string $queue_builder_mode = 'quick';
+
+    public string $quick_php_binary = 'php';
+
+    public string $quick_queue_connection = '';
+
+    public string $quick_queue_name = 'default';
+
+    public int $quick_timeout = 60;
+
+    public int $quick_sleep = 3;
+
+    public int $quick_tries = 3;
+
+    public int $quick_backoff = 0;
+
+    public int $quick_memory = 128;
+
+    public int $quick_max_time = 3600;
+
+    public string $quick_app_env = 'production';
+
+    /** When set (site route or overlaps query site), scope program list and defaults. */
+    public ?string $context_site_id = null;
+
+    /** @var 'site'|'all' Only when {@see $context_site_id} is set. */
+    public string $programs_list_scope = 'all';
+
+    public bool $siteContextUnavailable = false;
 
     public ?int $new_sv_priority = null;
 
@@ -100,8 +133,14 @@ class WorkspaceDaemons extends Component
     /** null = not checked yet (wire:init), true/false from dpkg on server */
     public ?bool $supervisor_installed = null;
 
-    public function mount(Server $server): void
+    public function mount(Server $server, ?Site $site = null): void
     {
+        if ($site !== null) {
+            abort_unless($site->server_id === $server->id, 404);
+            abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
+            Gate::authorize('view', $site);
+        }
+
         $this->bootWorkspace($server);
         $this->new_sv_directory = '/var/www/app/current';
         $this->supervisor_installed = match ($server->supervisor_package_status) {
@@ -109,6 +148,62 @@ class WorkspaceDaemons extends Component
             Server::SUPERVISOR_PACKAGE_MISSING => false,
             default => null,
         };
+
+        $resolvedSiteId = $site?->id;
+        if ($resolvedSiteId === null) {
+            $siteId = request()->query('site');
+            if (is_string($siteId) && $siteId !== '') {
+                $exists = Site::query()->where('server_id', $server->id)->whereKey($siteId)->exists();
+                if ($exists) {
+                    $resolvedSiteId = $siteId;
+                }
+            }
+        }
+
+        if ($resolvedSiteId !== null) {
+            $this->context_site_id = $resolvedSiteId;
+            $this->programs_list_scope = 'site';
+            $this->new_sv_site_id = $resolvedSiteId;
+            $siteModel = Site::query()->where('server_id', $server->id)->whereKey($resolvedSiteId)->first();
+            if ($siteModel !== null) {
+                $this->new_sv_directory = rtrim($siteModel->effectiveRepositoryPath(), '/').'/current';
+                $this->new_sv_user = $siteModel->effectiveSystemUser($server);
+                $this->siteContextUnavailable = ! $this->siteSupportsVmManagedDaemons($siteModel);
+            }
+        }
+
+        $preset = request()->query('preset');
+        if (Gate::allows('update', $server)
+            && is_string($preset)
+            && in_array($preset, [
+                'laravel-queue',
+                'laravel-horizon',
+                'reverb',
+                'laravel-schedule',
+                'laravel-octane',
+                'nodejs',
+                'sidekiq',
+            ], true)) {
+            $this->applySupervisorPreset($preset);
+        }
+    }
+
+    /**
+     * Whether this site can use Dply-managed Supervisor on the VM.
+     */
+    protected function siteSupportsVmManagedDaemons(Site $site): bool
+    {
+        return $this->server->hostCapabilities()->supportsSsh()
+            && ! $site->usesFunctionsRuntime()
+            && ! $site->usesDockerRuntime()
+            && ! $site->usesKubernetesRuntime();
+    }
+
+    public function updatedNewSvType(string $value): void
+    {
+        if ($value !== 'queue') {
+            $this->queue_builder_mode = 'advanced';
+        }
     }
 
     public function updatedDaemonsWorkspaceTab(string $value): void
@@ -145,12 +240,7 @@ class WorkspaceDaemons extends Component
     {
         $this->authorize('update', $this->server);
         match ($preset) {
-            'laravel-queue' => $this->applySupervisorPresetValues(
-                'laravel-queue',
-                'queue',
-                'php artisan queue:work --sleep=3 --tries=3 --max-time=3600',
-                '/var/www/app/current'
-            ),
+            'laravel-queue' => $this->applyLaravelQueuePresetQuick(),
             'laravel-horizon' => $this->applySupervisorPresetValues(
                 'laravel-horizon',
                 'horizon',
@@ -188,6 +278,51 @@ class WorkspaceDaemons extends Component
         $this->flash_error = null;
     }
 
+    protected function applyLaravelQueuePresetQuick(): void
+    {
+        $this->queue_builder_mode = 'quick';
+        $this->quick_php_binary = 'php';
+        $this->quick_queue_connection = '';
+        $this->quick_queue_name = 'default';
+        $this->quick_timeout = 60;
+        $this->quick_sleep = 3;
+        $this->quick_tries = 3;
+        $this->quick_backoff = 0;
+        $this->quick_memory = 128;
+        $this->quick_max_time = 3600;
+        $this->quick_app_env = 'production';
+        $this->new_sv_type = 'queue';
+        $this->new_sv_slug = 'laravel-queue';
+        $this->new_sv_numprocs = 1;
+        $this->resetExpertFormFields();
+
+        $dir = '/var/www/app/current';
+        $user = 'www-data';
+        if ($this->new_sv_site_id !== null && $this->new_sv_site_id !== '') {
+            $site = Site::query()
+                ->where('server_id', $this->server->id)
+                ->find($this->new_sv_site_id);
+            if ($site !== null) {
+                $dir = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+                $user = $site->effectiveSystemUser($this->server);
+            }
+        }
+        $this->new_sv_directory = $dir;
+        $this->new_sv_user = $user;
+
+        $this->new_sv_command = (new LaravelQueueWorkCommandBuilder(
+            phpBinary: $this->quick_php_binary,
+            connection: $this->quick_queue_connection,
+            queue: $this->quick_queue_name,
+            timeout: $this->quick_timeout,
+            sleep: $this->quick_sleep,
+            tries: $this->quick_tries,
+            backoff: $this->quick_backoff,
+            memory: $this->quick_memory,
+            maxTime: $this->quick_max_time,
+        ))->build();
+    }
+
     protected function applyLaravelOctanePreset(): void
     {
         $command = 'php artisan octane:start --server=swoole --host=127.0.0.1 --port=8000';
@@ -213,6 +348,7 @@ class WorkspaceDaemons extends Component
 
     protected function applySupervisorPresetValues(string $slug, string $type, string $command, string $directory): void
     {
+        $this->queue_builder_mode = 'advanced';
         $this->new_sv_slug = $slug;
         $this->new_sv_type = $type;
         $this->new_sv_command = $command;
@@ -230,6 +366,25 @@ class WorkspaceDaemons extends Component
         $this->new_sv_autorestart = '';
         $this->new_sv_redirect_stderr = true;
         $this->new_sv_stderr_logfile = '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function rulesForProgramFormQuickQueue(): array
+    {
+        return [
+            'quick_php_binary' => ['required', 'string', 'max:128'],
+            'quick_queue_connection' => ['nullable', 'string', 'max:64'],
+            'quick_queue_name' => ['required', 'string', 'max:128'],
+            'quick_timeout' => ['required', 'integer', 'min:1', 'max:86400'],
+            'quick_sleep' => ['required', 'integer', 'min:0', 'max:3600'],
+            'quick_tries' => ['required', 'integer', 'min:0', 'max:100'],
+            'quick_backoff' => ['required', 'integer', 'min:0', 'max:86400'],
+            'quick_memory' => ['required', 'integer', 'min:16', 'max:8192'],
+            'quick_max_time' => ['required', 'integer', 'min:0', 'max:86400'],
+            'quick_app_env' => ['nullable', 'string', 'max:64'],
+        ];
     }
 
     protected function rulesForProgramForm(): array
@@ -255,6 +410,67 @@ class WorkspaceDaemons extends Component
             'new_sv_redirect_stderr' => 'boolean',
             'new_sv_stderr_logfile' => 'nullable|string|max:512',
         ];
+    }
+
+    protected function resolveSiteForQueueBuilder(): ?Site
+    {
+        $id = $this->new_sv_site_id ?: $this->context_site_id;
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        return Site::query()->where('server_id', $this->server->id)->whereKey($id)->first();
+    }
+
+    /**
+     * When quick queue mode is on, map structured fields into command/directory/user/env.
+     */
+    protected function syncQuickQueueBuilderIntoForm(): bool
+    {
+        if ($this->queue_builder_mode !== 'quick' || $this->new_sv_type !== 'queue') {
+            return true;
+        }
+
+        $this->validate($this->rulesForProgramFormQuickQueue());
+
+        $site = $this->resolveSiteForQueueBuilder();
+        if ($site === null) {
+            $this->addError('new_sv_site_id', __('Select a related site so Dply can set the app directory and system user for this worker.'));
+
+            return false;
+        }
+
+        $this->new_sv_command = (new LaravelQueueWorkCommandBuilder(
+            phpBinary: $this->quick_php_binary,
+            connection: $this->quick_queue_connection,
+            queue: $this->quick_queue_name,
+            timeout: $this->quick_timeout,
+            sleep: $this->quick_sleep,
+            tries: $this->quick_tries,
+            backoff: $this->quick_backoff,
+            memory: $this->quick_memory,
+            maxTime: $this->quick_max_time,
+        ))->build();
+
+        $this->new_sv_directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+        $this->new_sv_user = $site->effectiveSystemUser($this->server);
+        $this->new_sv_site_id = $site->id;
+
+        if (trim($this->new_sv_slug) === '') {
+            $this->new_sv_slug = 'laravel-queue-'.Str::slug($this->quick_queue_name !== '' ? $this->quick_queue_name : 'default');
+        }
+
+        $env = SupervisorEnvFormatter::parseLines($this->new_sv_env_lines);
+        if (trim($this->quick_app_env) !== '') {
+            $env['APP_ENV'] = trim($this->quick_app_env);
+        }
+        $lines = [];
+        foreach ($env as $k => $v) {
+            $lines[] = $k.'='.$v;
+        }
+        $this->new_sv_env_lines = implode("\n", $lines);
+
+        return true;
     }
 
     protected function programAttributesFromForm(): array
@@ -284,6 +500,10 @@ class WorkspaceDaemons extends Component
     public function saveSupervisorProgram(): void
     {
         $this->authorize('update', $this->server);
+        if (! $this->syncQuickQueueBuilderIntoForm()) {
+            return;
+        }
+
         $this->validate($this->rulesForProgramForm());
 
         $attrs = $this->programAttributesFromForm();
@@ -326,10 +546,26 @@ class WorkspaceDaemons extends Component
     protected function resetDefaultsForNewProgramForm(): void
     {
         $this->new_sv_type = 'queue';
+        $this->queue_builder_mode = 'quick';
+        $this->quick_php_binary = 'php';
+        $this->quick_queue_connection = '';
+        $this->quick_queue_name = 'default';
+        $this->quick_timeout = 60;
+        $this->quick_sleep = 3;
+        $this->quick_tries = 3;
+        $this->quick_backoff = 0;
+        $this->quick_memory = 128;
+        $this->quick_max_time = 3600;
+        $this->quick_app_env = 'production';
         $this->new_sv_command = 'php artisan queue:work --sleep=3 --tries=3';
         $this->new_sv_directory = '/var/www/app/current';
         $this->new_sv_user = 'www-data';
         $this->new_sv_numprocs = 1;
+        $this->new_sv_site_id = $this->context_site_id;
+        if ($this->context_site_id !== null && ($ctx = Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first())) {
+            $this->new_sv_directory = rtrim($ctx->effectiveRepositoryPath(), '/').'/current';
+            $this->new_sv_user = $ctx->effectiveSystemUser($this->server);
+        }
     }
 
     public function beginEditProgram(string $id): void
@@ -363,6 +599,7 @@ class WorkspaceDaemons extends Component
             $lines[] = $k.'='.$v;
         }
         $this->new_sv_env_lines = implode("\n", $lines);
+        $this->queue_builder_mode = 'advanced';
         $this->flash_success = __('Editing — change fields and save.');
         $this->flash_error = null;
     }
@@ -371,15 +608,19 @@ class WorkspaceDaemons extends Component
     {
         $this->editing_program_id = null;
         $this->new_sv_slug = '';
-        $this->new_sv_env_lines = '';
         $this->new_sv_stdout_logfile = '';
-        $this->new_sv_site_id = null;
+        $this->resetDefaultsForNewProgramForm();
+        $this->new_sv_env_lines = '';
         $this->resetExpertFormFields();
     }
 
     public function saveOrgTemplate(): void
     {
         $this->authorize('update', $this->server);
+        if (! $this->syncQuickQueueBuilderIntoForm()) {
+            return;
+        }
+
         $this->validate([
             'template_save_name' => 'required|string|max:160',
             ...$this->rulesForProgramForm(),
@@ -838,6 +1079,15 @@ class WorkspaceDaemons extends Component
 
         $sitesForServer = $this->server->sites()->orderBy('name')->get(['id', 'name']);
 
+        $allPrograms = $this->server->supervisorPrograms;
+        $filteredSupervisorPrograms = ($this->context_site_id !== null && $this->programs_list_scope === 'site')
+            ? $allPrograms->where('site_id', $this->context_site_id)->values()
+            : $allPrograms;
+
+        $contextSiteModel = $this->context_site_id !== null
+            ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
+            : null;
+
         return view('livewire.servers.workspace-daemons', [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
@@ -846,6 +1096,8 @@ class WorkspaceDaemons extends Component
             'auditLogs' => $auditLogs,
             'orgServersForCopy' => $orgServersForCopy,
             'sitesForServer' => $sitesForServer,
+            'filteredSupervisorPrograms' => $filteredSupervisorPrograms,
+            'contextSiteModel' => $contextSiteModel,
         ]);
     }
 }

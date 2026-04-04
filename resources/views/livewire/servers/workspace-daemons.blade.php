@@ -8,11 +8,22 @@
     active="daemons"
     :title="__('Daemons')"
     :description="__('Supervisor is installed during server provisioning by default. If it is missing on this machine, install it here, then Dply can write configs under /etc/supervisor/conf.d and run supervisorctl reread/update.')"
+    :context-site="$contextSiteModel ?? null"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @if ($opsReady)
+    @if ($siteContextUnavailable)
+        <div class="rounded-2xl border border-amber-300/80 bg-amber-50/90 px-5 py-6 text-sm text-amber-950">
+            <p class="font-semibold">{{ __('Supervisor workers are not available for this site’s runtime') }}</p>
+            <p class="mt-2 leading-relaxed text-amber-900/90">
+                {{ __('Managed SSH Supervisor applies to VM-hosted sites. For container or serverless runtimes, run workers on that platform instead.') }}
+            </p>
+            @if ($contextSiteModel)
+                <a href="{{ route('sites.show', [$server, $contextSiteModel]) }}" wire:navigate class="mt-4 inline-flex font-medium text-amber-950 underline">{{ __('Back to site') }}</a>
+            @endif
+        </div>
+    @elseif ($opsReady)
         <div @if ($server->supervisor_package_status === null) wire:init="refreshSupervisorInstallStatus" @endif>
         @if ($supervisor_installed === null)
             <p class="mb-4 flex items-center gap-2 text-sm text-brand-moss">
@@ -168,32 +179,105 @@
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Links this worker to a site for clarity and deploy restarts when enabled on the site.') }}</p>
                         </div>
 
-                        <div>
-                            <x-input-label for="new_sv_command" value="{{ __('Command') }}" />
-                            <textarea
-                                id="new_sv_command"
-                                wire:model="new_sv_command"
-                                rows="2"
-                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                                placeholder="php artisan horizon"
-                            ></textarea>
-                            <x-input-error :messages="$errors->get('new_sv_command')" class="mt-1" />
-                        </div>
+                        @if ($new_sv_type === 'queue')
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-4">
+                                <p class="text-sm font-medium text-brand-ink">{{ __('Laravel queue worker') }}</p>
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Quick mode builds the `php artisan queue:work` line; advanced mode uses the raw fields below.') }}</p>
+                                <div class="mt-3 flex flex-wrap gap-4">
+                                    <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
+                                        <input type="radio" wire:model.live="queue_builder_mode" value="quick" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                        <span class="text-brand-ink">{{ __('Quick') }}</span>
+                                    </label>
+                                    <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
+                                        <input type="radio" wire:model.live="queue_builder_mode" value="advanced" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                        <span class="text-brand-ink">{{ __('Advanced') }}</span>
+                                    </label>
+                                </div>
 
-                        <div>
-                            <x-input-label for="new_sv_directory" value="{{ __('Working directory') }}" />
-                            <input
-                                id="new_sv_directory"
-                                type="text"
-                                wire:model="new_sv_directory"
-                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                                placeholder="/var/www/app/current"
-                            />
-                            <x-input-error :messages="$errors->get('new_sv_directory')" class="mt-1" />
-                        </div>
+                                @if ($queue_builder_mode === 'quick')
+                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <x-input-label for="quick_php_binary" value="{{ __('PHP binary') }}" />
+                                            <input id="quick_php_binary" type="text" wire:model="quick_php_binary" class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm" placeholder="php" />
+                                            <x-input-error :messages="$errors->get('quick_php_binary')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="quick_queue_connection" value="{{ __('Connection (optional)') }}" />
+                                            <input id="quick_queue_connection" type="text" wire:model="quick_queue_connection" class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm" placeholder="database" />
+                                            <x-input-error :messages="$errors->get('quick_queue_connection')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="quick_queue_name" value="{{ __('Queue name') }}" />
+                                            <input id="quick_queue_name" type="text" wire:model="quick_queue_name" class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm" placeholder="default" />
+                                            <x-input-error :messages="$errors->get('quick_queue_name')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="quick_timeout" value="{{ __('Timeout (seconds per job)') }}" />
+                                            <input id="quick_timeout" type="number" wire:model="quick_timeout" min="1" class="mt-1 block w-full max-w-[10rem] rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm" />
+                                            <x-input-error :messages="$errors->get('quick_timeout')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="quick_sleep" value="{{ __('Sleep when empty (seconds)') }}" />
+                                            <input id="quick_sleep" type="number" wire:model="quick_sleep" min="0" class="mt-1 block w-full max-w-[10rem] rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm" />
+                                            <x-input-error :messages="$errors->get('quick_sleep')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="quick_tries" value="{{ __('Tries') }}" />
+                                            <input id="quick_tries" type="number" wire:model="quick_tries" min="0" class="mt-1 block w-full max-w-[10rem] rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm" />
+                                            <x-input-error :messages="$errors->get('quick_tries')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="quick_backoff" value="{{ __('Backoff (seconds)') }}" />
+                                            <input id="quick_backoff" type="number" wire:model="quick_backoff" min="0" class="mt-1 block w-full max-w-[10rem] rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm" />
+                                            <x-input-error :messages="$errors->get('quick_backoff')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="quick_memory" value="{{ __('Memory (MB)') }}" />
+                                            <input id="quick_memory" type="number" wire:model="quick_memory" min="16" class="mt-1 block w-full max-w-[10rem] rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm" />
+                                            <x-input-error :messages="$errors->get('quick_memory')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="quick_max_time" value="{{ __('Max time (seconds)') }}" />
+                                            <input id="quick_max_time" type="number" wire:model="quick_max_time" min="0" class="mt-1 block w-full max-w-[10rem] rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm" />
+                                            <p class="mt-1 text-xs text-brand-moss">{{ __('Restarts the worker process periodically (`--max-time`).') }}</p>
+                                            <x-input-error :messages="$errors->get('quick_max_time')" class="mt-1" />
+                                        </div>
+                                        <div class="sm:col-span-2">
+                                            <x-input-label for="quick_app_env" value="{{ __('APP_ENV') }}" />
+                                            <input id="quick_app_env" type="text" wire:model="quick_app_env" class="mt-1 block w-full max-w-md rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm" placeholder="production" />
+                                            <x-input-error :messages="$errors->get('quick_app_env')" class="mt-1" />
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
 
-                        <div class="grid gap-6 sm:grid-cols-2">
+                        <div @class(['hidden' => $new_sv_type === 'queue' && $queue_builder_mode === 'quick'])>
                             <div>
+                                <x-input-label for="new_sv_command" value="{{ __('Command') }}" />
+                                <textarea
+                                    id="new_sv_command"
+                                    wire:model="new_sv_command"
+                                    rows="2"
+                                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                    placeholder="php artisan horizon"
+                                ></textarea>
+                                <x-input-error :messages="$errors->get('new_sv_command')" class="mt-1" />
+                            </div>
+
+                            <div class="mt-6">
+                                <x-input-label for="new_sv_directory" value="{{ __('Working directory') }}" />
+                                <input
+                                    id="new_sv_directory"
+                                    type="text"
+                                    wire:model="new_sv_directory"
+                                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                    placeholder="/var/www/app/current"
+                                />
+                                <x-input-error :messages="$errors->get('new_sv_directory')" class="mt-1" />
+                            </div>
+
+                            <div class="mt-6">
                                 <x-input-label for="new_sv_user" value="{{ __('Run as user') }}" />
                                 <input
                                     id="new_sv_user"
@@ -204,6 +288,9 @@
                                 />
                                 <x-input-error :messages="$errors->get('new_sv_user')" class="mt-1" />
                             </div>
+                        </div>
+
+                        <div class="grid gap-6 sm:grid-cols-2">
                             <div>
                                 <x-input-label for="new_sv_numprocs" value="{{ __('Processes') }}" />
                                 <input
@@ -402,7 +489,23 @@
 
             <div class="{{ $card }}">
                 <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-                    <h2 class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Programs on this server') }}</h2>
+                    <div class="min-w-0">
+                        <h2 class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Programs on this server') }}</h2>
+                        @if ($contextSiteModel)
+                            <fieldset class="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                                <legend class="sr-only">{{ __('Program list scope') }}</legend>
+                                <span class="text-brand-moss">{{ __('Show') }}</span>
+                                <label class="inline-flex cursor-pointer items-center gap-2">
+                                    <input type="radio" wire:model.live="programs_list_scope" value="site" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                    <span class="text-brand-ink">{{ __('This site only') }}</span>
+                                </label>
+                                <label class="inline-flex cursor-pointer items-center gap-2">
+                                    <input type="radio" wire:model.live="programs_list_scope" value="all" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                    <span class="text-brand-ink">{{ __('All programs on server') }}</span>
+                                </label>
+                            </fieldset>
+                        @endif
+                    </div>
                     <button
                         type="button"
                         wire:click="loadProgramStatuses"
@@ -418,9 +521,13 @@
                     <p class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">
                         {{ __('No programs yet. Add one above, then sync to write configs and reload Supervisor.') }}
                     </p>
+                @elseif ($filteredSupervisorPrograms->isEmpty())
+                    <p class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">
+                        {{ __('No programs match this filter. Choose “All programs on server” or add a program linked to this site.') }}
+                    </p>
                 @else
                     <ul class="divide-y divide-brand-ink/10">
-                        @foreach ($server->supervisorPrograms as $sp)
+                        @foreach ($filteredSupervisorPrograms as $sp)
                             @php
                                 $pst = $program_status_map[$sp->id]['state'] ?? 'unknown';
                                 $badgeClass = match ($pst) {

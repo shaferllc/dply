@@ -5,11 +5,16 @@ namespace App\Livewire\Sites;
 use App\Enums\SiteType;
 use App\Jobs\DeleteServerSystemUserJob;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SiteSystemUserMutationJob;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
+use App\Models\NotificationChannel;
+use App\Models\NotificationSubscription;
+use App\Models\NotificationWebhookDestination;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
@@ -21,14 +26,20 @@ use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\DigitalOceanService;
+use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerSystemUserService;
+use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
+use App\Services\Sites\SiteDeploySyncGroupManager;
 use App\Services\Sites\SiteScopedCommandWrapper;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class Settings extends Show
@@ -43,6 +54,13 @@ class Settings extends Show
         'redirects' => 'redirects',
         'preview' => 'preview',
         'tenants' => 'tenants',
+    ];
+
+    /** @var list<string> */
+    private const SITE_NOTIFICATION_EVENT_KEYS = [
+        'site.deployments',
+        'site.deployment_started',
+        'site.uptime',
     ];
 
     public string $section = 'general';
@@ -60,6 +78,12 @@ class Settings extends Show
     public string $new_alias_hostname = '';
 
     public string $new_alias_label = '';
+
+    public string $new_basic_auth_username = '';
+
+    public string $new_basic_auth_password = '';
+
+    public string $new_basic_auth_path = '/';
 
     public string $new_tenant_hostname = '';
 
@@ -132,6 +156,50 @@ class Settings extends Show
 
     public ?string $system_user_list_error = null;
 
+    /** @var 'commands'|'octane'|'reverb'|'logs'|'setup' */
+    public string $laravel_tab = 'commands';
+
+    public string $laravel_custom_commands_text = '';
+
+    /**
+     * @var array{ok?: bool, commands?: list<array{name: string, description?: string|null}>, error?: string|null, raw?: string}
+     */
+    public array $laravel_artisan_discovery = [];
+
+    public ?string $laravel_console_error = null;
+
+    public int $laravel_log_tail_lines = 500;
+
+    /** @var list<string> */
+    public array $site_notification_channel_ids = [];
+
+    /** @var list<string> */
+    public array $site_notification_event_keys = [];
+
+    public string $site_int_hook_name = '';
+
+    public string $site_int_hook_driver = NotificationWebhookDestination::DRIVER_SLACK;
+
+    public string $site_int_hook_url = '';
+
+    public bool $site_int_evt_success = true;
+
+    public bool $site_int_evt_failed = true;
+
+    public bool $site_int_evt_skipped = true;
+
+    public bool $site_int_evt_deploy_started = false;
+
+    public bool $site_int_evt_uptime_down = true;
+
+    public bool $site_int_evt_uptime_recovered = true;
+
+    public string $sync_group_name_input = '';
+
+    public string $sync_group_add_site_id = '';
+
+    public string $sync_group_leader_site_id = '';
+
     public function mount(Server $server, Site $site, ?string $section = null): void
     {
         if ($site->server_id !== $server->id) {
@@ -165,6 +233,16 @@ class Settings extends Show
             return;
         }
 
+        if ($section === 'webhooks') {
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'notifications',
+            ]), navigate: true);
+
+            return;
+        }
+
         $allowed = array_keys(config('site_settings.workspace_tabs', []));
 
         if (! in_array($section, $allowed, true)) {
@@ -174,12 +252,295 @@ class Settings extends Show
         $this->section = $section;
         $this->routingTab = $this->resolveRoutingTab(request()->query('tab'));
 
+        $laravelTabQuery = request()->query('laravel_tab');
+        if (is_string($laravelTabQuery) && in_array($laravelTabQuery, ['commands', 'octane', 'reverb', 'logs', 'setup'], true)) {
+            $this->laravel_tab = $laravelTabQuery;
+        }
+
         parent::mount($server, $site);
         $this->syncGeneralSettingsForm();
         $this->syncPreviewSettingsForm();
         if ($this->section === 'dns') {
             $this->syncDnsSettingsForm();
         }
+
+        if ($this->section === 'laravel-stack' && $this->site->isLaravelFrameworkDetected() && $this->laravel_tab === 'commands') {
+            $this->loadLaravelArtisanDiscovery(false);
+        }
+
+        $this->loadSiteNotificationPreferences();
+
+        if ($this->section === 'repository') {
+            $this->syncRepositorySyncUiState();
+        }
+    }
+
+    protected function syncRepositorySyncUiState(): void
+    {
+        $manager = app(SiteDeploySyncGroupManager::class);
+        $group = $manager->findGroupForSite($this->site);
+        $this->sync_group_leader_site_id = $group?->leader_site_id ? (string) $group->leader_site_id : '';
+    }
+
+    public function createDeploySyncGroup(SiteDeploySyncGroupManager $manager): void
+    {
+        $this->authorize('update', $this->site);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot manage sync groups.'));
+
+            return;
+        }
+
+        $this->validate(['sync_group_name_input' => 'required|string|max:120']);
+        $manager->createGroup($this->site->fresh(), $this->sync_group_name_input);
+        $this->sync_group_name_input = '';
+        $this->flash_success = __('Synchronized deployment group created.');
+        $this->flash_error = null;
+        $this->syncRepositorySyncUiState();
+    }
+
+    public function addSiteToDeploySyncGroup(SiteDeploySyncGroupManager $manager): void
+    {
+        $this->authorize('update', $this->site);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot manage sync groups.'));
+
+            return;
+        }
+
+        $this->validate(['sync_group_add_site_id' => 'required|string']);
+        $group = $manager->findGroupForSite($this->site);
+        if ($group === null) {
+            $this->addError('sync_group_add_site_id', __('Create a group first.'));
+
+            return;
+        }
+        $other = Site::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->findOrFail($this->sync_group_add_site_id);
+        $manager->addSite($group, $other);
+        $this->sync_group_add_site_id = '';
+        $this->flash_success = __('Site added to the sync group.');
+        $this->flash_error = null;
+        $this->syncRepositorySyncUiState();
+    }
+
+    public function setDeploySyncGroupLeader(SiteDeploySyncGroupManager $manager): void
+    {
+        $this->authorize('update', $this->site);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot manage sync groups.'));
+
+            return;
+        }
+
+        $this->validate(['sync_group_leader_site_id' => 'required|string']);
+        $group = $manager->findGroupForSite($this->site);
+        if ($group === null) {
+            return;
+        }
+        $leader = Site::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->findOrFail($this->sync_group_leader_site_id);
+        $manager->setLeader($group, $leader);
+        $this->flash_success = __('Leader updated.');
+        $this->flash_error = null;
+        $this->syncRepositorySyncUiState();
+    }
+
+    public function leaveDeploySyncGroup(SiteDeploySyncGroupManager $manager): void
+    {
+        $this->authorize('update', $this->site);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot manage sync groups.'));
+
+            return;
+        }
+
+        $manager->removeSite($this->site->fresh());
+        $this->flash_success = __('Removed from sync group.');
+        $this->flash_error = null;
+        $this->syncRepositorySyncUiState();
+    }
+
+    protected function loadSiteNotificationPreferences(): void
+    {
+        $subs = NotificationSubscription::query()
+            ->where('subscribable_type', Site::class)
+            ->where('subscribable_id', $this->site->id)
+            ->whereIn('event_key', self::SITE_NOTIFICATION_EVENT_KEYS)
+            ->get();
+
+        $this->site_notification_channel_ids = $subs->pluck('notification_channel_id')->unique()->values()->map(fn ($id) => (string) $id)->all();
+        $this->site_notification_event_keys = $subs->pluck('event_key')->unique()->values()->all();
+    }
+
+    public function saveSiteNotificationSubscriptions(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot change notification subscriptions.'));
+
+            return;
+        }
+
+        $inRule = implode(',', self::SITE_NOTIFICATION_EVENT_KEYS);
+
+        $this->validate([
+            'site_notification_channel_ids' => ['array'],
+            'site_notification_channel_ids.*' => ['string', 'exists:notification_channels,id'],
+            'site_notification_event_keys' => ['array'],
+            'site_notification_event_keys.*' => ['string', 'in:'.$inRule],
+        ], [], [
+            'site_notification_channel_ids' => __('channels'),
+            'site_notification_event_keys' => __('events'),
+        ]);
+
+        $org = auth()->user()?->currentOrganization();
+        $allowedChannelIds = AssignableNotificationChannels::forUser(auth()->user(), $org)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        foreach ($this->site_notification_channel_ids as $channelId) {
+            if (! in_array((string) $channelId, $allowedChannelIds, true)) {
+                $this->addError('site_notification_channel_ids', __('Invalid channel selected.'));
+
+                return;
+            }
+        }
+
+        NotificationSubscription::query()
+            ->where('subscribable_type', Site::class)
+            ->where('subscribable_id', $this->site->id)
+            ->whereIn('event_key', self::SITE_NOTIFICATION_EVENT_KEYS)
+            ->delete();
+
+        if ($this->site_notification_channel_ids === [] || $this->site_notification_event_keys === []) {
+            $this->dispatch('notify', message: __('Site notification subscriptions updated.'));
+            $this->loadSiteNotificationPreferences();
+
+            return;
+        }
+
+        foreach ($this->site_notification_channel_ids as $channelId) {
+            $channel = NotificationChannel::query()->findOrFail((string) $channelId);
+            Gate::authorize('manageNotificationChannels', $channel->owner);
+
+            foreach ($this->site_notification_event_keys as $eventKey) {
+                NotificationSubscription::query()->create([
+                    'notification_channel_id' => $channel->id,
+                    'subscribable_type' => Site::class,
+                    'subscribable_id' => $this->site->id,
+                    'event_key' => $eventKey,
+                ]);
+            }
+        }
+
+        $this->loadSiteNotificationPreferences();
+        $this->dispatch('notify', message: __('Site notification subscriptions saved.'));
+    }
+
+    public function saveSiteIntegrationWebhookDestination(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot manage integration webhooks.'));
+
+            return;
+        }
+
+        $this->validate([
+            'site_int_hook_name' => 'required|string|max:120',
+            'site_int_hook_driver' => 'required|string|in:slack,discord,teams',
+            'site_int_hook_url' => 'required|string|url|max:2000',
+        ]);
+
+        $events = [];
+        if ($this->site_int_evt_success) {
+            $events[] = 'deploy_success';
+        }
+        if ($this->site_int_evt_failed) {
+            $events[] = 'deploy_failed';
+        }
+        if ($this->site_int_evt_skipped) {
+            $events[] = 'deploy_skipped';
+        }
+        if ($this->site_int_evt_deploy_started) {
+            $events[] = 'deploy_started';
+        }
+        if ($this->site_int_evt_uptime_down) {
+            $events[] = 'uptime_down';
+        }
+        if ($this->site_int_evt_uptime_recovered) {
+            $events[] = 'uptime_recovered';
+        }
+
+        NotificationWebhookDestination::query()->create([
+            'organization_id' => $this->site->organization_id,
+            'site_id' => $this->site->id,
+            'name' => $this->site_int_hook_name,
+            'driver' => $this->site_int_hook_driver,
+            'webhook_url' => $this->site_int_hook_url,
+            'events' => $events !== [] ? $events : null,
+            'enabled' => true,
+        ]);
+
+        $this->reset([
+            'site_int_hook_name',
+            'site_int_hook_url',
+        ]);
+        $this->site_int_hook_driver = NotificationWebhookDestination::DRIVER_SLACK;
+        $this->site_int_evt_success = true;
+        $this->site_int_evt_failed = true;
+        $this->site_int_evt_skipped = true;
+        $this->site_int_evt_deploy_started = false;
+        $this->site_int_evt_uptime_down = true;
+        $this->site_int_evt_uptime_recovered = true;
+
+        $this->dispatch('notify', message: __('Webhook destination saved.'));
+    }
+
+    public function deleteSiteIntegrationWebhookDestination(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot manage integration webhooks.'));
+
+            return;
+        }
+
+        $hook = NotificationWebhookDestination::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('site_id', $this->site->id)
+            ->whereKey($id)
+            ->firstOrFail();
+        $hook->delete();
+
+        $this->dispatch('notify', message: __('Webhook destination removed.'));
+    }
+
+    public function toggleSiteIntegrationWebhookDestination(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot manage integration webhooks.'));
+
+            return;
+        }
+
+        $hook = NotificationWebhookDestination::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('site_id', $this->site->id)
+            ->whereKey($id)
+            ->firstOrFail();
+        $hook->update(['enabled' => ! $hook->enabled]);
+
+        $this->dispatch('notify', message: __('Webhook destination updated.'));
     }
 
     public function updatedSection(string $value): void
@@ -191,6 +552,255 @@ class Settings extends Show
             $this->syncGeneralSettingsForm();
             $this->syncFormFromSite();
         }
+
+        if ($value === 'laravel-stack' && $this->site->isLaravelFrameworkDetected() && $this->laravel_tab === 'commands') {
+            $this->loadLaravelArtisanDiscovery(false);
+        }
+
+        if ($value === 'notifications') {
+            $this->loadSiteNotificationPreferences();
+        }
+    }
+
+    protected function syncFormFromSite(): void
+    {
+        parent::syncFormFromSite();
+        $this->syncLaravelConsoleForm();
+    }
+
+    protected function syncLaravelConsoleForm(): void
+    {
+        $executor = app(LaravelConsoleExecutor::class);
+        $this->laravel_custom_commands_text = implode("\n", $executor->customCommands($this->site));
+    }
+
+    public function updatedLaravelTab(string $value): void
+    {
+        if ($value === 'commands') {
+            $this->loadLaravelArtisanDiscovery(false);
+        }
+    }
+
+    public function loadLaravelArtisanDiscovery(bool $force = false): void
+    {
+        $this->authorize('view', $this->site);
+        $executor = app(LaravelConsoleExecutor::class);
+        $this->laravel_artisan_discovery = $executor->listArtisanCommands($this->site->fresh(), $force);
+    }
+
+    public function saveLaravelCustomCommands(LaravelConsoleExecutor $executor): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->flash_error = __('Deployers cannot edit custom Artisan commands.');
+            $this->flash_success = null;
+
+            return;
+        }
+
+        $lines = preg_split('/\R/', $this->laravel_custom_commands_text) ?: [];
+        $clean = [];
+        foreach ($lines as $line) {
+            $t = trim((string) $line);
+            if ($t === '') {
+                continue;
+            }
+            $executor->assertSafeArtisanArgv($t);
+            $clean[] = $t;
+        }
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $lc = is_array($meta['laravel_console'] ?? null) ? $meta['laravel_console'] : [];
+        $lc['custom_commands'] = $clean;
+        $meta['laravel_console'] = $lc;
+        $this->site->update(['meta' => $meta]);
+        $this->site->refresh();
+        $this->syncLaravelConsoleForm();
+        $this->flash_success = __('Custom Artisan commands saved.');
+        $this->flash_error = null;
+    }
+
+    public function runLaravelArtisanPreset(string $argvTail, LaravelConsoleExecutor $executor): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->laravel_console_error = __('Deployers cannot run Artisan commands on servers.');
+            $this->resetRemoteSshStreamTargets();
+
+            return;
+        }
+
+        $this->laravel_console_error = null;
+        $timeout = 600;
+
+        try {
+            $this->resetRemoteSshStreamTargets();
+            $this->remoteSshStreamSetMeta(
+                __('Artisan'),
+                'php artisan '.trim($argvTail)
+            );
+            $executor->runArtisan(
+                $this->site->fresh(),
+                $argvTail,
+                $timeout,
+                fn (string $chunk) => $this->remoteSshStreamAppendStdout($chunk)
+            );
+        } catch (\Throwable $e) {
+            $this->laravel_console_error = $e->getMessage();
+        }
+    }
+
+    public function runLaravelApplicationLogTail(LaravelConsoleExecutor $executor): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->laravel_console_error = __('Deployers cannot tail Laravel logs.');
+            $this->resetRemoteSshStreamTargets();
+
+            return;
+        }
+
+        $this->validate([
+            'laravel_log_tail_lines' => 'required|integer|min:50|max:5000',
+        ]);
+
+        $this->laravel_console_error = null;
+
+        try {
+            $this->resetRemoteSshStreamTargets();
+            $this->remoteSshStreamSetMeta(
+                __('Laravel log'),
+                'tail -n '.(int) $this->laravel_log_tail_lines.' storage/logs/laravel.log'
+            );
+            $executor->tailLaravelLog(
+                $this->site->fresh(),
+                (int) $this->laravel_log_tail_lines,
+                fn (string $chunk) => $this->remoteSshStreamAppendStdout($chunk)
+            );
+        } catch (\Throwable $e) {
+            $this->laravel_console_error = $e->getMessage();
+        }
+    }
+
+    public function saveLaravelOctaneTab(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
+            $this->flash_error = __('Octane settings apply to VM and container sites.');
+            $this->flash_success = null;
+
+            return;
+        }
+
+        if (! $this->site->shouldShowPhpOctaneRolloutSettings() || ! $this->site->shouldShowOctaneRuntimeUi()) {
+            return;
+        }
+
+        $this->validate([
+            'octane_port' => 'nullable|integer|min:1|max:65535',
+            'octane_server' => ['required', Rule::in(Site::OCTANE_SERVERS)],
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $lo = is_array($meta['laravel_octane'] ?? null) ? $meta['laravel_octane'] : [];
+        $lo['server'] = $this->octane_server;
+        $meta['laravel_octane'] = $lo;
+
+        $this->site->update([
+            'octane_port' => $this->octane_port !== '' ? (int) $this->octane_port : null,
+            'meta' => $meta,
+        ]);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+        $this->flash_success = __('Octane settings saved.');
+        $this->flash_error = null;
+    }
+
+    public function saveLaravelReverbTab(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
+            $this->flash_error = __('Reverb settings apply to VM and container sites.');
+            $this->flash_success = null;
+
+            return;
+        }
+
+        if (! $this->site->shouldShowPhpOctaneRolloutSettings()) {
+            return;
+        }
+
+        if (! $this->site->shouldShowLaravelReverbRuntimeUi() && ! $this->site->shouldProxyReverbInWebserver()) {
+            return;
+        }
+
+        $this->validate([
+            'laravel_reverb_port' => 'nullable|integer|min:1|max:65535',
+            'laravel_reverb_ws_path' => ['nullable', 'string', 'max:128'],
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $rv = is_array($meta['laravel_reverb'] ?? null) ? $meta['laravel_reverb'] : [];
+        $rv['port'] = $this->laravel_reverb_port !== '' ? (int) $this->laravel_reverb_port : 8080;
+        $ws = trim($this->laravel_reverb_ws_path);
+        $rv['ws_path'] = $ws !== '' ? $ws : '/app';
+        $meta['laravel_reverb'] = $rv;
+
+        $this->site->update(['meta' => $meta]);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+        $this->flash_success = __('Reverb settings saved.');
+        $this->flash_error = null;
+    }
+
+    public function saveLaravelSetupTab(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
+            $this->flash_error = __('These settings apply to VM and container sites.');
+            $this->flash_success = null;
+
+            return;
+        }
+
+        if (! $this->site->shouldShowPhpOctaneRolloutSettings()) {
+            return;
+        }
+
+        $this->validate([
+            'laravel_horizon_path' => ['nullable', 'string', 'max:128'],
+            'laravel_horizon_notes' => ['nullable', 'string', 'max:2000'],
+            'laravel_pulse_path' => ['nullable', 'string', 'max:128'],
+            'laravel_pulse_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+
+        if ($this->site->resolvedLaravelPackageFlag('horizon')) {
+            $meta['laravel_horizon'] = [
+                'path' => trim($this->laravel_horizon_path) !== '' ? trim($this->laravel_horizon_path) : '/horizon',
+                'notes' => trim($this->laravel_horizon_notes),
+            ];
+        }
+
+        if ($this->site->resolvedLaravelPackageFlag('pulse')) {
+            $meta['laravel_pulse'] = [
+                'path' => trim($this->laravel_pulse_path) !== '' ? trim($this->laravel_pulse_path) : '/pulse',
+                'notes' => trim($this->laravel_pulse_notes),
+            ];
+        }
+
+        $this->site->update(['meta' => $meta]);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+        $this->flash_success = __('Laravel setup notes saved.');
+        $this->flash_error = null;
     }
 
     public function saveLaravelStackSettings(): void
@@ -680,6 +1290,80 @@ class Settings extends Show
         $this->finalizeRoutingMutation('Alias removed.');
     }
 
+    public function addBasicAuthUser(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            $this->flash_error = __('Basic authentication is not available for this site runtime.');
+            $this->flash_success = null;
+
+            return;
+        }
+
+        $pathRules = ['required', 'string', 'max:512'];
+        if (! $this->site->basicAuthSupportsPathPrefixes()) {
+            $pathRules[] = Rule::in(['/', '']);
+        }
+
+        $validated = $this->validate([
+            'new_basic_auth_username' => [
+                'required',
+                'string',
+                'max:128',
+                Rule::unique('site_basic_auth_users', 'username')->where('site_id', $this->site->id),
+            ],
+            'new_basic_auth_password' => ['required', 'string', 'min:8', 'max:255'],
+            'new_basic_auth_path' => $pathRules,
+        ]);
+
+        $path = SiteBasicAuthUser::normalizePath($validated['new_basic_auth_path'] ?? '/');
+        if (! $this->site->basicAuthSupportsPathPrefixes() && $path !== '/') {
+            $this->addError('new_basic_auth_path', __('Use path / for this site type.'));
+
+            return;
+        }
+
+        if (! preg_match('#^(/|/[a-zA-Z0-9/_-]*)$#', $path)) {
+            $this->addError('new_basic_auth_path', __('Enter a path like / or /wp-admin.'));
+
+            return;
+        }
+
+        SiteBasicAuthUser::query()->create([
+            'site_id' => $this->site->id,
+            'username' => trim($validated['new_basic_auth_username']),
+            'password_hash' => Hash::make($validated['new_basic_auth_password']),
+            'path' => $path,
+            'sort_order' => (int) ($this->site->basicAuthUsers()->max('sort_order') ?? 0) + 1,
+        ]);
+
+        $this->new_basic_auth_username = '';
+        $this->new_basic_auth_password = '';
+        $this->new_basic_auth_path = '/';
+        $this->site->load('basicAuthUsers');
+        $this->finalizeRoutingMutation(__('Basic authentication user saved.'));
+    }
+
+    public function removeBasicAuthUser(string $userId): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            return;
+        }
+
+        $this->site->basicAuthUsers()->findOrFail($userId)->delete();
+        $this->site->load('basicAuthUsers');
+        $this->finalizeRoutingMutation(__('Basic authentication user removed.'));
+    }
+
+    public function generateBasicAuthPassword(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->new_basic_auth_password = Str::password(20);
+    }
+
     public function addTenantDomain(): void
     {
         $this->authorize('update', $this->site);
@@ -795,10 +1479,12 @@ class Settings extends Show
     public function openQuickDomainSslModal(string $hostname): void
     {
         $this->authorize('update', $this->site);
-        $this->site->loadMissing('domains');
+        $this->site->loadMissing(['domains', 'domainAliases']);
 
         $normalized = strtolower(trim($hostname));
-        if (! $this->site->domains->contains(fn (SiteDomain $domain): bool => strtolower($domain->hostname) === $normalized)) {
+        $inDomain = $this->site->domains->contains(fn (SiteDomain $domain): bool => strtolower($domain->hostname) === $normalized);
+        $inAlias = $this->site->domainAliases->contains(fn (SiteDomainAlias $alias): bool => strtolower($alias->hostname) === $normalized);
+        if (! $inDomain && ! $inAlias) {
             abort(404);
         }
 
@@ -815,7 +1501,7 @@ class Settings extends Show
     public function quickAddDomainSsl(CertificateRequestService $certificateRequestService): void
     {
         $this->authorize('update', $this->site);
-        $this->site->loadMissing(['domains', 'certificates']);
+        $this->site->loadMissing(['domains', 'domainAliases', 'certificates']);
 
         $validated = $this->validate([
             'quick_ssl_domain_hostname' => ['required', 'string'],
@@ -826,8 +1512,10 @@ class Settings extends Show
         ]);
 
         $hostname = strtolower(trim($validated['quick_ssl_domain_hostname']));
-        if (! $this->site->domains->contains(fn (SiteDomain $domain): bool => strtolower($domain->hostname) === $hostname)) {
-            $this->addError('quick_ssl_domain_hostname', __('Choose a domain that belongs to this site.'));
+        $inDomain = $this->site->domains->contains(fn (SiteDomain $domain): bool => strtolower($domain->hostname) === $hostname);
+        $inAlias = $this->site->domainAliases->contains(fn (SiteDomainAlias $alias): bool => strtolower($alias->hostname) === $hostname);
+        if (! $inDomain && ! $inAlias) {
+            $this->addError('quick_ssl_domain_hostname', __('Choose a domain or alias that belongs to this site.'));
 
             return;
         }
@@ -1114,7 +1802,7 @@ class Settings extends Show
             return $typedDomains;
         }
 
-        return $this->site->customerDomainHostnames();
+        return $this->site->sslIssuanceHostnames();
     }
 
     public function loadSystemUsersForPanel(ServerPasswdUserLister $lister, ServerSystemUserService $service): void
@@ -1171,6 +1859,18 @@ class Settings extends Show
         $this->system_user_remove_username = '';
         $this->system_user_remove_confirm = '';
         $this->dispatch('open-modal', 'site-system-user-remove-modal');
+    }
+
+    public function openSystemUserResetPermissionsModal(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->resetErrorBag();
+        $this->dispatch('open-modal', 'site-reset-permissions-modal');
+    }
+
+    public function closeSystemUserResetPermissionsModal(): void
+    {
+        $this->dispatch('close-modal', 'site-reset-permissions-modal');
     }
 
     public function closeSystemUserCreateModal(): void
@@ -1274,6 +1974,28 @@ class Settings extends Show
         $this->flash_error = null;
     }
 
+    public function queueResetSitePermissions(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->shouldShowSystemUserPanel()) {
+            return;
+        }
+
+        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
+            $this->flash_error = __('The server must be ready with SSH.');
+            $this->closeSystemUserResetPermissionsModal();
+
+            return;
+        }
+
+        SiteResetPermissionsJob::dispatch($this->site->id);
+
+        $this->closeSystemUserResetPermissionsModal();
+        $this->flash_success = __('Reset permissions queued. Refresh in a moment for results.');
+        $this->flash_error = null;
+    }
+
     public function dismissSystemUserOperationBanner(): void
     {
         $this->authorize('update', $this->site);
@@ -1309,6 +2031,7 @@ class Settings extends Show
         $this->site->load([
             'domains',
             'domainAliases',
+            'basicAuthUsers',
             'previewDomains',
             'dnsProviderCredential',
             'certificates.previewDomain',
@@ -1322,10 +2045,19 @@ class Settings extends Show
             'workspace.variables',
         ]);
 
+        $org = $this->site->organization;
+
         return view('livewire.sites.settings', [
             'tabs' => config('site_settings.workspace_tabs', []),
             'routingTabs' => self::ROUTING_TABS,
             'deployHookUrl' => $this->site->deployHookUrl(),
+            'assignableNotificationChannels' => AssignableNotificationChannels::forUser(auth()->user(), $org),
+            'siteNotificationEventLabels' => config('notification_events.categories.site.events', []),
+            'siteIntegrationWebhookDestinations' => NotificationWebhookDestination::query()
+                ->where('organization_id', $this->site->organization_id)
+                ->where('site_id', $this->site->id)
+                ->orderBy('name')
+                ->get(),
             'deploymentContract' => app(DeploymentContractBuilder::class)->build($this->site),
             'deploymentPreflight' => app(DeploymentPreflightValidator::class)->validate($this->site),
             'availableWorkspaces' => Workspace::query()
@@ -1340,6 +2072,12 @@ class Settings extends Show
             'sitePhpData' => $this->server->hostCapabilities()->supportsMachinePhpManagement()
                 ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
                 : null,
+            'repositorySyncGroup' => app(SiteDeploySyncGroupManager::class)->findGroupForSite($this->site)?->load(['sites.server', 'leader']),
+            'organizationSites' => Site::query()
+                ->where('organization_id', $this->site->organization_id)
+                ->with('server:id,name')
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 }

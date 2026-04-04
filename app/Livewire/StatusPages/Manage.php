@@ -6,9 +6,11 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\Incident;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
 use App\Models\StatusPageMonitor;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -28,6 +30,9 @@ class Manage extends Component
     public string $monitorKind = 'server';
 
     public ?string $monitorId = null;
+
+    /** @var string|null Site ULID when adding a site uptime monitor */
+    public ?string $monitorSiteId = null;
 
     public ?string $monitorLabel = null;
 
@@ -52,6 +57,7 @@ class Manage extends Component
             'monitors.monitorable' => function ($morph) {
                 $morph->morphWith([
                     Site::class => ['server'],
+                    SiteUptimeMonitor::class => ['site'],
                 ]);
             },
             'incidents.incidentUpdates.user',
@@ -86,13 +92,29 @@ class Manage extends Component
         session()->flash('success', __('Status page updated.'));
     }
 
+    public function updatedMonitorKind(): void
+    {
+        $this->monitorId = null;
+        $this->monitorSiteId = null;
+    }
+
+    public function updatedMonitorSiteId(): void
+    {
+        $this->monitorId = null;
+    }
+
     public function addMonitor(): void
     {
         $this->authorize('update', $this->statusPage);
 
         $this->validate([
-            'monitorKind' => 'required|in:server,site',
-            'monitorId' => 'required|string',
+            'monitorKind' => 'required|in:server,site,site_uptime',
+            'monitorSiteId' => [
+                Rule::requiredIf(fn (): bool => $this->monitorKind === 'site_uptime'),
+                'nullable',
+                'string',
+            ],
+            'monitorId' => ['required', 'string'],
             'monitorLabel' => 'nullable|string|max:120',
         ]);
 
@@ -102,10 +124,16 @@ class Manage extends Component
             $server = Server::query()->where('organization_id', $orgId)->findOrFail($this->monitorId);
             $this->authorize('view', $server);
             $model = $server;
-        } else {
+        } elseif ($this->monitorKind === 'site') {
             $site = Site::query()->where('organization_id', $orgId)->findOrFail($this->monitorId);
             $this->authorize('view', $site);
             $model = $site;
+        } else {
+            $site = Site::query()->where('organization_id', $orgId)->findOrFail($this->monitorSiteId);
+            $this->authorize('view', $site);
+            $model = SiteUptimeMonitor::query()
+                ->where('site_id', $site->id)
+                ->findOrFail($this->monitorId);
         }
 
         $exists = StatusPageMonitor::query()
@@ -131,11 +159,13 @@ class Manage extends Component
         ]);
 
         $this->monitorId = null;
+        $this->monitorSiteId = null;
         $this->monitorLabel = null;
         $this->statusPage->load([
             'monitors.monitorable' => function ($morph) {
                 $morph->morphWith([
                     Site::class => ['server'],
+                    SiteUptimeMonitor::class => ['site'],
                 ]);
             },
         ]);
@@ -155,6 +185,7 @@ class Manage extends Component
             'monitors.monitorable' => function ($morph) {
                 $morph->morphWith([
                     Site::class => ['server'],
+                    SiteUptimeMonitor::class => ['site'],
                 ]);
             },
         ]);
@@ -256,9 +287,19 @@ class Manage extends Component
         $servers = Server::query()->where('organization_id', $orgId)->orderBy('name')->get();
         $sites = Site::query()->where('organization_id', $orgId)->orderBy('name')->get();
 
+        $uptimeMonitorsForPicker = collect();
+        if ($this->monitorKind === 'site_uptime' && $this->monitorSiteId) {
+            $uptimeMonitorsForPicker = SiteUptimeMonitor::query()
+                ->where('site_id', $this->monitorSiteId)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get();
+        }
+
         return view('livewire.status-pages.manage', [
             'servers' => $servers,
             'sites' => $sites,
+            'uptimeMonitorsForPicker' => $uptimeMonitorsForPicker,
         ]);
     }
 }

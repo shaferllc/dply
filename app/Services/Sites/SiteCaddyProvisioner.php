@@ -31,6 +31,7 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
         $ssh = $this->systemSsh($site);
         $this->installPlaceholderPage($site, $ssh);
         $this->ensureSuspendedPage($site, $ssh);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
         $this->writeSystemFile($ssh, $configFile, $config);
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_CADDY_EXIT:%%s" "$?"',
@@ -87,5 +88,50 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
         $site->update(['meta' => $meta]);
 
         return $out;
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    public function readCurrentSiteConfig(Site $site): ?string
+    {
+        $server = $this->ensureServerReady($site);
+        $ssh = $this->systemSsh($site);
+        $configFile = rtrim(config('sites.caddy_sites_enabled'), '/').'/'.$this->configBasename($site).'.caddy';
+
+        return $this->readRemoteFile($server, $ssh, $configFile);
+    }
+
+    public function validatePendingOnServer(Site $site, string $pendingConfig): array
+    {
+        $server = $this->ensureServerReady($site);
+        $ssh = $this->systemSsh($site);
+        $configFile = rtrim(config('sites.caddy_sites_enabled'), '/').'/'.$this->configBasename($site).'.caddy';
+        $prev = $this->readRemoteFile($server, $ssh, $configFile);
+
+        $ok = false;
+        $message = '';
+
+        try {
+            $this->writeSystemFile($ssh, $configFile, $pendingConfig);
+            $out = $ssh->exec(sprintf(
+                '(%s) 2>&1; printf "\nDPLY_CADDY_TEST_EXIT:%%s" "$?"',
+                $this->privilegedCommand(
+                    $server,
+                    'mkdir -p /etc/caddy/sites-enabled /var/log/caddy && touch /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile'
+                )
+            ), 120);
+            $ok = (bool) preg_match('/DPLY_CADDY_TEST_EXIT:0\s*$/', $out);
+            $message = trim($out);
+        } catch (\Throwable $e) {
+            $message = $e->getMessage();
+        } finally {
+            $this->restoreRemoteFile($ssh, $server, $configFile, $prev);
+        }
+
+        return [
+            'ok' => $ok,
+            'message' => $message !== '' ? $message : ($ok ? __('Caddy configuration is valid.') : __('Caddy validation failed.')),
+        ];
     }
 }

@@ -52,7 +52,7 @@
 
             <div class="bg-white border border-slate-200 rounded-lg p-6">
                 <h3 class="font-medium text-slate-900 mb-2">{{ __('Monitors') }}</h3>
-                <p class="text-sm text-slate-600 mb-4">{{ __('Server status uses health checks from the server list (SSH port or optional HTTP URL). Sites follow the parent server and site state.') }}</p>
+                <p class="text-sm text-slate-600 mb-4">{{ __('Server status uses health checks from the server list (SSH port or optional HTTP URL). Sites follow the parent server and site state. Site uptime monitors use scheduled HTTP checks you configure on each site’s Monitor page.') }}</p>
 
                 @if ($statusPage->monitors->isEmpty())
                     <p class="text-sm text-slate-500 mb-4">{{ __('No monitors yet.') }}</p>
@@ -76,8 +76,31 @@
                         <select id="mk" wire:model.live="monitorKind" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm">
                             <option value="server">{{ __('Server') }}</option>
                             <option value="site">{{ __('Site') }}</option>
+                            <option value="site_uptime">{{ __('Site uptime check') }}</option>
                         </select>
                     </div>
+                    @if ($monitorKind === 'site_uptime')
+                        <div class="min-w-[12rem]">
+                            <x-input-label for="msite" :value="__('Site')" />
+                            <select id="msite" wire:model.live="monitorSiteId" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm">
+                                <option value="">{{ __('Choose…') }}</option>
+                                @foreach ($sites as $s)
+                                    <option value="{{ $s->id }}">{{ $s->name }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('monitorSiteId')" class="mt-1" />
+                        </div>
+                        <div class="min-w-[12rem]">
+                            <x-input-label for="muptime" :value="__('Uptime monitor')" />
+                            <select id="muptime" wire:model="monitorId" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm" @disabled(! $monitorSiteId || $uptimeMonitorsForPicker->isEmpty())>
+                                <option value="">{{ __('Choose…') }}</option>
+                                @foreach ($uptimeMonitorsForPicker as $um)
+                                    <option value="{{ $um->id }}">{{ $um->label }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('monitorId')" class="mt-1" />
+                        </div>
+                    @else
                     <div class="min-w-[12rem]">
                         <x-input-label for="mid" :value="__('Resource')" />
                         <select id="mid" wire:model="monitorId" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm text-sm">
@@ -94,6 +117,7 @@
                         </select>
                         <x-input-error :messages="$errors->get('monitorId')" class="mt-1" />
                     </div>
+                    @endif
                     <div class="min-w-[10rem]">
                         <x-input-label for="ml" :value="__('Label (optional)')" />
                         <x-text-input id="ml" wire:model="monitorLabel" type="text" class="mt-1 block w-full text-sm" placeholder="{{ __('Override display name') }}" />

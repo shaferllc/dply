@@ -221,4 +221,48 @@ class LocalDockerKubernetesRuntimeManager
 
         return $output;
     }
+
+    /**
+     * @param  list<string>  $argv  Command and args after `kubectl exec … --`
+     * @param  callable(string): void  $onChunk
+     */
+    public function execInDeploymentApp(Site $site, array $argv, int $timeoutSeconds, callable $onChunk): int
+    {
+        $runtime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
+        $deploymentName = (string) ($runtime['deployment_name'] ?? '');
+        $namespace = (string) ($runtime['namespace'] ?? 'default');
+        $repositoryPath = (string) ($runtime['repository_checkout_path'] ?? storage_path('app'));
+
+        if ($deploymentName === '') {
+            throw new \RuntimeException(__('This Kubernetes runtime has not been deployed yet.'));
+        }
+
+        $command = [(string) config('kubernetes.kubectl_bin', 'kubectl')];
+
+        if (($kubeconfig = trim((string) config('kubernetes.kubeconfig_path', ''))) !== '') {
+            $command[] = '--kubeconfig='.$kubeconfig;
+        }
+
+        if (($context = trim((string) ($runtime['kubectl_context'] ?? $runtime['context'] ?? config('kubernetes.context', '')))) !== '') {
+            $command[] = '--context='.$context;
+        }
+
+        $command = [
+            ...$command,
+            'exec',
+            '-n',
+            $namespace,
+            'deployment/'.$deploymentName,
+            '--',
+            ...$argv,
+        ];
+
+        $process = new Process($command, $repositoryPath);
+        $process->setTimeout($timeoutSeconds);
+        $process->run(function (string $type, string $buffer) use ($onChunk): void {
+            $onChunk($buffer);
+        });
+
+        return $process->getExitCode() ?? 1;
+    }
 }

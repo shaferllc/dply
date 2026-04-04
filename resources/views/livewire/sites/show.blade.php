@@ -2,6 +2,11 @@
     $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
     $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
     $supportsNginxProvisioning = $server->hostCapabilities()->supportsNginxProvisioning();
+    $showWebserverConfigEditor = $server->hostCapabilities()->supportsSsh()
+        && ! $site->usesFunctionsRuntime()
+        && ! $site->usesDockerRuntime()
+        && ! $site->usesKubernetesRuntime();
+    $showVmCronDaemonsLinks = $showWebserverConfigEditor;
     $supportsEnvPush = $server->hostCapabilities()->supportsEnvPushToHost();
     $supportsReleaseRollback = $server->hostCapabilities()->supportsReleaseRollback();
     $supportsSshDeployHooks = $server->hostCapabilities()->supportsSshDeployHooks();
@@ -114,7 +119,7 @@
     $sidebarItems = [
         ['id' => 'general', 'label' => __('General'), 'icon' => 'heroicon-o-rectangle-stack'],
         ['id' => 'settings', 'label' => __('Site settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'href' => route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'general'])],
-        ['id' => 'deployment-log', 'label' => __('Queue'), 'icon' => 'heroicon-o-code-bracket'],
+        ['id' => 'deployment-log', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket'],
         ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list'],
     ];
     if ($site->visitUrl()) {
@@ -163,12 +168,28 @@
                         {{ __('Project delivery') }}
                     </a>
                 @endif
+                @if ($showWebserverConfigEditor)
+                    <a href="{{ route('sites.webserver-config', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                        {{ __('Web server config') }}
+                    </a>
+                @endif
                 @if ($readyForWorkspace)
                     <a href="{{ route('sites.insights', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
                         {{ __('Insights') }}
                         @if ($openSiteInsightsCount > 0)
                             <span class="inline-flex min-w-[1.25rem] justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" title="{{ trans_choice(':count open finding|:count open findings', $openSiteInsightsCount, ['count' => $openSiteInsightsCount]) }}">{{ $openSiteInsightsCount }}</span>
                         @endif
+                    </a>
+                    <a href="{{ route('sites.monitor', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                        {{ __('Monitor') }}
+                    </a>
+                @endif
+                @if ($readyForWorkspace && $showVmCronDaemonsLinks)
+                    <a href="{{ route('sites.cron', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                        {{ __('Cron jobs') }}
+                    </a>
+                    <a href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                        {{ __('Queue workers') }}
                     </a>
                 @endif
                 <a href="{{ route('servers.show', $server) }}" class="text-slate-500 hover:text-slate-700 text-sm">← Server</a>

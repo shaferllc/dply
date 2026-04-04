@@ -4,6 +4,7 @@ namespace App\Services\Certificates;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Services\SshConnection;
 
 class CertificateRequestService
 {
@@ -31,14 +32,14 @@ class CertificateRequestService
 
     public function issueForCustomerDomains(Site $site): SiteCertificate
     {
-        $site->loadMissing('domains');
+        $site->loadMissing('domains', 'domainAliases');
 
         return $this->execute($this->create([
             'site_id' => $site->id,
             'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
             'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
             'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
-            'domains_json' => $site->customerDomainHostnames(),
+            'domains_json' => $site->sslIssuanceHostnames(),
             'status' => SiteCertificate::STATUS_PENDING,
             'requested_settings' => [
                 'source' => 'customer_domains',
@@ -88,7 +89,7 @@ class CertificateRequestService
         $certificate->loadMissing('site.server');
         if ($certificate->certificate_path || $certificate->private_key_path || $certificate->chain_path) {
             try {
-                $ssh = new \App\Services\SshConnection($certificate->site->server);
+                $ssh = new SshConnection($certificate->site->server);
                 foreach ([$certificate->certificate_path, $certificate->private_key_path, $certificate->chain_path] as $path) {
                     if (is_string($path) && $path !== '') {
                         $ssh->exec('rm -f '.escapeshellarg($path), 60);

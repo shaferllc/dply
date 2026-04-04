@@ -2,6 +2,10 @@
     $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
     $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
     $supportsNginxProvisioning = $server->hostCapabilities()->supportsNginxProvisioning();
+    $showWebserverConfigEditor = $server->hostCapabilities()->supportsSsh()
+        && ! $site->usesFunctionsRuntime()
+        && ! $site->usesDockerRuntime()
+        && ! $site->usesKubernetesRuntime();
     $supportsHttp3Certificates = $server->hostCapabilities()->supportsHttp3Certificates();
     $supportsEnvPush = $server->hostCapabilities()->supportsEnvPushToHost();
     $supportsSshDeployHooks = $server->hostCapabilities()->supportsSshDeployHooks();
@@ -24,34 +28,7 @@
     $runtimePlatform = $site->runtimeTargetPlatform();
     $runtimeFamily = $site->runtimeTargetFamily();
     $isContainerWorkspace = in_array($runtimeMode, ['docker', 'kubernetes', 'serverless'], true);
-    $settingsSidebarItems = $isContainerWorkspace
-        ? [
-            ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home'],
-            ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent'],
-            ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user'],
-            ['id' => 'laravel-stack', 'label' => __('Laravel stack'), 'icon' => 'heroicon-o-bolt'],
-            ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square'],
-            ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line'],
-            ['id' => 'routing', 'label' => __('Networking'), 'icon' => 'heroicon-o-globe-alt'],
-            ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-signal'],
-            ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list'],
-            ['id' => 'webhooks', 'label' => __('Automation'), 'icon' => 'heroicon-o-bolt'],
-            ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box'],
-        ]
-        : [
-            ['id' => 'general', 'label' => __('General'), 'icon' => 'heroicon-o-rectangle-stack'],
-            ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share'],
-            ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-signal'],
-            ['id' => 'certificates', 'label' => __('Certificates'), 'icon' => 'heroicon-o-shield-check'],
-            ['id' => 'deploy', 'label' => __('Deploy'), 'icon' => 'heroicon-o-code-bracket-square'],
-            ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent'],
-            ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user'],
-            ['id' => 'laravel-stack', 'label' => __('Laravel stack'), 'icon' => 'heroicon-o-bolt'],
-            ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line'],
-            ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list'],
-            ['id' => 'webhooks', 'label' => __('Webhooks'), 'icon' => 'heroicon-o-clipboard-document-list'],
-            ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box'],
-        ];
+    $settingsSidebarItems = \App\Support\SiteSettingsSidebar::items($site, $server);
     $routingTabIcons = [
         'domains' => 'heroicon-o-globe-alt',
         'aliases' => 'heroicon-o-link',
@@ -190,13 +167,29 @@
             flush
         >
             <x-slot name="actions">
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
+                    @if ($showWebserverConfigEditor)
+                        <a
+                            href="{{ route('sites.webserver-config', [$server, $site]) }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
+                        >
+                            {{ __('Web server config') }}
+                        </a>
+                    @endif
                     <a
                         href="{{ route('sites.insights', [$server, $site]) }}"
                         wire:navigate
                         class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
                     >
                         {{ __('Insights') }}
+                    </a>
+                    <a
+                        href="{{ route('sites.monitor', [$server, $site]) }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
+                    >
+                        {{ __('Monitor') }}
                     </a>
                 </div>
             </x-slot>
@@ -657,10 +650,13 @@
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-sm">
                                     <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open deploy actions') }}</a>
+                                    <a href="{{ route('sites.commits', [$server, $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Commits') }}</a>
                                     <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open site logs') }}</a>
                                     <a href="{{ route('servers.logs', $server) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open server logs') }}</a>
                                 </div>
                             </div>
+
+                            @include('livewire.sites.settings.partials.engine-http-cache')
 
                             <form wire:submit="saveGit" class="space-y-4">
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1203,6 +1199,8 @@
                                 </dl>
                             </section>
                         </section>
+                    @elseif ($section === 'repository')
+                        @include('livewire.sites.settings.partials.repository')
                     @elseif ($section === 'runtime')
                         @include('livewire.sites.settings.partials.runtime')
                     @elseif ($section === 'system-user')
@@ -1213,8 +1211,10 @@
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'logs')
                         @include('livewire.sites.settings.partials.logs')
-                    @elseif ($section === 'webhooks')
-                        @include('livewire.sites.settings.partials.webhooks')
+                    @elseif ($section === 'notifications')
+                        @include('livewire.sites.settings.partials.notifications')
+                    @elseif ($section === 'basic-auth')
+                        @include('livewire.sites.settings.partials.basic-auth')
                     @elseif ($section === 'danger')
                         @include('livewire.sites.settings.partials.danger')
                     @endif
@@ -1234,16 +1234,16 @@
         >
             <div class="border-b border-brand-ink/10 px-6 py-5">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Quick SSL') }}</p>
-                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add SSL for this domain') }}</h2>
+                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add SSL for this hostname') }}</h2>
                 <p class="mt-2 text-sm leading-6 text-brand-moss">
-                    {{ __('Create a certificate request without leaving the Domains workspace. This is best for customer-facing domains that are otherwise ready to serve traffic.') }}
+                    {{ __('Create a certificate request without leaving the routing workspace. Use this when the hostname already resolves here and is ready for HTTP validation.') }}
                 </p>
             </div>
 
             <div class="space-y-5 px-6 py-6">
                 <div class="rounded-xl border border-brand-ink/10 bg-slate-50/70 px-4 py-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Domain') }}</p>
-                    <p class="mt-2 font-mono text-sm text-brand-ink">{{ $quick_ssl_domain_hostname ?: __('No domain selected') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Hostname') }}</p>
+                    <p class="mt-2 font-mono text-sm text-brand-ink">{{ $quick_ssl_domain_hostname ?: __('No hostname selected') }}</p>
                     <x-input-error :messages="$errors->get('quick_ssl_domain_hostname')" class="mt-2" />
                 </div>
 
@@ -1439,6 +1439,69 @@
                         {{ __('Queueing…') }}
                     </span>
                 </x-danger-button>
+            </div>
+        </x-modal>
+
+        <x-modal
+            name="site-reset-permissions-modal"
+            :show="false"
+            maxWidth="2xl"
+            overlayClass="bg-brand-ink/30"
+            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            focusable
+        >
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex gap-4">
+                    <div class="shrink-0 rounded-full bg-brand-forest/10 p-2 text-brand-forest">
+                        <x-heroicon-o-information-circle class="h-7 w-7" aria-hidden="true" />
+                    </div>
+                    <div class="min-w-0">
+                        <h2 class="text-xl font-semibold text-brand-ink">{{ __('Are you sure?') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('Please read carefully before proceeding.') }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-h-[min(70vh,32rem)] space-y-5 overflow-y-auto px-6 py-6 text-sm leading-6 text-brand-ink">
+                <div>
+                    <p class="font-semibold text-brand-ink">{{ __('What will happen') }}</p>
+                    <p class="mt-2 text-brand-moss">
+                        {{ __('Choosing Reset will run a one-time job over SSH on this site’s repository path. Ownership is set to the effective system user and the web server group, then directories and files receive typical secure modes (755 / 644). If :storage and :cache exist, those trees use 775 / 664 so Laravel can write logs and compiled files.', ['storage' => 'storage/', 'cache' => 'bootstrap/cache/']) }}
+                    </p>
+                    <p class="mt-3 text-brand-moss">
+                        {{ __('In this case, ownership will be user :user and group :group.', ['user' => $site->effectiveSystemUser($this->server), 'group' => config('site_settings.vm_site_file_web_group', 'www-data')]) }}
+                    </p>
+                </div>
+
+                <div>
+                    <p class="font-semibold text-brand-ink">{{ __('Why you might need this') }}</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-brand-moss">
+                        <li>{{ __('Accidental chmod/chown changes broke deploys or HTTP access.') }}</li>
+                        <li>{{ __('The site shows errors because PHP or the web server cannot read or write expected paths.') }}</li>
+                        <li>{{ __('You want a known-good permission baseline before debugging further.') }}</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <p class="font-semibold text-brand-ink">{{ __('Considerations') }}</p>
+                    <ol class="mt-2 list-decimal space-y-1 pl-5 text-brand-moss">
+                        <li>{{ __('Custom permission tweaks under this path will be overwritten.') }}</li>
+                        <li>{{ __('The change is immediate on the server and may disrupt a site that relied on non-standard permissions.') }}</li>
+                        <li>{{ __('There is no automatic undo; restore from backups if you need the previous state.') }}</li>
+                        <li>{{ __('This targets the repository path only; it does not change pool config elsewhere on the server.') }}</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                <x-secondary-button type="button" wire:click="closeSystemUserResetPermissionsModal">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button type="button" wire:click="queueResetSitePermissions" wire:loading.attr="disabled" wire:target="queueResetSitePermissions">
+                    <span wire:loading.remove wire:target="queueResetSitePermissions">{{ __('Reset') }}</span>
+                    <span wire:loading wire:target="queueResetSitePermissions" class="inline-flex items-center gap-2">
+                        <x-spinner variant="cream" class="h-4 w-4" />
+                        {{ __('Queueing…') }}
+                    </span>
+                </x-primary-button>
             </div>
         </x-modal>
         @include('livewire.partials.confirm-action-modal')

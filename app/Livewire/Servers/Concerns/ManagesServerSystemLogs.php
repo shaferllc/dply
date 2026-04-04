@@ -82,7 +82,7 @@ trait ManagesServerSystemLogs
             $logDirectory = $site->webserverLogDirectory();
             $basename = $site->webserverConfigBasename();
 
-            return [
+            $sources = [
                 'site_'.$id.'_platform' => [
                     'type' => 'dply_site',
                     'label' => __('Platform activity'),
@@ -101,6 +101,26 @@ trait ManagesServerSystemLogs
                     'group' => 'site',
                 ],
             ];
+
+            if ($site->isLaravelFrameworkDetected()) {
+                $sources['site_'.$id.'_laravel'] = [
+                    'type' => 'file',
+                    'label' => __('Laravel log'),
+                    'path' => $site->effectiveEnvDirectory().'/storage/logs/laravel.log',
+                    'group' => 'site',
+                ];
+            }
+
+            if ($site->isLaravelFrameworkDetected() && $site->resolvedLaravelPackageFlag('horizon')) {
+                $sources['site_'.$id.'_laravel_horizon'] = [
+                    'type' => 'file',
+                    'label' => __('Horizon log'),
+                    'path' => $site->effectiveEnvDirectory().'/storage/logs/horizon.log',
+                    'group' => 'site',
+                ];
+            }
+
+            return $sources;
         }
 
         $server->loadMissing('sites');

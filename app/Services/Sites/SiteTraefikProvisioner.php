@@ -33,6 +33,7 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
         $ssh = $this->systemSsh($site);
         $this->installPlaceholderPage($site, $ssh);
         $this->ensureSuspendedPage($site, $ssh);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
         $this->writeSystemFile($ssh, $caddyConfig, $this->caddyBuilder->build($site, $backendPort));
         $this->writeSystemFile($ssh, $dynamicConfig, $this->builder->build($site, $backendPort));
 
@@ -59,6 +60,16 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
         $site->update(['meta' => $meta]);
 
         return $out;
+    }
+
+    public function readCurrentDynamicConfig(Site $site): ?string
+    {
+        $server = $this->ensureServerReady($site);
+        $ssh = $this->systemSsh($site);
+        $basename = $this->configBasename($site);
+        $dynamicConfig = rtrim(config('sites.traefik_dynamic_config_path'), '/').'/'.$basename.'.yml';
+
+        return $this->readRemoteFile($server, $ssh, $dynamicConfig);
     }
 
     public function remove(Site $site): string

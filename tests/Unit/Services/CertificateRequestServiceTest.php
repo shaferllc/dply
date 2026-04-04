@@ -2,12 +2,13 @@
 
 namespace Tests\Unit\Services;
 
-use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
+use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
+use App\Services\Certificates\CertificateEngine;
 use App\Services\Certificates\CertificateEngineResolver;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Certificates\CertificateSigningRequestGenerator;
@@ -20,6 +21,45 @@ use Tests\TestCase;
 class CertificateRequestServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_issue_for_customer_domains_includes_domain_aliases_in_domains_json(): void
+    {
+        $site = Site::factory()->create();
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'app.example.com',
+            'is_primary' => true,
+        ]);
+        SiteDomainAlias::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'alias.example.com',
+            'label' => 'marketing',
+        ]);
+
+        $noopEngine = new class implements CertificateEngine
+        {
+            public function supports(SiteCertificate $certificate): bool
+            {
+                return $certificate->provider_type === SiteCertificate::PROVIDER_LETSENCRYPT
+                    && $certificate->challenge_type === SiteCertificate::CHALLENGE_HTTP;
+            }
+
+            public function execute(SiteCertificate $certificate): SiteCertificate
+            {
+                $certificate->forceFill([
+                    'status' => SiteCertificate::STATUS_ACTIVE,
+                    'last_output' => 'noop',
+                ])->save();
+
+                return $certificate->fresh();
+            }
+        };
+
+        $service = new CertificateRequestService(new CertificateEngineResolver([$noopEngine]));
+        $issued = $service->issueForCustomerDomains($site->fresh(['domains', 'domainAliases']));
+
+        $this->assertSame(['app.example.com', 'alias.example.com'], $issued->domainHostnames());
+    }
 
     public function test_customer_domain_requests_do_not_include_preview_domains(): void
     {

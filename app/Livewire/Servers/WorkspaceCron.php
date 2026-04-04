@@ -10,6 +10,7 @@ use App\Models\OrganizationCronJobTemplate;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerCronJobRun;
+use App\Models\Site;
 use App\Services\Servers\CronExpressionValidator;
 use App\Services\Servers\ServerCronJobRunner;
 use App\Services\Servers\ServerCronSynchronizer;
@@ -19,6 +20,7 @@ use App\Services\Servers\ServerRemovalAdvisor;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -66,6 +68,15 @@ class WorkspaceCron extends Component
 
     public string $cron_job_search = '';
 
+    /** When set (site route or ?site=), scope UI and defaults to this site. */
+    public ?string $context_site_id = null;
+
+    /** @var 'site'|'all' Only applies when {@see $context_site_id} is set. */
+    public string $cron_list_scope = 'all';
+
+    /** True when the bound site uses a non-VM runtime (no SSH cron on the guest). */
+    public bool $siteContextUnavailable = false;
+
     public ?string $org_maintenance_until_local = null;
 
     public string $org_maintenance_note = '';
@@ -99,10 +110,34 @@ class WorkspaceCron extends Component
 
     public string $cron_run_output = '';
 
-    public function mount(Server $server): void
+    public function mount(Server $server, ?Site $site = null): void
     {
+        if ($site !== null) {
+            abort_unless($site->server_id === $server->id, 404);
+            abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
+            Gate::authorize('view', $site);
+        }
+
         $this->bootWorkspace($server);
-        $this->new_cron_user = trim((string) $server->ssh_user) ?: 'root';
+
+        $resolvedSite = $site;
+        if ($resolvedSite === null) {
+            $qSite = request()->query('site');
+            if (is_string($qSite) && $qSite !== '') {
+                $resolvedSite = Site::query()->where('server_id', $server->id)->whereKey($qSite)->first();
+            }
+        }
+
+        if ($resolvedSite !== null) {
+            $this->context_site_id = $resolvedSite->id;
+            $this->cron_list_scope = 'site';
+            $this->new_site_id = $resolvedSite->id;
+            $this->new_cron_user = $resolvedSite->effectiveSystemUser($server);
+            $this->siteContextUnavailable = ! $this->siteSupportsVmManagedCron($resolvedSite);
+        } else {
+            $this->new_cron_user = trim((string) $server->ssh_user) ?: 'root';
+        }
+
         $this->inspect_crontab_user = $this->new_cron_user;
         $this->new_schedule_timezone = config('app.timezone');
         $server->loadMissing('organization');
@@ -111,6 +146,36 @@ class WorkspaceCron extends Component
             $this->org_maintenance_until_local = $org->cron_maintenance_until->timezone(config('app.timezone'))->format('Y-m-d\TH:i');
         }
         $this->org_maintenance_note = (string) ($org?->cron_maintenance_note ?? '');
+    }
+
+    /**
+     * Whether this site can use Dply-managed SSH crontab entries on the VM.
+     */
+    protected function siteSupportsVmManagedCron(Site $site): bool
+    {
+        return $this->server->hostCapabilities()->supportsSsh()
+            && ! $site->usesFunctionsRuntime()
+            && ! $site->usesDockerRuntime()
+            && ! $site->usesKubernetesRuntime();
+    }
+
+    public function fillLaravelSchedulerCommand(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $siteId = $this->new_site_id ?: $this->context_site_id;
+        if ($siteId === null || $siteId === '') {
+            return;
+        }
+
+        $site = Site::query()->where('server_id', $this->server->id)->whereKey($siteId)->first();
+        if ($site === null || ! $site->isLaravelFrameworkDetected()) {
+            return;
+        }
+
+        $artisan = rtrim($site->effectiveRepositoryPath(), '/').'/current/artisan';
+        $this->new_cron_command = 'php '.escapeshellarg($artisan).' schedule:run';
+        $this->new_cron_user = $site->effectiveSystemUser($this->server);
     }
 
     public function updatedFrequencyPreset(string $value): void
@@ -794,9 +859,16 @@ class WorkspaceCron extends Component
         $this->frequency_preset = 'every_minute';
         $this->command_preset = 'custom';
         $this->new_cron_command = '';
-        $this->new_cron_user = trim((string) $this->server->ssh_user) ?: 'root';
         $this->new_description = null;
-        $this->new_site_id = null;
+        $this->new_site_id = $this->context_site_id;
+        if ($this->context_site_id !== null) {
+            $ctx = Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first();
+            $this->new_cron_user = $ctx !== null
+                ? $ctx->effectiveSystemUser($this->server)
+                : (trim((string) $this->server->ssh_user) ?: 'root');
+        } else {
+            $this->new_cron_user = trim((string) $this->server->ssh_user) ?: 'root';
+        }
         $this->new_schedule_timezone = config('app.timezone');
         $this->new_overlap_policy = ServerCronJob::OVERLAP_ALLOW;
         $this->new_alert_on_failure = false;
@@ -824,10 +896,18 @@ class WorkspaceCron extends Component
             });
         }
 
+        if ($this->context_site_id !== null && $this->cron_list_scope === 'site') {
+            $jobsQuery->where('site_id', $this->context_site_id);
+        }
+
         $filteredCronJobs = $jobsQuery
             ->orderBy('description')
             ->orderBy('id')
             ->get();
+
+        $contextSiteModel = $this->context_site_id !== null
+            ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
+            : null;
 
         $recentCronRuns = ServerCronJobRun::query()
             ->whereHas('cronJob', fn ($q) => $q->where('server_id', $this->server->id))
@@ -844,6 +924,7 @@ class WorkspaceCron extends Component
         }
 
         return view('livewire.servers.workspace-cron', [
+            'contextSiteModel' => $contextSiteModel,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
@@ -865,6 +946,17 @@ class WorkspaceCron extends Component
                 ->when($this->editing_job_id, fn ($q) => $q->whereKeyNot($this->editing_job_id))
                 ->orderBy('description')
                 ->get(),
+            'schedulerSiteIsLaravel' => $this->schedulerHelperTargetSite()?->isLaravelFrameworkDetected() ?? false,
         ]);
+    }
+
+    protected function schedulerHelperTargetSite(): ?Site
+    {
+        $sid = $this->new_site_id ?: $this->context_site_id;
+        if ($sid === null || $sid === '') {
+            return null;
+        }
+
+        return Site::query()->where('server_id', $this->server->id)->whereKey($sid)->first();
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Backups\Databases;
 use App\Livewire\Backups\Files;
 use App\Models\BackupConfiguration;
@@ -9,15 +10,20 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
+use App\Models\Site;
+use App\Models\SiteFileBackup;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
 class BackupsTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 
     protected function userWithOrganization(): User
     {
@@ -100,7 +106,7 @@ class BackupsTest extends TestCase
             'organization_id' => $org->id,
         ]);
 
-        $site = \App\Models\Site::factory()->create([
+        $site = Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
             'organization_id' => $org->id,
@@ -165,9 +171,10 @@ class BackupsTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'workspace_id' => $workspace->id,
+            'ssh_private_key' => self::FAKE_SSH_KEY,
         ]);
 
-        \App\Models\Site::factory()->create([
+        Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
             'organization_id' => $org->id,
@@ -182,6 +189,42 @@ class BackupsTest extends TestCase
             ->assertOk()
             ->assertSee('Archive Bucket', false)
             ->assertSee('Document root: /var/www/docs/current/public', false)
-            ->assertSee('1 project runbook is already attached to this site workspace.', false);
+            ->assertSee('1 project runbook is already attached to this site workspace.', false)
+            ->assertSee('Queue full backup', false);
+    }
+
+    public function test_queue_full_file_backup_dispatches_export_job(): void
+    {
+        Queue::fake();
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'ssh_private_key' => self::FAKE_SSH_KEY,
+        ]);
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'App',
+            'repository_path' => '/var/www/app',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(Files::class)
+            ->call('queueFullBackup', $site->id)
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(ExportSiteFileBackupJob::class);
+
+        $this->assertDatabaseHas('site_file_backups', [
+            'site_id' => $site->id,
+            'user_id' => $user->id,
+            'status' => SiteFileBackup::STATUS_PENDING,
+        ]);
     }
 }

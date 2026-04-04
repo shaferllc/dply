@@ -16,6 +16,7 @@
     active="cron"
     :title="__('Cron jobs')"
     :description="__('Schedule commands in the Dply-managed crontab block for this server.')"
+    :context-site="$contextSiteModel ?? null"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -32,7 +33,17 @@
         </div>
     @endif
 
-    @if ($opsReady)
+    @if ($siteContextUnavailable)
+        <div class="rounded-2xl border border-amber-300/80 bg-amber-50/90 px-5 py-6 text-sm text-amber-950">
+            <p class="font-semibold">{{ __('Cron jobs are not available for this site’s runtime') }}</p>
+            <p class="mt-2 leading-relaxed text-amber-900/90">
+                {{ __('Managed SSH crontab applies to VM-hosted sites. For container or serverless runtimes, use that platform’s scheduler or workers instead.') }}
+            </p>
+            @if ($contextSiteModel)
+                <a href="{{ route('sites.show', [$server, $contextSiteModel]) }}" wire:navigate class="mt-4 inline-flex font-medium text-amber-950 underline">{{ __('Back to site') }}</a>
+            @endif
+        </div>
+    @elseif ($opsReady)
         <div
             id="dply-server-cron-run-context"
             class="hidden"
@@ -90,6 +101,15 @@
                             {{ __('Use an explicit PHP binary if needed (for example') }}
                             <span class="font-mono text-brand-ink/80">php8.2</span>).
                         </p>
+                        @if ($schedulerSiteIsLaravel)
+                            <button
+                                type="button"
+                                wire:click="fillLaravelSchedulerCommand"
+                                class="mt-3 inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
+                            >
+                                {{ __('Use Laravel scheduler for this site (schedule:run)') }}
+                            </button>
+                        @endif
                         <x-input-error :messages="$errors->get('new_cron_command')" class="mt-1" />
                     </div>
 
@@ -302,16 +322,35 @@
                 <p class="mt-1 text-xs text-brand-moss">
                     {{ __('Review what is scheduled on this server, then sync after changes so the Dply-managed crontab block is updated.') }}
                 </p>
-                <div class="mt-3">
-                    <x-input-label for="cron_job_search" value="{{ __('Search jobs') }}" class="sr-only" />
-                    <input
-                        id="cron_job_search"
-                        type="search"
-                        wire:model.live.debounce.300ms="cron_job_search"
-                        class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist"
-                        placeholder="{{ __('Filter by command or description…') }}"
-                    />
+                <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div class="min-w-0 flex-1">
+                        <x-input-label for="cron_job_search" value="{{ __('Search jobs') }}" class="sr-only" />
+                        <input
+                            id="cron_job_search"
+                            type="search"
+                            wire:model.live.debounce.300ms="cron_job_search"
+                            class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist"
+                            placeholder="{{ __('Filter by command or description…') }}"
+                        />
+                    </div>
+                    @if ($contextSiteModel)
+                        <fieldset class="flex flex-wrap items-center gap-3 text-sm">
+                            <legend class="sr-only">{{ __('Job list scope') }}</legend>
+                            <span class="text-brand-moss">{{ __('Show') }}</span>
+                            <label class="inline-flex cursor-pointer items-center gap-2">
+                                <input type="radio" wire:model.live="cron_list_scope" value="site" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                <span class="text-brand-ink">{{ __('This site only') }}</span>
+                            </label>
+                            <label class="inline-flex cursor-pointer items-center gap-2">
+                                <input type="radio" wire:model.live="cron_list_scope" value="all" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                <span class="text-brand-ink">{{ __('All jobs on server') }}</span>
+                            </label>
+                        </fieldset>
+                    @endif
                 </div>
+                @if ($contextSiteModel && $cron_list_scope === 'site')
+                    <p class="mt-2 text-xs text-brand-moss">{{ __('Showing jobs attached to :name.', ['name' => $contextSiteModel->name]) }}</p>
+                @endif
             </div>
             @if ($filteredCronJobs->isEmpty())
                 <p class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">

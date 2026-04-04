@@ -11,7 +11,9 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
@@ -87,6 +89,7 @@ class Site extends Model
         'deploy_strategy',
         'releases_to_keep',
         'nginx_extra_raw',
+        'engine_http_cache_enabled',
         'octane_port',
         'laravel_scheduler',
         'restart_supervisor_programs_after_deploy',
@@ -107,6 +110,7 @@ class Site extends Model
             'meta' => 'array',
             'laravel_scheduler' => 'boolean',
             'restart_supervisor_programs_after_deploy' => 'boolean',
+            'engine_http_cache_enabled' => 'boolean',
             'nginx_installed_at' => 'datetime',
             'ssl_installed_at' => 'datetime',
             'last_deploy_at' => 'datetime',
@@ -161,6 +165,11 @@ class Site extends Model
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public function webserverConfigProfile(): HasOne
+    {
+        return $this->hasOne(SiteWebserverConfigProfile::class);
     }
 
     public function user(): BelongsTo
@@ -255,6 +264,16 @@ class Site extends Model
         return $this->hasMany(SiteDomainAlias::class)->orderBy('sort_order')->orderBy('hostname');
     }
 
+    public function basicAuthUsers(): HasMany
+    {
+        return $this->hasMany(SiteBasicAuthUser::class)->orderBy('sort_order')->orderBy('username');
+    }
+
+    public function uptimeMonitors(): HasMany
+    {
+        return $this->hasMany(SiteUptimeMonitor::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     public function tenantDomains(): HasMany
     {
         return $this->hasMany(SiteTenantDomain::class)->orderBy('sort_order')->orderBy('hostname');
@@ -298,6 +317,29 @@ class Site extends Model
     public function deploySteps(): HasMany
     {
         return $this->hasMany(SiteDeployStep::class)->orderBy('sort_order');
+    }
+
+    public function fileBackups(): HasMany
+    {
+        return $this->hasMany(SiteFileBackup::class)->orderByDesc('created_at');
+    }
+
+    /**
+     * Whether this site can export a full filesystem archive over SSH (BYO VM-style hosts only).
+     */
+    public function supportsSshFileArchive(): bool
+    {
+        if ($this->usesFunctionsRuntime()
+            || $this->usesDockerRuntime()
+            || $this->usesKubernetesRuntime()) {
+            return false;
+        }
+
+        $server = $this->server;
+
+        return $server !== null
+            && $server->isReady()
+            && $server->hasAnySshPrivateKey();
     }
 
     public function primaryDomain(): ?SiteDomain
@@ -650,6 +692,11 @@ class Site extends Model
         }
 
         return null;
+    }
+
+    public function isLaravelFrameworkDetected(): bool
+    {
+        return strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'laravel';
     }
 
     /**
@@ -1184,6 +1231,20 @@ class Site extends Model
     }
 
     /**
+     * Customer domains plus domain aliases for automatic customer-scope certificate issuance (e.g. bulk “issue SSL”).
+     *
+     * @return list<string>
+     */
+    public function sslIssuanceHostnames(): array
+    {
+        return collect($this->customerDomainHostnames())
+            ->merge($this->aliasHostnames())
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return list<string>
      */
     public function tenantHostnames(): array
@@ -1217,6 +1278,48 @@ class Site extends Model
         $path = $this->repository_path;
 
         return $path !== null && $path !== '' ? $path : $this->document_root;
+    }
+
+    /**
+     * On-host directory for Dply-managed htpasswd files (under the site repo root, not web-served).
+     */
+    public function basicAuthStorageDirectoryOnHost(): string
+    {
+        return rtrim($this->effectiveRepositoryPath(), '/').'/.dply/basic-auth';
+    }
+
+    /**
+     * Absolute path for {@see auth_basic_user_file} / Apache {@see AuthUserFile} for a normalized path group.
+     */
+    public function basicAuthHtpasswdPathForNormalizedPath(string $normalizedPath): string
+    {
+        $key = SiteBasicAuthUser::normalizePath($normalizedPath);
+        $hash = substr(hash('sha256', $key), 0, 16);
+
+        return $this->basicAuthStorageDirectoryOnHost().'/group-'.$hash.'.htpasswd';
+    }
+
+    public function supportsBasicAuthProvisioning(): bool
+    {
+        if ($this->usesFunctionsRuntime() || $this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
+            return false;
+        }
+
+        $server = $this->server;
+
+        return $server !== null && $server->hostCapabilities()->supportsNginxProvisioning();
+    }
+
+    /**
+     * Path-prefix basic auth (e.g. /wp-admin) is emitted for static and non-Octane PHP nginx configs.
+     */
+    public function basicAuthSupportsPathPrefixes(): bool
+    {
+        if ($this->type === SiteType::Static) {
+            return true;
+        }
+
+        return $this->type === SiteType::Php && ! $this->octane_port;
     }
 
     /**
@@ -1273,6 +1376,24 @@ class Site extends Model
     }
 
     /**
+     * Managed VM vhosts may emit engine-level HTTP cache directives (e.g. nginx FastCGI / proxy_cache).
+     */
+    public function wantsEngineHttpCache(): bool
+    {
+        if (! $this->engine_http_cache_enabled) {
+            return false;
+        }
+
+        if ($this->isSuspended()) {
+            return false;
+        }
+
+        return ! $this->usesFunctionsRuntime()
+            && ! $this->usesDockerRuntime()
+            && ! $this->usesKubernetesRuntime();
+    }
+
+    /**
      * Static web root for the suspended HTML page (outside public/).
      */
     public function suspendedStaticRoot(): string
@@ -1320,6 +1441,34 @@ class Site extends Model
     public function deployHookUrl(): string
     {
         return route('hooks.site.deploy', ['site' => $this->id]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function repositoryMeta(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return is_array($meta['repository'] ?? null) ? $meta['repository'] : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $patch
+     */
+    public function mergeRepositoryMeta(array $patch): void
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $current = is_array($meta['repository'] ?? null) ? $meta['repository'] : [];
+        $meta['repository'] = array_merge($current, $patch);
+        $this->meta = $meta;
+    }
+
+    public function deploySyncGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(SiteDeploySyncGroup::class, 'site_deploy_sync_group_sites', 'site_id', 'site_deploy_sync_group_id')
+            ->withPivot('sort_order')
+            ->withTimestamps();
     }
 
     public function notificationSubscriptions(): MorphMany

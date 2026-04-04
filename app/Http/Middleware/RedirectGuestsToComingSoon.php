@@ -25,6 +25,10 @@ class RedirectGuestsToComingSoon
             return $next($request);
         }
 
+        if ($request->is('hooks/*')) {
+            return $next($request);
+        }
+
         if ($this->routeIsAllowed($request)) {
             return $next($request);
         }

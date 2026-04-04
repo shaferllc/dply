@@ -154,18 +154,22 @@ return [
         'client_id' => env('GITHUB_CLIENT_ID'),
         'client_secret' => env('GITHUB_CLIENT_SECRET'),
         'redirect' => env('GITHUB_REDIRECT_URI', env('APP_URL').'/auth/github/callback'),
+        /** Used for Quick deploy (repo webhooks). Re-link accounts after changing scopes. */
+        'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('GITHUB_SCOPES', 'read:user,repo,admin:repo_hook'))))),
     ],
 
     'bitbucket' => [
         'client_id' => env('BITBUCKET_CLIENT_ID'),
         'client_secret' => env('BITBUCKET_CLIENT_SECRET'),
         'redirect' => env('BITBUCKET_REDIRECT_URI', env('APP_URL').'/auth/bitbucket/callback'),
+        'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('BITBUCKET_SCOPES', 'account,repository:write,webhook'))))),
     ],
 
     'gitlab' => [
         'client_id' => env('GITLAB_CLIENT_ID'),
         'client_secret' => env('GITLAB_CLIENT_SECRET'),
         'redirect' => env('GITLAB_REDIRECT_URI', env('APP_URL').'/auth/gitlab/callback'),
+        'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('GITLAB_SCOPES', 'read_user,api'))))),
     ],
 
 ];

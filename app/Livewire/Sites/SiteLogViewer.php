@@ -79,10 +79,16 @@ class SiteLogViewer extends Component
         $this->closeLogOptionsMenu();
     }
 
-    public function mount(Server $server, Site $site): void
+    public ?string $preferredLogKey = null;
+
+    public function mount(Server $server, Site $site, ?string $preferredLogKey = null): void
     {
         $this->server = $server;
         $this->scopedSite = $site;
+        $this->preferredLogKey = $preferredLogKey;
+        if (is_string($preferredLogKey) && $preferredLogKey !== '') {
+            $this->logKey = $preferredLogKey;
+        }
         $this->bootServerLogs();
     }
 

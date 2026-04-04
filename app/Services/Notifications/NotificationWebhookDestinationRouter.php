@@ -50,6 +50,18 @@ class NotificationWebhookDestinationRouter
             };
         }
 
+        if ($event->event_key === 'site.deployment_started') {
+            return 'deploy_started';
+        }
+
+        if ($event->event_key === 'site.uptime') {
+            return match ((string) ($event->metadata['state'] ?? '')) {
+                'down' => 'uptime_down',
+                'recovered' => 'uptime_recovered',
+                default => null,
+            };
+        }
+
         if ($event->event_key === 'server.insights_alerts') {
             return ($event->metadata['insight_state'] ?? 'opened') === 'resolved'
                 ? 'insight_resolved'

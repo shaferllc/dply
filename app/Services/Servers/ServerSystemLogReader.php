@@ -465,7 +465,7 @@ class ServerSystemLogReader
 
     private function resolveSitePerHostLogPath(Server $server, string $key): ?string
     {
-        if (! preg_match('/^site_([0-9A-HJKMNP-TV-Z]{26})_(access|error)$/i', $key, $m)) {
+        if (! preg_match('/^site_([0-9A-HJKMNP-TV-Z]{26})_(access|error|laravel|laravel_horizon)$/i', $key, $m)) {
             return null;
         }
 
@@ -479,6 +479,22 @@ class ServerSystemLogReader
 
         if ($site === null) {
             return null;
+        }
+
+        if ($which === 'laravel') {
+            if (! $site->isLaravelFrameworkDetected()) {
+                return null;
+            }
+
+            return $site->effectiveEnvDirectory().'/storage/logs/laravel.log';
+        }
+
+        if ($which === 'laravel_horizon') {
+            if (! $site->isLaravelFrameworkDetected() || ! $site->resolvedLaravelPackageFlag('horizon')) {
+                return null;
+            }
+
+            return $site->effectiveEnvDirectory().'/storage/logs/horizon.log';
         }
 
         $basename = $site->webserverConfigBasename();

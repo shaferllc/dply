@@ -941,9 +941,11 @@ CREATE TABLE site_environment_variables (
 CREATE TABLE site_redirects (
 	id CHAR(26) NOT NULL, 
 	site_id CHAR(26) NOT NULL, 
+	kind VARCHAR(32) DEFAULT 'http' NOT NULL, 
 	from_path VARCHAR(512) NOT NULL, 
 	to_url VARCHAR(1024) NOT NULL, 
 	status_code SMALLINT DEFAULT '301' NOT NULL, 
+	response_headers TEXT, 
 	sort_order INTEGER DEFAULT 0 NOT NULL, 
 	created_at TIMESTAMP, 
 	updated_at TIMESTAMP, 

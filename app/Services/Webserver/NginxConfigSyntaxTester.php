@@ -15,13 +15,20 @@ class NginxConfigSyntaxTester
     public function testServerBlock(string $serverBlock): array
     {
         $banner = (string) config('webserver_templates.required_banner_line', '');
-        if ($banner !== '' && ! str_contains($serverBlock, $banner)) {
+        $managedBanner = '# Managed by Dply';
+        if ($banner !== '' && ! str_contains($serverBlock, $banner) && ! str_contains($serverBlock, $managedBanner)) {
             return [
                 'ok' => false,
                 'message' => __('Template must include this line: :line', ['line' => $banner]),
             ];
         }
 
+        $serverBlock = trim($serverBlock);
+        if ($serverBlock === '') {
+            return ['ok' => false, 'message' => __('Template content is empty.')];
+        }
+
+        $serverBlock = $this->stripLogDirectivesForLocalValidation($serverBlock);
         $serverBlock = trim($serverBlock);
         if ($serverBlock === '') {
             return ['ok' => false, 'message' => __('Template content is empty.')];
@@ -69,5 +76,25 @@ NGINX;
             @unlink($pidFile);
             @unlink($errLog);
         }
+    }
+
+    /**
+     * Remove log file directives so local `nginx -t` does not depend on host log paths under /var/log.
+     */
+    private function stripLogDirectivesForLocalValidation(string $config): string
+    {
+        $patterns = [
+            '/^\s*access_log\s+[^;]+;\s*$/m',
+            '/^\s*error_log\s+[^;]+;\s*$/m',
+            '/^\s*open_log_file_cache\s+[^;]+;\s*$/m',
+            '/^\s*rewrite_log\s+[^;]+;\s*$/m',
+        ];
+
+        $out = $config;
+        foreach ($patterns as $pattern) {
+            $out = preg_replace($pattern, '', $out) ?? $out;
+        }
+
+        return preg_replace("/\n{3,}/", "\n\n", $out) ?? $out;
     }
 }

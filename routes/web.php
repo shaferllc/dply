@@ -61,25 +61,29 @@ use App\Livewire\Settings\Security as SettingsSecurity;
 use App\Livewire\Settings\SourceControl as SettingsSourceControl;
 use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
+use App\Livewire\Sites\Commits as SitesCommits;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Index as SitesIndex;
+use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Settings as SiteSettings;
-use App\Livewire\Sites\Show as SitesShow;
+use App\Livewire\Sites\SiteClone as SitesClone;
+use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Livewire\StatusPages\Manage as StatusPagesManage;
 use App\Livewire\Teams\NotificationChannels as TeamsNotificationChannels;
 use App\Livewire\TwoFactor\Page as TwoFactorPage;
-use App\Models\Site;
+use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\Site;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 Broadcast::routes(['middleware' => ['web', 'auth']]);
 
-Route::post('/hooks/sites/{site}/deploy', SiteDeployWebhookController::class)
+Route::match(['post', 'options'], '/hooks/sites/{site}/deploy', SiteDeployWebhookController::class)
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.site.deploy');
 
@@ -192,13 +196,21 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('servers.show');
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
+    Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
+    Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
+    Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
+    Route::livewire('servers/{server}/sites/{site}/commits', SitesCommits::class)->name('sites.commits');
+    Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
+    Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::get('servers/{server}/sites/{site}/settings/{section?}', function (Server $server, Site $site, ?string $section = null) {
         $targetSection = $section;
         $query = request()->query();
 
         if ($targetSection === null) {
             $targetSection = 'general';
+        } elseif ($targetSection === 'webhooks') {
+            $targetSection = 'notifications';
         } elseif (in_array($targetSection, ['domains', 'aliases', 'redirects', 'preview', 'tenants'], true)) {
             $query['tab'] = $targetSection;
             $targetSection = 'routing';
@@ -234,7 +246,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         $user = auth()->user();
         $organization = $user?->currentOrganization();
 
-        app(\Illuminate\Contracts\Auth\Access\Gate::class)->authorize('viewAny', \App\Models\ProviderCredential::class);
+        app(Illuminate\Contracts\Auth\Access\Gate::class)->authorize('viewAny', ProviderCredential::class);
         abort_unless($organization, 404);
 
         $params = request()->query();

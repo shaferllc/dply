@@ -31,6 +31,7 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
         $ssh = $this->systemSsh($site);
         $this->installPlaceholderPage($site, $ssh);
         $this->ensureSuspendedPage($site, $ssh);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
         $this->writeSystemFile($ssh, $configFile, $this->builder->build($site));
 
         $includeBlock = sprintf(
@@ -63,6 +64,17 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
         $this->updateSiteMeta($site, 'openlitespeed_last_output', $out);
 
         return $out;
+    }
+
+    public function readCurrentSiteConfig(Site $site): ?string
+    {
+        $server = $this->ensureServerReady($site);
+        $ssh = $this->systemSsh($site);
+        $basename = $this->configBasename($site);
+        $vhostsPath = rtrim(config('sites.openlitespeed_vhosts_path'), '/');
+        $configFile = $vhostsPath.'/'.$basename.'/vhconf.conf';
+
+        return $this->readRemoteFile($server, $ssh, $configFile);
     }
 
     public function remove(Site $site): string

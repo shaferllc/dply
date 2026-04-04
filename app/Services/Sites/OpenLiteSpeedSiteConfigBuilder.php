@@ -2,8 +2,10 @@
 
 namespace App\Services\Sites;
 
+use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
 use App\Models\Site;
+use App\Support\SiteRedirectConfigSupport;
 use Illuminate\Support\Collection;
 
 class OpenLiteSpeedSiteConfigBuilder
@@ -166,14 +168,40 @@ CONF;
 
     private function rewriteBlock(Site $site, ?int $proxyPort = null): string
     {
-        $rules = $site->redirects
-            ->map(fn ($redirect): string => sprintf(
-                'RewriteRule ^%s$ %s [R=%d,L]',
-                ltrim($redirect->from_path, '/'),
-                $redirect->to_url,
-                $redirect->status_code,
-            ))
-            ->values();
+        $rules = collect();
+        $olsHeaderNote = false;
+        foreach ($site->redirects->sortBy('sort_order') as $redirect) {
+            $from = SiteRedirectConfigSupport::sanitizeFromPath((string) $redirect->from_path);
+            if ($from === '') {
+                continue;
+            }
+            $fromTail = ltrim($from, '/');
+            $kind = $redirect->kind instanceof SiteRedirectKind ? $redirect->kind : SiteRedirectKind::Http;
+            if ($kind === SiteRedirectKind::InternalRewrite) {
+                $to = SiteRedirectConfigSupport::sanitizeInternalTarget((string) $redirect->to_url);
+                if ($to === '') {
+                    continue;
+                }
+                $rules->push(sprintf('RewriteRule ^%s$ %s [L]', preg_quote($fromTail, '#'), $to));
+
+                continue;
+            }
+            $code = (int) $redirect->status_code;
+            if (! in_array($code, SiteRedirectConfigSupport::allowedHttpRedirectStatusCodes(), true)) {
+                continue;
+            }
+            $to = trim((string) $redirect->to_url);
+            if ($to === '') {
+                continue;
+            }
+            if (SiteRedirectConfigSupport::normalizeResponseHeaders($redirect->response_headers ?? null) !== []) {
+                $olsHeaderNote = true;
+            }
+            $rules->push(sprintf('RewriteRule ^%s$ %s [R=%d,L]', preg_quote($fromTail, '#'), $to, $code));
+        }
+        if ($olsHeaderNote) {
+            $rules->prepend('# Dply: custom response headers on HTTP redirects are not applied by Open LiteSpeed; use application headers or nginx/Caddy/Apache as the edge.');
+        }
 
         if ($site->type === SiteType::Php && $site->shouldProxyReverbInWebserver()) {
             $ws = trim($site->reverbWebSocketPath(), '/');

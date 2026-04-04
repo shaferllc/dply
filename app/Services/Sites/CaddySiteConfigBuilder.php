@@ -2,8 +2,10 @@
 
 namespace App\Services\Sites;
 
+use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
 use App\Models\Site;
+use App\Support\SiteRedirectConfigSupport;
 
 class CaddySiteConfigBuilder
 {
@@ -117,17 +119,51 @@ CADDY;
 
     private function redirectLines(Site $site): string
     {
-        if ($site->redirects->isEmpty()) {
+        $lines = [];
+        $matcherIndex = 0;
+        foreach ($site->redirects->sortBy('sort_order') as $redirect) {
+            $from = SiteRedirectConfigSupport::sanitizeFromPath((string) $redirect->from_path);
+            if ($from === '') {
+                continue;
+            }
+            $kind = $redirect->kind instanceof SiteRedirectKind ? $redirect->kind : SiteRedirectKind::Http;
+            if ($kind === SiteRedirectKind::InternalRewrite) {
+                $to = SiteRedirectConfigSupport::sanitizeInternalTarget((string) $redirect->to_url);
+                if ($to === '') {
+                    continue;
+                }
+                $lines[] = "    rewrite {$from} {$to}";
+
+                continue;
+            }
+            $code = (int) $redirect->status_code;
+            if (! in_array($code, SiteRedirectConfigSupport::allowedHttpRedirectStatusCodes(), true)) {
+                continue;
+            }
+            $to = trim((string) $redirect->to_url);
+            if ($to === '') {
+                continue;
+            }
+            $headers = SiteRedirectConfigSupport::normalizeResponseHeaders($redirect->response_headers ?? null);
+            if ($headers !== []) {
+                $name = 'dply_redir_'.$matcherIndex;
+                $matcherIndex++;
+                $block = "    @{$name} path {$from}\n    handle @{$name} {\n";
+                foreach ($headers as $h) {
+                    $hv = SiteRedirectConfigSupport::escapeCaddyHeaderValue($h['value']);
+                    $block .= "        header {$h['name']} \"{$hv}\"\n";
+                }
+                $block .= "        redir {$to} {$code}\n    }";
+                $lines[] = $block;
+            } else {
+                $lines[] = "    redir {$from} {$to} {$code}";
+            }
+        }
+
+        if ($lines === []) {
             return '';
         }
 
-        return $site->redirects
-            ->map(fn ($redirect): string => sprintf(
-                '    redir %s %s %d',
-                $redirect->from_path,
-                $redirect->to_url,
-                $redirect->status_code,
-            ))
-            ->implode("\n")."\n";
+        return implode("\n", $lines)."\n";
     }
 }

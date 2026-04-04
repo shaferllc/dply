@@ -18,7 +18,7 @@ class SiteWebserverConfigApplier
             throw new \RuntimeException('This site runtime does not use managed VM webserver config.');
         }
 
-        if (! $site->server || ! $site->server->hostCapabilities()->supportsNginxProvisioning()) {
+        if (! $site->server || ! $site->server->hostCapabilities()->supportsSsh()) {
             throw new \RuntimeException('This host runtime does not support managed webserver config.');
         }
 

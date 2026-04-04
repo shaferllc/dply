@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Sites;
 
+use App\Enums\SiteRedirectKind;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
+use App\Jobs\RemoveSiteRepositoryJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\InsightFinding;
@@ -19,6 +21,7 @@ use App\Models\SiteDomain;
 use App\Models\SiteEnvironmentVariable;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
+use App\Models\SocialAccount;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
@@ -26,6 +29,8 @@ use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Deploy\SiteRuntimeActionExecutor;
 use App\Services\Servers\ServerPhpManager;
+use App\Services\Sites\RepositoryWebhookProvisioner;
+use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteEnvPusher;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
@@ -33,10 +38,12 @@ use App\Services\Sites\SiteReleaseRollback;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
 use App\Support\SiteDeployKeyGenerator;
+use App\Support\SiteRedirectConfigSupport;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -115,6 +122,9 @@ class Show extends Component
 
     public string $nginx_extra_raw = '';
 
+    /** Managed VM webserver: nginx FastCGI / proxy cache, Apache static Expires, etc. */
+    public bool $engine_http_cache_enabled = false;
+
     /** Optional message shown on the public suspended page; stored in meta `suspended_message` (VM sites only). */
     public string $settings_suspended_message = '';
 
@@ -167,7 +177,17 @@ class Show extends Component
 
     public string $new_redirect_to = '';
 
+    /** @var value-of<SiteRedirectKind> */
+    public string $new_redirect_kind = 'http';
+
     public int $new_redirect_code = 301;
+
+    /**
+     * Optional HTTP response headers for new redirect rows (HTTP redirects only).
+     *
+     * @var list<array{name: string, value: string}>
+     */
+    public array $new_redirect_header_rows = [['name' => '', 'value' => '']];
 
     public string $new_hook_phase = 'after_clone';
 
@@ -184,6 +204,15 @@ class Show extends Component
     public int $new_deploy_step_timeout = 900;
 
     public string $webhook_allowed_ips_text = '';
+
+    /** @var 'github'|'gitlab'|'bitbucket'|'custom' */
+    public string $git_provider_kind = 'custom';
+
+    public string $git_source_control_account_id = '';
+
+    public bool $quick_deploy_enabled_ui = false;
+
+    public bool $deploy_sync_include_peers_on_manual = true;
 
     /**
      * @var list<array{id: string, provider: string, label: string}>
@@ -261,6 +290,7 @@ class Show extends Component
         $this->rails_env = (string) ($railsRuntime['env'] ?? 'production');
         $this->releases_to_keep = (int) ($this->site->releases_to_keep ?? 5);
         $this->nginx_extra_raw = (string) ($this->site->nginx_extra_raw ?? '');
+        $this->engine_http_cache_enabled = (bool) ($this->site->engine_http_cache_enabled ?? false);
         $this->octane_port = $this->site->octane_port !== null ? (string) $this->site->octane_port : '';
         $this->octane_server = $this->site->octaneServer();
         $this->laravel_reverb_port = (string) $this->site->reverbLocalPort();
@@ -286,6 +316,12 @@ class Show extends Component
             ? implode("\n", $ips)
             : '';
         $this->settings_suspended_message = $this->site->suspendedPublicMessage();
+        $repoMeta = $this->site->repositoryMeta();
+        $kind = (string) ($repoMeta['git_provider_kind'] ?? 'custom');
+        $this->git_provider_kind = in_array($kind, ['github', 'gitlab', 'bitbucket', 'custom'], true) ? $kind : 'custom';
+        $this->git_source_control_account_id = (string) ($repoMeta['git_source_control_account_id'] ?? '');
+        $this->quick_deploy_enabled_ui = (bool) ($repoMeta['quick_deploy_enabled'] ?? false);
+        $this->deploy_sync_include_peers_on_manual = (bool) ($repoMeta['deploy_sync_include_peers_on_manual'] ?? true);
     }
 
     #[On('site-provisioning-updated')]
@@ -534,10 +570,10 @@ class Show extends Component
         }
     }
 
-    public function queueDeploy(): void
+    public function queueDeploy(SiteDeploySyncCoordinator $coordinator): void
     {
         $this->authorize('update', $this->site);
-        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
+        $coordinator->dispatchManualForGroup($this->site->fresh());
         $base = __('Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.');
         $this->flash_success = config('insights.queue_after_deploy', true)
             ? $base.' '.__('After a successful deploy, server and site insight runs are queued automatically.')
@@ -757,6 +793,116 @@ class Show extends Component
         $this->syncFormFromSite();
     }
 
+    public function saveRepositoryWorkspace(): void
+    {
+        $this->authorize('update', $this->site);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot change repository settings.'));
+
+            return;
+        }
+
+        $rules = [
+            'git_repository_url' => 'nullable|string|max:500',
+            'git_branch' => 'nullable|string|max:120',
+            'git_provider_kind' => 'required|string|in:github,gitlab,bitbucket,custom',
+            'git_source_control_account_id' => 'nullable|string|max:26',
+            'deploy_sync_include_peers_on_manual' => 'boolean',
+        ];
+        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
+            $rules['git_repository_url'] = 'required|string|max:500';
+            $rules['git_branch'] = 'required|string|max:120';
+        }
+        if ($this->git_provider_kind !== 'custom' && $this->git_source_control_account_id === '') {
+            $this->addError('git_source_control_account_id', __('Select a linked source control account or choose Custom.'));
+
+            return;
+        }
+
+        $this->validate($rules);
+
+        $this->site->mergeRepositoryMeta([
+            'git_provider_kind' => $this->git_provider_kind,
+            'git_source_control_account_id' => $this->git_source_control_account_id !== '' ? $this->git_source_control_account_id : null,
+            'deploy_sync_include_peers_on_manual' => $this->deploy_sync_include_peers_on_manual,
+        ]);
+
+        $this->site->fill([
+            'git_repository_url' => trim($this->git_repository_url) ?: null,
+            'git_branch' => trim($this->git_branch) ?: 'main',
+            'post_deploy_command' => trim($this->post_deploy_command) ?: null,
+        ]);
+        $this->site->save();
+        $this->flash_success = __('Repository settings saved.');
+        $this->flash_error = null;
+        $this->syncFormFromSite();
+    }
+
+    public function enableQuickDeploy(RepositoryWebhookProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot enable Quick deploy.'));
+
+            return;
+        }
+
+        $account = $this->git_source_control_account_id !== ''
+            ? SocialAccount::query()->where('user_id', auth()->id())->find($this->git_source_control_account_id)
+            : null;
+        if ($account === null) {
+            $this->flash_error = __('Select a connected source control account first.');
+            $this->flash_success = null;
+
+            return;
+        }
+
+        $result = $provisioner->enable($this->site->fresh(), $account);
+        if (! $result['ok']) {
+            $this->flash_error = $result['message'];
+            $this->flash_success = null;
+        } else {
+            $this->flash_success = $result['message'];
+            $this->flash_error = null;
+        }
+        $this->syncFormFromSite();
+    }
+
+    public function disableQuickDeploy(RepositoryWebhookProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot change Quick deploy.'));
+
+            return;
+        }
+
+        $provisioner->disable($this->site->fresh());
+        $this->flash_success = __('Quick deploy disabled and provider hook removed when possible.');
+        $this->flash_error = null;
+        $this->syncFormFromSite();
+    }
+
+    public function queueRemoveRemoteRepository(): void
+    {
+        $this->authorize('update', $this->site);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot remove the repository checkout.'));
+
+            return;
+        }
+
+        if ($this->site->usesFunctionsRuntime() || $this->site->usesDockerRuntime() || $this->site->usesKubernetesRuntime()) {
+            $this->flash_error = __('This runtime does not use a traditional VM repository path.');
+
+            return;
+        }
+
+        RemoveSiteRepositoryJob::dispatch($this->site->id);
+        $this->flash_success = __('Repository removal has been queued. This may take a minute on large trees.');
+        $this->flash_error = null;
+    }
+
     public function updatedFunctionsRepoSource(): void
     {
         if ($this->functions_repo_source === 'manual') {
@@ -927,12 +1073,13 @@ class Show extends Component
         }
     }
 
-    public function regenerateWebhookSecret(): void
+    public function regenerateWebhookSecret(RepositoryWebhookProvisioner $provisioner): void
     {
         $this->authorize('update', $this->site);
         $plain = Str::random(48);
         $this->site->update(['webhook_secret' => $plain]);
         $this->revealed_webhook_secret = $plain;
+        $provisioner->syncProviderHookSecret($this->site->fresh());
         $this->flash_success = 'Webhook secret rotated. Copy it below — it will not be shown again.';
         $this->flash_error = null;
     }
@@ -1130,6 +1277,41 @@ class Show extends Component
         $this->flash_error = null;
     }
 
+    public function saveEngineHttpCache(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
+            $this->flash_error = __('Engine HTTP cache is only available for managed VM web server sites on this host.');
+            $this->flash_success = null;
+
+            return;
+        }
+
+        $this->validate([
+            'engine_http_cache_enabled' => ['boolean'],
+        ]);
+
+        $this->site->update([
+            'engine_http_cache_enabled' => $this->engine_http_cache_enabled,
+        ]);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+        $this->flash_error = null;
+
+        try {
+            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
+            $this->site->refresh();
+            $this->syncFormFromSite();
+            $this->flash_success = $this->engine_http_cache_enabled
+                ? __('Engine HTTP cache enabled and web server config reloaded.')
+                : __('Engine HTTP cache disabled and web server config reloaded.');
+        } catch (\Throwable $e) {
+            $this->flash_success = __('Setting saved, but the web server config could not be re-applied automatically.');
+            $this->flash_error = $e->getMessage();
+        }
+    }
+
     public function addEnvironmentVariable(): void
     {
         $this->authorize('update', $this->site);
@@ -1164,21 +1346,92 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         $this->validate([
+            'new_redirect_kind' => ['required', Rule::in(array_column(SiteRedirectKind::cases(), 'value'))],
             'new_redirect_from' => 'required|string|max:512',
-            'new_redirect_to' => 'required|string|max:1024',
-            'new_redirect_code' => 'required|integer|in:301,302,307,308',
+            'new_redirect_to' => [
+                'required',
+                'string',
+                'max:1024',
+                Rule::when(
+                    $this->new_redirect_kind === SiteRedirectKind::InternalRewrite->value,
+                    ['regex:/^\/$|^\/[a-zA-Z0-9\/_\-]+$/']
+                ),
+            ],
+            'new_redirect_code' => [
+                Rule::requiredIf(fn () => $this->new_redirect_kind === SiteRedirectKind::Http->value),
+                'nullable',
+                'integer',
+                Rule::in(SiteRedirectConfigSupport::allowedHttpRedirectStatusCodes()),
+            ],
         ]);
+
+        $responseHeaders = null;
+        if ($this->new_redirect_kind === SiteRedirectKind::Http->value) {
+            foreach ($this->new_redirect_header_rows as $i => $row) {
+                $n = trim((string) ($row['name'] ?? ''));
+                $v = trim((string) ($row['value'] ?? ''));
+                if ($n === '' && $v === '') {
+                    continue;
+                }
+                if ($n === '' || $v === '') {
+                    throw ValidationException::withMessages([
+                        "new_redirect_header_rows.{$i}.name" => [__('Provide both a header name and value, or clear the row.')],
+                    ]);
+                }
+                if (! SiteRedirectConfigSupport::isValidHeaderName($n)) {
+                    throw ValidationException::withMessages([
+                        "new_redirect_header_rows.{$i}.name" => [__('Use a valid header name (letters, digits, and !#$&-.^_`|~).')],
+                    ]);
+                }
+                if (! SiteRedirectConfigSupport::isValidHeaderValue($v)) {
+                    throw ValidationException::withMessages([
+                        "new_redirect_header_rows.{$i}.value" => [__('Header value is too long or contains invalid characters.')],
+                    ]);
+                }
+                if (SiteRedirectConfigSupport::isForbiddenResponseHeaderName($n)) {
+                    throw ValidationException::withMessages([
+                        "new_redirect_header_rows.{$i}.name" => [__('This header cannot be set from a redirect.')],
+                    ]);
+                }
+            }
+            $normalized = SiteRedirectConfigSupport::normalizeResponseHeaders($this->new_redirect_header_rows);
+            $responseHeaders = $normalized === [] ? null : $normalized;
+        }
+
         SiteRedirect::query()->create([
             'site_id' => $this->site->id,
+            'kind' => SiteRedirectKind::from($this->new_redirect_kind),
             'from_path' => $this->new_redirect_from,
             'to_url' => $this->new_redirect_to,
-            'status_code' => $this->new_redirect_code,
+            'status_code' => $this->new_redirect_kind === SiteRedirectKind::InternalRewrite->value
+                ? 301
+                : (int) $this->new_redirect_code,
+            'response_headers' => $responseHeaders,
             'sort_order' => (int) ($this->site->redirects()->max('sort_order') ?? 0) + 1,
         ]);
         $this->new_redirect_from = '';
         $this->new_redirect_to = '';
+        $this->new_redirect_kind = SiteRedirectKind::Http->value;
         $this->new_redirect_code = 301;
+        $this->new_redirect_header_rows = [['name' => '', 'value' => '']];
         $this->finalizeRoutingMutation('Redirect added.');
+    }
+
+    public function addNewRedirectHeaderRow(): void
+    {
+        if (count($this->new_redirect_header_rows) >= 8) {
+            return;
+        }
+        $this->new_redirect_header_rows[] = ['name' => '', 'value' => ''];
+    }
+
+    public function removeNewRedirectHeaderRow(int $index): void
+    {
+        unset($this->new_redirect_header_rows[$index]);
+        $this->new_redirect_header_rows = array_values($this->new_redirect_header_rows);
+        if ($this->new_redirect_header_rows === []) {
+            $this->new_redirect_header_rows = [['name' => '', 'value' => '']];
+        }
     }
 
     public function deleteRedirectRule(int $id): void
@@ -1498,6 +1751,7 @@ class Show extends Component
         $this->site->load([
             'domains',
             'domainAliases',
+            'basicAuthUsers',
             'tenantDomains',
             'previewDomains',
             'certificates',
@@ -1530,11 +1784,11 @@ class Show extends Component
 
     private function loadFunctionsSourceControlState(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
+        $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser(auth()->user());
+
         if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
             return;
         }
-
-        $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser(auth()->user());
 
         if ($this->linkedSourceControlAccounts === []) {
             $this->functions_repo_source = 'manual';

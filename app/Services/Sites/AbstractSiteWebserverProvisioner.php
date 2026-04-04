@@ -5,8 +5,10 @@ namespace App\Services\Sites;
 use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteBasicAuthUser;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -135,8 +137,62 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         $site->update(['meta' => $meta]);
     }
 
+    protected function readRemoteFile(Server $server, SshConnection $ssh, string $path): ?string
+    {
+        $out = $ssh->exec($this->privilegedCommand($server, 'cat '.escapeshellarg($path).' 2>/dev/null || true'), 30);
+        $out = trim($out);
+
+        return $out === '' ? null : $out;
+    }
+
+    /**
+     * @param  string|null  $previousContent  null = treat as missing file
+     */
+    protected function restoreRemoteFile(SshConnection $ssh, Server $server, string $path, ?string $previousContent): void
+    {
+        if ($previousContent === null) {
+            $ssh->exec($this->privilegedCommand($server, 'rm -f '.escapeshellarg($path)), 30);
+
+            return;
+        }
+
+        $this->writeSystemFile($ssh, $path, $previousContent);
+    }
+
     protected function configBasename(Site $site): string
     {
         return $site->webserverConfigBasename();
+    }
+
+    /**
+     * Writes grouped htpasswd files under {@see Site::basicAuthStorageDirectoryOnHost()}.
+     */
+    protected function syncBasicAuthHtpasswdFiles(Site $site, SshConnection $ssh): void
+    {
+        $site->loadMissing('basicAuthUsers');
+        $base = $site->basicAuthStorageDirectoryOnHost();
+
+        $groups = $site->basicAuthUsers->groupBy(fn (SiteBasicAuthUser $u): string => $u->normalizedPath());
+
+        foreach ($groups as $normalizedPath => $users) {
+            if (! $users instanceof Collection || $users->isEmpty()) {
+                continue;
+            }
+
+            $path = $site->basicAuthHtpasswdPathForNormalizedPath($normalizedPath);
+            $lines = $users->map(function (SiteBasicAuthUser $user): string {
+                $name = trim($user->username);
+
+                return $name.':'.trim($user->password_hash);
+            })->filter(fn (string $line): bool => $line !== ':' && ! str_starts_with($line, ':'));
+
+            $content = $lines->implode("\n").($lines->isNotEmpty() ? "\n" : '');
+
+            $this->writeSystemFile($ssh, $path, $content);
+        }
+
+        if ($site->basicAuthUsers->isEmpty()) {
+            $ssh->exec(sprintf('rm -rf %s 2>/dev/null || true', escapeshellarg($base)), 30);
+        }
     }
 }

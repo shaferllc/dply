@@ -6,12 +6,12 @@ use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
-use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
+use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
-use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\EnsureApiTokenAbility;
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
@@ -19,9 +19,11 @@ use App\Jobs\CheckServerHealthJob;
 use App\Jobs\CheckSiteUrlHealthJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSiteInsightsJob;
+use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteUptimeMonitor;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -59,6 +61,15 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->pluck('id')
                 ->each(fn (int $id) => CheckSiteUrlHealthJob::dispatch($id));
         })->everyTenMinutes();
+
+        $schedule->call(function (): void {
+            if (! config('site_uptime.enabled', true)) {
+                return;
+            }
+            SiteUptimeMonitor::query()
+                ->pluck('id')
+                ->each(fn (string $id) => RunSiteUptimeMonitorCheckJob::dispatch($id));
+        })->everyFiveMinutes();
 
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()

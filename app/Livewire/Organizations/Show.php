@@ -54,6 +54,12 @@ class Show extends Component
 
     public bool $int_evt_skipped = true;
 
+    public bool $int_evt_deploy_started = false;
+
+    public bool $int_evt_uptime_down = true;
+
+    public bool $int_evt_uptime_recovered = true;
+
     public bool $int_evt_insight_opened = false;
 
     public bool $int_evt_insight_resolved = false;
@@ -374,6 +380,15 @@ class Show extends Component
         if ($this->int_evt_skipped) {
             $events[] = 'deploy_skipped';
         }
+        if ($this->int_evt_deploy_started) {
+            $events[] = 'deploy_started';
+        }
+        if ($this->int_evt_uptime_down) {
+            $events[] = 'uptime_down';
+        }
+        if ($this->int_evt_uptime_recovered) {
+            $events[] = 'uptime_recovered';
+        }
         if ($this->int_evt_insight_opened) {
             $events[] = 'insight_opened';
         }
@@ -396,6 +411,9 @@ class Show extends Component
         $this->int_evt_success = true;
         $this->int_evt_failed = true;
         $this->int_evt_skipped = true;
+        $this->int_evt_deploy_started = false;
+        $this->int_evt_uptime_down = true;
+        $this->int_evt_uptime_recovered = true;
         $this->int_evt_insight_opened = false;
         $this->int_evt_insight_resolved = false;
         $this->refreshOrganization();

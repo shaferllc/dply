@@ -111,12 +111,42 @@
     @if ($site->domainAliases->isNotEmpty())
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($site->domainAliases as $alias)
+                @php
+                    $aliasHostname = strtolower($alias->hostname);
+                    $hasSslCoverage = $site->certificates->contains(function ($certificate) use ($aliasHostname) {
+                        return in_array($certificate->status, [
+                            \App\Models\SiteCertificate::STATUS_PENDING,
+                            \App\Models\SiteCertificate::STATUS_ISSUED,
+                            \App\Models\SiteCertificate::STATUS_INSTALLING,
+                            \App\Models\SiteCertificate::STATUS_ACTIVE,
+                        ], true)
+                            && in_array($aliasHostname, $certificate->domainHostnames(), true);
+                    });
+                @endphp
                 <li class="flex items-center justify-between gap-3 py-3">
                     <div class="min-w-0">
                         <p class="truncate font-mono text-sm text-brand-ink">{{ $alias->hostname }}</p>
-                        <p class="mt-1 text-xs text-brand-moss">{{ $alias->label ?: __('Alias') }}</p>
+                        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
+                            <span>{{ $alias->label ?: __('Alias') }}</span>
+                            @if ($hasSslCoverage)
+                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">{{ __('SSL configured') }}</span>
+                            @else
+                                <span class="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">{{ __('SSL missing') }}</span>
+                            @endif
+                        </div>
                     </div>
-                    <button type="button" wire:click="removeAlias('{{ $alias->id }}')" class="text-sm font-medium text-red-700 hover:underline">{{ __('Remove') }}</button>
+                    <div class="flex items-center gap-4">
+                        @if (! $hasSslCoverage)
+                            <button
+                                type="button"
+                                wire:click="openQuickDomainSslModal('{{ $alias->hostname }}')"
+                                class="text-sm font-medium text-brand-sage hover:underline"
+                            >
+                                {{ __('Add SSL') }}
+                            </button>
+                        @endif
+                        <button type="button" wire:click="removeAlias('{{ $alias->id }}')" class="text-sm font-medium text-red-700 hover:underline">{{ __('Remove') }}</button>
+                    </div>
                 </li>
             @endforeach
         </ul>
@@ -141,14 +171,24 @@
 <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
     <div>
         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Redirects') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Keep redirects separate from aliases. Redirects rewrite requests, while aliases only add hostnames to the site config.') }}</p>
+        <p class="mt-1 text-sm text-brand-moss">{{ __('Keep redirects separate from aliases. HTTP redirects return a 3xx to the browser; internal rewrites map a path to another path on the server without changing the visible URL.') }}</p>
     </div>
 
     @if ($site->redirects->isNotEmpty())
         <ul class="space-y-2 text-sm">
             @foreach ($site->redirects as $redirect)
                 <li class="flex items-start justify-between gap-3 rounded-xl border border-brand-ink/10 px-4 py-3">
-                    <span class="font-mono text-xs text-brand-ink">{{ $redirect->from_path }} → {{ $redirect->to_url }} ({{ $redirect->status_code }})</span>
+                    <span class="font-mono text-xs text-brand-ink">
+                        {{ $redirect->from_path }} → {{ $redirect->to_url }}
+                        @if ($redirect->kind === \App\Enums\SiteRedirectKind::InternalRewrite)
+                            ({{ __('Internal rewrite') }})
+                        @else
+                            ({{ $redirect->status_code }})
+                            @if (is_array($redirect->response_headers) && ($__rh = count($redirect->response_headers)) > 0)
+                                — {{ $__rh }} {{ $__rh === 1 ? __('custom header') : __('custom headers') }}
+                            @endif
+                        @endif
+                    </span>
                     <button type="button" wire:click="deleteRedirectRule({{ $redirect->id }})" class="shrink-0 text-sm font-medium text-red-700 hover:underline">{{ __('Remove') }}</button>
                 </li>
             @endforeach
@@ -156,16 +196,59 @@
     @endif
 
     <form wire:submit="addRedirectRule" class="flex flex-wrap items-end gap-3">
+        <div class="flex min-w-[140px] flex-col gap-1">
+            <span class="text-xs font-medium text-brand-moss">{{ __('Kind') }}</span>
+            <select wire:model.live="new_redirect_kind" class="rounded-md border-slate-300 text-sm">
+                <option value="http">{{ __('HTTP redirect') }}</option>
+                <option value="internal_rewrite">{{ __('Internal rewrite') }}</option>
+            </select>
+        </div>
         <x-text-input wire:model="new_redirect_from" placeholder="/old" class="w-32 font-mono text-sm" />
-        <x-text-input wire:model="new_redirect_to" placeholder="https://..." class="min-w-[220px] flex-1 font-mono text-sm" />
-        <select wire:model.number="new_redirect_code" class="rounded-md border-slate-300 text-sm">
-            <option value="301">301</option>
-            <option value="302">302</option>
-            <option value="307">307</option>
-            <option value="308">308</option>
-        </select>
+        <div class="flex min-w-[220px] flex-1 flex-col gap-1">
+            <span class="text-xs font-medium text-brand-moss">{{ $new_redirect_kind === 'internal_rewrite' ? __('To path') : __('Destination') }}</span>
+            <x-text-input wire:model="new_redirect_to" :placeholder="$new_redirect_kind === 'internal_rewrite' ? '/new' : 'https://...'" class="w-full font-mono text-sm" />
+        </div>
+        @if ($new_redirect_kind === 'http')
+            <div class="flex min-w-[160px] flex-col gap-1">
+                <span class="text-xs font-medium text-brand-moss">{{ __('Status') }}</span>
+                <select wire:model.number="new_redirect_code" class="rounded-md border-slate-300 text-sm">
+                    <option value="301">{{ __('301 — Permanent') }}</option>
+                    <option value="302">{{ __('302 — Found') }}</option>
+                    <option value="303">{{ __('303 — See Other') }}</option>
+                    <option value="307">{{ __('307 — Temporary (method preserved)') }}</option>
+                    <option value="308">{{ __('308 — Permanent (method preserved)') }}</option>
+                </select>
+            </div>
+        @endif
         <x-primary-button type="submit">{{ __('Add redirect') }}</x-primary-button>
     </form>
+
+    @if ($new_redirect_kind === 'http')
+        <div class="w-full space-y-3 rounded-xl border border-brand-ink/10 bg-slate-50/60 p-4">
+            <p class="text-sm font-medium text-brand-ink">{{ __('Response headers (optional)') }}</p>
+            <p class="text-xs text-brand-moss">{{ __('Sent with the redirect response on nginx, Apache, and Caddy. Open LiteSpeed applies the redirect but not these headers—use app-level headers there if needed.') }}</p>
+            @foreach ($new_redirect_header_rows as $idx => $row)
+                <div class="flex flex-wrap items-end gap-2">
+                    <div class="min-w-[140px] flex-1">
+                        <x-input-label :for="'hdr_name_'.$idx" value="{{ __('Name') }}" class="text-xs" />
+                        <x-text-input :id="'hdr_name_'.$idx" wire:model="new_redirect_header_rows.{{ $idx }}.name" placeholder="X-Example" class="mt-1 w-full font-mono text-sm" />
+                        <x-input-error :messages="$errors->get('new_redirect_header_rows.'.$idx.'.name')" class="mt-1" />
+                    </div>
+                    <div class="min-w-[180px] flex-[2]">
+                        <x-input-label :for="'hdr_val_'.$idx" value="{{ __('Value') }}" class="text-xs" />
+                        <x-text-input :id="'hdr_val_'.$idx" wire:model="new_redirect_header_rows.{{ $idx }}.value" placeholder="value" class="mt-1 w-full font-mono text-sm" />
+                        <x-input-error :messages="$errors->get('new_redirect_header_rows.'.$idx.'.value')" class="mt-1" />
+                    </div>
+                    @if (count($new_redirect_header_rows) > 1)
+                        <button type="button" wire:click="removeNewRedirectHeaderRow({{ $idx }})" class="mb-1 text-xs font-medium text-red-700 hover:underline">{{ __('Remove') }}</button>
+                    @endif
+                </div>
+            @endforeach
+            @if (count($new_redirect_header_rows) < 8)
+                <button type="button" wire:click="addNewRedirectHeaderRow" class="text-sm font-medium text-brand-ink hover:underline">{{ __('Add header row') }}</button>
+            @endif
+        </div>
+    @endif
 
     @if ($supportsNginxProvisioning)
         <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/60 p-4">

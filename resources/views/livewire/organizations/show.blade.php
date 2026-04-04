@@ -306,6 +306,10 @@
                                             <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_success" class="rounded border-slate-300"> {{ __('Success') }}</label>
                                             <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_failed" class="rounded border-slate-300"> {{ __('Failed') }}</label>
                                             <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_skipped" class="rounded border-slate-300"> {{ __('Skipped') }}</label>
+                                            <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_deploy_started" class="rounded border-slate-300"> {{ __('Deployment started') }}</label>
+                                            <span class="w-full text-xs font-medium text-slate-500">{{ __('Uptime') }}</span>
+                                            <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_down" class="rounded border-slate-300"> {{ __('Monitor down') }}</label>
+                                            <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_recovered" class="rounded border-slate-300"> {{ __('Monitor recovered') }}</label>
                                             <span class="w-full text-xs font-medium text-slate-500">{{ __('Insight events (org-wide only)') }}</span>
                                             <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_opened" class="rounded border-slate-300"> {{ __('Opened') }}</label>
                                             <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_resolved" class="rounded border-slate-300"> {{ __('Resolved') }}</label>

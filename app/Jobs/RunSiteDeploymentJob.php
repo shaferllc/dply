@@ -6,9 +6,9 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Notifications\SiteDeploymentCompletedNotification;
-use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DeployEngineResolver;
+use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
 use App\Support\DeployLogRedactor;
 use Illuminate\Bus\Queueable;
@@ -19,6 +19,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 class RunSiteDeploymentJob implements ShouldQueue
 {
@@ -38,8 +39,7 @@ class RunSiteDeploymentJob implements ShouldQueue
     public function handle(
         DeployEngineResolver $deployEngineResolver,
         NotificationPublisher $notificationPublisher,
-    ): void
-    {
+    ): void {
         $this->site = $this->site->fresh();
         if (! $this->site) {
             $this->clearIdempotencyInflight();
@@ -95,6 +95,8 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'started_at' => now()->toIso8601String(),
                 'deployment_id' => $deployment->id,
             ], $this->timeout + 120);
+
+            $this->notifyDeploymentStarted($deployment, $notificationPublisher);
 
             try {
                 $engine = $deployEngineResolver->forProject($this->site->project);
@@ -211,6 +213,33 @@ class RunSiteDeploymentJob implements ShouldQueue
         ]);
     }
 
+    protected function notifyDeploymentStarted(SiteDeployment $deployment, NotificationPublisher $notificationPublisher): void
+    {
+        if (! config('dply.deploy_notifications', true)) {
+            return;
+        }
+
+        $site = $this->site->fresh(['server', 'organization']);
+        if (! $site || ! $site->server) {
+            return;
+        }
+
+        $notificationPublisher->publish(
+            eventKey: 'site.deployment_started',
+            subject: $deployment->fresh(),
+            title: '['.config('app.name').'] '.$site->name.' deploy started',
+            body: 'Trigger: '.$deployment->trigger,
+            url: route('sites.show', [$site->server, $site], absolute: true),
+            metadata: [
+                'deployment_id' => $deployment->id,
+                'site_id' => $site->id,
+                'site_name' => $site->name,
+                'trigger' => $deployment->trigger,
+                'status' => SiteDeployment::STATUS_RUNNING,
+            ],
+        );
+    }
+
     protected function notifyStakeholders(SiteDeployment $deployment, NotificationPublisher $notificationPublisher): void
     {
         if (! config('dply.deploy_notifications', true)) {
@@ -253,7 +282,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'trigger' => $deployment->trigger,
                 'git_sha' => $deployment->git_sha,
                 'log_excerpt' => $deployment->log_output
-                    ? \Illuminate\Support\Str::limit(\App\Support\DeployLogRedactor::redact($deployment->log_output), 1200)
+                    ? Str::limit(DeployLogRedactor::redact($deployment->log_output), 1200)
                     : null,
             ],
         );

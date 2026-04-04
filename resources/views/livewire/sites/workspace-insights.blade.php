@@ -84,11 +84,13 @@
     @endif
 
     @if ($tab === 'notifications')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm p-6 space-y-3 text-sm text-brand-moss max-w-2xl">
-            <p>{{ __('Insights alerts use the server’s “Insights alerts” subscription. Configure channels from your profile, then assign the server event server.insights_alerts.') }}</p>
-            <p>
-                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="font-medium text-brand-forest underline">{{ __('Manage notification channels') }}</a>
-            </p>
+        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm p-6 space-y-4 text-sm text-brand-moss max-w-2xl">
+            <p>{{ __('Deploy completions, deployment start, and uptime transitions for this site are configured under Site workspace → Notifications. Connect outbound webhooks and channel subscriptions there.') }}</p>
+            <p>{{ __('Insights findings still use the server’s “Insights alerts” subscription when enabled.') }}</p>
+            <div class="flex flex-wrap gap-2 pt-1">
+                <a href="{{ route('sites.show', [$server, $site, 'section' => 'notifications']) }}" wire:navigate class="{{ $btnPrimary }}">{{ __('Open site Notifications') }}</a>
+                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="{{ $btnSecondary }}">{{ __('Manage notification channels') }}</a>
+            </div>
         </div>
     @endif
 

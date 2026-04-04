@@ -43,6 +43,9 @@ class StatusPageMonitor extends Model
         if ($m instanceof Site) {
             return $m->name;
         }
+        if ($m instanceof SiteUptimeMonitor) {
+            return $m->label;
+        }
 
         return __('Monitor');
     }

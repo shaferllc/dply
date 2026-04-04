@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\Site;
+use App\Models\User;
 use App\Notifications\CronJobAlertNotification;
 use App\Notifications\OrganizationInvitationNotification;
 use App\Notifications\ServerRemovalExecutedNotification;
@@ -17,10 +18,11 @@ use App\Notifications\ServerRemovalScheduledNotification;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Notifications\SshKeyRotationDueNotification;
 use App\Notifications\SupervisorProgramsUnhealthyNotification;
-use App\Models\User;
+use App\Notifications\UniversalEventNotification;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -179,7 +181,7 @@ class UniversalNotificationsTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'notifiable_type' => User::class,
             'notifiable_id' => $user->id,
-            'type' => \App\Notifications\UniversalEventNotification::class,
+            'type' => UniversalEventNotification::class,
         ]);
     }
 
@@ -187,7 +189,7 @@ class UniversalNotificationsTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $result = \Illuminate\Support\Facades\Broadcast::auth(['channel_name' => 'private-App.Models.User.'.$user->id], $user);
+        $result = Broadcast::auth(['channel_name' => 'private-App.Models.User.'.$user->id], $user);
 
         $this->assertNotFalse($result);
     }
@@ -230,6 +232,86 @@ class UniversalNotificationsTest extends TestCase
         );
 
         Http::assertSent(fn ($request) => $request->url() === 'https://example.test/deploy-hook');
+    }
+
+    public function test_publisher_routes_deployment_started_to_integration_webhook(): void
+    {
+        Http::fake([
+            '*' => Http::response('ok', 200),
+        ]);
+
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        $site = Site::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+
+        NotificationWebhookDestination::query()->create([
+            'organization_id' => $org->id,
+            'site_id' => $site->id,
+            'name' => 'Start hook',
+            'driver' => NotificationWebhookDestination::DRIVER_SLACK,
+            'webhook_url' => 'https://example.test/start-hook',
+            'events' => ['deploy_started'],
+            'enabled' => true,
+        ]);
+
+        app(NotificationPublisher::class)->publish(
+            eventKey: 'site.deployment_started',
+            subject: $site,
+            title: 'Deploy started',
+            body: 'Manual deploy',
+            url: route('sites.show', [$site->server, $site], absolute: true),
+            metadata: [
+                'site_id' => $site->id,
+                'trigger' => 'manual',
+            ],
+            recipientUsers: [$user],
+        );
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://example.test/start-hook');
+    }
+
+    public function test_publisher_routes_uptime_events_to_integration_webhook(): void
+    {
+        Http::fake([
+            '*' => Http::response('ok', 200),
+        ]);
+
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        $site = Site::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
+
+        NotificationWebhookDestination::query()->create([
+            'organization_id' => $org->id,
+            'site_id' => $site->id,
+            'name' => 'Uptime hook',
+            'driver' => NotificationWebhookDestination::DRIVER_SLACK,
+            'webhook_url' => 'https://example.test/uptime-hook',
+            'events' => ['uptime_down', 'uptime_recovered'],
+            'enabled' => true,
+        ]);
+
+        app(NotificationPublisher::class)->publish(
+            eventKey: 'site.uptime',
+            subject: $site,
+            title: 'Monitor down',
+            body: 'URL: https://example.com',
+            url: route('sites.monitor', [$site->server, $site], absolute: true),
+            metadata: [
+                'site_id' => $site->id,
+                'state' => 'down',
+            ],
+            recipientUsers: [$user],
+        );
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://example.test/uptime-hook');
     }
 
     public function test_deploy_email_notification_renders_from_universal_event_metadata(): void

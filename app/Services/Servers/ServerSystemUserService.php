@@ -137,6 +137,65 @@ class ServerSystemUserService
         );
     }
 
+    /**
+     * Resets ownership and typical permissions on the site repository tree (user + web server group, 755/644;
+     * Laravel storage and bootstrap/cache tightened to 775/664 when present).
+     *
+     * @throws \RuntimeException
+     */
+    public function resetSiteFilePermissions(Site $site): void
+    {
+        $server = $site->server;
+        $this->assertServerReady($server);
+
+        $path = rtrim($site->effectiveRepositoryPath(), '/');
+        if ($path === '') {
+            throw new \RuntimeException(__('Site repository path is empty; set paths before resetting permissions.'));
+        }
+
+        $user = $site->effectiveSystemUser($server);
+        $u = $this->validatePasswdStyleUsername($user);
+
+        $group = $this->validateWebServerGroup((string) config('site_settings.vm_site_file_web_group', 'www-data'));
+
+        $pathQ = escapeshellarg($path);
+        $userQ = escapeshellarg($u);
+        $groupQ = escapeshellarg($group);
+
+        $script = <<<BASH
+ROOT={$pathQ}
+chown -R {$userQ}:{$groupQ} "\$ROOT"
+find "\$ROOT" -type d -exec chmod 755 {} +
+find "\$ROOT" -type f -exec chmod 644 {} +
+if [ -d "\$ROOT/storage" ]; then
+  find "\$ROOT/storage" -type d -exec chmod 775 {} +
+  find "\$ROOT/storage" -type f -exec chmod 664 {} +
+fi
+if [ -d "\$ROOT/bootstrap/cache" ]; then
+  find "\$ROOT/bootstrap/cache" -type d -exec chmod 775 {} +
+  find "\$ROOT/bootstrap/cache" -type f -exec chmod 664 {} +
+fi
+BASH;
+
+        $this->runPrivileged($server, $script, 900);
+
+        $this->writeOperationMeta(
+            $site,
+            'ok',
+            __('File permissions reset (user :user, group :group).', ['user' => $u, 'group' => $group])
+        );
+    }
+
+    private function validateWebServerGroup(string $group): string
+    {
+        $g = trim($group);
+        if ($g === '' || ! preg_match('/^[a-zA-Z0-9._-]+$/', $g) || strlen($g) > 32) {
+            throw new \RuntimeException(__('Configured web server group is invalid.'));
+        }
+
+        return $g;
+    }
+
     private function assertServerReady(Server $server): void
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {

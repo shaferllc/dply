@@ -3,6 +3,7 @@
 namespace App\Livewire\Status;
 
 use App\Models\Site;
+use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
 use App\Models\StatusPageMonitor;
 use App\Services\Status\MonitorOperationalState;
@@ -24,6 +25,7 @@ class PublicPage extends Component
             'monitors.monitorable' => function ($morph) {
                 $morph->morphWith([
                     Site::class => ['server'],
+                    SiteUptimeMonitor::class => ['site'],
                 ]);
             },
             'incidents' => fn ($q) => $q->orderByDesc('started_at')->with(['incidentUpdates.user']),

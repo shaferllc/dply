@@ -38,26 +38,6 @@ class ProvisionJourney extends Component
         $this->server->refresh();
 
         if ($this->shouldRedirectToServerOverview()) {
-            // #region agent log
-            @file_put_contents(
-                base_path('.cursor/debug-182f08.log'),
-                json_encode([
-                    'sessionId' => '182f08',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'H1',
-                    'location' => 'app/Livewire/Servers/ProvisionJourney.php:30',
-                    'message' => 'Journey render reached completion branch',
-                    'data' => [
-                        'serverId' => (string) $this->server->id,
-                        'serverStatus' => (string) $this->server->status,
-                        'setupStatus' => (string) $this->server->setup_status,
-                        'isLivewireRequest' => Livewire::isLivewireRequest(),
-                    ],
-                    'timestamp' => round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL,
-                FILE_APPEND
-            );
-            // #endregion
             if (Livewire::isLivewireRequest()) {
                 $this->dispatch('provision-journey-complete', url: route('servers.overview', $this->server));
             } else {

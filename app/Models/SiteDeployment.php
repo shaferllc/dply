@@ -18,6 +18,8 @@ class SiteDeployment extends Model
 
     public const TRIGGER_API = 'api';
 
+    public const TRIGGER_SYNC_PEER = 'sync_peer';
+
     public const STATUS_RUNNING = 'running';
 
     public const STATUS_SUCCESS = 'success';

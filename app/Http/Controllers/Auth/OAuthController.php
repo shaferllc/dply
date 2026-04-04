@@ -26,7 +26,13 @@ class OAuthController extends Controller
             Session::forget('oauth_intent');
         }
 
-        return Socialite::driver($provider)->redirect();
+        $driver = Socialite::driver($provider);
+        $scopes = config('services.'.$provider.'.scopes');
+        if (is_array($scopes) && $scopes !== []) {
+            $driver = $driver->scopes($scopes);
+        }
+
+        return $driver->redirect();
     }
 
     public function callback(string $provider): RedirectResponse

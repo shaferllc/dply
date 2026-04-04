@@ -23,6 +23,7 @@ return [
             'label' => 'Site notifications',
             'events' => [
                 'site.deployments' => 'Deployments & failing deployments',
+                'site.deployment_started' => 'Deployment started',
                 'site.uptime' => 'Site uptime monitoring',
             ],
         ],
