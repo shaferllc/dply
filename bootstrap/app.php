@@ -148,6 +148,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'hooks/*',
             'webhook/*',
+            'webauthn/*',
         ]);
 
         $middleware->appendToGroup('web', [

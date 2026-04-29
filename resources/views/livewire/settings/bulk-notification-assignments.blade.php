@@ -1,60 +1,66 @@
 <div>
     <x-livewire-validation-errors />
 
-    <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('profile.edit') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Profile') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('profile.notification-channels') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Notification channels') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('Bulk assign notifications') }}</li>
-        </ol>
-    </nav>
-
-    <header class="mb-8">
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Bulk assign notifications') }}</h1>
-        <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-            {{ __('Link channels you can manage to events, then choose servers and sites in your current organization.') }}
-        </p>
-    </header>
-
-    @if ($flash_success)
-        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ $flash_success }}</div>
-    @endif
-
-    @if (! $currentOrganization)
-        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            {{ __('Select a current organization from the header to load servers and sites as assignment targets.') }}
-        </div>
-    @else
-        <p class="mb-6 text-sm text-brand-moss">
-            {{ __('Organization:') }} <span class="font-medium text-brand-ink">{{ $currentOrganization->name }}</span>
-        </p>
-    @endif
-
-    @if ($contextServer || $contextSite)
-        <div class="mb-6 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm text-brand-ink">
-            @if ($contextServer)
-                <p>
-                    {{ __('Assigning notifications for server:') }}
-                    <span class="font-semibold">{{ $contextServer->name }}</span>
-                </p>
-            @endif
-            @if ($contextSite)
-                <p class="{{ $contextServer ? 'mt-1' : '' }}">
-                    {{ __('Assigning notifications for site:') }}
-                    <span class="font-semibold">{{ $contextSite->name }}</span>
-                </p>
-            @endif
-            <p class="mt-2 text-brand-moss">
-                {{ __('Choose channels and event types below. The matching target is already preselected for you.') }}
-            </p>
-        </div>
-    @endif
+    <x-breadcrumb-trail :items="[
+        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+        ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
+        ['label' => __('Notification channels'), 'href' => route('profile.notification-channels'), 'icon' => 'bell-alert'],
+        ['label' => __('Bulk assign notifications'), 'icon' => 'rectangle-stack'],
+    ]" />
 
     <div class="space-y-8">
+        <div class="dply-card overflow-hidden">
+            <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
+                <div class="lg:col-span-4">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Bulk assign notifications') }}</h2>
+                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+                        {{ __('Link channels you can manage to events, then choose servers and sites in your current organization.') }}
+                    </p>
+                </div>
+                <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
+                    <a
+                        href="{{ route('docs.index') }}"
+                        wire:navigate
+                        class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('Documentation') }}
+                    </a>
+                    @if ($currentOrganization)
+                        <x-badge tone="accent" :caps="false" class="text-xs">
+                            {{ __('Organization: :name', ['name' => $currentOrganization->name]) }}
+                        </x-badge>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        @if (! $currentOrganization)
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                {{ __('Select a current organization from the header to load servers and sites as assignment targets.') }}
+            </div>
+        @endif
+
+        @if ($contextServer || $contextSite)
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm text-brand-ink">
+                @if ($contextServer)
+                    <p>
+                        {{ __('Assigning notifications for server:') }}
+                        <span class="font-semibold">{{ $contextServer->name }}</span>
+                    </p>
+                @endif
+                @if ($contextSite)
+                    <p class="{{ $contextServer ? 'mt-1' : '' }}">
+                        {{ __('Assigning notifications for site:') }}
+                        <span class="font-semibold">{{ $contextSite->name }}</span>
+                    </p>
+                @endif
+                <p class="mt-2 text-brand-moss">
+                    {{ __('Choose channels and event types below. The matching target is already preselected for you.') }}
+                </p>
+            </div>
+        @endif
+
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8 flex flex-wrap justify-between gap-3 items-start">
                 <div>

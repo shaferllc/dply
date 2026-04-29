@@ -4,8 +4,12 @@ namespace App\Livewire\Profile;
 
 use App\Http\Controllers\SessionController;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Livewire\Forms\ProfileBillingForm;
 use App\Livewire\Forms\ProfileGeneralForm;
+use App\Services\Billing\StripeOrganizationTaxIdSync;
+use App\Services\Billing\VatInsightService;
 use DateTimeZone;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +21,8 @@ use Livewire\Component;
 class Edit extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
+    use InteractsWithUnsavedChangesBar;
 
     public ProfileGeneralForm $profileForm;
 
@@ -116,14 +122,48 @@ class Edit extends Component
 
         $this->billingForm->validate($rules);
 
-        $this->user()->update([
+        $user = $this->user();
+        $user->update([
             'invoice_email' => $this->billingForm->invoice_email !== '' ? $this->billingForm->invoice_email : null,
             'vat_number' => $this->billingForm->vat_number !== '' ? $this->billingForm->vat_number : null,
             'billing_currency' => $this->billingForm->billing_currency === '' ? null : $this->billingForm->billing_currency,
             'billing_details' => $this->billingForm->billing_details !== '' ? $this->billingForm->billing_details : null,
         ]);
 
+        $user->refresh();
+
+        foreach (app(VatInsightService::class)->collectSoftWarnings($user->vat_number) as $message) {
+            $this->toastWarning($message);
+        }
+
+        foreach (app(StripeOrganizationTaxIdSync::class)->syncFromProfile($user) as $message) {
+            $this->toastWarning($message);
+        }
+
         $this->dispatch('billing-updated');
+    }
+
+    public function discardProfileFormUnsaved(): void
+    {
+        $user = $this->user();
+        $this->profileForm->fill([
+            'name' => $user->name,
+            'email' => $user->email,
+            'country_code' => $user->country_code ?? '',
+            'locale' => $user->locale ?? config('app.locale'),
+            'timezone' => $user->timezone ?? config('app.timezone'),
+        ]);
+    }
+
+    public function discardBillingFormUnsaved(): void
+    {
+        $user = $this->user();
+        $this->billingForm->fill([
+            'invoice_email' => $user->invoice_email ?? '',
+            'vat_number' => $user->vat_number ?? '',
+            'billing_currency' => $user->billing_currency ?? '',
+            'billing_details' => $user->billing_details ?? '',
+        ]);
     }
 
     public function revokeSession(int|string $sessionId): void
@@ -179,6 +219,9 @@ class Edit extends Component
 
     public function render(): View
     {
-        return view('livewire.profile.edit');
+        return view('livewire.profile.edit', [
+            'profileFormUnsavedTargets' => 'profileForm.name,profileForm.email,profileForm.country_code,profileForm.locale,profileForm.timezone',
+            'billingFormUnsavedTargets' => 'billingForm.invoice_email,billingForm.vat_number,billingForm.billing_currency,billingForm.billing_details',
+        ]);
     }
 }

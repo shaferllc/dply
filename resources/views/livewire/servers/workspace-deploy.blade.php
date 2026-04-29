@@ -8,8 +8,11 @@
     active="deploy"
     :title="__('Deploy')"
     :description="__('Manage the release command for this server and run deploy-focused actions when you are shipping code.')"
+    doc-route="docs.markdown"
+    doc-slug="source-control"
+    :doc-label="__('Deploy & Git docs')"
 >
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null, 'command_error' => $command_error ?? null])
+    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if ($server->workspace)

@@ -6,7 +6,7 @@
     <x-site-header :show-guest-signup="false" />
 
     <main class="px-4 py-14 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
-        <section class="mx-auto max-w-6xl">
+        <section class="mx-auto max-w-7xl">
             <div class="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] lg:items-center">
                 <div class="max-w-2xl">
                     <p class="inline-flex items-center gap-2 rounded-full border border-brand-sage/20 bg-white/75 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-forest">

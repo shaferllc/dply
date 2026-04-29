@@ -14,7 +14,7 @@
     @if ($manageRemoteTaskId)
         <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
     @endif
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null, 'command_error' => $remote_error ?? null])
+    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 18])

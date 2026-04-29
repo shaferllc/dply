@@ -76,8 +76,7 @@ class WorkspaceInsights extends Component
             'parameters' => $this->parameters,
         ])->save();
 
-        $this->flash_success = __('Settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Settings saved.'));
     }
 
     /**
@@ -134,7 +133,7 @@ class WorkspaceInsights extends Component
         $this->running = true;
         RunServerInsightsJob::dispatch($this->server->id);
         $this->running = false;
-        $this->flash_success = __('Insights check queued. Refresh in a moment for results.');
+        $this->toastSuccess(__('Insights check queued. Refresh in a moment for results.'));
     }
 
     public function openApplyFixModal(int $findingId): void
@@ -198,7 +197,7 @@ class WorkspaceInsights extends Component
         }
 
         ApplyInsightFixJob::dispatch($finding->id, $user->id);
-        $this->flash_success = __('Fix has been queued. This may take up to a minute.');
+        $this->toastSuccess(__('Fix has been queued. This may take up to a minute.'));
     }
 
     public function render(): View

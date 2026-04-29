@@ -7,6 +7,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\Referrals\ReferralAttribution;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Laravel\Socialite\Facades\Socialite;
@@ -16,14 +17,20 @@ class OAuthController extends Controller
 {
     private const ALLOWED_PROVIDERS = ['github', 'bitbucket', 'gitlab'];
 
-    public function redirect(string $provider): RedirectResponse
+    public function redirect(Request $request, string $provider): RedirectResponse
     {
         $this->validateProvider($provider);
 
         if (Auth::check()) {
             Session::put('oauth_intent', 'link');
+            if ($request->query('return') === 'security') {
+                Session::put('oauth_return_route', 'profile.security');
+            } else {
+                Session::forget('oauth_return_route');
+            }
         } else {
             Session::forget('oauth_intent');
+            Session::forget('oauth_return_route');
         }
 
         $driver = Socialite::driver($provider);
@@ -87,7 +94,7 @@ class OAuthController extends Controller
     private function oauthFailureRedirect(?string $intent, string $message): RedirectResponse
     {
         if ($intent === 'link') {
-            return redirect()->route('profile.source-control')
+            return redirect()->route(Session::pull('oauth_return_route', 'profile.source-control'))
                 ->with('error', $message);
         }
 
@@ -97,6 +104,8 @@ class OAuthController extends Controller
 
     private function linkAccountToCurrentUser(string $provider, SocialiteUser $oauthUser): RedirectResponse
     {
+        $returnRoute = Session::pull('oauth_return_route', 'profile.source-control');
+
         /** @var User $user */
         $user = Auth::user();
         $providerId = (string) $oauthUser->getId();
@@ -107,7 +116,7 @@ class OAuthController extends Controller
             ->first();
 
         if ($existing && (string) $existing->user_id !== (string) $user->id) {
-            return redirect()->route('profile.source-control')
+            return redirect()->route($returnRoute)
                 ->with('error', __('This :provider account is already linked to another user.', ['provider' => ucfirst($provider)]));
         }
 
@@ -129,7 +138,7 @@ class OAuthController extends Controller
             ], $payload));
         }
 
-        return redirect()->route('profile.source-control')
+        return redirect()->route($returnRoute)
             ->with('success', __('Account linked.'));
     }
 

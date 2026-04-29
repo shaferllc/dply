@@ -7,13 +7,14 @@
     $summary = $deletionSummary ?? null;
 @endphp
 @if ($open)
+    @teleport('body')
     <div
-        class="fixed inset-0 z-50 overflow-y-auto overscroll-y-contain"
+        class="fixed inset-0 isolate z-[100] overflow-y-auto overscroll-y-contain"
         role="dialog"
         aria-modal="true"
         aria-labelledby="remove-server-modal-title"
     >
-        <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeRemoveServerModal" wire:key="remove-server-backdrop"></div>
+        <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeRemoveServerModal" wire:key="remove-server-backdrop"></div>
         <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
             <div
                 class="my-auto w-full max-w-xl dply-modal-panel"
@@ -74,4 +75,5 @@
             </div>
         </div>
     </div>
+    @endteleport
 @endif

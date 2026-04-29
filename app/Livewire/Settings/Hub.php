@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
+use DateTimeZone;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -14,6 +17,9 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class Hub extends Component
 {
+    use DispatchesToastNotifications;
+    use InteractsWithUnsavedChangesBar;
+
     /** @var 'profile'|'servers' */
     public string $section = 'profile';
 
@@ -33,11 +39,14 @@ class Hub extends Component
 
     public ?string $selectedTeamId = null;
 
+    public string $profileTimezone = 'UTC';
+
     public function mount(): void
     {
         /** @var User $user */
         $user = Auth::user();
         $this->ui = $user->mergedUiPreferences();
+        $this->profileTimezone = $user->timezone ?? config('app.timezone');
 
         $legacyTab = request()->query('tab');
         if (in_array($legacyTab, ['servers', 'servers-sites'], true)) {
@@ -173,7 +182,7 @@ class Hub extends Component
 
         $this->ui = $user->fresh()->mergedUiPreferences();
 
-        session()->flash('success', __('Profile settings saved.'));
+        $this->toastSuccess(__('Profile settings saved.'));
     }
 
     public function saveOrganizationServersSites(): void
@@ -183,7 +192,7 @@ class Hub extends Component
         $org = $user->currentOrganization();
 
         if (! $org instanceof Organization) {
-            session()->flash('error', __('Select or create an organization to save these defaults.'));
+            $this->toastError(__('Select or create an organization to save these defaults.'));
 
             return;
         }
@@ -204,7 +213,7 @@ class Hub extends Component
 
         $this->organizationServerSite = $org->fresh()->mergedServerSitePreferences();
 
-        session()->flash('success', __('Organization settings saved.'));
+        $this->toastSuccess(__('Organization settings saved.'));
     }
 
     public function saveOrganizationInsights(): void
@@ -214,7 +223,7 @@ class Hub extends Component
         $org = $user->currentOrganization();
 
         if (! $org instanceof Organization) {
-            session()->flash('error', __('Select or create an organization to save Insights preferences.'));
+            $this->toastError(__('Select or create an organization to save Insights preferences.'));
 
             return;
         }
@@ -244,7 +253,7 @@ class Hub extends Component
 
         $this->organizationInsights = $this->insightsStateFromOrg($org->fresh());
 
-        session()->flash('success', __('Insights preferences saved.'));
+        $this->toastSuccess(__('Insights preferences saved.'));
     }
 
     public function saveTeamServersSites(): void
@@ -254,7 +263,7 @@ class Hub extends Component
         $org = $user->currentOrganization();
 
         if (! $org instanceof Organization) {
-            session()->flash('error', __('Select or create an organization first.'));
+            $this->toastError(__('Select or create an organization first.'));
 
             return;
         }
@@ -264,7 +273,7 @@ class Hub extends Component
             : null;
 
         if (! $team instanceof Team) {
-            session()->flash('error', __('Select a team to save team defaults.'));
+            $this->toastError(__('Select a team to save team defaults.'));
 
             return;
         }
@@ -289,7 +298,138 @@ class Hub extends Component
 
         $this->teamServerSite = $team->fresh()->mergedTeamPreferences();
 
-        session()->flash('success', __('Team settings saved.'));
+        $this->toastSuccess(__('Team settings saved.'));
+    }
+
+    public function persistTheme(string $theme): void
+    {
+        $options = config('user_preferences.theme_options', []);
+        if (! in_array($theme, $options, true)) {
+            return;
+        }
+
+        /** @var User $user */
+        $user = Auth::user();
+        $this->ui['theme'] = $theme;
+
+        $keys = array_keys(config('user_preferences.defaults', []));
+        $filtered = array_intersect_key($this->ui, array_flip($keys));
+
+        $user->update([
+            'ui_preferences' => array_merge($user->ui_preferences ?? [], $filtered),
+        ]);
+
+        $this->ui = $user->fresh()->mergedUiPreferences();
+    }
+
+    public function persistNavigationLayout(string $layout): void
+    {
+        $options = config('user_preferences.navigation_layout_options', []);
+        if (! in_array($layout, $options, true)) {
+            return;
+        }
+
+        /** @var User $user */
+        $user = Auth::user();
+        $this->ui['navigation_layout'] = $layout;
+
+        $keys = array_keys(config('user_preferences.defaults', []));
+        $filtered = array_intersect_key($this->ui, array_flip($keys));
+
+        $user->update([
+            'ui_preferences' => array_merge($user->ui_preferences ?? [], $filtered),
+        ]);
+
+        $this->ui = $user->fresh()->mergedUiPreferences();
+
+        session()->flash('success', __('Navigation layout updated.'));
+
+        $this->redirect(
+            $this->section === 'servers' ? route('settings.servers') : route('settings.profile'),
+            navigate: false,
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getTimezonesProperty(): array
+    {
+        return collect(DateTimeZone::listIdentifiers(DateTimeZone::ALL))
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    public function saveProfileTimezone(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $this->validate([
+            'profileTimezone' => ['required', 'string', Rule::in(DateTimeZone::listIdentifiers(DateTimeZone::ALL))],
+        ]);
+
+        $user->update(['timezone' => $this->profileTimezone]);
+
+        $this->profileTimezone = $user->fresh()->timezone ?? config('app.timezone');
+
+        $this->toastSuccess(__('Timezone saved.'));
+    }
+
+    public function discardProfileUnsaved(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $this->ui = $user->mergedUiPreferences();
+    }
+
+    public function discardProfileTimezoneUnsaved(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $this->profileTimezone = $user->timezone ?? config('app.timezone');
+    }
+
+    public function discardOrganizationServersSitesUnsaved(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $org = $user->currentOrganization();
+        if (! $org instanceof Organization) {
+            return;
+        }
+
+        $this->organizationServerSite = $org->mergedServerSitePreferences();
+    }
+
+    public function discardOrganizationInsightsUnsaved(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $org = $user->currentOrganization();
+        if (! $org instanceof Organization) {
+            return;
+        }
+
+        $this->organizationInsights = $this->insightsStateFromOrg($org);
+    }
+
+    public function discardTeamServersSitesUnsaved(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $org = $user->currentOrganization();
+        if (! $org instanceof Organization || ! $this->selectedTeamId) {
+            return;
+        }
+
+        $team = $org->teams()->whereKey($this->selectedTeamId)->first();
+        $defaults = config('user_preferences.team_server_site_defaults', []);
+
+        $this->teamServerSite = $team instanceof Team
+            ? $team->mergedTeamPreferences()
+            : $defaults;
     }
 
     public function render(): View
@@ -313,6 +453,11 @@ class Hub extends Component
             'canEditOrgPrefs' => $org?->hasAdminAccess($user) ?? false,
             'canEditTeamPrefs' => $canEditTeamPrefs,
             'userTimezoneLabel' => $user->timezone ?? 'UTC',
+            'profileTimezoneUnsavedTargets' => 'profileTimezone',
+            'profileUnsavedTargets' => 'ui.newsletter,ui.keyboard_shortcuts,ui.redirect_home_to_app,ui.subscription_invoice_emails,ui.theme,ui.navigation_layout,ui.notification_position',
+            'organizationServerSiteUnsavedTargets' => 'organizationServerSite.email_server_passwords,organizationServerSite.set_timezone_on_new_servers',
+            'organizationInsightsUnsavedTargets' => 'organizationInsights.digest_non_critical,organizationInsights.digest_frequency,organizationInsights.quiet_hours_enabled,organizationInsights.quiet_hours_start,organizationInsights.quiet_hours_end',
+            'teamServersSitesUnsavedTargets' => 'teamServerSite.show_server_updates_in_list,teamServerSite.isolate_new_sites,teamServerSite.default_server_sort,teamServerSite.default_site_sort',
         ]);
     }
 }

@@ -20,10 +20,14 @@ use App\Livewire\Launches\Path as LaunchesPath;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
+use App\Livewire\Organizations\Activity as OrganizationsActivity;
+use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
+use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Livewire\Organizations\Show as OrganizationsShow;
+use App\Livewire\Organizations\Teams as OrganizationsTeams;
 use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
 use App\Livewire\Profile\Edit as ProfileEdit;
 use App\Livewire\Profile\Referrals as ProfileReferrals;
@@ -121,8 +125,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('/docs', [DocsController::class, 'index'])->name('docs.index');
     Route::get('/docs/connect-provider', [DocsController::class, 'connectProvider'])->name('docs.connect-provider');
     Route::get('/docs/create-first-server', [DocsController::class, 'createFirstServer'])->name('docs.create-first-server');
-    Route::get('/docs/org-roles-and-limits', [DocsController::class, 'orgRolesAndLimits'])->name('docs.org-roles-and-limits');
-    Route::get('/docs/source-control', [DocsController::class, 'sourceControl'])->name('docs.source-control');
+    Route::get('/docs/{slug}', [DocsController::class, 'markdown'])
+        ->whereIn('slug', array_keys(config('docs.markdown', [])))
+        ->name('docs.markdown');
 
     Route::redirect('/settings', '/settings/profile')->name('settings.index');
     Route::livewire('/settings/profile', SettingsHub::class)->name('settings.profile');
@@ -145,6 +150,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations', OrganizationsIndex::class)->name('organizations.index');
     Route::livewire('organizations/create', OrganizationsCreate::class)->name('organizations.create');
     Route::livewire('organizations/{organization}', OrganizationsShow::class)->name('organizations.show');
+    Route::livewire('organizations/{organization}/members', OrganizationsMembers::class)->name('organizations.members');
+    Route::livewire('organizations/{organization}/teams', OrganizationsTeams::class)->name('organizations.teams');
+    Route::livewire('organizations/{organization}/activity', OrganizationsActivity::class)->name('organizations.activity');
+    Route::livewire('organizations/{organization}/automation', OrganizationsAutomation::class)->name('organizations.automation');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
     Route::livewire('organizations/{organization}/billing', BillingShow::class)->name('billing.show');

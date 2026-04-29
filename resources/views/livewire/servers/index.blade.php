@@ -50,7 +50,6 @@
 
         <section class="relative mb-6 overflow-hidden rounded-[2rem] border border-brand-ink/10 bg-brand-ink text-brand-cream shadow-xl shadow-brand-ink/10">
             <div class="absolute inset-0 bg-mesh-brand opacity-90"></div>
-            <div class="absolute inset-y-0 right-0 w-2/5 bg-gradient-to-l from-brand-gold/18 via-transparent to-transparent"></div>
             <div class="relative px-6 py-6 sm:px-8 sm:py-7 lg:px-10">
                 <div class="flex flex-col gap-5">
                     <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
@@ -63,9 +62,13 @@
                             </p>
 
                             @can('create', App\Models\Server::class)
-                                <div class="mt-5">
+                                <div class="mt-5 flex flex-wrap items-center gap-3">
                                     <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
                                         {{ __('Open launchpad') }}
+                                    </a>
+                                    <a href="{{ route('docs.create-first-server') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/15">
+                                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                        {{ __('First server guide') }}
                                     </a>
                                 </div>
                             @endcan
@@ -106,7 +109,7 @@
                                             aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
                                         >
                                             <span class="sr-only">{{ __('List') }}</span>
-                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.008v.008H3.75V6.75zm0 5.25h.008v.008H3.75v-.008zm0 5.25h.008v.008H3.75v-.008z"/></svg>
+                                            <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
                                         </button>
                                         <button
                                             type="button"
@@ -115,7 +118,7 @@
                                             aria-pressed="{{ $viewMode === 'grid' ? 'true' : 'false' }}"
                                         >
                                             <span class="sr-only">{{ __('Grid') }}</span>
-                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25A2.25 2.25 0 018.25 8.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 8.25h-2.25A2.25 2.25 0 0113.5 6V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+                                            <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
                                         </button>
                                     </div>
                                 </div>
@@ -172,19 +175,75 @@
         @endunless
 
         @if (! $hasServersInScope)
-            <x-empty-state
-                :title="__('No servers yet')"
-                :description="__('Choose a launch path for your first infrastructure workflow. Start with the launchpad, then move into BYO, local Docker, remote Docker, serverless, Kubernetes, edge, or cloud network setup as needed.')"
-                :dashed="false"
-                class="rounded-[2rem] p-10 text-center text-sm text-brand-moss"
-            >
-                <x-slot name="actions">
-                @can('create', App\Models\Server::class)
-                    <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream transition hover:bg-brand-forest">{{ __('Open launchpad') }}</a>
-                @endcan
-                    <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-brand-cream px-4 py-2.5 text-sm font-semibold text-brand-ink transition hover:bg-white">{{ __('Connect a provider') }}</a>
-                </x-slot>
-            </x-empty-state>
+            <section class="rounded-[2rem] border-2 border-brand-sage/35 bg-brand-cream shadow-lg shadow-brand-ink/10 ring-1 ring-brand-ink/[0.07]" aria-labelledby="servers-empty-heading">
+                <div class="px-6 py-12 text-center sm:px-10 sm:py-14">
+                    <div class="mx-auto flex max-w-xl flex-col items-center">
+                        <span class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-sand/55 text-brand-forest ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-server-stack class="h-9 w-9" aria-hidden="true" />
+                        </span>
+                        <h2 id="servers-empty-heading" class="mt-6 text-2xl font-semibold tracking-tight text-brand-ink">
+                            {{ __('No servers yet') }}
+                        </h2>
+                        <p class="mt-3 text-base leading-relaxed text-brand-moss">
+                            {{ __('Create a VM from here once a cloud provider is connected—or pick a guided path first.') }}
+                        </p>
+                        <ul class="mt-8 w-full space-y-3 text-left text-sm leading-snug text-brand-moss">
+                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <x-heroicon-o-plus-circle class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span>
+                                    <span class="font-semibold text-brand-ink">{{ __('Create a server') }}</span>
+                                    <span class="text-brand-mist"> — </span>
+                                    {{ __('Fast path to provision when credentials are ready.') }}
+                                </span>
+                            </li>
+                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <x-heroicon-o-squares-2x2 class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span>
+                                    <span class="font-semibold text-brand-ink">{{ __('Open launchpad') }}</span>
+                                    <span class="text-brand-mist"> — </span>
+                                    {{ __('Explore BYO, Docker, serverless, Kubernetes, and more.') }}
+                                </span>
+                            </li>
+                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <x-heroicon-o-link class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span>
+                                    <span class="font-semibold text-brand-ink">{{ __('Connect a provider') }}</span>
+                                    <span class="text-brand-mist"> — </span>
+                                    {{ __('Add API tokens so Dply can reach your cloud account.') }}
+                                </span>
+                            </li>
+                        </ul>
+                        <div class="mt-10 flex w-full flex-wrap items-center justify-center gap-3">
+                            @can('create', App\Models\Server::class)
+                                <a
+                                    href="{{ route('servers.create') }}"
+                                    wire:navigate
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-3 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition hover:bg-brand-forest"
+                                >
+                                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('Create a server') }}
+                                </a>
+                                <a
+                                    href="{{ route('launches.create') }}"
+                                    wire:navigate
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-5 py-3 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                    {{ __('Open launchpad') }}
+                                </a>
+                            @endcan
+                            <a
+                                href="{{ route('credentials.index') }}"
+                                wire:navigate
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-sage/40 bg-brand-sand/30 px-5 py-3 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/50"
+                            >
+                                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Connect a provider') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
         @else
             <div class="dply-card overflow-hidden rounded-[2rem]">
                 @if ($groupedServers->flatten()->isEmpty())
@@ -244,7 +303,7 @@
                                                 </p>
                                                 <div class="flex items-center justify-end gap-2 pt-1 mt-auto">
                                                     <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/50" title="{{ __('Manage') }}">
-                                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/></svg>
+                                                        <x-heroicon-o-bars-3 class="h-4 w-4" aria-hidden="true" />
                                                     </a>
                                                     @can('delete', $server)
                                                         <button type="button" wire:click="openRemoveServerModal(@js($server->id))" class="text-xs font-semibold text-red-600 hover:text-red-800">

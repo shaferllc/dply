@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Workspace;
 use Illuminate\Support\Collection;
@@ -9,11 +10,9 @@ use Livewire\Attributes\On;
 
 trait InteractsWithServerWorkspace
 {
+    use DispatchesToastNotifications;
+
     public Server $server;
-
-    public ?string $flash_success = null;
-
-    public ?string $flash_error = null;
 
     protected function bootWorkspace(Server $server): void
     {
@@ -87,7 +86,7 @@ trait InteractsWithServerWorkspace
             'meta' => $meta,
         ]);
         $this->server = $server->fresh();
-        session()->flash('success', __('Scheduled removal was cancelled.'));
+        $this->toastSuccess(__('Scheduled removal was cancelled.'));
     }
 
     /**

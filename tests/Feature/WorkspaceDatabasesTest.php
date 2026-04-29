@@ -173,7 +173,7 @@ class WorkspaceDatabasesTest extends TestCase
         $this->assertDatabaseMissing('server_databases', ['id' => $db->id]);
     }
 
-    public function test_page_render_shows_flash_error_when_capability_probe_ssh_fails(): void
+    public function test_page_render_shows_connection_error_when_capability_probe_ssh_fails(): void
     {
         [$user, $server] = $this->actingOwnerWithServer();
 

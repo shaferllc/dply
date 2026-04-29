@@ -15,6 +15,8 @@
         :title="__('Server creation')"
         :description="__('Track provisioning and setup until this server is ready.')"
         :show-navigation="false"
+        doc-route="docs.create-first-server"
+        :doc-label="__('Provisioning guide')"
     >
         @include('livewire.servers.partials.workspace-flashes')
 

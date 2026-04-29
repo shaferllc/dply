@@ -3,6 +3,7 @@
 namespace App\Livewire\Backups;
 
 use App\Jobs\ExportSiteFileBackupJob;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\BackupConfiguration;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
@@ -17,9 +18,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 #[Layout('layouts.app')]
 class Files extends Component
 {
-    public ?string $flash_success = null;
-
-    public ?string $flash_error = null;
+    use DispatchesToastNotifications;
 
     public function queueFullBackup(string $siteId): void
     {
@@ -37,7 +36,7 @@ class Files extends Component
         $this->authorize('update', $site);
 
         if (! $site->supportsSshFileArchive()) {
-            $this->flash_error = __('Full file backup is only available for SSH-ready VM sites.');
+            $this->toastError(__('Full file backup is only available for SSH-ready VM sites.'));
 
             return;
         }
@@ -50,7 +49,7 @@ class Files extends Component
 
         dispatch(new ExportSiteFileBackupJob($backup->id));
 
-        $this->flash_success = __('Full backup queued. Refresh shortly to download the archive when it completes.');
+        $this->toastSuccess(__('Full backup queued. Refresh shortly to download the archive when it completes.'));
     }
 
     public function downloadSiteFileBackup(string $backupId): StreamedResponse|Response|null
@@ -70,13 +69,13 @@ class Files extends Component
         $this->authorize('update', $backup->site);
 
         if ($backup->status !== SiteFileBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
-            $this->flash_error = __('Backup is not ready yet.');
+            $this->toastError(__('Backup is not ready yet.'));
 
             return null;
         }
 
         if (! Storage::disk('local')->exists($backup->disk_path)) {
-            $this->flash_error = __('Backup file is missing from storage.');
+            $this->toastError(__('Backup file is missing from storage.'));
 
             return null;
         }

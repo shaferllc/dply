@@ -39,8 +39,19 @@ class SettingsAndNotificationsTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->get(route('docs.source-control'))
-            ->assertOk();
+            ->get(route('docs.markdown', ['slug' => 'source-control']))
+            ->assertOk()
+            ->assertSeeText('Source control & deploy flow');
+    }
+
+    public function test_docs_org_roles_and_limits_renders_markdown(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('docs.markdown', ['slug' => 'org-roles-and-limits']))
+            ->assertOk()
+            ->assertSeeText('Organization roles & plan limits');
     }
 
     public function test_org_admin_can_disable_deploy_email_notifications(): void

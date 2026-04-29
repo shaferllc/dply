@@ -85,7 +85,7 @@ trait HandlesServerRemovalFlow
             $this->notifyOrgAdminsOfScheduledRemoval($server->fresh(['organization']), $at, $reason !== '' ? $reason : null);
             $this->server = $server->fresh();
             $this->closeRemoveServerModal();
-            session()->flash('success', __('This server is scheduled for removal at the end of :date.', [
+            $this->toastSuccess(__('This server is scheduled for removal at the end of :date.', [
                 'date' => $at->toFormattedDateString(),
             ]));
 

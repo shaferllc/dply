@@ -34,12 +34,20 @@ class NotificationChannels extends Component
         return [
             'pageTitle' => __('Organization notification channels'),
             'intro' => __('Webhooks and chat destinations for this organization. Only organization admins can add or edit channels.'),
-            'breadcrumbs' => [],
+            'breadcrumbs' => [
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],
+                ['label' => __('Notification channels'), 'icon' => 'bell-alert'],
+            ],
             'backUrl' => null,
             'backLabel' => null,
             'organization' => $this->organization,
             'useOrgShell' => true,
             'orgShellSection' => 'notifications',
+            'showBulkAssign' => false,
+            'currentOrganization' => null,
+            'organizationChannels' => collect(),
+            'teamChannelGroups' => collect(),
         ];
     }
 

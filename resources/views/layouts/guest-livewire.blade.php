@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    @include('partials.theme-head')
+
     <title>{{ isset($title) && $title ? $title . ' – ' : '' }}{{ config('app.name', 'Laravel') }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
@@ -30,7 +33,7 @@
     <x-site-header />
 
     <main class="flex-1 w-full px-4 sm:px-6 py-10 sm:py-14 lg:py-16">
-        <div class="max-w-6xl mx-auto">
+        <div class="mx-auto w-full max-w-7xl">
             <div class="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
                 <div class="lg:col-span-5 order-2 lg:order-1">
                     <x-auth-aside :variant="$authAsideVariant" class="lg:sticky lg:top-28" />

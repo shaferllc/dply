@@ -32,13 +32,10 @@
 >
     <x-livewire-validation-errors />
 
-    <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('Profile') }}</li>
-        </ol>
-    </nav>
+    <x-breadcrumb-trail :items="[
+        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+        ['label' => __('Profile'), 'icon' => 'user-circle'],
+    ]" />
 
     <div class="space-y-8">
         {{-- General information --}}
@@ -60,6 +57,7 @@
                     </div>
                 </div>
                 <div class="lg:col-span-8">
+                    <p x-show="profileSaved" x-transition class="mb-4 text-sm text-emerald-700" x-cloak>{{ __('Saved.') }}</p>
                     <div class="space-y-5">
                         <div>
                             <x-input-label for="name" :value="__('Name')" required />
@@ -134,16 +132,6 @@
                     </div>
                 </div>
             </div>
-            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 sm:px-8 py-4 flex justify-end items-center gap-4">
-                <p x-show="profileSaved" x-transition class="text-sm text-brand-moss">{{ __('Saved.') }}</p>
-                <x-primary-button type="button" wire:click="updateProfile" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="updateProfile">{{ __('Save profile') }}</span>
-                    <span wire:loading wire:target="updateProfile" class="inline-flex items-center justify-center gap-2">
-                        <x-spinner variant="cream" />
-                        {{ __('Saving…') }}
-                    </span>
-                </x-primary-button>
-            </div>
         </div>
 
         {{-- Billing --}}
@@ -156,6 +144,7 @@
                     </p>
                 </div>
                 <div class="lg:col-span-8">
+                    <p x-show="billingSaved" x-transition class="mb-4 text-sm text-emerald-700" x-cloak>{{ __('Saved.') }}</p>
                     <div class="space-y-5">
                         <div>
                             <x-input-label for="invoice_email" :value="__('Invoice email')" />
@@ -198,16 +187,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 sm:px-8 py-4 flex justify-end items-center gap-4">
-                <p x-show="billingSaved" x-transition class="text-sm text-brand-moss">{{ __('Saved.') }}</p>
-                <x-primary-button type="button" wire:click="updateBilling" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="updateBilling">{{ __('Save billing details') }}</span>
-                    <span wire:loading wire:target="updateBilling" class="inline-flex items-center justify-center gap-2">
-                        <x-spinner variant="cream" />
-                        {{ __('Saving…') }}
-                    </span>
-                </x-primary-button>
             </div>
         </div>
 
@@ -290,6 +269,22 @@
                 </div>
             </div>
         </div>
+
+        <x-unsaved-changes-bar
+            :message="__('You have unsaved changes to your profile information.')"
+            saveAction="updateProfile"
+            discardAction="discardProfileFormUnsaved"
+            :targets="$profileFormUnsavedTargets"
+            :saveLabel="__('Save profile')"
+        />
+
+        <x-unsaved-changes-bar
+            :message="__('You have unsaved changes to your billing details.')"
+            saveAction="updateBilling"
+            discardAction="discardBillingFormUnsaved"
+            :targets="$billingFormUnsavedTargets"
+            :saveLabel="__('Save billing details')"
+        />
 
         <x-slot name="modals">
             @include('livewire.partials.confirm-action-modal')

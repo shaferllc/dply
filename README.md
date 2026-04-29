@@ -22,11 +22,13 @@ php artisan key:generate
 # Create an empty PostgreSQL database matching DB_DATABASE in .env (see docs/BYO_LOCAL_SETUP.md).
 php artisan migrate
 npm install && npm run build
-php artisan queue:work           # second terminal — provisioning / deploy jobs
+php artisan queue:work           # second terminal — provisioning / deploy jobs (required)
 php artisan serve
 ```
 
-Then open the app URL, register, and use **Credentials** / **Servers** as needed. Full detail, troubleshooting, and optional services are in **[docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md)**.
+Or run **`composer dev`** (server + queue + Vite + Reverb + logs together), or **`php artisan solo`** for panes (Queue, Reverb, optional Jetty when `JETTY_START_COMMAND` is set).
+
+Then open the app URL, register, and use **Credentials** / **Servers** as needed. Full detail (DigitalOcean from localhost, tunnels, `DPLY_PUBLIC_APP_URL`, Jetty) is in **[docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md)**.
 
 ## Features (BYO)
 

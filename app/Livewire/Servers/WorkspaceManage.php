@@ -56,7 +56,7 @@ class WorkspaceManage extends Component
     {
         $this->authorize('update', $this->server);
         if ($this->currentUserIsDeployer()) {
-            $this->flash_error = __('Deployers cannot change server manage settings.');
+            $this->toastError(__('Deployers cannot change server manage settings.'));
 
             return;
         }
@@ -79,8 +79,7 @@ class WorkspaceManage extends Component
         $this->server->update(['meta' => $meta]);
         $this->manage_db_password = '';
         $this->server->refresh();
-        $this->flash_success = __('Manage preferences saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Manage preferences saved.'));
     }
 
     public function previewConfig(string $key): void
@@ -160,7 +159,6 @@ BASH;
                 120,
             );
             $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
-            $this->flash_success = null;
         } catch (\Throwable $e) {
             $this->remote_error = $e->getMessage();
         }
@@ -236,8 +234,7 @@ BASH;
                 $timeout,
             );
             $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
-            $this->flash_success = $flash;
-            $this->flash_error = null;
+            $this->toastSuccess($flash);
         } catch (\Throwable $e) {
             $this->remote_error = $e->getMessage();
         }
@@ -284,11 +281,9 @@ BASH;
         if ($status === 'finished') {
             $flash = $payload['flash_success'] ?? null;
             if (is_string($flash) && $flash !== '') {
-                $this->flash_success = $flash;
-                $this->flash_error = null;
+                $this->toastSuccess($flash);
             }
         } else {
-            $this->flash_success = null;
         }
 
         Cache::forget(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
@@ -391,7 +386,6 @@ BASH;
         $this->manageRemoteTaskId = $id;
         $this->remote_output = __('Task queued. This page will update when the server responds.');
         $this->remote_error = null;
-        $this->flash_success = null;
         $this->resetRemoteSshStreamTargets();
         $this->remoteSshStreamSetMeta(
             $streamTitle,

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
@@ -16,6 +17,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WebserverConfig extends Component
 {
+    use DispatchesToastNotifications;
+
     public Server $server;
 
     public Site $site;
@@ -33,10 +36,6 @@ class WebserverConfig extends Component
     public ?string $local_validation_message = null;
 
     public ?string $remote_validation_message = null;
-
-    public ?string $flash_success = null;
-
-    public ?string $flash_error = null;
 
     public ?string $health_hint = null;
 
@@ -73,7 +72,7 @@ class WebserverConfig extends Component
                     $this->remote_live_config = $hydrate['remote_config'];
                 }
             } elseif ($hydrate['message'] !== null) {
-                $this->flash_error = $hydrate['message'];
+                $this->toastError($hydrate['message']);
             }
         } else {
             $this->remote_live_config = $editor->fetchRemoteMainConfig($site);
@@ -125,15 +124,13 @@ class WebserverConfig extends Component
             'full_override_body' => $this->full_override_body,
             'draft_saved_at' => now(),
         ]);
-        $this->flash_success = __('Draft saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Draft saved.'));
     }
 
     public function validateLocalAction(SiteWebserverConfigEditorService $editor): void
     {
         Gate::authorize('view', $this->site);
         $this->resetValidation();
-        $this->flash_error = null;
         $pending = $editor->effectivePreview($this->site, $this->draftProfile());
         $r = $editor->validateLocal($this->site, $pending);
         $this->local_validation_message = $r['message'];
@@ -146,7 +143,6 @@ class WebserverConfig extends Component
     {
         Gate::authorize('view', $this->site);
         $this->resetValidation();
-        $this->flash_error = null;
         $profile = $this->draftProfile();
         $pending = $editor->effectivePreview($this->site, $profile);
         $r = $editor->validateRemote($this->site, $pending, $profile);
@@ -160,7 +156,6 @@ class WebserverConfig extends Component
     {
         Gate::authorize('update', $this->site);
         $this->resetValidation();
-        $this->flash_error = null;
         $this->health_hint = null;
 
         $lock = $editor->lock($this->site);
@@ -197,7 +192,7 @@ class WebserverConfig extends Component
                 ]);
             }
 
-            $this->flash_success = __('Web server configuration applied.');
+            $this->toastSuccess(__('Web server configuration applied.'));
             $hint = $editor->optionalHttpHealthHint($this->site->fresh());
             if ($hint !== null) {
                 $this->health_hint = ($hint['ok'] ?? false)
@@ -223,7 +218,7 @@ class WebserverConfig extends Component
             'full_override_body' => $this->full_override_body,
         ]);
         $editor->saveRevision($this->site, $profile->fresh(), auth()->user(), __('Manual snapshot'));
-        $this->flash_success = __('Revision saved.');
+        $this->toastSuccess(__('Revision saved.'));
     }
 
     public function restoreRevision(string $revisionId, SiteWebserverConfigEditorService $editor): void
@@ -246,7 +241,7 @@ class WebserverConfig extends Component
         }
 
         $this->show_history_modal = false;
-        $this->flash_success = __('Revision restored into the editor.');
+        $this->toastSuccess(__('Revision restored into the editor.'));
     }
 
     public function fetchRemoteConfig(SiteWebserverConfigEditorService $editor): void

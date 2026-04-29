@@ -35,45 +35,39 @@
             'title' => __('Provider credentials'),
             'description' => __('Connect DigitalOcean, Hetzner, and other providers before provisioning infrastructure.'),
             'href' => route('credentials.index'),
-            'accent' => 'from-[#3d7a8f]/90 to-brand-sage',
+            'icon_bg' => 'bg-brand-sage',
         ],
         [
             'title' => __('Security settings'),
             'description' => __('Review two-factor, profile security, and access controls for your account.'),
             'href' => route('profile.security'),
-            'accent' => 'from-brand-rust/90 to-brand-copper',
+            'icon_bg' => 'bg-brand-copper',
         ],
         [
             'title' => __('API keys'),
             'description' => __('Issue organization-scoped API tokens with only the permissions you need.'),
             'href' => route('profile.api-keys'),
-            'accent' => 'from-brand-olive to-brand-forest',
+            'icon_bg' => 'bg-brand-forest',
         ],
         [
             'title' => __('Setup guide'),
             'description' => __('Follow the guided checklist for connecting a provider and launching your first server.'),
             'href' => route('docs.connect-provider'),
-            'accent' => 'from-brand-gold to-[#b8922e]',
+            'icon_bg' => 'bg-brand-olive',
         ],
     ];
     $surfaceAccents = [
-        ['border' => 'border-cyan-700/15', 'bar' => 'bg-cyan-600', 'glow' => 'from-cyan-500/10'],
-        ['border' => 'border-brand-sage/25', 'bar' => 'bg-brand-sage', 'glow' => 'from-brand-sage/15'],
-        ['border' => 'border-brand-gold/30', 'bar' => 'bg-brand-gold', 'glow' => 'from-brand-gold/15'],
-        ['border' => 'border-brand-copper/25', 'bar' => 'bg-brand-copper', 'glow' => 'from-brand-rust/12'],
+        ['border' => 'border-cyan-700/20', 'bar' => 'bg-cyan-600'],
+        ['border' => 'border-brand-sage/30', 'bar' => 'bg-brand-sage'],
+        ['border' => 'border-brand-gold/35', 'bar' => 'bg-brand-gold'],
+        ['border' => 'border-brand-copper/30', 'bar' => 'bg-brand-copper'],
     ];
 @endphp
 
-<div class="relative py-8 sm:py-10 lg:py-12">
-    {{-- Atmospheric wash behind dashboard content --}}
-    <div class="pointer-events-none absolute inset-x-0 top-0 h-[min(42rem,65vh)] bg-[radial-gradient(ellipse_85%_70%_at_50%_-10%,rgb(104_132_121/0.22),transparent_55%),radial-gradient(ellipse_60%_45%_at_100%_15%,rgb(205_169_66/0.14),transparent_50%),radial-gradient(ellipse_50%_40%_at_0%_30%,rgb(50_72_44/0.12),transparent_45%)]" aria-hidden="true"></div>
-    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+<div class="py-8 sm:py-10 lg:py-12">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <section class="relative overflow-hidden rounded-[2rem] border border-brand-ink/10 bg-brand-ink text-brand-cream shadow-xl shadow-brand-ink/15 ring-1 ring-white/10">
-            <div class="absolute inset-0 bg-mesh-brand opacity-95"></div>
-            <div class="absolute -left-24 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-brand-sage/25 blur-3xl"></div>
-            <div class="absolute -right-16 top-0 h-56 w-56 rounded-full bg-brand-gold/20 blur-3xl"></div>
-            <div class="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-brand-gold/[0.22] via-brand-sage/[0.08] to-transparent"></div>
-            <div class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand-gold/35 to-transparent"></div>
+            <div class="absolute inset-0 bg-mesh-brand opacity-90"></div>
             <div class="relative px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
                 <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
                     <div class="max-w-3xl">
@@ -107,17 +101,17 @@
                     </div>
 
                     <div class="grid gap-3 sm:grid-cols-3 lg:w-[28rem]">
-                        <div class="rounded-2xl border border-emerald-400/25 bg-gradient-to-br from-emerald-500/20 to-white/[0.06] p-4 shadow-inner shadow-emerald-900/20 backdrop-blur-sm ring-1 ring-white/10">
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
                             <p class="text-xs font-medium uppercase tracking-wide text-emerald-100/90">{{ __('Servers in scope') }}</p>
                             <p class="mt-3 text-3xl font-semibold tabular-nums text-white">{{ $serverCount }}</p>
                             <p class="mt-1 text-sm text-brand-cream/75">{{ $serverCount === 1 ? __('1 server') : __(':count servers', ['count' => $serverCount]) }}</p>
                         </div>
-                        <div class="rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/18 to-white/[0.05] p-4 shadow-inner shadow-amber-950/25 backdrop-blur-sm ring-1 ring-white/10">
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
                             <p class="text-xs font-medium uppercase tracking-wide text-amber-100/90">{{ __('Open findings') }}</p>
                             <p class="mt-3 text-3xl font-semibold tabular-nums text-white">{{ $openFindings }}</p>
                             <p class="mt-1 text-sm text-brand-cream/75">{{ __('Across your organization') }}</p>
                         </div>
-                        <div class="rounded-2xl border border-brand-gold/35 bg-gradient-to-br from-brand-gold/25 to-brand-sage/15 p-4 shadow-inner shadow-brand-ink/30 backdrop-blur-sm ring-1 ring-white/10">
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
                             <p class="text-xs font-medium uppercase tracking-wide text-brand-sand">{{ __('Avg health score') }}</p>
                             <p class="mt-3 text-3xl font-semibold tabular-nums text-white">{{ $avgHealthScore !== null ? (int) $avgHealthScore : '—' }}</p>
                             <p class="mt-1 text-sm text-brand-cream/75">{{ $avgHealthScore !== null ? __('0–100, higher is better') : __('Available when insights are ready') }}</p>
@@ -150,7 +144,7 @@
         @endunless
 
         <div class="mt-8 grid gap-6 xl:grid-cols-[1.7fr_1fr]">
-            <section class="rounded-[1.75rem] border border-brand-ink/10 bg-gradient-to-br from-white via-white to-brand-sand/40 p-6 shadow-md shadow-brand-ink/[0.06] ring-1 ring-brand-sage/10 sm:p-7">
+            <section class="dply-card p-6 sm:p-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Platform surfaces') }}</p>
@@ -164,8 +158,7 @@
                 <div class="mt-6 grid gap-4 md:grid-cols-2">
                     @foreach ($platformSurfaces as $surface)
                         @php $acc = $surfaceAccents[$loop->index % count($surfaceAccents)]; @endphp
-                        <a href="{{ $surface['href'] }}" wire:navigate class="group relative overflow-hidden rounded-2xl border {{ $acc['border'] }} bg-gradient-to-br from-white to-brand-cream/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-lg hover:shadow-brand-sage/10">
-                            <div class="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gradient-to-br {{ $acc['glow'] }} to-transparent blur-2xl"></div>
+                        <a href="{{ $surface['href'] }}" wire:navigate class="group relative overflow-hidden rounded-2xl border {{ $acc['border'] }} bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md">
                             <span class="absolute left-0 top-3 bottom-3 w-1 rounded-full {{ $acc['bar'] }} opacity-90"></span>
                             <div class="relative flex items-start justify-between gap-3 ps-2">
                                 <div>
@@ -182,7 +175,7 @@
                 </div>
             </section>
 
-            <section class="rounded-[1.75rem] border border-brand-ink/10 bg-gradient-to-b from-white to-brand-sand/35 p-6 shadow-md shadow-brand-ink/[0.06] ring-1 ring-brand-gold/15 sm:p-7">
+            <section class="dply-card p-6 sm:p-7">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Quick actions') }}</p>
                 <h2 class="mt-2 text-2xl font-semibold tracking-tight text-brand-ink">{{ __('Keep the workspace ready') }}</h2>
                 <p class="mt-3 text-sm leading-6 text-brand-moss">
@@ -192,7 +185,7 @@
                 <div class="mt-6 space-y-3">
                     @foreach ($quickActions as $action)
                         <a href="{{ $action['href'] }}" wire:navigate class="group flex items-start gap-4 rounded-2xl border border-brand-ink/10 bg-white/80 px-4 py-4 shadow-sm transition hover:border-brand-gold/25 hover:bg-white hover:shadow-md">
-                            <span class="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br {{ $action['accent'] }} text-white shadow-md ring-1 ring-white/20">
+                            <span class="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $action['icon_bg'] }} text-white shadow-sm ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-arrow-up-right class="h-5 w-5 opacity-95" />
                             </span>
                             <span class="min-w-0">
@@ -206,7 +199,7 @@
         </div>
 
         <div class="mt-6 grid gap-6 lg:grid-cols-[1.35fr_0.95fr]">
-            <section class="rounded-[1.75rem] border border-brand-ink/10 bg-gradient-to-br from-white via-brand-cream/50 to-brand-sage/[0.08] p-6 shadow-md shadow-brand-ink/[0.05] ring-1 ring-brand-sage/10 sm:p-7">
+            <section class="dply-card p-6 sm:p-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Fleet insights') }}</p>
@@ -270,7 +263,7 @@
                 @endif
             </section>
 
-            <section class="rounded-[1.75rem] border border-brand-ink/10 bg-gradient-to-br from-white to-brand-sand/30 p-6 shadow-md shadow-brand-ink/[0.05] ring-1 ring-brand-ink/5 sm:p-7">
+            <section class="dply-card p-6 sm:p-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Your servers') }}</p>

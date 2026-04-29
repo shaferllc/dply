@@ -10,6 +10,7 @@ use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RemoveSiteRepositoryJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
@@ -52,6 +53,7 @@ use Livewire\Component;
 class Show extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
 
     public Server $server;
 
@@ -82,10 +84,6 @@ class Show extends Component
     public string $env_file_content = '';
 
     public string $new_domain_hostname = '';
-
-    public ?string $flash_success = null;
-
-    public ?string $flash_error = null;
 
     public ?string $revealed_webhook_secret = null;
 
@@ -349,7 +347,7 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         if (! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
-            $this->flash_error = __('This host runtime does not expose machine PHP settings.');
+            $this->toastError(__('This host runtime does not expose machine PHP settings.'));
 
             return;
         }
@@ -391,8 +389,7 @@ class Show extends Component
             'meta' => $meta,
         ]);
 
-        $this->flash_success = 'PHP settings saved.';
-        $this->flash_error = null;
+        $this->toastSuccess('PHP settings saved.');
         $this->syncFormFromSite();
     }
 
@@ -419,8 +416,7 @@ class Show extends Component
         $this->site->update([
             'webhook_allowed_ips' => $clean !== [] ? $clean : null,
         ]);
-        $this->flash_success = 'Webhook IP allow list saved. Leave empty to allow any source (signature still required).';
-        $this->flash_error = null;
+        $this->toastSuccess('Webhook IP allow list saved. Leave empty to allow any source (signature still required).');
         $this->syncFormFromSite();
     }
 
@@ -443,10 +439,9 @@ class Show extends Component
 
     protected function finalizeRoutingMutation(string $successMessage): void
     {
-        $this->flash_error = null;
 
         if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
-            $this->flash_success = $successMessage;
+            $this->toastSuccess($successMessage);
 
             return;
         }
@@ -454,10 +449,10 @@ class Show extends Component
         try {
             ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
             $this->site->refresh();
-            $this->flash_success = $successMessage.' Webserver config reloaded.';
+            $this->toastSuccess($successMessage.' Webserver config reloaded.');
         } catch (\Throwable $e) {
-            $this->flash_success = $successMessage.' Saved, but the webserver config could not be re-applied automatically.';
-            $this->flash_error = $e->getMessage();
+            $this->toastSuccess($successMessage.' Saved, but the webserver config could not be re-applied automatically.');
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -465,19 +460,17 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         if (! $this->server->hostCapabilities()->supportsNginxProvisioning()) {
-            $this->flash_error = __('This host runtime does not use managed webserver config.');
+            $this->toastError(__('This host runtime does not use managed webserver config.'));
 
             return;
         }
 
-        $this->flash_error = null;
-        $this->flash_success = null;
         try {
             ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
             $this->site->refresh();
-            $this->flash_success = 'Webserver config written and reloaded.';
+            $this->toastSuccess('Webserver config written and reloaded.');
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -485,20 +478,18 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         if (! $this->server->hostCapabilities()->supportsNginxProvisioning()) {
-            $this->flash_error = __('This host runtime does not issue SSL from the server workspace.');
+            $this->toastError(__('This host runtime does not issue SSL from the server workspace.'));
 
             return;
         }
 
-        $this->flash_error = null;
-        $this->flash_success = null;
         try {
             IssueSiteSslJob::dispatchSync($this->site);
             $this->site->refresh();
-            $this->flash_success = 'SSL certificate requested. Refresh if status still updating.';
+            $this->toastSuccess('SSL certificate requested. Refresh if status still updating.');
         } catch (\Throwable $e) {
             $this->site->refresh();
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -506,13 +497,10 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
 
-        $this->flash_error = null;
-        $this->flash_success = null;
-
         $this->site->refresh();
 
         if ($this->site->isReadyForWorkspace()) {
-            $this->flash_success = __('This site is already configured.');
+            $this->toastSuccess(__('This site is already configured.'));
 
             return;
         }
@@ -525,20 +513,17 @@ class Show extends Component
         ProvisionSiteJob::dispatch($this->site->id);
 
         $this->site->refresh();
-        $this->flash_success = __('Site provisioning has been queued again.');
+        $this->toastSuccess(__('Site provisioning has been queued again.'));
     }
 
     public function cancelProvisioning(SiteProvisioningCanceller $canceller): mixed
     {
         $this->authorize('update', $this->site);
 
-        $this->flash_error = null;
-        $this->flash_success = null;
-
         $this->site->refresh();
 
         if ($this->site->isReadyForWorkspace()) {
-            $this->flash_error = __('This site is already configured. Delete it from the site actions instead.');
+            $this->toastError(__('This site is already configured. Delete it from the site actions instead.'));
 
             return null;
         }
@@ -546,7 +531,7 @@ class Show extends Component
         try {
             $canceller->cancel($this->site->fresh(['server', 'domains']));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
 
             return null;
         }
@@ -557,16 +542,14 @@ class Show extends Component
     public function deployNow(): void
     {
         $this->authorize('update', $this->site);
-        $this->flash_error = null;
-        $this->flash_success = null;
         try {
             RunSiteDeploymentJob::dispatchSync($this->site, SiteDeployment::TRIGGER_MANUAL);
             $this->site->refresh();
-            $this->flash_success = config('insights.queue_after_deploy', true)
+            $this->toastSuccess(config('insights.queue_after_deploy', true)
                 ? __('Deployment finished. Server and site insight runs have been queued.')
-                : __('Deployment finished.');
+                : __('Deployment finished.'));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -575,24 +558,20 @@ class Show extends Component
         $this->authorize('update', $this->site);
         $coordinator->dispatchManualForGroup($this->site->fresh());
         $base = __('Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.');
-        $this->flash_success = config('insights.queue_after_deploy', true)
+        $this->toastSuccess(config('insights.queue_after_deploy', true)
             ? $base.' '.__('After a successful deploy, server and site insight runs are queued automatically.')
-            : $base;
-        $this->flash_error = null;
+            : $base);
     }
 
     public function runRuntimeAction(string $action, SiteRuntimeActionExecutor $executor): void
     {
         $this->authorize('update', $this->site);
 
-        $this->flash_error = null;
-        $this->flash_success = null;
-
         try {
             $result = $executor->run($this->site->fresh(), $action);
             $this->storeRuntimeActionResult($action, $result);
             $this->site->refresh();
-            $this->flash_success = match ($action) {
+            $this->toastSuccess(match ($action) {
                 'rebuild' => __('Runtime rebuilt.'),
                 'start' => __('Runtime started.'),
                 'stop' => __('Runtime stopped.'),
@@ -602,11 +581,11 @@ class Show extends Component
                 'logs' => __('Runtime logs refreshed.'),
                 'destroy' => __('Runtime destroyed.'),
                 default => __('Runtime status refreshed.'),
-            };
+            });
         } catch (\Throwable $e) {
             $this->storeRuntimeActionFailure($action, $e->getMessage());
             $this->site->refresh();
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -620,8 +599,7 @@ class Show extends Component
         $this->authorize('update', $this->site);
         Cache::lock('site-deploy:'.$this->site->id)->forceRelease();
         Cache::forget('site-deploy-active:'.$this->site->id);
-        $this->flash_success = 'Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.';
-        $this->flash_error = null;
+        $this->toastSuccess('Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.');
     }
 
     /**
@@ -713,16 +691,13 @@ class Show extends Component
             ->where('site_id', $this->site->id)
             ->findOrFail($certificateId);
 
-        $this->flash_error = null;
-        $this->flash_success = null;
-
         try {
             ExecuteSiteCertificateJob::dispatchSync($certificate->id);
             $this->site->refresh();
-            $this->flash_success = __('Certificate retry finished.');
+            $this->toastSuccess(__('Certificate retry finished.'));
         } catch (\Throwable $e) {
             $this->site->refresh();
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -737,8 +712,7 @@ class Show extends Component
 
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
             if (($this->functionsDetection['unsupported_for_target'] ?? false) === true) {
-                $this->flash_error = (string) ($this->functionsDetection['warnings'][0] ?? __('This repository runtime is not supported by the selected target.'));
-                $this->flash_success = null;
+                $this->toastError((string) ($this->functionsDetection['warnings'][0] ?? __('This repository runtime is not supported by the selected target.')));
 
                 return;
             }
@@ -788,8 +762,7 @@ class Show extends Component
         }
 
         $this->site->update($updates);
-        $this->flash_success = 'Git settings saved.';
-        $this->flash_error = null;
+        $this->toastSuccess('Git settings saved.');
         $this->syncFormFromSite();
     }
 
@@ -833,8 +806,7 @@ class Show extends Component
             'post_deploy_command' => trim($this->post_deploy_command) ?: null,
         ]);
         $this->site->save();
-        $this->flash_success = __('Repository settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Repository settings saved.'));
         $this->syncFormFromSite();
     }
 
@@ -851,19 +823,16 @@ class Show extends Component
             ? SocialAccount::query()->where('user_id', auth()->id())->find($this->git_source_control_account_id)
             : null;
         if ($account === null) {
-            $this->flash_error = __('Select a connected source control account first.');
-            $this->flash_success = null;
+            $this->toastError(__('Select a connected source control account first.'));
 
             return;
         }
 
         $result = $provisioner->enable($this->site->fresh(), $account);
         if (! $result['ok']) {
-            $this->flash_error = $result['message'];
-            $this->flash_success = null;
+            $this->toastError($result['message']);
         } else {
-            $this->flash_success = $result['message'];
-            $this->flash_error = null;
+            $this->toastSuccess($result['message']);
         }
         $this->syncFormFromSite();
     }
@@ -878,8 +847,7 @@ class Show extends Component
         }
 
         $provisioner->disable($this->site->fresh());
-        $this->flash_success = __('Quick deploy disabled and provider hook removed when possible.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Quick deploy disabled and provider hook removed when possible.'));
         $this->syncFormFromSite();
     }
 
@@ -893,14 +861,13 @@ class Show extends Component
         }
 
         if ($this->site->usesFunctionsRuntime() || $this->site->usesDockerRuntime() || $this->site->usesKubernetesRuntime()) {
-            $this->flash_error = __('This runtime does not use a traditional VM repository path.');
+            $this->toastError(__('This runtime does not use a traditional VM repository path.'));
 
             return;
         }
 
         RemoveSiteRepositoryJob::dispatch($this->site->id);
-        $this->flash_success = __('Repository removal has been queued. This may take a minute on large trees.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Repository removal has been queued. This may take a minute on large trees.'));
     }
 
     public function updatedFunctionsRepoSource(): void
@@ -1055,7 +1022,7 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->flash_error = __('Serverless-backed sites deploy from the configured artifact zip instead of a server-side git checkout.');
+            $this->toastError(__('Serverless-backed sites deploy from the configured artifact zip instead of a server-side git checkout.'));
 
             return;
         }
@@ -1066,10 +1033,9 @@ class Show extends Component
                 'git_deploy_key_private' => $private,
                 'git_deploy_key_public' => $public,
             ]);
-            $this->flash_success = 'New deploy key generated. Add the public key to your Git host.';
-            $this->flash_error = null;
+            $this->toastSuccess('New deploy key generated. Add the public key to your Git host.');
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -1080,8 +1046,7 @@ class Show extends Component
         $this->site->update(['webhook_secret' => $plain]);
         $this->revealed_webhook_secret = $plain;
         $provisioner->syncProviderHookSecret($this->site->fresh());
-        $this->flash_success = 'Webhook secret rotated. Copy it below — it will not be shown again.';
-        $this->flash_error = null;
+        $this->toastSuccess('Webhook secret rotated. Copy it below — it will not be shown again.');
     }
 
     public function saveEnvDraft(): void
@@ -1089,26 +1054,24 @@ class Show extends Component
         $this->authorize('update', $this->site);
         $this->validate(['env_file_content' => 'nullable|string|max:65535']);
         $this->site->update(['env_file_content' => $this->env_file_content]);
-        $this->flash_success = '.env saved in Dply (not yet on server). Use “Push .env to server” to write the file.';
-        $this->flash_error = null;
+        $this->toastSuccess('.env saved in Dply (not yet on server). Use “Push .env to server” to write the file.');
     }
 
     public function pushEnvToServer(SiteEnvPusher $pusher): void
     {
         $this->authorize('update', $this->site);
         if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
-            $this->flash_error = __('This host runtime does not support pushing a .env file over SSH.');
+            $this->toastError(__('This host runtime does not support pushing a .env file over SSH.'));
 
             return;
         }
 
         $this->validate(['env_file_content' => 'nullable|string|max:65535']);
-        $this->flash_error = null;
         try {
             $path = $pusher->push($this->site, $this->env_file_content);
-            $this->flash_success = '.env written to '.$path;
+            $this->toastSuccess('.env written to '.$path);
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -1129,28 +1092,25 @@ class Show extends Component
         $message = __('Zero downtime deployment settings saved.');
 
         if ($previousStrategy === $newStrategy) {
-            $this->flash_success = $message;
-            $this->flash_error = null;
+            $this->toastSuccess($message);
 
             return;
         }
-
-        $this->flash_error = null;
 
         if ($this->shouldAutoReapplyManagedWebserverConfig()) {
             try {
                 ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
                 $this->site->refresh();
-                $this->flash_success = $message.' '.__('Webserver config reloaded.');
+                $this->toastSuccess($message.' '.__('Webserver config reloaded.'));
             } catch (\Throwable $e) {
-                $this->flash_success = $message.' '.__('Saved, but the webserver config could not be re-applied automatically.');
-                $this->flash_error = $e->getMessage();
+                $this->toastSuccess($message.' '.__('Saved, but the webserver config could not be re-applied automatically.'));
+                $this->toastError($e->getMessage());
             }
 
             return;
         }
 
-        $this->flash_success = $message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this strategy.');
+        $this->toastSuccess($message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this strategy.'));
     }
 
     public function shouldShowSystemUserPanel(): bool
@@ -1273,8 +1233,7 @@ class Show extends Component
 
         $this->site->update($update);
         $this->syncFormFromSite();
-        $this->flash_success = 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.';
-        $this->flash_error = null;
+        $this->toastSuccess('Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.');
     }
 
     public function saveEngineHttpCache(): void
@@ -1282,8 +1241,7 @@ class Show extends Component
         $this->authorize('update', $this->site);
 
         if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
-            $this->flash_error = __('Engine HTTP cache is only available for managed VM web server sites on this host.');
-            $this->flash_success = null;
+            $this->toastError(__('Engine HTTP cache is only available for managed VM web server sites on this host.'));
 
             return;
         }
@@ -1297,18 +1255,17 @@ class Show extends Component
         ]);
         $this->site->refresh();
         $this->syncFormFromSite();
-        $this->flash_error = null;
 
         try {
             ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
             $this->site->refresh();
             $this->syncFormFromSite();
-            $this->flash_success = $this->engine_http_cache_enabled
+            $this->toastSuccess($this->engine_http_cache_enabled
                 ? __('Engine HTTP cache enabled and web server config reloaded.')
-                : __('Engine HTTP cache disabled and web server config reloaded.');
+                : __('Engine HTTP cache disabled and web server config reloaded.'));
         } catch (\Throwable $e) {
-            $this->flash_success = __('Setting saved, but the web server config could not be re-applied automatically.');
-            $this->flash_error = $e->getMessage();
+            $this->toastError(__('Setting saved, but the web server config could not be re-applied automatically.'));
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -1330,16 +1287,14 @@ class Show extends Component
         );
         $this->new_env_key = '';
         $this->new_env_value = '';
-        $this->flash_success = 'Environment variable saved.';
-        $this->flash_error = null;
+        $this->toastSuccess('Environment variable saved.');
     }
 
     public function deleteEnvironmentVariable(int $id): void
     {
         $this->authorize('update', $this->site);
         SiteEnvironmentVariable::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->flash_success = 'Variable removed.';
-        $this->flash_error = null;
+        $this->toastSuccess('Variable removed.');
     }
 
     public function addRedirectRule(): void
@@ -1460,16 +1415,14 @@ class Show extends Component
         $this->new_hook_script = '';
         $this->new_hook_order = 0;
         $this->new_hook_timeout_seconds = 900;
-        $this->flash_success = 'Deploy hook added.';
-        $this->flash_error = null;
+        $this->toastSuccess('Deploy hook added.');
     }
 
     public function deleteDeployHook(int $id): void
     {
         $this->authorize('update', $this->site);
         SiteDeployHook::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->flash_success = 'Hook removed.';
-        $this->flash_error = null;
+        $this->toastSuccess('Hook removed.');
     }
 
     public function addDeployPipelineStep(): void
@@ -1499,16 +1452,14 @@ class Show extends Component
         ]);
         $this->new_deploy_step_command = '';
         $this->new_deploy_step_timeout = 900;
-        $this->flash_success = 'Deploy pipeline step added. Runs after git, before the post-deploy command.';
-        $this->flash_error = null;
+        $this->toastSuccess('Deploy pipeline step added. Runs after git, before the post-deploy command.');
     }
 
     public function deleteDeployPipelineStep(int $id): void
     {
         $this->authorize('update', $this->site);
         SiteDeployStep::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->flash_success = 'Pipeline step removed.';
-        $this->flash_error = null;
+        $this->toastSuccess('Pipeline step removed.');
     }
 
     public function moveDeployStepUp(int $id): void
@@ -1523,8 +1474,7 @@ class Show extends Component
         foreach ($ids as $i => $stepId) {
             SiteDeployStep::query()->whereKey($stepId)->update(['sort_order' => $i + 1]);
         }
-        $this->flash_success = 'Pipeline order updated.';
-        $this->flash_error = null;
+        $this->toastSuccess('Pipeline order updated.');
     }
 
     public function moveDeployStepDown(int $id): void
@@ -1539,8 +1489,7 @@ class Show extends Component
         foreach ($ids as $i => $stepId) {
             SiteDeployStep::query()->whereKey($stepId)->update(['sort_order' => $i + 1]);
         }
-        $this->flash_success = 'Pipeline order updated.';
-        $this->flash_error = null;
+        $this->toastSuccess('Pipeline order updated.');
     }
 
     public function confirmRollbackRelease(int|string $releaseId): void
@@ -1561,19 +1510,18 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         if (! $this->server->hostCapabilities()->supportsReleaseRollback()) {
-            $this->flash_error = __('This host runtime does not support release rollback via server symlinks.');
+            $this->toastError(__('This host runtime does not support release rollback via server symlinks.'));
 
             return;
         }
 
-        $this->flash_error = null;
         try {
             $release = SiteRelease::query()->where('site_id', $this->site->id)->findOrFail($releaseId);
             $rollback->rollbackTo($this->site, $release);
             $this->site->refresh();
-            $this->flash_success = 'Rolled back active release symlink. Re-install Nginx if document root changed.';
+            $this->toastSuccess('Rolled back active release symlink. Re-install Nginx if document root changed.');
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -1622,17 +1570,17 @@ class Show extends Component
         $this->authorize('update', $this->site);
         $domain = SiteDomain::query()->where('site_id', $this->site->id)->findOrFail($domainId);
         if ($domain->is_primary && $this->site->domains()->count() === 1) {
-            $this->flash_error = 'Cannot remove the only domain.';
+            $this->toastError('Cannot remove the only domain.');
 
             return;
         }
         if ($domain->hostname === $this->site->testingHostname()) {
-            $this->flash_error = 'The generated testing hostname is managed by Dply and cannot be removed here.';
+            $this->toastError('The generated testing hostname is managed by Dply and cannot be removed here.');
 
             return;
         }
         if ($domain->is_primary) {
-            $this->flash_error = 'Set another domain as primary before removing the primary domain.';
+            $this->toastError('Set another domain as primary before removing the primary domain.');
 
             return;
         }
@@ -1653,8 +1601,7 @@ class Show extends Component
         $this->authorize('update', $this->site);
 
         if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
-            $this->flash_error = __('Site suspension requires managed web server configuration on this host.');
-            $this->flash_success = null;
+            $this->toastError(__('Site suspension requires managed web server configuration on this host.'));
 
             return;
         }
@@ -1677,7 +1624,7 @@ class Show extends Component
         $this->authorize('update', $this->site);
 
         if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
-            $this->flash_error = __('Site suspension is not available for this runtime.');
+            $this->toastError(__('Site suspension is not available for this runtime.'));
 
             return;
         }
@@ -1702,15 +1649,13 @@ class Show extends Component
         $this->site->refresh();
         $this->syncFormFromSite();
 
-        $this->flash_error = null;
-
         try {
             ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
             $this->site->refresh();
-            $this->flash_success = __('Site suspended. Webserver config reloaded.');
+            $this->toastSuccess(__('Site suspended. Webserver config reloaded.'));
         } catch (\Throwable $e) {
-            $this->flash_success = __('Suspension saved, but the webserver config could not be re-applied automatically.');
-            $this->flash_error = $e->getMessage();
+            $this->toastSuccess(__('Suspension saved, but the webserver config could not be re-applied automatically.'));
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -1719,7 +1664,7 @@ class Show extends Component
         $this->authorize('update', $this->site);
 
         if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
-            $this->flash_error = __('Resuming requires managed web server configuration on this host.');
+            $this->toastError(__('Resuming requires managed web server configuration on this host.'));
 
             return;
         }
@@ -1734,15 +1679,14 @@ class Show extends Component
         ]);
         $this->site->refresh();
         $this->settings_suspended_message = '';
-        $this->flash_error = null;
 
         try {
             ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
             $this->site->refresh();
-            $this->flash_success = __('Site resumed. Webserver config reloaded.');
+            $this->toastSuccess(__('Site resumed. Webserver config reloaded.'));
         } catch (\Throwable $e) {
-            $this->flash_success = __('Resume saved, but the webserver config could not be re-applied automatically.');
-            $this->flash_error = $e->getMessage();
+            $this->toastSuccess(__('Resume saved, but the webserver config could not be re-applied automatically.'));
+            $this->toastError($e->getMessage());
         }
     }
 

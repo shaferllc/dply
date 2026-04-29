@@ -6,6 +6,7 @@ use App\Livewire\Profile\DeleteAccount;
 use App\Livewire\Profile\Edit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -22,6 +23,18 @@ class ProfileTest extends TestCase
             ->get('/profile');
 
         $response->assertOk();
+    }
+
+    public function test_profile_edit_shows_dashboard_profile_breadcrumb(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSeeText('Dashboard')
+            ->assertSeeText('Profile')
+            ->assertSee('aria-current="page"', false);
     }
 
     public function test_security_page_is_displayed(): void
@@ -68,6 +81,15 @@ class ProfileTest extends TestCase
 
     public function test_billing_details_can_be_updated(): void
     {
+        Http::fake([
+            'ec.europa.eu/*' => Http::response(
+                '<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">'
+                .'<soap:Body><checkVatResponse><valid>true</valid></checkVatResponse></soap:Body></soap:Envelope>',
+                200,
+                ['Content-Type' => 'text/xml']
+            ),
+        ]);
+
         $user = User::factory()->create();
 
         Livewire::actingAs($user)

@@ -1,6 +1,7 @@
 @if ($showConfirmActionModal ?? false)
+    @teleport('body')
     <div
-        class="fixed inset-0 z-50 overflow-y-auto"
+        class="fixed inset-0 isolate z-[100] overflow-y-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-action-modal-title"
@@ -25,8 +26,8 @@
         x-on:keydown.tab.prevent="!$event.shiftKey && nextFocusable().focus()"
         x-on:keydown.shift.tab.prevent="prevFocusable().focus()"
     >
-        <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="close()"></div>
-        <div class="relative flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
+        <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="close()"></div>
+        <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
             <x-dialog-shell :title="$confirmActionModalTitle" title-id="confirm-action-modal-title" max-width="md">
                 <div>
                     <p class="text-sm leading-relaxed text-brand-moss">{{ $confirmActionModalMessage }}</p>
@@ -52,4 +53,5 @@
             </x-dialog-shell>
         </div>
     </div>
+    @endteleport
 @endif

@@ -20,5 +20,8 @@
         "pusher-js": "^8.4.3",
         "tailwindcss": "^4.2.2",
         "vite": "^7.0.7"
+    },
+    "dependencies": {
+        "@laragear/webpass": "^2.1.2"
     }
 }

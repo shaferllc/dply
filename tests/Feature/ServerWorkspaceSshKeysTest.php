@@ -68,7 +68,41 @@ class ServerWorkspaceSshKeysTest extends TestCase
             ->assertSee('Recent audit history')
             ->assertDontSee('Bulk import')
             ->assertDontSee('Export CSV')
-            ->assertDontSee('Export audit CSV');
+            ->assertDontSee('Export audit CSV')
+            ->assertSee('Generate key pair');
+    }
+
+    public function test_generate_key_pair_prefills_public_and_dispatches_browser_event(): void
+    {
+        if (! function_exists('sodium_crypto_sign_keypair')) {
+            $this->markTestSkipped('sodium extension required for Ed25519 generation.');
+        }
+
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->call('generateNewAuthorizedKeyPair')
+            ->assertHasNoErrors()
+            ->assertSet('new_auth_key', fn ($v) => is_string($v) && str_starts_with($v, 'ssh-ed25519'))
+            ->assertSet('new_auth_name', __('Generated key'))
+            ->assertDispatched('dply-ssh-keypair-generated', function ($name, $params) {
+                return isset($params['privateKey'], $params['publicKey'])
+                    && str_contains((string) $params['privateKey'], 'BEGIN OPENSSH PRIVATE KEY')
+                    && str_starts_with((string) $params['publicKey'], 'ssh-ed25519');
+            });
+
+        $this->assertSame(
+            0,
+            ServerAuthorizedKey::query()->where('server_id', $server->id)->count(),
+            'Generating a key pair must not persist an authorized key row until the user adds it.'
+        );
+
+        $this->assertSame(
+            0,
+            UserSshKey::query()->where('user_id', $user->id)->count(),
+            'Generating a key pair must not save to profile keys automatically.'
+        );
     }
 
     public function test_component_reminds_user_when_server_has_no_personal_profile_key_attached(): void
@@ -234,9 +268,10 @@ class ServerWorkspaceSshKeysTest extends TestCase
             ->test(WorkspaceSshKeys::class, ['server' => $server])
             ->call('syncAuthorizedKeys')
             ->assertHasNoErrors()
-            ->assertSet(
-                'flash_error',
-                "Dply could not connect to the server to sync authorized_keys. Check that the server SSH login user still accepts Dply's provisioned key. The server rejected the SSH key for root@{$server->ip_address}."
+            ->assertDispatched(
+                'notify',
+                message: "Dply could not connect to the server to sync authorized_keys. Check that the server SSH login user still accepts Dply's provisioned key. The server rejected the SSH key for root@{$server->ip_address}.",
+                type: 'error'
             );
     }
 }

@@ -11,7 +11,7 @@
     :title="__('PHP')"
     :description="__('Review server-level PHP inventory, defaults, and runtime configuration from one workspace.')"
 >
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null, 'command_error' => $remote_error ?? null])
+    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if (! $opsReady && ! $sshUnavailable)
@@ -325,7 +325,7 @@
             >
                 <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closePhpConfigEditor"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-5xl dply-modal-panel" @click.stop>
+                    <div class="my-auto w-full max-w-7xl dply-modal-panel" @click.stop>
                         <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>

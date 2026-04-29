@@ -132,7 +132,7 @@ class Index extends Component
             $this->notifyOrgAdminsOfScheduledRemoval($server->fresh(['organization']), $at, $reason !== '' ? $reason : null);
             $this->closeRemoveServerModal();
             $this->serverListEpoch++;
-            session()->flash('success', __(':name is scheduled for removal at the end of :date.', [
+            $this->toastSuccess(__(':name is scheduled for removal at the end of :date.', [
                 'name' => $server->name,
                 'date' => $at->toFormattedDateString(),
             ]));
@@ -167,7 +167,7 @@ class Index extends Component
         $this->closeRemoveServerModal();
         $deleteServer->execute($server, $actor, $auditExtras, $emailContext);
         $this->serverListEpoch++;
-        session()->flash('success', __('Server removed.'));
+        $this->toastSuccess(__('Server removed.'));
     }
 
     public function cancelScheduledServerRemoval(string $serverId): void
@@ -192,7 +192,7 @@ class Index extends Component
             'meta' => $meta,
         ]);
         $this->serverListEpoch++;
-        session()->flash('success', __('Scheduled removal was cancelled.'));
+        $this->toastSuccess(__('Scheduled removal was cancelled.'));
     }
 
     /**

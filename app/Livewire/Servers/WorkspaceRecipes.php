@@ -6,9 +6,9 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Models\Script;
 use App\Models\Server;
 use App\Models\ServerRecipe;
-use App\Models\Script;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\SshConnection;
 use Illuminate\Contracts\View\View;
@@ -58,7 +58,7 @@ class WorkspaceRecipes extends Component
                     'script' => $this->new_recipe_script,
                 ]);
 
-            $this->flash_success = 'Saved command updated.';
+            $this->toastSuccess('Saved command updated.');
         } else {
             ServerRecipe::query()->create([
                 'server_id' => $this->server->id,
@@ -67,11 +67,10 @@ class WorkspaceRecipes extends Component
                 'script' => $this->new_recipe_script,
             ]);
 
-            $this->flash_success = 'Saved command added.';
+            $this->toastSuccess('Saved command added.');
         }
 
         $this->resetRecipeEditor();
-        $this->flash_error = null;
     }
 
     public function editRecipe(string $id): void
@@ -100,8 +99,7 @@ class WorkspaceRecipes extends Component
         if ($this->editing_recipe_id === $id) {
             $this->resetRecipeEditor();
         }
-        $this->flash_success = 'Saved command removed.';
-        $this->flash_error = null;
+        $this->toastSuccess('Saved command removed.');
     }
 
     public function importOrganizationScript(): void
@@ -129,8 +127,7 @@ class WorkspaceRecipes extends Component
         ]);
 
         $this->import_script_id = '';
-        $this->flash_success = 'Organization script copied to this server.';
-        $this->flash_error = null;
+        $this->toastSuccess('Organization script copied to this server.');
     }
 
     public function useRecipeAsDeployCommand(string $id): void
@@ -146,8 +143,7 @@ class WorkspaceRecipes extends Component
             'deploy_command' => trim($recipe->script) ?: null,
         ]);
 
-        $this->flash_success = 'Saved command copied to deploy.';
-        $this->flash_error = null;
+        $this->toastSuccess('Saved command copied to deploy.');
     }
 
     public function runRecipe(string $id): void
@@ -175,7 +171,7 @@ class WorkspaceRecipes extends Component
                 fn (string $chunk) => $this->remoteSshStreamAppendStdout($chunk),
                 900
             );
-            $this->flash_success = 'Saved command ran. See command output below if shown.';
+            $this->toastSuccess('Saved command ran. See command output below if shown.');
         } catch (\Throwable $e) {
             $this->command_error = $e->getMessage();
         }

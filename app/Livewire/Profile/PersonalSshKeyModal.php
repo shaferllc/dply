@@ -3,6 +3,7 @@
 namespace App\Livewire\Profile;
 
 use App\Models\UserSshKey;
+use App\Support\OpenSshEd25519KeyPairGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -29,6 +30,38 @@ class PersonalSshKeyModal extends Component
     {
         $this->resetForm();
         $this->dispatch('close-modal', $this->modalName);
+    }
+
+    public function generateKeyPair(): void
+    {
+        $this->authorize('create', UserSshKey::class);
+        $this->resetErrorBag();
+
+        try {
+            [$private, $public] = OpenSshEd25519KeyPairGenerator::generate();
+        } catch (\RuntimeException $e) {
+            $this->dispatch('notify', message: $e->getMessage(), type: 'error');
+
+            return;
+        }
+
+        if (! UserSshKey::publicKeyLooksValid($public)) {
+            $this->dispatch('notify', message: __('Generated key was invalid. Try again or generate a key locally with ssh-keygen.'), type: 'error');
+
+            return;
+        }
+
+        if (trim($this->name) === '') {
+            $this->name = __('Generated key');
+        }
+
+        $this->public_key = $public;
+
+        $this->dispatch(
+            'dply-ssh-profile-keypair-generated',
+            privateKey: $private,
+            publicKey: $public,
+        );
     }
 
     public function save(): void

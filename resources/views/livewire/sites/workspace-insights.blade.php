@@ -18,16 +18,22 @@
         </ol>
     </nav>
 
-    <header class="mb-8 pb-6 border-b border-brand-ink/10 flex flex-wrap items-start justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-bold tracking-tight text-brand-ink">{{ __('Insights') }}</h1>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Monitoring and recommendations for this site.') }}</p>
-        </div>
-        <button type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
-            <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
-            <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-        </button>
-    </header>
+    <div class="mb-8 border-b border-brand-ink/10 pb-6">
+        <x-page-header
+            :title="__('Insights')"
+            :description="__('Monitoring and recommendations for this site.')"
+            doc-route="docs.index"
+            flush
+            compact
+        >
+            <x-slot name="actions">
+                <button type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
+                    <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
+                    <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
+                </button>
+            </x-slot>
+        </x-page-header>
+    </div>
 
     @if (session('success'))
         <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">{{ session('success') }}</div>

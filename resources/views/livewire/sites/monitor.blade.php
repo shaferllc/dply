@@ -27,11 +27,13 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <header>
-                <h1 class="text-2xl font-bold tracking-tight text-brand-ink">{{ __('Monitor') }}</h1>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Create uptime monitors here; choose a label, optional path, and displayed probe region.') }}</p>
-                <p class="mt-2 text-xs text-brand-moss">{{ __('Checks run from Dply infrastructure. Region labels are for your status page and future multi-region probes.') }}</p>
-            </header>
+            <x-page-header
+                :title="__('Monitor')"
+                :description="__('Create uptime monitors here; choose a label, optional path, and displayed probe region. Checks run from Dply infrastructure — region labels are for your status page and future multi-region probes.')"
+                doc-route="docs.index"
+                flush
+                compact
+            />
 
             @if ($resolvedBaseUrl === null)
                 <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">

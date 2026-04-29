@@ -10,12 +10,13 @@
             </ol>
         </nav>
 
-        <header class="mb-6">
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Database backups') }}</h1>
-            <p class="mt-2 text-sm text-brand-moss max-w-3xl leading-relaxed">
-                {{ __('Define how production data for :org should be captured, retained, and restored. Storage destinations give every site a recovery target, while the backup plan here keeps schedules, ownership, and restore expectations visible to the whole team.', ['org' => $organization->name]) }}
-            </p>
-        </header>
+        <x-page-header
+            :title="__('Database backups')"
+            :description="__('Define how production data for :org should be captured, retained, and restored. Storage destinations give every site a recovery target, while the backup plan here keeps schedules, ownership, and restore expectations visible to the whole team.', ['org' => $organization->name])"
+            doc-route="docs.index"
+            flush
+            compact
+        />
 
         <x-backups-subnav active="databases" />
 
@@ -43,7 +44,7 @@
             </section>
         </div>
 
-        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-gradient-to-r from-brand-sand/40 to-white px-5 py-4 shadow-sm">
+        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-brand-sand/50 px-5 py-4 shadow-sm">
             <p class="text-sm font-semibold text-brand-ink">{{ __('What a trustworthy database backup setup includes') }}</p>
             <ul class="mt-2 space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
                 <li>{{ __('A storage destination with retention you can explain to the team.') }}</li>

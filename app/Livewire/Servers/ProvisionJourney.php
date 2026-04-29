@@ -7,15 +7,16 @@ use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
+use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ClassifyProvisionFailure;
-use App\Support\Servers\ProvisionVerificationSummary;
 use App\Support\Servers\ProvisionStepSnapshots;
-use Illuminate\Support\Collection;
+use App\Support\Servers\ProvisionVerificationSummary;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Livewire;
@@ -98,7 +99,7 @@ class ProvisionJourney extends Component
 
         $task = $this->activeProvisionTask();
         if (! $task) {
-            $this->flash_error = __('There is no active build task to cancel right now.');
+            $this->toastError(__('There is no active build task to cancel right now.'));
             $this->showCancelProvisionModal = false;
 
             return;
@@ -107,14 +108,14 @@ class ProvisionJourney extends Component
         $result = $taskRunner->cancelTask((string) $task->id);
 
         if (! ($result['success'] ?? false)) {
-            $this->flash_error = (string) ($result['error'] ?? __('Could not cancel the build task.'));
+            $this->toastError((string) ($result['error'] ?? __('Could not cancel the build task.')));
 
             return;
         }
 
         $this->server->refresh();
         $this->showCancelProvisionModal = false;
-        session()->flash('success', __('Build cancelled. You can keep this server or remove it.'));
+        $this->toastSuccess(__('Build cancelled. You can keep this server or remove it.'));
     }
 
     public function cancelProvisionAndOpenDelete(TaskRunnerService $taskRunner): void
@@ -126,7 +127,7 @@ class ProvisionJourney extends Component
             $result = $taskRunner->cancelTask((string) $task->id);
 
             if (! ($result['success'] ?? false)) {
-                $this->flash_error = (string) ($result['error'] ?? __('Could not cancel the build task.'));
+                $this->toastError((string) ($result['error'] ?? __('Could not cancel the build task.')));
 
                 return;
             }
@@ -158,7 +159,7 @@ class ProvisionJourney extends Component
 
         $server = $this->server->fresh();
         if (! $server || ! RunSetupScriptJob::shouldDispatch($server)) {
-            $this->flash_error = 'This server is not ready for a setup re-run yet.';
+            $this->toastError('This server is not ready for a setup re-run yet.');
 
             return;
         }
@@ -457,6 +458,7 @@ class ProvisionJourney extends Component
         foreach ($lines as $line) {
             if (str_contains($line, ProvisionStepSnapshots::SCRIPT_STEP_PREFIX.$label)) {
                 $capture = true;
+
                 continue;
             }
 
@@ -502,7 +504,7 @@ class ProvisionJourney extends Component
      */
     protected function verificationChecks(Collection $artifacts): array
     {
-        /** @var \App\Models\ServerProvisionArtifact|null $artifact */
+        /** @var ServerProvisionArtifact|null $artifact */
         $artifact = $artifacts->firstWhere('type', 'verification_report');
 
         return ProvisionVerificationSummary::fromArtifact($artifact);
@@ -589,7 +591,7 @@ class ProvisionJourney extends Component
      */
     protected function stackSummary(Collection $artifacts): ?array
     {
-        /** @var \App\Models\ServerProvisionArtifact|null $artifact */
+        /** @var ServerProvisionArtifact|null $artifact */
         $artifact = $artifacts->firstWhere('type', 'stack_summary');
         if (! $artifact) {
             return null;

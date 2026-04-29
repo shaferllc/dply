@@ -77,11 +77,13 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.index'));
 
         $response->assertOk();
-        $response->assertSee('Fleet control');
+        $response->assertSee('Scan readiness', false);
         $response->assertSee('Open launchpad');
         $response->assertSee(route('launches.create'), false);
         $response->assertSee('No servers yet');
-        $response->assertSee('Choose a launch path for your first infrastructure workflow');
+        $response->assertSee('Create a server');
+        $response->assertSee(route('servers.create'), false);
+        $response->assertSee('Create a VM from here once a cloud provider is connected', false);
     }
 
     public function test_servers_index_prompts_for_provider_setup_when_no_provider_credentials_exist(): void
@@ -215,11 +217,12 @@ class ServerTest extends TestCase
         $response->assertSee('Edge');
         $response->assertSee('Cloud');
         $response->assertSee('Serverless');
+        $response->assertSee('Coming soon');
         $response->assertSee(route('servers.create'), false);
-        $response->assertSee(route('launches.containers'), false);
-        $response->assertSee(route('launches.serverless'), false);
-        $response->assertSee(route('launches.edge-network'), false);
-        $response->assertSee(route('launches.cloud-network'), false);
+        $response->assertDontSee(route('launches.containers'), false);
+        $response->assertDontSee(route('launches.serverless'), false);
+        $response->assertDontSee(route('launches.edge-network'), false);
+        $response->assertDontSee(route('launches.cloud-network'), false);
     }
 
     public function test_serverless_launch_path_is_displayed_with_organization(): void
@@ -988,9 +991,8 @@ class ServerTest extends TestCase
             ->assertOk()
             ->assertSee('Bring your own server')
             ->assertSee('Provision with a provider')
-            ->assertSee('DigitalOcean')
-            ->assertSee('Choose provider')
-            ->assertSee('Choose account');
+            ->assertDontSee('Choose provider')
+            ->assertDontSee('Choose account');
     }
 
     public function test_servers_create_shows_provider_provisioning_option_even_without_provider_credentials(): void
@@ -1006,13 +1008,12 @@ class ServerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Bring your own server');
         $response->assertSee('Provision with a provider');
-        $response->assertSee('Custom server details');
-        $response->assertSee('SSH private key (PEM / OpenSSH)');
-        $response->assertSee('Add a provider credential');
-        $response->assertSee('Choose provider');
+        $response->assertDontSee('Custom server details');
+        $response->assertDontSee('SSH private key (PEM / OpenSSH)');
+        $response->assertDontSee('Choose provider');
     }
 
-    public function test_servers_create_defaults_to_existing_server_form_while_showing_provider_path(): void
+    public function test_servers_create_defaults_to_no_path_until_operator_selects_one(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -1035,11 +1036,14 @@ class ServerTest extends TestCase
             ->assertSee('Use an existing server')
             ->assertSee('Provision with a provider')
             ->assertSee('Bring your own server')
+            ->assertDontSee('SSH private key (PEM / OpenSSH)')
+            ->assertDontSee('Choose provider')
+            ->assertSet('createMode', '')
+            ->assertSet('form.type', 'custom')
+            ->call('useExistingServerPath')
             ->assertSee('SSH private key (PEM / OpenSSH)')
             ->assertSee('Test connection')
-            ->assertSee('Choose provider')
-            ->assertSee('Choose account')
-            ->assertSet('form.type', 'custom');
+            ->assertSet('createMode', 'existing');
     }
 
     public function test_servers_create_can_switch_to_provider_provisioning_path(): void
@@ -1179,13 +1183,13 @@ class ServerTest extends TestCase
     {
         $user = $this->userWithOrganization();
 
-        $response = $this->actingAs($user)->get(route('servers.create'));
-
-        $response->assertOk();
-        $response->assertSee('Preflight and cost preview');
-        $response->assertSee('SSH reachability is not verified yet');
-        $response->assertSee('Dply cannot estimate pricing for your own VPS.');
-        $response->assertSee('Unavailable');
+        Livewire::actingAs($user)
+            ->test(ServersCreate::class)
+            ->call('useExistingServerPath')
+            ->assertSee('Preflight and cost preview')
+            ->assertSee('SSH reachability is not verified yet')
+            ->assertSee('Dply cannot estimate pricing for your own VPS.')
+            ->assertSee('Unavailable');
     }
 
     public function test_servers_create_custom_connection_test_can_report_success(): void

@@ -47,7 +47,7 @@ class WorkspaceDaemons extends Component
 
     public ?string $new_sv_site_id = null;
 
-    /** @var 'quick'|'advanced' When {@see $new_sv_type} is queue, structured builder vs raw command. */
+    /** @var 'quick'|'advanced' When {@see} is queue, structured builder vs raw command. */
     public string $queue_builder_mode = 'quick';
 
     public string $quick_php_binary = 'php';
@@ -73,7 +73,7 @@ class WorkspaceDaemons extends Component
     /** When set (site route or overlaps query site), scope program list and defaults. */
     public ?string $context_site_id = null;
 
-    /** @var 'site'|'all' Only when {@see $context_site_id} is set. */
+    /** @var 'site'|'all' Only when {@see} is set. */
     public string $programs_list_scope = 'all';
 
     public bool $siteContextUnavailable = false;
@@ -217,9 +217,7 @@ class WorkspaceDaemons extends Component
     {
         $readOnly = in_array($action, ['status', 'is-active', 'is-enabled'], true);
         $this->authorize($readOnly ? 'view' : 'update', $this->server);
-        $this->flash_error = null;
         if (! $readOnly) {
-            $this->flash_success = null;
         }
         try {
             $out = $provisioner->manageSupervisorService($this->server->fresh(), $action);
@@ -228,11 +226,11 @@ class WorkspaceDaemons extends Component
                 SupervisorDaemonAudit::log($this->server->fresh(), null, 'supervisor_service_'.$action, [
                     'output' => Str::limit($out, 2000),
                 ]);
-                $this->flash_success = __('Service command completed. Review output below.');
+                $this->toastSuccess(__('Service command completed. Review output below.'));
             }
         } catch (\Throwable $e) {
             $this->supervisor_service_output = '';
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -274,8 +272,7 @@ class WorkspaceDaemons extends Component
             ),
             default => null,
         };
-        $this->flash_success = __('Preset loaded — adjust directory if needed, then add the program.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Preset loaded — adjust directory if needed, then add the program.'));
     }
 
     protected function applyLaravelQueuePresetQuick(): void
@@ -514,13 +511,13 @@ class WorkspaceDaemons extends Component
                 ->whereKey($this->editing_program_id)
                 ->first();
             if (! $prog) {
-                $this->flash_error = __('Program not found.');
+                $this->toastError(__('Program not found.'));
                 $this->cancelEditProgram();
 
                 return;
             }
             $prog->update($attrs);
-            $this->flash_success = __('Program updated. Sync Supervisor on the server to apply changes.');
+            $this->toastSuccess(__('Program updated. Sync Supervisor on the server to apply changes.'));
             $this->cancelEditProgram();
         } else {
             $type = $this->new_sv_type;
@@ -537,10 +534,9 @@ class WorkspaceDaemons extends Component
             if ($type === 'queue' && $nproc > 4) {
                 $msg .= ' '.__('Note: Many queue workers are often better as separate programs or Horizon.');
             }
-            $this->flash_success = $msg;
+            $this->toastSuccess($msg);
         }
 
-        $this->flash_error = null;
     }
 
     protected function resetDefaultsForNewProgramForm(): void
@@ -600,8 +596,7 @@ class WorkspaceDaemons extends Component
         }
         $this->new_sv_env_lines = implode("\n", $lines);
         $this->queue_builder_mode = 'advanced';
-        $this->flash_success = __('Editing — change fields and save.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Editing — change fields and save.'));
     }
 
     public function cancelEditProgram(): void
@@ -661,8 +656,7 @@ class WorkspaceDaemons extends Component
 
         SupervisorDaemonAudit::log($this->server->fresh(), null, 'template_saved', ['name' => $savedTemplateName, 'slug' => $slug]);
         $this->template_save_name = '';
-        $this->flash_success = __('Organization template saved. Use “Apply” on a template to load it into the form.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Organization template saved. Use “Apply” on a template to load it into the form.'));
     }
 
     public function applyOrgTemplate(string $templateId): void
@@ -694,8 +688,7 @@ class WorkspaceDaemons extends Component
             $lines[] = $k.'='.$v;
         }
         $this->new_sv_env_lines = implode("\n", $lines);
-        $this->flash_success = __('Template loaded — review slug and site, then add the program.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Template loaded — review slug and site, then add the program.'));
     }
 
     public function deleteOrgTemplate(string $templateId): void
@@ -705,8 +698,7 @@ class WorkspaceDaemons extends Component
             ->where('organization_id', $this->server->organization_id)
             ->whereKey($templateId)
             ->delete();
-        $this->flash_success = __('Template removed.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Template removed.'));
     }
 
     public function copyProgramToServer(): void
@@ -725,7 +717,7 @@ class WorkspaceDaemons extends Component
         ]);
 
         if ($this->copy_target_server_id === $this->server->id) {
-            $this->flash_error = __('Choose a different server than the current one.');
+            $this->toastError(__('Choose a different server than the current one.'));
 
             return;
         }
@@ -735,7 +727,7 @@ class WorkspaceDaemons extends Component
             ->whereKey($this->copy_source_program_id)
             ->first();
         if (! $source) {
-            $this->flash_error = __('Source program not found.');
+            $this->toastError(__('Source program not found.'));
 
             return;
         }
@@ -745,13 +737,13 @@ class WorkspaceDaemons extends Component
             ->whereKey($this->copy_target_server_id)
             ->first();
         if (! $target) {
-            $this->flash_error = __('Target server not found.');
+            $this->toastError(__('Target server not found.'));
 
             return;
         }
 
         if (SupervisorProgram::query()->where('server_id', $target->id)->where('slug', $this->copy_new_slug)->exists()) {
-            $this->flash_error = __('A program with that slug already exists on the target server.');
+            $this->toastError(__('A program with that slug already exists on the target server.'));
 
             return;
         }
@@ -784,14 +776,12 @@ class WorkspaceDaemons extends Component
         $this->copy_source_program_id = '';
         $this->copy_target_server_id = '';
         $this->copy_new_slug = '';
-        $this->flash_success = __('Program copied to the target server. Open that server’s Daemons page and sync Supervisor.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Program copied to the target server. Open that server’s Daemons page and sync Supervisor.'));
     }
 
     public function loadProgramStatuses(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
-        $this->flash_error = null;
         $this->program_status_map = [];
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
             return;
@@ -800,53 +790,48 @@ class WorkspaceDaemons extends Component
             $out = $provisioner->fetchSupervisorctlStatus($this->server->fresh());
             $this->program_status_map = $provisioner->parseManagedProgramStatuses($this->server->fresh(), $out);
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function runPreflightPathCheck(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
-        $this->flash_error = null;
         try {
             $result = $provisioner->preflightPathCheck($this->server->fresh());
             $this->preflight_messages = $result['messages'];
-            $this->flash_success = $result['ok']
+            $this->toastSuccess($result['ok']
                 ? __('Working directories look OK on the server.')
-                : __('Some paths failed checks — see messages below.');
+                : __('Some paths failed checks — see messages below.'));
         } catch (\Throwable $e) {
             $this->preflight_messages = [];
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function stopOneProgram(string $id, SupervisorProvisioner $provisioner): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $out = $provisioner->stopProgramGroup($this->server->fresh(), $id);
             $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
             SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'stop_one', ['output' => Str::limit($out, 500)]);
-            $this->flash_success = __('Stop: :out', ['out' => Str::limit($out, 500)]);
+            $this->toastSuccess(__('Stop: :out', ['out' => Str::limit($out, 500)]));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function startOneProgram(string $id, SupervisorProvisioner $provisioner): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $out = $provisioner->startProgramGroup($this->server->fresh(), $id);
             $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
             SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'start_one', ['output' => Str::limit($out, 500)]);
-            $this->flash_success = __('Start: :out', ['out' => Str::limit($out, 500)]);
+            $this->toastSuccess(__('Start: :out', ['out' => Str::limit($out, 500)]));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -861,8 +846,7 @@ class WorkspaceDaemons extends Component
         if ($this->editing_program_id === $id) {
             $this->cancelEditProgram();
         }
-        $this->flash_success = __('Removed. Sync Supervisor to reload on the server.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Removed. Sync Supervisor to reload on the server.'));
     }
 
     public function refreshSupervisorInstallStatus(SupervisorProvisioner $provisioner): void
@@ -889,8 +873,6 @@ class WorkspaceDaemons extends Component
     public function installSupervisorPackage(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $out = $provisioner->installSupervisorPackage($this->server->fresh());
             $this->last_supervisor_sync_output = trim($out);
@@ -901,9 +883,9 @@ class WorkspaceDaemons extends Component
             } else {
                 $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_MISSING]);
             }
-            $this->flash_success = __('Supervisor was installed on the server. You can add programs and sync.');
+            $this->toastSuccess(__('Supervisor was installed on the server. You can add programs and sync.'));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
             $this->supervisor_installed = false;
         }
     }
@@ -911,50 +893,45 @@ class WorkspaceDaemons extends Component
     public function syncSupervisor(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $this->server->refresh();
             $out = $provisioner->sync($this->server);
             $trimmed = trim($out);
             $this->last_supervisor_sync_output = $trimmed;
             SupervisorDaemonAudit::log($this->server->fresh(), null, 'supervisor_sync', ['output' => Str::limit($trimmed, 2000)]);
-            $this->flash_success = __('Supervisor sync: :snippet', ['snippet' => Str::limit($trimmed, 800)]);
+            $this->toastSuccess(__('Supervisor sync: :snippet', ['snippet' => Str::limit($trimmed, 800)]));
             $this->supervisor_installed = true;
             $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function loadPreviewSync(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
-        $this->flash_error = null;
         try {
             $this->preview_sync_output = $provisioner->previewSyncDiff($this->server->fresh());
         } catch (\Throwable $e) {
             $this->preview_sync_output = '';
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function loadDrift(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
-        $this->flash_error = null;
         try {
             $this->drift_output = $provisioner->driftReport($this->server->fresh());
         } catch (\Throwable $e) {
             $this->drift_output = '';
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function tailProgramLog(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
-        $this->flash_error = null;
         $this->validate([
             'log_tail_program_id' => 'required|string',
             'log_which' => 'required|in:stdout,stderr',
@@ -964,7 +941,7 @@ class WorkspaceDaemons extends Component
             ->whereKey($this->log_tail_program_id)
             ->first();
         if (! $prog) {
-            $this->flash_error = __('Program not found.');
+            $this->toastError(__('Program not found.'));
 
             return;
         }
@@ -974,7 +951,7 @@ class WorkspaceDaemons extends Component
                 : $provisioner->tailProgramStdoutLog($this->server->fresh(), $prog, 200);
         } catch (\Throwable $e) {
             $this->log_tail_body = '';
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -989,53 +966,48 @@ class WorkspaceDaemons extends Component
     public function restartOneProgram(string $id, SupervisorProvisioner $provisioner): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $out = $provisioner->restartProgramGroup($this->server->fresh(), $id);
             $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
             SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'restart_one', ['output' => Str::limit($out, 500)]);
-            $this->flash_success = __('Restart: :out', ['out' => Str::limit($out, 500)]);
+            $this->toastSuccess(__('Restart: :out', ['out' => Str::limit($out, 500)]));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function restartAllPrograms(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $out = $provisioner->restartAllManagedPrograms($this->server->fresh());
             SupervisorDaemonAudit::log($this->server->fresh(), null, 'restart_all', ['output' => Str::limit($out, 1200)]);
-            $this->flash_success = __('Restart all: :out', ['out' => Str::limit($out, 1200)]);
+            $this->toastSuccess(__('Restart all: :out', ['out' => Str::limit($out, 1200)]));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function loadSupervisorInspect(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
-        $this->flash_error = null;
         $this->inspect_supervisor_body = null;
 
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->flash_error = __('Server must be ready with SSH before inspecting Supervisor.');
+            $this->toastError(__('Server must be ready with SSH before inspecting Supervisor.'));
 
             return;
         }
 
         $this->server->refresh();
         if ($this->server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_MISSING) {
-            $this->flash_error = __('Supervisor is not installed on this server yet. Use Install Supervisor at the top of this page.');
+            $this->toastError(__('Supervisor is not installed on this server yet. Use Install Supervisor at the top of this page.'));
 
             return;
         }
         if ($this->server->supervisor_package_status !== Server::SUPERVISOR_PACKAGE_INSTALLED
             && ! $provisioner->isSupervisorPackageInstalled($this->server->fresh())) {
-            $this->flash_error = __('Supervisor is not installed on this server yet. Use Install Supervisor at the top of this page.');
+            $this->toastError(__('Supervisor is not installed on this server yet. Use Install Supervisor at the top of this page.'));
 
             return;
         }
@@ -1046,7 +1018,7 @@ class WorkspaceDaemons extends Component
         try {
             $this->inspect_supervisor_body = $provisioner->fetchSupervisorctlStatus($this->server->fresh());
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 

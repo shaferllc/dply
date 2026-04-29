@@ -1,22 +1,18 @@
 <div>
     <x-livewire-validation-errors />
 
-    <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('profile.edit') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Profile') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('API keys') }}</li>
-        </ol>
-    </nav>
+    <x-breadcrumb-trail :items="[
+        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+        ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
+        ['label' => __('API keys'), 'icon' => 'bolt'],
+    ]" />
 
-    <header class="mb-8">
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ __('API keys') }}</h1>
-        <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-            {{ __('Create personal access tokens for automation and API access. Tokens are scoped to an organization and can be restricted by IP.') }}
-        </p>
-    </header>
+    <x-page-header
+        :title="__('API keys')"
+        :description="__('Create personal access tokens for automation and API access. Tokens are scoped to an organization and can be restricted by IP.')"
+        doc-route="docs.index"
+        flush
+    />
 
     @if ($adminOrganizations->isEmpty())
         <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -146,7 +142,7 @@
                                         <span>{{ $cat['label'] }}</span>
                                         <span class="flex items-center gap-2 text-xs text-brand-moss font-normal">
                                             ({{ $selectedInCat }}/{{ $totalInCat }})
-                                            <svg class="h-4 w-4 transition-transform {{ $expanded ? 'rotate-180' : '' }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                                            <x-heroicon-m-chevron-down class="h-4 w-4 transition-transform {{ $expanded ? 'rotate-180' : '' }}" aria-hidden="true" />
                                         </span>
                                     </button>
                                     @if ($expanded)
@@ -188,36 +184,40 @@
                 </div>
             </section>
 
-            <section class="dply-card overflow-hidden">
-                <div class="px-6 py-4 border-b border-brand-ink/10 flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your tokens') }}</h2>
-                    <div class="w-full sm:w-auto sm:max-w-xs">
-                        <label for="api_token_search" class="sr-only">{{ __('Search') }}</label>
-                        <input
-                            id="api_token_search"
-                            type="search"
-                            wire:model.live.debounce.300ms="token_list_search"
-                            placeholder="{{ __('Search…') }}"
-                            class="w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                        />
-                    </div>
-                </div>
-                @if ($tokens->isEmpty())
-                    <div class="px-6 py-10 text-center text-sm text-brand-moss">{{ __('No results found.') }}</div>
+            <x-table-card :title="__('Your tokens')" :subtitle="__('Revoke tokens you no longer need.')">
+                <x-slot name="search">
+                    <label for="api_token_search" class="sr-only">{{ __('Search') }}</label>
+                    <x-text-input
+                        id="api_token_search"
+                        type="search"
+                        wire:model.live.debounce.300ms="token_list_search"
+                        placeholder="{{ __('Search by name…') }}"
+                        class="block w-full"
+                        autocomplete="off"
+                    />
+                </x-slot>
+
+                @php
+                    $hasApiTokenSearch = trim($token_list_search ?? '') !== '';
+                @endphp
+                @if (! $hasApiTokenSearch && $tokens->isEmpty())
+                    <x-table-card-empty>{{ __('No API tokens yet.') }}</x-table-card-empty>
+                @elseif ($hasApiTokenSearch && $tokens->isEmpty())
+                    <x-table-card-empty>{{ __('No tokens match your search.') }}</x-table-card-empty>
                 @else
-                    <ul class="divide-y divide-brand-ink/10">
+                    <ul class="divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
                         @foreach ($tokens as $t)
-                            <li class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4">
+                            <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                                 <div class="min-w-0">
                                     <p class="font-medium text-brand-ink">{{ $t->name }}</p>
-                                    <p class="text-xs font-mono text-brand-moss mt-0.5">{{ $t->masked_display }}</p>
+                                    <p class="mt-0.5 font-mono text-xs text-brand-moss">{{ $t->masked_display }}</p>
                                     @if ($t->abilities)
-                                        <p class="text-xs text-brand-mist mt-2 font-mono break-words">{{ implode(', ', $t->abilities) }}</p>
+                                        <p class="mt-2 break-words font-mono text-xs text-brand-mist">{{ implode(', ', $t->abilities) }}</p>
                                     @endif
                                     @if ($t->allowed_ips)
-                                        <p class="text-xs text-brand-moss mt-1">{{ __('IPs:') }} {{ implode(', ', $t->allowed_ips) }}</p>
+                                        <p class="mt-1 text-xs text-brand-moss">{{ __('IPs:') }} {{ implode(', ', $t->allowed_ips) }}</p>
                                     @endif
-                                    <p class="text-xs text-brand-mist mt-1">
+                                    <p class="mt-1 text-xs text-brand-mist">
                                         @if ($t->last_used_at)
                                             {{ __('Last used :time', ['time' => $t->last_used_at->diffForHumans()]) }}
                                         @else
@@ -239,7 +239,7 @@
                         @endforeach
                     </ul>
                 @endif
-            </section>
+            </x-table-card>
         </div>
     @endif
 

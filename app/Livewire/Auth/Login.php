@@ -106,6 +106,8 @@ class Login extends Component
         return view('livewire.auth.login', [
             'oauthProviders' => OAuthController::getEnabledProviders(),
             'showQuickLoginButton' => $this->canUseQuickLoginButton(),
+            'webauthnLoginOptionsUrl' => route('webauthn.login.options', absolute: false),
+            'webauthnLoginUrl' => route('webauthn.login', absolute: false),
         ])->layout('layouts.guest-livewire', ['title' => $this->title]);
     }
 

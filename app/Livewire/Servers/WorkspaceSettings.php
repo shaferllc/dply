@@ -58,7 +58,7 @@ class WorkspaceSettings extends Component
         if ($this->server->status === Server::STATUS_READY && ! empty($this->server->ip_address)) {
             CheckServerHealthJob::dispatch($this->server);
         }
-        $this->flash_success = __('Health check has been queued. Status will update shortly.');
+        $this->toastSuccess(__('Health check has been queued. Status will update shortly.'));
     }
 
     public function render(): View

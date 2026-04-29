@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
 use App\Models\WebserverTemplate;
 use App\Services\Webserver\NginxConfigSyntaxTester;
@@ -16,6 +17,7 @@ use Livewire\Component;
 class WebserverTemplates extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
 
     public Organization $organization;
 
@@ -113,10 +115,10 @@ NGINX;
                 ->where('organization_id', $this->organization->id)
                 ->findOrFail($this->editingId);
             $template->update($payload);
-            session()->flash('success', __('Template updated.'));
+            $this->toastSuccess(__('Template updated.'));
         } else {
             $this->organization->webserverTemplates()->create($payload);
-            session()->flash('success', __('Template created.'));
+            $this->toastSuccess(__('Template created.'));
         }
 
         $this->cancelEdit();
@@ -136,7 +138,7 @@ NGINX;
             $this->cancelEdit();
         }
 
-        session()->flash('success', __('Template deleted.'));
+        $this->toastSuccess(__('Template deleted.'));
     }
 
     public function testDraft(WebserverTemplateRenderer $renderer, NginxConfigSyntaxTester $tester): void

@@ -45,7 +45,7 @@ class Marketplace extends Component
             'marketplace_key' => $key,
         ]);
 
-        session()->flash('success', __('Script added to your organization. You can edit it below.'));
+        $this->toastSuccess(__('Script added to your organization. You can edit it below.'));
 
         return $this->redirect(route('scripts.edit', $script), navigate: true);
     }

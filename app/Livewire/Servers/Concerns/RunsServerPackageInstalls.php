@@ -87,8 +87,7 @@ trait RunsServerPackageInstalls
                 $timeout,
             );
             $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
-            $this->flash_success = $flash;
-            $this->flash_error = null;
+            $this->toastSuccess($flash);
             if ($key === 'install_monitoring_prerequisites') {
                 app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
             }
@@ -139,12 +138,10 @@ trait RunsServerPackageInstalls
         if ($status === 'finished') {
             $flash = $payload['flash_success'] ?? null;
             if (is_string($flash) && $flash !== '') {
-                $this->flash_success = $flash;
-                $this->flash_error = null;
+                $this->toastSuccess($flash);
             }
             $this->dispatch('monitoring-probe-requested');
         } else {
-            $this->flash_success = null;
         }
 
         Cache::forget(ServerManageRemoteSshJob::cacheKey($this->servicesRemoteTaskId));
@@ -216,7 +213,6 @@ trait RunsServerPackageInstalls
         $this->servicesRemoteTaskId = $id;
         $this->remote_output = __('Task queued. This page will update when the server responds.');
         $this->remote_error = null;
-        $this->flash_success = null;
         $this->resetRemoteSshStreamTargets();
         $this->remoteSshStreamSetMeta(
             $streamTitle,

@@ -29,6 +29,8 @@
     :title="__('Overview')"
     :description="__('At-a-glance health, sites, deploy status, and operations shortcuts for this server.')"
     :show-navigation="! $setupIncomplete"
+    doc-route="docs.create-first-server"
+    :doc-label="__('First server guide')"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -198,8 +200,8 @@
             @endif
 
             @if ($containerLaunch)
-                <section class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-brand-sand/20 p-6 shadow-sm">
-                    <div class="mx-auto flex max-w-5xl flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+                <section class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-sky-50/90 p-6 shadow-sm">
+                    <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                         <div class="max-w-3xl">
                             <div class="flex flex-wrap items-center gap-3">
                                 <span class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-700">

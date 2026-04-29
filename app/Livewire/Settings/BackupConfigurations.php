@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\BackupConfiguration;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,7 @@ use Livewire\Component;
 class BackupConfigurations extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
 
     /** @var array<string, mixed> */
     public array $createForm = [];
@@ -24,10 +26,6 @@ class BackupConfigurations extends Component
     public ?int $editing_id = null;
 
     public string $search = '';
-
-    public ?string $flash_success = null;
-
-    public ?string $flash_error = null;
 
     public function mount(): void
     {
@@ -99,8 +97,7 @@ class BackupConfigurations extends Component
         ]);
 
         $this->createForm = $this->emptyForm();
-        $this->flash_success = __('Backup configuration saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Backup configuration saved.'));
     }
 
     public function startEdit(int $id): void
@@ -143,8 +140,7 @@ class BackupConfigurations extends Component
         ]);
 
         $this->cancelEdit();
-        $this->flash_success = __('Backup configuration updated.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Backup configuration updated.'));
     }
 
     public function deleteConfiguration(int $id): void
@@ -159,8 +155,7 @@ class BackupConfigurations extends Component
             $this->cancelEdit();
         }
 
-        $this->flash_success = __('Backup configuration removed.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Backup configuration removed.'));
     }
 
     /**

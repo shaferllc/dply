@@ -1,8 +1,9 @@
 <div>
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div class="dply-page-shell py-8 space-y-8">
         <x-page-header
             :title="__('Sites')"
             :description="__('Sites belong to a server. Open a server to create one, or jump from the list below.')"
+            doc-route="docs.index"
             flush
         >
             <x-slot name="actions">

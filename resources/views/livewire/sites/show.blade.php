@@ -197,14 +197,7 @@
         </div>
     </header>
     <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            @if ($flash_success)
-                <div class="p-4 rounded-md bg-green-50 text-green-800">{{ $flash_success }}</div>
-            @endif
-            @if ($flash_error)
-                <div class="p-4 rounded-md bg-red-50 text-red-800">{{ $flash_error }}</div>
-            @endif
-
+        <div class="dply-page-shell space-y-6">
             @if ($this->deployLockInfo)
                 <div class="p-4 rounded-md bg-amber-50 text-amber-900 text-sm border border-amber-200" wire:poll.5s>
                     <strong>Deployment in progress</strong>
@@ -217,7 +210,7 @@
             @endif
 
             @if (! $readyForWorkspace)
-                <div class="mx-auto max-w-5xl space-y-6" wire:poll.5s="pollProvisioningStatus">
+                <div class="space-y-6" wire:poll.5s="pollProvisioningStatus">
                     <div class="overflow-hidden rounded-[1.75rem] border {{ $provisioningState === 'failed' ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-white' }} shadow-sm">
                         <div class="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1.55fr)_20rem]">
                             <div class="min-w-0">

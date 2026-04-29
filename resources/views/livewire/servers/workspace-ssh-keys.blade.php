@@ -129,6 +129,25 @@
                 @endif
 
                 <form wire:submit="addAuthorizedKey" class="space-y-4">
+                    <div class="flex flex-col gap-3 rounded-xl border border-brand-sage/20 bg-brand-sage/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-sm leading-relaxed text-brand-moss">
+                            {{ __('Generate an Ed25519 key pair in your browser session. Dply only keeps the public half—save the private key locally before closing the dialog.') }}
+                        </p>
+                        <button
+                            type="button"
+                            wire:click="generateNewAuthorizedKeyPair"
+                            wire:loading.attr="disabled"
+                            wire:target="generateNewAuthorizedKeyPair"
+                            class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
+                        >
+                            <span wire:loading.remove wire:target="generateNewAuthorizedKeyPair">{{ __('Generate key pair') }}</span>
+                            <span wire:loading wire:target="generateNewAuthorizedKeyPair" class="inline-flex items-center gap-2">
+                                <x-spinner variant="forest" size="sm" />
+                                {{ __('Generating…') }}
+                            </span>
+                        </button>
+                    </div>
+
                     <div>
                         <x-input-label for="new_auth_name" :value="__('Name')" />
                         <x-text-input id="new_auth_name" wire:model="new_auth_name" class="mt-1 block w-full" placeholder="{{ __('e.g. Work laptop') }}" :disabled="(bool) $profile_key_id" />
@@ -433,6 +452,8 @@
                 <p class="text-xs text-brand-moss">{{ __('Outbound webhooks: configure the server “Outbound webhook” URL in Settings to receive JSON when sync completes (signed with your webhook secret).') }}</p>
             </div>
         </x-server-workspace-tab-panel>
+
+        @include('livewire.partials.ssh-keypair-reveal-modal', ['revealContext' => 'server'])
         </div>
     @else
         @include('livewire.servers.partials.workspace-ops-not-ready')

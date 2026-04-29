@@ -8,14 +8,13 @@
             </ol>
         </nav>
 
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
-            <div>
-                <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Scripts') }}</h1>
-                <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-                    {{ __('Keep reusable organization-wide automation here. Start from script presets, edit them anytime, and copy a script into a server only when it should become a server-local saved command.') }}
-                </p>
-            </div>
-            <div class="flex flex-wrap gap-2 shrink-0">
+        <x-page-header
+            :title="__('Scripts')"
+            :description="__('Keep reusable organization-wide automation here. Start from script presets, edit them anytime, and copy a script into a server only when it should become a server-local saved command.')"
+            doc-route="docs.index"
+            flush
+        >
+            <x-slot name="actions">
                 <a href="{{ route('scripts.marketplace') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                     {{ __('Script presets') }}
                 </a>
@@ -24,8 +23,8 @@
                         {{ __('Create script') }}
                     </a>
                 @endcan
-            </div>
-        </div>
+            </x-slot>
+        </x-page-header>
 
         @if (session('success'))
             <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ session('success') }}</div>

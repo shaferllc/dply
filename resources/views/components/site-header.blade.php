@@ -189,21 +189,21 @@
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                <div class="border-b border-brand-sage/25 bg-brand-sand px-4 py-3">
+                                <div class="border-b border-brand-ink/8 bg-brand-sand/20 px-4 py-3">
                                     <div class="flex items-center justify-between gap-3">
                                         <div>
                                             <p class="text-sm font-semibold text-brand-ink">{{ __('Notifications') }}</p>
                                             <p class="text-xs text-brand-moss">{{ __('Unread: :count', ['count' => $notificationUnreadCount]) }}</p>
                                         </div>
                                         @if ($notificationTablesReady)
-                                            <a href="{{ route('notifications.index') }}" class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest shadow-sm ring-1 ring-brand-sage/25 transition hover:bg-brand-cream">
+                                            <a href="{{ route('notifications.index') }}" class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss shadow-sm ring-1 ring-brand-ink/10 transition hover:bg-brand-cream hover:text-brand-ink">
                                                 {{ __('Open inbox') }}
                                             </a>
                                         @endif
                                     </div>
                                 </div>
                                 @forelse ($recentNotificationItems as $notificationItem)
-                                    <a href="{{ $notificationItem->url ?: route('notifications.index') }}" class="block border-b border-brand-ink/5 px-4 py-3 last:border-b-0 transition hover:bg-brand-sand">
+                                    <a href="{{ $notificationItem->url ?: route('notifications.index') }}" class="block border-b border-brand-ink/5 px-4 py-3 last:border-b-0 transition hover:bg-brand-sand/35">
                                         <div class="flex items-start justify-between gap-3">
                                             <div>
                                                 <p class="text-sm font-medium text-brand-ink">{{ $notificationItem->title }}</p>
@@ -241,8 +241,8 @@
                             </x-slot>
                             <x-slot name="content">
                                 @can('viewPlatformAdmin')
-                                    <div class="mx-2 mb-1 mt-1 rounded-xl border border-brand-sage/30 bg-brand-sand px-1 pt-2 pb-1 shadow-inner shadow-brand-ink/5">
-                                    <p class="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-forest">{{ __('Platform admin') }}</p>
+                                    <div class="mx-2 mb-1 mt-1 rounded-xl border border-brand-ink/10 bg-brand-sand/25 px-1 pt-2 pb-1">
+                                    <p class="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Platform admin') }}</p>
                                     <x-dropdown-link :href="route('admin.dashboard')">
                                         <x-slot name="icon">
                                             <x-heroicon-o-squares-2x2 class="{{ $hi }}" />
@@ -270,7 +270,7 @@
                                         </x-dropdown-link>
                                     @endif
                                     </div>
-                                    <div class="my-2 h-px bg-gradient-to-r from-transparent via-brand-ink/12 to-transparent" role="presentation"></div>
+                                    <div class="my-2 h-px bg-brand-ink/10" role="presentation"></div>
                                 @endcan
                                 <x-dropdown-link :href="route('status-pages.index')">
                                     <x-slot name="icon">
@@ -296,7 +296,7 @@
                                     </x-slot>
                                     {{ __('Scripts') }}
                                 </x-dropdown-link>
-                                <div class="my-2 h-px bg-gradient-to-r from-transparent via-brand-ink/12 to-transparent" role="presentation"></div>
+                                <div class="my-2 h-px bg-brand-ink/10" role="presentation"></div>
                                 <x-dropdown-link :href="route('features')">
                                     <x-slot name="icon">
                                         <x-heroicon-o-sparkles class="{{ $hi }}" />
@@ -322,7 +322,7 @@
                         <x-dropdown align="right" width="48">
                             <x-slot name="trigger">
                                 <button type="button" class="inline-flex items-center gap-1.5 lg:gap-2 rounded-lg border border-brand-ink/10 bg-white/90 px-2 py-2 text-sm font-medium text-brand-ink shadow-sm shadow-brand-ink/5 transition hover:border-brand-ink/20 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50">
-                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sand/50 text-brand-forest ring-1 ring-brand-ink/5" aria-hidden="true">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-ink/[0.05] text-brand-moss ring-1 ring-brand-ink/[0.08]" aria-hidden="true">
                                         <x-heroicon-o-user-circle class="h-4 w-4 shrink-0" />
                                     </span>
                                     <span class="hidden xl:inline max-w-[10rem] truncate text-left leading-tight text-brand-moss">{{ Auth::user()->name }}</span>

@@ -107,7 +107,7 @@ class Index extends Component
         $importService->importDeployCommand($user, $item, $server);
 
         $this->closeServerImportModal();
-        session()->flash('success', __('Deploy command imported to :server.', ['server' => $server->name]));
+        $this->toastSuccess(__('Deploy command imported to :server.', ['server' => $server->name]));
     }
 
     public function confirmServerRecipeImport(MarketplaceImportService $importService): void
@@ -138,7 +138,7 @@ class Index extends Component
         $importService->importServerRecipe($user, $item, $server);
 
         $this->closeServerImportModal();
-        session()->flash('success', __('Saved command imported to :server.', ['server' => $server->name]));
+        $this->toastSuccess(__('Saved command imported to :server.', ['server' => $server->name]));
     }
 
     public function importWebserverTemplate(string $itemId, MarketplaceImportService $importService): void
@@ -155,8 +155,8 @@ class Index extends Component
             return;
         }
 
-        session()->flash('success', __('Webserver template saved to your organization.'));
         $org = $user->currentOrganization();
+        session()->flash('success', __('Webserver template saved to your organization.'));
         if ($org) {
             $this->redirect(route('organizations.webserver-templates', $org), navigate: true);
         }

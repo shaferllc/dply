@@ -264,7 +264,7 @@ class SiteTest extends TestCase
             ->set('php_max_execution_time', '120')
             ->call('savePhpSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'PHP settings saved.');
+            ->assertDispatched('notify', message: 'PHP settings saved.', type: 'success');
 
         $site->refresh();
 
@@ -1353,11 +1353,11 @@ class SiteTest extends TestCase
             ->set('post_deploy_command', 'php artisan optimize')
             ->call('saveGit')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Git settings saved.')
+            ->assertDispatched('notify', message: 'Git settings saved.', type: 'success')
             ->set('zero_downtime_enabled', true)
             ->call('saveZeroDowntimeDeployment')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Zero downtime deployment settings saved. Webserver config reloaded.')
+            ->assertDispatched('notify', message: 'Zero downtime deployment settings saved. Webserver config reloaded.', type: 'success')
             ->set('releases_to_keep', 8)
             ->set('deployment_environment', 'staging')
             ->set('octane_port', '8080')
@@ -1366,11 +1366,11 @@ class SiteTest extends TestCase
             ->set('nginx_extra_raw', 'location /health { return 200; }')
             ->call('saveDeploymentSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.')
+            ->assertDispatched('notify', message: 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.', type: 'success')
             ->set('php_fpm_user', 'deploy')
             ->call('saveSystemUserSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', __('System user settings saved.'));
+            ->assertDispatched('notify', message: __('System user settings saved.'), type: 'success');
 
         Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 
@@ -1793,7 +1793,7 @@ class SiteTest extends TestCase
             ->assertSee('Refresh Docker details')
             ->assertSee('Destroy')
             ->call('runRuntimeAction', 'status')
-            ->assertSet('flash_success', 'Runtime status refreshed.');
+            ->assertDispatched('notify', message: 'Runtime status refreshed.', type: 'success');
 
         $site->refresh();
 
@@ -2019,7 +2019,7 @@ class SiteTest extends TestCase
         Livewire::actingAs($user)
             ->test(SitesShow::class, ['server' => $server, 'site' => $site])
             ->call('runRuntimeAction', 'inspect')
-            ->assertSet('flash_success', 'Docker details refreshed.');
+            ->assertDispatched('notify', message: 'Docker details refreshed.', type: 'success');
 
         $site->refresh();
 
@@ -2075,7 +2075,7 @@ class SiteTest extends TestCase
         Livewire::actingAs($user)
             ->test(SitesShow::class, ['server' => $server, 'site' => $site])
             ->call('runRuntimeAction', 'rebuild')
-            ->assertSet('flash_error', "docker compose failed\n\nWorking directory: /tmp/demo\nCommand: docker compose up -d");
+            ->assertDispatched('notify', message: "docker compose failed\n\nWorking directory: /tmp/demo\nCommand: docker compose up -d", type: 'error');
 
         $site->refresh();
 
@@ -2206,7 +2206,7 @@ class SiteTest extends TestCase
         Livewire::actingAs($user)
             ->test(SitesShow::class, ['server' => $server, 'site' => $site])
             ->call('retryCertificate', $certificate->id)
-            ->assertSet('flash_success', 'Certificate retry finished.');
+            ->assertDispatched('notify', message: 'Certificate retry finished.', type: 'success');
 
         $certificate->refresh();
 
@@ -2303,7 +2303,7 @@ class SiteTest extends TestCase
             ->assertSet('showConfirmActionModal', true)
             ->assertSet('confirmActionModalMethod', 'releaseDeployLock')
             ->call('confirmActionModal')
-            ->assertSet('flash_success', 'Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.');
+            ->assertDispatched('notify', message: 'Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.', type: 'success');
 
         $this->assertNull(cache()->get('site-deploy-active:'.$site->id));
     }
@@ -2373,7 +2373,7 @@ class SiteTest extends TestCase
             ->set('new_alias_label', 'Marketing alias')
             ->call('addAlias')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Alias added. Webserver config reloaded.');
+            ->assertDispatched('notify', message: 'Alias added. Webserver config reloaded.', type: 'success');
 
         $this->assertDatabaseHas('site_domain_aliases', [
             'site_id' => $site->id,
@@ -2409,7 +2409,7 @@ class SiteTest extends TestCase
             ->set('new_tenant_notes', 'App resolver uses the hostname.')
             ->call('addTenantDomain')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Tenant domain added. Webserver config reloaded.');
+            ->assertDispatched('notify', message: 'Tenant domain added. Webserver config reloaded.', type: 'success');
 
         $this->assertDatabaseHas('site_tenant_domains', [
             'site_id' => $site->id,
@@ -2499,7 +2499,7 @@ class SiteTest extends TestCase
             ->set('webhook_allowed_ips_text', "203.0.113.10\n192.0.2.0/24")
             ->call('saveWebhookSecurity')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Webhook IP allow list saved. Leave empty to allow any source (signature still required).');
+            ->assertDispatched('notify', message: 'Webhook IP allow list saved. Leave empty to allow any source (signature still required).', type: 'success');
 
         $site->refresh();
 
@@ -2578,7 +2578,7 @@ class SiteTest extends TestCase
             ->set('settings_document_root', '/srv/new/public')
             ->call('saveGeneralSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Site settings saved. Webserver config reloaded.');
+            ->assertDispatched('notify', message: 'Site settings saved. Webserver config reloaded.', type: 'success');
 
         $site->refresh();
         $domain->refresh();
@@ -2614,7 +2614,7 @@ class SiteTest extends TestCase
             ->set('project_workspace_id', $workspace->id)
             ->call('saveProjectSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Project settings saved.');
+            ->assertDispatched('notify', message: 'Project settings saved.', type: 'success');
 
         $site->refresh();
 
@@ -2683,7 +2683,7 @@ class SiteTest extends TestCase
             ->set('php_version', '8.4')
             ->call('savePhpSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'PHP settings saved.');
+            ->assertDispatched('notify', message: 'PHP settings saved.', type: 'success');
 
         $site->refresh();
 
@@ -2743,7 +2743,7 @@ class SiteTest extends TestCase
             ->set('site_notes', 'Remember the vendor firewall allow list.')
             ->call('saveSiteNotes')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Site notes saved.');
+            ->assertDispatched('notify', message: 'Site notes saved.', type: 'success');
 
         $site->refresh();
 
@@ -2781,7 +2781,7 @@ class SiteTest extends TestCase
             ->set('preview_https_redirect', true)
             ->call('savePreviewSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Preview settings saved. Webserver config reloaded.');
+            ->assertDispatched('notify', message: 'Preview settings saved. Webserver config reloaded.', type: 'success');
 
         $site->refresh();
         $previewDomain = SitePreviewDomain::query()->where('site_id', $site->id)->first();
@@ -2935,7 +2935,7 @@ class SiteTest extends TestCase
             ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
             ->call('quickAddDomainSsl')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'SSL request started for alias.example.com via Let\'s Encrypt.');
+            ->assertDispatched('notify', message: 'SSL request started for alias.example.com via Let\'s Encrypt.', type: 'success');
 
         $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
 
@@ -2998,7 +2998,7 @@ class SiteTest extends TestCase
             ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
             ->call('quickAddDomainSsl')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'SSL request started for app.example.com via Let\'s Encrypt.');
+            ->assertDispatched('notify', message: 'SSL request started for app.example.com via Let\'s Encrypt.', type: 'success');
 
         $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
 
@@ -3060,7 +3060,7 @@ class SiteTest extends TestCase
             ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_ZEROSSL)
             ->call('quickAddDomainSsl')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'SSL request started for api.example.com via ZeroSSL.');
+            ->assertDispatched('notify', message: 'SSL request started for api.example.com via ZeroSSL.', type: 'success');
 
         $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
 
@@ -3096,7 +3096,7 @@ class SiteTest extends TestCase
             ->set('new_certificate_domains', 'app.example.com')
             ->call('createCertificateRequest')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'Certificate request saved.');
+            ->assertDispatched('notify', message: 'Certificate request saved.', type: 'success');
 
         $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
 
@@ -3140,7 +3140,7 @@ class SiteTest extends TestCase
             ->set('new_certificate_preview_domain_id', $previewDomain->id)
             ->set('new_certificate_provider_credential_id', $credential->id)
             ->call('createCertificateRequest')
-            ->assertSet('flash_error', 'Server must be ready with an SSH key.');
+            ->assertDispatched('notify', message: 'Server must be ready with an SSH key.', type: 'error');
 
         $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
 

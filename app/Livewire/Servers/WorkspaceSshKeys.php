@@ -19,6 +19,7 @@ use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SshKeyLabelTemplate;
 use App\Services\Servers\SshPublicKeyFingerprint;
+use App\Support\OpenSshEd25519KeyPairGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Request;
@@ -135,27 +136,59 @@ class WorkspaceSshKeys extends Component
         $this->profile_key_id = null;
     }
 
+    public function generateNewAuthorizedKeyPair(): void
+    {
+        $this->authorize('update', $this->server);
+
+        try {
+            [$private, $public] = OpenSshEd25519KeyPairGenerator::generate();
+        } catch (\RuntimeException $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        if (! UserSshKey::publicKeyLooksValid($public)) {
+            $this->toastError(__('Generated key was invalid. Try again or generate a key locally with ssh-keygen.'));
+
+            return;
+        }
+
+        $this->profile_key_id = null;
+
+        if (trim($this->new_auth_name) === '') {
+            $this->new_auth_name = __('Generated key');
+        }
+
+        $this->new_auth_key = $public;
+
+        $this->dispatch(
+            'dply-ssh-keypair-generated',
+            privateKey: $private,
+            publicKey: $public,
+        );
+
+        $this->toastSuccess(__('A new key pair was generated. Copy your private key from the dialog, then use “Add SSH key” and “Sync authorized_keys”.'));
+    }
+
     #[On('personal-ssh-key-created')]
     public function refreshProfileKeysAfterCreate(): void
     {
-        $this->flash_success = __('SSH key saved. Select it below to attach it to this server, then sync authorized_keys.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('SSH key saved. Select it below to attach it to this server, then sync authorized_keys.'));
     }
 
     public function loadSystemUsers(ServerPasswdUserLister $lister): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
 
         try {
             $names = $lister->listUsernames($this->server->fresh());
             $merged = array_values(array_unique([...$this->baselineSystemUsers(), ...$names]));
             sort($merged);
             $this->system_users = $merged;
-            $this->flash_success = __('Loaded system users from the server.');
+            $this->toastSuccess(__('Loaded system users from the server.'));
         } catch (\Throwable $e) {
-            $this->flash_error = $this->friendlyWorkspaceError($e, __('Dply could not connect to the server to load system users.'));
+            $this->toastError($this->friendlyWorkspaceError($e, __('Dply could not connect to the server to load system users.')));
         }
     }
 
@@ -178,20 +211,17 @@ class WorkspaceSshKeys extends Component
         $this->server->fresh()->update(['meta' => $meta]);
         $this->server->refresh();
         $this->hydrateAdvancedFromServer();
-        $this->flash_success = __('SSH key settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('SSH key settings saved.'));
     }
 
     public function previewDiff(ServerAuthorizedKeysDiffPreview $diff): void
     {
         $this->authorize('view', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $this->diff_result = $diff->diffPerUser($this->server->fresh(['authorizedKeys']));
             $this->ssh_workspace_tab = 'preview';
         } catch (\Throwable $e) {
-            $this->flash_error = $this->friendlyWorkspaceError($e, __('Dply could not connect to the server to preview SSH key drift.'));
+            $this->toastError($this->friendlyWorkspaceError($e, __('Dply could not connect to the server to preview SSH key drift.')));
         }
     }
 
@@ -275,8 +305,7 @@ class WorkspaceSshKeys extends Component
         $this->new_target_linux_user = (string) ($this->server->ssh_user ?: 'root');
         $this->profile_key_id = null;
         $this->loadReviewDateInputs();
-        $this->flash_success = __('Key saved. Click “Sync authorized_keys” to apply on the server.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Key saved. Click “Sync authorized_keys” to apply on the server.'));
     }
 
     public function updateKeyReviewFromInput(string $id, ServerAuthorizedKeysAuditLogger $audit): void
@@ -306,8 +335,7 @@ class WorkspaceSshKeys extends Component
         );
 
         $this->loadReviewDateInputs();
-        $this->flash_success = __('Review date updated.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Review date updated.'));
     }
 
     public function deleteAuthorizedKey(string $id, ServerAuthorizedKeysAuditLogger $audit): void
@@ -333,25 +361,22 @@ class WorkspaceSshKeys extends Component
 
         $key->delete();
         $this->loadReviewDateInputs();
-        $this->flash_success = __('Key removed. Sync again to update the server.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Key removed. Sync again to update the server.'));
     }
 
     public function syncAuthorizedKeys(ServerAuthorizedKeysSynchronizer $sync): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $this->server->refresh();
             $sync->sync($this->server->fresh(['authorizedKeys']), Auth::user(), Request::ip());
             $this->loadReviewDateInputs();
-            $this->flash_success = __('authorized_keys updated on the server.');
+            $this->toastSuccess(__('authorized_keys updated on the server.'));
         } catch (\Throwable $e) {
-            $this->flash_error = $this->friendlyWorkspaceError(
+            $this->toastError($this->friendlyWorkspaceError(
                 $e,
                 __('Dply could not connect to the server to sync authorized_keys. Check that the server SSH login user still accepts Dply\'s provisioned key.')
-            );
+            ));
         }
     }
 
@@ -396,11 +421,9 @@ class WorkspaceSshKeys extends Component
 
         $result = $deployer->deployOrganizationKey(Auth::user(), $key, $this->server->fresh(), $stored);
         if ($result['ok']) {
-            $this->flash_success = $result['message'];
-            $this->flash_error = null;
+            $this->toastSuccess($result['message']);
         } else {
-            $this->flash_error = $result['message'];
-            $this->flash_success = null;
+            $this->toastError($result['message']);
         }
     }
 
@@ -418,11 +441,9 @@ class WorkspaceSshKeys extends Component
 
         $result = $deployer->deployTeamKey(Auth::user(), $key, $this->server->fresh(), $stored);
         if ($result['ok']) {
-            $this->flash_success = $result['message'];
-            $this->flash_error = null;
+            $this->toastSuccess($result['message']);
         } else {
-            $this->flash_error = $result['message'];
-            $this->flash_success = null;
+            $this->toastError($result['message']);
         }
     }
 

@@ -13,14 +13,15 @@ $width = match ($width) {
 };
 @endphp
 
+{{-- Use @@ so Blade outputs a literal @ for Alpine (@click, @close); raw @ can be parsed as Blade directives. --}}
 <div
     class="relative"
     :class="open ? 'z-50' : ''"
     x-data="{ open: false }"
-    @click.outside="open = false"
-    @close.stop="open = false"
+    @@click.outside="open = false"
+    @@close.stop="open = false"
 >
-    <div @click="open = ! open">
+    <div @@click="open = ! open">
         {{ $trigger }}
     </div>
 
@@ -33,7 +34,7 @@ $width = match ($width) {
             x-transition:leave-end="opacity-0 scale-[0.98]"
             class="absolute z-50 mt-2 {{ $width }} {{ $alignmentClasses }}"
             style="display: none;"
-            @click="open = false">
+            @@click="open = false">
         <div class="dply-dropdown-panel {{ $contentClasses }}">
             {{ $content }}
         </div>

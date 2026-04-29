@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 
+/* Class-based dark mode (toggle `dark` on <html> via resources/views/partials/theme-head.blade.php + theme.js). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
@@ -29,50 +32,280 @@
         radial-gradient(at 0% 50%, rgb(50 72 44 / 0.08) 0px, transparent 50%);
 }
 
-/* Shared surfaces — floating menus use opaque fills so page content does not show through */
+/* Dark palette: same semantic tokens, tuned for low-light UI */
+html.dark {
+    color-scheme: dark;
+    --color-brand-ink: #eef0e8;
+    --color-brand-forest: #9cbc92;
+    --color-brand-moss: #b9bcb4;
+    --color-brand-sage: #9fb5ae;
+    --color-brand-olive: #c9b86a;
+    --color-brand-rust: #d4a574;
+    --color-brand-copper: #d9b07a;
+    --color-brand-gold: #e6d18f;
+    --color-brand-sand: #2f352c;
+    --color-brand-cream: #141612;
+    --color-brand-mist: #7a7d76;
+    --background-image-mesh-brand: radial-gradient(at 40% 20%, rgb(205 169 66 / 0.06) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgb(104 132 121 / 0.07) 0px, transparent 45%),
+        radial-gradient(at 0% 50%, rgb(50 72 44 / 0.05) 0px, transparent 50%);
+}
+
+/* Shared surfaces — flat fills + border/shadow (avoid muddy vertical gradients) */
 @layer components {
     .dply-dropdown-panel {
-        @apply overflow-hidden rounded-2xl border border-brand-ink/15 bg-brand-cream shadow-xl shadow-brand-forest/25 ring-1 ring-brand-sage/35;
-        box-shadow:
-            inset 0 1px 0 0 rgb(255 255 255 / 0.85),
-            0 12px 40px -8px rgb(23 26 14 / 0.18);
+        @apply overflow-hidden rounded-2xl border border-brand-ink/12 bg-white shadow-lg shadow-brand-ink/10;
     }
 
     .dply-card {
-        @apply rounded-2xl border border-brand-ink/12 bg-gradient-to-b from-white via-brand-cream to-brand-sand shadow-sm shadow-brand-ink/[0.07] ring-1 ring-brand-sage/14;
+        @apply rounded-2xl border border-brand-ink/10 bg-white shadow-sm;
     }
 
     .dply-surface-nav {
-        @apply rounded-2xl border border-brand-ink/12 bg-gradient-to-b from-white via-brand-cream to-brand-sand p-4 shadow-md shadow-brand-forest/12 ring-1 ring-brand-sage/22;
+        @apply rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm;
     }
 
     .dply-dialog {
-        @apply rounded-2xl border border-brand-ink/15 bg-brand-cream shadow-xl shadow-brand-forest/18 ring-1 ring-brand-sage/28;
-        box-shadow:
-            inset 0 1px 0 0 rgb(255 255 255 / 0.75),
-            0 18px 45px -12px rgb(23 26 14 / 0.2);
+        @apply rounded-2xl border border-brand-ink/12 bg-white shadow-xl shadow-brand-ink/12;
     }
 
     .dply-page-header {
-        @apply rounded-2xl border border-brand-ink/12 bg-gradient-to-br from-white via-brand-cream to-brand-sand px-6 py-6 shadow-md shadow-brand-ink/[0.06] ring-1 ring-brand-sage/14;
+        @apply rounded-2xl border border-brand-ink/10 bg-white px-6 py-6 shadow-sm;
     }
 
     .dply-flyout-panel {
-        @apply rounded-2xl border border-brand-ink/15 bg-brand-cream shadow-lg shadow-brand-forest/22 ring-1 ring-brand-sage/32;
-        box-shadow:
-            inset 0 1px 0 0 rgb(255 255 255 / 0.8),
-            0 10px 30px -6px rgb(23 26 14 / 0.16);
+        @apply rounded-2xl border border-brand-ink/12 bg-white shadow-md shadow-brand-ink/10;
     }
 
-    /* Modals (x-modal panelClass) — stronger shadow */
+    /* Modals (x-modal panelClass) */
     .dply-modal-panel {
-        @apply overflow-hidden rounded-2xl border border-brand-ink/15 bg-brand-cream shadow-2xl ring-1 ring-brand-sage/30;
-        box-shadow:
-            inset 0 1px 0 0 rgb(255 255 255 / 0.78),
-            0 22px 55px -12px rgb(23 26 14 / 0.22);
+        @apply overflow-hidden rounded-2xl border border-brand-ink/12 bg-white shadow-2xl shadow-brand-ink/15;
     }
 
     .dply-card-compact {
-        @apply rounded-xl border border-brand-ink/12 bg-gradient-to-b from-white via-brand-cream to-brand-sand p-4 shadow-sm shadow-brand-ink/[0.06] ring-1 ring-brand-sage/12 sm:p-5;
+        @apply rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm sm:p-5;
+    }
+
+    /** Same horizontal bounds as the dashboard (`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8`). */
+    .dply-page-shell {
+        @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+    }
+
+    html.dark .dply-dropdown-panel {
+        @apply border-brand-mist/25 bg-zinc-900 shadow-black/30;
+    }
+
+    html.dark .dply-card,
+    html.dark .dply-surface-nav,
+    html.dark .dply-dialog,
+    html.dark .dply-page-header,
+    html.dark .dply-flyout-panel,
+    html.dark .dply-modal-panel,
+    html.dark .dply-card-compact {
+        @apply border-brand-mist/20 bg-zinc-900/95 shadow-black/25;
+    }
+
+    /** Shared form control surface — prefer over raw `bg-white` for predictable dark mode */
+    .dply-input {
+        @apply mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    html.dark .dply-input {
+        @apply border-brand-mist/30 bg-zinc-900 text-brand-ink;
+    }
+
+    html.dark select.dply-input,
+    html.dark textarea.dply-input {
+        @apply bg-zinc-900;
+    }
+}
+
+/* Surfaces that still use raw `bg-white` in Blade — sink them in dark mode */
+@layer utilities {
+    html.dark .bg-white {
+        background-color: rgb(24 24 27);
+    }
+
+    /*
+     * Opacity whites (marketing, guest shells, breadcrumbs) — match elevated zinc surfaces.
+     * Tailwind emits escaped `/` in class names (e.g. bg-white/90 → .bg-white\/90).
+     */
+    html.dark .bg-white\/5 {
+        background-color: rgb(24 24 27 / 0.4);
+    }
+    html.dark .bg-white\/7 {
+        background-color: rgb(24 24 27 / 0.45);
+    }
+    html.dark .bg-white\/8 {
+        background-color: rgb(24 24 27 / 0.48);
+    }
+    html.dark .bg-white\/10 {
+        background-color: rgb(24 24 27 / 0.5);
+    }
+    html.dark .bg-white\/12 {
+        background-color: rgb(24 24 27 / 0.52);
+    }
+    html.dark .bg-white\/15 {
+        background-color: rgb(24 24 27 / 0.55);
+    }
+    html.dark .bg-white\/40 {
+        background-color: rgb(24 24 27 / 0.72);
+    }
+    html.dark .bg-white\/45 {
+        background-color: rgb(24 24 27 / 0.74);
+    }
+    html.dark .bg-white\/50 {
+        background-color: rgb(24 24 27 / 0.76);
+    }
+    html.dark .bg-white\/60 {
+        background-color: rgb(24 24 27 / 0.8);
+    }
+    html.dark .bg-white\/70 {
+        background-color: rgb(24 24 27 / 0.85);
+    }
+    html.dark .bg-white\/75 {
+        background-color: rgb(24 24 27 / 0.88);
+    }
+    html.dark .bg-white\/80 {
+        background-color: rgb(24 24 27 / 0.9);
+    }
+    html.dark .bg-white\/85 {
+        background-color: rgb(24 24 27 / 0.92);
+    }
+    html.dark .bg-white\/90 {
+        background-color: rgb(24 24 27 / 0.94);
+    }
+    html.dark .bg-white\/95 {
+        background-color: rgb(24 24 27 / 0.97);
+    }
+
+    html.dark .hover\:bg-white:hover {
+        background-color: rgb(39 39 42);
+    }
+
+    /* Muted panels that use translucent slate — align with zinc surfaces */
+    html.dark .bg-slate-50\/40 {
+        background-color: rgb(39 39 42 / 0.42);
+    }
+    html.dark .bg-slate-50\/50 {
+        background-color: rgb(39 39 42 / 0.52);
+    }
+    html.dark .bg-slate-50\/60 {
+        background-color: rgb(39 39 42 / 0.62);
+    }
+    html.dark .bg-slate-50\/70 {
+        background-color: rgb(39 39 42 / 0.72);
+    }
+    html.dark .bg-slate-50\/80 {
+        background-color: rgb(39 39 42 / 0.82);
+    }
+
+    /* Slate scale — maps legacy neutrals to brand-aware dark UI */
+    html.dark .text-slate-900,
+    html.dark .text-slate-800 {
+        color: var(--color-brand-ink);
+    }
+
+    html.dark .text-slate-700,
+    html.dark .text-slate-600 {
+        color: var(--color-brand-moss);
+    }
+
+    html.dark .text-slate-500 {
+        color: var(--color-brand-mist);
+    }
+
+    html.dark .text-slate-400 {
+        color: color-mix(in srgb, var(--color-brand-mist) 80%, transparent);
+    }
+
+    html.dark .border-slate-100 {
+        border-color: rgb(63 63 70 / 0.45);
+    }
+
+    html.dark .border-slate-200 {
+        border-color: rgb(63 63 70 / 0.55);
+    }
+
+    html.dark .border-slate-300 {
+        border-color: rgb(82 82 91 / 0.55);
+    }
+
+    html.dark .border-slate-900 {
+        border-color: rgb(63 63 70 / 0.9);
+    }
+
+    html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+        border-color: rgb(63 63 70 / 0.45);
+    }
+
+    html.dark .bg-slate-50 {
+        background-color: rgb(39 39 42 / 0.72);
+    }
+
+    html.dark .bg-slate-100 {
+        background-color: rgb(39 39 42);
+    }
+
+    html.dark .bg-slate-900 {
+        background-color: rgb(24 24 27);
+    }
+
+    html.dark .hover\:bg-slate-50:hover {
+        background-color: rgb(39 39 42 / 0.85);
+    }
+
+    html.dark .hover\:border-slate-300:hover {
+        border-color: rgb(82 82 91 / 0.6);
+    }
+
+    html.dark .hover\:text-slate-700:hover,
+    html.dark .hover\:text-slate-800:hover,
+    html.dark .hover\:text-slate-900:hover {
+        color: var(--color-brand-ink);
+    }
+
+    /* Links that still use indigo in prose / docs */
+    html.dark .text-indigo-600 {
+        color: var(--color-brand-forest);
+    }
+
+    html.dark .hover\:text-indigo-800:hover {
+        color: var(--color-brand-sage);
+    }
+
+    /* Accent strips (launch path, server builder) */
+    html.dark .border-sky-300 {
+        border-color: rgb(56 189 248 / 0.45);
+    }
+
+    html.dark .bg-sky-50 {
+        background-color: rgb(12 74 110 / 0.35);
+    }
+
+    html.dark .border-sky-400 {
+        border-color: rgb(56 189 248 / 0.55);
+    }
+
+    html.dark .hover\:border-sky-300:hover {
+        border-color: rgb(125 211 252 / 0.45);
+    }
+
+    /* Semantic borders */
+    html.dark .border-red-200 {
+        border-color: rgb(127 29 29 / 0.55);
+    }
+
+    html.dark .border-green-200 {
+        border-color: rgb(20 83 45 / 0.55);
+    }
+
+    /* Legacy modal overlay */
+    html.dark .bg-gray-500 {
+        background-color: rgb(0 0 0 / 0.55);
+    }
+
+    html.dark .focus\:ring-offset-white:focus {
+        --tw-ring-offset-color: rgb(24 24 27);
     }
 }

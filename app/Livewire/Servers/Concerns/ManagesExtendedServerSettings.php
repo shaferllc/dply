@@ -51,7 +51,7 @@ trait ManagesExtendedServerSettings
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -84,15 +84,14 @@ trait ManagesExtendedServerSettings
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->flash_success = __('Maintenance window saved. Dply will use this when scheduling supports it.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Maintenance window saved. Dply will use this when scheduling supports it.'));
     }
 
     public function saveNotificationRouting(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -111,15 +110,14 @@ trait ManagesExtendedServerSettings
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->flash_success = __('Notification hints saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Notification hints saved.'));
     }
 
     public function saveCostLifecycle(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -143,15 +141,14 @@ trait ManagesExtendedServerSettings
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->flash_success = __('Cost & lifecycle notes saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Cost & lifecycle notes saved.'));
     }
 
     public function saveComplianceSettings(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -176,15 +173,14 @@ trait ManagesExtendedServerSettings
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->flash_success = __('Environment & compliance saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Environment & compliance saved.'));
     }
 
     public function saveBackupDrHints(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -216,15 +212,14 @@ trait ManagesExtendedServerSettings
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->flash_success = __('Backup & DR hints saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Backup & DR hints saved.'));
     }
 
     public function saveServerWebhooks(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -250,15 +245,14 @@ trait ManagesExtendedServerSettings
         $this->server->refresh();
         $this->settingsWebhookSecret = '';
         $this->syncExtendedServerSettingsFromServer();
-        $this->flash_success = __('Webhook settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Webhook settings saved.'));
     }
 
     public function saveInventoryDepthPreference(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -273,8 +267,7 @@ trait ManagesExtendedServerSettings
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->flash_success = __('Inventory scan depth saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Inventory scan depth saved.'));
     }
 
     public function downloadServerManifest(): StreamedResponse

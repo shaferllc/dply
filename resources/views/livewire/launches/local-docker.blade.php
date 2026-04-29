@@ -1,17 +1,22 @@
 <div>
     <div class="border-b border-slate-200 bg-white">
-        <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-            <a href="{{ route('launches.containers') }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('← Back to Containers') }}</a>
-            <p class="mt-4 text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Repo-first containers') }}</p>
-            <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Launch a container target from a repo') }}</h1>
-            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                {{ __('Inspect the repo first, review the inferred runtime, then choose whether to launch on Local Docker or continue into a remote Docker or Kubernetes target.') }}
-            </p>
+        <div class="dply-page-shell py-8">
+            <x-page-header
+                :eyebrow="__('Repo-first containers')"
+                :title="__('Launch a container target from a repo')"
+                :description="__('Inspect the repo first, review the inferred runtime, then choose whether to launch on Local Docker or continue into a remote Docker or Kubernetes target.')"
+                doc-route="docs.index"
+                flush
+            >
+                <x-slot name="actions">
+                    <a href="{{ route('launches.containers') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Back to Containers') }}</a>
+                </x-slot>
+            </x-page-header>
         </div>
     </div>
 
     <div class="py-10">
-        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
+        <div class="dply-page-shell space-y-6">
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div class="grid gap-6 md:grid-cols-2">
                     <div>

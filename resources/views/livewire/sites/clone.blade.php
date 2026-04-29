@@ -1,13 +1,17 @@
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-    <div class="mb-6">
-        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Sites') }}</p>
-        <h1 class="mt-2 text-2xl font-semibold text-brand-ink">{{ __('Clone site') }}</h1>
-        <p class="mt-1 text-sm text-brand-moss">
-            <a href="{{ route('sites.show', [$server, $site]) }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $site->name }}</a>
-            <span class="text-brand-moss">·</span>
-            {{ $server->name }}
-        </p>
-    </div>
+<div class="dply-page-shell py-8">
+    <x-page-header
+        :eyebrow="__('Sites')"
+        :title="__('Clone site')"
+        :description="__('Copy this site to another server or hostname. The job runs in the background; duration depends on repository size.')"
+        doc-route="docs.index"
+        flush
+        compact
+    />
+    <p class="mb-8 text-sm text-brand-moss">
+        <a href="{{ route('sites.show', [$server, $site]) }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $site->name }}</a>
+        <span class="text-brand-moss">·</span>
+        {{ $server->name }}
+    </p>
 
     <div class="grid gap-8 lg:grid-cols-2">
         <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">

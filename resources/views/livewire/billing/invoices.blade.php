@@ -1,13 +1,38 @@
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-organization-shell :organization="$organization" section="invoices">
-            <div>
-                <header class="mb-8">
-                    <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Invoices') }}</h1>
-                    <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-                        {{ __('Stripe invoices for :org.', ['org' => $organization->name]) }}
-                    </p>
-                </header>
+            <x-livewire-validation-errors />
+
+            <x-breadcrumb-trail :items="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('Invoices'), 'icon' => 'document-text'],
+            ]" />
+
+            <div class="space-y-8">
+                <div class="dply-card overflow-hidden">
+                    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
+                        <div class="lg:col-span-4">
+                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Invoices') }}</h2>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+                                {{ __('Stripe invoices for :org.', ['org' => $organization->name]) }}
+                            </p>
+                        </div>
+                        <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
+                            <a
+                                href="{{ route('docs.index') }}"
+                                wire:navigate
+                                class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Documentation') }}
+                            </a>
+                            <x-badge tone="accent" :caps="false" class="text-xs">
+                                {{ __('Organization: :name', ['name' => $organization->name]) }}
+                            </x-badge>
+                        </div>
+                    </div>
+                </div>
 
                 @if (! $hasStripeCustomer)
                     <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -26,7 +51,7 @@
                                     @click.outside="showColumns = false"
                                     class="inline-flex items-center gap-2 rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                 >
-                                    <svg class="h-4 w-4 text-brand-moss" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <x-heroicon-o-eye class="h-4 w-4 text-brand-moss" aria-hidden="true" />
                                     {{ __('Columns') }}
                                 </button>
                                 <div

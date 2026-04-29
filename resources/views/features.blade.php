@@ -6,6 +6,9 @@
     <title>Features – {{ config('app.name') }}</title>
     <meta name="description" content="BYO cloud servers with nginx, TLS, PHP, firewall—alongside classic panels like ServerPilot. Plus Git deploys, org vault, CD, IaC-friendly ops, Forge-style transparency, AI-builder complement.">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    @include('partials.theme-head')
+
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -62,7 +65,7 @@
 
         {{-- How it fits together --}}
         <section id="how-it-fits" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl text-center">How it works together</h2>
                 <p class="mt-4 text-center text-brand-moss max-w-2xl mx-auto">Data and permissions flow through a single hierarchy—so onboarding a teammate never means forwarding API tokens.</p>
 
@@ -95,7 +98,7 @@
 
         {{-- Git-native developer workflow (similar positioning to bohr.io: integrate with Git, automate deploys) --}}
         <section id="git-native" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-white/60 to-brand-sand/20 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <div class="max-w-3xl">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Code more, manage less—on your metal</p>
                     <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Git-first workflows, not a black-box host</h2>
@@ -125,7 +128,7 @@
 
         {{-- AI vibe-coding / no-code builders (e.g. YouWare) vs production ops on owned infra --}}
         <section id="ai-builders" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/60 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <div class="max-w-3xl">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Vibe coding · then production</p>
                     <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Not an AI website generator—operations for code you own</h2>
@@ -161,7 +164,7 @@
 
         {{-- Complement to IaC / platform engineering tools (e.g. Pulumi: define infra in code; dply: operate servers & apps) --}}
         <section id="platform-ops" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/50 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <div class="max-w-3xl">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Infrastructure as code · then what?</p>
                     <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Complements IaC platforms like Pulumi</h2>
@@ -196,7 +199,7 @@
 
         {{-- CI vs CD: overlap with Octopus-style release orchestration (narrower scope in dply) --}}
         <section id="cd-releases" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-white/70 to-brand-sand/20 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <div class="max-w-3xl">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">CI is not CD</p>
                     <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Deploy &amp; releases — alongside tools like Octopus</h2>
@@ -236,7 +239,7 @@
 
         {{-- Organizations --}}
         <section id="organizations" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/40 scroll-mt-24">
-            <div class="max-w-6xl mx-auto lg:grid lg:grid-cols-12 lg:gap-12 lg:items-start">
+            <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-12 lg:items-start">
                 <div class="lg:col-span-4">
                     <h2 class="text-3xl font-bold tracking-tight text-brand-ink">Organizations &amp; people</h2>
                     <p class="mt-3 text-brand-moss">Multi-tenant by design—your production org stays separate from personal experiments.</p>
@@ -291,7 +294,7 @@
 
         {{-- Credentials --}}
         <section id="credentials" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Credentials &amp; clouds</h2>
                 <p class="mt-4 text-brand-moss max-w-3xl">Connect the APIs that create and manage infrastructure. Tokens are validated when possible, then stored encrypted—your team uses them through {{ config('app.name') }}, not from plaintext notes.</p>
 
@@ -318,7 +321,7 @@
 
         {{-- Servers --}}
         <section id="servers" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/40 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Servers &amp; day-two operations</h2>
                 <p class="mt-4 text-brand-moss max-w-3xl">After a machine exists—cloud or custom—the server record becomes your control plane: run commands, declare dependencies, and keep access tidy.</p>
 
@@ -353,7 +356,7 @@
 
         {{-- Sites --}}
         <section id="sites" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-24">
-            <div class="max-w-6xl mx-auto lg:grid lg:grid-cols-12 lg:gap-12">
+            <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-12">
                 <div class="lg:col-span-5">
                     <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Sites, TLS &amp; deploys</h2>
                     <p class="mt-4 text-brand-moss leading-relaxed">A <strong class="text-brand-forest font-medium">site</strong> is how traffic reaches your code: hostname, runtime, document root, and deployment settings—all bound to a parent server.</p>
@@ -380,7 +383,7 @@
         </section>
 
         <section id="recovery" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/45 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <div class="max-w-3xl">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Recovery and confidence</p>
                     <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Backups, rollback, and migration work as one story</h2>
@@ -413,7 +416,7 @@
         </section>
 
         <section id="project-ops" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-brand-sand/20 to-white/70 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <div class="max-w-3xl">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">A better operating surface</p>
                     <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Projects turn servers into a team control plane</h2>
@@ -442,7 +445,7 @@
 
         {{-- Positioning vs Laravel Forge–style panels; reference Serversinc comparison narrative --}}
         <section id="forge-style" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-brand-sand/25 to-white/80 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Transparency vs Forge-style panels</h2>
                 <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
                     <strong class="text-brand-forest font-medium">Laravel Forge</strong>-style products make Laravel deploys easy but are sometimes criticized for feeling like a
@@ -493,7 +496,7 @@
 
         {{-- Classic BYO control panels: ServerPilot-style any-provider hosting --}}
         <section id="serverpilot" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/70 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Same lane as ServerPilot: your cloud, your root</h2>
                 <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
                     <a href="https://serverpilot.io" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">ServerPilot</a>
@@ -561,7 +564,7 @@
 
         {{-- Coverage vs common server panels (categories aligned with e.g. SiteKit features) --}}
         <section id="coverage" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-brand-sand/15 scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Coverage vs panels like SiteKit</h2>
                 <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
                     {{ config('app.name') }} is a control plane that drives your servers over SSH and provider APIs—similar in scope to panels that advertise a full LEMP/LAMP stack, Git deploys, and security tooling.
@@ -657,7 +660,7 @@
 
         {{-- Security --}}
         <section id="security" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-brand-ink text-brand-cream scroll-mt-24">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Security &amp; account hygiene</h2>
                 <p class="mt-4 text-brand-sand/85 max-w-3xl">Enterprise-style products need more than a password—here is how {{ config('app.name') }} keeps keys and sessions under control.</p>
                 <ul class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-2">

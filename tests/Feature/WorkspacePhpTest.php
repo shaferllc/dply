@@ -250,7 +250,7 @@ class WorkspacePhpTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspacePhp::class, ['server' => $server])
             ->call('refreshPhpInventory')
-            ->assertSet('flash_success', 'PHP inventory refreshed.')
+            ->assertDispatched('notify', message: 'PHP inventory refreshed.', type: 'success')
             ->assertSet('remote_output', "Supported environment: yes\nInstalled versions: 8.3\nDetected CLI default: 8.3");
     }
 
@@ -464,7 +464,7 @@ class WorkspacePhpTest extends TestCase
             ->call('openPhpConfigEditor', '8.3', 'fpm_ini')
             ->set('phpConfigEditorContent', "memory_limit=512M\n")
             ->call('savePhpConfigEditor')
-            ->assertSet('flash_success', 'FPM ini saved for PHP 8.3.')
+            ->assertDispatched('notify', message: 'FPM ini saved for PHP 8.3.', type: 'success')
             ->assertSet('phpConfigEditorReloadGuidance', 'Reload PHP-FPM 8.3 after saving to apply these changes.')
             ->assertSet('phpConfigEditorValidationOutput', 'configuration file syntax is ok')
             ->assertSet('remote_output', "configuration file syntax is ok\n\nFPM ini saved and PHP-FPM 8.3 reloaded.");
@@ -535,7 +535,7 @@ class WorkspacePhpTest extends TestCase
             ->call('openPhpConfigEditor', '8.3', 'cli_ini')
             ->set('phpConfigEditorContent', "memory_limit==512M\n")
             ->call('savePhpConfigEditor')
-            ->assertSet('flash_error', 'CLI ini validation failed. The live file was not replaced.')
+            ->assertDispatched('notify', message: 'CLI ini validation failed. The live file was not replaced.', type: 'error')
             ->assertSet('phpConfigEditorValidationOutput', 'PHP: syntax error on line 2')
             ->assertSet('remote_output', 'PHP: syntax error on line 2')
             ->assertSet('phpConfigEditorContent', "memory_limit==512M\n");
@@ -587,9 +587,8 @@ class WorkspacePhpTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspacePhp::class, ['server' => $server])
             ->call('runPhpPackageAction', 'install', '8.4')
-            ->assertSet('flash_success', 'PHP 8.4 installed.')
-            ->assertSet('remote_output', "Installing packages...\n\nSupported environment: yes\nInstalled versions: 8.4\nDetected CLI default: 8.4")
-            ->assertSet('flash_error', null);
+            ->assertDispatched('notify', message: 'PHP 8.4 installed.', type: 'success')
+            ->assertSet('remote_output', "Installing packages...\n\nSupported environment: yes\nInstalled versions: 8.4\nDetected CLI default: 8.4");
     }
 
     public function test_php_workspace_surfaces_package_action_failures(): void
@@ -626,9 +625,8 @@ class WorkspacePhpTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspacePhp::class, ['server' => $server])
             ->call('runPhpPackageAction', 'uninstall', '8.3')
-            ->assertSet('flash_error', 'PHP 8.3 is still used by 1 site.')
-            ->assertSet('remote_error', 'PHP 8.3 is still used by 1 site.')
-            ->assertSet('flash_success', null);
+            ->assertDispatched('notify', message: 'PHP 8.3 is still used by 1 site.', type: 'error')
+            ->assertSet('remote_error', 'PHP 8.3 is still used by 1 site.');
     }
 
     public function test_php_workspace_rejects_package_actions_while_another_server_mutation_is_running(): void
@@ -649,8 +647,7 @@ class WorkspacePhpTest extends TestCase
             Livewire::actingAs($user)
                 ->test(WorkspacePhp::class, ['server' => $server])
                 ->call('runPhpPackageAction', 'install', '8.4')
-                ->assertSet('flash_error', 'Another PHP package action is already running for this server.')
-                ->assertSet('flash_success', null);
+                ->assertDispatched('notify', message: 'Another PHP package action is already running for this server.', type: 'error');
         } finally {
             $lock->release();
         }
@@ -718,7 +715,6 @@ class WorkspacePhpTest extends TestCase
             ->call('openPhpConfigEditor', '8.3', 'cli_ini')
             ->set('phpConfigEditorContent', "memory_limit=512M\n")
             ->call('savePhpConfigEditor')
-            ->assertSet('flash_error', 'Another PHP server mutation is already running for this server.')
-            ->assertSet('flash_success', null);
+            ->assertDispatched('notify', message: 'Another PHP server mutation is already running for this server.', type: 'error');
     }
 }

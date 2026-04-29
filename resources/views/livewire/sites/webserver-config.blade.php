@@ -44,25 +44,18 @@
         </ol>
     </nav>
 
-    @if ($flash_success)
-        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">{{ $flash_success }}</div>
-    @endif
-    @if ($flash_error)
-        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">{{ $flash_error }}</div>
-    @endif
-
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-            <h1 class="text-3xl font-bold tracking-tight text-brand-ink">
-                <span class="sr-only">{{ __('Web server config') }} — </span>{{ $config_paths['engine_label'] }}
-            </h1>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Managed configuration for :site', ['site' => $site->name]) }}</p>
-        </div>
-    </header>
+    <x-page-header
+        :eyebrow="__('Web server config')"
+        :title="$config_paths['engine_label']"
+        :description="__('Managed configuration for :site', ['site' => $site->name])"
+        doc-route="docs.index"
+        flush
+        compact
+    />
 
     @if ($core_changed_warning)
         <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">

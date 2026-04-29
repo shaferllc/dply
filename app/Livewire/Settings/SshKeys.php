@@ -2,8 +2,9 @@
 
 namespace App\Livewire\Settings;
 
-use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Jobs\SyncServerAuthorizedKeysJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\UserSshKey;
 use App\Services\Servers\UserSshKeyDeploymentService;
@@ -20,6 +21,7 @@ use Livewire\Component;
 class SshKeys extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
 
     public string $new_name = '';
 
@@ -43,13 +45,11 @@ class SshKeys extends Component
     /** @var array<int, string> */
     public array $deploy_server_ids = [];
 
-    public ?string $flash_success = null;
-
-    public ?string $flash_error = null;
-
     public ?string $setup_source = null;
 
     public ?string $return_to = null;
+
+    public string $ssh_keys_search = '';
 
     public function mount(): void
     {
@@ -103,28 +103,26 @@ class SshKeys extends Component
         if ($ids !== []) {
             $result = $deployment->deployToServers($user, $key, $ids);
             if (! $result['ok']) {
-                $this->flash_error = $result['message'].' '.implode(' ', $result['errors']);
-                $this->flash_success = __('Key saved; fix server errors above or deploy again from the list.');
+                $this->toastError($result['message'].' '.implode(' ', $result['errors']));
+                $this->toastSuccess(__('Key saved; fix server errors above or deploy again from the list.'));
 
                 return;
             }
         }
 
-        $this->flash_success = $ids === []
+        $msg = $ids === []
             ? __('SSH key saved.')
             : __('SSH key saved and deployed to the selected servers.');
-        $this->flash_error = null;
-
         if ($this->setup_source === 'servers.create') {
-            $this->flash_success .= ' '.__('You can go back to create your BYO server now.');
+            $msg .= ' '.__('You can go back to create your BYO server now.');
         }
+        $this->toastSuccess($msg);
     }
 
     #[On('personal-ssh-key-created')]
     public function refreshAfterPersonalSshKeyCreated(): void
     {
-        $this->flash_success = __('SSH key saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('SSH key saved.'));
     }
 
     public function startEdit(int $id): void
@@ -183,8 +181,7 @@ class SshKeys extends Component
         }
 
         $this->cancelEdit();
-        $this->flash_success = __('SSH key updated.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('SSH key updated.'));
     }
 
     public function startDeploy(int $id): void
@@ -225,14 +222,12 @@ class SshKeys extends Component
         $this->cancelDeploy();
 
         if (! $result['ok']) {
-            $this->flash_error = $result['message'].' '.implode(' ', $result['errors']);
-            $this->flash_success = null;
+            $this->toastError($result['message'].' '.implode(' ', $result['errors']));
 
             return;
         }
 
-        $this->flash_success = $result['message'];
-        $this->flash_error = null;
+        $this->toastSuccess($result['message']);
     }
 
     public function deleteKey(int $id): void
@@ -248,8 +243,7 @@ class SshKeys extends Component
             SyncServerAuthorizedKeysJob::dispatch($serverId);
         }
 
-        $this->flash_success = __('SSH key removed. Remaining keys are being synced on affected servers.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('SSH key removed. Remaining keys are being synced on affected servers.'));
     }
 
     /**
@@ -273,10 +267,18 @@ class SshKeys extends Component
 
     public function render(): View
     {
-        $keys = Auth::user()->sshKeys()->orderBy('name')->get();
+        $allKeys = Auth::user()->sshKeys()->orderBy('name')->get();
+
+        $term = trim($this->ssh_keys_search);
+        $keys = $term === ''
+            ? $allKeys
+            : $allKeys->filter(
+                fn (UserSshKey $k): bool => str_contains(mb_strtolower($k->name), mb_strtolower($term))
+            )->values();
 
         return view('livewire.settings.ssh-keys', [
             'sshKeys' => $keys,
+            'sshKeysAll' => $allKeys,
             'servers' => $this->serversForUi(),
             'currentOrganization' => Auth::user()->currentOrganization(),
             'returnUrl' => $this->return_to ? route($this->return_to) : null,

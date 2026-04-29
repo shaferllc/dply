@@ -36,7 +36,7 @@ trait ManagesWorkspaceSettingsForm
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -105,15 +105,14 @@ trait ManagesWorkspaceSettingsForm
         }
 
         $this->syncSettingsFormFromServer();
-        $this->flash_success = __('Server information saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Server information saved.'));
     }
 
     public function repairSshAccess(ServerSshAccessRepairer $repairer): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot repair server SSH access.');
+            $this->toastError(__('Deployers cannot repair server SSH access.'));
 
             return;
         }
@@ -121,10 +120,9 @@ trait ManagesWorkspaceSettingsForm
         try {
             $repairer->repairOperationalAccess($this->server->fresh());
             $this->server->refresh();
-            $this->flash_success = __('SSH access repaired. Dply reinstalled the operational key for this server.');
-            $this->flash_error = null;
+            $this->toastSuccess(__('SSH access repaired. Dply reinstalled the operational key for this server.'));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -132,7 +130,7 @@ trait ManagesWorkspaceSettingsForm
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -146,15 +144,14 @@ trait ManagesWorkspaceSettingsForm
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncSettingsFormFromServer();
-        $this->flash_success = __('Timezone preference saved (for your notes; Dply does not change the OS clock).');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Timezone preference saved (for your notes; Dply does not change the OS clock).'));
     }
 
     public function applyDetectedOsFromInventory(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -169,15 +166,14 @@ trait ManagesWorkspaceSettingsForm
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncSettingsFormFromServer();
-        $this->flash_success = __('OS label updated to match the last inventory scan.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('OS label updated to match the last inventory scan.'));
     }
 
     public function saveServerNotes(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot change server settings.');
+            $this->toastError(__('Deployers cannot change server settings.'));
 
             return;
         }
@@ -192,21 +188,20 @@ trait ManagesWorkspaceSettingsForm
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncSettingsFormFromServer();
-        $this->flash_success = __('Notes saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Notes saved.'));
     }
 
     public function refreshServerInventoryDetails(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
-            $this->flash_error = __('Deployers cannot run server inventory over SSH.');
+            $this->toastError(__('Deployers cannot run server inventory over SSH.'));
 
             return;
         }
 
         if (! $this->server->isReady() || ! $this->server->ssh_private_key || empty($this->server->ip_address)) {
-            $this->flash_error = __('Server must be ready with SSH before refreshing inventory.');
+            $this->toastError(__('Server must be ready with SSH before refreshing inventory.'));
 
             return;
         }
@@ -256,7 +251,7 @@ trait ManagesWorkspaceSettingsForm
         }
 
         if ($out === null) {
-            $this->flash_error = $lastError !== null ? $lastError->getMessage() : __('SSH connection failed for inventory check.');
+            $this->toastError($lastError !== null ? $lastError->getMessage() : __('SSH connection failed for inventory check.'));
 
             return;
         }
@@ -331,10 +326,9 @@ trait ManagesWorkspaceSettingsForm
             if (method_exists($this, 'syncExtendedServerSettingsFromServer')) {
                 $this->syncExtendedServerSettingsFromServer();
             }
-            $this->flash_success = __('Server inventory refreshed from SSH.');
-            $this->flash_error = null;
+            $this->toastSuccess(__('Server inventory refreshed from SSH.'));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 

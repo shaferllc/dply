@@ -89,7 +89,7 @@ class Manage extends Component
         ]);
 
         $this->statusPage->refresh();
-        session()->flash('success', __('Status page updated.'));
+        $this->toastSuccess(__('Status page updated.'));
     }
 
     public function updatedMonitorKind(): void
@@ -169,7 +169,7 @@ class Manage extends Component
                 ]);
             },
         ]);
-        session()->flash('success', __('Monitor added.'));
+        $this->toastSuccess(__('Monitor added.'));
     }
 
     public function removeMonitor(string $monitorId): void
@@ -189,7 +189,7 @@ class Manage extends Component
                 ]);
             },
         ]);
-        session()->flash('success', __('Monitor removed.'));
+        $this->toastSuccess(__('Monitor removed.'));
     }
 
     public function createIncident(): void
@@ -221,7 +221,7 @@ class Manage extends Component
         $this->updateBodies[$incident->id] = '';
 
         $this->statusPage->load('incidents.incidentUpdates.user');
-        session()->flash('success', __('Incident created.'));
+        $this->toastSuccess(__('Incident created.'));
     }
 
     public function addIncidentUpdate(string $incidentId): void
@@ -241,7 +241,7 @@ class Manage extends Component
 
         $this->updateBodies[$incidentId] = '';
         $this->statusPage->load('incidents.incidentUpdates.user');
-        session()->flash('success', __('Update posted.'));
+        $this->toastSuccess(__('Update posted.'));
     }
 
     public function setIncidentState(string $incidentId, string $state): void
@@ -267,7 +267,7 @@ class Manage extends Component
         ]);
 
         $this->statusPage->load('incidents.incidentUpdates.user');
-        session()->flash('success', __('Incident updated.'));
+        $this->toastSuccess(__('Incident updated.'));
     }
 
     public function destroyPage(): void
@@ -275,7 +275,7 @@ class Manage extends Component
         $this->authorize('delete', $this->statusPage);
 
         $this->statusPage->delete();
-        session()->flash('success', __('Status page deleted.'));
+        $this->toastSuccess(__('Status page deleted.'));
 
         $this->redirect(route('status-pages.index'), navigate: true);
     }

@@ -15,6 +15,7 @@ use Livewire\Attributes\Computed;
 trait ManagesNotificationChannels
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
 
     public string $new_type = NotificationChannel::TYPE_SLACK;
 
@@ -86,10 +87,6 @@ trait ManagesNotificationChannels
 
     public ?string $testing_id = null;
 
-    public ?string $flash_success = null;
-
-    public ?string $flash_error = null;
-
     abstract protected function owner(): User|Organization|Team;
 
     abstract protected function notificationChannelsViewData(): array;
@@ -153,8 +150,7 @@ trait ManagesNotificationChannels
 
         $this->resetNewChannelFields();
         unset($this->channels);
-        $this->flash_success = __('Channel created.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Channel created.'));
     }
 
     protected function resetNewChannelFields(): void
@@ -258,8 +254,7 @@ trait ManagesNotificationChannels
 
         $this->cancelEdit();
         unset($this->channels);
-        $this->flash_success = __('Channel updated.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Channel updated.'));
     }
 
     public function deleteChannel(string|int $id): void
@@ -268,8 +263,7 @@ trait ManagesNotificationChannels
         Gate::authorize('delete', $channel);
         $channel->delete();
         unset($this->channels);
-        $this->flash_success = __('Channel removed.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Channel removed.'));
     }
 
     public function sendTest(string|int $id): void
@@ -280,11 +274,9 @@ trait ManagesNotificationChannels
         $result = $channel->sendTest(Auth::user());
         $this->testing_id = null;
         if ($result['ok']) {
-            $this->flash_success = $result['message'];
-            $this->flash_error = null;
+            $this->toastSuccess($result['message']);
         } else {
-            $this->flash_error = $result['message'];
-            $this->flash_success = null;
+            $this->toastError($result['message']);
         }
     }
 

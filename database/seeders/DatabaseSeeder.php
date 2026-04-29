@@ -35,5 +35,7 @@ class DatabaseSeeder extends Seeder
             EnsureLocalDevAdminUser::run();
             $this->call(LocalDemoServersSeeder::class);
         }
+
+        $this->call(ScriptSeeder::class);
     }
 }

@@ -10,23 +10,13 @@
             </ol>
         </nav>
 
-        <header class="mb-6">
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('File backups') }}</h1>
-            <p class="mt-2 text-sm text-brand-moss max-w-3xl leading-relaxed">
-                {{ __('Protect uploads, shared assets, and app-specific paths for :org with a recovery policy your team can explain. Queue a full archive (tar.gz) of each site’s repository root from here, with standard excludes such as vendor and node_modules—pair that with database exports on the Databases tab for a complete restore story.', ['org' => $organization->name]) }}
-            </p>
-        </header>
-
-        @if ($flash_success)
-            <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900" role="status">
-                {{ $flash_success }}
-            </div>
-        @endif
-        @if ($flash_error)
-            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
-                {{ $flash_error }}
-            </div>
-        @endif
+        <x-page-header
+            :title="__('File backups')"
+            :description="__('Protect uploads, shared assets, and app-specific paths for :org with a recovery policy your team can explain. Queue a full archive (tar.gz) of each site’s repository root from here, with standard excludes such as vendor and node_modules—pair that with database exports on the Databases tab for a complete restore story.', ['org' => $organization->name])"
+            doc-route="docs.index"
+            flush
+            compact
+        />
 
         <x-backups-subnav active="files" />
 
@@ -54,7 +44,7 @@
             </section>
         </div>
 
-        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-gradient-to-r from-brand-sand/40 to-white px-5 py-4 shadow-sm">
+        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-brand-sand/50 px-5 py-4 shadow-sm">
             <p class="text-sm font-semibold text-brand-ink">{{ __('Good file backup hygiene') }}</p>
             <ul class="mt-2 space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
                 <li>{{ __('List the paths you would miss in the first hour of an outage.') }}</li>

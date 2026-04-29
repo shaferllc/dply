@@ -22,7 +22,7 @@
         {{-- Avoid concurrent poll + modal SSH refresh (Livewire request overlap). --}}
         <div wire:poll.5s="refreshSystemdUiFromDatabase" class="hidden" aria-hidden="true"></div>
     @endif
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => null, 'command_error' => $remote_error ?? null])
+    @include('livewire.servers.partials.workspace-flashes', ['command_output' => null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if ($server->workspace)

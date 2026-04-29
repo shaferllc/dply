@@ -15,17 +15,22 @@
 
 <div>
     <div class="border-b border-slate-200 bg-white">
-        <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-            <a href="{{ route('launches.create') }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('← Back to launchpad') }}</a>
-            <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">{{ __('Create BYO server') }}</h1>
-            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                {{ __('Bring your own server into Dply by connecting an existing machine over SSH or provisioning a new machine inside your own provider account.') }}
-            </p>
+        <div class="dply-page-shell py-8">
+            <x-page-header
+                :title="__('Create BYO server')"
+                :description="__('Bring your own server into Dply by connecting an existing machine over SSH or provisioning a new machine inside your own provider account.')"
+                doc-route="docs.create-first-server"
+                flush
+            >
+                <x-slot name="actions">
+                    <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Back to launchpad') }}</a>
+                </x-slot>
+            </x-page-header>
         </div>
     </div>
 
     <div class="py-10">
-        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div class="dply-page-shell">
             @if (session('error'))
                 <div class="mb-4 rounded-lg bg-red-50 p-4 text-red-800">{{ session('error') }}</div>
             @endif
@@ -53,15 +58,13 @@
                     </section>
                 @endif
 
-                <section class="rounded-2xl border border-slate-200 bg-sky-50/70 p-6">
-                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Bring your own server') }}</p>
-                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">{{ __('Connect an existing machine or provision one with a provider') }}</h2>
-                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
-                        {{ __('BYO includes both paths: use SSH for a machine you already control, or let Dply create a new virtual machine inside your cloud account and continue the setup from there.') }}
-                    </p>
-                    <div class="mt-5 flex flex-wrap gap-3 text-sm">
-                        <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50">{{ __('Choose another launch path') }}</a>
-                        <a href="{{ route('profile.ssh-keys', ['source' => 'servers.create', 'return_to' => 'servers.create']) }}" wire:navigate class="inline-flex items-center rounded-xl text-sm font-semibold text-sky-700 hover:text-sky-900">{{ __('Manage profile SSH keys') }}</a>
+                <section class="rounded-2xl border border-slate-200 bg-sky-50/70 px-5 py-4 sm:px-6">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                        <p class="text-sm text-slate-600">{{ __('Switch launch paths or update SSH keys before you continue.') }}</p>
+                        <div class="flex flex-wrap gap-3 text-sm">
+                            <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50">{{ __('Choose another launch path') }}</a>
+                            <a href="{{ route('profile.ssh-keys', ['source' => 'servers.create', 'return_to' => 'servers.create']) }}" wire:navigate class="inline-flex items-center rounded-xl text-sm font-semibold text-sky-700 hover:text-sky-900">{{ __('Manage profile SSH keys') }}</a>
+                        </div>
                     </div>
                 </section>
 
@@ -95,41 +98,43 @@
                         </button>
                     </div>
 
-                    <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
-                        <div class="flex flex-wrap items-baseline justify-between gap-2">
-                            <div>
-                                <h3 class="text-lg font-semibold text-slate-900">{{ __('Choose provider') }}</h3>
-                                <p class="mt-1 text-sm text-slate-600">{{ __('Pick the provider that should create the machine. Then connect an account or continue with a saved credential.') }}</p>
+                    @if ($createMode === 'provider')
+                        <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-slate-900">{{ __('Choose provider') }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('Pick the provider that should create the machine. Then connect an account or continue with a saved credential.') }}</p>
+                                </div>
+                                <a href="{{ route('docs.connect-provider') }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('Provider setup guide') }}</a>
                             </div>
-                            <a href="{{ route('docs.connect-provider') }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('Provider setup guide') }}</a>
-                        </div>
 
-                        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            @foreach ($provisionProviderCards as $card)
-                                <button
-                                    type="button"
-                                    wire:click="useProviderProvisioningPath('{{ $card['id'] }}')"
-                                    @class([
-                                        'rounded-2xl border p-4 text-left transition',
-                                        'border-sky-300 bg-white shadow-sm ring-2 ring-sky-200' => $createMode === 'provider' && $form->type === $card['id'],
-                                        'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' => ! ($createMode === 'provider' && $form->type === $card['id']),
-                                    ])
-                                >
-                                    <div class="flex items-center justify-between gap-3">
-                                        <p class="text-sm font-semibold text-slate-900">{{ $card['label'] }}</p>
-                                        <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $card['linked'] ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800' }}">
-                                            {{ $card['linked'] ? __('Connected') : __('Needs account') }}
-                                        </span>
-                                    </div>
-                                </button>
-                            @endforeach
-                        </div>
+                            <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                @foreach ($provisionProviderCards as $card)
+                                    <button
+                                        type="button"
+                                        wire:click="useProviderProvisioningPath('{{ $card['id'] }}')"
+                                        @class([
+                                            'rounded-2xl border p-4 text-left transition',
+                                            'border-sky-300 bg-white shadow-sm ring-2 ring-sky-200' => $createMode === 'provider' && $form->type === $card['id'],
+                                            'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' => ! ($createMode === 'provider' && $form->type === $card['id']),
+                                        ])
+                                    >
+                                        <div class="flex items-center justify-between gap-3">
+                                            <p class="text-sm font-semibold text-slate-900">{{ $card['label'] }}</p>
+                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $card['linked'] ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800' }}">
+                                                {{ $card['linked'] ? __('Connected') : __('Needs account') }}
+                                            </span>
+                                        </div>
+                                    </button>
+                                @endforeach
+                            </div>
 
-                        <div class="mt-4 flex flex-wrap gap-6 text-sm text-slate-600">
-                            <p>{{ __('Choose account') }}</p>
-                            <p>{{ __('Add a provider credential') }}</p>
+                            <div class="mt-4 flex flex-wrap gap-6 text-sm text-slate-600">
+                                <p>{{ __('Choose account') }}</p>
+                                <p>{{ __('Add a provider credential') }}</p>
+                            </div>
                         </div>
-                    </div>
+                    @endif
                 </section>
 
                 @if ($createMode === 'provider')
@@ -381,9 +386,7 @@
                                                                 @endif
                                                             </div>
                                                             <div class="shrink-0 pt-1 text-slate-400" x-bind:class="{ 'rotate-180': open }">
-                                                                <svg class="h-5 w-5 transition-transform" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.513a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
-                                                                </svg>
+                                                                <x-heroicon-m-chevron-down class="h-5 w-5 transition-transform" aria-hidden="true" />
                                                             </div>
                                                         </div>
                                                     </button>
@@ -455,14 +458,14 @@
                                                         <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="mapOpen = false"></div>
 
                                                         <div class="flex min-h-full items-end justify-center p-4 sm:items-center sm:p-6">
-                                                            <div class="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-brand-ink/10 bg-white shadow-2xl">
+                                                            <div class="relative w-full max-w-7xl overflow-hidden rounded-3xl border border-brand-ink/10 bg-white shadow-2xl">
                                                                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                                                                     <div>
                                                                         <h3 class="text-lg font-semibold text-slate-900">{{ __('Region map') }}</h3>
                                                                         <p class="mt-1 text-sm text-slate-600">{{ __('Choose a region visually, or use the grouped list below.') }}</p>
                                                                     </div>
                                                                     <button type="button" x-on:click="mapOpen = false" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
-                                                                        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 1 1.06 0L10 7.94l2.66-2.72a.75.75 0 1 1 1.08 1.04L11.06 9l2.68 2.74a.75.75 0 1 1-1.08 1.04L10 10.06l-2.66 2.72a.75.75 0 1 1-1.08-1.04L8.94 9 6.26 6.26a.75.75 0 0 1 .02-1.04Z"/></svg>
+                                                                        <x-heroicon-m-x-mark class="h-5 w-5" aria-hidden="true" />
                                                                     </button>
                                                                 </div>
 
@@ -588,9 +591,7 @@
                                                                 @endif
                                                             </div>
                                                             <div class="shrink-0 pt-1 text-slate-400" x-bind:class="{ 'rotate-180': open }">
-                                                                <svg class="h-5 w-5 transition-transform" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.513a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
-                                                                </svg>
+                                                                <x-heroicon-m-chevron-down class="h-5 w-5 transition-transform" aria-hidden="true" />
                                                             </div>
                                                         </div>
                                                     </button>
@@ -851,7 +852,7 @@
                             </div>
                         </form>
                     </section>
-                @else
+                @elseif ($createMode === 'existing')
                     <section aria-labelledby="custom-details-heading">
                         <h2 id="custom-details-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('Custom server details') }}</h2>
 

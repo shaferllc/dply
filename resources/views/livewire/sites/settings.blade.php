@@ -154,16 +154,10 @@
     </nav>
 
     <div class="space-y-6">
-        @if ($flash_success)
-            <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{{ $flash_success }}</div>
-        @endif
-        @if ($flash_error)
-            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">{{ $flash_error }}</div>
-        @endif
-
         <x-page-header
             :title="$workspaceTitle"
             :description="$workspaceDescription"
+            doc-route="docs.index"
             flush
         >
             <x-slot name="actions">

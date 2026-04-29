@@ -9,7 +9,7 @@
     :title="__('Saved commands')"
     :description="__('Keep server-local runbooks, maintenance commands, and one-off operational scripts for this machine.')"
 >
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null, 'command_error' => $command_error ?? null])
+    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if ($opsReady)

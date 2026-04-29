@@ -1,1 +1,1 @@
-<textarea {{ $attributes->merge(['class' => 'mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage disabled:cursor-not-allowed disabled:opacity-50']) }}>{{ $slot }}</textarea>
+<textarea {{ $attributes->merge(['class' => 'dply-input']) }}>{{ $slot }}</textarea>

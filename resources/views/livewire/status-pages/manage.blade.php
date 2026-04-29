@@ -1,21 +1,26 @@
 <div>
     <header class="border-b border-slate-200 bg-white">
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <a href="{{ route('status-pages.index') }}" class="text-sm text-slate-600 hover:text-slate-900">{{ __('← Status pages') }}</a>
-                    <h2 class="font-semibold text-xl text-slate-800 leading-tight mt-2">{{ $statusPage->name }}</h2>
-                </div>
-                @can('delete', $statusPage)
-                    <button
-                        type="button"
-                        wire:click="openConfirmActionModal('destroyPage', [], @js(__('Delete status page')), @js(__('Delete this status page? Monitors and incidents are removed.')), @js(__('Delete')), true)"
-                        class="text-sm text-red-600 hover:text-red-800"
-                    >
-                        {{ __('Delete') }}
-                    </button>
-                @endcan
-            </div>
+            <x-page-header
+                :title="$statusPage->name"
+                :description="__('Configure monitors, incidents, and visibility for this status page.')"
+                doc-route="docs.index"
+                flush
+                compact
+            >
+                <x-slot name="actions">
+                    <a href="{{ route('status-pages.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Status pages') }}</a>
+                    @can('delete', $statusPage)
+                        <button
+                            type="button"
+                            wire:click="openConfirmActionModal('destroyPage', [], @js(__('Delete status page')), @js(__('Delete this status page? Monitors and incidents are removed.')), @js(__('Delete')), true)"
+                            class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 hover:bg-red-100"
+                        >
+                            {{ __('Delete') }}
+                        </button>
+                    @endcan
+                </x-slot>
+            </x-page-header>
         </div>
     </header>
     <div class="py-12">

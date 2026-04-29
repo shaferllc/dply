@@ -3,6 +3,8 @@
 namespace App\Livewire\Scripts;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\Server;
@@ -18,6 +20,8 @@ use Livewire\Component;
 class Edit extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
+    use InteractsWithUnsavedChangesBar;
 
     public Script $script;
 
@@ -33,8 +37,6 @@ class Edit extends Component
     public array $selected_server_ids = [];
 
     public ?string $run_output = null;
-
-    public ?string $flash_success = null;
 
     public function mount(Script $script): void
     {
@@ -79,7 +81,20 @@ class Edit extends Component
 
         $this->syncDefaultForNewSites($org);
 
-        $this->flash_success = __('Script saved.');
+        $this->toastSuccess(__('Script saved.'));
+    }
+
+    public function discardScriptFieldsUnsaved(): void
+    {
+        $this->script->refresh();
+
+        $org = Auth::user()->currentOrganization();
+        $this->name = $this->script->name;
+        $this->content = $this->script->content;
+        $this->run_as_user = (string) ($this->script->run_as_user ?? '');
+        $this->use_as_default_for_new_sites = $org
+            ? $this->script->isDefaultForOrganization($org)
+            : false;
     }
 
     protected function syncDefaultForNewSites(Organization $org): void

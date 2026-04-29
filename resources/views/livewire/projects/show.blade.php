@@ -3,6 +3,7 @@
             <x-page-header
                 :title="$workspace->name"
                 :description="__('Operate one logical stack, customer, or app family from a shared project workspace.')"
+                doc-route="docs.index"
                 flush
             >
                 <x-slot name="actions">

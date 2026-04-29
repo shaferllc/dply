@@ -22,14 +22,13 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <header class="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight text-brand-ink">{{ __('Commits') }}</h1>
-                    <p class="mt-1 text-sm text-brand-moss max-w-2xl">
-                        {{ __('Recent commits from your connected Git provider for this site’s repository and branch. Links open on GitHub, GitLab, or Bitbucket.') }}
-                    </p>
-                </div>
-            </header>
+            <x-page-header
+                :title="__('Commits')"
+                :description="__('Recent commits from your connected Git provider for this site’s repository and branch. Links open on GitHub, GitLab, or Bitbucket.')"
+                doc-route="docs.index"
+                flush
+                compact
+            />
 
             <section class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 flex flex-wrap items-center justify-between gap-3">

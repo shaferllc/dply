@@ -28,9 +28,9 @@ trait ManagesFirewallWorkspaceAdvanced
 
         try {
             $n = app(FirewallRuleTemplateApplicator::class)->applyBundled($this->server, $key, auth()->user());
-            $this->flash_success = __('Added :n rule(s) from the bundle.', ['n' => $n]);
+            $this->toastSuccess(__('Added :n rule(s) from the bundle.', ['n' => $n]));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -48,9 +48,9 @@ trait ManagesFirewallWorkspaceAdvanced
 
         try {
             $n = app(FirewallRuleTemplateApplicator::class)->applyDatabaseTemplate($this->server, $tpl, auth()->user());
-            $this->flash_success = __('Added :n rule(s) from template “:name”.', ['n' => $n, 'name' => $tpl->name]);
+            $this->toastSuccess(__('Added :n rule(s) from template “:name”.', ['n' => $n, 'name' => $tpl->name]));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -89,6 +89,6 @@ trait ManagesFirewallWorkspaceAdvanced
 
         $this->new_saved_template_name = '';
         $this->new_saved_template_description = null;
-        $this->flash_success = __('Template saved.');
+        $this->toastSuccess(__('Template saved.'));
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Projects;
 
-use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Jobs\RunWorkspaceDeployJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\AuditLog;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
@@ -131,7 +131,7 @@ class Show extends Component
             $this->workspace->only(['name', 'description', 'notes'])
         );
 
-        session()->flash('success', __('Project updated.'));
+        $this->toastSuccess(__('Project updated.'));
     }
 
     public function attachServer(): void
@@ -157,7 +157,7 @@ class Show extends Component
             'server_name' => $server->name,
         ]);
 
-        session()->flash('success', __('Server added to project.'));
+        $this->toastSuccess(__('Server added to project.'));
     }
 
     public function detachServer(int $serverId): void
@@ -176,7 +176,7 @@ class Show extends Component
             'server_name' => $server->name,
         ]);
 
-        session()->flash('success', __('Server removed from project.'));
+        $this->toastSuccess(__('Server removed from project.'));
     }
 
     public function attachSite(): void
@@ -202,7 +202,7 @@ class Show extends Component
             'site_name' => $site->name,
         ]);
 
-        session()->flash('success', __('Site added to project.'));
+        $this->toastSuccess(__('Site added to project.'));
     }
 
     public function detachSite(int $siteId): void
@@ -221,7 +221,7 @@ class Show extends Component
             'site_name' => $site->name,
         ]);
 
-        session()->flash('success', __('Site removed from project.'));
+        $this->toastSuccess(__('Site removed from project.'));
     }
 
     public function addMember(): void
@@ -258,7 +258,7 @@ class Show extends Component
 
         $this->memberUserId = null;
         $this->memberRole = WorkspaceMember::ROLE_VIEWER;
-        session()->flash('success', __('Project member saved.'));
+        $this->toastSuccess(__('Project member saved.'));
     }
 
     public function removeMember(string $memberId): void
@@ -280,7 +280,7 @@ class Show extends Component
             'member_name' => $name,
         ]);
 
-        session()->flash('success', __('Project member removed.'));
+        $this->toastSuccess(__('Project member removed.'));
     }
 
     public function addEnvironment(): void
@@ -312,7 +312,7 @@ class Show extends Component
         ]);
 
         $this->reset('environmentName', 'environmentDescription');
-        session()->flash('success', __('Environment added.'));
+        $this->toastSuccess(__('Environment added.'));
     }
 
     public function removeEnvironment(string $environmentId): void
@@ -327,7 +327,7 @@ class Show extends Component
             'environment' => $name,
         ]);
 
-        session()->flash('success', __('Environment removed.'));
+        $this->toastSuccess(__('Environment removed.'));
     }
 
     public function createLabel(): void
@@ -356,7 +356,7 @@ class Show extends Component
 
         $this->workspace->labels()->syncWithoutDetaching([$label->id]);
         $this->reset('labelName');
-        session()->flash('success', __('Label created and attached.'));
+        $this->toastSuccess(__('Label created and attached.'));
     }
 
     public function toggleLabel(string $labelId): void
@@ -388,14 +388,14 @@ class Show extends Component
         ]);
 
         $this->reset('runbookTitle', 'runbookUrl', 'runbookBody');
-        session()->flash('success', __('Runbook saved.'));
+        $this->toastSuccess(__('Runbook saved.'));
     }
 
     public function removeRunbook(string $runbookId): void
     {
         $this->authorize('update', $this->workspace);
         $this->workspace->runbooks()->findOrFail($runbookId)->delete();
-        session()->flash('success', __('Runbook removed.'));
+        $this->toastSuccess(__('Runbook removed.'));
     }
 
     public function saveVariable(): void
@@ -415,7 +415,7 @@ class Show extends Component
             ]
         );
 
-        session()->flash('success', __('Project variable saved.'));
+        $this->toastSuccess(__('Project variable saved.'));
         $this->reset('variableKey', 'variableValue');
         $this->variableIsSecret = true;
     }
@@ -424,7 +424,7 @@ class Show extends Component
     {
         $this->authorize('update', $this->workspace);
         $this->workspace->variables()->findOrFail($variableId)->delete();
-        session()->flash('success', __('Project variable removed.'));
+        $this->toastSuccess(__('Project variable removed.'));
     }
 
     public function saveNotifications(): void
@@ -454,7 +454,7 @@ class Show extends Component
             }
         }
 
-        session()->flash('success', __('Project notification routing updated.'));
+        $this->toastSuccess(__('Project notification routing updated.'));
     }
 
     public function queueWorkspaceDeploy(): void
@@ -481,7 +481,7 @@ class Show extends Component
         ]);
 
         RunWorkspaceDeployJob::dispatch($run->id);
-        session()->flash('success', __('Project deploy queued.'));
+        $this->toastSuccess(__('Project deploy queued.'));
     }
 
     public function destroyWorkspace(): void
@@ -489,7 +489,7 @@ class Show extends Component
         $this->authorize('delete', $this->workspace);
 
         $this->workspace->delete();
-        session()->flash('success', __('Project deleted. Servers and sites are unchanged but no longer grouped.'));
+        $this->toastSuccess(__('Project deleted. Servers and sites are unchanged but no longer grouped.'));
 
         $this->redirect(route('projects.index'), navigate: true);
     }
@@ -523,7 +523,7 @@ class Show extends Component
         }
 
         if ($event->subject_type === Server::class) {
-            /** @var \App\Models\Server|null $server */
+            /** @var Server|null $server */
             $server = $event->subject;
 
             if (! $server) {
@@ -545,7 +545,7 @@ class Show extends Component
         }
 
         if ($event->subject_type === Site::class) {
-            /** @var \App\Models\Site|null $site */
+            /** @var Site|null $site */
             $site = $event->subject;
             $site?->loadMissing('server');
 

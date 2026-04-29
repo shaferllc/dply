@@ -3,6 +3,7 @@
         <x-page-header
             :title="__('Projects')"
             :description="__('Group related servers and sites, lock down access, and operate each project from one place.')"
+            doc-route="docs.index"
             flush
         />
 

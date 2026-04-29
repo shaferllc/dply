@@ -6,6 +6,9 @@
     <title>{{ config('app.name') }} – Enterprise infrastructure operations</title>
     <meta name="description" content="Connect your cloud, govern credentials, and run commands across servers—with organizations, teams, and audit-ready workflows.">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    @include('partials.theme-head')
+
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -24,7 +27,7 @@
     <main>
         {{-- Hero --}}
         <section class="relative pt-16 pb-20 sm:pt-24 sm:pb-28 lg:pt-28 lg:pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <div class="lg:grid lg:grid-cols-12 lg:gap-12 lg:items-center">
                     <div class="lg:col-span-6 text-center lg:text-left">
                         <p class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-white/60 px-4 py-1.5 text-xs font-semibold tracking-wide text-brand-forest uppercase">
@@ -100,7 +103,7 @@
 
         {{-- Trust strip --}}
         <section class="border-y border-brand-ink/10 bg-brand-ink text-brand-cream py-10 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+            <div class="mx-auto max-w-7xl flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
                 <p class="text-sm font-medium text-brand-sand/90 max-w-md">
                     Built for engineering leaders who need predictable access patterns, clearer deploy workflows, and flat organization pricing.
                 </p>
@@ -116,7 +119,7 @@
 
         {{-- Bento features --}}
         <section class="py-20 sm:py-28 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-6xl mx-auto">
+            <div class="mx-auto max-w-7xl">
                 <div class="max-w-2xl mx-auto text-center lg:mx-0 lg:text-left">
                     <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Everything your platform team expects</h2>
                     <p class="mt-4 text-lg text-brand-moss">Provisioning, access, and day-two operations—without stitching together five different tools.</p>
@@ -125,7 +128,7 @@
                     <article class="sm:col-span-2 rounded-2xl border border-brand-ink/10 bg-white/70 p-8 sm:p-10 shadow-sm hover:shadow-md transition-shadow">
                         <div class="flex items-start gap-4">
                             <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
+                                <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
                             </div>
                             <div>
                                 <h3 class="text-xl font-semibold text-brand-ink">Cloud &amp; SSH in one inventory</h3>
@@ -135,14 +138,14 @@
                     </article>
                     <article class="rounded-2xl border border-brand-ink/10 bg-gradient-to-b from-brand-sand/40 to-white/80 p-8 shadow-sm">
                         <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-gold/25 text-brand-rust">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                            <x-heroicon-o-key class="h-6 w-6" aria-hidden="true" />
                         </div>
                         <h3 class="mt-6 text-lg font-semibold text-brand-ink">Secrets that stay vaulted</h3>
                         <p class="mt-2 text-sm text-brand-moss leading-relaxed">Members use infrastructure without copying tokens to laptops.</p>
                     </article>
                     <article class="rounded-2xl border border-brand-ink/10 bg-white/70 p-8 shadow-sm">
                         <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <x-heroicon-o-user-group class="h-6 w-6" aria-hidden="true" />
                         </div>
                         <h3 class="mt-6 text-lg font-semibold text-brand-ink">Organizations &amp; teams</h3>
                         <p class="mt-2 text-sm text-brand-moss leading-relaxed">Invite by email, segment access, align billing to the org.</p>

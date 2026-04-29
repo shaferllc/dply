@@ -1,3 +1,4 @@
+<div>
 <x-modal
     :name="$modalName"
     :show="false"
@@ -33,7 +34,22 @@
         </div>
 
         <div>
-            <x-input-label for="personal_ssh_key_public_key" :value="__('Public key')" />
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <x-input-label for="personal_ssh_key_public_key" :value="__('Public key')" class="!mb-0" />
+                <button
+                    type="button"
+                    wire:click="generateKeyPair"
+                    wire:loading.attr="disabled"
+                    wire:target="generateKeyPair"
+                    class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
+                >
+                    <span wire:loading.remove wire:target="generateKeyPair">{{ __('Generate key pair') }}</span>
+                    <span wire:loading wire:target="generateKeyPair" class="inline-flex items-center gap-2">
+                        <x-spinner variant="cream" size="sm" />
+                        {{ __('Generating…') }}
+                    </span>
+                </button>
+            </div>
             <textarea
                 id="personal_ssh_key_public_key"
                 wire:model="public_key"
@@ -53,8 +69,8 @@
         </label>
 
         <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-3 text-sm leading-6 text-brand-moss">
-            {{ __('Paste an OpenSSH public key only. Private keys are never stored here.') }}
-            <span class="block mt-2">{{ __('If you need to generate one, run `ssh-keygen -t ed25519 -C "you@example.com"` and paste the contents of the `.pub` file.') }}</span>
+            {{ __('Paste an OpenSSH public key only, or use “Generate key pair.” Private keys are never stored in Dply—you must copy them from the dialog into your SSH agent or a local file.') }}
+            <span class="block mt-2">{{ __('Alternatively, run `ssh-keygen -t ed25519 -C "you@example.com"` locally and paste the `.pub` file contents.') }}</span>
         </div>
     </div>
 
@@ -71,3 +87,9 @@
         </x-primary-button>
     </div>
 </x-modal>
+
+@include('livewire.partials.ssh-keypair-reveal-modal', [
+    'listenEvent' => 'dply-ssh-profile-keypair-generated',
+    'revealContext' => 'profile',
+])
+</div>

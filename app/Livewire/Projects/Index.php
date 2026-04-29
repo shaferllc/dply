@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Projects;
 
+use App\Models\Workspace;
 use App\Models\WorkspaceLabel;
 use App\Models\WorkspaceMember;
 use App\Models\WorkspaceView;
-use App\Models\Workspace;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -49,7 +49,7 @@ class Index extends Component
         ]);
 
         $this->reset('name', 'description');
-        session()->flash('success', __('Project created.'));
+        $this->toastSuccess(__('Project created.'));
     }
 
     public function saveView(): void
@@ -76,7 +76,7 @@ class Index extends Component
         ]);
 
         $this->savedViewName = '';
-        session()->flash('success', __('Saved view created.'));
+        $this->toastSuccess(__('Saved view created.'));
     }
 
     public function applySavedView(string $viewId): void

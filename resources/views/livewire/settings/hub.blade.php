@@ -1,13 +1,17 @@
 <div>
-    <nav class="mb-2 text-sm text-brand-mist" aria-label="Breadcrumb">
-        <a href="{{ route('dashboard') }}" class="hover:text-brand-ink" wire:navigate>{{ __('Dashboard') }}</a>
-        <span class="mx-2" aria-hidden="true">/</span>
-        <span class="text-brand-ink">{{ __('Settings') }}</span>
-    </nav>
+    <x-breadcrumb-trail
+        :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
+            ['label' => $section === 'servers' ? __('Servers & Sites') : __('Profile'), 'icon' => $section === 'servers' ? 'server' : 'user-circle'],
+        ]"
+        wrapper-class="mb-2"
+    />
 
     <x-page-header
         :title="__('Settings')"
         :description="__('Profile stores personal preferences on this page. Servers & Sites covers organization defaults and team defaults (servers belong to teams).')"
+        doc-route="docs.index"
         flush
     />
 
@@ -17,22 +21,24 @@
                 href="{{ route('settings.profile') }}"
                 wire:navigate
                 @class([
-                    'border-b-2 py-3 text-sm font-medium transition-colors',
+                    'inline-flex items-center gap-2 border-b-2 py-3 text-sm font-medium transition-colors',
                     'border-brand-ink text-brand-ink' => request()->routeIs('settings.profile'),
                     'border-transparent text-brand-moss hover:text-brand-ink' => ! request()->routeIs('settings.profile'),
                 ])
             >
+                <x-heroicon-o-user-circle class="h-5 w-5 shrink-0 opacity-90" aria-hidden="true" />
                 {{ __('Profile') }}
             </a>
             <a
                 href="{{ route('settings.servers') }}"
                 wire:navigate
                 @class([
-                    'border-b-2 py-3 text-sm font-medium transition-colors',
+                    'inline-flex items-center gap-2 border-b-2 py-3 text-sm font-medium transition-colors',
                     'border-brand-ink text-brand-ink' => request()->routeIs('settings.servers'),
                     'border-transparent text-brand-moss hover:text-brand-ink' => ! request()->routeIs('settings.servers'),
                 ])
             >
+                <x-heroicon-o-server class="h-5 w-5 shrink-0 opacity-90" aria-hidden="true" />
                 {{ __('Servers & Sites') }}
             </a>
         </nav>
@@ -40,6 +46,7 @@
 
     @if ($section === 'profile')
         <form wire:submit="saveProfile" class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden">
+            <button type="submit" class="sr-only">{{ __('Save settings') }}</button>
             <div class="lg:grid lg:grid-cols-12 lg:gap-10 p-6 lg:p-8">
                 <div class="lg:col-span-4 mb-8 lg:mb-0">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Profile') }}</h2>
@@ -85,7 +92,7 @@
                             @foreach (config('user_preferences.theme_options', []) as $opt)
                                 <button
                                     type="button"
-                                    wire:click="$set('ui.theme', '{{ $opt }}')"
+                                    wire:click="persistTheme('{{ $opt }}')"
                                     @class([
                                         'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                                         'bg-brand-ink text-brand-cream shadow-sm' => ($ui['theme'] ?? '') === $opt,
@@ -94,17 +101,17 @@
                                 >
                                     @if ($opt === 'light')
                                         <span class="inline-flex items-center gap-1.5">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
+                                            <x-heroicon-o-sun class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Light') }}
                                         </span>
                                     @elseif ($opt === 'dark')
                                         <span class="inline-flex items-center gap-1.5">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/></svg>
+                                            <x-heroicon-o-moon class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Dark') }}
                                         </span>
                                     @else
                                         <span class="inline-flex items-center gap-1.5">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 00-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>
+                                            <x-heroicon-o-computer-desktop class="h-4 w-4" aria-hidden="true" />
                                             {{ __('System') }}
                                         </span>
                                     @endif
@@ -116,12 +123,12 @@
 
                     <div>
                         <span class="block text-sm font-medium text-brand-ink">{{ __('Navigation layout') }}</span>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Sidebar or top navigation (where the shell supports it).') }}</p>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('Controls the Settings area: sidebar links on large screens, or a horizontal link row under the header.') }}</p>
                         <div class="mt-3 inline-flex flex-wrap gap-1 rounded-xl border border-brand-mist bg-brand-cream/80 p-1">
                             @foreach (config('user_preferences.navigation_layout_options', []) as $opt)
                                 <button
                                     type="button"
-                                    wire:click="$set('ui.navigation_layout', '{{ $opt }}')"
+                                    wire:click="persistNavigationLayout('{{ $opt }}')"
                                     @class([
                                         'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                                         'bg-brand-ink text-brand-cream shadow-sm' => ($ui['navigation_layout'] ?? '') === $opt,
@@ -130,12 +137,12 @@
                                 >
                                     @if ($opt === 'sidebar')
                                         <span class="inline-flex items-center gap-1.5">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+                                            <x-heroicon-o-squares-2x2 class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Sidebar') }}
                                         </span>
                                     @else
                                         <span class="inline-flex items-center gap-1.5">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/></svg>
+                                            <x-heroicon-o-bars-3 class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Top') }}
                                         </span>
                                     @endif
@@ -148,30 +155,79 @@
                     <div>
                         <label for="notification-position" class="block text-sm font-medium text-brand-ink">{{ __('Notification position') }}</label>
                         <p class="mt-1 text-sm text-brand-moss">{{ __('Where toast-style notifications appear on screen.') }}</p>
-                        <select
-                            id="notification-position"
-                            wire:model="ui.notification_position"
-                            class="mt-3 block w-full max-w-md rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                        >
-                            @foreach (config('user_preferences.notification_positions', []) as $value => $label)
-                                <option value="{{ $value }}">{{ __($label) }}</option>
-                            @endforeach
-                        </select>
+                        <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch">
+                            <select
+                                id="notification-position"
+                                wire:model="ui.notification_position"
+                                class="block w-full min-w-0 max-w-md flex-1 rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                            >
+                                @foreach (config('user_preferences.notification_positions', []) as $value => $label)
+                                    <option value="{{ $value }}">{{ __($label) }}</option>
+                                @endforeach
+                            </select>
+                            {{-- Client-only preview: a Livewire action round-trip clears wire:dirty and hides the unsaved bar. --}}
+                            <button
+                                type="button"
+                                data-notification-preview-message="{{ __('This is where notifications will appear.') }}"
+                                onclick="window.dispatchEvent(new CustomEvent('toast', { detail: { message: this.dataset.notificationPreviewMessage, type: 'success', position: document.getElementById('notification-position').value } }))"
+                                class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-mist bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm transition hover:bg-brand-cream focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage sm:self-start"
+                            >
+                                {{ __('Test') }}
+                            </button>
+                        </div>
                         @error('ui.notification_position') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </div>
-            <div class="flex justify-end border-t border-brand-mist/60 bg-brand-sand/30 px-6 py-4">
-                <button type="submit" class="inline-flex items-center rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-2">
-                    {{ __('Save settings') }}
-                </button>
-            </div>
         </form>
+
+        <x-unsaved-changes-bar
+            :message="__('You have unsaved changes to your profile preferences.')"
+            saveAction="saveProfile"
+            discardAction="discardProfileUnsaved"
+            :targets="$profileUnsavedTargets"
+            :saveLabel="__('Save settings')"
+        />
     @endif
 
     @if ($section === 'servers')
         <div class="space-y-8">
+            <form wire:submit="saveProfileTimezone" class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden">
+                <button type="submit" class="sr-only">{{ __('Save timezone') }}</button>
+                <div class="lg:grid lg:grid-cols-12 lg:gap-10 p-6 lg:p-8">
+                    <div class="lg:col-span-4 mb-8 lg:mb-0">
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your timezone') }}</h2>
+                        <p class="mt-2 text-sm text-brand-moss">{{ __('Used for schedules, Insights quiet hours, and when applying timezone on new servers below.') }}</p>
+                    </div>
+                    <div class="lg:col-span-8 space-y-4 min-w-0">
+                        <div>
+                            <x-input-label for="hub-profile-timezone" :value="__('Timezone')" required />
+                            <select
+                                id="hub-profile-timezone"
+                                wire:model="profileTimezone"
+                                required
+                                class="mt-2 block w-full max-w-md rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage max-h-48 sm:max-h-none"
+                            >
+                                @foreach ($this->timezones as $tz)
+                                    <option value="{{ $tz }}">{{ $tz }}</option>
+                                @endforeach
+                            </select>
+                            @error('profileTimezone') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to your timezone.')"
+                saveAction="saveProfileTimezone"
+                discardAction="discardProfileTimezoneUnsaved"
+                :targets="$profileTimezoneUnsavedTargets"
+                :saveLabel="__('Save timezone')"
+            />
+
             <form wire:submit="saveOrganizationServersSites" class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden">
+                <button type="submit" class="sr-only">{{ __('Save organization settings') }}</button>
                 <div class="lg:grid lg:grid-cols-12 lg:gap-10 p-6 lg:p-8">
                     <div class="lg:col-span-4 mb-8 lg:mb-0">
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Organization') }}</h2>
@@ -203,25 +259,17 @@
                                     <input type="checkbox" wire:model.boolean="organizationServerSite.set_timezone_on_new_servers" class="mt-1 rounded border-brand-mist text-brand-ink focus:ring-brand-sage" />
                                     <span>
                                         <span class="block text-sm font-medium text-brand-ink">{{ __('Set timezone on new servers') }}</span>
-                                        <span class="block text-sm text-brand-moss mt-0.5">{{ __('Apply your profile timezone to new servers. (Currently: :tz)', ['tz' => $userTimezoneLabel]) }}</span>
+                                        <span class="block text-sm text-brand-moss mt-0.5">{{ __('Apply the timezone from above to new servers. (Currently: :tz)', ['tz' => $userTimezoneLabel]) }}</span>
                                     </span>
                                 </label>
                             </div>
                         @endif
                     </div>
                 </div>
-                <div class="flex justify-end border-t border-brand-mist/60 bg-brand-sand/30 px-6 py-4">
-                    <button
-                        type="submit"
-                        @disabled(! $currentOrg || ! $canEditOrgPrefs)
-                        class="inline-flex items-center rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {{ __('Save organization settings') }}
-                    </button>
-                </div>
             </form>
 
             <form wire:submit="saveOrganizationInsights" class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden">
+                <button type="submit" class="sr-only">{{ __('Save Insights preferences') }}</button>
                 <div class="lg:grid lg:grid-cols-12 lg:gap-10 p-6 lg:p-8">
                     <div class="lg:col-span-4 mb-8 lg:mb-0">
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Insights') }}</h2>
@@ -295,18 +343,10 @@
                         @endif
                     </div>
                 </div>
-                <div class="flex justify-end border-t border-brand-mist/60 bg-brand-sand/30 px-6 py-4">
-                    <button
-                        type="submit"
-                        @disabled(! $currentOrg || ! $canEditOrgPrefs)
-                        class="inline-flex items-center rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {{ __('Save Insights preferences') }}
-                    </button>
-                </div>
             </form>
 
             <form wire:submit="saveTeamServersSites" class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden">
+                <button type="submit" class="sr-only">{{ __('Save team settings') }}</button>
                 <div class="lg:grid lg:grid-cols-12 lg:gap-10 p-6 lg:p-8">
                     <div class="lg:col-span-4 mb-8 lg:mb-0">
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Team') }}</h2>
@@ -390,16 +430,34 @@
                         @endif
                     </div>
                 </div>
-                <div class="flex justify-end border-t border-brand-mist/60 bg-brand-sand/30 px-6 py-4">
-                    <button
-                        type="submit"
-                        @disabled(! $currentOrg || $teams->isEmpty() || ! $canEditTeamPrefs)
-                        class="inline-flex items-center rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {{ __('Save team settings') }}
-                    </button>
-                </div>
             </form>
+
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to organization defaults.')"
+                saveAction="saveOrganizationServersSites"
+                discardAction="discardOrganizationServersSitesUnsaved"
+                :targets="$organizationServerSiteUnsavedTargets"
+                :save-disabled="! $currentOrg || ! $canEditOrgPrefs"
+                :saveLabel="__('Save organization settings')"
+            />
+
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to Insights preferences.')"
+                saveAction="saveOrganizationInsights"
+                discardAction="discardOrganizationInsightsUnsaved"
+                :targets="$organizationInsightsUnsavedTargets"
+                :save-disabled="! $currentOrg || ! $canEditOrgPrefs"
+                :saveLabel="__('Save Insights preferences')"
+            />
+
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to team defaults.')"
+                saveAction="saveTeamServersSites"
+                discardAction="discardTeamServersSitesUnsaved"
+                :targets="$teamServersSitesUnsavedTargets"
+                :save-disabled="! $currentOrg || $teams->isEmpty() || ! $canEditTeamPrefs"
+                :saveLabel="__('Save team settings')"
+            />
         </div>
     @endif
 

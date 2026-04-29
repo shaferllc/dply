@@ -24,9 +24,24 @@ class DocsController extends Controller
         return view('docs.create-first-server');
     }
 
-    public function orgRolesAndLimits(): View
+    /**
+     * Markdown pages registered in config/docs.php (`markdown` key).
+     */
+    public function markdown(string $slug): View
     {
-        $path = base_path('docs/ORG_ROLES_AND_LIMITS.md');
+        $pages = config('docs.markdown', []);
+        $page = $pages[$slug] ?? null;
+        if (! is_array($page)) {
+            throw new NotFoundHttpException;
+        }
+
+        $filename = $page['file'] ?? null;
+        $title = $page['title'] ?? null;
+        if (! is_string($filename) || $filename === '' || ! is_string($title) || $title === '') {
+            throw new NotFoundHttpException;
+        }
+
+        $path = base_path('docs/'.$filename);
         if (! File::isFile($path)) {
             throw new NotFoundHttpException;
         }
@@ -34,22 +49,7 @@ class DocsController extends Controller
         $html = Str::markdown(File::get($path));
 
         return view('docs.markdown-doc', [
-            'title' => 'Organization roles & plan limits',
-            'html' => $html,
-        ]);
-    }
-
-    public function sourceControl(): View
-    {
-        $path = base_path('docs/DEPLOYMENT_FLOW.md');
-        if (! File::isFile($path)) {
-            throw new NotFoundHttpException;
-        }
-
-        $html = Str::markdown(File::get($path));
-
-        return view('docs.markdown-doc', [
-            'title' => 'Source control & deploy flow',
+            'title' => $title,
             'html' => $html,
         ]);
     }

@@ -1,21 +1,22 @@
 <div>
     @php($functionsHost = $server->hostCapabilities()->supportsFunctionDeploy())
     <div class="border-b border-slate-200 bg-white">
-        <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-            <a href="{{ route('servers.sites', $server) }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('← Cancel') }}</a>
-            <h1 class="mt-4 text-2xl font-semibold tracking-tight text-slate-900">{{ __('Create site') }}</h1>
-            <p class="mt-2 max-w-2xl text-sm text-slate-600">
-                @if ($functionsHost)
-                    {{ __('Set up the domain, runtime, and artifact details for a new site on :server. This host deploys through a serverless target instead of an SSH machine.', ['server' => $server->name]) }}
-                @else
-                    {{ __('Set up the domain, stack, and deploy paths for a new site on :server. Dply will wire a temporary testing hostname during provisioning so you can verify the install before customer DNS is switched.', ['server' => $server->name]) }}
-                @endif
-            </p>
+        <div class="dply-page-shell py-8">
+            <x-page-header
+                :title="__('Create site')"
+                :description="$functionsHost ? __('Set up the domain, runtime, and artifact details for a new site on :server. This host deploys through a serverless target instead of an SSH machine.', ['server' => $server->name]) : __('Set up the domain, stack, and deploy paths for a new site on :server. Dply will wire a temporary testing hostname during provisioning so you can verify the install before customer DNS is switched.', ['server' => $server->name])"
+                doc-route="docs.index"
+                flush
+            >
+                <x-slot name="actions">
+                    <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Cancel') }}</a>
+                </x-slot>
+            </x-page-header>
         </div>
     </div>
 
     <div class="py-10">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="dply-page-shell">
             <form wire:submit="store" class="space-y-10">
                 <section aria-labelledby="server-context-heading">
                     <h2 id="server-context-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('1. Confirm server context') }}</h2>

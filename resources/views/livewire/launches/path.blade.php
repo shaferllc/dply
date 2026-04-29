@@ -1,15 +1,22 @@
 <div>
     <div class="border-b border-slate-200 bg-white">
-        <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-            <a href="{{ route('launches.create') }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('← Back to launchpad') }}</a>
-            <p class="mt-4 text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">{{ $page['eyebrow'] }}</p>
-            <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{{ $page['title'] }}</h1>
-            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{{ $page['description'] }}</p>
+        <div class="dply-page-shell py-8">
+            <x-page-header
+                :eyebrow="$page['eyebrow']"
+                :title="$page['title']"
+                :description="$page['description']"
+                doc-route="docs.index"
+                flush
+            >
+                <x-slot name="actions">
+                    <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Back to launchpad') }}</a>
+                </x-slot>
+            </x-page-header>
         </div>
     </div>
 
     <div class="py-10">
-        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div class="dply-page-shell">
             @if ($page['eyebrow'] === __('Containers'))
                 <section class="mb-6 rounded-2xl border border-sky-200 bg-sky-50/70 p-6">
                     <p class="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Shared runtime model') }}</p>

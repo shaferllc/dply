@@ -1,111 +1,116 @@
 <div>
     <x-livewire-validation-errors />
 
-    <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('profile.edit') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Profile') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('SSH keys') }}</li>
-        </ol>
-    </nav>
+    <x-breadcrumb-trail :items="[
+        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+        ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
+        ['label' => __('SSH keys'), 'icon' => 'key'],
+    ]" />
 
-    <header class="mb-8">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <h1 class="text-2xl font-semibold text-brand-ink">{{ __('SSH keys') }}</h1>
-                <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Save public keys on your account, optionally add them automatically to new servers, and deploy them to existing servers when you need access.') }}
-                </p>
-            </div>
-            <button
-                type="button"
-                x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')"
-                class="inline-flex items-center justify-center rounded-xl border border-brand-ink/10 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-cream"
-            >
-                {{ __('Add SSH key') }}
-            </button>
-        </div>
-    </header>
-
-    @if ($setup_source === 'servers.create')
-        <section class="mb-6 rounded-2xl border border-brand-gold/30 bg-brand-sand/35 px-5 py-5 shadow-sm">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Before you create a BYO server') }}</p>
-                    <h2 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('Add at least one SSH key to your profile first') }}</h2>
-                    <p class="mt-2 text-sm leading-6 text-brand-moss">
-                        {{ __('Dply can keep your personal public key ready for access workflows on connected hosts. Add a key from the modal here, optionally enable "Always provision to new servers," then go back to the BYO server form.') }}
-                    </p>
-                    <ol class="mt-4 space-y-2 text-sm leading-6 text-brand-moss">
-                        <li>{{ __('1. Generate or copy your SSH public key from your machine.') }}</li>
-                        <li>{{ __('2. Open the add key modal and give the key a clear name like "Work laptop."') }}</li>
-                        <li>{{ __('3. Turn on "Always provision to new servers" if this key should be added automatically.') }}</li>
-                        <li>{{ __('4. Save the key, then return to create your BYO server.') }}</li>
-                    </ol>
-                    <p class="mt-4 text-sm text-brand-moss">
-                        {{ __('Need help generating a key? Run `ssh-keygen -t ed25519 -C "you@example.com"` in your terminal, then paste the contents of your `.pub` file here.') }}
-                    </p>
+    <div class="space-y-8">
+        @if ($setup_source === 'servers.create')
+            <section class="rounded-2xl border border-brand-gold/30 bg-brand-sand/35 px-5 py-5 shadow-sm">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="max-w-3xl">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Before you create a BYO server') }}</p>
+                        <h3 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('Add at least one SSH key to your profile first') }}</h3>
+                        <p class="mt-2 text-sm leading-6 text-brand-moss">
+                            {{ __('Dply can keep your personal public key ready for access workflows on connected hosts. Add a key from the modal here, optionally enable "Always provision to new servers," then go back to the BYO server form.') }}
+                        </p>
+                        <ol class="mt-4 space-y-2 text-sm leading-6 text-brand-moss">
+                            <li>{{ __('1. Generate or copy your SSH public key from your machine.') }}</li>
+                            <li>{{ __('2. Open the add key modal and give the key a clear name like "Work laptop."') }}</li>
+                            <li>{{ __('3. Turn on "Always provision to new servers" if this key should be added automatically.') }}</li>
+                            <li>{{ __('4. Save the key, then return to create your BYO server.') }}</li>
+                        </ol>
+                        <p class="mt-4 text-sm text-brand-moss">
+                            {{ __('Need help generating a key? Run `ssh-keygen -t ed25519 -C "you@example.com"` in your terminal, then paste the contents of your `.pub` file here.') }}
+                        </p>
+                    </div>
+                    @if ($returnUrl)
+                        <a
+                            href="{{ $returnUrl }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center rounded-xl border border-brand-ink/10 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-cream shrink-0"
+                        >
+                            {{ __('Back to create BYO server') }}
+                        </a>
+                    @endif
                 </div>
-                @if ($returnUrl)
-                    <a
-                        href="{{ $returnUrl }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl border border-brand-ink/10 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-cream"
-                    >
-                        {{ __('Back to create BYO server') }}
-                    </a>
-                @endif
-            </div>
-        </section>
-    @endif
+            </section>
+        @endif
 
-    @if ($flash_success)
-        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ $flash_success }}</div>
-    @endif
-    @if ($flash_error)
-        <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">{{ $flash_error }}</div>
-    @endif
-
-    <div class="space-y-10">
-        {{-- List --}}
-        <section class="dply-card overflow-hidden">
-            <div class="px-6 py-4 border-b border-brand-ink/10 flex flex-wrap items-center justify-between gap-2">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your keys') }}</h2>
-            </div>
-            @if ($sshKeys->isEmpty())
-                <div class="px-6 py-10 text-center">
-                    <p class="text-sm text-brand-moss">{{ __('No SSH keys yet.') }}</p>
+        <x-table-card
+            :title="__('Your keys')"
+            :subtitle="__('Save public keys on your account, optionally add them automatically to new servers, and deploy them to existing servers when you need access.')"
+        >
+            @if ($sshKeysAll->isNotEmpty())
+                <x-slot name="actions">
                     <button
                         type="button"
                         x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')"
-                        class="mt-4 inline-flex items-center justify-center rounded-xl border border-brand-ink/10 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-cream"
+                        class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-transparent bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
                     >
+                        <x-heroicon-o-plus class="h-5 w-5 shrink-0" aria-hidden="true" />
                         {{ __('Add SSH key') }}
                     </button>
-                </div>
+                </x-slot>
+                <x-slot name="search">
+                    <label for="ssh_keys_search" class="sr-only">{{ __('Search') }}</label>
+                    <x-text-input
+                        id="ssh_keys_search"
+                        type="search"
+                        wire:model.live.debounce.300ms="ssh_keys_search"
+                        placeholder="{{ __('Search by name…') }}"
+                        class="block w-full"
+                        autocomplete="off"
+                    />
+                </x-slot>
+            @endif
+
+            @php
+                $hasSshKeySearch = trim($ssh_keys_search ?? '') !== '';
+            @endphp
+            @if ($sshKeysAll->isEmpty())
+                <x-table-card-empty>
+                    <div class="flex max-w-md flex-col items-center gap-4">
+                        <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-brand-ink/10 bg-brand-sand/40" aria-hidden="true">
+                            <x-heroicon-o-key class="h-7 w-7 text-brand-moss" />
+                        </div>
+                        <p class="text-sm text-brand-moss">{{ __('No SSH keys yet.') }}</p>
+                        <button
+                            type="button"
+                            x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/12 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-ink/20 hover:bg-brand-sand/30"
+                        >
+                            <x-heroicon-o-plus class="h-5 w-5 shrink-0" aria-hidden="true" />
+                            {{ __('Add SSH key') }}
+                        </button>
+                    </div>
+                </x-table-card-empty>
+            @elseif ($hasSshKeySearch && $sshKeys->isEmpty())
+                <x-table-card-empty>{{ __('No SSH keys match your search.') }}</x-table-card-empty>
             @else
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
                     <table class="min-w-full text-sm">
                         <thead>
-                            <tr class="border-b border-brand-ink/10 text-left text-brand-mist">
-                                <th class="px-6 py-3 font-medium">{{ __('Name') }}</th>
-                                <th class="px-6 py-3 font-medium">{{ __('On new servers') }}</th>
-                                <th class="px-6 py-3 font-medium text-right">{{ __('Actions') }}</th>
+                            <tr class="border-b border-brand-ink/10 bg-brand-sand/40 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
+                                <th class="px-4 py-3">{{ __('Name') }}</th>
+                                <th class="px-4 py-3">{{ __('On new servers') }}</th>
+                                <th class="px-4 py-3 text-right">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-brand-ink/10 bg-white">
                             @foreach ($sshKeys as $key)
-                                <tr wire:key="ssh-key-{{ $key->id }}" class="border-b border-brand-ink/5">
-                                    <td class="px-6 py-3 text-brand-ink font-medium">{{ $key->name }}</td>
-                                    <td class="px-6 py-3 text-brand-moss">{{ $key->provision_on_new_servers ? __('Yes') : __('No') }}</td>
-                                    <td class="px-6 py-3 text-right whitespace-nowrap space-x-2">
+                                <tr wire:key="ssh-key-{{ $key->id }}" class="hover:bg-brand-sand/20">
+                                    <td class="px-4 py-3 font-medium text-brand-ink">{{ $key->name }}</td>
+                                    <td class="px-4 py-3 text-brand-moss">{{ $key->provision_on_new_servers ? __('Yes') : __('No') }}</td>
+                                    <td class="space-x-2 whitespace-nowrap px-4 py-3 text-right">
                                         @if ($servers->isNotEmpty())
-                                            <button type="button" wire:click="startDeploy({{ $key->id }})" class="text-brand-sage font-medium hover:text-brand-ink text-xs">{{ __('Deploy on servers') }}</button>
+                                            <button type="button" wire:click="startDeploy({{ $key->id }})" class="text-xs font-medium text-brand-sage hover:text-brand-ink">{{ __('Deploy on servers') }}</button>
                                         @endif
-                                        <button type="button" wire:click="startEdit({{ $key->id }})" class="text-brand-sage font-medium hover:text-brand-ink text-xs">{{ __('Edit') }}</button>
-                                        <button type="button" wire:click="openConfirmActionModal('deleteKey', [{{ $key->id }}], @js(__('Delete SSH key')), @js(__('Remove this key from your account? Linked copies on servers will be removed on the next sync.')), @js(__('Delete')), true)" class="text-red-600 font-medium hover:underline text-xs">{{ __('Delete') }}</button>
+                                        <button type="button" wire:click="startEdit({{ $key->id }})" class="text-xs font-medium text-brand-sage hover:text-brand-ink">{{ __('Edit') }}</button>
+                                        <button type="button" wire:click="openConfirmActionModal('deleteKey', [{{ $key->id }}], @js(__('Delete SSH key')), @js(__('Remove this key from your account? Linked copies on servers will be removed on the next sync.')), @js(__('Delete')), true)" class="text-xs font-medium text-red-600 hover:underline">{{ __('Delete') }}</button>
                                     </td>
                                 </tr>
                             @endforeach
@@ -113,7 +118,7 @@
                     </table>
                 </div>
             @endif
-        </section>
+        </x-table-card>
     </div>
 
     {{-- Edit panel --}}
@@ -129,11 +134,11 @@
                     </div>
                     <div>
                         <x-input-label for="ssh_edit_pub" :value="__('Public key')" />
-                        <textarea id="ssh_edit_pub" wire:model="edit_public_key" rows="5" class="mt-1 block w-full rounded-xl border border-brand-ink/15 font-mono text-sm"></textarea>
+                        <textarea id="ssh_edit_pub" wire:model="edit_public_key" rows="5" class="mt-1 block w-full rounded-xl border border-brand-mist shadow-sm focus:border-brand-forest focus:ring-brand-forest font-mono text-sm"></textarea>
                         <x-input-error :messages="$errors->get('edit_public_key')" class="mt-2" />
                     </div>
                     <label class="flex items-start gap-3 cursor-pointer">
-                        <input type="checkbox" wire:model.boolean="edit_provision_on_new_servers" class="mt-1 rounded border-brand-ink/20 text-brand-ink focus:ring-brand-sage" />
+                        <input type="checkbox" wire:model.boolean="edit_provision_on_new_servers" class="mt-1 rounded border-brand-mist text-brand-forest focus:ring-brand-forest" />
                         <span class="text-sm text-brand-moss">{{ __('Always provision to new servers') }}</span>
                     </label>
                 </div>
@@ -160,10 +165,10 @@
                 <div class="flex justify-end mb-2">
                     <button type="button" wire:click="$set('deploy_server_ids', {{ json_encode($servers->pluck('id')->values()->all()) }})" class="text-xs font-medium text-brand-sage hover:text-brand-ink">{{ __('Select all') }}</button>
                 </div>
-                <div class="max-h-48 overflow-y-auto rounded-xl border border-brand-ink/10 divide-y divide-brand-ink/10 mb-4">
+                <div class="max-h-48 overflow-y-auto rounded-xl border border-brand-mist divide-y divide-brand-mist/80 mb-4">
                     @foreach ($servers as $server)
                         <label class="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-sand/30 cursor-pointer">
-                            <input type="checkbox" wire:model.live="deploy_server_ids" value="{{ $server->id }}" class="rounded border-brand-ink/20 text-brand-ink focus:ring-brand-sage" />
+                            <input type="checkbox" wire:model.live="deploy_server_ids" value="{{ $server->id }}" class="rounded border-brand-mist text-brand-forest focus:ring-brand-forest" />
                             <span class="text-sm text-brand-ink font-medium">{{ $server->name }}</span>
                             @if ($server->ip_address)
                                 <span class="text-xs text-brand-mist font-mono">{{ $server->ip_address }}</span>

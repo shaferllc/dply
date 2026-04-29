@@ -1,5 +1,5 @@
 <div>
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="dply-page-shell py-8">
         <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
             <ol class="flex flex-wrap items-center gap-2">
                 <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Dashboard') }}</a></li>
@@ -10,23 +10,20 @@
             </ol>
         </nav>
 
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
-            <div>
-                <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Edit script') }}</h1>
-                <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-                    {{ __('Non-interactive scripts only. Save changes before running on servers.') }}
-                </p>
-            </div>
-            @can('delete', $script)
-                <button type="button" wire:click="openConfirmActionModal('deleteScript', [], @js(__('Delete script')), @js(__('Delete this script? Sites using it as a deploy script will stop referencing it.')), @js(__('Delete')), true)" class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 hover:bg-red-100 self-start">
-                    {{ __('Delete') }}
-                </button>
-            @endcan
-        </div>
-
-        @if ($flash_success)
-            <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ $flash_success }}</div>
-        @endif
+        <x-page-header
+            :title="__('Edit script')"
+            :description="__('Non-interactive scripts only. Save changes before running on servers.')"
+            doc-route="docs.index"
+            flush
+        >
+            <x-slot name="actions">
+                @can('delete', $script)
+                    <button type="button" wire:click="openConfirmActionModal('deleteScript', [], @js(__('Delete script')), @js(__('Delete this script? Sites using it as a deploy script will stop referencing it.')), @js(__('Delete')), true)" class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 hover:bg-red-100">
+                        {{ __('Delete') }}
+                    </button>
+                @endcan
+            </x-slot>
+        </x-page-header>
 
         <div class="space-y-8">
             <section class="dply-card overflow-hidden">
@@ -57,7 +54,6 @@
                         </div>
                         <div class="flex flex-wrap justify-end gap-3">
                             <a href="{{ route('scripts.index') }}" wire:navigate class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Cancel') }}</a>
-                            <x-primary-button type="button" wire:click="save">{{ __('Update') }}</x-primary-button>
                         </div>
                     </div>
                 </div>
@@ -110,6 +106,14 @@
             </section>
         </div>
     </div>
+
+    <x-unsaved-changes-bar
+        :message="__('You have unsaved changes to this script.')"
+        saveAction="save"
+        discardAction="discardScriptFieldsUnsaved"
+        targets="name,content,run_as_user,use_as_default_for_new_sites"
+        :saveLabel="__('Save')"
+    />
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')

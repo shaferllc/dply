@@ -294,8 +294,7 @@ class Settings extends Show
         $this->validate(['sync_group_name_input' => 'required|string|max:120']);
         $manager->createGroup($this->site->fresh(), $this->sync_group_name_input);
         $this->sync_group_name_input = '';
-        $this->flash_success = __('Synchronized deployment group created.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Synchronized deployment group created.'));
         $this->syncRepositorySyncUiState();
     }
 
@@ -320,8 +319,7 @@ class Settings extends Show
             ->findOrFail($this->sync_group_add_site_id);
         $manager->addSite($group, $other);
         $this->sync_group_add_site_id = '';
-        $this->flash_success = __('Site added to the sync group.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Site added to the sync group.'));
         $this->syncRepositorySyncUiState();
     }
 
@@ -343,8 +341,7 @@ class Settings extends Show
             ->where('organization_id', $this->site->organization_id)
             ->findOrFail($this->sync_group_leader_site_id);
         $manager->setLeader($group, $leader);
-        $this->flash_success = __('Leader updated.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Leader updated.'));
         $this->syncRepositorySyncUiState();
     }
 
@@ -358,8 +355,7 @@ class Settings extends Show
         }
 
         $manager->removeSite($this->site->fresh());
-        $this->flash_success = __('Removed from sync group.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Removed from sync group.'));
         $this->syncRepositorySyncUiState();
     }
 
@@ -593,8 +589,7 @@ class Settings extends Show
         $this->authorize('update', $this->site);
 
         if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
-            $this->flash_error = __('Deployers cannot edit custom Artisan commands.');
-            $this->flash_success = null;
+            $this->toastError(__('Deployers cannot edit custom Artisan commands.'));
 
             return;
         }
@@ -617,8 +612,7 @@ class Settings extends Show
         $this->site->update(['meta' => $meta]);
         $this->site->refresh();
         $this->syncLaravelConsoleForm();
-        $this->flash_success = __('Custom Artisan commands saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Custom Artisan commands saved.'));
     }
 
     public function runLaravelArtisanPreset(string $argvTail, LaravelConsoleExecutor $executor): void
@@ -690,8 +684,7 @@ class Settings extends Show
         $this->authorize('update', $this->site);
 
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->flash_error = __('Octane settings apply to VM and container sites.');
-            $this->flash_success = null;
+            $this->toastError(__('Octane settings apply to VM and container sites.'));
 
             return;
         }
@@ -716,8 +709,7 @@ class Settings extends Show
         ]);
         $this->site->refresh();
         $this->syncFormFromSite();
-        $this->flash_success = __('Octane settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Octane settings saved.'));
     }
 
     public function saveLaravelReverbTab(): void
@@ -725,8 +717,7 @@ class Settings extends Show
         $this->authorize('update', $this->site);
 
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->flash_error = __('Reverb settings apply to VM and container sites.');
-            $this->flash_success = null;
+            $this->toastError(__('Reverb settings apply to VM and container sites.'));
 
             return;
         }
@@ -754,8 +745,7 @@ class Settings extends Show
         $this->site->update(['meta' => $meta]);
         $this->site->refresh();
         $this->syncFormFromSite();
-        $this->flash_success = __('Reverb settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Reverb settings saved.'));
     }
 
     public function saveLaravelSetupTab(): void
@@ -763,8 +753,7 @@ class Settings extends Show
         $this->authorize('update', $this->site);
 
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->flash_error = __('These settings apply to VM and container sites.');
-            $this->flash_success = null;
+            $this->toastError(__('These settings apply to VM and container sites.'));
 
             return;
         }
@@ -799,8 +788,7 @@ class Settings extends Show
         $this->site->update(['meta' => $meta]);
         $this->site->refresh();
         $this->syncFormFromSite();
-        $this->flash_success = __('Laravel setup notes saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Laravel setup notes saved.'));
     }
 
     public function saveLaravelStackSettings(): void
@@ -808,8 +796,7 @@ class Settings extends Show
         $this->authorize('update', $this->site);
 
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->flash_error = __('Laravel stack settings apply to VM and container sites that use SSH deploy and managed web server config.');
-            $this->flash_success = null;
+            $this->toastError(__('Laravel stack settings apply to VM and container sites that use SSH deploy and managed web server config.'));
 
             return;
         }
@@ -861,7 +848,7 @@ class Settings extends Show
         $this->authorize('update', $this->site);
 
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->flash_error = __('Runtime preferences apply to VM and container sites. Use Deploy for function and serverless targets.');
+            $this->toastError(__('Runtime preferences apply to VM and container sites. Use Deploy for function and serverless targets.'));
 
             return;
         }
@@ -955,7 +942,7 @@ class Settings extends Show
         $this->authorize('update', $this->site);
 
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->flash_error = __('System user settings apply to VM-backed sites with managed PHP.');
+            $this->toastError(__('System user settings apply to VM-backed sites with managed PHP.'));
 
             return;
         }
@@ -973,8 +960,7 @@ class Settings extends Show
         ]);
         $this->site->refresh();
         $this->syncFormFromSite();
-        $this->flash_success = __('System user settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('System user settings saved.'));
     }
 
     private function shouldShowRuntimePhpRolloutFields(): bool
@@ -1146,8 +1132,7 @@ class Settings extends Show
             'dns_zone' => $zone,
         ]);
         $this->syncDnsSettingsForm();
-        $this->flash_success = __('DNS settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('DNS settings saved.'));
     }
 
     public function saveGeneralSettings(): void
@@ -1215,10 +1200,9 @@ class Settings extends Show
             'workspace_id' => $workspaceId,
         ]);
 
-        $this->flash_success = $workspaceId === null
+        $this->toastSuccess($workspaceId === null
             ? 'Project assignment removed.'
-            : 'Project settings saved.';
-        $this->flash_error = null;
+            : 'Project settings saved.');
         $this->syncGeneralSettingsForm();
     }
 
@@ -1241,8 +1225,7 @@ class Settings extends Show
             'meta' => $meta,
         ]);
 
-        $this->flash_success = 'Site notes saved.';
-        $this->flash_error = null;
+        $this->toastSuccess('Site notes saved.');
         $this->syncGeneralSettingsForm();
     }
 
@@ -1295,8 +1278,7 @@ class Settings extends Show
         $this->authorize('update', $this->site);
 
         if (! $this->site->supportsBasicAuthProvisioning()) {
-            $this->flash_error = __('Basic authentication is not available for this site runtime.');
-            $this->flash_success = null;
+            $this->toastError(__('Basic authentication is not available for this site runtime.'));
 
             return;
         }
@@ -1530,8 +1512,7 @@ class Settings extends Show
         });
 
         if ($existing) {
-            $this->flash_error = __('SSL is already configured or in progress for :domain.', ['domain' => $hostname]);
-            $this->flash_success = null;
+            $this->toastError(__('SSL is already configured or in progress for :domain.', ['domain' => $hostname]));
             $this->closeQuickDomainSslModal();
 
             return;
@@ -1554,14 +1535,12 @@ class Settings extends Show
             $providerLabel = $validated['quick_ssl_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
                 ? 'ZeroSSL'
                 : 'Let\'s Encrypt';
-            $this->flash_success = __('SSL request started for :domain via :provider.', [
+            $this->toastSuccess(__('SSL request started for :domain via :provider.', [
                 'domain' => $hostname,
                 'provider' => $providerLabel,
-            ]);
-            $this->flash_error = null;
+            ]));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
-            $this->flash_success = null;
+            $this->toastError($e->getMessage());
         }
 
         $this->site->load('certificates');
@@ -1608,7 +1587,6 @@ class Settings extends Show
         }
 
         $this->laravel_ssh_setup_error = null;
-        $this->flash_error = null;
 
         try {
             $runner->assertActionAllowed($this->site, $action);
@@ -1633,14 +1611,11 @@ class Settings extends Show
             $exit = $ssh->lastExecExitCode();
             if ($exit !== null && $exit !== 0) {
                 $this->laravel_ssh_setup_error = __('Command exited with code :code.', ['code' => $exit]);
-                $this->flash_success = null;
             } else {
-                $this->flash_success = __('Setup command finished.');
-                $this->flash_error = null;
+                $this->toastSuccess(__('Setup command finished.'));
             }
         } catch (\Throwable $e) {
             $this->laravel_ssh_setup_error = $e->getMessage();
-            $this->flash_success = null;
         }
 
         $this->laravel_ssh_setup_pending_action = null;
@@ -1702,8 +1677,7 @@ class Settings extends Show
             $validated['new_certificate_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
             && $validated['new_certificate_challenge_type'] !== SiteCertificate::CHALLENGE_HTTP
         ) {
-            $this->flash_error = 'ZeroSSL currently supports the HTTP challenge flow only.';
-            $this->flash_success = null;
+            $this->toastError('ZeroSSL currently supports the HTTP challenge flow only.');
 
             return;
         }
@@ -1753,16 +1727,14 @@ class Settings extends Show
                 ExecuteSiteCertificateJob::dispatchSync($certificate->id);
             }
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
-            $this->flash_success = null;
+            $this->toastError($e->getMessage());
             $this->site->load('certificates');
 
             return;
         }
 
         $this->resetCertificateRequestForm();
-        $this->flash_success = 'Certificate request saved.';
-        $this->flash_error = null;
+        $this->toastSuccess('Certificate request saved.');
         $this->site->load('certificates');
     }
 
@@ -1774,8 +1746,7 @@ class Settings extends Show
         $certificateRequestService->removeArtifacts($certificate);
         $certificate->delete();
 
-        $this->flash_success = 'Certificate removed.';
-        $this->flash_error = null;
+        $this->toastSuccess('Certificate removed.');
         $this->site->load('certificates');
     }
 
@@ -1809,8 +1780,6 @@ class Settings extends Show
     {
         $this->authorize('update', $this->site);
         $this->system_user_list_error = null;
-        $this->flash_success = null;
-        $this->flash_error = null;
 
         if (! $this->shouldShowSystemUserPanel()) {
             return;
@@ -1897,7 +1866,7 @@ class Settings extends Show
         }
 
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->flash_error = __('The server must be ready with SSH.');
+            $this->toastError(__('The server must be ready with SSH.'));
 
             return;
         }
@@ -1915,8 +1884,7 @@ class Settings extends Show
         );
 
         $this->closeSystemUserCreateModal();
-        $this->flash_success = __('System user operation queued. Refresh in a moment to see updates.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('System user operation queued. Refresh in a moment to see updates.'));
     }
 
     public function queueAssignSystemUser(): void
@@ -1928,7 +1896,7 @@ class Settings extends Show
         }
 
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->flash_error = __('The server must be ready with SSH.');
+            $this->toastError(__('The server must be ready with SSH.'));
 
             return;
         }
@@ -1946,8 +1914,7 @@ class Settings extends Show
         );
 
         $this->closeSystemUserAssignModal();
-        $this->flash_success = __('System user operation queued. Refresh in a moment to see updates.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('System user operation queued. Refresh in a moment to see updates.'));
     }
 
     public function queueRemoveSystemUser(): void
@@ -1955,7 +1922,7 @@ class Settings extends Show
         $this->authorize('update', $this->server);
 
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->flash_error = __('The server must be ready with SSH.');
+            $this->toastError(__('The server must be ready with SSH.'));
             $this->closeSystemUserRemoveModal();
 
             return;
@@ -1970,8 +1937,7 @@ class Settings extends Show
         DeleteServerSystemUserJob::dispatch($this->server->id, $this->system_user_remove_username);
 
         $this->closeSystemUserRemoveModal();
-        $this->flash_success = __('User removal queued. Refresh server and site lists shortly.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('User removal queued. Refresh server and site lists shortly.'));
     }
 
     public function queueResetSitePermissions(): void
@@ -1983,7 +1949,7 @@ class Settings extends Show
         }
 
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->flash_error = __('The server must be ready with SSH.');
+            $this->toastError(__('The server must be ready with SSH.'));
             $this->closeSystemUserResetPermissionsModal();
 
             return;
@@ -1992,8 +1958,7 @@ class Settings extends Show
         SiteResetPermissionsJob::dispatch($this->site->id);
 
         $this->closeSystemUserResetPermissionsModal();
-        $this->flash_success = __('Reset permissions queued. Refresh in a moment for results.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Reset permissions queued. Refresh in a moment for results.'));
     }
 
     public function dismissSystemUserOperationBanner(): void

@@ -71,7 +71,7 @@ class WorkspaceCron extends Component
     /** When set (site route or ?site=), scope UI and defaults to this site. */
     public ?string $context_site_id = null;
 
-    /** @var 'site'|'all' Only applies when {@see $context_site_id} is set. */
+    /** @var 'site'|'all' Only applies when {@see} is set. */
     public string $cron_list_scope = 'all';
 
     /** True when the bound site uses a non-VM runtime (no SSH cron on the guest). */
@@ -361,16 +361,15 @@ class WorkspaceCron extends Component
                 ->whereKey($this->editing_job_id)
                 ->firstOrFail()
                 ->update($payload);
-            $this->flash_success = __('Cron job updated. Sync crontab on the server to apply changes.');
+            $this->toastSuccess(__('Cron job updated. Sync crontab on the server to apply changes.'));
         } else {
             ServerCronJob::query()->create(array_merge($payload, [
                 'server_id' => $this->server->id,
                 'enabled' => true,
             ]));
-            $this->flash_success = __('Cron job added. Sync crontab on the server to install the Dply-managed block.');
+            $this->toastSuccess(__('Cron job added. Sync crontab on the server to install the Dply-managed block.'));
         }
 
-        $this->flash_error = null;
         $this->cancelEdit();
     }
 
@@ -379,10 +378,9 @@ class WorkspaceCron extends Component
         $this->authorize('update', $this->server);
         $job = ServerCronJob::query()->where('server_id', $this->server->id)->findOrFail($jobId);
         $job->update(['enabled' => ! $job->enabled, 'is_synced' => false]);
-        $this->flash_success = $job->enabled
+        $this->toastSuccess($job->fresh()->enabled
             ? __('Job enabled. Sync crontab to apply.')
-            : __('Job paused (omitted from crontab on next sync).');
-        $this->flash_error = null;
+            : __('Job paused (omitted from crontab on next sync).'));
     }
 
     public function deleteCronJob(string $jobId): void
@@ -392,21 +390,18 @@ class WorkspaceCron extends Component
         if ($this->editing_job_id === $jobId) {
             $this->cancelEdit();
         }
-        $this->flash_success = __('Cron entry removed. Sync crontab again to update the server.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Cron entry removed. Sync crontab again to update the server.'));
     }
 
     public function runCronJobNow(string $jobId): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
 
         $this->cron_workspace_tab = 'run';
 
         $job = ServerCronJob::query()->where('server_id', $this->server->id)->findOrFail($jobId);
         if (! $job->enabled) {
-            $this->flash_error = __('Enable this job before running it.');
+            $this->toastError(__('Enable this job before running it.'));
 
             return;
         }
@@ -414,7 +409,7 @@ class WorkspaceCron extends Component
         $this->server->loadMissing('organization');
         $org = $this->server->organization;
         if ($org?->cron_maintenance_until && now()->lt($org->cron_maintenance_until)) {
-            $this->flash_error = __('Cron runs are paused for this organization until the maintenance window ends. Clear the organization-level maintenance window or ask an admin.');
+            $this->toastError(__('Cron runs are paused for this organization until the maintenance window ends. Clear the organization-level maintenance window or ask an admin.'));
 
             return;
         }
@@ -430,7 +425,7 @@ class WorkspaceCron extends Component
         // Set active run id for Echo (may already be set from the first broadcast if the worker was fast).
         $this->js('window.__dplyCronRunActiveId='.$rid.';');
 
-        $this->flash_success = __('Run queued. A queue worker runs it over SSH; output appears here via Reverb or polling.');
+        $this->toastSuccess(__('Run queued. A queue worker runs it over SSH; output appears here via Reverb or polling.'));
     }
 
     /**
@@ -464,12 +459,10 @@ class WorkspaceCron extends Component
         }
 
         $this->cron_run_id = null;
-        $this->flash_error = null;
-        $this->flash_success = null;
         if ($status === 'finished') {
-            $this->flash_success = (string) ($payload['flash_success'] ?? __('Finished.'));
+            $this->toastSuccess((string) ($payload['flash_success'] ?? __('Finished.')));
         } else {
-            $this->flash_error = (string) ($payload['error'] ?? __('Run failed.'));
+            $this->toastError((string) ($payload['error'] ?? __('Run failed.')));
         }
     }
 
@@ -532,12 +525,10 @@ class WorkspaceCron extends Component
         }
 
         $this->cron_run_id = null;
-        $this->flash_error = null;
-        $this->flash_success = null;
         if ($success) {
-            $this->flash_success = is_string($flashSuccess) && $flashSuccess !== '' ? $flashSuccess : __('Finished.');
+            $this->toastSuccess(is_string($flashSuccess) && $flashSuccess !== '' ? $flashSuccess : __('Finished.'));
         } else {
-            $this->flash_error = is_string($error) && $error !== '' ? $error : __('Run failed.');
+            $this->toastError(is_string($error) && $error !== '' ? $error : __('Run failed.'));
         }
     }
 
@@ -605,8 +596,7 @@ class WorkspaceCron extends Component
     {
         $this->authorize('update', $this->server);
         Cache::forget('server_passwd_usernames:'.$this->server->id);
-        $this->flash_success = __('Reloaded user names from /etc/passwd on the server.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Reloaded user names from /etc/passwd on the server.'));
     }
 
     /**
@@ -632,8 +622,6 @@ class WorkspaceCron extends Component
     public function loadInspectCrontab(ServerCrontabReader $reader): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         $this->cron_workspace_tab = 'troubleshooting';
         $this->inspect_crontab_body = null;
         $this->inspect_crontab_exit_code = null;
@@ -655,26 +643,22 @@ class WorkspaceCron extends Component
                 && str_contains(strtolower($result['body']), 'no crontab');
 
             if ($result['exit_code'] !== null && $result['exit_code'] !== 0 && ! $noCrontabYet) {
-                $this->flash_error = __('Could not read crontab (exit :code). Output is shown below.', ['code' => $result['exit_code']]);
-            } else {
-                $this->flash_error = null;
+                $this->toastError(__('Could not read crontab (exit :code). Output is shown below.', ['code' => $result['exit_code']]));
             }
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function syncCronJobs(ServerCronSynchronizer $synchronizer): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         try {
             $this->server->refresh();
             $out = $synchronizer->sync($this->server);
-            $this->flash_success = __('Crontab sync finished. Output: :out', ['out' => Str::limit(trim($out), 800)]);
+            $this->toastSuccess(__('Crontab sync finished. Output: :out', ['out' => Str::limit(trim($out), 800)]));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -684,11 +668,9 @@ class WorkspaceCron extends Component
         $this->resetErrorBag('new_cron_expression');
         $expr = trim($this->new_cron_expression);
         if ($cronValidator->isValid($expr)) {
-            $this->flash_success = __('Cron expression looks valid.');
-            $this->flash_error = null;
+            $this->toastSuccess(__('Cron expression looks valid.'));
         } else {
-            $this->flash_error = __('That cron expression is not valid.');
-            $this->flash_success = null;
+            $this->toastError(__('That cron expression is not valid.'));
         }
     }
 
@@ -713,11 +695,9 @@ class WorkspaceCron extends Component
         $temp->setRelation('server', $this->server->fresh());
         try {
             $text = $runner->dryRunPreview($this->server->fresh(), $temp);
-            $this->flash_success = $text;
-            $this->flash_error = null;
+            $this->toastSuccess($text);
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
-            $this->flash_success = null;
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -750,8 +730,7 @@ class WorkspaceCron extends Component
             ]
         );
         $this->template_save_name = null;
-        $this->flash_success = __('Template saved for this organization.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Template saved for this organization.'));
     }
 
     public function deleteOrgCronTemplate(string $templateId): void
@@ -767,8 +746,7 @@ class WorkspaceCron extends Component
             ->whereKey($templateId)
             ->firstOrFail()
             ->delete();
-        $this->flash_success = __('Template removed.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Template removed.'));
     }
 
     public function applyOrgCronTemplate(string $templateId): void
@@ -788,8 +766,7 @@ class WorkspaceCron extends Component
         $this->new_description = $tpl->description;
         $this->updatedNewCronExpression();
         $this->cron_workspace_tab = 'jobs';
-        $this->flash_success = __('Loaded template into the form — review and save.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Loaded template into the form — review and save.'));
     }
 
     public function saveOrgCronMaintenance(): void
@@ -821,8 +798,7 @@ class WorkspaceCron extends Component
             'cron_maintenance_until' => $until,
             'cron_maintenance_note' => trim($this->org_maintenance_note) ?: null,
         ]);
-        $this->flash_success = __('Maintenance window saved. Managed cron lines are omitted until then.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Maintenance window saved. Managed cron lines are omitted until then.'));
     }
 
     public function clearOrgCronMaintenance(): void
@@ -839,8 +815,7 @@ class WorkspaceCron extends Component
         ]);
         $this->org_maintenance_until_local = null;
         $this->org_maintenance_note = '';
-        $this->flash_success = __('Maintenance window cleared.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Maintenance window cleared.'));
     }
 
     public function openLogsModal(string $jobId): void

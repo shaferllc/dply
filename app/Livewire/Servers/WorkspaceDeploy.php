@@ -68,7 +68,7 @@ class WorkspaceDeploy extends Component
         $this->authorize('view', $this->server);
         $cmd = $this->server->deploy_command;
         if (empty(trim((string) $cmd))) {
-            $this->flash_error = 'Set a deploy command first. Use "Edit deploy command" below.';
+            $this->toastError('Set a deploy command first. Use "Edit deploy command" below.');
 
             return;
         }
@@ -97,7 +97,7 @@ class WorkspaceDeploy extends Component
         $this->authorize('update', $this->server);
         $this->validate(['deploy_command' => 'nullable|string|max:2000']);
         $this->server->update(['deploy_command' => trim($this->deploy_command) ?: null]);
-        $this->flash_success = 'Deploy command updated.';
+        $this->toastSuccess('Deploy command updated.');
     }
 
     public function applyDeployTemplate(string $key): void
@@ -108,7 +108,7 @@ class WorkspaceDeploy extends Component
         if ($template && ! empty($template['command'])) {
             $this->deploy_command = $template['command'];
             $this->server->update(['deploy_command' => $template['command']]);
-            $this->flash_success = 'Deploy template applied. Edit below if needed, then save.';
+            $this->toastSuccess('Deploy template applied. Edit below if needed, then save.');
         }
     }
 

@@ -153,7 +153,7 @@ class NotificationChannelsTest extends TestCase
         Livewire::actingAs($user)
             ->test(TeamNotificationChannels::class, ['organization' => $org, 'team' => $team])
             ->call('sendTest', $channel->id)
-            ->assertSet('flash_success', __('Test message sent.'));
+            ->assertDispatched('notify', message: __('Test message sent.'), type: 'success');
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'hooks.slack.com'));
     }
@@ -196,7 +196,7 @@ class NotificationChannelsTest extends TestCase
         Livewire::actingAs($user)
             ->test(ProfileNotificationChannels::class)
             ->call('sendTest', $channel->id)
-            ->assertSet('flash_success', __('Test email sent.'));
+            ->assertDispatched('notify', message: __('Test email sent.'), type: 'success');
     }
 
     public function test_bulk_assign_notifications_creates_subscription(): void

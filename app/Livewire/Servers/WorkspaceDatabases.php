@@ -6,6 +6,7 @@ use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAdminCredential;
@@ -13,7 +14,6 @@ use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseExtraUser;
-use App\Models\NotificationSubscription;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\ServerDatabaseAuditLogger;
@@ -115,6 +115,10 @@ class WorkspaceDatabases extends Component
     /** @var array<string, mixed>|null */
     public ?array $drift_snapshot = null;
 
+    protected bool $capabilitiesProbeErrorNotified = false;
+
+    protected bool $driftProbeErrorNotified = false;
+
     public $import_sql_file = null;
 
     public function boot(): void
@@ -141,8 +145,7 @@ class WorkspaceDatabases extends Component
         $this->authorize('update', $this->server);
         $capabilities->forget($this->server);
         $this->db_engine_default_applied = false;
-        $this->flash_error = null;
-        $this->flash_success = __('Rechecked the server for database engines.');
+        $this->toastSuccess(__('Rechecked the server for database engines.'));
     }
 
     public function setWorkspaceTab(string $tab): void
@@ -194,7 +197,7 @@ class WorkspaceDatabases extends Component
     {
         $this->authorize('update', $this->server);
         if ($this->currentUserIsDeployer()) {
-            $this->flash_error = __('Deployers cannot change notification routing.');
+            $this->toastError(__('Deployers cannot change notification routing.'));
 
             return;
         }
@@ -238,8 +241,7 @@ class WorkspaceDatabases extends Component
             }
         });
 
-        $this->flash_success = __('Database notification routing updated.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Database notification routing updated.'));
         $this->loadDatabaseAlertMatrix();
     }
 
@@ -274,8 +276,7 @@ class WorkspaceDatabases extends Component
         $this->db_engine_default_applied = false;
 
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_ADMIN_CREDENTIALS_SAVED, [], auth()->user());
-        $this->flash_success = __('Saved database admin credentials.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Saved database admin credentials.'));
     }
 
     public function clearStoredMysqlRootPassword(
@@ -289,7 +290,7 @@ class WorkspaceDatabases extends Component
         }
         $capabilities->forget($this->server);
         $this->db_engine_default_applied = false;
-        $this->flash_success = __('Cleared stored MySQL root password.');
+        $this->toastSuccess(__('Cleared stored MySQL root password.'));
     }
 
     public function clearStoredPostgresPassword(ServerDatabaseHostCapabilities $capabilities): void
@@ -302,7 +303,7 @@ class WorkspaceDatabases extends Component
         }
         $capabilities->forget($this->server);
         $this->db_engine_default_applied = false;
-        $this->flash_success = __('Cleared stored PostgreSQL password.');
+        $this->toastSuccess(__('Cleared stored PostgreSQL password.'));
     }
 
     public function runDriftAnalysis(
@@ -312,7 +313,7 @@ class WorkspaceDatabases extends Component
         $this->authorize('update', $this->server);
         $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DRIFT_CHECK, [], auth()->user());
-        $this->flash_success = __('Drift analysis updated.');
+        $this->toastSuccess(__('Drift analysis updated.'));
     }
 
     public function addExtraMysqlUser(
@@ -349,7 +350,7 @@ class WorkspaceDatabases extends Component
 
         $this->extra_username = '';
         $this->extra_password = '';
-        $this->flash_success = __('Extra user created on the server.');
+        $this->toastSuccess(__('Extra user created on the server.'));
     }
 
     public function removeExtraUser(
@@ -359,8 +360,6 @@ class WorkspaceDatabases extends Component
         ServerDatabaseAuditLogger $auditLogger,
     ): void {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
 
         $row = ServerDatabaseExtraUser::query()
             ->whereKey($extraId)
@@ -378,7 +377,7 @@ class WorkspaceDatabases extends Component
                 'username' => $user,
                 'dropped_remote' => false,
             ], auth()->user());
-            $this->flash_success = __('Removed extra user from Dply.');
+            $this->toastSuccess(__('Removed extra user from Dply.'));
 
             return;
         }
@@ -386,7 +385,7 @@ class WorkspaceDatabases extends Component
         $caps = $capabilities->forServer($this->server);
 
         if (! $caps['mysql']) {
-            $this->flash_error = __('MySQL is not reachable over SSH; cannot drop the remote user safely.');
+            $this->toastError(__('MySQL is not reachable over SSH; cannot drop the remote user safely.'));
 
             return;
         }
@@ -394,7 +393,7 @@ class WorkspaceDatabases extends Component
         try {
             $provisioner->dropExtraMysqlUser($db, $row);
         } catch (\Throwable $e) {
-            $this->flash_error = __('Could not drop user on the server: :msg', ['msg' => $e->getMessage()]);
+            $this->toastError(__('Could not drop user on the server: :msg', ['msg' => $e->getMessage()]));
 
             return;
         }
@@ -409,7 +408,7 @@ class WorkspaceDatabases extends Component
             'dropped_remote' => true,
         ], auth()->user());
 
-        $this->flash_success = __('Dropped the MySQL user on the server and removed it from Dply.');
+        $this->toastSuccess(__('Dropped the MySQL user on the server and removed it from Dply.'));
     }
 
     public function createCredentialShare(ServerDatabaseAuditLogger $auditLogger): void
@@ -446,7 +445,7 @@ class WorkspaceDatabases extends Component
 
         $this->share_link_modal_url = $url;
         $this->share_link_modal_db_name = $db->name;
-        $this->flash_success = __('Share link created.');
+        $this->toastSuccess(__('Share link created.'));
     }
 
     public function queueExport(string $databaseId, ServerDatabaseAuditLogger $auditLogger): void
@@ -459,7 +458,7 @@ class WorkspaceDatabases extends Component
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
         dispatch(new ExportServerDatabaseBackupJob($backup->id));
-        $this->flash_success = __('Export queued. Refresh this page in a few moments and download from the backup list.');
+        $this->toastSuccess(__('Export queued. Refresh this page in a few moments and download from the backup list.'));
     }
 
     public function downloadBackup(string $backupId): StreamedResponse|Response|null
@@ -471,13 +470,13 @@ class WorkspaceDatabases extends Component
             ->firstOrFail();
 
         if ($backup->status !== ServerDatabaseBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
-            $this->flash_error = __('Backup is not ready yet.');
+            $this->toastError(__('Backup is not ready yet.'));
 
             return null;
         }
 
         if (! Storage::disk('local')->exists($backup->disk_path)) {
-            $this->flash_error = __('Backup file is missing from storage.');
+            $this->toastError(__('Backup file is missing from storage.'));
 
             return null;
         }
@@ -502,7 +501,7 @@ class WorkspaceDatabases extends Component
         $db = ServerDatabase::query()->where('server_id', $this->server->id)->whereKey($this->import_target_db_id)->firstOrFail();
         $contents = file_get_contents($this->import_sql_file->getRealPath());
         if (! is_string($contents)) {
-            $this->flash_error = __('Could not read the uploaded file.');
+            $this->toastError(__('Could not read the uploaded file.'));
 
             return;
         }
@@ -514,7 +513,7 @@ class WorkspaceDatabases extends Component
                 $remoteExec->mysqlImportFromString($db->server, $db->name, $db->username, $db->password, $contents, 600, $maxBytes);
             }
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -524,7 +523,7 @@ class WorkspaceDatabases extends Component
             'bytes' => strlen($contents),
         ], auth()->user());
         $this->import_sql_file = null;
-        $this->flash_success = __('Import finished.');
+        $this->toastSuccess(__('Import finished.'));
     }
 
     public function synchronizeDatabases(
@@ -533,12 +532,10 @@ class WorkspaceDatabases extends Component
         ServerDatabaseAuditLogger $auditLogger,
     ): void {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
 
         $caps = $capabilities->forServer($this->server);
         if (! $caps['mysql'] && ! $caps['postgres']) {
-            $this->flash_error = __('No supported database engine is reachable on this server (MySQL/MariaDB as root, or PostgreSQL via the postgres user).');
+            $this->toastError(__('No supported database engine is reachable on this server (MySQL/MariaDB as root, or PostgreSQL via the postgres user).'));
 
             return;
         }
@@ -558,9 +555,9 @@ class WorkspaceDatabases extends Component
                 'mysql_count' => count($this->remote_mysql_databases),
                 'postgres_count' => count($this->remote_postgres_databases),
             ], auth()->user());
-            $this->flash_success = __('Queried the server for database names. Compare the lists below and add or import anything missing in Dply.');
+            $this->toastSuccess(__('Queried the server for database names. Compare the lists below and add or import anything missing in Dply.'));
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -573,12 +570,12 @@ class WorkspaceDatabases extends Component
         $caps = $capabilities->forServer($this->server);
         $engine = $engine === 'postgres' ? 'postgres' : 'mysql';
         if ($engine === 'mysql' && ! $caps['mysql']) {
-            $this->flash_error = __('MySQL/MariaDB is not available on this server.');
+            $this->toastError(__('MySQL/MariaDB is not available on this server.'));
 
             return;
         }
         if ($engine === 'postgres' && ! $caps['postgres']) {
-            $this->flash_error = __('PostgreSQL is not available on this server.');
+            $this->toastError(__('PostgreSQL is not available on this server.'));
 
             return;
         }
@@ -639,9 +636,6 @@ class WorkspaceDatabases extends Component
         }
         $this->validate($rules);
 
-        $this->flash_success = null;
-        $this->flash_error = null;
-
         $existingMysqlUser = null;
         if ($this->new_db_user_mode === 'existing') {
             if ($this->new_db_engine !== 'mysql') {
@@ -698,7 +692,7 @@ class WorkspaceDatabases extends Component
                 'used_existing_user' => $existingMysqlUser !== null,
             ], auth()->user());
             $notificationDispatcher->notifyIfSubscribed($this->server, 'created', $db, auth()->user());
-            $this->flash_success = __('Database provisioned on the server.').' '.Str::limit($out, 500);
+            $this->toastSuccess(__('Database provisioned on the server.').' '.Str::limit($out, 500));
             $this->generated_database_credentials = [
                 'name' => $db->name,
                 'engine' => $db->engine,
@@ -716,7 +710,7 @@ class WorkspaceDatabases extends Component
             $this->new_mysql_charset = null;
             $this->new_mysql_collation = null;
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -724,8 +718,7 @@ class WorkspaceDatabases extends Component
         string $id,
         ServerDatabaseAuditLogger $auditLogger,
         ServerDatabaseNotificationDispatcher $notificationDispatcher,
-    ): void
-    {
+    ): void {
         $this->authorize('update', $this->server);
         $db = ServerDatabase::query()->where('server_id', $this->server->id)->findOrFail($id);
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DATABASE_REMOVED_DPLY, [
@@ -734,8 +727,7 @@ class WorkspaceDatabases extends Component
         ], auth()->user());
         $notificationDispatcher->notifyIfSubscribed($this->server, 'removed', $db, auth()->user(), false);
         $db->delete();
-        $this->flash_success = __('Removed this database from Dply. The database was not dropped on the server.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Removed this database from Dply. The database was not dropped on the server.'));
         if ($this->credentials_modal_db_id === $id) {
             $this->credentials_modal_db_id = null;
         }
@@ -749,18 +741,16 @@ class WorkspaceDatabases extends Component
         ServerDatabaseNotificationDispatcher $notificationDispatcher,
     ): void {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
 
         $db = ServerDatabase::query()->where('server_id', $this->server->id)->findOrFail($id);
         $caps = $capabilities->forServer($this->server);
         if ($db->engine === 'mysql' && ! $caps['mysql']) {
-            $this->flash_error = __('MySQL/MariaDB is not available on this server, so the database cannot be dropped remotely.');
+            $this->toastError(__('MySQL/MariaDB is not available on this server, so the database cannot be dropped remotely.'));
 
             return;
         }
         if ($db->engine === 'postgres' && ! $caps['postgres']) {
-            $this->flash_error = __('PostgreSQL is not available on this server, so the database cannot be dropped remotely.');
+            $this->toastError(__('PostgreSQL is not available on this server, so the database cannot be dropped remotely.'));
 
             return;
         }
@@ -773,12 +763,12 @@ class WorkspaceDatabases extends Component
             ], auth()->user());
             $notificationDispatcher->notifyIfSubscribed($this->server, 'removed', $db, auth()->user(), true);
             $db->delete();
-            $this->flash_success = __('Database and user were dropped on the server and the entry was removed from Dply.').' '.Str::limit($out, 400);
+            $this->toastSuccess(__('Database and user were dropped on the server and the entry was removed from Dply.').' '.Str::limit($out, 400));
             if ($this->credentials_modal_db_id === $id) {
                 $this->credentials_modal_db_id = null;
             }
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -795,11 +785,16 @@ class WorkspaceDatabases extends Component
         $capabilities = ['mysql' => false, 'postgres' => false, 'redis' => false];
         try {
             $capabilities = $capabilitiesService->forServer($this->server);
+            $this->capabilitiesProbeErrorNotified = false;
         } catch (\Throwable $e) {
-            $this->flash_error = $this->friendlyDatabaseWorkspaceError(
+            $message = $this->friendlyDatabaseWorkspaceError(
                 $e,
                 __('Dply could not connect to the server to check database engines.')
             );
+            if (! $this->capabilitiesProbeErrorNotified) {
+                $this->toastError($message);
+                $this->capabilitiesProbeErrorNotified = true;
+            }
         }
 
         if (! $this->db_engine_default_applied) {
@@ -821,11 +816,16 @@ class WorkspaceDatabases extends Component
         if ($this->workspace_tab === 'advanced' && $this->drift_snapshot === null) {
             try {
                 $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
+                $this->driftProbeErrorNotified = false;
             } catch (\Throwable $e) {
-                $this->flash_error = $this->friendlyDatabaseWorkspaceError(
+                $message = $this->friendlyDatabaseWorkspaceError(
                     $e,
                     __('Dply could not connect to the server to compare database drift.')
                 );
+                if (! $this->driftProbeErrorNotified) {
+                    $this->toastError($message);
+                    $this->driftProbeErrorNotified = true;
+                }
             }
         }
 

@@ -2,7 +2,7 @@
     <x-livewire-validation-errors />
     <div class="mb-6 flex gap-3 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-brand-forest">
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-amber-600 shadow-sm ring-1 ring-amber-200/60" aria-hidden="true">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            <x-heroicon-o-lock-closed class="h-5 w-5" />
         </span>
         <p class="leading-relaxed">{{ __('This is a secure area of the application. Please confirm your password before continuing.') }}</p>
     </div>

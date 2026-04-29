@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    @include('partials.theme-head')
+
     <title>Pricing – {{ config('app.name') }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
@@ -36,7 +39,7 @@
         </div>
 
         <section class="pb-24 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-5xl mx-auto grid gap-8 md:grid-cols-3">
+            <div class="mx-auto grid w-full max-w-7xl gap-8 md:grid-cols-3">
                 <div class="relative flex flex-col rounded-2xl border border-brand-ink/10 bg-white/80 backdrop-blur-sm p-8 shadow-sm">
                     <h2 class="text-lg font-semibold text-brand-ink">Trial</h2>
                     <p class="mt-1 text-sm text-brand-moss">For evaluation and your first real deploys</p>
@@ -45,19 +48,19 @@
                     </div>
                     <ul class="mt-8 space-y-4 flex-1">
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Connect your first servers and sites
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             DigitalOcean and SSH-based workflows
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Git deploys, SSL, and command-center visibility
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Upgrade to Pro when the whole org is ready
                         </li>
                     </ul>
@@ -75,23 +78,23 @@
                     <p class="mt-2 text-sm text-brand-moss">One flat subscription for the whole organization.</p>
                     <ul class="mt-8 space-y-4 flex-1">
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Unlimited servers
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Unlimited sites across the organization
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             API tokens and org-wide automation
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Priority support and rollout help
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Backup planning, metrics, and rollback-friendly delivery
                         </li>
                     </ul>
@@ -106,15 +109,15 @@
                     </div>
                     <ul class="mt-8 space-y-4 flex-1">
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Everything in Pro
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Procurement, onboarding, and rollout planning
                         </li>
                         <li class="flex items-start gap-3 text-sm text-brand-moss">
-                            <svg class="h-5 w-5 shrink-0 text-brand-sage" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Dedicated support
                         </li>
                     </ul>

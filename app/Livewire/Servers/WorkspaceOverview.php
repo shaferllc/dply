@@ -94,7 +94,7 @@ class WorkspaceOverview extends Component
         if ($this->server->status === Server::STATUS_READY && ! empty($this->server->ip_address)) {
             CheckServerHealthJob::dispatch($this->server);
         }
-        $this->flash_success = 'Health check has been queued. Status will update shortly.';
+        $this->toastSuccess('Health check has been queued. Status will update shortly.');
     }
 
     public function saveHealthCheckUrl(): void
@@ -107,7 +107,7 @@ class WorkspaceOverview extends Component
             unset($meta['health_check_url']);
         }
         $this->server->update(['meta' => $meta]);
-        $this->flash_success = 'Health check URL updated.';
+        $this->toastSuccess('Health check URL updated.');
     }
 
     public function rerunSetup(): void
@@ -116,7 +116,7 @@ class WorkspaceOverview extends Component
 
         $server = $this->server->fresh();
         if (! $server || ! RunSetupScriptJob::shouldDispatch($server)) {
-            $this->flash_error = 'This server is not ready for a setup re-run yet.';
+            $this->toastError('This server is not ready for a setup re-run yet.');
 
             return;
         }
@@ -182,7 +182,7 @@ class WorkspaceOverview extends Component
             }
         }
 
-        $this->flash_success = __('Saved :count new notification subscription(s) for this server.', ['count' => $created]);
+        $this->toastSuccess(__('Saved :count new notification subscription(s) for this server.', ['count' => $created]));
     }
 
     public function createQuickNotificationChannel(): void
@@ -214,7 +214,7 @@ class WorkspaceOverview extends Component
 
         $this->resetQuickNotificationChannelFields();
         $this->showQuickNotificationChannelModal = false;
-        $this->flash_success = __('Channel created and selected for this server.');
+        $this->toastSuccess(__('Channel created and selected for this server.'));
     }
 
     public function openQuickNotificationChannelModal(): void

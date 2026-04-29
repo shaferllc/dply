@@ -77,7 +77,7 @@ class Monitor extends Component
 
         $this->reset('newLabel', 'newPath');
         $this->site->load('uptimeMonitors');
-        session()->flash('success', __('Monitor added.'));
+        $this->toastSuccess(__('Monitor added.'));
 
         if (config('site_uptime.enabled', true)) {
             RunSiteUptimeMonitorCheckJob::dispatch($created->id);
@@ -97,7 +97,7 @@ class Monitor extends Component
         }
 
         $this->site->load('uptimeMonitors');
-        session()->flash('success', __('Check queued.'));
+        $this->toastSuccess(__('Check queued.'));
     }
 
     public function confirmRemoveMonitor(string $monitorId): void
@@ -128,7 +128,7 @@ class Monitor extends Component
             ->delete();
 
         $this->site->load('uptimeMonitors');
-        session()->flash('success', __('Monitor removed.'));
+        $this->toastSuccess(__('Monitor removed.'));
     }
 
     public function render(SiteUptimeCheckUrlResolver $resolver): View

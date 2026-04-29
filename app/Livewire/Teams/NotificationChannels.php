@@ -39,13 +39,17 @@ class NotificationChannels extends Component
             'pageTitle' => __('Team notification channels'),
             'intro' => __('Destinations for team-scoped notifications. Team admins and organization admins can manage channels; all team members can view.'),
             'breadcrumbs' => [
-                ['label' => __('Dashboard'), 'url' => route('dashboard')],
-                ['label' => $this->organization->name, 'url' => route('organizations.show', $this->organization)],
-                ['label' => $this->team->name, 'url' => null],
-                ['label' => __('Notification channels'), 'url' => null],
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],
+                ['label' => $this->team->name, 'icon' => 'user-group'],
+                ['label' => __('Notification channels'), 'icon' => 'bell-alert'],
             ],
             'backUrl' => route('organizations.show', $this->organization),
             'backLabel' => __('Back to organization'),
+            'showBulkAssign' => false,
+            'currentOrganization' => null,
+            'organizationChannels' => collect(),
+            'teamChannelGroups' => collect(),
         ];
     }
 
