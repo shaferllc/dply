@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\Organizations\Show as OrganizationsShow;
+use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Settings\Hub as SettingsHub;
 use App\Models\NotificationWebhookDestination;
 use App\Models\Organization;
@@ -54,6 +54,66 @@ class SettingsAndNotificationsTest extends TestCase
             ->assertSeeText('Organization roles & plan limits');
     }
 
+    public function test_docs_api_renders_http_api_markdown(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('docs.api'))
+            ->assertOk()
+            ->assertSeeText('HTTP API');
+    }
+
+    public function test_docs_sites_and_deploy_renders_markdown(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('docs.markdown', ['slug' => 'sites-and-deploy']))
+            ->assertOk()
+            ->assertSeeText('Sites, DNS & deploy');
+    }
+
+    public function test_docs_credentials_renders_markdown(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('docs.markdown', ['slug' => 'credentials']))
+            ->assertOk()
+            ->assertSeeText('Server providers vs Git');
+    }
+
+    public function test_docs_billing_and_plans_renders_markdown(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('docs.markdown', ['slug' => 'billing-and-plans']))
+            ->assertOk()
+            ->assertSeeText('Billing & plans');
+    }
+
+    public function test_docs_server_workspace_renders_markdown(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('docs.markdown', ['slug' => 'server-workspace']))
+            ->assertOk()
+            ->assertSeeText('Server workspace overview');
+    }
+
+    public function test_docs_local_development_renders_markdown(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('docs.markdown', ['slug' => 'local-development']))
+            ->assertOk()
+            ->assertSeeText('Local development');
+    }
+
     public function test_org_admin_can_disable_deploy_email_notifications(): void
     {
         $user = User::factory()->create();
@@ -61,7 +121,7 @@ class SettingsAndNotificationsTest extends TestCase
         $org->users()->attach($user->id, ['role' => 'owner']);
 
         Livewire::actingAs($user)
-            ->test(OrganizationsShow::class, ['organization' => $org])
+            ->test(OrganizationsAutomation::class, ['organization' => $org])
             ->set('deploy_email_notifications_enabled', false);
 
         $this->assertDatabaseHas('organizations', [
@@ -77,7 +137,7 @@ class SettingsAndNotificationsTest extends TestCase
         $org->users()->attach($user->id, ['role' => 'owner']);
 
         Livewire::actingAs($user)
-            ->test(OrganizationsShow::class, ['organization' => $org])
+            ->test(OrganizationsAutomation::class, ['organization' => $org])
             ->set('int_hook_name', 'Ops room')
             ->set('int_hook_driver', NotificationWebhookDestination::DRIVER_SLACK)
             ->set('int_hook_url', 'https://hooks.slack.com/services/T000/B000/XXXX')

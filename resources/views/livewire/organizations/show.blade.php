@@ -30,7 +30,7 @@
                                 wire:navigate
                                 class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                             >
-                                <x-heroicon-o-rectangle-stack class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Documentation') }}
                             </a>
                             @if ($organization->hasAdminAccess(auth()->user()))

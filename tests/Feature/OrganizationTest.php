@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
+use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -88,6 +90,23 @@ class OrganizationTest extends TestCase
         $response->assertSee('Deploy emails');
         $response->assertSee('Webhook destinations');
         $response->assertSee('API tokens');
+    }
+
+    public function test_organization_automation_prompt_revoke_api_token_opens_confirm_modal(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+
+        ['token' => $token] = ApiToken::createToken($user, $org, 'CI token', null, ['*'], null);
+
+        Livewire::actingAs($user)
+            ->test(OrganizationsAutomation::class, ['organization' => $org])
+            ->call('promptRevokeApiToken', (string) $token->id)
+            ->assertSet('showConfirmActionModal', true)
+            ->assertSet('confirmActionModalMethod', 'revokeApiToken');
+
+        $this->assertDatabaseHas('api_tokens', ['id' => $token->id]);
     }
 
     public function test_organization_show_returns_403_for_non_member(): void

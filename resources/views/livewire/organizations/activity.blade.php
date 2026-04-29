@@ -1,14 +1,33 @@
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-organization-shell :organization="$organization" section="activity">
+            <x-breadcrumb-trail :items="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('Activity'), 'icon' => 'archive-box'],
+            ]" />
+
             <div class="space-y-8">
                 <div class="dply-card overflow-hidden">
-                    <div class="p-6 sm:p-8">
-                        <div class="max-w-3xl">
+                    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
+                        <div class="lg:col-span-4">
                             <h2 class="text-lg font-semibold text-brand-ink">{{ __('Activity') }}</h2>
                             <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                                 {{ __('Recent audit events for this organization. Admins can review who did what and when.') }}
                             </p>
+                        </div>
+                        <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
+                            <a
+                                href="{{ route('docs.index') }}"
+                                wire:navigate
+                                class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Documentation') }}
+                            </a>
+                            <x-badge tone="accent" :caps="false" class="text-xs">
+                                {{ __('Organization: :name', ['name' => $organization->name]) }}
+                            </x-badge>
                         </div>
                     </div>
                 </div>

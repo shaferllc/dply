@@ -25,6 +25,14 @@ class DocsController extends Controller
     }
 
     /**
+     * Stable URL for HTTP API documentation (see docs/HTTP_API.md).
+     */
+    public function apiDocumentation(): View
+    {
+        return $this->markdownFromDocsPath('HTTP_API.md', 'HTTP API');
+    }
+
+    /**
      * Markdown pages registered in config/docs.php (`markdown` key).
      */
     public function markdown(string $slug): View
@@ -41,6 +49,11 @@ class DocsController extends Controller
             throw new NotFoundHttpException;
         }
 
+        return $this->markdownFromDocsPath($filename, $title);
+    }
+
+    private function markdownFromDocsPath(string $filename, string $title): View
+    {
         $path = base_path('docs/'.$filename);
         if (! File::isFile($path)) {
             throw new NotFoundHttpException;

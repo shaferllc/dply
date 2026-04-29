@@ -26,6 +26,9 @@ class Teams extends Component
     /** @var array<int, int> team id => user id for "add member" dropdown */
     public array $addMemberSelected = [];
 
+    /** When set, the save-team-name modal is shown for this team (ULID). */
+    public ?string $saveTeamNameModalTeamId = null;
+
     public function mount(Organization $organization): void
     {
         $this->authorize('view', $organization);
@@ -70,11 +73,89 @@ class Teams extends Component
         audit_log($this->organization, auth()->user(), 'team.created', $this->organization->teams()->latest()->first());
 
         $this->reset('team_name');
+        $this->dispatch('close-modal', 'create-team-modal');
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Team created.');
     }
 
-    public function updateTeam(int $teamId): void
+    public function openCreateTeamModal(): void
+    {
+        $this->authorize('create', [Team::class, $this->organization]);
+
+        $this->team_name = '';
+        $this->resetValidation(['team_name']);
+        $this->dispatch('open-modal', 'create-team-modal');
+    }
+
+    public function closeCreateTeamModal(): void
+    {
+        $this->team_name = '';
+        $this->resetValidation(['team_name']);
+        $this->dispatch('close-modal', 'create-team-modal');
+    }
+
+    public function promptDeleteTeam(string $teamId): void
+    {
+        $this->openConfirmActionModal(
+            'deleteTeam',
+            [$teamId],
+            __('Delete team'),
+            __('Remove this team?'),
+            __('Delete'),
+            true,
+        );
+    }
+
+    public function promptSaveTeamNameOnBlur(string $teamId): void
+    {
+        $team = $this->organization->teams->firstWhere('id', $teamId);
+        if (! $team) {
+            return;
+        }
+
+        $new = trim((string) ($this->teamNames[$teamId] ?? ''));
+        if ($new === $team->name) {
+            return;
+        }
+        if ($new === '') {
+            $this->teamNames[$teamId] = $team->name;
+
+            return;
+        }
+
+        $this->saveTeamNameModalTeamId = $teamId;
+        $this->dispatch('open-modal', 'save-team-name-modal');
+    }
+
+    public function confirmSaveTeamName(): void
+    {
+        if ($this->saveTeamNameModalTeamId === null) {
+            return;
+        }
+
+        $id = $this->saveTeamNameModalTeamId;
+        $this->updateTeam($id);
+        $this->saveTeamNameModalTeamId = null;
+        $this->dispatch('close-modal', 'save-team-name-modal');
+    }
+
+    public function cancelSaveTeamName(): void
+    {
+        if ($this->saveTeamNameModalTeamId === null) {
+            return;
+        }
+
+        $id = $this->saveTeamNameModalTeamId;
+        $team = $this->organization->teams->firstWhere('id', $id);
+        if ($team) {
+            $this->teamNames[$id] = $team->name;
+        }
+        $this->resetValidation(['teamNames.'.$id]);
+        $this->saveTeamNameModalTeamId = null;
+        $this->dispatch('close-modal', 'save-team-name-modal');
+    }
+
+    public function updateTeam(int|string $teamId): void
     {
         $team = $this->organization->teams()->findOrFail($teamId);
         $this->authorize('update', $team);
@@ -104,7 +185,7 @@ class Teams extends Component
         $this->dispatch('notify', message: 'Team removed.');
     }
 
-    public function addTeamMember(int $teamId): void
+    public function addTeamMember(int|string $teamId): void
     {
         $team = $this->organization->teams()->findOrFail($teamId);
         $this->authorize('update', $team);
@@ -132,7 +213,25 @@ class Teams extends Component
         $this->dispatch('notify', message: 'Member added to team.');
     }
 
-    public function removeTeamMember(int $teamId, int $userId): void
+    public function promptRemoveTeamMember(string $teamId, int $userId): void
+    {
+        $team = $this->organization->teams->firstWhere('id', $teamId);
+        $member = $team ? User::find($userId) : null;
+
+        $this->openConfirmActionModal(
+            'removeTeamMember',
+            [$teamId, $userId],
+            __('Remove from team'),
+            __('Remove :member from the team “:team”?', [
+                'member' => $member?->name ?? __('this member'),
+                'team' => $team?->name ?? __('this team'),
+            ]),
+            __('Remove'),
+            true,
+        );
+    }
+
+    public function removeTeamMember(int|string $teamId, int $userId): void
     {
         $team = $this->organization->teams()->findOrFail($teamId);
         $this->authorize('update', $team);

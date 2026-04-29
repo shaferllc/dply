@@ -125,6 +125,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('/docs', [DocsController::class, 'index'])->name('docs.index');
     Route::get('/docs/connect-provider', [DocsController::class, 'connectProvider'])->name('docs.connect-provider');
     Route::get('/docs/create-first-server', [DocsController::class, 'createFirstServer'])->name('docs.create-first-server');
+    Route::get('/docs/api', [DocsController::class, 'apiDocumentation'])->name('docs.api');
     Route::get('/docs/{slug}', [DocsController::class, 'markdown'])
         ->whereIn('slug', array_keys(config('docs.markdown', [])))
         ->name('docs.markdown');

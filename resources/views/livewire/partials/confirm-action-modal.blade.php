@@ -21,7 +21,11 @@
                 $wire.closeConfirmActionModal()
             },
         }"
-        x-init="document.body.classList.add('overflow-y-hidden'); setTimeout(() => firstFocusable()?.focus(), 100)"
+        x-init="
+            document.body.classList.add('overflow-y-hidden');
+            setTimeout(() => firstFocusable()?.focus(), 100);
+            return () => document.body.classList.remove('overflow-y-hidden')
+        "
         x-on:keydown.escape.window="close()"
         x-on:keydown.tab.prevent="!$event.shiftKey && nextFocusable().focus()"
         x-on:keydown.shift.tab.prevent="prevFocusable().focus()"

@@ -96,8 +96,53 @@ class Members extends Component
         audit_log($this->organization, auth()->user(), 'invitation.sent', $invitation);
 
         $this->reset(['invite_email', 'invite_role']);
+        $this->dispatch('close-modal', 'invite-member-modal');
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Invitation sent to '.$email);
+    }
+
+    public function openInviteModal(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->invite_email = '';
+        $this->invite_role = 'member';
+        $this->resetValidation(['invite_email', 'invite_role']);
+        $this->dispatch('open-modal', 'invite-member-modal');
+    }
+
+    public function closeInviteModal(): void
+    {
+        $this->invite_email = '';
+        $this->invite_role = 'member';
+        $this->resetValidation(['invite_email', 'invite_role']);
+        $this->dispatch('close-modal', 'invite-member-modal');
+    }
+
+    /**
+     * Roles assignable through invites. Owner is tied to org ownership and is not granted via invitation.
+     *
+     * @return array<string, string>
+     */
+    public function inviteableRoles(): array
+    {
+        return [
+            'member' => __('Member'),
+            'admin' => __('Admin'),
+            'deployer' => __('Deployer'),
+        ];
+    }
+
+    public function promptCancelInvitation(string $invitationId): void
+    {
+        $this->openConfirmActionModal(
+            'cancelInvitation',
+            [$invitationId],
+            __('Cancel invitation'),
+            __('Cancel this invitation?'),
+            __('Cancel invitation'),
+            true,
+        );
     }
 
     public function cancelInvitation(int|string $invitationId): void

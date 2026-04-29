@@ -58,6 +58,8 @@ class Automation extends Component
 
     public ?string $new_token_name = null;
 
+    public bool $show_new_api_token_modal = false;
+
     public function mount(Organization $organization): void
     {
         $this->authorize('view', $organization);
@@ -124,14 +126,42 @@ class Automation extends Component
 
         $this->new_token_plaintext = $plaintext;
         $this->new_token_name = $token->name;
+        $this->show_new_api_token_modal = true;
         $this->reset(['token_name', 'token_expires_at', 'token_allowed_ips_text']);
         $this->refreshOrganization();
     }
 
     public function clearNewToken(): void
     {
+        $this->show_new_api_token_modal = false;
         $this->new_token_plaintext = null;
         $this->new_token_name = null;
+    }
+
+    /**
+     * Opens the confirm modal without embedding JSON in wire:click (which breaks HTML attributes).
+     */
+    public function promptRevokeApiToken(string $apiTokenId): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $apiToken = ApiToken::query()
+            ->where('organization_id', $this->organization->id)
+            ->whereKey($apiTokenId)
+            ->first();
+
+        if ($apiToken === null) {
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'revokeApiToken',
+            [$apiToken->id],
+            __('Revoke API token'),
+            __('Revoke :name? Integrations using this token will stop working immediately. This cannot be undone.', ['name' => $apiToken->name]),
+            __('Revoke token'),
+            true
+        );
     }
 
     public function revokeApiToken(int|string $apiTokenId): void

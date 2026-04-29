@@ -57,7 +57,8 @@
                         </p>
                         <p class="mt-3 text-sm text-brand-mist leading-relaxed">
                             <a href="{{ route('docs.index') }}" wire:navigate class="text-brand-sage font-medium hover:underline">{{ __('Documentation') }}</a>
-                            <span> — {{ __('HTTP API reference: docs/API.md in this repository.') }}</span>
+                            <span class="text-brand-mist"> — </span>
+                            <a href="{{ route('docs.api') }}" wire:navigate class="text-brand-sage font-medium hover:underline">{{ __('HTTP API guide') }}</a>
                         </p>
                     </div>
                     <div class="lg:col-span-8 space-y-5">

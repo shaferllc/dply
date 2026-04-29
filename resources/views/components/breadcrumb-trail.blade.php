@@ -31,6 +31,7 @@
         'gift' => 'heroicon-o-gift',
         'trash' => 'heroicon-o-trash',
         'building-office-2' => 'heroicon-o-building-office-2',
+        'rectangle-group' => 'heroicon-o-rectangle-group',
     ];
 @endphp
 
