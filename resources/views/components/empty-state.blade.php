@@ -7,7 +7,7 @@
 <div {{ $attributes->class([
     'rounded-2xl px-5 py-6',
     'border border-dashed border-brand-ink/15 bg-brand-sand/10' => $dashed,
-    'border border-brand-ink/10 bg-white shadow-sm' => ! $dashed,
+    'dply-card' => ! $dashed,
 ]) }}>
     <p class="text-sm font-medium text-brand-ink">{{ $title }}</p>
 

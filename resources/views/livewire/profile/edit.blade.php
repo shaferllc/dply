@@ -42,7 +42,7 @@
 
     <div class="space-y-8">
         {{-- General information --}}
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                 <div class="lg:col-span-4 space-y-4">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('General information') }}</h2>
@@ -147,7 +147,7 @@
         </div>
 
         {{-- Billing --}}
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                 <div class="lg:col-span-4">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Billing') }}</h2>
@@ -212,7 +212,7 @@
         </div>
 
         {{-- Active Sessions --}}
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                 <div class="lg:col-span-4">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Active Sessions') }}</h2>
@@ -265,7 +265,7 @@
         {{-- Danger zone — delete account (full flow on separate page) --}}
         <div>
             <p class="text-xs font-semibold uppercase tracking-wider text-brand-mist mb-3">{{ __('Danger zone') }}</p>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <div class="dply-card overflow-hidden">
                 <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                     <div class="lg:col-span-4">
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Delete account') }}</h2>

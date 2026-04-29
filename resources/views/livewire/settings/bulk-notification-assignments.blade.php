@@ -55,7 +55,7 @@
     @endif
 
     <div class="space-y-8">
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8 flex flex-wrap justify-between gap-3 items-start">
                 <div>
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Notification channels') }}</h2>
@@ -107,7 +107,7 @@
             @enderror
         </section>
 
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8 flex flex-wrap justify-between gap-3 items-start">
                 <div>
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Notification type') }}</h2>
@@ -140,7 +140,7 @@
             @enderror
         </section>
 
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8 flex flex-wrap justify-between gap-3 items-start">
                 <div>
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Select targets') }}</h2>

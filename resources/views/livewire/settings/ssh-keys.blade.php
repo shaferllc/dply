@@ -70,7 +70,7 @@
 
     <div class="space-y-10">
         {{-- List --}}
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <section class="dply-card overflow-hidden">
             <div class="px-6 py-4 border-b border-brand-ink/10 flex flex-wrap items-center justify-between gap-2">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your keys') }}</h2>
             </div>

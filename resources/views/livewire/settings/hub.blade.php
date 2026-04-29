@@ -7,38 +7,38 @@
 
     <x-page-header
         :title="__('Settings')"
-        :description="__('Your profile tab stores personal preferences. Servers & Sites covers organization defaults and team defaults (servers belong to teams).')"
+        :description="__('Profile stores personal preferences on this page. Servers & Sites covers organization defaults and team defaults (servers belong to teams).')"
         flush
     />
 
     <div class="border-b border-brand-mist/60 mb-6">
         <nav class="-mb-px flex gap-6" aria-label="Settings sections">
-            <button
-                type="button"
-                wire:click="$set('activeTab', 'profile')"
+            <a
+                href="{{ route('settings.profile') }}"
+                wire:navigate
                 @class([
                     'border-b-2 py-3 text-sm font-medium transition-colors',
-                    'border-brand-ink text-brand-ink' => $activeTab === 'profile',
-                    'border-transparent text-brand-moss hover:text-brand-ink' => $activeTab !== 'profile',
+                    'border-brand-ink text-brand-ink' => request()->routeIs('settings.profile'),
+                    'border-transparent text-brand-moss hover:text-brand-ink' => ! request()->routeIs('settings.profile'),
                 ])
             >
                 {{ __('Profile') }}
-            </button>
-            <button
-                type="button"
-                wire:click="$set('activeTab', 'servers')"
+            </a>
+            <a
+                href="{{ route('settings.servers') }}"
+                wire:navigate
                 @class([
                     'border-b-2 py-3 text-sm font-medium transition-colors',
-                    'border-brand-ink text-brand-ink' => $activeTab === 'servers',
-                    'border-transparent text-brand-moss hover:text-brand-ink' => $activeTab !== 'servers',
+                    'border-brand-ink text-brand-ink' => request()->routeIs('settings.servers'),
+                    'border-transparent text-brand-moss hover:text-brand-ink' => ! request()->routeIs('settings.servers'),
                 ])
             >
                 {{ __('Servers & Sites') }}
-            </button>
+            </a>
         </nav>
     </div>
 
-    @if ($activeTab === 'profile')
+    @if ($section === 'profile')
         <form wire:submit="saveProfile" class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden">
             <div class="lg:grid lg:grid-cols-12 lg:gap-10 p-6 lg:p-8">
                 <div class="lg:col-span-4 mb-8 lg:mb-0">
@@ -169,7 +169,7 @@
         </form>
     @endif
 
-    @if ($activeTab === 'servers')
+    @if ($section === 'servers')
         <div class="space-y-8">
             <form wire:submit="saveOrganizationServersSites" class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden">
                 <div class="lg:grid lg:grid-cols-12 lg:gap-10 p-6 lg:p-8">
@@ -403,86 +403,4 @@
         </div>
     @endif
 
-    <section class="mt-12">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-brand-mist mb-4">{{ __('More settings') }}</h2>
-        <div class="grid gap-4 sm:grid-cols-2">
-            <a href="{{ route('profile.edit') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                <h3 class="font-medium text-brand-ink">{{ __('Profile details') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Name, email, billing profile, and account deletion.') }}</p>
-            </a>
-            <a href="{{ route('profile.referrals') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                <h3 class="font-medium text-brand-ink">{{ __('Referrals') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Share your link and track sign-ups.') }}</p>
-            </a>
-            <a href="{{ route('profile.security') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                <h3 class="font-medium text-brand-ink">{{ __('Security') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Password and two-factor authentication.') }}</p>
-            </a>
-            <a href="{{ route('organizations.index') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                <h3 class="font-medium text-brand-ink">{{ __('Organizations') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Members, roles, and trial or Pro usage.') }}</p>
-            </a>
-            <a href="{{ route('profile.source-control') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                <h3 class="font-medium text-brand-ink">{{ __('Source control') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Git providers (GitHub, GitLab, Bitbucket).') }}</p>
-            </a>
-            <a href="{{ route('profile.api-keys') }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                <h3 class="font-medium text-brand-ink">{{ __('API keys') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Personal access tokens for the HTTP API.') }}</p>
-            </a>
-            @if ($currentOrg)
-                <a href="{{ route('organizations.credentials', $currentOrg) }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                    <h3 class="font-medium text-brand-ink">{{ __('Server providers') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Cloud API tokens to create and manage infrastructure.') }}</p>
-                </a>
-                @if ($currentOrg->hasAdminAccess(auth()->user()))
-                    <a href="{{ route('subscription.show', $currentOrg) }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                        <h3 class="font-medium text-brand-ink">{{ __('Subscription') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Trial, Pro billing, payment method, and Stripe Customer Portal.') }}</p>
-                    </a>
-                    <a href="{{ route('billing.invoices', $currentOrg) }}" class="block rounded-2xl border border-brand-mist/80 bg-white p-5 shadow-sm transition hover:border-brand-sage/50" wire:navigate>
-                        <h3 class="font-medium text-brand-ink">{{ __('Invoices') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Search, sort, and open PDFs from Stripe.') }}</p>
-                    </a>
-                @endif
-            @endif
-        </div>
-    </section>
-
-    <section class="mt-10 rounded-2xl border border-brand-mist/80 bg-brand-sand/40 p-6">
-        <h2 class="text-sm font-semibold text-brand-ink">{{ __('What Dply does not manage') }}</h2>
-        <ul class="mt-3 space-y-2 text-sm text-brand-moss list-disc list-inside">
-            <li>
-                <a href="{{ route('backups.databases') }}" class="font-medium text-brand-sage underline underline-offset-2 hover:text-brand-ink" wire:navigate>{{ __('Backups') }}</a>
-                — {{ __('database and file backup plans for the current organization; use Storage destinations for S3 and other targets.') }}
-            </li>
-            <li>
-                @if ($currentOrg)
-                    <a href="{{ route('organizations.webserver-templates', $currentOrg) }}" class="font-medium text-brand-sage underline underline-offset-2 hover:text-brand-ink" wire:navigate>{{ __('Webserver templates') }}</a>
-                @else
-                    <span class="font-medium text-brand-ink">{{ __('Webserver templates') }}</span>
-                @endif
-                — {{ __('Save default Nginx :code blocks per organization; apply to sites from the site screen when wired.', ['code' => 'server']) }}
-            </li>
-            <li><span class="font-medium text-brand-ink">{{ __('SSH keys') }}</span> — <a href="{{ route('profile.ssh-keys') }}" class="font-medium text-brand-sage underline underline-offset-2 hover:text-brand-ink" wire:navigate>{{ __('Save keys on your account') }}</a> {{ __('and deploy to servers, or add keys on each server’s page.') }}</li>
-        </ul>
-    </section>
-
-    <section class="mt-10 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-brand-mist">{{ __('Operational trust') }}</h2>
-        <div class="mt-4 grid gap-4 md:grid-cols-3">
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Recovery paths') }}</h3>
-                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Keep backups, storage destinations, and restore notes current before the next production incident. Settings link you into those workflows, while projects and server pages carry them into operations.') }}</p>
-            </div>
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Governed changes') }}</h3>
-                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Firewall approvals, notification routing, and org defaults help teams make changes with clearer ownership and less hidden machine state.') }}</p>
-            </div>
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Team-wide visibility') }}</h3>
-                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Preferences here shape how the wider workspace behaves, but the goal is simple: fewer surprises when someone else has to deploy, recover, or audit the stack.') }}</p>
-            </div>
-        </div>
-    </section>
 </div>

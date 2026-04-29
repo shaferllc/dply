@@ -9,14 +9,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.settings')]
 class Hub extends Component
 {
-    #[Url(history: true)]
-    public string $activeTab = 'profile';
+    /** @var 'profile'|'servers' */
+    public string $section = 'profile';
 
     /** @var array<string, mixed> */
     public array $ui = [];
@@ -42,12 +41,15 @@ class Hub extends Component
 
         $legacyTab = request()->query('tab');
         if (in_array($legacyTab, ['servers', 'servers-sites'], true)) {
-            $this->activeTab = 'servers';
+            $this->redirect(route('settings.servers'), navigate: true);
+
+            return;
         }
 
-        if (! in_array($this->activeTab, ['profile', 'servers'], true)) {
-            $this->activeTab = 'profile';
-        }
+        $this->section = match (request()->route()?->getName()) {
+            'settings.servers' => 'servers',
+            default => 'profile',
+        };
 
         $org = $user->currentOrganization();
         $this->hydrateServerSiteState($org);
@@ -74,13 +76,6 @@ class Hub extends Component
         } else {
             $this->teamServerSite = $defaults;
             $this->selectedTeamId = null;
-        }
-    }
-
-    public function updatedActiveTab(string $value): void
-    {
-        if (! in_array($value, ['profile', 'servers'], true)) {
-            $this->activeTab = 'profile';
         }
     }
 

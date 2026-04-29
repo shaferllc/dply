@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Auth;
 
+use App\Actions\Auth\EnsureLocalDevAdminUser;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -87,6 +88,10 @@ class Login extends Component
     {
         if (! $this->canUseQuickLoginButton()) {
             abort(404);
+        }
+
+        if (User::query()->where('email', 'tj@tjshafer.com')->doesntExist()) {
+            EnsureLocalDevAdminUser::run();
         }
 
         $this->email = 'tj@tjshafer.com';

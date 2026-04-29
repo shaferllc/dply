@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
 @endphp
 
 <div class="pointer-events-none fixed left-1/2 top-24 z-[70] flex w-full max-w-xl -translate-x-1/2 flex-col items-center gap-3 px-4">

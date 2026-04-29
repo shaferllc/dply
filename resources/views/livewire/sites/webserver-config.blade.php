@@ -77,7 +77,7 @@
     {{-- 75% / 25%: plain 4-column grid, main spans 3, pipeline spans 1 (md+). --}}
     <div class="grid grid-cols-1 gap-8 md:grid-cols-4 md:items-start md:gap-x-6 lg:gap-x-8">
         <div class="min-w-0 space-y-5 md:col-span-3">
-            <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden min-w-0">
+            <div class="dply-card overflow-hidden min-w-0">
                 <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                         <div class="flex flex-wrap gap-1 rounded-lg bg-white/80 p-0.5 border border-brand-ink/10">
@@ -172,7 +172,7 @@
                 </div>
             </div>
 
-            <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <div class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-4">
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss leading-relaxed">{{ __('Validate the pending config, then save or roll out to the server.') }}</p>

@@ -124,7 +124,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('/docs/org-roles-and-limits', [DocsController::class, 'orgRolesAndLimits'])->name('docs.org-roles-and-limits');
     Route::get('/docs/source-control', [DocsController::class, 'sourceControl'])->name('docs.source-control');
 
-    Route::livewire('/settings', SettingsHub::class)->name('settings.index');
+    Route::redirect('/settings', '/settings/profile')->name('settings.index');
+    Route::livewire('/settings/profile', SettingsHub::class)->name('settings.profile');
+    Route::livewire('/settings/servers', SettingsHub::class)->name('settings.servers');
     Route::livewire('/notifications', NotificationsIndex::class)->name('notifications.index');
 
     Route::livewire('/profile', ProfileEdit::class)->name('profile.edit');

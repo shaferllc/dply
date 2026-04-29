@@ -11,6 +11,7 @@
     $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));
     $hi = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
+    $browseActive = request()->routeIs('servers.*', 'sites.*', 'projects.*', 'organizations.*');
     $moreMenuActive = request()->routeIs('status-pages.*')
         || request()->routeIs('marketplace.index')
         || request()->routeIs('backups.*')
@@ -25,6 +26,7 @@
             || request()->is('horizon*')
             || request()->is('pulse*')
         );
+    $moreMenuActive = $moreMenuActive || $adminMenuActive;
     $notificationMenuActive = request()->routeIs('notifications.*');
     $notificationUnreadCount = auth()->check() && $notificationTablesReady
         ? auth()->user()->notificationInboxItems()->whereNull('read_at')->count()
@@ -36,8 +38,8 @@
 
 <header x-data="{ open: false }" class="border-b border-brand-ink/10 bg-brand-cream/85 backdrop-blur-xl sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between gap-3 py-2.5 sm:py-3">
-            <div class="flex items-center justify-between sm:justify-start gap-3 min-w-0 shrink-0 w-full sm:w-auto">
+        <div class="flex items-center justify-between gap-2 sm:gap-3 py-2 sm:py-2.5">
+            <div class="flex items-center justify-between sm:justify-start gap-2 sm:gap-3 min-w-0 shrink-0 w-full sm:w-auto">
                 <a
                     href="{{ auth()->check() ? route('dashboard') : url('/') }}"
                     class="flex items-center gap-3 group shrink-0"
@@ -45,16 +47,25 @@
                     <img
                         src="{{ asset('images/dply-logo.svg') }}"
                         alt="{{ config('app.name') }}"
-                        class="h-14 w-auto sm:h-16 lg:h-[4.25rem] shrink-0 transition-transform duration-300 group-hover:scale-[1.02]"
+                        @class([
+                            'w-auto shrink-0 transition-transform duration-300 group-hover:scale-[1.02]',
+                            'h-10 sm:h-11' => auth()->check(),
+                            'h-14 sm:h-16 lg:h-[4.25rem]' => ! auth()->check(),
+                        ])
                         width="120"
                         height="136"
                     />
                 </a>
                 @auth
+                    @if (auth()->user()->organizations()->exists())
+                        <div class="flex min-w-0 flex-1 basis-0 max-w-[min(68vw,13.5rem)] sm:max-w-[min(44vw,18rem)] lg:max-w-[22rem] lg:flex-none">
+                            @livewire('layout.context-breadcrumb', ['variant' => 'inline'], key('site-header-workspace'))
+                        </div>
+                    @endif
                     <button
                         type="button"
                         @click="open = ! open"
-                        class="inline-flex items-center justify-center p-2 rounded-lg text-brand-moss hover:text-brand-ink hover:bg-brand-sand/40 focus:outline-none sm:hidden"
+                        class="inline-flex items-center justify-center p-2 rounded-lg text-brand-moss hover:text-brand-ink hover:bg-brand-sand/40 focus:outline-none sm:hidden ms-auto"
                         aria-expanded="false"
                         :aria-expanded="open"
                         aria-label="Toggle navigation"
@@ -107,56 +118,131 @@
             @endguest
 
             @auth
-                <div class="hidden sm:flex flex-1 min-w-0 items-center justify-end gap-1 ms-2 lg:ms-4">
-                    <div class="min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [scrollbar-color:rgba(55_65_50/0.35)_transparent]">
-                        <nav class="flex h-full min-h-[2.75rem] flex-nowrap items-center justify-end gap-x-0.5 lg:gap-x-1 pe-2 text-sm font-medium" aria-label="{{ __('App') }}">
+                <div class="hidden sm:flex flex-1 min-w-0 items-center justify-end gap-0.5 lg:gap-1 ms-1 lg:ms-2">
+                    {{-- overflow visible so dropdown panels are not clipped (CSS overflow-x:auto implies vertical clipping) --}}
+                    <div class="min-w-0 shrink overflow-visible">
+                        <nav class="flex min-h-[2.5rem] flex-nowrap items-center justify-end gap-x-0.5 pe-1 text-sm font-medium" aria-label="{{ __('App') }}">
                             <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                                 <x-slot name="icon">
                                     <x-heroicon-o-squares-2x2 class="{{ $hi }}" />
                                 </x-slot>
                                 {{ __('Dashboard') }}
                             </x-nav-link>
-                            <x-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">
-                                <x-slot name="icon">
-                                    <x-heroicon-o-server class="{{ $hi }}" />
-                                </x-slot>
-                                {{ __('Servers') }}
-                            </x-nav-link>
-                            <x-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
-                                <x-slot name="icon">
-                                    <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                                </x-slot>
-                                {{ __('Sites') }}
-                            </x-nav-link>
-                            <x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
-                                <x-slot name="icon">
-                                    <x-heroicon-o-rectangle-stack class="{{ $hi }}" />
-                                </x-slot>
-                                {{ __('Projects') }}
-                            </x-nav-link>
-                            <x-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">
-                                <x-slot name="icon">
-                                    <x-heroicon-o-building-office-2 class="{{ $hi }}" />
-                                </x-slot>
-                                {{ __('Organizations') }}
-                            </x-nav-link>
-                        </nav>
-                    </div>
-                    @can('viewPlatformAdmin')
-                        <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('Platform admin') }}">
-                            <x-dropdown align="right" width="w-64" contentClasses="py-1 bg-white">
+                            <x-dropdown align="right" width="w-56">
                                 <x-slot name="trigger">
                                     <button
                                         type="button"
-                                        class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $adminMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
+                                        class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $browseActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
                                         aria-haspopup="menu"
                                     >
-                                        <x-heroicon-o-shield-check class="h-5 w-5 shrink-0 opacity-90" />
-                                        <span>{{ __('Admin') }}</span>
+                                        {{ __('Browse') }}
                                         <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
                                     </button>
                                 </x-slot>
                                 <x-slot name="content">
+                                    <x-dropdown-link :href="route('servers.index')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-server class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Servers') }}
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('sites.index')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-globe-alt class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Sites') }}
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('projects.index')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-rectangle-stack class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Projects') }}
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('organizations.index')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-building-office-2 class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Organizations') }}
+                                    </x-dropdown-link>
+                                </x-slot>
+                            </x-dropdown>
+                        </nav>
+                    </div>
+                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-1.5 lg:ps-2" aria-label="{{ __('Notifications') }}">
+                        <x-dropdown align="right" width="w-80" contentClasses="p-0 overflow-hidden">
+                            <x-slot name="trigger">
+                                <button
+                                    type="button"
+                                    class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $notificationMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
+                                    aria-haspopup="menu"
+                                >
+                                    <span class="relative inline-flex">
+                                        <x-heroicon-o-bell class="h-5 w-5 shrink-0 opacity-90" />
+                                        @if ($notificationUnreadCount > 0)
+                                            <span class="absolute -right-1.5 -top-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-brand-gold px-1 text-[10px] font-semibold text-brand-ink">
+                                                {{ $notificationUnreadCount > 9 ? '9+' : $notificationUnreadCount }}
+                                            </span>
+                                        @endif
+                                    </span>
+                                    <span class="sr-only">{{ __('Notifications') }}</span>
+                                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <div class="border-b border-brand-sage/25 bg-brand-sand px-4 py-3">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Notifications') }}</p>
+                                            <p class="text-xs text-brand-moss">{{ __('Unread: :count', ['count' => $notificationUnreadCount]) }}</p>
+                                        </div>
+                                        @if ($notificationTablesReady)
+                                            <a href="{{ route('notifications.index') }}" class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest shadow-sm ring-1 ring-brand-sage/25 transition hover:bg-brand-cream">
+                                                {{ __('Open inbox') }}
+                                            </a>
+                                        @endif
+                                    </div>
+                                </div>
+                                @forelse ($recentNotificationItems as $notificationItem)
+                                    <a href="{{ $notificationItem->url ?: route('notifications.index') }}" class="block border-b border-brand-ink/5 px-4 py-3 last:border-b-0 transition hover:bg-brand-sand">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p class="text-sm font-medium text-brand-ink">{{ $notificationItem->title }}</p>
+                                                @if ($notificationItem->body)
+                                                    <p class="mt-1 line-clamp-2 text-xs text-brand-moss">{{ $notificationItem->body }}</p>
+                                                @endif
+                                            </div>
+                                            @if (! $notificationItem->read_at)
+                                                <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-brand-gold"></span>
+                                            @endif
+                                        </div>
+                                    </a>
+                                @empty
+                                    <div class="px-4 py-4 text-sm text-brand-moss">
+                                        {{ $notificationTablesReady
+                                            ? __('No notifications yet.')
+                                            : __('Notifications will appear here after the latest database migrations are applied.') }}
+                                    </div>
+                                @endforelse
+                            </x-slot>
+                        </x-dropdown>
+                    </div>
+                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-1.5 lg:ps-2" aria-label="{{ __('More navigation') }}">
+                        <x-dropdown align="right" width="w-64" contentClasses="py-1.5">
+                            <x-slot name="trigger">
+                                <button
+                                    type="button"
+                                    class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $moreMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
+                                    aria-haspopup="menu"
+                                >
+                                    <x-heroicon-o-ellipsis-horizontal class="h-5 w-5 shrink-0 opacity-90" />
+                                    <span class="hidden xl:inline">{{ __('More') }}</span>
+                                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                @can('viewPlatformAdmin')
+                                    <div class="mx-2 mb-1 mt-1 rounded-xl border border-brand-sage/30 bg-brand-sand px-1 pt-2 pb-1 shadow-inner shadow-brand-ink/5">
+                                    <p class="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-forest">{{ __('Platform admin') }}</p>
                                     <x-dropdown-link :href="route('admin.dashboard')">
                                         <x-slot name="icon">
                                             <x-heroicon-o-squares-2x2 class="{{ $hi }}" />
@@ -183,82 +269,9 @@
                                             {{ __('Reverb health') }}
                                         </x-dropdown-link>
                                     @endif
-                                </x-slot>
-                            </x-dropdown>
-                        </div>
-                    @endcan
-                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('Notifications') }}">
-                        <x-dropdown align="right" width="w-80" contentClasses="py-1 bg-white">
-                            <x-slot name="trigger">
-                                <button
-                                    type="button"
-                                    class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $notificationMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
-                                    aria-haspopup="menu"
-                                >
-                                    <span class="relative inline-flex">
-                                        <x-heroicon-o-bell class="h-5 w-5 shrink-0 opacity-90" />
-                                        @if ($notificationUnreadCount > 0)
-                                            <span class="absolute -right-1.5 -top-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-brand-gold px-1 text-[10px] font-semibold text-brand-ink">
-                                                {{ $notificationUnreadCount > 9 ? '9+' : $notificationUnreadCount }}
-                                            </span>
-                                        @endif
-                                    </span>
-                                    <span>{{ __('Notifications') }}</span>
-                                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
-                                </button>
-                            </x-slot>
-                            <x-slot name="content">
-                                <div class="border-b border-brand-ink/10 px-4 py-3">
-                                    <div class="flex items-center justify-between gap-3">
-                                        <div>
-                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Notifications') }}</p>
-                                            <p class="text-xs text-brand-moss">{{ __('Unread: :count', ['count' => $notificationUnreadCount]) }}</p>
-                                        </div>
-                                        @if ($notificationTablesReady)
-                                            <a href="{{ route('notifications.index') }}" class="text-xs font-medium text-brand-forest hover:text-brand-ink">
-                                                {{ __('Open inbox') }}
-                                            </a>
-                                        @endif
                                     </div>
-                                </div>
-                                @forelse ($recentNotificationItems as $notificationItem)
-                                    <a href="{{ $notificationItem->url ?: route('notifications.index') }}" class="block border-b border-brand-ink/5 px-4 py-3 last:border-b-0 hover:bg-brand-sand/20">
-                                        <div class="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p class="text-sm font-medium text-brand-ink">{{ $notificationItem->title }}</p>
-                                                @if ($notificationItem->body)
-                                                    <p class="mt-1 line-clamp-2 text-xs text-brand-moss">{{ $notificationItem->body }}</p>
-                                                @endif
-                                            </div>
-                                            @if (! $notificationItem->read_at)
-                                                <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-brand-gold"></span>
-                                            @endif
-                                        </div>
-                                    </a>
-                                @empty
-                                    <div class="px-4 py-4 text-sm text-brand-moss">
-                                        {{ $notificationTablesReady
-                                            ? __('No notifications yet.')
-                                            : __('Notifications will appear here after the latest database migrations are applied.') }}
-                                    </div>
-                                @endforelse
-                            </x-slot>
-                        </x-dropdown>
-                    </div>
-                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('More navigation') }}">
-                        <x-dropdown align="right" width="w-56" contentClasses="py-1 bg-white">
-                            <x-slot name="trigger">
-                                <button
-                                    type="button"
-                                    class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $moreMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
-                                    aria-haspopup="menu"
-                                >
-                                    <x-heroicon-o-ellipsis-horizontal class="h-5 w-5 shrink-0 opacity-90" />
-                                    <span>{{ __('More') }}</span>
-                                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
-                                </button>
-                            </x-slot>
-                            <x-slot name="content">
+                                    <div class="my-2 h-px bg-gradient-to-r from-transparent via-brand-ink/12 to-transparent" role="presentation"></div>
+                                @endcan
                                 <x-dropdown-link :href="route('status-pages.index')">
                                     <x-slot name="icon">
                                         <x-heroicon-o-check-circle class="{{ $hi }}" />
@@ -283,7 +296,7 @@
                                     </x-slot>
                                     {{ __('Scripts') }}
                                 </x-dropdown-link>
-                                <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
+                                <div class="my-2 h-px bg-gradient-to-r from-transparent via-brand-ink/12 to-transparent" role="presentation"></div>
                                 <x-dropdown-link :href="route('features')">
                                     <x-slot name="icon">
                                         <x-heroicon-o-sparkles class="{{ $hi }}" />
@@ -305,19 +318,19 @@
                             </x-slot>
                         </x-dropdown>
                     </div>
-                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-2 lg:ps-3" aria-label="{{ __('Account') }}">
+                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-1.5 lg:ps-2" aria-label="{{ __('Account') }}">
                         <x-dropdown align="right" width="48">
                             <x-slot name="trigger">
-                                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white/90 px-2.5 py-2 text-sm font-medium text-brand-ink shadow-sm shadow-brand-ink/5 transition hover:border-brand-ink/20 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50">
+                                <button type="button" class="inline-flex items-center gap-1.5 lg:gap-2 rounded-lg border border-brand-ink/10 bg-white/90 px-2 py-2 text-sm font-medium text-brand-ink shadow-sm shadow-brand-ink/5 transition hover:border-brand-ink/20 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50">
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sand/50 text-brand-forest ring-1 ring-brand-ink/5" aria-hidden="true">
                                         <x-heroicon-o-user-circle class="h-4 w-4 shrink-0" />
                                     </span>
-                                    <span class="max-w-[10rem] truncate text-left leading-tight text-brand-moss">{{ Auth::user()->name }}</span>
+                                    <span class="hidden xl:inline max-w-[10rem] truncate text-left leading-tight text-brand-moss">{{ Auth::user()->name }}</span>
                                     <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 text-brand-moss" />
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                <x-dropdown-link :href="route('settings.index')">
+                                <x-dropdown-link :href="route('settings.profile')">
                                     <x-slot name="icon">
                                         <x-heroicon-o-cog-8-tooth class="{{ $hi }}" />
                                     </x-slot>
@@ -461,7 +474,7 @@
                     <p class="px-4 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ Auth::user()->name }}</p>
                     <p class="px-4 text-sm text-brand-moss">{{ Auth::user()->email }}</p>
                     <div class="mt-2 space-y-1">
-                        <x-responsive-nav-link :href="route('settings.index')">
+                        <x-responsive-nav-link :href="route('settings.profile')">
                             <x-slot name="icon">
                                 <x-heroicon-o-cog-8-tooth class="{{ $hi }}" />
                             </x-slot>

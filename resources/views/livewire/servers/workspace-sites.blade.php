@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
 @endphp
 
 <x-server-workspace-layout

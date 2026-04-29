@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     $opsReady = $server->isReady() && $server->ssh_private_key;
     $presets = [
         'every_minute' => [__('Every minute'), '* * * * *'],
@@ -677,7 +677,7 @@
                 <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeLogsModal"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
                     <div
-                        class="my-auto w-full max-w-2xl rounded-2xl border border-brand-ink/10 bg-white shadow-xl"
+                        class="my-auto w-full max-w-2xl dply-modal-panel"
                         @click.stop
                         wire:key="cron-logs-dialog"
                     >

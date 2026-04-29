@@ -28,3 +28,51 @@
         radial-gradient(at 80% 0%, rgb(104 132 121 / 0.14) 0px, transparent 45%),
         radial-gradient(at 0% 50%, rgb(50 72 44 / 0.08) 0px, transparent 50%);
 }
+
+/* Shared surfaces — floating menus use opaque fills so page content does not show through */
+@layer components {
+    .dply-dropdown-panel {
+        @apply overflow-hidden rounded-2xl border border-brand-ink/15 bg-brand-cream shadow-xl shadow-brand-forest/25 ring-1 ring-brand-sage/35;
+        box-shadow:
+            inset 0 1px 0 0 rgb(255 255 255 / 0.85),
+            0 12px 40px -8px rgb(23 26 14 / 0.18);
+    }
+
+    .dply-card {
+        @apply rounded-2xl border border-brand-ink/12 bg-gradient-to-b from-white via-brand-cream to-brand-sand shadow-sm shadow-brand-ink/[0.07] ring-1 ring-brand-sage/14;
+    }
+
+    .dply-surface-nav {
+        @apply rounded-2xl border border-brand-ink/12 bg-gradient-to-b from-white via-brand-cream to-brand-sand p-4 shadow-md shadow-brand-forest/12 ring-1 ring-brand-sage/22;
+    }
+
+    .dply-dialog {
+        @apply rounded-2xl border border-brand-ink/15 bg-brand-cream shadow-xl shadow-brand-forest/18 ring-1 ring-brand-sage/28;
+        box-shadow:
+            inset 0 1px 0 0 rgb(255 255 255 / 0.75),
+            0 18px 45px -12px rgb(23 26 14 / 0.2);
+    }
+
+    .dply-page-header {
+        @apply rounded-2xl border border-brand-ink/12 bg-gradient-to-br from-white via-brand-cream to-brand-sand px-6 py-6 shadow-md shadow-brand-ink/[0.06] ring-1 ring-brand-sage/14;
+    }
+
+    .dply-flyout-panel {
+        @apply rounded-2xl border border-brand-ink/15 bg-brand-cream shadow-lg shadow-brand-forest/22 ring-1 ring-brand-sage/32;
+        box-shadow:
+            inset 0 1px 0 0 rgb(255 255 255 / 0.8),
+            0 10px 30px -6px rgb(23 26 14 / 0.16);
+    }
+
+    /* Modals (x-modal panelClass) — stronger shadow */
+    .dply-modal-panel {
+        @apply overflow-hidden rounded-2xl border border-brand-ink/15 bg-brand-cream shadow-2xl ring-1 ring-brand-sage/30;
+        box-shadow:
+            inset 0 1px 0 0 rgb(255 255 255 / 0.78),
+            0 22px 55px -12px rgb(23 26 14 / 0.22);
+    }
+
+    .dply-card-compact {
+        @apply rounded-xl border border-brand-ink/12 bg-gradient-to-b from-white via-brand-cream to-brand-sand p-4 shadow-sm shadow-brand-ink/[0.06] ring-1 ring-brand-sage/12 sm:p-5;
+    }
+}

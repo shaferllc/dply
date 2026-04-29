@@ -6,7 +6,7 @@
 @php
     $cardClasses = match ($tone) {
         'subtle' => 'rounded-2xl border border-brand-ink/10 bg-brand-sand/15 shadow-sm overflow-hidden',
-        default => 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden',
+        default => 'dply-card overflow-hidden',
     };
 
     $bodyPadding = match ($padding) {

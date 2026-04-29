@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     $btnPrimary = 'inline-flex w-auto shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-ink/90 disabled:cursor-not-allowed disabled:opacity-60';
     $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:border-brand-ink/20 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-60';
     $badge = 'inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2.5 py-1 text-xs font-medium text-brand-ink';
@@ -207,7 +207,7 @@
                                                     <span wire:loading wire:target="{{ $actionTarget('patch') }}">{{ __('Patching…') }}</span>
                                                 </button>
 
-                                                <x-dropdown align="right" width="w-56" contentClasses="py-1 bg-white">
+                                                <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
                                                     <x-slot name="trigger">
                                                         <button
                                                             type="button"
@@ -257,7 +257,7 @@
                                                     </x-slot>
                                                 </x-dropdown>
 
-                                                <x-dropdown align="right" width="w-48" contentClasses="py-1 bg-white">
+                                                <x-dropdown align="right" width="w-48" contentClasses="py-1.5">
                                                     <x-slot name="trigger">
                                                         <button
                                                             type="button"
@@ -325,7 +325,7 @@
             >
                 <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closePhpConfigEditor"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-5xl rounded-2xl border border-brand-ink/10 bg-white shadow-xl" @click.stop>
+                    <div class="my-auto w-full max-w-5xl dply-modal-panel" @click.stop>
                         <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>

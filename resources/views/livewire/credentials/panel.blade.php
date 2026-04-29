@@ -12,7 +12,7 @@
 @endif
 
 @if ($credentials->isNotEmpty())
-    <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+    <section class="dply-card overflow-hidden">
         <div class="px-5 py-4 border-b border-brand-ink/10 bg-brand-cream/50 flex flex-wrap items-center justify-between gap-2">
             <h3 class="text-sm font-semibold text-brand-ink">{{ __('Saved in this organization') }}</h3>
             <span class="text-xs text-brand-moss">{{ __('Encrypted at rest') }}</span>
@@ -50,7 +50,7 @@
 
 @switch($active_provider)
     @case('digitalocean')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 @if (! empty($digitalOceanOAuthConfigured))
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
@@ -99,7 +99,7 @@
         @break
 
     @case('cloudflare')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <p class="text-sm text-brand-moss leading-relaxed">
                     {{ __('Use an API token with Zone:DNS:Edit (and Zone:Zone:Read) for the zones Dply should manage. This is independent of where servers are hosted.') }}
@@ -128,7 +128,7 @@
         @break
 
     @case('hetzner')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -154,7 +154,7 @@
         @break
 
     @case('linode')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -180,7 +180,7 @@
         @break
 
     @case('vultr')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -206,7 +206,7 @@
         @break
 
     @case('akamai')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <p class="text-sm text-brand-moss leading-relaxed">{{ __('Uses the same API as Linode. Your Linode Cloud token works here.') }}</p>
                 <div class="space-y-5">
@@ -233,7 +233,7 @@
         @break
 
     @case('equinix_metal')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -264,7 +264,7 @@
         @break
 
     @case('upcloud')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -295,7 +295,7 @@
         @break
 
     @case('scaleway')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -326,7 +326,7 @@
         @break
 
     @case('ovh')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
                     {{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}
@@ -348,7 +348,7 @@
         @break
 
     @case('rackspace')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
                     {{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}
@@ -370,7 +370,7 @@
         @break
 
     @case('fly_io')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -401,7 +401,7 @@
         @break
 
     @case('render')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <p class="text-sm text-brand-moss">{{ __('Saved for future integrations. Not used for VM provisioning in Dply today.') }}</p>
                 <div class="space-y-5">
@@ -420,7 +420,7 @@
         @break
 
     @case('railway')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <p class="text-sm text-brand-moss">{{ __('Saved for future integrations.') }}</p>
                 <div class="space-y-5">
@@ -439,7 +439,7 @@
         @break
 
     @case('coolify')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -463,7 +463,7 @@
         @break
 
     @case('cap_rover')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -487,7 +487,7 @@
         @break
 
     @case('aws')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -511,7 +511,7 @@
         @break
 
     @case('gcp')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -529,7 +529,7 @@
         @break
 
     @case('azure')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -547,7 +547,7 @@
         @break
 
     @case('oracle')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>

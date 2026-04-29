@@ -45,9 +45,6 @@
             <x-site-header />
 
             @auth
-                @if (auth()->user()->organizations()->exists())
-                    <livewire:layout.context-breadcrumb />
-                @endif
                 <div
                     id="dply-broadcast-context"
                     class="hidden"
@@ -100,8 +97,11 @@
             @endisset
 
             <!-- Page Content -->
-            <main class="flex-1 w-full">
-                {{ $slot }}
+            <main class="relative flex-1 w-full">
+                <div class="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[min(36rem,55vh)] bg-[radial-gradient(ellipse_90%_55%_at_50%_-10%,rgb(104_132_121/0.11),transparent_55%),radial-gradient(ellipse_50%_38%_at_100%_5%,rgb(205_169_66/0.09),transparent_48%),radial-gradient(ellipse_42%_36%_at_0%_25%,rgb(50_72_44/0.07),transparent_50%)]" aria-hidden="true"></div>
+                <div class="relative z-0">
+                    {{ $slot }}
+                </div>
             </main>
         </div>
 

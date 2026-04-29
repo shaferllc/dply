@@ -52,7 +52,7 @@
         @endif
 
         <div class="space-y-10">
-            <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <section class="dply-card overflow-hidden">
                 <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                     <div class="lg:col-span-4">
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Personal access token') }}</h2>
@@ -188,7 +188,7 @@
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <section class="dply-card overflow-hidden">
                 <div class="px-6 py-4 border-b border-brand-ink/10 flex flex-wrap items-center justify-between gap-3">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your tokens') }}</h2>
                     <div class="w-full sm:w-auto sm:max-w-xs">

@@ -44,7 +44,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('organizationServerSite.email_server_passwords', false)
             ->set('organizationServerSite.set_timezone_on_new_servers', true)
             ->call('saveOrganizationServersSites')
@@ -64,7 +64,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('organizationServerSite.email_server_passwords', false)
             ->call('saveOrganizationServersSites')
             ->assertForbidden();
@@ -79,7 +79,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('organizationInsights.digest_non_critical', true)
             ->set('organizationInsights.digest_frequency', 'weekly')
             ->set('organizationInsights.quiet_hours_enabled', true)
@@ -108,7 +108,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('selectedTeamId', $team->id)
             ->set('teamServerSite.default_server_sort', 'name')
             ->set('teamServerSite.show_server_updates_in_list', true)
@@ -131,7 +131,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('selectedTeamId', $team->id)
             ->set('teamServerSite.default_server_sort', 'name')
             ->call('saveTeamServersSites')

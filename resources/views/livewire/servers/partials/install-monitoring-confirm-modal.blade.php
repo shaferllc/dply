@@ -27,7 +27,7 @@
         <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeInstallMonitoringModal"></div>
         <div class="relative flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
             <div
-                class="relative w-full max-w-md rounded-2xl border border-brand-ink/10 bg-white shadow-xl"
+                class="relative w-full max-w-md dply-dialog"
                 wire:click.stop
             >
                 <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-7">

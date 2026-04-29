@@ -31,7 +31,7 @@
             <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ session('success') }}</div>
         @endif
 
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="w-full sm:max-w-md">
                     <label for="scripts_search" class="sr-only">{{ __('Search') }}</label>

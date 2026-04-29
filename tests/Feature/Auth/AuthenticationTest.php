@@ -77,6 +77,22 @@ class AuthenticationTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    public function test_local_quick_login_creates_tj_user_when_missing(): void
+    {
+        config()->set('app.env', 'local');
+
+        $this->assertDatabaseMissing('users', ['email' => 'tj@tjshafer.com']);
+
+        Livewire::test(Login::class)
+            ->call('quickLogin')
+            ->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertDatabaseHas('users', ['email' => 'tj@tjshafer.com']);
+
+        $user = User::query()->where('email', 'tj@tjshafer.com')->firstOrFail();
+        $this->assertAuthenticatedAs($user);
+    }
+
     public function test_users_can_logout(): void
     {
         $user = User::factory()->create();

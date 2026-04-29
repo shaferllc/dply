@@ -15,7 +15,7 @@
     };
 @endphp
 
-<div {{ $attributes->class(['relative w-full rounded-2xl border border-brand-ink/10 bg-white shadow-xl', $maxWidthClass]) }} wire:click.stop>
+<div {{ $attributes->class(['relative w-full dply-dialog', $maxWidthClass]) }} wire:click.stop>
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-7">
         <div class="flex items-start justify-between gap-4">
             <div>

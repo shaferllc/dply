@@ -42,7 +42,7 @@
     </div>
 
     @if ($tab === 'overview')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 px-5 py-4">
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Findings for this site') }}</h2>
             </div>

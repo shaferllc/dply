@@ -26,7 +26,7 @@
     @endif
 
     <div class="space-y-10">
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <section class="dply-card overflow-hidden">
             <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                 <div class="lg:col-span-4">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Create backup configuration') }}</h2>
@@ -105,7 +105,7 @@
             </section>
         @endif
 
-        <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <section class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your configurations') }}</h2>

@@ -6,7 +6,7 @@
 ])
 
 <header @class([
-    'rounded-2xl border border-brand-ink/10 bg-white px-6 py-6 shadow-sm' => ! $flush,
+    'dply-page-header' => ! $flush,
     'mb-8',
 ])>
     <div class="flex flex-wrap items-start justify-between gap-4">

@@ -23,7 +23,7 @@
 
     <div class="space-y-8">
         {{-- Password --}}
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <form wire:submit="updatePassword" class="block" autocomplete="on">
                 {{-- Browsers expect a username field on password-change forms (a11y + password managers). --}}
                 <div class="sr-only">
@@ -79,7 +79,7 @@
         </div>
 
         {{-- Two-factor authentication --}}
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                 <div class="lg:col-span-4">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Two-factor authentication') }}</h2>

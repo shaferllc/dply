@@ -20,9 +20,9 @@ class SettingsAndNotificationsTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->get(route('settings.index'))
+            ->get(route('settings.profile'))
             ->assertOk()
-            ->assertSee('Your profile tab stores personal preferences', false);
+            ->assertSee('Profile stores personal preferences on this page', false);
     }
 
     public function test_settings_hub_livewire_renders(): void

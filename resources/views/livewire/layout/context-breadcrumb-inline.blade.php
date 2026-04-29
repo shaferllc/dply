@@ -3,7 +3,7 @@
 @endphp
 
 <div
-    class="border-b border-brand-ink/10 bg-gradient-to-b from-brand-sand/40 to-brand-cream/90"
+    class="min-w-0 max-w-full"
     x-data="{
         orgOpen: false,
         teamOpen: false,
@@ -13,28 +13,27 @@
     }"
     @keydown.escape.window="closeAll()"
 >
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3">
-        <nav class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-1 sm:gap-y-2" aria-label="{{ __('Workspace context') }}">
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-brand-moss sm:hidden">{{ __('You are working in') }}</span>
-
-            <div class="relative flex flex-wrap items-center gap-x-2 gap-y-2 min-w-0">
+    <div class="min-w-0">
+        {{-- overflow visible so org/team menus are not clipped below the header row --}}
+        <nav class="flex flex-nowrap items-center gap-x-1 gap-y-1 overflow-visible" aria-label="{{ __('Workspace context') }}">
+            <div class="relative flex flex-nowrap items-center gap-x-1.5 min-w-0">
                 {{-- Organization switcher --}}
-                <div class="relative min-w-0" @click.outside="orgOpen = false">
+                <div class="relative min-w-0 shrink-0" @click.outside="orgOpen = false">
                     <button
                         type="button"
-                        class="group flex max-w-full items-center gap-2.5 rounded-xl border border-brand-ink/10 bg-white/90 px-2.5 py-2 text-left shadow-sm transition hover:border-brand-ink/20 hover:bg-white"
+                        class="group flex max-w-[min(42vw,11rem)] sm:max-w-[13rem] lg:max-w-[15rem] items-center gap-2 rounded-lg border border-brand-ink/10 bg-white/90 px-2 py-1.5 text-left shadow-sm transition hover:border-brand-ink/20 hover:bg-white"
                         @click="toggleOrg()"
                         :aria-expanded="orgOpen.toString()"
                         aria-haspopup="listbox"
                     >
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sage text-xs font-bold text-white shadow-inner shadow-brand-forest/20" aria-hidden="true">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sage text-[10px] font-bold text-white shadow-inner shadow-brand-forest/20" aria-hidden="true">
                             {{ \App\Livewire\Layout\ContextBreadcrumb::initials($currentOrg->name ?? __('Org')) }}
                         </span>
                         <span class="min-w-0 flex-1">
-                            <span class="block text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</span>
-                            <span class="block truncate text-sm font-semibold text-brand-ink">{{ $currentOrg->name ?? __('None') }}</span>
+                            <span class="block text-[10px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</span>
+                            <span class="block truncate text-xs font-semibold text-brand-ink">{{ $currentOrg->name ?? __('None') }}</span>
                         </span>
-                        <svg class="h-4 w-4 shrink-0 text-brand-moss group-hover:text-brand-ink" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <svg class="h-3.5 w-3.5 shrink-0 text-brand-moss group-hover:text-brand-ink" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
                         </svg>
                     </button>
@@ -115,27 +114,27 @@
                 </div>
 
                 @if ($currentOrg)
-                    <span class="hidden sm:inline text-brand-mist select-none" aria-hidden="true">/</span>
+                    <span class="text-brand-mist/80 select-none text-xs" aria-hidden="true">/</span>
 
                     {{-- Team switcher --}}
-                    <div class="relative min-w-0" @click.outside="teamOpen = false">
+                    <div class="relative min-w-0 shrink-0" @click.outside="teamOpen = false">
                         @if ($teams->isEmpty())
-                            <div class="flex items-center gap-2.5 rounded-xl border border-dashed border-brand-ink/15 bg-white/50 px-2.5 py-2 text-sm text-brand-moss">
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sand/80 text-xs font-bold text-brand-moss">—</span>
+                            <div class="flex max-w-[min(42vw,11rem)] items-center gap-2 rounded-lg border border-dashed border-brand-ink/15 bg-white/50 px-2 py-1.5 text-xs text-brand-moss">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sand/80 text-[10px] font-bold text-brand-moss">—</span>
                                 <span class="min-w-0">
-                                    <span class="block text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
+                                    <span class="block text-[10px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
                                     <a href="{{ route('organizations.show', $currentOrg) }}" wire:navigate class="block truncate font-medium text-brand-sage hover:text-brand-ink">{{ __('No teams yet — set up on the org page') }}</a>
                                 </span>
                             </div>
                         @else
                             <button
                                 type="button"
-                                class="group flex max-w-full items-center gap-2.5 rounded-xl border border-brand-ink/10 bg-white/90 px-2.5 py-2 text-left shadow-sm transition hover:border-brand-ink/20 hover:bg-white"
+                                class="group flex max-w-[min(42vw,11rem)] sm:max-w-[13rem] lg:max-w-[15rem] items-center gap-2 rounded-lg border border-brand-ink/10 bg-white/90 px-2 py-1.5 text-left shadow-sm transition hover:border-brand-ink/20 hover:bg-white"
                                 @click="toggleTeam()"
                                 :aria-expanded="teamOpen.toString()"
                                 aria-haspopup="listbox"
                             >
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#3b6fb6] text-xs font-bold text-white shadow-inner shadow-brand-ink/10" aria-hidden="true">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#3b6fb6] text-[10px] font-bold text-white shadow-inner shadow-brand-ink/10" aria-hidden="true">
                                     @if ($currentTeam)
                                         {{ \App\Livewire\Layout\ContextBreadcrumb::initials($currentTeam->name) }}
                                     @else
@@ -143,12 +142,12 @@
                                     @endif
                                 </span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="block text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
-                                    <span class="block truncate text-sm font-semibold text-brand-ink">
+                                    <span class="block text-[10px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
+                                    <span class="block truncate text-xs font-semibold text-brand-ink">
                                         {{ $currentTeam?->name ?? __('All teams') }}
                                     </span>
                                 </span>
-                                <svg class="h-4 w-4 shrink-0 text-brand-moss group-hover:text-brand-ink" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                <svg class="h-3.5 w-3.5 shrink-0 text-brand-moss group-hover:text-brand-ink" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
                                 </svg>
                             </button>

@@ -10,6 +10,9 @@ use Livewire\Component;
 
 class ContextBreadcrumb extends Component
 {
+    /** bar = full-width strip below header; inline = compact row inside the header */
+    public string $variant = 'bar';
+
     public static function initials(string $name): string
     {
         $parts = array_values(array_filter(preg_split('/\s+/', trim($name)) ?: []));
@@ -65,7 +68,11 @@ class ContextBreadcrumb extends Component
         $teams = $currentOrg ? $user->accessibleTeamsForOrganization($currentOrg) : new Collection([]);
         $currentTeam = $user->currentTeam();
 
-        return view('livewire.layout.context-breadcrumb', [
+        $view = $this->variant === 'inline'
+            ? 'livewire.layout.context-breadcrumb-inline'
+            : 'livewire.layout.context-breadcrumb';
+
+        return view($view, [
             'organizations' => $organizations,
             'currentOrg' => $currentOrg,
             'teams' => $teams,

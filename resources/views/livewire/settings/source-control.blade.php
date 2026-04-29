@@ -32,7 +32,7 @@
     <div class="space-y-8">
         @forelse ($this->providers as $provider)
                 @php($count = $this->repositoryCount($provider['host']))
-                <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden" aria-labelledby="sc-heading-{{ $provider['id'] }}">
+                <section class="dply-card overflow-hidden" aria-labelledby="sc-heading-{{ $provider['id'] }}">
                     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-3 min-w-0">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-brand-ink/10 text-brand-ink" aria-hidden="true">

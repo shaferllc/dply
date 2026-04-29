@@ -15,7 +15,7 @@
                     </div>
                 @else
                     <div
-                        class="rounded-2xl border border-brand-mist/80 bg-white shadow-sm overflow-hidden"
+                        class="dply-card overflow-hidden border-brand-mist/60"
                         x-data="{ showColumns: false }"
                     >
                         <div class="flex flex-col gap-3 border-b border-brand-mist/60 bg-brand-sand/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -33,7 +33,7 @@
                                     x-show="showColumns"
                                     x-cloak
                                     x-transition
-                                    class="absolute left-0 z-20 mt-1 w-56 rounded-lg border border-brand-mist bg-white py-2 shadow-lg"
+                                    class="absolute left-0 z-20 mt-1 w-56 dply-flyout-panel py-2"
                                 >
                                     <p class="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Visible columns') }}</p>
                                     @foreach (['number' => __('Number'), 'description' => __('Description'), 'status' => __('Status'), 'total' => __('Total'), 'date' => __('Date'), 'actions' => __('Actions')] as $key => $label)

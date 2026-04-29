@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     $progressPercent = $totalCount > 0 ? (int) round(($completedCount / $totalCount) * 100) : 0;
 @endphp
 
@@ -388,7 +388,7 @@
                 >
                     <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeCancelProvisionModal"></div>
                     <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
-                        <div class="w-full max-w-xl rounded-2xl border border-brand-ink/10 bg-white shadow-xl" @click.stop>
+                        <div class="w-full max-w-xl dply-modal-panel" @click.stop>
                             <div class="border-b border-zinc-100 px-6 py-6 sm:px-8 sm:py-7">
                                 <h2 id="cancel-provision-title" class="text-lg font-semibold text-brand-ink">{{ __('Cancel server build') }}</h2>
                                 <p class="mt-3 text-sm leading-relaxed text-brand-moss">

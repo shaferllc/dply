@@ -186,7 +186,7 @@
                 </x-slot>
             </x-empty-state>
         @else
-            <div class="rounded-[2rem] border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <div class="dply-card overflow-hidden rounded-[2rem]">
                 @if ($groupedServers->flatten()->isEmpty())
                     <div class="px-6 py-14 text-center">
                         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('No results') }}</p>

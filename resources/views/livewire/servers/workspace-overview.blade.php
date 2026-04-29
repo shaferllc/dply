@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     $setupIncomplete = $server->status !== \App\Models\Server::STATUS_READY || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE;
     $containerLaunchTranscript = collect($containerLaunch['events'] ?? [])->map(function (array $event): string {
         $timestamp = (string) ($event['at'] ?? '');

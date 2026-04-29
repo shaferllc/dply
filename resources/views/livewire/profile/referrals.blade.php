@@ -23,10 +23,10 @@
                 @endif
             </p>
         </div>
-        <a href="{{ route('settings.index') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Settings overview') }}</a>
+        <a href="{{ route('settings.profile') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Settings overview') }}</a>
     </header>
 
-    <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden mb-8">
+    <section class="dply-card overflow-hidden mb-8">
         <div class="px-5 py-4 border-b border-brand-ink/10 bg-brand-cream/50 flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-sm font-semibold text-brand-ink">{{ __('Your referral link') }}</h2>
         </div>
@@ -54,7 +54,7 @@
         </div>
     </section>
 
-    <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden relative">
+    <section class="dply-card overflow-hidden relative">
         <div class="absolute top-4 right-5 text-brand-sage/40" aria-hidden="true">
             <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1c0 1.384.56 2.635 1.464 3.544M15 10a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         </div>

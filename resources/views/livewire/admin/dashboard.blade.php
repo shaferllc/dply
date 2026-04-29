@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm sm:p-5';
+    $card = 'dply-card-compact';
     $mini = 'text-xs font-medium uppercase tracking-wide text-brand-mist';
     $kv = 'flex flex-wrap items-baseline justify-between gap-2 border-b border-brand-ink/5 py-2 last:border-0';
     $pillOk = 'inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800';

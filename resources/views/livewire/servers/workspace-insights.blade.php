@@ -37,7 +37,7 @@
     </div>
 
     @if ($tab === 'overview')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 px-5 py-4">
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Open findings') }}</h2>
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Server-scoped open findings appear here. Site-specific items are on each site’s Insights page.') }}</p>
@@ -147,7 +147,7 @@
             >
                 <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeApplyFixModal"></div>
                 <div class="relative flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
-                    <div class="relative w-full max-w-md rounded-2xl border border-brand-ink/10 bg-white shadow-xl" wire:click.stop>
+                    <div class="relative w-full max-w-md dply-modal-panel" wire:click.stop>
                         <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-7">
                             <h2 id="apply-insight-fix-title" class="text-lg font-semibold text-brand-ink">{{ __('Apply suggested fix') }}</h2>
                         </div>

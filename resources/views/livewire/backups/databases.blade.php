@@ -91,7 +91,7 @@
             </section>
         </div>
 
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="px-4 py-3 sm:px-6 border-b border-brand-ink/10 bg-brand-sand/30">
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Sites in this organization') }}</h2>
                 <p class="text-xs text-brand-moss mt-0.5">{{ __('Use each site to define the intended database backup path, storage destination, and restore notes for its primary data.') }}</p>

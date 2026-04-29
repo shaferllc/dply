@@ -51,11 +51,11 @@
                 </div>
             @endif
 
-            <main class="flex-1 w-full">
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <main class="relative flex-1 w-full">
+                <div class="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[min(36rem,55vh)] bg-[radial-gradient(ellipse_90%_55%_at_50%_-10%,rgb(104_132_121/0.11),transparent_55%),radial-gradient(ellipse_50%_38%_at_100%_5%,rgb(205_169_66/0.09),transparent_48%),radial-gradient(ellipse_42%_36%_at_0%_25%,rgb(50_72_44/0.07),transparent_50%)]" aria-hidden="true"></div>
+                <div class="relative z-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
-                        <aside class="lg:col-span-3 mb-8 lg:mb-0">
-                            <h2 class="text-xs font-semibold uppercase tracking-wider text-brand-mist mb-3">Settings</h2>
+                        <aside class="lg:col-span-3 mb-8 lg:mb-0 shrink-0">
                             <x-settings-nav />
                         </aside>
                         <div class="lg:col-span-9 min-w-0">

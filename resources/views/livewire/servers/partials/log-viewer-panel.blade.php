@@ -1,7 +1,7 @@
 @php
     /** @var array<string, array<string, mixed>> $logSources */
     $logSources = $logSources ?? [];
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     /** Entry methods only — omit loadSystemLog and poll so auto-refresh / Reverb merges do not flash a layer over the log. */
     $logLoadingTargets = 'selectLogSource,selectLogSourceFromMenu,loadSystemLogIfEmpty,refreshSystemLog,refreshSystemLogAndCloseMenu,applyLogViewerSettingsAndCloseMenu,applyLogTailLines,setLogTimeRange,setLogTimeRangeFromSelect';
     $currentLogDef = $logSources[$logKey] ?? [];
@@ -16,7 +16,7 @@
 @endphp
 
 <div
-    class="{{ $card }} overflow-hidden"
+    class="{{ $card }}"
     wire:init="loadSystemLogIfEmpty"
     @if ($logAutoRefresh) wire:poll.{{ $logAutoRefreshSeconds }}s="pollLogViewerRefresh" @endif
 >
@@ -85,7 +85,7 @@
                         @if ($logSourceMenuOpen)
                             <div
                                 wire:transition
-                                class="absolute start-0 z-50 mt-2 w-[min(calc(100vw-2rem),32rem)] max-h-[min(70dvh,28rem)] overflow-y-auto rounded-xl border border-brand-ink/10 bg-white p-3 shadow-lg shadow-brand-ink/10"
+                                class="absolute start-0 z-50 mt-2 w-[min(calc(100vw-2rem),32rem)] max-h-[min(70dvh,28rem)] overflow-y-auto dply-flyout-panel p-3"
                                 role="listbox"
                                 @click.stop
                             >
@@ -182,7 +182,7 @@
                             @if ($logOptionsMenuOpen)
                                 <div
                                     wire:transition
-                                    class="absolute end-0 z-50 mt-2 w-[min(calc(100vw-2rem),32rem)] rounded-xl border border-brand-ink/10 bg-white p-4 shadow-lg shadow-brand-ink/10"
+                                    class="absolute end-0 z-50 mt-2 w-[min(calc(100vw-2rem),32rem)] dply-flyout-panel p-4"
                                     @click.stop
                                 >
                                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-3">

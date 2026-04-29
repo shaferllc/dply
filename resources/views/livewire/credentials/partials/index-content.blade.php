@@ -4,7 +4,7 @@
     <ol class="flex flex-wrap items-center gap-2">
         <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
         <li class="text-brand-mist" aria-hidden="true">/</li>
-        <li><a href="{{ route('settings.index') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Settings') }}</a></li>
+        <li><a href="{{ route('settings.profile') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Settings') }}</a></li>
         <li class="text-brand-mist" aria-hidden="true">/</li>
         <li class="text-brand-ink font-medium">{{ __('Provider credentials') }}</li>
     </ol>
@@ -40,7 +40,7 @@
 
 <div class="lg:grid lg:grid-cols-12 lg:gap-10 items-start">
     <aside class="hidden lg:block lg:col-span-4 xl:col-span-3">
-        <div class="sticky top-24 rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden max-h-[calc(100vh-8rem)] flex flex-col">
+        <div class="sticky top-24 dply-card overflow-hidden max-h-[calc(100vh-8rem)] flex flex-col">
             <div class="px-4 py-3 border-b border-brand-ink/10 bg-brand-sand/30">
                 <p class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Providers') }}</p>
             </div>

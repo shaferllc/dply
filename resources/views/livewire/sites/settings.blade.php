@@ -1229,7 +1229,7 @@
             :show="false"
             maxWidth="lg"
             overlayClass="bg-brand-ink/30"
-            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            panelClass="dply-modal-panel"
             focusable
         >
             <div class="border-b border-brand-ink/10 px-6 py-5">
@@ -1289,7 +1289,7 @@
             :show="false"
             maxWidth="lg"
             overlayClass="bg-brand-ink/30"
-            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            panelClass="dply-modal-panel"
             focusable
         >
             <div class="border-b border-brand-ink/10 px-6 py-5">
@@ -1328,7 +1328,7 @@
             :show="false"
             maxWidth="lg"
             overlayClass="bg-brand-ink/30"
-            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            panelClass="dply-modal-panel"
             focusable
         >
             <div class="border-b border-brand-ink/10 px-6 py-5">
@@ -1368,7 +1368,7 @@
             :show="false"
             maxWidth="lg"
             overlayClass="bg-brand-ink/30"
-            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            panelClass="dply-modal-panel"
             focusable
         >
             <div class="border-b border-brand-ink/10 px-6 py-5">
@@ -1401,7 +1401,7 @@
             :show="false"
             maxWidth="lg"
             overlayClass="bg-brand-ink/30"
-            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            panelClass="dply-modal-panel"
             focusable
         >
             <div class="border-b border-brand-ink/10 px-6 py-5">
@@ -1447,7 +1447,7 @@
             :show="false"
             maxWidth="2xl"
             overlayClass="bg-brand-ink/30"
-            panelClass="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
+            panelClass="dply-modal-panel"
             focusable
         >
             <div class="border-b border-brand-ink/10 px-6 py-5">

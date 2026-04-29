@@ -39,7 +39,7 @@
                 </div>
             @endif
 
-            <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <section class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('New monitor') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Specify a path if you need a specific URL monitored inside your hostname.') }}</p>
@@ -104,7 +104,7 @@
                 </form>
             </section>
 
-            <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <section class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 px-5 py-4">
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Monitors') }}</h2>
                 </div>

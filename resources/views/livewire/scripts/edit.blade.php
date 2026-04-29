@@ -29,7 +29,7 @@
         @endif
 
         <div class="space-y-8">
-            <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <section class="dply-card overflow-hidden">
                 <div class="grid md:grid-cols-12 gap-6 p-6 sm:p-8">
                     <div class="md:col-span-4">
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Script') }}</h2>
@@ -63,7 +63,7 @@
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+            <section class="dply-card overflow-hidden">
                 <div class="grid md:grid-cols-12 gap-6 p-6 sm:p-8">
                     <div class="md:col-span-4">
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Run script') }}</h2>
