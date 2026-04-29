@@ -121,7 +121,10 @@ DOCKER;
 
         return <<<'DOCKER'
 RUN mkdir -p /var/www/html/database \
-    && touch /var/www/html/database/database.sqlite
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/views \
+    /var/www/html/storage/framework/cache \
+    /var/www/html/storage/framework/data
 DOCKER;
     }
 }

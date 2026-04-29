@@ -106,7 +106,7 @@ use App\Actions\DesignPatterns\TransactionDesignPattern;
  *     public function getTransactionConnection(): string
  *     {
  *         // Can be dynamic based on context
- *         return config('database.default'); // or 'mysql', 'pgsql', 'sqlite', etc.
+ *         return config('database.default'); // or 'pgsql', etc.
  *     }
  * }
  * @example

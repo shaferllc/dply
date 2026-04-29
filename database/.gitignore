@@ -1,1 +1,1 @@
-*.sqlite*
+# PostgreSQL dumps / local artifacts (optional)

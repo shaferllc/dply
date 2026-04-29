@@ -10,10 +10,10 @@ The platform now ships from this one app for every product line (BYO, Serverless
 
 | Requirement | Notes |
 | ----------- | ----- |
-| PHP **8.3+** | Extensions typical for Laravel (openssl, pdo, mbstring, tokenizer, xml, ctype, json, bcmath; `pdo_sqlite` or `pdo_mysql` / `pdo_pgsql`). |
+| PHP **8.3+** | Extensions typical for Laravel (openssl, pdo, mbstring, tokenizer, xml, ctype, json, bcmath; **`pdo_pgsql`** required). |
 | **Composer** | v2. |
 | **Node.js + npm** | For Vite / front-end assets. |
-| **Database** | **SQLite** (simplest) or MySQL/PostgreSQL. |
+| **Database** | **PostgreSQL** only (local install, Docker, or a managed instance). |
 
 ---
 
@@ -40,17 +40,15 @@ php artisan key:generate
 
 ## 3. Database
 
-### SQLite (default in `.env.example`)
-
-```bash
-touch database/database.sqlite
-```
-
-Ensure `.env` has:
+`.env.example` defaults to **PostgreSQL**. Install Postgres locally (Homebrew, Docker, DBngin, etc.), create an empty database, then set:
 
 ```env
-DB_CONNECTION=sqlite
-# DB_DATABASE is relative to the project base path; leave empty to use database/database.sqlite
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=dply
+DB_USERNAME=postgres
+DB_PASSWORD=
 ```
 
 Run migrations:
@@ -63,15 +61,17 @@ The migration `migrate_local_dev_organization_to_workspace` renames the old seed
 
 In **`APP_ENV=local`**, `php artisan db:seed` also ensures the usual local admin user (`tj@tjshafer.com` / `password` per `DatabaseSeeder`) has that workspace as **owner**, then runs **`LocalDemoServersSeeder`**: demo teams, **Custom**-provider servers (no cloud `provider_id`), sites with varying counts, and a **fake** DigitalOcean credential row for credentials UI testing. Re-seeding skips creating duplicate demo servers when rows tagged with `meta.local_demo` already exist. Demo servers are safe to remove from the **Servers** index; they do not call cloud teardown APIs.
 
-### MySQL or PostgreSQL
+**Naming:** Pick any database name you like locally (e.g. `dply` or `dply_local`). The platform uses one database for all product lines.
 
-Set `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` in `.env`, create an empty database, then:
+### Automated tests
+
+PHPUnit (`php artisan test`) expects a database named **`dply_testing`** (see `phpunit.xml`). Create it once:
 
 ```bash
-php artisan migrate
+createdb dply_testing   # or: psql -c 'CREATE DATABASE dply_testing;'
 ```
 
-**Naming:** Pick any database name you like locally (e.g. `dply` or `dply_local`). The platform uses one database for all product lines.
+Tests use the same PostgreSQL server as in `phpunit.xml` (`DB_HOST`, `DB_USERNAME`, `DB_PASSWORD`).
 
 ---
 

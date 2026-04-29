@@ -19,7 +19,7 @@ Long-term product roadmap: [docs/MULTI_PRODUCT_PLATFORM_PLAN.md](docs/MULTI_PROD
 composer install
 cp .env.example .env
 php artisan key:generate
-touch database/database.sqlite   # if using SQLite
+# Create an empty PostgreSQL database matching DB_DATABASE in .env (see docs/BYO_LOCAL_SETUP.md).
 php artisan migrate
 npm install && npm run build
 php artisan queue:work           # second terminal — provisioning / deploy jobs

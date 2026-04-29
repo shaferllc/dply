@@ -45,7 +45,6 @@ cd /path/to/dply
 composer install
 cp .env.example .env
 php artisan key:generate
-touch database/database.sqlite   # if DB_CONNECTION=sqlite
 php artisan migrate
 npm install && npm run build
 ```

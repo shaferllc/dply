@@ -37,7 +37,7 @@ class DockerRuntimeDockerfileBuilderTest extends TestCase
         $this->assertStringContainsString('composer install --no-interaction --prefer-dist', $dockerfile);
     }
 
-    public function test_it_bootstraps_laravel_sqlite_storage_for_php_sites(): void
+    public function test_it_bootstraps_laravel_runtime_directories_for_php_sites(): void
     {
         $site = new Site([
             'type' => SiteType::Php,
@@ -54,7 +54,7 @@ class DockerRuntimeDockerfileBuilderTest extends TestCase
         $dockerfile = (new DockerRuntimeDockerfileBuilder)->build($site);
 
         $this->assertStringContainsString('mkdir -p /var/www/html/database', $dockerfile);
-        $this->assertStringContainsString('touch /var/www/html/database/database.sqlite', $dockerfile);
+        $this->assertStringContainsString('/var/www/html/storage/framework/sessions', $dockerfile);
     }
 
     public function test_it_builds_vite_static_sites_before_copying_to_nginx(): void

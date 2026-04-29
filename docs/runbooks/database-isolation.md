@@ -54,7 +54,7 @@ esac
 
 ### 2b. Dynamic: Laravel config (optional)
 
-In CI, with a **throwaway** DB or sqlite:
+In CI, with a **throwaway** PostgreSQL database:
 
 ```bash
 cp .env.example .env
