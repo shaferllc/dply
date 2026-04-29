@@ -19,12 +19,6 @@ jobs:
         include:
           - name: BYO
             directory: .
-          - name: dply-cloud
-            directory: apps/dply-cloud
-          - name: dply-wordpress
-            directory: apps/dply-wordpress
-          - name: dply-edge
-            directory: apps/dply-edge
           - name: dply-core
             directory: packages/dply-core
 

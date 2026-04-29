@@ -1,5 +1,9 @@
 # dply Auth Home Dashboard Redesign
 
+> **Superseded 2026-04-28.** The `apps/dply-auth` Laravel app this spec targeted was deleted as part of merging all product lines into the single root app. Auth home is now provided by the root app's user dashboard. This spec is kept for historical reference only.
+
+---
+
 ## Goal
 
 Redesign the signed-in `apps/dply-auth/resources/views/home.blade.php` page from a plain confirmation card into a premium account home that feels like a flagship product surface for the broader dply ecosystem.

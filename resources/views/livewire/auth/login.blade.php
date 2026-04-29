@@ -10,15 +10,6 @@
         </div>
     @endif
 
-    @if (config('dply_auth.enabled'))
-        <div class="mb-6">
-            <a href="{{ route('oauth.central.redirect') }}" class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-ink/12 bg-brand-sand/30 px-4 py-2.5 text-sm font-semibold text-brand-forest shadow-sm hover:border-brand-sage/40 hover:bg-brand-sand/50 transition-colors">
-                <svg class="h-5 w-5 text-brand-sage shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                {{ __('Continue with dply account') }}
-            </a>
-        </div>
-    @endif
-
     @if (!empty($oauthProviders))
         <div class="mb-6">
             <p class="mb-3 flex items-center gap-2 text-sm font-medium text-brand-moss">
@@ -42,7 +33,7 @@
         </div>
     @endif
 
-    @if (config('dply_auth.enabled') || ! empty($oauthProviders))
+    @if (!empty($oauthProviders))
         <p class="mb-5 flex items-center justify-center gap-2 text-center text-sm text-brand-moss">
             <span class="h-px flex-1 max-w-[4rem] bg-brand-ink/10" aria-hidden="true"></span>
             {{ __('Or sign in with email') }}

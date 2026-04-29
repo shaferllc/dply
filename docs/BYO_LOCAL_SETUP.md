@@ -1,8 +1,8 @@
 # BYO (bring-your-own-server) — local setup
 
-This guide is the **canonical way to run the main dply product** in the monorepo: the **BYO** Laravel app at the **repository root** (`composer.json` next to `app/`, `routes/`, `resources/`).
+This guide is the **canonical way to run the dply product locally**: the single Laravel app at the **repository root** (`composer.json` next to `app/`, `routes/`, `resources/`).
 
-**You do not need** `apps/dply-cloud` or any other product app to develop or use BYO. Serverless provider support now lives in the root app alongside the main BYO flows. Other product apps under `apps/` still have **their own** installs, `.env` files, and databases; treat them as **on hold** until you deliberately work on them.
+The platform now ships from this one app for every product line (BYO, Serverless, and the future Cloud / WordPress / Edge engines). There is no `apps/*` folder to install, and no separate identity service.
 
 ---
 
@@ -71,7 +71,7 @@ Set `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PAS
 php artisan migrate
 ```
 
-**Isolation:** Use a **dedicated** database name for BYO (e.g. `dply_byo`). Do not point BYO at a database used by another app such as `apps/dply-cloud`. See [database isolation runbook](runbooks/database-isolation.md).
+**Naming:** Pick any database name you like locally (e.g. `dply` or `dply_local`). The platform uses one database for all product lines.
 
 ---
 
@@ -198,16 +198,15 @@ php artisan test
 
 ---
 
-## 10. Monorepo: what to ignore for BYO-only work
+## 10. Repository map
 
-For a **full map** of the repo (all apps, `dply-core`, install commands per app), read **[MONOREPO_AND_APPS.md](MONOREPO_AND_APPS.md)**.
+For the **full layout** (root app, `packages/dply-core`, install workflow), see **[MONOREPO_AND_APPS.md](MONOREPO_AND_APPS.md)**.
 
 | Path | Role |
 | ---- | ---- |
-| **Repository root** | **BYO app** — this guide. |
+| **Repository root** | The dply Laravel app. Every product line ships from here. |
 | `packages/dply-core/` | Shared library; pulled in via Composer path from the root `composer.json`. |
-| `apps/dply-cloud/` | **Separate product** — same as above. **On hold** for BYO-focused work. |
-| `docs/MULTI_PRODUCT_PLATFORM_PLAN.md` | Long-term multi-product blueprint; rollout beyond BYO is paused for **documentation and default local setup** per team focus. |
+| `docs/MULTI_PRODUCT_PLATFORM_PLAN.md` | Long-term multi-product blueprint (single-app + single-database direction). |
 
 ---
 

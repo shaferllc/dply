@@ -2,7 +2,7 @@
 
 | Field        | Value      |
 | ------------ | ---------- |
-| **Status**   | Accepted   |
+| **Status**   | **Superseded 2026-04-28** — the multi-app + per-product-database layout was retired in favor of a single Laravel application + a single database. If product-line storage isolation is reintroduced later, it will use **named Laravel database connections** within the same app rather than separate Laravel installs. |
 | **Date**     | 2026-03-23 |
 | **Deciders** | Platform   |
 | **Context**  | [MULTI_PRODUCT_PLATFORM_PLAN.md](../MULTI_PRODUCT_PLATFORM_PLAN.md) §8, §10 |

@@ -1,5 +1,9 @@
 # Central authentication (`auth.dply.io`)
 
+> **Superseded 2026-04-28.** This document described a separate `apps/dply-auth` Passport server federating identity across separate product apps. That layout has been retired: there is now a single root Laravel application that owns its own auth (Fortify + OAuth providers). The `apps/dply-auth` app, the `dply_auth_id` column on `users`, the `CentralAuthController`, and the `config/dply_auth.php` binding have all been removed. The remainder of this document is kept for historical reference only.
+
+---
+
 Separate product apps (BYO, Serverless, Cloud, WordPress, Edge) keep **their own databases and billing**. **Identity** (email/password, 2FA, password reset) is centralized in **`apps/dply-auth`**, deployed at a dedicated host such as **`https://auth.dply.io`**.
 
 ## Pattern

@@ -1,17 +1,17 @@
-# Dply (BYO)
+# Dply
 
-**Bring-your-own-server** platform: connect providers, provision or attach servers, manage sites, and deploy over **SSH**. This repository’s **primary app** is the **Laravel application at the repository root** (not under `apps/`).
+Single Laravel application that runs the dply platform: connect providers, provision or attach servers, manage sites, and deploy across BYO (SSH), Serverless (AWS Lambda, DigitalOcean Functions, etc.), Docker, and Kubernetes engines. Future product lines (Cloud, WordPress, Edge) re-enter as additional engines + modules in this same app.
 
-> **Start here:** [docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md) — step-by-step local setup for BYO only.
+> **Start here:** [docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md) — step-by-step local setup.
 
-**Monorepo:** This repo also contains `apps/dply-cloud`, `apps/dply-auth`, and `packages/dply-core`. Serverless provider and Lambda/Bref support now live in the root app. See **[docs/MONOREPO_AND_APPS.md](docs/MONOREPO_AND_APPS.md)** for how the remaining apps relate to the root app, **per-app `composer install`**, and separate databases.
+**Repository:** the Laravel app lives at the repository root. The only other tracked piece is **`packages/dply-core`**, a small shared PHP library consumed via a Composer path repository. There are no `apps/*` Laravel installs and no separate identity service. See **[docs/MONOREPO_AND_APPS.md](docs/MONOREPO_AND_APPS.md)**.
 
 ## Product focus
 
-- **Active (default):** **BYO** — develop and run from the repo root with one `.env` and one database.
-- **On hold** for day-to-day onboarding: separate product apps under `apps/` (**Cloud**) and future **WordPress** / **Edge** lines. They are **not** required to run BYO; each has its own Composer install and database when you choose to work on them.
+- **Active:** BYO + Serverless + Docker + Kubernetes engines, all served from the root app.
+- **Planned:** Cloud, WordPress, Edge — added as new engines + modules in this same app when their behavior is real.
 
-Long-term multi-product context (rollout order, separate DBs): [docs/MULTI_PRODUCT_PLATFORM_PLAN.md](docs/MULTI_PRODUCT_PLATFORM_PLAN.md).
+Long-term product roadmap: [docs/MULTI_PRODUCT_PLATFORM_PLAN.md](docs/MULTI_PRODUCT_PLATFORM_PLAN.md).
 
 ## Quick start (summary)
 

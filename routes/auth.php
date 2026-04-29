@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\CentralAuthController;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Livewire\Auth\ConfirmPassword;
@@ -17,11 +16,6 @@ Route::get('auth/{provider}/redirect', [OAuthController::class, 'redirect'])->na
 Route::get('auth/{provider}/callback', [OAuthController::class, 'callback'])->name('oauth.callback');
 
 Route::middleware('guest')->group(function () {
-    Route::get('oauth/central/redirect', [CentralAuthController::class, 'redirect'])
-        ->name('oauth.central.redirect');
-    Route::get('oauth/callback', [CentralAuthController::class, 'callback'])
-        ->name('oauth.central.callback');
-
     Route::livewire('register', Register::class)->name('register');
     Route::livewire('login', Login::class)->name('login');
     Route::livewire('two-factor-challenge', TwoFactorChallenge::class)->name('two-factor.login');

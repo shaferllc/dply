@@ -2,10 +2,12 @@
 
 | Field        | Value      |
 | ------------ | ---------- |
-| **Status**   | Accepted   |
+| **Status**   | Accepted (scope updated 2026-04-28) |
 | **Date**     | 2026-03-23 |
 | **Deciders** | Platform   |
 | **Context**  | [MULTI_PRODUCT_PLATFORM_PLAN.md](../MULTI_PRODUCT_PLATFORM_PLAN.md) §4, §10 |
+
+> **Scope update (2026-04-28):** the multi-app `apps/dply-{cloud,wordpress,edge}` direction this ADR referenced was retired. The engine-isolation discipline still applies, but the boundary is now between **engines / queues / worker pools inside the single root app**, not between separate Laravel installs. Forbidden-import lists target package or namespace boundaries within `app/Services/Deploy/` rather than per-app `composer.json` files.
 
 ## Context
 

@@ -74,7 +74,6 @@ use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\OpenLiteSpeedWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\TraefikWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
-use Dply\Core\Auth\CentralOAuthClient;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -91,15 +90,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(CentralOAuthClient::class, function () {
-            return new CentralOAuthClient(
-                authBaseUrl: rtrim((string) config('dply_auth.auth_url'), '/'),
-                clientId: (string) config('dply_auth.client_id'),
-                clientSecret: (string) config('dply_auth.client_secret'),
-                redirectUri: (string) config('dply_auth.redirect_uri'),
-            );
-        });
-
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
         $this->app->singleton(ServerlessProvisionerFactory::class);

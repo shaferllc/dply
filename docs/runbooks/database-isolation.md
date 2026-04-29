@@ -1,5 +1,9 @@
 # Runbook: database isolation per product app
 
+> **Superseded 2026-04-28.** The multi-app + per-product-database direction was retired; the platform now ships from a single Laravel application using a single database. This runbook is kept for historical reference. If storage isolation is reintroduced later, it will use **named Laravel database connections** within the same app, and a fresh runbook will replace this one.
+
+---
+
 Ensure **no deployable** points `DB_*` at another product’s database. Use this when creating environments, rotating secrets, or after infra incidents.
 
 ## 1. Naming convention (locked)

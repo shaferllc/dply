@@ -2,10 +2,12 @@
 
 | Field        | Value      |
 | ------------ | ---------- |
-| **Status**   | Accepted   |
+| **Status**   | Accepted (scope updated 2026-04-28) |
 | **Date**     | 2026-03-30 |
 | **Deciders** | Platform   |
 | **Context**  | [MULTI_PRODUCT_PLATFORM_PLAN.md](../MULTI_PRODUCT_PLATFORM_PLAN.md), [ADR-004](./0004-engine-isolation-ssh-leakage.md) |
+
+> **Scope update (2026-04-28):** the `apps/dply-wordpress` Laravel app this ADR was written against was deleted; WordPress re-enters as an engine + module inside the root app. The "hosted-only, no customer SSH" promise still holds, and SSH-leakage discipline still applies — see the updated [ADR-004](./0004-engine-isolation-ssh-leakage.md). References below to `apps/dply-wordpress` should be read as "the WordPress module inside the root app".
 
 ## Context
 
