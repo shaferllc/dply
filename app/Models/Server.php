@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\ServerProvider;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
+use App\Support\Hosts\HostCapabilities;
+use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +14,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
-use App\Support\Hosts\HostCapabilities;
 use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
 
@@ -312,6 +313,11 @@ class Server extends Model
 
     public function operationalSshPrivateKey(): ?string
     {
+        $fakeOverride = FakeCloudProvision::sshPrivateKeyOverrideForFakeServer($this);
+        if ($fakeOverride !== null) {
+            return $fakeOverride;
+        }
+
         $key = $this->ssh_operational_private_key;
 
         if (is_string($key) && trim($key) !== '') {
@@ -325,6 +331,11 @@ class Server extends Model
 
     public function recoverySshPrivateKey(): ?string
     {
+        $fakeOverride = FakeCloudProvision::sshPrivateKeyOverrideForFakeServer($this);
+        if ($fakeOverride !== null) {
+            return $fakeOverride;
+        }
+
         $key = $this->ssh_recovery_private_key;
 
         if (is_string($key) && trim($key) !== '') {
@@ -451,11 +462,20 @@ class Server extends Model
             throw new \RuntimeException('Server has no IP address.');
         }
 
-        return TaskRunnerConnection::fromArray([
+        $connection = [
             'host' => $host,
             'port' => (int) ($this->ssh_port ?: 22),
             'username' => $username,
             'private_key' => $key,
-        ]);
+        ];
+
+        if (FakeCloudProvision::isFakeServer($this)) {
+            $scriptPath = config('server_provision_fake.ssh_script_path');
+            if (is_string($scriptPath) && trim($scriptPath) !== '') {
+                $connection['script_path'] = trim($scriptPath);
+            }
+        }
+
+        return TaskRunnerConnection::fromArray($connection);
     }
 }

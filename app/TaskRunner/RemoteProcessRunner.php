@@ -65,7 +65,8 @@ class RemoteProcessRunner
     public function sshOptions(): array
     {
         $options = [
-            '-o LogLevel=ERROR', // Suppress "Permanently added … known hosts" on stderr (still logs real errors)
+            // INFO: ERROR hides typical auth/connection stderr (exit 255 with empty streams); strip known-host noise in cleanupOutput instead.
+            '-o LogLevel=INFO',
             '-o IdentitiesOnly=yes', // Only use the configured public key
             '-o UserKnownHostsFile=/dev/null', // Don't use known hosts
             '-o StrictHostKeyChecking=no', // Disable host key checking

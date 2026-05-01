@@ -60,13 +60,21 @@
                 this.privateKey = '';
                 this.publicKey = '';
             },
+            cancelReveal() {
+                this.revealOpen = false;
+                this.privateKey = '';
+                this.publicKey = '';
+                this.copiedPrivate = false;
+                this.copiedPublic = false;
+                this.acknowledged = false;
+            },
         }"
         @if ($listenEvent === 'dply-ssh-profile-keypair-generated')
             x-on:dply-ssh-profile-keypair-generated.window="openFromLivewire($event.detail)"
         @else
             x-on:dply-ssh-keypair-generated.window="openFromLivewire($event.detail)"
         @endif
-        x-on:keydown.escape.window="if (revealOpen && acknowledged) closeReveal()"
+        x-on:keydown.escape.window="if (revealOpen) cancelReveal()"
     >
         <div
             x-show="revealOpen"
@@ -128,7 +136,14 @@
                         <span class="text-sm leading-relaxed text-brand-moss">{{ __('I have saved my private key somewhere secure.') }}</span>
                     </label>
                 </div>
-                <div class="flex justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                        @click="cancelReveal()"
+                    >
+                        {{ __('Cancel') }}
+                    </button>
                     <button
                         type="button"
                         class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"

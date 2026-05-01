@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Servers;
 
 use App\Jobs\RunSetupScriptJob;
@@ -11,8 +13,11 @@ use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
+use App\Services\Servers\ServerJourneyInfrastructureAlerts;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ClassifyProvisionFailure;
+use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProvisionPipelineLog;
 use App\Support\Servers\ProvisionStepSnapshots;
 use App\Support\Servers\ProvisionVerificationSummary;
 use Illuminate\Contracts\View\View;
@@ -29,6 +34,9 @@ class ProvisionJourney extends Component
 
     public bool $showCancelProvisionModal = false;
 
+    /** @var string SHA-256 of last logged journey snapshot (avoids log spam on wire:poll). */
+    public string $journeyViewLogSignature = '';
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -36,7 +44,24 @@ class ProvisionJourney extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
+        // Server may have been deleted out from under us (e.g. user just confirmed
+        // the remove-server modal). Bail to the index instead of letting refresh()
+        // throw ModelNotFoundException, which surfaces in the UI as a 404 inside
+        // any lingering modal/poll response.
+        $fresh = Server::query()->find($this->server->getKey());
+        if ($fresh === null) {
+            $this->showRemoveServerModal = false;
+            $this->showCancelProvisionModal = false;
+
+            if (Livewire::isLivewireRequest()) {
+                $this->dispatch('provision-journey-complete', url: route('servers.index'));
+            } else {
+                $this->redirectRoute('servers.index', navigate: true);
+            }
+
+            return view('livewire.servers.provision-journey-removed');
+        }
+        $this->server = $fresh;
 
         if ($this->shouldRedirectToServerOverview()) {
             if (Livewire::isLivewireRequest()) {
@@ -58,9 +83,43 @@ class ProvisionJourney extends Component
         $stackSummary = $this->stackSummary($artifacts);
         $stallState = $this->stallState($task, $steps);
 
+        $stepStatesSig = collect($steps)
+            ->map(fn (array $s): string => ($s['key'] ?? '').':'.$s['state'])
+            ->implode('|');
+        $activeRow = collect($steps)->firstWhere('state', 'active');
+        $failedRow = collect($steps)->firstWhere('state', 'failed');
+        $sigPayload = [
+            'server_status' => $this->server->status,
+            'setup_status' => $this->server->setup_status,
+            'task_id' => $task?->id,
+            'task_status' => $task?->status?->value,
+            'run_id' => $run?->id,
+            'run_status' => $run?->status,
+            'step_signature' => $stepStatesSig,
+            'active_key' => $activeRow['key'] ?? null,
+            'failed_key' => $failedRow['key'] ?? null,
+            'should_poll' => $shouldPoll,
+        ];
+        $sig = hash('sha256', json_encode($sigPayload, JSON_THROW_ON_ERROR));
+        if ($this->journeyViewLogSignature !== $sig) {
+            $this->journeyViewLogSignature = $sig;
+            ProvisionPipelineLog::info('server.provision.journey.view_state', $this->server, [
+                'phase' => 'ui',
+                'active_step' => $activeRow['label'] ?? null,
+                'failed_step' => $failedRow['label'] ?? null,
+                'completed_steps' => $completedCount,
+                'total_steps' => count($steps),
+                'task_status' => $task?->status?->value,
+                'run_status' => $run?->status,
+                'should_poll' => $shouldPoll,
+            ]);
+        }
+
         return view('livewire.servers.provision-journey', [
             'task' => $task,
             'run' => $run,
+            'infrastructureAlerts' => app(ServerJourneyInfrastructureAlerts::class)->forServer($this->server),
+            'localDevShellHints' => $this->localDevShellHints(),
             'artifacts' => $artifacts,
             'steps' => $steps,
             'completedCount' => $completedCount,
@@ -76,6 +135,9 @@ class ProvisionJourney extends Component
             'stallState' => $stallState,
             'shouldPoll' => $shouldPoll,
             'canCancelProvision' => $this->canCancelProvision($task),
+            'liveTaskOutput' => $this->liveTaskOutput($task),
+            'liveTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
+            'taskUpdatedAt' => $task?->updated_at,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server->fresh())
                 : null,
@@ -143,6 +205,49 @@ class ProvisionJourney extends Component
         return ! $this->shouldRedirectToServerOverview();
     }
 
+    /**
+     * Copy/paste hints for local SSH dev (docker-compose.ssh-dev, fake cloud). Not used in production UI.
+     *
+     * @return array{
+     *     ssh:string,
+     *     docker_exec:string,
+     *     web_terminal_url:?string,
+     *     fake_cloud_enabled:bool,
+     *     is_fake_server:bool
+     * }|null
+     */
+    protected function localDevShellHints(): ?array
+    {
+        if (! app()->environment('local')) {
+            return null;
+        }
+
+        $ip = trim((string) ($this->server->ip_address ?? ''));
+        $port = (int) ($this->server->ssh_port ?: 22);
+        $user = trim((string) ($this->server->ssh_user ?? ''));
+        if ($user === '') {
+            $user = 'root';
+        }
+
+        $ssh = $ip !== ''
+            ? ($port === 22 ? "ssh {$user}@{$ip}" : "ssh -p {$port} {$user}@{$ip}")
+            : '';
+
+        $container = (string) config('server_provision.local_dev_ssh_compose_container', 'dply-ssh-dev');
+        $dockerExec = "docker exec -it {$container} /bin/bash";
+
+        $webUrl = config('server_provision.local_dev_web_terminal_url');
+        $webTerminalUrl = is_string($webUrl) && $webUrl !== '' ? $webUrl : null;
+
+        return [
+            'ssh' => $ssh,
+            'docker_exec' => $dockerExec,
+            'web_terminal_url' => $webTerminalUrl,
+            'fake_cloud_enabled' => FakeCloudProvision::enabled(),
+            'is_fake_server' => FakeCloudProvision::isFakeServer($this->server),
+        ];
+    }
+
     protected function shouldRedirectToServerOverview(): bool
     {
         if (app()->environment('local')) {
@@ -173,7 +278,13 @@ class ProvisionJourney extends Component
             'meta' => $meta,
         ]);
 
-        WaitForServerSshReadyJob::dispatch($server->fresh());
+        $fresh = $server->fresh();
+        if ($fresh) {
+            ProvisionPipelineLog::info('server.provision.journey.rerun_setup_dispatched', $fresh, [
+                'phase' => 'ui',
+            ]);
+        }
+        WaitForServerSshReadyJob::dispatch($fresh ?? $server);
 
         $this->redirectRoute('servers.journey', $server, navigate: true);
     }
@@ -351,16 +462,51 @@ class ProvisionJourney extends Component
     {
         $scriptLabel = $this->scriptStepLabelForKey($task, $key);
         if ($scriptLabel !== null) {
-            return $this->persistedStepOutput($server, $key) ?? $this->scriptStepOutput($task, $scriptLabel);
+            $stepSpecific = $this->persistedStepOutput($server, $key) ?? $this->scriptStepOutput($task, $scriptLabel);
+            if ($stepSpecific !== null) {
+                return $stepSpecific;
+            }
+
+            // Step marker hasn't appeared yet — fall back to the latest raw output so the user still sees activity.
+            if ($state === 'active' && $task) {
+                $output = trim((string) $task->tailOutput(40));
+
+                return $output !== '' ? $output : null;
+            }
+
+            return null;
         }
 
         if ($key === 'setup' && $task && in_array($state, ['active', 'failed', 'completed'], true)) {
-            $output = trim((string) $task->tailOutput(12));
+            $output = trim((string) $task->tailOutput(40));
 
             return $output !== '' ? $output : null;
         }
 
         return null;
+    }
+
+    /**
+     * Raw tail of the task output regardless of step framing — gives the user a "tail -f" view of progress.
+     */
+    protected function liveTaskOutput(?Task $task): ?string
+    {
+        if (! $task) {
+            return null;
+        }
+
+        $output = trim((string) $task->tailOutput(150));
+
+        return $output !== '' ? $output : null;
+    }
+
+    protected function liveTaskOutputLineCount(?Task $task): int
+    {
+        if (! $task || ! is_string($task->output) || trim($task->output) === '') {
+            return 0;
+        }
+
+        return count(preg_split('/\r\n|\r|\n/', $task->output) ?: []);
     }
 
     /**
@@ -638,7 +784,7 @@ class ProvisionJourney extends Component
             default => 'Usually a few minutes',
         };
 
-        $stalled = $minutesSinceUpdate >= 6 || $minutesRunning >= 8;
+        $stalled = $minutesSinceUpdate >= 3 || $minutesRunning >= 8;
 
         return [
             'eta' => $eta,

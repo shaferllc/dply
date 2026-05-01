@@ -8,6 +8,7 @@ use App\Actions\Concerns\AsObject;
 use App\Livewire\Forms\ServerCreateForm;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 final class BuildServerCreatePreflight
@@ -80,7 +81,7 @@ final class BuildServerCreatePreflight
         array $sizeRecommendations = [],
     ): array {
         $checks = match ($form->type) {
-            'custom' => $this->customChecks($form, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $customConnectionTest),
+            'custom' => $this->customChecks($form, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $customConnectionTest, $hasLinkedCredential),
             'digitalocean_functions' => $this->digitalOceanFunctionsChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
             'digitalocean_kubernetes' => $this->digitalOceanKubernetesChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
             'aws_lambda' => $this->awsLambdaChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
@@ -252,7 +253,7 @@ final class BuildServerCreatePreflight
     /**
      * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
      */
-    private function customChecks(ServerCreateForm $form, bool $canCreateServer, bool $hasUserSshKeys, bool $hasProvisionableUserSshKeys, array $customConnectionTest): array
+    private function customChecks(ServerCreateForm $form, bool $canCreateServer, bool $hasUserSshKeys, bool $hasProvisionableUserSshKeys, array $customConnectionTest, bool $hasLinkedCredential): array
     {
         $checks = [];
 
@@ -286,6 +287,43 @@ final class BuildServerCreatePreflight
                     'error',
                     __('Missing required connection details'),
                     (string) ($messages[0] ?? __('This field is required.')),
+                    true,
+                    $field
+                );
+            }
+        }
+
+        $scriptKeys = array_keys(config('setup_scripts.scripts', []));
+        $installProfileIds = collect(config('server_provision_options.install_profiles', []))->pluck('id')->filter()->values()->all();
+
+        try {
+            Validator::make(
+                [
+                    'install_profile' => $form->install_profile,
+                    'server_role' => $form->server_role,
+                    'cache_service' => $form->cache_service,
+                    'webserver' => $form->webserver,
+                    'php_version' => $form->php_version,
+                    'database' => $form->database,
+                    'setup_script_key' => $form->setup_script_key,
+                ],
+                array_merge(
+                    [
+                        'install_profile' => ['required', 'string', Rule::in($installProfileIds)],
+                        'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
+                    ],
+                    ServerProvisionPreferenceRules::rules('custom', $hasLinkedCredential, $form->server_role)
+                )
+            )->validate();
+
+            $checks[] = $this->check('custom_stack', 'info', __('Stack selection ready'), __('Install profile and default stack choices are valid for this BYO server.'), false);
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $checks[] = $this->check(
+                    'custom_stack_'.$field,
+                    'error',
+                    __('Invalid stack configuration'),
+                    (string) ($messages[0] ?? __('Invalid value.')),
                     true,
                     $field
                 );

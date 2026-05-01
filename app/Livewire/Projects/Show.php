@@ -4,6 +4,7 @@ namespace App\Livewire\Projects;
 
 use App\Jobs\RunWorkspaceDeployJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\AuditLog;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
@@ -27,6 +28,7 @@ use Livewire\Component;
 class Show extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
 
     public Workspace $workspace;
 

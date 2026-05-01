@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Jobs\Concerns\DispatchesServerProvisionJob;
+use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\Server;
 use App\Services\HetznerService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,6 +12,7 @@ use Illuminate\Foundation\Queue\Queueable;
 class PollHetznerIpJob implements ShouldQueue
 {
     use DispatchesServerProvisionJob;
+    use HandlesFakeCloudPoll;
     use Queueable;
 
     public int $tries = 60;
@@ -27,6 +29,10 @@ class PollHetznerIpJob implements ShouldQueue
         if (! $credential) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
 
+            return;
+        }
+
+        if ($this->finishFakeCloudPollIfNeeded($this->server)) {
             return;
         }
 

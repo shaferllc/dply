@@ -22,14 +22,10 @@
                 </div>
                 <div class="lg:col-span-8 space-y-4">
                     <div>
-                        <a
-                            href="{{ route('docs.markdown', ['slug' => 'source-control']) }}"
-                            wire:navigate
-                            class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                        >
+                        <x-outline-link href="{{ route('docs.markdown', ['slug' => 'source-control']) }}" wire:navigate>
                             <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                             {{ __('Source control docs') }}
-                        </a>
+                        </x-outline-link>
                     </div>
                     @if (auth()->user()->currentOrganization())
                         <p class="text-sm text-brand-moss leading-relaxed">

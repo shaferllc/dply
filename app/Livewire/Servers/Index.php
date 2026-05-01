@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Actions\Servers\DeleteServerAction;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\ProviderCredential;
 use App\Models\Server;
@@ -19,6 +20,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use DispatchesToastNotifications;
     use ManagesServerRemovalForm;
 
     public string $search = '';

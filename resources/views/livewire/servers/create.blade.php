@@ -68,34 +68,97 @@
                     </div>
                 </section>
 
-                <section class="rounded-2xl border border-slate-200 bg-white p-6">
-                    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('Choose how to add this BYO server') }}</h2>
-                    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                <section class="rounded-[2rem] border border-brand-ink/10 bg-gradient-to-br from-brand-cream/90 via-white to-brand-cream/40 p-6 shadow-md shadow-brand-ink/10 ring-1 ring-brand-ink/[0.06] sm:p-8">
+                    <header>
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Choose how to add this BYO server') }}</p>
+                        <p class="mt-3 text-pretty text-sm leading-6 text-brand-moss">{{ __('Pick how this host joins your workspace — SSH to hardware you already run, or spin up a new VM from a linked cloud account.') }}</p>
+                    </header>
+
+                    <div class="relative mt-8">
+                        <div
+                            wire:loading.delay.150ms.flex
+                            wire:target="useExistingServerPath,useProviderProvisioningPath"
+                            class="absolute inset-0 z-10 hidden items-center justify-center rounded-2xl bg-white/60 backdrop-blur-[1px]"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <div class="inline-flex items-center gap-2.5 rounded-full border border-brand-ink/10 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-lg shadow-brand-ink/10">
+                                <x-spinner variant="forest" size="sm" />
+                                {{ __('Loading…') }}
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 lg:grid-cols-2">
                         <button
                             type="button"
                             wire:click="useExistingServerPath"
+                            wire:loading.attr="disabled"
+                            wire:target="useExistingServerPath,useProviderProvisioningPath"
+                            aria-pressed="{{ $createMode === 'existing' ? 'true' : 'false' }}"
                             @class([
-                                'rounded-2xl border p-5 text-left transition',
-                                'border-sky-300 bg-sky-50/70 shadow-sm' => $createMode === 'existing',
-                                'border-slate-200 hover:border-slate-300 hover:bg-slate-50' => $createMode !== 'existing',
+                                'group flex w-full gap-5 rounded-2xl border p-5 text-left transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-sage/60 sm:gap-6 sm:p-6',
+                                'border-2 border-brand-sage/50 bg-white shadow-lg shadow-brand-ink/10 ring-1 ring-brand-sage/20' => $createMode === 'existing',
+                                'border border-brand-ink/12 bg-white/90 hover:-translate-y-1 hover:border-brand-sage/35 hover:shadow-lg hover:shadow-brand-ink/10' => $createMode !== 'existing',
                             ])
                         >
-                            <p class="text-sm font-semibold text-slate-900">{{ __('Use an existing server') }}</p>
-                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('Connect a host you already own over SSH and let Dply manage it as customer-owned infrastructure.') }}</p>
+                            <span @class([
+                                'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ring-1 transition',
+                                'bg-brand-forest/12 text-brand-forest ring-brand-forest/25' => $createMode === 'existing',
+                                'bg-brand-sand/55 text-brand-forest ring-brand-ink/10 group-hover:bg-brand-sand/75' => $createMode !== 'existing',
+                            ])>
+                                <x-heroicon-o-command-line class="h-8 w-8" aria-hidden="true" />
+                            </span>
+                            <span class="min-w-0 flex-1 pt-0.5">
+                                <span class="block text-lg font-semibold leading-snug text-brand-ink">{{ __('Use an existing server') }}</span>
+                                <span class="mt-2 block text-sm leading-6 text-brand-moss">{{ __('Connect a host you already own over SSH and let Dply manage it as customer-owned infrastructure.') }}</span>
+                                <span class="mt-4 flex items-center gap-2 text-sm font-semibold">
+                                    @if ($createMode === 'existing')
+                                        <span class="inline-flex items-center gap-1.5 text-brand-forest">
+                                            <x-heroicon-m-check-circle class="h-5 w-5 shrink-0" aria-hidden="true" />
+                                            {{ __('SSH details below') }}
+                                        </span>
+                                    @else
+                                        <span class="text-brand-sage transition group-hover:text-brand-ink">{{ __('Continue with SSH') }} →</span>
+                                    @endif
+                                </span>
+                            </span>
                         </button>
 
                         <button
                             type="button"
                             wire:click="useProviderProvisioningPath"
+                            wire:loading.attr="disabled"
+                            wire:target="useExistingServerPath,useProviderProvisioningPath"
+                            aria-pressed="{{ $createMode === 'provider' ? 'true' : 'false' }}"
                             @class([
-                                'rounded-2xl border p-5 text-left transition',
-                                'border-sky-300 bg-sky-50/70 shadow-sm' => $createMode === 'provider',
-                                'border-slate-200 hover:border-slate-300 hover:bg-slate-50' => $createMode !== 'provider',
+                                'group flex w-full gap-5 rounded-2xl border p-5 text-left transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-sage/60 sm:gap-6 sm:p-6',
+                                'border-2 border-brand-sage/50 bg-white shadow-lg shadow-brand-ink/10 ring-1 ring-brand-sage/20' => $createMode === 'provider',
+                                'border border-brand-ink/12 bg-white/90 hover:-translate-y-1 hover:border-brand-sage/35 hover:shadow-lg hover:shadow-brand-ink/10' => $createMode !== 'provider',
                             ])
                         >
-                            <p class="text-sm font-semibold text-slate-900">{{ __('Provision with a provider') }}</p>
-                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('Create a new machine in DigitalOcean, Hetzner, AWS, or another connected account, then continue into the standard Dply setup flow.') }}</p>
+                            <span @class([
+                                'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ring-1 transition',
+                                'bg-brand-forest/12 text-brand-forest ring-brand-forest/25' => $createMode === 'provider',
+                                'bg-brand-sand/55 text-brand-forest ring-brand-ink/10 group-hover:bg-brand-sand/75' => $createMode !== 'provider',
+                            ])>
+                                <x-heroicon-o-cloud-arrow-up class="h-8 w-8" aria-hidden="true" />
+                            </span>
+                            <span class="min-w-0 flex-1 pt-0.5">
+                                <span class="block text-lg font-semibold leading-snug text-brand-ink">{{ __('Provision with a provider') }}</span>
+                                <span class="mt-2 block text-sm leading-6 text-brand-moss">{{ __('Create a new machine in DigitalOcean, Hetzner, AWS, or another connected account, then continue into the standard Dply setup flow.') }}</span>
+                                <span class="mt-4 flex items-center gap-2 text-sm font-semibold">
+                                    @if ($createMode === 'provider')
+                                        <span class="inline-flex items-center gap-1.5 text-brand-forest">
+                                            <x-heroicon-m-check-circle class="h-5 w-5 shrink-0" aria-hidden="true" />
+                                            {{ __('Provider flow below') }}
+                                        </span>
+                                    @else
+                                        <span class="text-brand-sage transition group-hover:text-brand-ink">{{ __('Continue with provisioning') }} →</span>
+                                    @endif
+                                </span>
+                            </span>
                         </button>
+                        </div>
                     </div>
 
                     @if ($createMode === 'provider')
@@ -155,6 +218,23 @@
                                 $regionSizePickReady = $catalog['credentials']->isNotEmpty() && $form->provider_credential_id !== '';
                             }
 
+                            $installProfileCardIcons = [
+                                'laravel_app' => 'heroicon-o-bolt',
+                                'php_api' => 'heroicon-o-code-bracket',
+                                'queue_worker' => 'heroicon-o-queue-list',
+                                'database_node' => 'heroicon-o-circle-stack',
+                                'static_app_host' => 'heroicon-o-document-text',
+                            ];
+                            $serverRoleCardIcons = [
+                                'application' => 'heroicon-o-globe-alt',
+                                'load_balancer' => 'heroicon-o-arrow-path-rounded-square',
+                                'database' => 'heroicon-o-circle-stack',
+                                'redis' => 'heroicon-o-bolt',
+                                'valkey' => 'heroicon-o-sparkles',
+                                'worker' => 'heroicon-o-cpu-chip',
+                                'docker' => 'heroicon-o-cube-transparent',
+                                'plain' => 'heroicon-o-squares-2x2',
+                            ];
                             $selectedInstallProfile = collect($installProfiles ?? [])->firstWhere('id', $form->install_profile);
                             $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
                             $serverRoleInstalls = collect($selectedServerRole['installs'] ?? [])
@@ -248,86 +328,21 @@
                                             <button
                                                 type="button"
                                                 wire:click="regenerateServerName"
-                                                class="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                                wire:loading.attr="disabled"
+                                                wire:target="regenerateServerName"
+                                                class="inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                {{ __('Regenerate') }}
+                                                <span wire:loading.remove wire:target="regenerateServerName">{{ __('Regenerate') }}</span>
+                                                <span wire:loading wire:target="regenerateServerName" class="inline-flex items-center gap-2">
+                                                    <x-spinner variant="zinc" size="sm" />
+                                                    {{ __('Regenerating…') }}
+                                                </span>
                                             </button>
                                         </div>
                                         <x-input-error :messages="$errors->get('name')" class="mt-1" />
                                     </div>
 
-                                    <section class="space-y-4">
-                                        <div>
-                                            <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('1. Choose an install profile') }}</h4>
-                                            <p class="mt-1 text-sm text-slate-600">{{ __('Start with a preset and then fine-tune anything in advanced options.') }}</p>
-                                            <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-                                                <div>
-                                                    <x-input-label for="install_profile" :value="__('Install profile')" />
-                                                    <select wire:model.live="form.install_profile" id="install_profile" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                        @foreach ($installProfiles as $profile)
-                                                            <option value="{{ $profile['id'] }}">{{ $profile['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('install_profile')" class="mt-1" />
-                                                </div>
-
-                                                @if ($selectedInstallProfile)
-                                                    <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                                                        <div class="flex items-start justify-between gap-3">
-                                                            <div>
-                                                                <p class="text-sm font-semibold text-slate-900">{{ $selectedInstallProfile['label'] }}</p>
-                                                                <p class="mt-1 text-sm leading-6 text-slate-600">{{ $selectedInstallProfile['summary'] ?? '' }}</p>
-                                                            </div>
-                                                            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
-                                                                {{ __('Preset') }}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('2. Choose the server role') }}</h4>
-                                            <p class="mt-1 text-sm text-slate-600">{{ __('Pick what this machine is mainly responsible for. We will adapt the default software stack to match.') }}</p>
-                                            <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-                                                <div>
-                                                    <x-input-label for="server_role" :value="__('Server type')" />
-                                                    <select wire:model.live="form.server_role" id="server_role" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                        @foreach ($provisionOptions['server_roles'] as $role)
-                                                            <option value="{{ $role['id'] }}">{{ $role['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('server_role')" class="mt-1" />
-                                                </div>
-
-                                                @if ($selectedServerRole)
-                                                    <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                                                        <div class="flex items-start justify-between gap-3">
-                                                            <div>
-                                                                <p class="text-sm font-semibold text-slate-900">{{ $selectedServerRole['label'] }}</p>
-                                                                <p class="mt-1 text-sm leading-6 text-slate-600">{{ $selectedServerRole['summary'] ?? ($selectedServerRole['detail'] ?? '') }}</p>
-                                                            </div>
-                                                            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
-                                                                {{ __('Role') }}
-                                                            </span>
-                                                        </div>
-
-                                                        @if ($serverRoleInstalls->isNotEmpty())
-                                                            <div class="mt-4">
-                                                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Default installs') }}</p>
-                                                                <div class="mt-2 flex flex-wrap gap-2">
-                                                                    @foreach ($serverRoleInstalls as $install)
-                                                                        <span class="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">{{ $install }}</span>
-                                                                    @endforeach
-                                                                </div>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    </section>
+                                    @include('livewire.servers.partials.create-install-profile-and-role')
 
                                     <div
                                         class="grid gap-4 sm:grid-cols-2"
@@ -653,58 +668,7 @@
                                         </div>
                                     </div>
 
-                                        <div class="rounded-2xl border border-slate-200 p-4">
-                                            <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('4. Default stack') }}</h4>
-                                            <div class="mt-3 grid gap-4 sm:grid-cols-2">
-                                                <div>
-                                                    <x-input-label for="webserver" :value="__('Web server')" />
-                                                    <select id="webserver" wire:model.live="form.webserver" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                        @foreach ($provisionOptions['webservers'] as $option)
-                                                            <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('webserver')" class="mt-1" />
-                                                </div>
-
-                                                <div>
-                                                    <x-input-label for="php_version" :value="__('PHP version')" />
-                                                    <select id="php_version" wire:model.live="form.php_version" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                        @foreach ($provisionOptions['php_versions'] as $option)
-                                                            <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('php_version')" class="mt-1" />
-                                                </div>
-
-                                                <div>
-                                                    <x-input-label for="database" :value="__('Database')" />
-                                                    <select id="database" wire:model.live="form.database" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                        @foreach ($provisionOptions['databases'] as $option)
-                                                            <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('database')" class="mt-1" />
-                                                </div>
-
-                                                <div>
-                                                    <x-input-label for="cache_service" :value="__('Cache service')" />
-                                                    <select id="cache_service" wire:model.live="form.cache_service" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                        @foreach ($provisionOptions['cache_services'] as $option)
-                                                            <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('cache_service')" class="mt-1" />
-                                                </div>
-                                            </div>
-
-                                            @if ($selectedWebserver)
-                                                <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                                                    <p class="text-sm font-semibold text-slate-900">{{ $selectedWebserver['label'] }}</p>
-                                                    <p class="mt-1 text-sm text-slate-600">{{ $selectedWebserver['summary'] ?? $selectedWebserver['detail'] ?? __('Selected as the default web server for this machine.') }}</p>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </div>
+                                    @include('livewire.servers.partials.create-default-stack-fields')
                                 </div>
                             @endif
 
@@ -764,20 +728,7 @@
                                                 </p>
                                                 <div class="mt-3 space-y-3">
                                                     @foreach ($groupChecks as $check)
-                                                        <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($check['severity']) }}">
-                                                            <div class="flex items-start justify-between gap-3">
-                                                                <div>
-                                                                    <p class="text-sm font-semibold">{{ $check['label'] }}</p>
-                                                                    <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
-                                                                </div>
-                                                                <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">
-                                                                    {{ $check['blocking'] ? __('Blocking') : match ($check['severity']) {
-                                                                        'warning' => __('Warning'),
-                                                                        default => __('Ready'),
-                                                                    } }}
-                                                                </span>
-                                                            </div>
-                                                        </div>
+                                                        @include('livewire.servers.partials.preflight-check-row', ['check' => $check])
                                                     @endforeach
                                                 </div>
                                             </div>
@@ -865,9 +816,15 @@
                                         <button
                                             type="button"
                                             wire:click="regenerateServerName"
-                                            class="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                            wire:loading.attr="disabled"
+                                            wire:target="regenerateServerName"
+                                            class="inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
-                                            {{ __('Regenerate') }}
+                                            <span wire:loading.remove wire:target="regenerateServerName">{{ __('Regenerate') }}</span>
+                                            <span wire:loading wire:target="regenerateServerName" class="inline-flex items-center gap-2">
+                                                <x-spinner variant="zinc" size="sm" />
+                                                {{ __('Regenerating…') }}
+                                            </span>
                                         </button>
                                     </div>
                                     <x-input-error :messages="$errors->get('name')" class="mt-1" />
@@ -927,6 +884,41 @@
                                 </div>
                             </div>
 
+                            @php
+                                $installProfileCardIcons = [
+                                    'laravel_app' => 'heroicon-o-bolt',
+                                    'php_api' => 'heroicon-o-code-bracket',
+                                    'queue_worker' => 'heroicon-o-queue-list',
+                                    'database_node' => 'heroicon-o-circle-stack',
+                                    'static_app_host' => 'heroicon-o-document-text',
+                                ];
+                                $serverRoleCardIcons = [
+                                    'application' => 'heroicon-o-globe-alt',
+                                    'load_balancer' => 'heroicon-o-arrow-path-rounded-square',
+                                    'database' => 'heroicon-o-circle-stack',
+                                    'redis' => 'heroicon-o-bolt',
+                                    'valkey' => 'heroicon-o-sparkles',
+                                    'worker' => 'heroicon-o-cpu-chip',
+                                    'docker' => 'heroicon-o-cube-transparent',
+                                    'plain' => 'heroicon-o-squares-2x2',
+                                ];
+                                $selectedInstallProfile = collect($installProfiles ?? [])->firstWhere('id', $form->install_profile);
+                                $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
+                                $serverRoleInstalls = collect($selectedServerRole['installs'] ?? [])
+                                    ->filter(fn ($item) => filled($item))
+                                    ->take(5)
+                                    ->values();
+                                $availableWebservers = collect($provisionOptions['webservers'] ?? [])
+                                    ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'none')
+                                    ->values();
+                                $selectedWebserver = $availableWebservers->firstWhere('id', $form->webserver);
+                            @endphp
+
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-8">
+                                @include('livewire.servers.partials.create-install-profile-and-role')
+                                @include('livewire.servers.partials.create-default-stack-fields')
+                            </div>
+
                             <div class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                     <div>
@@ -956,20 +948,7 @@
                                             </p>
                                             <div class="mt-3 space-y-3">
                                                 @foreach ($groupChecks as $check)
-                                                    <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($check['severity']) }}">
-                                                        <div class="flex items-start justify-between gap-3">
-                                                            <div>
-                                                                <p class="text-sm font-semibold">{{ $check['label'] }}</p>
-                                                                <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
-                                                            </div>
-                                                            <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">
-                                                                {{ $check['blocking'] ? __('Blocking') : match ($check['severity']) {
-                                                                    'warning' => __('Warning'),
-                                                                    default => __('Ready'),
-                                                                } }}
-                                                            </span>
-                                                        </div>
-                                                    </div>
+                                                    @include('livewire.servers.partials.preflight-check-row', ['check' => $check])
                                                 @endforeach
                                             </div>
                                         </div>
@@ -999,4 +978,6 @@
             </div>
         </div>
     </div>
+
+    <livewire:profile.personal-ssh-key-modal source="servers.create" />
 </div>

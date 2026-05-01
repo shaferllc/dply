@@ -7,6 +7,7 @@ use App\Enums\SiteType;
 use App\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
 use App\Jobs\ProvisionSiteJob;
+use App\Jobs\RunSetupScriptJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\WaitForServerSshReadyJob;
@@ -77,7 +78,7 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.index'));
 
         $response->assertOk();
-        $response->assertSee('Scan readiness', false);
+        $response->assertSee('Provision hosts', false);
         $response->assertSee('Open launchpad');
         $response->assertSee(route('launches.create'), false);
         $response->assertSee('No servers yet');
@@ -1133,6 +1134,8 @@ class ServerTest extends TestCase
 
     public function test_servers_can_be_stored_as_custom(): void
     {
+        Queue::fake();
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
 
@@ -1147,12 +1150,20 @@ class ServerTest extends TestCase
             ->call('store')
             ->assertRedirect();
 
+        $server = Server::query()->where('name', 'Custom Box')->firstOrFail();
+
         $this->assertDatabaseHas('servers', [
             'name' => 'Custom Box',
             'organization_id' => $org->id,
             'provider' => 'custom',
             'status' => 'ready',
         ]);
+
+        $this->assertSame('application', data_get($server->meta, 'server_role'));
+        $this->assertSame('laravel_app', data_get($server->meta, 'install_profile'));
+        $this->assertSame(Server::HOST_KIND_VM, data_get($server->meta, 'host_kind'));
+        $this->assertTrue(RunSetupScriptJob::shouldDispatch($server));
+        Queue::assertPushed(WaitForServerSshReadyJob::class);
     }
 
     public function test_servers_can_be_stored_as_custom_docker_hosts(): void
@@ -1177,6 +1188,7 @@ class ServerTest extends TestCase
         $this->assertSame($org->id, $server->organization_id);
         $this->assertSame(Server::HOST_KIND_DOCKER, data_get($server->meta, 'host_kind'));
         $this->assertTrue($server->isDockerHost());
+        $this->assertFalse(RunSetupScriptJob::shouldDispatch($server));
     }
 
     public function test_servers_create_custom_path_shows_warning_preflight_and_unavailable_cost(): void
@@ -1187,6 +1199,7 @@ class ServerTest extends TestCase
             ->test(ServersCreate::class)
             ->call('useExistingServerPath')
             ->assertSee('Preflight and cost preview')
+            ->assertSee('Stack selection ready')
             ->assertSee('SSH reachability is not verified yet')
             ->assertSee('Dply cannot estimate pricing for your own VPS.')
             ->assertSee('Unavailable');

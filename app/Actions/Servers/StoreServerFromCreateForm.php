@@ -15,6 +15,8 @@ use App\Jobs\ProvisionLinodeServerJob;
 use App\Jobs\ProvisionScalewayServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
+use App\Jobs\RunSetupScriptJob;
+use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -41,6 +43,29 @@ final class StoreServerFromCreateForm
         }
 
         $scriptKeys = array_keys(config('setup_scripts.scripts', []));
+
+        if ($form->type === 'custom') {
+            $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
+            $installProfileIds = collect(config('server_provision_options.install_profiles', []))->pluck('id')->filter()->values()->all();
+            Validator::make(
+                [
+                    'install_profile' => $form->install_profile,
+                    'server_role' => $form->server_role,
+                    'cache_service' => $form->cache_service,
+                    'webserver' => $form->webserver,
+                    'php_version' => $form->php_version,
+                    'database' => $form->database,
+                    'setup_script_key' => $form->setup_script_key,
+                ],
+                array_merge(
+                    [
+                        'install_profile' => ['required', 'string', Rule::in($installProfileIds)],
+                        'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
+                    ],
+                    ServerProvisionPreferenceRules::rules('custom', $hasLinkedCredential, $form->server_role)
+                )
+            )->validate();
+        }
 
         if (! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
             $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
@@ -741,6 +766,13 @@ final class StoreServerFromCreateForm
             ]
         )->validate();
 
+        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
+
+        $meta = $this->meta($form);
+        $meta['host_kind'] = $form->custom_host_kind === 'docker'
+            ? Server::HOST_KIND_DOCKER
+            : Server::HOST_KIND_VM;
+
         $server = $user->servers()->create([
             'organization_id' => $org->id,
             'name' => $form->name,
@@ -749,15 +781,18 @@ final class StoreServerFromCreateForm
             'ssh_port' => (int) ($form->ssh_port ?: 22),
             'ssh_user' => $form->ssh_user,
             'ssh_private_key' => $form->ssh_private_key,
+            'setup_script_key' => $setupScriptKey,
+            'setup_status' => $setupStatus,
             'status' => Server::STATUS_READY,
-            'meta' => [
-                'host_kind' => $form->custom_host_kind === 'docker'
-                    ? Server::HOST_KIND_DOCKER
-                    : Server::HOST_KIND_VM,
-            ],
+            'meta' => $meta,
         ]);
 
         audit_log($org, $user, 'server.created', $server);
+
+        $fresh = $server->fresh();
+        if ($fresh && RunSetupScriptJob::shouldDispatch($fresh)) {
+            WaitForServerSshReadyJob::dispatch($fresh);
+        }
 
         return $server;
     }

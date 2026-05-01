@@ -244,7 +244,7 @@
                         <div class="mb-4">
                             <h3 class="font-medium text-slate-900">{{ __('Sites in this project') }}</h3>
                             <p class="mt-1 text-sm text-slate-500">{{ __('Attach sites that should deploy, alert, and be reviewed alongside this project. This is useful for multi-site apps, customer estates, and grouped environments.') }}</p>
-                            <p class="mt-2 text-sm text-slate-500">{{ __('You can manage project membership here or from each site\\'s settings page.') }}</p>
+                            <p class="mt-2 text-sm text-slate-500">{{ __("You can manage project membership here or from each site's settings page.") }}</p>
                         </div>
                         @if ($workspace->sites->isEmpty())
                             <p class="text-sm text-slate-500 mb-4">{{ __('No sites yet.') }}</p>

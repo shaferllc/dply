@@ -39,12 +39,6 @@
                                         {{ __('Documentation') }}
                                     </a>
                                 </div>
-                                <div class="flex justify-end">
-                                    <div class="inline-flex max-w-full items-center gap-2 rounded-full border border-brand-ink/10 bg-brand-sand/40 px-3 py-1.5 text-xs text-brand-ink dark:border-brand-mist/20 dark:bg-zinc-800/60">
-                                        <x-heroicon-o-building-office-2 class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                        <span class="min-w-0 truncate font-medium" title="{{ $organization->name }}">{{ $organization->name }}</span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -139,52 +133,6 @@
             </div>
         </x-organization-shell>
     </div>
-
-    <x-modal
-        name="save-team-name-modal"
-        :show="false"
-        maxWidth="md"
-        overlayClass="bg-brand-ink/30"
-        panelClass="dply-modal-panel overflow-hidden shadow-xl"
-        focusable
-    >
-        @php
-            $pendingRenameTeam = $saveTeamNameModalTeamId
-                ? $organization->teams->firstWhere('id', $saveTeamNameModalTeamId)
-                : null;
-            $pendingRenameNewName = $saveTeamNameModalTeamId
-                ? trim((string) ($teamNames[$saveTeamNameModalTeamId] ?? ''))
-                : '';
-        @endphp
-        <div class="border-b border-brand-ink/10 px-6 py-5 dark:border-brand-mist/20">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Team name') }}</p>
-            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Save changes?') }}</h2>
-            @if ($pendingRenameTeam && $pendingRenameNewName !== '')
-                <p class="mt-2 text-sm leading-6 text-brand-moss">
-                    {{ __('Change this team’s name from “:from” to “:to”?', ['from' => $pendingRenameTeam->name, 'to' => $pendingRenameNewName]) }}
-                </p>
-            @endif
-        </div>
-
-        <div class="px-6 py-5">
-            @if ($saveTeamNameModalTeamId)
-                <x-input-error :messages="$errors->get('teamNames.'.$saveTeamNameModalTeamId)" />
-            @endif
-        </div>
-
-        <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4 dark:border-brand-mist/20">
-            <x-secondary-button type="button" wire:click="cancelSaveTeamName">
-                {{ __('Discard') }}
-            </x-secondary-button>
-            <x-primary-button type="button" wire:click="confirmSaveTeamName" wire:loading.attr="disabled" wire:target="confirmSaveTeamName">
-                <span wire:loading.remove wire:target="confirmSaveTeamName">{{ __('Save name') }}</span>
-                <span wire:loading wire:target="confirmSaveTeamName" class="inline-flex items-center gap-2">
-                    <x-spinner variant="cream" />
-                    {{ __('Saving…') }}
-                </span>
-            </x-primary-button>
-        </div>
-    </x-modal>
 
     @if ($organization->hasAdminAccess(auth()->user()))
         <x-modal

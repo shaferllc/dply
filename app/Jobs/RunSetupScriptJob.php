@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use App\Actions\Servers\CreateServerProvisionRun;
@@ -15,6 +17,7 @@ use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
+use App\Support\Servers\ProvisionPipelineLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -95,7 +98,20 @@ class RunSetupScriptJob implements ShouldQueue
         TaskDispatcher $dispatcher,
     ): void {
         $server = $this->server->fresh();
-        if (! $server || ! static::shouldDispatch($server)) {
+        if (! $server) {
+            Log::debug('server.provision.run_setup.skip_missing_server', [
+                'server_id' => $this->server->id,
+            ]);
+
+            return;
+        }
+
+        if (! static::shouldDispatch($server)) {
+            ProvisionPipelineLog::debug('server.provision.run_setup.skip_should_dispatch', $server, [
+                'phase' => 'gate',
+                'setup_script_key' => $server->setup_script_key,
+            ]);
+
             return;
         }
 
@@ -114,10 +130,23 @@ class RunSetupScriptJob implements ShouldQueue
         }
 
         if ($commands === []) {
+            ProvisionPipelineLog::debug('server.provision.run_setup.skip_no_commands', $server, [
+                'phase' => 'build',
+                'setup_script_key' => $server->setup_script_key,
+            ]);
+
             return;
         }
 
         $timeout = (int) config('server_provision.remote_script_timeout_seconds', 3600);
+
+        ProvisionPipelineLog::info('server.provision.run_setup.script_built', $server, [
+            'phase' => 'build',
+            'strategy' => $strategy::class,
+            'command_count' => count($commands),
+            'remote_timeout_seconds' => $timeout,
+            'setup_script_key' => $server->setup_script_key,
+        ]);
 
         $body = '';
         foreach ($commands as $line) {
@@ -136,6 +165,11 @@ class RunSetupScriptJob implements ShouldQueue
             'status' => TaskStatus::Pending,
         ]);
         $taskModel->save();
+
+        ProvisionPipelineLog::info('server.provision.run_setup.task_row_created', $server, [
+            'phase' => 'persist_task',
+            'task_runner_task_id' => $taskModel->id,
+        ]);
 
         $run = $createProvisionRun->handle($server, $taskModel);
         foreach ($strategy->buildArtifacts($server) as $artifact) {
@@ -163,6 +197,13 @@ class RunSetupScriptJob implements ShouldQueue
             'meta' => $meta,
         ]);
 
+        ProvisionPipelineLog::info('server.provision.run_setup.dispatching_remote', $server, [
+            'phase' => 'task_runner',
+            'task_runner_task_id' => $taskModel->id,
+            'provision_run_id' => $run->id,
+            'setup_status' => Server::SETUP_STATUS_RUNNING,
+        ]);
+
         try {
             $task->setTaskModel($taskModel);
 
@@ -176,16 +217,29 @@ class RunSetupScriptJob implements ShouldQueue
             $output = $dispatcher->runInBackgroundWithModel($tracked, $taskModel);
 
             if ($output === null || ! $output->isSuccessful()) {
+                ProvisionPipelineLog::warning('server.provision.run_setup.background_start_failed', $server, [
+                    'phase' => 'task_runner',
+                    'task_runner_task_id' => $taskModel->id,
+                    'provision_run_id' => $run->id,
+                    'output_null' => $output === null,
+                    'successful' => $output?->isSuccessful(),
+                ]);
                 $taskModel->update([
                     'status' => TaskStatus::Failed,
                     'completed_at' => now(),
                     'output' => $output !== null ? $output->getBuffer() : 'Background start returned no output.',
                 ]);
                 static::applyProvisionOutcomeToServer($server, false);
+            } else {
+                ProvisionPipelineLog::info('server.provision.run_setup.background_started', $server, [
+                    'phase' => 'task_runner',
+                    'task_runner_task_id' => $taskModel->id,
+                    'provision_run_id' => $run->id,
+                ]);
             }
         } catch (TaskExecutionException $e) {
-            Log::warning('Server provision / setup script failed (TaskRunner).', [
-                'server_id' => $server->id,
+            ProvisionPipelineLog::warning('server.provision.run_setup.task_runner_exception', $server, [
+                'phase' => 'task_runner',
                 'task_runner_task_id' => $taskModel->id,
                 'setup_script_key' => $server->setup_script_key,
                 'error' => $e->getMessage(),
@@ -199,8 +253,8 @@ class RunSetupScriptJob implements ShouldQueue
             ]);
             static::applyProvisionOutcomeToServer($server, false);
         } catch (\Throwable $e) {
-            Log::warning('Server provision / setup script failed.', [
-                'server_id' => $server->id,
+            ProvisionPipelineLog::warning('server.provision.run_setup.failed', $server, [
+                'phase' => 'task_runner',
                 'task_runner_task_id' => $taskModel->id,
                 'setup_script_key' => $server->setup_script_key,
                 'error' => $e->getMessage(),
@@ -266,7 +320,7 @@ dply_write_file() {
   echo "[dply-rollback] \${rel} :: checkpoint :: Backup recorded"
 }
 
-trap 'status=$?; echo "[dply-rollback] automatic :: started :: Provision failed, attempting safe rollback"; dply_restore_backups || true; exit $status' ERR
+trap 'status=\$?; echo "[dply-rollback] automatic :: started :: Provision failed, attempting safe rollback"; dply_restore_backups || true; exit \$status' ERR
 
 BASH;
     }

@@ -1,37 +1,24 @@
 <div>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <nav class="text-sm text-brand-moss mb-6" aria-label="{{ __('Breadcrumb') }}">
-            <ol class="flex flex-wrap items-center gap-2">
-                <li>
-                    <a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Dashboard') }}</a>
-                </li>
-                <li class="text-brand-mist" aria-hidden="true">/</li>
-                <li class="text-brand-ink font-medium">{{ __('Organizations') }}</li>
-            </ol>
-        </nav>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <x-dashboard-breadcrumb :current="__('Organizations')" current-icon="building-office-2" />
 
         @if (session('success'))
-            <x-alert tone="success" class="mb-6">{{ session('success') }}</x-alert>
+            <x-alert tone="success">{{ session('success') }}</x-alert>
         @endif
 
         @if ($organizations->isEmpty())
-            <div class="flex flex-col items-center rounded-4xl border border-brand-ink/10 bg-brand-sand/15 px-6 py-14 text-center">
-                <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+            <div class="rounded-2xl border border-dashed border-brand-mist/80 bg-brand-sand/10 px-6 py-12 text-center">
+                <div class="mx-auto flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                     <x-heroicon-o-building-office-2 class="h-9 w-9 text-brand-moss" aria-hidden="true" />
                 </div>
-                <x-empty-state
-                    class="mt-6 border-0 bg-transparent p-0 shadow-none"
-                    :title="__('You\'re not in any organization yet.')"
-                    :description="__('Create one to manage servers and billing.')"
-                    :dashed="false"
-                >
-                    <x-slot name="actions">
-                        <a href="{{ route('organizations.create') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest">
-                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Create your first organization') }}
-                        </a>
-                    </x-slot>
-                </x-empty-state>
+                <p class="mt-6 font-medium text-brand-ink">{{ __("You're not in any organization yet.") }}</p>
+                <p class="mt-2 text-sm text-brand-moss">{{ __('Create one to manage servers and billing.') }}</p>
+                <div class="mt-6">
+                    <a href="{{ route('organizations.create') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest">
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Create your first organization') }}
+                    </a>
+                </div>
             </div>
         @else
             @php
@@ -42,70 +29,66 @@
                 $rollupSites = $organizations->sum('sites_count');
             @endphp
 
-            <section class="relative mb-8 overflow-hidden rounded-4xl border border-brand-ink/10 bg-brand-cream shadow-sm">
-                <div class="absolute inset-0 bg-mesh-brand opacity-[0.08]" aria-hidden="true"></div>
-                <div class="relative px-6 py-6 sm:px-8 sm:py-7 lg:px-10">
-                    <x-page-header
-                        :title="__('Organizations')"
-                        :description="__('Switch between workspaces, review usage at a glance, and jump into the right organization shell.')"
-                        doc-route="docs.markdown"
-                        doc-slug="org-roles-and-limits"
-                        :doc-label="__('Roles & limits')"
-                        flush
-                        compact
-                    >
-                        <x-slot name="leading">
-                            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                                <x-heroicon-o-building-office-2 class="h-7 w-7 text-brand-ink" aria-hidden="true" />
-                            </span>
-                        </x-slot>
-                        <x-slot name="actions">
-                            <a href="{{ route('organizations.create') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest">
-                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('New organization') }}
-                            </a>
-                        </x-slot>
-                    </x-page-header>
+            <x-page-header
+                :title="__('Organizations')"
+                :description="__('Switch workspaces, review usage, and open the organization you need.')"
+                doc-route="docs.markdown"
+                doc-slug="org-roles-and-limits"
+                :doc-label="__('Roles & limits')"
+                flush
+                compact
+                toolbar
+            >
+                <x-slot name="leading">
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                        <x-heroicon-o-building-office-2 class="h-7 w-7 text-brand-ink" aria-hidden="true" />
+                    </span>
+                </x-slot>
+                <x-slot name="actions">
+                    <a href="{{ route('organizations.create') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest">
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('New organization') }}
+                    </a>
+                </x-slot>
+            </x-page-header>
 
-                    <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
-                            <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                                <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                {{ __('Workspaces') }}
-                            </div>
-                            <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $orgTotal }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
-                            <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                                <x-heroicon-o-user-group class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                {{ __('Members') }}
-                            </div>
-                            <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $rollupMembers }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
-                            <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                                <x-heroicon-o-squares-2x2 class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                {{ __('Teams') }}
-                            </div>
-                            <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $rollupTeams }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
-                            <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                                <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                {{ __('Servers') }}
-                            </div>
-                            <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $rollupServers }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm sm:col-span-2 lg:col-span-1">
-                            <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                                <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                {{ __('Sites') }}
-                            </div>
-                            <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $rollupSites }}</p>
-                        </div>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Workspaces') }}
                     </div>
+                    <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $orgTotal }}</p>
                 </div>
-            </section>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <x-heroicon-o-user-group class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Members') }}
+                    </div>
+                    <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $rollupMembers }}</p>
+                </div>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <x-heroicon-o-squares-2x2 class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Teams') }}
+                    </div>
+                    <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $rollupTeams }}</p>
+                </div>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Servers') }}
+                    </div>
+                    <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $rollupServers }}</p>
+                </div>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm sm:col-span-2 lg:col-span-1">
+                    <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Sites') }}
+                    </div>
+                    <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $rollupSites }}</p>
+                </div>
+            </div>
 
             <x-section-card padding="none">
                 <ul class="divide-y divide-brand-ink/10">

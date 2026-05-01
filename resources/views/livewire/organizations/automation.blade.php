@@ -19,27 +19,16 @@
                             </p>
                         </div>
                         <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
-                            <a
-                                href="{{ route('docs.index') }}"
-                                wire:navigate
-                                class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                            >
+                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
                                 <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Documentation') }}
-                            </a>
+                            </x-outline-link>
                             @can('viewNotificationChannels', $organization)
-                                <a
-                                    href="{{ route('organizations.notification-channels', $organization) }}"
-                                    wire:navigate
-                                    class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                                >
+                                <x-outline-link href="{{ route('organizations.notification-channels', $organization) }}" wire:navigate>
                                     <x-heroicon-o-bell class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                     {{ __('Notification channels') }}
-                                </a>
+                                </x-outline-link>
                             @endcan
-                            <x-badge tone="accent" :caps="false" class="text-xs">
-                                {{ __('Organization: :name', ['name' => $organization->name]) }}
-                            </x-badge>
                         </div>
                     </div>
                 </div>

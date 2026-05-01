@@ -156,6 +156,38 @@ class ApiKeys extends Component
         $this->new_token_plaintext = $created['plaintext'];
         $this->new_token_name = $this->token_name;
         $this->reset(['token_name', 'token_expires_at', 'token_allowed_ips_text', 'selected_abilities']);
+        $this->expanded_categories = [];
+        $this->dispatch('close-modal', 'create-api-token-modal');
+    }
+
+    public function openCreateApiTokenModal(): void
+    {
+        if ($this->adminOrganizations()->isEmpty()) {
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->reset([
+            'token_name',
+            'token_expires_at',
+            'token_allowed_ips_text',
+        ]);
+        $this->selected_abilities = [];
+        $this->expanded_categories = [];
+        $this->dispatch('open-modal', 'create-api-token-modal');
+    }
+
+    public function closeCreateApiTokenModal(): void
+    {
+        $this->resetErrorBag();
+        $this->reset([
+            'token_name',
+            'token_expires_at',
+            'token_allowed_ips_text',
+        ]);
+        $this->selected_abilities = [];
+        $this->expanded_categories = [];
+        $this->dispatch('close-modal', 'create-api-token-modal');
     }
 
     public function clearNewToken(): void

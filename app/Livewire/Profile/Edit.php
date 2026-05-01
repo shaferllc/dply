@@ -10,6 +10,7 @@ use App\Livewire\Forms\ProfileBillingForm;
 use App\Livewire\Forms\ProfileGeneralForm;
 use App\Services\Billing\StripeOrganizationTaxIdSync;
 use App\Services\Billing\VatInsightService;
+use Closure;
 use DateTimeZone;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
@@ -106,6 +107,7 @@ class Edit extends Component
         }
         $user->save();
 
+        $this->toastSuccess(__('Profile details saved.'));
         $this->dispatch('profile-updated');
     }
 
@@ -113,7 +115,17 @@ class Edit extends Component
     {
         $rules = [
             'invoice_email' => ['nullable', 'string', 'email', 'max:255'],
-            'vat_number' => ['nullable', 'string', 'max:64'],
+            'vat_number' => [
+                'nullable',
+                'string',
+                'max:64',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $msg = app(VatInsightService::class)->blockingValidationMessage(is_string($value) ? $value : null);
+                    if ($msg !== null) {
+                        $fail($msg);
+                    }
+                },
+            ],
             'billing_details' => ['nullable', 'string', 'max:5000'],
         ];
         $rules['billing_currency'] = $this->billingForm->billing_currency === ''
@@ -131,6 +143,8 @@ class Edit extends Component
         ]);
 
         $user->refresh();
+
+        $this->toastSuccess(__('Billing details saved.'));
 
         foreach (app(VatInsightService::class)->collectSoftWarnings($user->vat_number) as $message) {
             $this->toastWarning($message);

@@ -78,6 +78,57 @@ class VatInsightService
         return $warnings;
     }
 
+    /**
+     * Blocking validation before persisting a VAT number: EU national format (when applicable) and GB digits.
+     * Returns null when valid or empty; otherwise a translated error message.
+     */
+    public function blockingValidationMessage(?string $raw): ?string
+    {
+        $normalized = $this->normalize($raw ?? '');
+        if ($normalized === '') {
+            return null;
+        }
+
+        $parsed = $this->parseCountryAndNational($normalized);
+        if ($parsed === null) {
+            return __('The VAT number must start with a two-letter country code (for example NL, DE, or FR) followed by your national number.');
+        }
+
+        [$country, $national] = $parsed;
+
+        $allowed = array_values(array_unique(array_merge(
+            config('vat.stripe_eu_vat_prefixes', []),
+            ['GB'],
+        )));
+
+        if (! in_array($country, $allowed, true)) {
+            return __('Use an EU VAT number or a GB VAT number. The first two letters must be a supported country code.');
+        }
+
+        if ($country === 'GB') {
+            if (! preg_match('/^\d{9}(?:\d{3})?$/', $national)) {
+                return __('Enter a valid GB VAT number: 9 or 12 digits after GB.');
+            }
+
+            return null;
+        }
+
+        if (! $this->isViesCountryCode($country)) {
+            return null;
+        }
+
+        $patterns = config('vat.national_patterns', []);
+        $patternKey = $this->patternCountryKey($country);
+        $regex = $patterns[$patternKey] ?? $patterns[$country] ?? null;
+        if ($regex !== null && ! preg_match('#^'.$regex.'$#iu', $national)) {
+            return __('This VAT number does not match the usual format for :country.', [
+                'country' => $country,
+            ]);
+        }
+
+        return null;
+    }
+
     private function normalize(string $raw): string
     {
         $trimmed = strtoupper(preg_replace('/[\s.\-\x{00A0}]+/u', '', $raw) ?? '');

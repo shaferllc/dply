@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\DispatchesServerProvisionJob;
+use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\Server;
 use App\Services\EquinixMetalService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -9,6 +11,8 @@ use Illuminate\Foundation\Queue\Queueable;
 
 class PollEquinixMetalIpJob implements ShouldQueue
 {
+    use DispatchesServerProvisionJob;
+    use HandlesFakeCloudPoll;
     use Queueable;
 
     public int $tries = 40;
@@ -25,6 +29,10 @@ class PollEquinixMetalIpJob implements ShouldQueue
         if (! $credential) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
 
+            return;
+        }
+
+        if ($this->finishFakeCloudPollIfNeeded($this->server)) {
             return;
         }
 

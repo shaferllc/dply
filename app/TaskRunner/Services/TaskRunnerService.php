@@ -7,6 +7,7 @@ namespace App\Modules\TaskRunner\Services;
 use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Enums\TaskStatus;
+use App\Modules\TaskRunner\Jobs\KillRemoteTaskProcessJob;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\Task;
 use App\Modules\TaskRunner\TaskChain;
@@ -432,19 +433,21 @@ class TaskRunnerService
 
         $task->refresh();
 
-        if ($task->server) {
-            $remoteCancellation = $this->cancelRemoteTaskExecution($task);
-
-            if (! $remoteCancellation['success']) {
-                return $remoteCancellation;
-            }
-        }
-
+        // Mark the task cancelled locally first so the UI returns immediately.
+        // Remote kill is dispatched to a queue job — synchronous SSH from the request
+        // can sit on stdio for tens of seconds and overrun PHP's max_execution_time.
         $task->update([
             'status' => TaskStatus::Cancelled,
             'output' => $this->appendCancellationMessage($task->output),
             'completed_at' => now(),
         ]);
+
+        if ($task->server) {
+            $script = $this->buildRemoteCancellationScript($task);
+            if ($script !== null) {
+                KillRemoteTaskProcessJob::dispatch((string) $task->id, $script);
+            }
+        }
 
         return [
             'success' => true,
@@ -452,45 +455,16 @@ class TaskRunnerService
         ];
     }
 
-    /**
-     * @return array{success:bool,error?:string}
-     */
-    private function cancelRemoteTaskExecution(TaskModel $task): array
-    {
-        if (! $task->server) {
-            return ['success' => true];
-        }
-
-        $script = $this->buildRemoteCancellationScript($task);
-        if ($script === null) {
-            return ['success' => true];
-        }
-
-        $output = $this->dispatcher->run(
-            AnonymousTask::command('Cancel Task Process', $script)
-                ->pending()
-                ->onConnection($task->server->connectionAsRoot())
-        );
-
-        if (! $output || ! $output->isSuccessful()) {
-            return [
-                'success' => false,
-                'error' => 'Could not cancel the remote task process.',
-            ];
-        }
-
-        return ['success' => true];
-    }
-
     private function appendCancellationMessage(?string $output): string
     {
         $existingOutput = trim((string) $output);
+        $message = 'Task cancelled by user (remote process kill dispatched in background)';
 
         if ($existingOutput === '') {
-            return 'Task cancelled by user';
+            return $message;
         }
 
-        return $existingOutput."\nTask cancelled by user";
+        return $existingOutput."\n".$message;
     }
 
     private function buildRemoteCancellationScript(TaskModel $task): ?string

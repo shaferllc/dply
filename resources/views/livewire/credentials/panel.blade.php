@@ -11,9 +11,12 @@
                 <x-heroicon-o-archive-box class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
                 {{ __('Saved in this organization') }}
             </h3>
-            <span class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
-                <x-heroicon-o-lock-closed class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Encrypted at rest') }}
+            <span
+                class="inline-flex max-w-[min(100%,18rem)] items-start gap-1.5 text-xs leading-snug text-brand-moss sm:text-end"
+                title="{{ __('Tokens and keys are encrypted in the database before they are stored on disk (encryption at rest).') }}"
+            >
+                <x-heroicon-o-lock-closed class="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                <span>{{ __('Stored encrypted in our database') }}</span>
             </span>
         </div>
         <ul class="divide-y divide-brand-ink/10">
@@ -25,21 +28,24 @@
                     </div>
                     <div class="flex flex-wrap items-center gap-3 shrink-0">
                         @if ($this->canVerifyCredentialProvider($cred->provider))
+                            @php $verifyingThis = $verifyingCredentialId === (string) $cred->id; @endphp
                             <button
                                 type="button"
-                                wire:click="verifyCredential({{ $cred->id }})"
-                                wire:loading.attr="disabled"
-                                wire:target="verifyCredential"
-                                class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:text-brand-ink"
+                                wire:click="verifyCredential('{{ $cred->id }}')"
+                                @if ($verifyingCredentialId !== null) disabled @endif
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:text-brand-ink disabled:pointer-events-none disabled:opacity-60"
                             >
-                                <span wire:loading.remove wire:target="verifyCredential" class="inline-flex items-center gap-1.5">
-                                    <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                    {{ __('Verify') }}
-                                </span>
-                                <span wire:loading wire:target="verifyCredential" class="inline-flex items-center gap-2">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Verifying…') }}
-                                </span>
+                                @if ($verifyingThis)
+                                    <span class="inline-flex items-center gap-2">
+                                        <x-spinner variant="forest" size="sm" />
+                                        {{ __('Verifying…') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                        {{ __('Verify with provider') }}
+                                    </span>
+                                @endif
                             </button>
                         @endif
                         <button type="button" wire:click="openConfirmActionModal('destroy', ['{{ $cred->id }}'], @js(__('Remove credential')), @js(__('Remove this credential?')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 hover:text-red-900">

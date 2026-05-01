@@ -1,32 +1,55 @@
 <div>
-    <div class="dply-page-shell py-8 space-y-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <x-dashboard-breadcrumb :current="__('Sites')" current-icon="globe-alt" />
+
         <x-page-header
             :title="__('Sites')"
-            :description="__('Sites belong to a server. Open a server to create one, or jump from the list below.')"
+            :description="__('Every hostname routes through a server—pick a site below or add one from its server page.')"
             doc-route="docs.index"
             flush
+            compact
+            toolbar
         >
+            <x-slot name="leading">
+                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                    <x-heroicon-o-globe-alt class="h-7 w-7 text-brand-ink" aria-hidden="true" />
+                </span>
+            </x-slot>
             <x-slot name="actions">
-                <a href="{{ route('servers.index') }}" class="inline-flex items-center gap-1 text-sm font-medium text-brand-moss hover:text-brand-ink">Servers <span aria-hidden="true">→</span></a>
+                <a
+                    href="{{ route('servers.index') }}"
+                    wire:navigate
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-server class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    {{ __('Servers') }}
+                    <span aria-hidden="true">→</span>
+                </a>
             </x-slot>
         </x-page-header>
-            @if ($sites->isEmpty())
-                <x-empty-state
-                    :title="__('No sites yet.')"
-                    :description="__('Provision a server, then add a site from the server page.')"
-                    :dashed="false"
-                >
-                    <x-slot name="actions">
-                        <a href="{{ route('servers.index') }}" class="text-sm font-semibold text-brand-ink hover:underline">{{ __('Go to servers') }}</a>
-                    </x-slot>
-                </x-empty-state>
-            @else
-                <x-section-card padding="none">
+
+        @if ($sites->isEmpty())
+            <div class="rounded-2xl border border-dashed border-brand-mist/80 bg-brand-sand/10 px-6 py-12 text-center">
+                <p class="font-medium text-brand-ink">{{ __('No sites yet.') }}</p>
+                <p class="mt-2 text-sm text-brand-moss">{{ __("Provision a server, then add a site from that server's workspace.") }}</p>
+                <div class="mt-6">
+                    <a
+                        href="{{ route('servers.index') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-server class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Go to servers') }}
+                    </a>
+                </div>
+            </div>
+        @else
+            <x-section-card padding="none">
                 <ul class="divide-y divide-brand-ink/10 overflow-hidden">
                     @foreach ($sites as $site)
-                        <li class="p-4 flex flex-wrap justify-between gap-4 items-center transition-colors hover:bg-brand-sand/20">
+                        <li class="flex flex-wrap items-center justify-between gap-4 p-4 transition-colors hover:bg-brand-sand/20">
                             <div>
-                                <a href="{{ route('sites.show', [$site->server, $site]) }}" class="font-medium text-brand-ink hover:underline">{{ $site->name }}</a>
+                                <a href="{{ route('sites.show', [$site->server, $site]) }}" class="font-medium text-brand-ink hover:text-brand-sage">{{ $site->name }}</a>
                                 <p class="text-sm text-brand-moss">
                                     Server: {{ $site->server->name }}
                                     @php $d = $site->domains->firstWhere('is_primary') ?? $site->domains->first(); @endphp
@@ -68,7 +91,7 @@
                         </li>
                     @endforeach
                 </ul>
-                </x-section-card>
-            @endif
+            </x-section-card>
+        @endif
     </div>
 </div>

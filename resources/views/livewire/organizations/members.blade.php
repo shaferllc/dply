@@ -39,12 +39,6 @@
                                         {{ __('Documentation') }}
                                     </a>
                                 </div>
-                                <div class="flex justify-end">
-                                    <div class="inline-flex max-w-full items-center gap-2 rounded-full border border-brand-ink/10 bg-brand-sand/40 px-3 py-1.5 text-xs text-brand-ink dark:border-brand-mist/20 dark:bg-zinc-800/60">
-                                        <x-heroicon-o-building-office-2 class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                        <span class="min-w-0 truncate font-medium" title="{{ $organization->name }}">{{ $organization->name }}</span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>

@@ -20,6 +20,9 @@ trait ManagesProviderCredentials
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
+    /** When set, the credentials panel shows a working state on that row only. */
+    public ?string $verifyingCredentialId = null;
+
     public string $do_name = '';
 
     public string $do_api_token = '';
@@ -640,20 +643,23 @@ trait ManagesProviderCredentials
         ], true);
     }
 
-    public function verifyCredential(int $id): void
+    public function verifyCredential(string $id): void
     {
-        $credential = ProviderCredential::findOrFail($id);
-        $this->authorize('view', $credential);
-
-        if (! $this->canVerifyCredentialProvider($credential->provider)) {
-            $this->toastError(__('API verification is not implemented for this provider yet.'));
-
-            return;
-        }
+        $this->verifyingCredentialId = $id;
 
         try {
+            $credential = ProviderCredential::findOrFail($id);
+            $this->authorize('view', $credential);
+
+            if (! $this->canVerifyCredentialProvider($credential->provider)) {
+                $this->toastError(__('API verification is not implemented for this provider yet.'));
+
+                return;
+            }
+
             match ($credential->provider) {
-                'digitalocean' => (new DigitalOceanService($credential))->getDroplets(),
+                // Light GET /account — confirms the token works (same check as when connecting).
+                'digitalocean' => (new DigitalOceanService($credential))->validateToken(),
                 'cloudflare' => (new CloudflareDnsService($credential))->verifyToken(),
                 'hetzner' => (new HetznerService($credential))->validateToken(),
                 'linode', 'akamai' => (new LinodeService($credential))->validateToken(),
@@ -665,13 +671,13 @@ trait ManagesProviderCredentials
                 'aws' => (new AwsEc2Service($credential))->validateCredentials(),
                 default => throw new \RuntimeException(__('Unknown provider.')),
             };
+
+            $this->toastSuccess(__('Credentials verified with the provider API.'));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-
-            return;
+        } finally {
+            $this->verifyingCredentialId = null;
         }
-
-        $this->toastSuccess(__('Credential verified successfully.'));
     }
 
     public function destroy(string|int $id): void

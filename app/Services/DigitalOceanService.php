@@ -48,6 +48,35 @@ class DigitalOceanService
      *
      * @return array<string, mixed>
      */
+    /**
+     * Whether the droplet still exists (404 means deleted / wrong account).
+     *
+     * @return array{state: 'present'|'gone'|'unknown', detail?: string}
+     */
+    public function inspectDropletPresence(int $id): array
+    {
+        $response = $this->request('get', '/droplets/'.$id);
+        $status = $response->status();
+
+        if ($status === 404) {
+            return ['state' => 'gone'];
+        }
+
+        if ($response->successful()) {
+            return ['state' => 'present'];
+        }
+
+        $detail = $response->json('message');
+        if (! is_string($detail) || $detail === '') {
+            $detail = $response->body();
+        }
+        if (! is_string($detail) || trim($detail) === '') {
+            $detail = 'HTTP '.$status;
+        }
+
+        return ['state' => 'unknown', 'detail' => $detail];
+    }
+
     public function getDroplet(int $id): array
     {
         $response = $this->request('get', '/droplets/'.$id);

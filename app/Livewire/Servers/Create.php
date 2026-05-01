@@ -13,15 +13,16 @@ use App\Actions\Servers\StoreServerFromCreateForm;
 use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Forms\ServerCreateForm;
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Services\SshConnection;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -34,7 +35,7 @@ class Create extends Component
 
     public ServerCreateForm $form;
 
-    public string $createMode = 'existing';
+    public string $createMode = '';
 
     public string $active_provider = 'digitalocean';
 
@@ -48,13 +49,28 @@ class Create extends Component
 
     public ?string $launchSource = null;
 
+    /**
+     * Request-scoped memo for {@see ResolveServerCreateCatalog}: the same catalog fetch was
+     * running in provisioning hooks and again in render; provider APIs are the main latency.
+     *
+     * @var array<string, mixed>|null
+     */
+    protected ?array $memoServerCreateCatalog = null;
+
+    protected ?string $memoServerCreateCatalogKey = null;
+
+    /** @var list<array<string, mixed>>|null */
+    protected ?array $memoListServerProviderCards = null;
+
+    /** @var array<int, mixed>|null */
+    protected ?array $memoCredentialProviderNav = null;
+
     public function mount(): void
     {
         $user = auth()->user();
         $org = $user?->currentOrganization();
 
         $this->form->type = 'custom';
-        $this->createMode = 'existing';
 
         $ids = CredentialsIndex::credentialProviderIds();
         if ($ids !== [] && ! in_array($this->active_provider, $ids, true)) {
@@ -211,9 +227,7 @@ class Create extends Component
         }
     }
 
-    public function updatedFormServerRole(): void
-    {
-    }
+    public function updatedFormServerRole(): void {}
 
     public function updatedFormRegion(): void
     {
@@ -318,12 +332,14 @@ class Create extends Component
         $billingUrl = $org ? route('subscription.show', $org) : null;
         $setupScripts = config('setup_scripts.scripts', []);
         $installProfiles = config('server_provision_options.install_profiles', []);
+        $providerNav = $this->memoCredentialProviderNav();
+        $listProviderCards = $this->listServerProviderCards();
 
         return view('livewire.servers.create', [
             'catalog' => $catalog,
-            'providerCards' => ListServerProviderCards::run($org),
-            'provisionProviderCards' => $this->provisionProviderCards($org),
-            'providerNav' => CredentialsIndex::credentialProviderNav(),
+            'providerCards' => $listProviderCards,
+            'provisionProviderCards' => $this->provisionProviderCardsFromList($listProviderCards),
+            'providerNav' => $providerNav,
             'setupScripts' => $setupScripts,
             'installProfiles' => $installProfiles,
             'provisionOptions' => $context['provisionOptions'],
@@ -334,9 +350,9 @@ class Create extends Component
             'credentials' => $org
                 ? ProviderCredential::where('organization_id', $org->id)->latest()->get()
                 : collect(),
-            'activeProviderLabel' => CredentialsIndex::credentialProviderNav() !== []
-                ? (function (): string {
-                    foreach (CredentialsIndex::credentialProviderNav() as $group) {
+            'activeProviderLabel' => $providerNav !== []
+                ? (function () use ($providerNav): string {
+                    foreach ($providerNav as $group) {
                         foreach ($group['items'] as $item) {
                             if ($item['id'] === $this->active_provider) {
                                 return $item['label'];
@@ -352,12 +368,61 @@ class Create extends Component
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    protected function resolveServerCreateCatalog(Organization $org, ?string $selectedRegionOverride = null): array
+    {
+        $selectedRegion = $selectedRegionOverride ?? $this->form->region;
+        $memoSegment = $this->form->type === 'scaleway' ? $selectedRegion : '';
+        $memoKey = implode('|', [(string) $org->getKey(), $this->form->type, $this->form->provider_credential_id, $memoSegment]);
+
+        if ($this->memoServerCreateCatalog !== null && $this->memoServerCreateCatalogKey === $memoKey) {
+            return $this->memoServerCreateCatalog;
+        }
+
+        $catalog = ResolveServerCreateCatalog::run(
+            $org,
+            $this->form->type,
+            $this->form->provider_credential_id,
+            $selectedRegion,
+        );
+
+        $this->memoServerCreateCatalogKey = $memoKey;
+        $this->memoServerCreateCatalog = $catalog;
+
+        return $catalog;
+    }
+
+    /**
      * @return list<array{id: string, label: string, linked: bool}>
      */
-    protected function provisionProviderCards($org): array
+    protected function listServerProviderCards(): array
+    {
+        if ($this->memoListServerProviderCards !== null) {
+            return $this->memoListServerProviderCards;
+        }
+
+        $org = auth()->user()?->currentOrganization();
+
+        return $this->memoListServerProviderCards = ListServerProviderCards::run($org);
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    protected function memoCredentialProviderNav(): array
+    {
+        return $this->memoCredentialProviderNav ??= CredentialsIndex::credentialProviderNav();
+    }
+
+    /**
+     * @param  list<array{id: string, label: string, linked: bool}>  $cards
+     * @return list<array{id: string, label: string, linked: bool}>
+     */
+    protected function provisionProviderCardsFromList(array $cards): array
     {
         return array_values(array_filter(
-            ListServerProviderCards::run($org),
+            $cards,
             fn (array $card): bool => in_array($card['id'], [
                 'digitalocean',
                 'hetzner',
@@ -375,7 +440,7 @@ class Create extends Component
 
     protected function defaultProvisionProvider(): string
     {
-        foreach ($this->provisionProviderCards(auth()->user()?->currentOrganization()) as $card) {
+        foreach ($this->provisionProviderCardsFromList($this->listServerProviderCards()) as $card) {
             if (($card['linked'] ?? false) === true) {
                 return $card['id'];
             }
@@ -431,7 +496,7 @@ class Create extends Component
 
         $type = $preferredType;
         if ($type === null || ! ServerProviderGate::enabled($type)) {
-            $type = collect(ListServerProviderCards::run($org))
+            $type = collect($this->listServerProviderCards())
                 ->first(fn (array $card): bool => $card['id'] !== 'custom' && ($card['linked'] ?? false))['id'] ?? null;
         }
 
@@ -451,21 +516,15 @@ class Create extends Component
         $this->applyInstallProfile();
         $this->syncProvisionPreferenceFields();
 
-        $catalog = ResolveServerCreateCatalog::run(
-            $org,
-            $this->form->type,
-            $this->form->provider_credential_id,
-            '',
-        );
+        $catalog = $this->resolveServerCreateCatalog($org, '');
 
         $this->form->region = $this->preferredRegionValue($catalog['regions'] ?? []);
 
-        $catalog = ResolveServerCreateCatalog::run(
-            $org,
-            $this->form->type,
-            $this->form->provider_credential_id,
-            $this->form->region,
-        );
+        // Scaleway is the only provider where plan sizes depend on the selected zone; all others
+        // return a full size list in the first catalog pass (region is for provisioning only).
+        if ($this->form->type === 'scaleway' && $this->form->region !== '') {
+            $catalog = $this->resolveServerCreateCatalog($org);
+        }
 
         $this->form->size = $this->recommendedSizeValue($catalog['sizes'] ?? [], $this->form->server_role);
     }
@@ -577,12 +636,7 @@ class Create extends Component
     protected function buildPreflightContext($org): array
     {
         $catalog = $org
-            ? ResolveServerCreateCatalog::run(
-                $org,
-                $this->form->type,
-                $this->form->provider_credential_id,
-                $this->form->region,
-            )
+            ? $this->resolveServerCreateCatalog($org)
             : [
                 'credentials' => collect(),
                 'regions' => [],
@@ -617,7 +671,7 @@ class Create extends Component
                 return $size;
             }, $catalog['sizes']);
         }
-        $selectedCredential = $catalog['credentials'] instanceof \Illuminate\Support\Collection
+        $selectedCredential = $catalog['credentials'] instanceof Collection
             ? $catalog['credentials']->firstWhere('id', $this->form->provider_credential_id)
             : null;
         $providerHealth = $this->form->type !== 'custom' && $this->form->provider_credential_id !== '' && $selectedCredential instanceof ProviderCredential

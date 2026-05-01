@@ -2,9 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
 use App\Services\EquinixMetalService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
+use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -23,6 +25,12 @@ class ProvisionEquinixMetalServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'equinix_metal') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
+            return;
+        }
+
+        if (FakeCloudProvision::shouldInterceptVmProvision($this->server)) {
+            ApplyFakeCloudProvisionAsReady::run($this->server);
 
             return;
         }

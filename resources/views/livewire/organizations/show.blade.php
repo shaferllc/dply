@@ -17,28 +17,17 @@
                             </p>
                         </div>
                         <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
-                            <a
-                                href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}"
-                                wire:navigate
-                                class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                            >
+                            <x-outline-link href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate>
                                 <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Roles & limits') }}
-                            </a>
-                            <a
-                                href="{{ route('docs.index') }}"
-                                wire:navigate
-                                class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                            >
+                            </x-outline-link>
+                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
                                 <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Documentation') }}
-                            </a>
+                            </x-outline-link>
                             @if ($organization->hasAdminAccess(auth()->user()))
                                 <a href="{{ route('billing.show', $organization) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-transparent bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md hover:bg-brand-forest transition-colors">{{ __('Billing & plan') }}</a>
                             @endif
-                            <x-badge tone="accent" :caps="false" class="text-xs">
-                                {{ __('Organization: :name', ['name' => $organization->name]) }}
-                            </x-badge>
                         </div>
                     </div>
                 </div>

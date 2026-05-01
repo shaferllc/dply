@@ -14,7 +14,10 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Teams extends Component
 {
-    use ConfirmsActionWithModal;
+    use ConfirmsActionWithModal {
+        closeConfirmActionModal as private traitCloseConfirmActionModal;
+        confirmActionModal as private traitConfirmActionModal;
+    }
 
     public Organization $organization;
 
@@ -26,8 +29,8 @@ class Teams extends Component
     /** @var array<int, int> team id => user id for "add member" dropdown */
     public array $addMemberSelected = [];
 
-    /** When set, the save-team-name modal is shown for this team (ULID). */
-    public ?string $saveTeamNameModalTeamId = null;
+    /** Prevents reverting the team name field when closing the modal after confirm (see confirmActionModal). */
+    public bool $suppressTeamRenameRevertOnClose = false;
 
     public function mount(Organization $organization): void
     {
@@ -123,36 +126,49 @@ class Teams extends Component
             return;
         }
 
-        $this->saveTeamNameModalTeamId = $teamId;
-        $this->dispatch('open-modal', 'save-team-name-modal');
+        $this->openConfirmActionModal(
+            'updateTeam',
+            [$teamId],
+            __('Save team name'),
+            __('Change this team’s name from “:from” to “:to”?', [
+                'from' => $team->name,
+                'to' => $new,
+            ]),
+            __('Save'),
+            false,
+        );
     }
 
-    public function confirmSaveTeamName(): void
+    public function closeConfirmActionModal(): void
     {
-        if ($this->saveTeamNameModalTeamId === null) {
-            return;
+        $method = $this->confirmActionModalMethod;
+        $arguments = $this->confirmActionModalArguments;
+
+        $shouldRevertRename = ! $this->suppressTeamRenameRevertOnClose
+            && $method === 'updateTeam'
+            && isset($arguments[0]);
+
+        if ($shouldRevertRename) {
+            $tid = $arguments[0];
+            $team = $this->organization->teams->firstWhere('id', $tid);
+            if ($team) {
+                $this->teamNames[$tid] = $team->name;
+            }
+            $this->resetValidation(['teamNames.'.$tid]);
         }
 
-        $id = $this->saveTeamNameModalTeamId;
-        $this->updateTeam($id);
-        $this->saveTeamNameModalTeamId = null;
-        $this->dispatch('close-modal', 'save-team-name-modal');
+        $this->traitCloseConfirmActionModal();
     }
 
-    public function cancelSaveTeamName(): void
+    public function confirmActionModal(): mixed
     {
-        if ($this->saveTeamNameModalTeamId === null) {
-            return;
-        }
+        $this->suppressTeamRenameRevertOnClose = true;
 
-        $id = $this->saveTeamNameModalTeamId;
-        $team = $this->organization->teams->firstWhere('id', $id);
-        if ($team) {
-            $this->teamNames[$id] = $team->name;
+        try {
+            return $this->traitConfirmActionModal();
+        } finally {
+            $this->suppressTeamRenameRevertOnClose = false;
         }
-        $this->resetValidation(['teamNames.'.$id]);
-        $this->saveTeamNameModalTeamId = null;
-        $this->dispatch('close-modal', 'save-team-name-modal');
     }
 
     public function updateTeam(int|string $teamId): void

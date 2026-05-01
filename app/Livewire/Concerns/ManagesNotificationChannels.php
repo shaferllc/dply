@@ -7,11 +7,15 @@ use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 
+/**
+ * @property-read Collection<int, NotificationChannel> $channels Livewire computed (access as $this->channels; do not invoke $this->channels()).
+ */
 trait ManagesNotificationChannels
 {
     use ConfirmsActionWithModal;

@@ -284,7 +284,8 @@ class Connection
             $this->privateKeyPath = Helper::temporaryDirectoryPath(Str::random(32).'.key'),
             function () {
                 try {
-                    file_put_contents($this->privateKeyPath, $this->privateKey);
+                    // OpenSSH rejects PEM blobs that don't end in a newline as "invalid format".
+                    file_put_contents($this->privateKeyPath, rtrim((string) $this->privateKey)."\n");
 
                     // Make sure the private key is only readable by the current user
                     chmod($this->privateKeyPath, 0600);

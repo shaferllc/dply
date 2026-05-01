@@ -18,17 +18,16 @@
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ $intro }}</p>
             </div>
             <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
+                <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
+                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Documentation') }}
+                </x-outline-link>
                 @if (! empty($showBulkAssign ?? false))
                     <a
                         href="{{ route('profile.notification-channels.bulk-assign') }}"
                         wire:navigate
                         class="inline-flex items-center justify-center rounded-xl border border-transparent bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md hover:bg-brand-forest transition-colors"
                     >{{ __('Bulk assign notifications') }}</a>
-                @endif
-                @if (! empty($useOrgShell) && ($organization ?? null))
-                    <x-badge tone="accent" :caps="false" class="text-xs">
-                        {{ __('Organization: :name', ['name' => $organization->name]) }}
-                    </x-badge>
                 @endif
             </div>
         </div>

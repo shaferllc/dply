@@ -117,6 +117,9 @@ return [
         'level' => env('TASK_RUNNER_LOG_LEVEL', 'info'),
         'channel' => env('TASK_RUNNER_LOG_CHANNEL', 'stack'),
         'include_output' => env('TASK_RUNNER_LOG_INCLUDE_OUTPUT', false),
+        /** When a process exits non-zero or times out, log stdout/stderr (truncated) for diagnosis. */
+        'include_output_on_failure' => env('TASK_RUNNER_LOG_INCLUDE_OUTPUT_ON_FAILURE', true),
+        'failure_output_max_bytes' => env('TASK_RUNNER_LOG_FAILURE_OUTPUT_MAX_BYTES', 8192),
 
         /*
         |--------------------------------------------------------------------------
