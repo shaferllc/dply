@@ -55,11 +55,14 @@ class ServerPhpManager
             $supportedMap[$version['id']] = $version['label'];
         }
 
+        // Sites' PHP version moved from `php_version` → `runtime_version`
+        // (when runtime='php') per the multi-runtime strategy memo.
         $siteCounts = $server->sites()
-            ->selectRaw('php_version, COUNT(*) as aggregate')
-            ->whereNotNull('php_version')
-            ->groupBy('php_version')
-            ->pluck('aggregate', 'php_version')
+            ->selectRaw('runtime_version, COUNT(*) as aggregate')
+            ->where('runtime', 'php')
+            ->whereNotNull('runtime_version')
+            ->groupBy('runtime_version')
+            ->pluck('aggregate', 'runtime_version')
             ->all();
 
         $installedIds = $this->normalizeVersionList($inventory['installed_versions'] ?? []);
@@ -716,7 +719,7 @@ class ServerPhpManager
             }
         }
 
-        foreach ($server->sites()->whereNotNull('php_version')->pluck('php_version')->all() as $siteVersion) {
+        foreach ($server->sites()->where('runtime', 'php')->whereNotNull('runtime_version')->pluck('runtime_version')->all() as $siteVersion) {
             $normalized = $this->normalizeVersionId($siteVersion);
             if ($normalized !== null) {
                 $inferred[] = $normalized;

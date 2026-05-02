@@ -29,7 +29,7 @@ class SiteFactory extends Factory
             'type' => SiteType::Php,
             'document_root' => '/var/www/app/public',
             'repository_path' => '/var/www/app',
-            'php_version' => '8.3',
+            'runtime' => 'php',
             'runtime_version' => '8.3',
             'app_port' => null,
             'build_command' => null,

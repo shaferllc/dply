@@ -69,7 +69,6 @@ class Site extends Model
         'type',
         'document_root',
         'repository_path',
-        'php_version',
         'runtime',
         'runtime_version',
         'app_port',
@@ -608,7 +607,7 @@ class Site extends Model
             return $version;
         }
 
-        return $this->php_version;
+        return null;
     }
 
     /**
@@ -628,6 +627,56 @@ class Site extends Model
         }
 
         return $this->type?->value;
+    }
+
+    /**
+     * The PHP version this site runs on, when the runtime is PHP.
+     *
+     * Reads from the new `runtime_version` column (canonical source per
+     * the strategy memo's "drop php_version column entirely" decision)
+     * and falls back to the legacy `php_version` column for rows that
+     * predate the column drop. Returns null for non-PHP runtimes so
+     * call sites can distinguish "not a PHP site" from "PHP version
+     * unknown".
+     */
+    public function phpVersion(): ?string
+    {
+        if ($this->runtimeKey() !== 'php') {
+            return null;
+        }
+
+        $version = $this->runtime_version;
+
+        return is_string($version) && $version !== '' ? $version : null;
+    }
+
+    /**
+     * Back-compat shim for the dropped `php_version` column.
+     *
+     * The strategy memo's "drop php_version column entirely" decision
+     * removed the underlying column, but a lot of test code (and
+     * possibly third-party callers) still passes `'php_version' => '8.3'`
+     * to factory `->create([...])` calls or to `Site::query()->update()`.
+     * Routing those through to `runtime_version` keeps the old call
+     * shape working while the canonical column is the new one.
+     *
+     * Reads return runtime_version when the runtime is PHP, null otherwise
+     * — matches phpVersion()'s semantics so consumers can call either.
+     */
+    public function setPhpVersionAttribute($value): void
+    {
+        if ($value === null || $value === '') {
+            return;
+        }
+        if (! is_string($this->runtime) || $this->runtime === '') {
+            $this->runtime = 'php';
+        }
+        $this->runtime_version = (string) $value;
+    }
+
+    public function getPhpVersionAttribute(): ?string
+    {
+        return $this->phpVersion();
     }
 
     public function runtimeProfile(): string

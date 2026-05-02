@@ -29,7 +29,7 @@ class OpenLiteSpeedSiteConfigBuilder
         }
 
         $root = $site->effectiveDocumentRoot();
-        $phpBinary = '/usr/local/lsws/lsphp'.str_replace('.', '', (string) ($site->php_version ?? '83')).'/bin/lsphp';
+        $phpBinary = '/usr/local/lsws/lsphp'.str_replace('.', '', (string) ($site->phpVersion() ?? '83')).'/bin/lsphp';
 
         if ($site->type === SiteType::Php && $site->octane_port) {
             return $this->buildPhpOctaneProxy($site, $hostnames, $vhostRoot);

@@ -33,7 +33,7 @@ class CaddySiteConfigBuilder
         $root = $site->effectiveDocumentRoot();
         $phpSock = str_replace(
             '{version}',
-            $site->php_version ?? '8.3',
+            $site->phpVersion() ?? '8.3',
             config('sites.php_fpm_socket')
         );
         $redirectLines = $this->redirectLines($site);

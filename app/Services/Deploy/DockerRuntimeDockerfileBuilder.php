@@ -18,7 +18,7 @@ final class DockerRuntimeDockerfileBuilder
 
     private function phpDockerfile(Site $site): string
     {
-        $phpVersion = trim((string) ($site->php_version ?: '8.3'));
+        $phpVersion = trim((string) ($site->phpVersion() ?: '8.3'));
         $documentRoot = $this->containerDocumentRoot($site);
         $laravelBootstrap = $this->laravelBootstrapInstructions($site);
 

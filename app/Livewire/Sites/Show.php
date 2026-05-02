@@ -303,7 +303,7 @@ class Show extends Component
         $this->restart_supervisor_programs_after_deploy = (bool) ($this->site->restart_supervisor_programs_after_deploy ?? false);
         $this->deployment_environment = (string) ($this->site->deployment_environment ?? 'production');
         $this->php_fpm_user = (string) ($this->site->php_fpm_user ?? '');
-        $this->php_version = (string) ($this->site->php_version ?? '');
+        $this->php_version = (string) ($this->site->phpVersion() ?? '');
         $phpRuntime = is_array($this->site->meta['php_runtime'] ?? null) ? $this->site->meta['php_runtime'] : [];
         $this->php_memory_limit = (string) ($phpRuntime['memory_limit'] ?? '');
         $this->php_upload_max_filesize = (string) ($phpRuntime['upload_max_filesize'] ?? '');
@@ -384,8 +384,12 @@ class Show extends Component
             'max_execution_time' => $validated['php_max_execution_time'] !== '' ? (string) $validated['php_max_execution_time'] : null,
         ];
 
+        // PHP-version writes now flow through runtime_version (the
+        // canonical column post-php_version-drop). Always pin runtime
+        // to 'php' on the way out so future reads of runtimeKey() agree.
         $this->site->update([
-            'php_version' => $validated['php_version'],
+            'runtime' => 'php',
+            'runtime_version' => $validated['php_version'],
             'meta' => $meta,
         ]);
 

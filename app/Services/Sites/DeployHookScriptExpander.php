@@ -37,7 +37,7 @@ final class DeployHookScriptExpander
             '{SITE_PATH}' => $site->effectiveRepositoryPath(),
             '{BRANCH}' => (string) ($site->git_branch ?: 'main'),
             '{DEPLOY_ENV}' => (string) ($site->deployment_environment ?? 'production'),
-            '{PHP_VERSION}' => (string) ($site->php_version ?? ''),
+            '{PHP_VERSION}' => (string) ($site->phpVersion() ?? ''),
             '{RAILS_ENV}' => $railsEnv,
         ];
     }

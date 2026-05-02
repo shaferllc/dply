@@ -662,8 +662,17 @@ class Create extends Component
             'name' => $this->form->name,
             'slug' => Str::slug($this->form->name) ?: 'site',
             'type' => SiteType::from($this->form->type),
-            'runtime' => $this->form->runtime !== '' ? $this->form->runtime : null,
-            'runtime_version' => $this->form->runtime_version !== '' ? $this->form->runtime_version : null,
+            // Prefer the explicit `runtime` set by detection or wizard;
+            // when the form only provides the legacy `type`, derive an
+            // equivalent runtime key so the new schema is always populated.
+            'runtime' => $this->form->runtime !== '' ? $this->form->runtime : $this->form->type,
+            // Prefer the new runtime_version field; for legacy PHP-only flow
+            // (no detection), copy form->php_version into runtime_version.
+            'runtime_version' => $this->form->runtime_version !== ''
+                ? $this->form->runtime_version
+                : ($this->form->type === 'php' && ! $functionsHost && ! $containerHost && $this->form->php_version !== ''
+                    ? $this->form->php_version
+                    : null),
             'build_command' => $this->form->build_command !== '' ? $this->form->build_command : null,
             'start_command' => $this->form->start_command !== '' ? $this->form->start_command : null,
             'internal_port' => $internalPort,
@@ -673,7 +682,6 @@ class Create extends Component
                     : '/functions/'.$this->form->functions_entrypoint)
                 : $this->form->document_root,
             'repository_path' => $functionsHost ? null : ($this->form->repository_path ?: null),
-            'php_version' => $this->form->type === 'php' && ! $functionsHost && ! $containerHost ? $this->form->php_version : null,
             'app_port' => $this->form->type === 'node' ? $this->form->app_port : null,
             'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
