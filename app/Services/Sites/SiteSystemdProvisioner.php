@@ -131,6 +131,25 @@ class SiteSystemdProvisioner
     }
 
     /**
+     * Restart a single named unit. Used by the per-process restart
+     * affordance when an operator wants to re-roll a worker after a
+     * config or env change without redeploying.
+     *
+     * @param  (Closure(Server): RemoteShell)|null  $shellFactory
+     */
+    public function restartUnit(Site $site, string $unitName, ?Closure $shellFactory = null): string
+    {
+        $server = $site->server;
+        if ($server === null || ! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $shell = $shellFactory !== null ? $shellFactory($server) : new SshConnection($server);
+
+        return $shell->exec('sudo systemctl restart '.escapeshellarg($unitName), 60);
+    }
+
+    /**
      * @return array<string, string> unit filename => content
      */
     private function collectUnits(Site $site, string $deployUser): array
