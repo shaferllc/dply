@@ -134,6 +134,40 @@ class SiteDeployStep extends Model
         };
     }
 
+    /**
+     * Resolve this step into the shell command the deploy runner should
+     * execute. Built-in step types map to canonical command strings;
+     * TYPE_NPM_RUN appends the user-supplied script name; TYPE_CUSTOM
+     * uses custom_command verbatim.
+     *
+     * Returns null when the step can't produce a runnable command (a
+     * TYPE_CUSTOM row with empty custom_command, an unknown type, or a
+     * TYPE_NPM_RUN with no script name) so the runner can skip without
+     * generating an obviously-broken shell line.
+     */
+    public function commandFor(): ?string
+    {
+        return match ($this->step_type) {
+            self::TYPE_COMPOSER_INSTALL => 'composer install --no-dev --optimize-autoloader',
+            self::TYPE_NPM_CI => 'npm ci',
+            self::TYPE_NPM_INSTALL => 'npm install',
+            self::TYPE_NPM_RUN => trim((string) $this->custom_command) !== ''
+                ? 'npm run '.trim((string) $this->custom_command)
+                : null,
+            self::TYPE_ARTISAN_MIGRATE => 'php artisan migrate --force',
+            self::TYPE_ARTISAN_CONFIG_CACHE => 'php artisan config:cache',
+            self::TYPE_ARTISAN_ROUTE_CACHE => 'php artisan route:cache',
+            self::TYPE_ARTISAN_VIEW_CACHE => 'php artisan view:cache',
+            self::TYPE_ARTISAN_OPTIMIZE => 'php artisan optimize',
+            self::TYPE_ARTISAN_OCTANE_INSTALL => 'php artisan octane:install --no-interaction',
+            self::TYPE_ARTISAN_REVERB_INSTALL => 'php artisan reverb:install --no-interaction',
+            self::TYPE_CUSTOM => trim((string) $this->custom_command) !== ''
+                ? trim((string) $this->custom_command)
+                : null,
+            default => null,
+        };
+    }
+
     public static function typeLabels(): array
     {
         return [
