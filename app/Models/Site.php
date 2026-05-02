@@ -70,7 +70,9 @@ class Site extends Model
         'document_root',
         'repository_path',
         'php_version',
+        'runtime_version',
         'app_port',
+        'build_command',
         'status',
         'ssl_status',
         'nginx_installed_at',
@@ -567,6 +569,23 @@ class Site extends Model
             'digitalocean_functions' => self::STATUS_FUNCTIONS_ACTIVE,
             default => self::STATUS_NGINX_ACTIVE,
         };
+    }
+
+    /**
+     * Returns the version of whatever runtime this site uses.
+     *
+     * Prefers the new `runtime_version` column; falls back to `php_version`
+     * for legacy/PHP rows that haven't been re-saved since the column was
+     * introduced.
+     */
+    public function runtimeVersion(): ?string
+    {
+        $version = $this->runtime_version;
+        if (is_string($version) && $version !== '') {
+            return $version;
+        }
+
+        return $this->php_version;
     }
 
     public function runtimeProfile(): string
