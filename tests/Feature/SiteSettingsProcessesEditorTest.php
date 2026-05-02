@@ -144,6 +144,81 @@ class SiteSettingsProcessesEditorTest extends TestCase
         $this->assertNotNull($site->processes()->where('id', $web->id)->first());
     }
 
+    public function test_toggle_active_flips_inactive_to_active(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makeNodeSite();
+        $process = $site->processes()->create([
+            'type' => SiteProcess::TYPE_WORKER,
+            'name' => 'sidekiq',
+            'command' => 'bundle exec sidekiq',
+            'is_active' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('toggleSiteProcessActive', $process->id);
+
+        $this->assertTrue((bool) $process->refresh()->is_active);
+    }
+
+    public function test_toggle_active_refuses_to_deactivate_web_row(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makeNodeSite();
+        $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
+        $this->assertNotNull($web);
+
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('toggleSiteProcessActive', $web->id);
+
+        $this->assertTrue((bool) $web->refresh()->is_active);
+    }
+
+    public function test_set_scale_updates_process_and_dispatches_systemd_job(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makeNodeSite();
+        $process = $site->processes()->create([
+            'type' => SiteProcess::TYPE_WORKER,
+            'name' => 'worker',
+            'command' => 'npm run worker',
+            'scale' => 1,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('setSiteProcessScale', $process->id, 3);
+
+        $this->assertSame(3, (int) $process->refresh()->scale);
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\ProvisionSiteSystemdUnitsJob::class);
+    }
+
+    public function test_set_scale_rejects_out_of_bounds_values(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makeNodeSite();
+        $process = $site->processes()->create([
+            'type' => SiteProcess::TYPE_WORKER,
+            'name' => 'worker',
+            'command' => 'npm run worker',
+            'scale' => 1,
+        ]);
+
+        // Below minimum.
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('setSiteProcessScale', $process->id, 0);
+        $this->assertSame(1, (int) $process->refresh()->scale);
+
+        // Above maximum.
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('setSiteProcessScale', $process->id, 100);
+        $this->assertSame(1, (int) $process->refresh()->scale);
+    }
+
     public function test_does_not_dispatch_systemd_job_for_php_site(): void
     {
         Queue::fake();

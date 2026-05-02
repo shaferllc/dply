@@ -2109,6 +2109,87 @@ class Settings extends Show
         $this->toastSuccess(__('Process :name removed.', ['name' => $name]));
     }
 
+    /**
+     * Flip a SiteProcess between active and inactive.
+     *
+     * Active is the default; flipping to inactive prevents the deploy
+     * pipeline from registering / starting the unit (the systemd unit
+     * file is still removed/refreshed when the process is added or
+     * removed, but skipped from `systemctl enable --now` when the row
+     * is inactive). Useful for temporarily silencing a worker without
+     * deleting + recreating the row.
+     *
+     * Refuses to deactivate the auto-created `web` row — that would
+     * disable the upstream NGINX proxies to and 502 the site. The user
+     * can deactivate workers / schedulers / custom processes only.
+     */
+    public function toggleSiteProcessActive(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        $process = $this->site->processes()->whereKey($id)->first();
+        if ($process === null) {
+            return;
+        }
+
+        $next = ! (bool) $process->is_active;
+        if ($process->type === SiteProcess::TYPE_WEB && ! $next) {
+            $this->toastError(__('The web process must stay active.'));
+
+            return;
+        }
+
+        $process->update(['is_active' => $next]);
+
+        $this->toastSuccess($next
+            ? __('Process :name reactivated.', ['name' => $process->name])
+            : __('Process :name deactivated.', ['name' => $process->name]),
+        );
+    }
+
+    /**
+     * Update a SiteProcess's scale (number of replicas).
+     *
+     * Per the strategy memo: "scale (default 1, implemented via systemd
+     * @.service templates)". The data-layer update lands here; the
+     * actual systemd template + multi-instance enable happens on the
+     * next deploy / re-converge — re-running ProvisionSiteSystemdUnitsJob
+     * picks up the new scale value when it builds the unit content.
+     *
+     * Bounds: 1 (minimum, "process exists") to 16 (a reasonable cap
+     * for single-server scale; horizontal scale beyond that wants more
+     * servers, not more replicas on one).
+     */
+    public function setSiteProcessScale(string $id, int $scale): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($scale < 1 || $scale > 16) {
+            $this->toastError(__('Scale must be between 1 and 16.'));
+
+            return;
+        }
+
+        $process = $this->site->processes()->whereKey($id)->first();
+        if ($process === null) {
+            return;
+        }
+
+        $process->update(['scale' => $scale]);
+
+        // Re-provision the unit so the next deploy emits the right
+        // number of @{N}.service instances. Skipped for PHP/static —
+        // those don't have systemd units to reflect scale into.
+        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
+            \App\Jobs\ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
+        }
+
+        $this->toastSuccess(__('Scale set to :n for :name.', [
+            'n' => $scale,
+            'name' => $process->name,
+        ]));
+    }
+
     public function render(): View
     {
         if (! $this->site->isReadyForWorkspace()) {

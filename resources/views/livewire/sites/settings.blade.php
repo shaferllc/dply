@@ -367,9 +367,25 @@
                                                     </div>
                                                     <p class="mt-1 break-all font-mono text-xs text-slate-700">{{ $process->command ?? __('(unset — runtime-default applies)') }}</p>
                                                 </div>
-                                                @if ($process->type !== 'web')
-                                                    <button type="button" wire:click="removeSiteProcess('{{ $process->id }}')" wire:confirm="{{ __('Remove the :name process? Its systemd unit will be torn down on the next deploy.', ['name' => $process->name]) }}" class="text-xs font-medium text-rose-700 hover:text-rose-800">{{ __('Remove') }}</button>
-                                                @endif
+                                                <div class="flex flex-wrap items-center gap-3 text-xs">
+                                                    @if ($process->type !== 'web')
+                                                        <label class="flex items-center gap-1 text-slate-600">
+                                                            {{ __('scale') }}
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max="16"
+                                                                value="{{ (int) $process->scale }}"
+                                                                wire:change="setSiteProcessScale('{{ $process->id }}', $event.target.valueAsNumber)"
+                                                                class="w-14 rounded border-slate-300 px-2 py-1 text-xs"
+                                                            />
+                                                        </label>
+                                                        <button type="button" wire:click="toggleSiteProcessActive('{{ $process->id }}')" class="font-medium {{ $process->is_active ? 'text-amber-700 hover:text-amber-800' : 'text-emerald-700 hover:text-emerald-800' }}">
+                                                            {{ $process->is_active ? __('Deactivate') : __('Activate') }}
+                                                        </button>
+                                                        <button type="button" wire:click="removeSiteProcess('{{ $process->id }}')" wire:confirm="{{ __('Remove the :name process? Its systemd unit will be torn down on the next deploy.', ['name' => $process->name]) }}" class="font-medium text-rose-700 hover:text-rose-800">{{ __('Remove') }}</button>
+                                                    @endif
+                                                </div>
                                             </li>
                                         @endforeach
                                     </ul>
