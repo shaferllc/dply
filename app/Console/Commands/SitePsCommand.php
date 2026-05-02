@@ -22,7 +22,7 @@ use Illuminate\Console\Command;
  */
 class SitePsCommand extends Command
 {
-    protected $signature = 'dply:ps
+    protected $signature = 'dply:site:ps
         {site : Site ID, slug, or name}
         {--json : Output as JSON instead of a table}';
 

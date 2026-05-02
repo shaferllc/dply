@@ -39,7 +39,7 @@ class SitePsCommandTest extends TestCase
             'is_active' => true,
         ]);
 
-        $exit = Artisan::call('dply:ps', ['site' => 'jobs-app']);
+        $exit = Artisan::call('dply:site:ps', ['site' => 'jobs-app']);
         $output = Artisan::output();
 
         $this->assertSame(0, $exit);
@@ -59,7 +59,7 @@ class SitePsCommandTest extends TestCase
             'runtime' => 'python',
         ]);
 
-        $exit = Artisan::call('dply:ps', ['site' => $site->id]);
+        $exit = Artisan::call('dply:site:ps', ['site' => $site->id]);
         $output = Artisan::output();
 
         $this->assertSame(0, $exit);
@@ -68,7 +68,7 @@ class SitePsCommandTest extends TestCase
 
     public function test_command_returns_failure_when_site_not_found(): void
     {
-        $exit = Artisan::call('dply:ps', ['site' => 'nonexistent-slug']);
+        $exit = Artisan::call('dply:site:ps', ['site' => 'nonexistent-slug']);
         $output = Artisan::output();
 
         $this->assertSame(1, $exit);
@@ -89,7 +89,7 @@ class SitePsCommandTest extends TestCase
         $site->processes()->where('type', SiteProcess::TYPE_WEB)
             ->update(['command' => './bin/app']);
 
-        $exit = Artisan::call('dply:ps', ['site' => 'svc', '--json' => true]);
+        $exit = Artisan::call('dply:site:ps', ['site' => 'svc', '--json' => true]);
         $output = Artisan::output();
 
         $this->assertSame(0, $exit);
@@ -123,7 +123,7 @@ class SitePsCommandTest extends TestCase
             'command' => 'php artisan horizon',
         ]);
 
-        $exit = Artisan::call('dply:ps', ['site' => 'queue-app', '--json' => true]);
+        $exit = Artisan::call('dply:site:ps', ['site' => 'queue-app', '--json' => true]);
         $output = Artisan::output();
 
         $this->assertSame(0, $exit);
