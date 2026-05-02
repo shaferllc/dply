@@ -272,6 +272,15 @@ class SiteProvisioner
                 'status' => Site::activeStatusForWebserver($site->webserver()),
             ]);
 
+            // For non-PHP/static sites with a start_command, dispatch the
+            // systemd-unit installer so the runtime process NGINX now
+            // proxies to actually exists. Fire-and-forget; failures land
+            // in the worker log but don't roll back the activation.
+            if ($site->start_command !== null && $site->start_command !== ''
+                && ! in_array($site->runtimeKey(), ['php', 'static', null], true)) {
+                \App\Jobs\ProvisionSiteSystemdUnitsJob::dispatch($site->id);
+            }
+
             if ($previewDomain = $site->primaryPreviewDomain()) {
                 $previewDomain->update([
                     'dns_status' => 'ready',
