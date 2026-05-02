@@ -37,6 +37,7 @@ class SiteDeployment extends Model
         'git_sha',
         'exit_code',
         'log_output',
+        'phase_results',
         'started_at',
         'finished_at',
     ];
@@ -46,7 +47,72 @@ class SiteDeployment extends Model
         return [
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
+            'phase_results' => 'array',
         ];
+    }
+
+    /**
+     * Record one phase's worth of {@see DeployPhaseRunner} step results
+     * into the structured phase_results column. Calling repeatedly for
+     * different phases on the same deployment composes them under their
+     * canonical keys (build / swap / release / restart).
+     *
+     * The runner returns a list of step result arrays per call; each
+     * call to recordPhaseResults stores that list under its phase key.
+     * If the same phase is recorded twice (re-run scenario), the new
+     * list replaces the old — the UI shows the latest attempt.
+     *
+     * @param  list<array<string, mixed>>  $results
+     */
+    public function recordPhaseResults(string $phase, array $results): void
+    {
+        $existing = is_array($this->phase_results) ? $this->phase_results : [];
+        $existing[$phase] = $results;
+        $this->phase_results = $existing;
+        $this->save();
+    }
+
+    /**
+     * Aggregate ok flag across all recorded phases. True when every
+     * recorded step is ok or skipped; false when any step has ok=false.
+     */
+    public function phasesAllOk(): bool
+    {
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        if ($results === []) {
+            return false;
+        }
+        foreach ($results as $steps) {
+            if (! is_array($steps)) {
+                continue;
+            }
+            foreach ($steps as $step) {
+                if (($step['ok'] ?? false) !== true) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Total wall-clock duration across all recorded steps.
+     */
+    public function phaseTotalDurationMs(): int
+    {
+        $total = 0;
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        foreach ($results as $steps) {
+            if (! is_array($steps)) {
+                continue;
+            }
+            foreach ($steps as $step) {
+                $total += (int) ($step['duration_ms'] ?? 0);
+            }
+        }
+
+        return $total;
     }
 
     public function site(): BelongsTo
