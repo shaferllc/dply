@@ -5,6 +5,7 @@ namespace App\Services\Certificates;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Services\SshConnection;
+
 class ImportedCertificateInstaller implements CertificateEngine
 {
     public function supports(SiteCertificate $certificate): bool

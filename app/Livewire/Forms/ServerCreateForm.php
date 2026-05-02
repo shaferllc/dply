@@ -6,6 +6,12 @@ use Livewire\Form;
 
 class ServerCreateForm extends Form
 {
+    /**
+     * Wizard mode: 'provider' (Provision with a provider) or 'custom' (Custom/BYO).
+     * Set on Step 1 of the create wizard; drives branching on Step 2 and 3.
+     */
+    public string $mode = 'provider';
+
     public string $type = 'digitalocean';
 
     public string $name = '';

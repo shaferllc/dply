@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Models\ServerManageAction;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use Illuminate\Bus\Queueable;
@@ -26,6 +27,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
         public string $inlineBash,
         public int $timeoutSeconds,
         public ?string $flashSuccessMessage = null,
+        public ?string $logId = null,
     ) {
         $this->timeout = max(60, $timeoutSeconds + 60);
         $queue = config('server_manage.remote_task_queue');
@@ -63,6 +65,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => __('This request was replaced by a newer one.'),
                 'flash_success' => null,
             ]);
+            $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
 
             return;
         }
@@ -72,6 +75,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
             'output' => '',
             'error' => null,
         ]);
+        $this->updateLog(ServerManageAction::STATUS_RUNNING, started: true);
 
         $fullOutput = '';
         $lastFlush = microtime(true);
@@ -114,17 +118,20 @@ class ServerManageRemoteSshJob implements ShouldQueue
                     'error' => __('This request was replaced by a newer one.'),
                     'flash_success' => null,
                 ]);
+                $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
 
                 return;
             }
 
             if (! $out->isSuccessful()) {
+                $error = __('Remote command exited with code :code.', ['code' => (string) ($out->getExitCode() ?? 'unknown')]);
                 $this->mergePayload([
                     'status' => 'failed',
                     'output' => $trimmed,
-                    'error' => __('Remote command exited with code :code.', ['code' => (string) ($out->getExitCode() ?? 'unknown')]),
+                    'error' => $error,
                     'flash_success' => null,
                 ]);
+                $this->updateLog(ServerManageAction::STATUS_FAILED, error: $error);
 
                 return;
             }
@@ -135,12 +142,17 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => null,
                 'flash_success' => $this->flashSuccessMessage,
             ]);
+            $this->updateLog(ServerManageAction::STATUS_FINISHED);
 
             if ($this->taskName === 'services-install:install_monitoring_prerequisites') {
                 $server = Server::query()->find($this->serverId);
                 if ($server !== null) {
                     app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
                 }
+            }
+
+            if ($this->shouldRerunProbeAfterFinish()) {
+                RefreshServerInventoryJob::dispatch($this->serverId);
             }
         } catch (ManageRemoteTaskSupersededException) {
             $trimmed = trim(ServerManageSshExecutor::stripSshClientNoise($fullOutput));
@@ -150,6 +162,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => __('This request was replaced by a newer one.'),
                 'flash_success' => null,
             ]);
+            $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
         } catch (Throwable $e) {
             $this->mergePayload([
                 'status' => 'failed',
@@ -157,7 +170,45 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => $e->getMessage(),
                 'flash_success' => null,
             ]);
+            $this->updateLog(ServerManageAction::STATUS_FAILED, error: $e->getMessage());
         }
+    }
+
+    protected function shouldRerunProbeAfterFinish(): bool
+    {
+        if (! preg_match('/^manage-action:(.+)$/', $this->taskName, $m)) {
+            return false;
+        }
+        $key = $m[1];
+        $defs = config('server_manage.service_actions', []);
+        $danger = config('server_manage.dangerous_actions', []);
+        $entry = $defs[$key] ?? $danger[$key] ?? null;
+
+        return is_array($entry) && (bool) ($entry['rerun_probe_after_finish'] ?? false);
+    }
+
+    protected function updateLog(string $status, bool $started = false, ?string $error = null): void
+    {
+        if ($this->logId === null || $this->logId === '') {
+            return;
+        }
+
+        $row = ServerManageAction::query()->find($this->logId);
+        if ($row === null) {
+            return;
+        }
+
+        $update = ['status' => $status];
+        if ($started) {
+            $update['started_at'] = now();
+        }
+        if (in_array($status, [ServerManageAction::STATUS_FINISHED, ServerManageAction::STATUS_FAILED], true)) {
+            $update['finished_at'] = now();
+        }
+        if ($error !== null && $error !== '') {
+            $update['error_message'] = $error;
+        }
+        $row->update($update);
     }
 
     protected function isSuperseded(): bool

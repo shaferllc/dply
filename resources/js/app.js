@@ -206,6 +206,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDplyRegionMaps().catch(() => {});
 });
 
+// wire:navigate swaps the DOM without firing DOMContentLoaded — re-render any maps
+// that landed in the new page so the create wizard's region map works after SPA nav.
+document.addEventListener('livewire:navigated', () => {
+    renderDplyRegionMaps().catch(() => {});
+});
+
 window.addEventListener('dply-theme-applied', () => {
     renderDplyRegionMaps().catch(() => {});
 });

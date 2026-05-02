@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
 use App\Models\Server;
-use App\Modules\TaskRunner\ProcessOutput;
+use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
-use App\Modules\TaskRunner\TaskDispatcher;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
+use App\Modules\TaskRunner\TaskDispatcher;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
 
@@ -120,7 +120,7 @@ it('cancel task stops remote process and marks task cancelled', function () {
         ],
     ]);
 
-    $dispatcher = \Mockery::mock(TaskDispatcher::class);
+    $dispatcher = Mockery::mock(TaskDispatcher::class);
     $dispatcher->shouldReceive('run')
         ->once()
         ->andReturn(new ProcessOutput('cancelled remote task', 0, true));

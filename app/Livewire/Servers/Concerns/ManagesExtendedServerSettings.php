@@ -2,7 +2,16 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Models\NotificationChannel;
+use App\Models\NotificationSubscription;
+use App\Models\Server;
+use App\Services\Notifications\AssignableNotificationChannels;
+use App\Services\Servers\ProviderCostUnavailableException;
+use App\Services\Servers\ServerProviderCostEstimator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 trait ManagesExtendedServerSettings
@@ -20,11 +29,30 @@ trait ManagesExtendedServerSettings
 
     public bool $settingsNotifHealthAlerts = true;
 
+    /** Channel selected in the "add subscription" form on the Alerts tab. */
+    public string $notifAddChannelId = '';
+
+    /**
+     * Event keys ticked in the "add subscription" form. Restricted to server-scoped
+     * notification keys (matches WorkspaceOverview's quick-add validation).
+     *
+     * @var list<string>
+     */
+    public array $notifAddEventKeys = [];
+
     public string $settingsCostMonthlyNote = '';
 
     public string $settingsCostRenewalDate = '';
 
     public string $settingsCostProviderUrl = '';
+
+    /**
+     * Most recent provider cost lookup, surfaced inline so the user can see
+     * where the suggested figure came from. Cleared after Save.
+     *
+     * @var array{plan: string, provider_label: string, monthly: float, hourly: float, currency: string, fetched_at: string, mtd: float, ytd: float, runtime_hours_month: float, runtime_hours_year: float}|null
+     */
+    public ?array $lastPulledCostEstimate = null;
 
     public string $settingsEnvType = '';
 
@@ -84,10 +112,10 @@ trait ManagesExtendedServerSettings
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->toastSuccess(__('Maintenance window saved. Dply will use this when scheduling supports it.'));
+        $this->toastSuccess(__('Maintenance window saved. Disruptive actions (firewall apply, supervisor restart-all) will warn outside this window.'));
     }
 
-    public function saveNotificationRouting(): void
+    public function addServerNotificationSubscription(): void
     {
         $this->authorize('update', $this->server);
         if ($this->deployerCannotEditServerSettings()) {
@@ -97,20 +125,94 @@ trait ManagesExtendedServerSettings
         }
 
         $this->validate([
-            'settingsNotifRoutingNote' => ['nullable', 'string', 'max:5000'],
+            'notifAddChannelId' => ['required', 'string', 'exists:notification_channels,id'],
+            'notifAddEventKeys' => ['required', 'array', 'min:1'],
+            'notifAddEventKeys.*' => ['string', 'in:server.automatic_updates,server.ssh_login,server.insights_alerts,server.monitoring'],
+        ], [], [
+            'notifAddChannelId' => __('channel'),
+            'notifAddEventKeys' => __('notification types'),
         ]);
 
-        $meta = $this->server->meta ?? [];
-        $meta['notif_routing_note'] = trim($this->settingsNotifRoutingNote) !== '' ? trim($this->settingsNotifRoutingNote) : null;
-        if (($meta['notif_routing_note'] ?? null) === null) {
-            unset($meta['notif_routing_note']);
-        }
-        $meta['notif_health_alerts'] = $this->settingsNotifHealthAlerts;
+        $org = Auth::user()?->currentOrganization();
+        $allowed = AssignableNotificationChannels::forUser(Auth::user(), $org)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
 
+        if (! in_array($this->notifAddChannelId, $allowed, true)) {
+            $this->addError('notifAddChannelId', __('Channel is not assignable to this server.'));
+
+            return;
+        }
+
+        $channel = NotificationChannel::query()->findOrFail($this->notifAddChannelId);
+        Gate::authorize('manageNotificationChannels', $channel->owner);
+
+        $created = 0;
+        foreach ($this->notifAddEventKeys as $eventKey) {
+            $row = NotificationSubscription::firstOrCreate([
+                'notification_channel_id' => $channel->id,
+                'subscribable_type' => Server::class,
+                'subscribable_id' => $this->server->id,
+                'event_key' => $eventKey,
+            ]);
+            if ($row->wasRecentlyCreated) {
+                $created++;
+            }
+        }
+
+        $this->notifAddChannelId = '';
+        $this->notifAddEventKeys = [];
+        $this->toastSuccess(__('Added :count subscription(s) routing this server\'s events to :channel.', [
+            'count' => $created,
+            'channel' => $channel->label,
+        ]));
+    }
+
+    public function removeServerNotificationSubscription(string $subscriptionId): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->deployerCannotEditServerSettings()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        $sub = NotificationSubscription::query()
+            ->where('subscribable_type', Server::class)
+            ->where('subscribable_id', $this->server->id)
+            ->whereKey($subscriptionId)
+            ->first();
+        if ($sub === null) {
+            return;
+        }
+
+        // Only allow removal when the user can manage the underlying channel — otherwise
+        // an org member could detach a team-managed channel without permission.
+        $channel = $sub->channel;
+        if ($channel instanceof NotificationChannel) {
+            Gate::authorize('manageNotificationChannels', $channel->owner);
+        }
+
+        $sub->delete();
+        $this->toastSuccess(__('Subscription removed.'));
+    }
+
+    public function dismissLegacyRoutingNotes(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->deployerCannotEditServerSettings()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        $meta = $this->server->meta ?? [];
+        unset($meta['notif_routing_note'], $meta['notif_health_alerts']);
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->toastSuccess(__('Notification hints saved.'));
+        $this->toastSuccess(__('Legacy notes dismissed.'));
     }
 
     public function saveCostLifecycle(): void
@@ -141,7 +243,67 @@ trait ManagesExtendedServerSettings
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
+        $this->lastPulledCostEstimate = null;
         $this->toastSuccess(__('Cost & lifecycle notes saved.'));
+    }
+
+    /**
+     * Whether the current server's provider is wired up for catalog-price lookup.
+     */
+    public function providerCostPullSupported(): bool
+    {
+        return ServerProviderCostEstimator::isSupported($this->server->provider ?? null)
+            && $this->server->providerCredential !== null
+            && (string) $this->server->size !== '';
+    }
+
+    /**
+     * Fetches the catalog price from the provider API and pre-fills the
+     * monthly-cost field. Does NOT save — the user reviews / edits / saves
+     * manually so they can keep their own number if preferred.
+     */
+    public function pullCostFromProvider(ServerProviderCostEstimator $estimator): void
+    {
+        $this->authorize('view', $this->server);
+        if ($this->deployerCannotEditServerSettings()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        try {
+            $estimate = $estimator->estimate($this->server);
+        } catch (ProviderCostUnavailableException $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        } catch (\Throwable $e) {
+            Log::warning('Provider cost pull failed', [
+                'server_id' => $this->server->id,
+                'provider' => $this->server->provider?->value,
+                'error' => $e->getMessage(),
+            ]);
+            $this->toastError(__('Could not reach the provider API for pricing right now.'));
+
+            return;
+        }
+
+        $this->settingsCostMonthlyNote = $estimate['formatted'];
+        $this->lastPulledCostEstimate = [
+            'plan' => $estimate['plan'],
+            'provider_label' => $estimate['provider_label'],
+            'monthly' => $estimate['monthly'],
+            'hourly' => $estimate['hourly'],
+            'currency' => $estimate['currency'],
+            'fetched_at' => $estimate['fetched_at']->toIso8601String(),
+            'mtd' => $estimate['mtd'],
+            'ytd' => $estimate['ytd'],
+            'runtime_hours_month' => $estimate['runtime_hours_month'],
+            'runtime_hours_year' => $estimate['runtime_hours_year'],
+        ];
+        $this->toastSuccess(__('Pulled :provider catalog price. Review and click Save cost notes to keep it.', [
+            'provider' => $estimate['provider_label'],
+        ]));
     }
 
     public function saveComplianceSettings(): void

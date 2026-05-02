@@ -45,9 +45,12 @@ class RemoteProcessRunner
      */
     public function verifyScriptDirectoryExists(): self
     {
+        // 30s instead of 10s: the dev container's Docker port-forward occasionally stalls
+        // for 5-15s after the container restarts, and `mkdir` over SSH timing out at 10s
+        // wedges the whole background-task kickoff on the local fake-cloud path.
         $output = $this->run(
             script: 'mkdir -p '.$this->connection->scriptPath,
-            timeout: 10
+            timeout: 30
         );
 
         if ($output->isTimeout() || $output->getExitCode() !== 0) {

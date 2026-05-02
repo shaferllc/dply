@@ -40,8 +40,12 @@ class RunSetupScriptJob implements ShouldQueue
         public Server $server
     ) {}
 
+    /** Cap on automatic retries for transient provisioning failures (network/apt timeouts, etc.). */
+    public const MAX_AUTO_RETRY_ATTEMPTS = 3;
+
     /**
      * Apply provision outcome to the server (setup_status, optional deploy ssh_user).
+     * On transient failures, schedules an automatic retry with backoff up to MAX_AUTO_RETRY_ATTEMPTS.
      */
     public static function applyProvisionOutcomeToServer(Server $server, bool $success): void
     {
@@ -58,12 +62,130 @@ class RunSetupScriptJob implements ShouldQueue
                     $updates['ssh_user'] = $deployUser;
                 }
             }
+            // Clear any prior auto-retry markers on success.
+            $meta = $server->meta ?? [];
+            unset($meta['auto_retry_at'], $meta['auto_retry_attempt'], $meta['auto_retry_max']);
+            $updates['meta'] = $meta;
             $server->update($updates);
 
             return;
         }
 
-        $server->update(['setup_status' => Server::SETUP_STATUS_FAILED]);
+        if (static::tryScheduleAutoRetry($server)) {
+            return;
+        }
+
+        $meta = $server->meta ?? [];
+        unset($meta['auto_retry_at'], $meta['auto_retry_attempt'], $meta['auto_retry_max']);
+        $server->update([
+            'setup_status' => Server::SETUP_STATUS_FAILED,
+            'meta' => $meta,
+        ]);
+    }
+
+    /**
+     * If the most recent run failed for a transient reason (apt fetch timeout, network blip,
+     * connection reset) and we're under the attempt cap, queue a delayed retry rather than
+     * leaving the user staring at a failure card.
+     */
+    protected static function tryScheduleAutoRetry(Server $server): bool
+    {
+        $latestRun = ServerProvisionRun::query()
+            ->where('server_id', $server->getKey())
+            ->latest('created_at')
+            ->first();
+
+        if ($latestRun === null) {
+            return false;
+        }
+
+        $attempt = max(1, (int) $latestRun->attempt);
+        if ($attempt >= self::MAX_AUTO_RETRY_ATTEMPTS) {
+            return false;
+        }
+
+        $task = $latestRun->task;
+        $output = is_object($task) && isset($task->output) ? (string) $task->output : '';
+        if (! self::failureLooksTransient($output)) {
+            return false;
+        }
+
+        // Backoff: 30s after first failure, 90s after second.
+        $delaySeconds = $attempt === 1 ? 30 : 90;
+        $retryAt = now()->addSeconds($delaySeconds);
+
+        $meta = $server->meta ?? [];
+        $meta['auto_retry_at'] = $retryAt->toIso8601String();
+        $meta['auto_retry_attempt'] = $attempt + 1;
+        $meta['auto_retry_max'] = self::MAX_AUTO_RETRY_ATTEMPTS;
+        // Clear stale provision_task_id so the journey UI doesn't keep polling the dead task.
+        unset($meta['provision_task_id']);
+
+        $server->update([
+            'setup_status' => Server::SETUP_STATUS_PENDING,
+            'meta' => $meta,
+        ]);
+
+        Log::info('server.provision.auto_retry_scheduled', [
+            'server_id' => $server->id,
+            'attempt' => $attempt + 1,
+            'max_attempts' => self::MAX_AUTO_RETRY_ATTEMPTS,
+            'delay_seconds' => $delaySeconds,
+            'retry_at' => $retryAt->toIso8601String(),
+        ]);
+
+        WaitForServerSshReadyJob::dispatch($server)->delay($retryAt);
+
+        return true;
+    }
+
+    /**
+     * Heuristic: does the failure output look like something a retry could resolve?
+     * Network timeouts, apt fetch errors, connection resets — yes. Hard config / auth
+     * errors — no, retrying just wastes time and risks more partial state.
+     */
+    protected static function failureLooksTransient(string $output): bool
+    {
+        if ($output === '') {
+            return false;
+        }
+
+        $transientPatterns = [
+            '/Timeout was reached/i',
+            '/Connection (?:timed out|refused|reset)/i',
+            '/Temporary failure resolving/i',
+            '/Could not resolve host/i',
+            '/Failed to fetch /i',
+            '/E: Unable to (?:fetch|locate) /i',
+            '/Sub-process .* returned an error code/i',
+            '/Hash Sum mismatch/i',
+            '/network is unreachable/i',
+            '/No route to host/i',
+            '/SSL_connect: Connection reset/i',
+            '/curl: \(\d+\) (?:Could not|Operation timed out|Failed to|Recv failure)/i',
+        ];
+
+        $hardErrorPatterns = [
+            '/Permission denied/i',
+            '/command not found/i',
+            '/syntax error/i',
+            '/dpkg: error processing package/i',
+            '/conflicting requested operation/i',
+        ];
+
+        foreach ($hardErrorPatterns as $pattern) {
+            if (preg_match($pattern, $output) === 1) {
+                return false;
+            }
+        }
+
+        foreach ($transientPatterns as $pattern) {
+            if (preg_match($pattern, $output) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function shouldDispatch(Server $server): bool

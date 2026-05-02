@@ -2512,13 +2512,19 @@ class ServerTest extends TestCase
             'name' => 'Manage Me',
         ]);
 
-        $this->actingAs($user)->get(route('servers.manage', $server))->assertOk()->assertSee('Manage Me');
+        $this->actingAs($user)
+            ->get(route('servers.manage', ['server' => $server, 'section' => 'overview']))
+            ->assertOk()
+            ->assertSee('Manage Me');
 
         Livewire::actingAs($user)
-            ->test(WorkspaceManage::class, ['server' => $server])
+            ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'configuration'])
             ->assertSee('Manage')
-            ->assertSee('Configuration files')
-            ->assertSee('Service actions');
+            ->assertSee('Configuration files');
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'services'])
+            ->assertSee('Services');
     }
 
     public function test_server_manage_config_preview_dispatches_background_job_when_enabled(): void
@@ -2536,11 +2542,17 @@ class ServerTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test(WorkspaceManage::class, ['server' => $server])
+            ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'configuration'])
             ->call('previewConfig', 'nginx')
             ->assertSet('manageRemoteTaskId', fn ($id) => is_string($id) && strlen($id) > 0);
 
         Queue::assertPushed(ServerManageRemoteSshJob::class);
+
+        $this->assertDatabaseHas('server_manage_actions', [
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'status' => 'queued',
+        ]);
     }
 
     public function test_servers_show_returns_403_for_non_member(): void

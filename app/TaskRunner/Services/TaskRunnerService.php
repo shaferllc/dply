@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\TaskRunner\Services;
 
-use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Jobs\KillRemoteTaskProcessJob;

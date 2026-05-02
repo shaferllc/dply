@@ -11,11 +11,7 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <div
-        class="space-y-6"
-        x-data="{ settingsHelpOpen: false }"
-        @keydown.window="if ($event.key === '?' && ! ['INPUT','TEXTAREA','SELECT'].includes($event.target.tagName) && ! $event.target.isContentEditable) { $event.preventDefault(); settingsHelpOpen = ! settingsHelpOpen }"
-    >
+    <div class="space-y-6">
         @include('livewire.servers.partials.settings.tabs', ['server' => $server, 'section' => $section])
 
         @include('livewire.servers.partials.settings-tab', [

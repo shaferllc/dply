@@ -1,23 +1,7 @@
-@php
-    $dplyTheme = 'system';
-    if (auth()->check()) {
-        $dplyTheme = auth()->user()->mergedUiPreferences()['theme'] ?? 'system';
-    }
-@endphp
-<meta name="dply-theme" content="{{ $dplyTheme }}">
+{{-- Dark mode temporarily disabled: theme forced to light regardless of user preference. --}}
+<meta name="dply-theme" content="light">
 <script>
     (function () {
-        function dplyThemeIsDark(theme) {
-            if (theme === 'dark') {
-                return true;
-            }
-            if (theme === 'light') {
-                return false;
-            }
-            return window.matchMedia('(prefers-color-scheme: dark)').matches;
-        }
-        var meta = document.querySelector('meta[name="dply-theme"]');
-        var theme = (meta && meta.getAttribute('content')) || 'system';
-        document.documentElement.classList.toggle('dark', dplyThemeIsDark(theme));
+        document.documentElement.classList.remove('dark');
     })();
 </script>

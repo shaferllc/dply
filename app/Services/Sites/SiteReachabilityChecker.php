@@ -3,6 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 
 class SiteReachabilityChecker
@@ -19,10 +20,10 @@ class SiteReachabilityChecker
      */
     public function check(Site $site): array
     {
-        $previewDomains = $site->previewDomains instanceof \Illuminate\Support\Collection
+        $previewDomains = $site->previewDomains instanceof Collection
             ? $site->previewDomains
             : $site->previewDomains()->get();
-        $domains = $site->domains instanceof \Illuminate\Support\Collection
+        $domains = $site->domains instanceof Collection
             ? $site->domains
             : $site->domains()->get();
         $primaryHostname = $domains->firstWhere('is_primary', true)?->hostname
@@ -50,6 +51,7 @@ class SiteReachabilityChecker
                     'ok' => false,
                     'error' => 'DNS does not resolve yet.',
                 ];
+
                 continue;
             }
 

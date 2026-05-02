@@ -4,8 +4,10 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Events\Servers\ServerWorkspaceLogSnapshotBroadcast;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
+use App\Models\Server;
 use App\Models\Site;
 use App\Services\Servers\ServerSystemLogReader;
+use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 
@@ -74,6 +76,13 @@ trait ManagesServerSystemLogs
         $server = $this->server ?? null;
         if ($server === null) {
             return $sources;
+        }
+
+        // Filter the global (non-site-scoped) catalog by what's actually installed on this
+        // server — if the user picked Apache there's no point listing Nginx logs, etc.
+        // Site-scoped flow already builds its own list and skips this branch.
+        if ($this->scopedSite === null) {
+            $sources = $this->filterSourcesByInstalledServices($sources, $server);
         }
 
         if ($this->scopedSite !== null) {
@@ -685,6 +694,51 @@ trait ManagesServerSystemLogs
         } else {
             $this->remoteLogOutput = $body;
         }
+    }
+
+    /**
+     * Drop catalog rows whose backing service isn't on this server. Always-on groups
+     * (dply audit trail, Let's Encrypt, UFW, system/auth logs) stay regardless. If we have
+     * no provision artifact yet (still bootstrapping or pre-existing server), fail open
+     * and return the full list.
+     *
+     * @param  array<string, array<string, mixed>>  $sources
+     * @return array<string, array<string, mixed>>
+     */
+    private function filterSourcesByInstalledServices(array $sources, Server $server): array
+    {
+        $installed = ServerInstalledServices::tagsFor($server);
+        if (array_key_exists('unknown', $installed)) {
+            return $sources;
+        }
+
+        // Map config groups → required service tag(s). Groups not listed here are treated
+        // as always-on (firewall/security/system/ssl/dply/sites and any unrecognised group).
+        $groupRequires = [
+            'nginx' => ['nginx'],
+            'apache' => ['apache'],
+            'openlitespeed' => ['openlitespeed'],
+            'traefik' => ['traefik'],
+            'php' => ['php'],
+            'database' => ['mysql', 'postgres'],
+            'services' => ['redis'],
+            'daemons' => ['supervisor'],
+        ];
+
+        return array_filter($sources, function (array $row) use ($installed, $groupRequires): bool {
+            $group = (string) ($row['group'] ?? '');
+            $required = $groupRequires[$group] ?? null;
+            if ($required === null) {
+                return true;
+            }
+            foreach ($required as $tag) {
+                if (array_key_exists($tag, $installed)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
     }
 
     private function buildSafeRegexPattern(string $body): ?string

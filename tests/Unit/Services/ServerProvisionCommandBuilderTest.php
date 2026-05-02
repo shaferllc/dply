@@ -201,7 +201,8 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('grep -RqsE', $joined);
         $this->assertStringContainsString('ondrej-ubuntu-php|ppa\\.launchpadcontent\\.net/ondrej/php', $joined);
         $this->assertStringContainsString('[dply] ondrej/php repository already installed; skipping repository setup.', $joined);
-        $this->assertStringContainsString('timeout 120s add-apt-repository -y ppa:ondrej/php', $joined);
+        $this->assertStringContainsString('/etc/apt/keyrings/ondrej-php.gpg', $joined);
+        $this->assertStringContainsString('https://ppa.launchpadcontent.net/ondrej/php/ubuntu', $joined);
         $this->assertStringContainsString('timeout 300s apt-get update -y', $joined);
         $this->assertStringNotContainsString('rg -l "ondrej-ubuntu-php|ppa.launchpadcontent.net/ondrej/php"', $joined);
         $this->assertStringContainsString('command -v composer >/dev/null 2>&1', $joined);
@@ -232,7 +233,8 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('apt-get install -y --no-install-recommends nginx', $joined);
         $this->assertStringContainsString('apt-get install -y --no-install-recommends mysql-server', $joined);
         $this->assertStringContainsString('apt-get install -y --no-install-recommends redis-server', $joined);
-        $this->assertStringContainsString('add-apt-repository -y ppa:ondrej/php', $joined);
+        $this->assertStringContainsString('/etc/apt/keyrings/ondrej-php.gpg', $joined);
+        $this->assertStringContainsString('https://ppa.launchpadcontent.net/ondrej/php/ubuntu', $joined);
         $this->assertStringContainsString('curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer', $joined);
         $this->assertStringNotContainsString('already installed; skipping package install.', $joined);
         $this->assertStringNotContainsString('already installed; skipping repository setup.', $joined);

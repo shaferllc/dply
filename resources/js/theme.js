@@ -3,23 +3,18 @@
  * Inline script in theme-head runs first to reduce flash; this wires Livewire + OS scheme changes.
  */
 
+// Dark mode temporarily disabled: always apply light, ignore the requested theme.
 export function applyDplyTheme(theme) {
     const meta = document.querySelector('meta[name="dply-theme"]');
     if (meta) {
-        meta.setAttribute('content', theme);
+        meta.setAttribute('content', 'light');
     }
 
-    const isDark =
-        theme === 'dark' ||
-        (theme === 'system' &&
-            typeof window !== 'undefined' &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.classList.remove('dark');
 
     window.dispatchEvent(
         new CustomEvent('dply-theme-applied', {
-            detail: { theme, isDark },
+            detail: { theme: 'light', isDark: false },
         }),
     );
 }

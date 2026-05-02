@@ -7,6 +7,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\ServerCreateDraft;
 use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Carbon\Carbon;
@@ -51,6 +52,26 @@ class Index extends Component
         $this->sort = 'created_at';
         $this->statusFilter = '';
         $this->viewMode = 'list';
+    }
+
+    public bool $showDiscardServerCreateDraftModal = false;
+
+    public function openDiscardServerCreateDraftModal(): void
+    {
+        $this->showDiscardServerCreateDraftModal = true;
+    }
+
+    public function closeDiscardServerCreateDraftModal(): void
+    {
+        $this->showDiscardServerCreateDraftModal = false;
+    }
+
+    public function confirmDiscardServerCreateDraft(): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        $draft = ServerCreateDraft::forCurrentScope(auth()->user(), $org);
+        $draft?->delete();
+        $this->showDiscardServerCreateDraftModal = false;
     }
 
     #[On('server-state-updated')]
@@ -307,6 +328,8 @@ class Index extends Component
             ? ServerRemovalAdvisor::summary($deleteModalServer)
             : null;
 
+        $serverCreateDraft = ServerCreateDraft::forCurrentScope(auth()->user(), $org);
+
         return view('livewire.servers.index', [
             'hasServersInScope' => $hasServersInScope,
             'servers' => $servers,
@@ -317,6 +340,7 @@ class Index extends Component
             'hasProviderCredentials' => $hasProviderCredentials,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
+            'serverCreateDraft' => $serverCreateDraft,
             'sortOptions' => config('user_preferences.server_sort_options', []),
             'statusOptions' => [
                 '' => __('All statuses'),

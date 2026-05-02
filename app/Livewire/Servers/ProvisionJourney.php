@@ -132,12 +132,24 @@ class ProvisionJourney extends Component
             'failureClassification' => $failureClassification,
             'repairGuidance' => $repairGuidance,
             'stackSummary' => $stackSummary,
+            'stackTiles' => $stackSummary ? [
+                ['label' => __('Role'),        'value' => $stackSummary['role'],         'icon' => 'heroicon-o-rectangle-stack'],
+                ['label' => __('Web server'),  'value' => $stackSummary['webserver'],    'icon' => 'heroicon-o-globe-alt'],
+                ['label' => __('PHP'),         'value' => $stackSummary['php_version'],  'icon' => 'heroicon-o-code-bracket'],
+                ['label' => __('Database'),    'value' => $stackSummary['database'],     'icon' => 'heroicon-o-circle-stack'],
+                ['label' => __('Cache'),       'value' => $stackSummary['cache_service'], 'icon' => 'heroicon-o-bolt'],
+                ['label' => __('Deploy user'), 'value' => $stackSummary['deploy_user'],  'icon' => 'heroicon-o-user-circle'],
+            ] : [],
             'stallState' => $stallState,
             'shouldPoll' => $shouldPoll,
             'canCancelProvision' => $this->canCancelProvision($task),
             'liveTaskOutput' => $this->liveTaskOutput($task),
             'liveTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
+            'fullTaskOutput' => $this->fullTaskOutput($task),
+            'fullTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
             'taskUpdatedAt' => $task?->updated_at,
+            'rollbackSummary' => $this->rollbackSummary($task),
+            'failureReason' => $this->failureReason($task, collect($steps)->firstWhere('state', 'failed')),
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server->fresh())
                 : null,
@@ -250,10 +262,6 @@ class ProvisionJourney extends Component
 
     protected function shouldRedirectToServerOverview(): bool
     {
-        if (app()->environment('local')) {
-            return false;
-        }
-
         return $this->server->status === Server::STATUS_READY
             && $this->server->setup_status === Server::SETUP_STATUS_DONE;
     }
@@ -507,6 +515,185 @@ class ProvisionJourney extends Component
         }
 
         return count(preg_split('/\r\n|\r|\n/', $task->output) ?: []);
+    }
+
+    /**
+     * Full untrimmed task output for the "View full" modal — capped to keep page size sane.
+     */
+    protected function fullTaskOutput(?Task $task): string
+    {
+        if (! $task || ! is_string($task->output)) {
+            return '';
+        }
+
+        $output = trim($task->output);
+        // Hard cap to ~1MB so a runaway log doesn't bloat the rendered HTML.
+        if (strlen($output) > 1_000_000) {
+            $output = '… [truncated to last 1 MB] …'."\n".substr($output, -1_000_000);
+        }
+
+        return $output;
+    }
+
+    /**
+     * Extract a one-line "why did this fail" headline + a few supporting lines from the
+     * captured step output (or full task output as a fallback). Surfaces the actual error
+     * message to the user instead of a generic "step failed before finishing" framing.
+     *
+     * @param  array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}|null  $failedStep
+     * @return array{headline:string, context:list<string>, exit_code:?int}|null
+     */
+    protected function failureReason(?Task $task, ?array $failedStep): ?array
+    {
+        if ($failedStep === null) {
+            return null;
+        }
+
+        $source = trim((string) ($failedStep['output'] ?? ''));
+        if ($source === '' && $task !== null && is_string($task->output)) {
+            $source = trim($task->output);
+        }
+        if ($source === '') {
+            return null;
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $source) ?: [];
+
+        // Drop noise: rollback markers, step markers, empty lines, locale warnings.
+        $meaningful = [];
+        foreach ($lines as $line) {
+            $trimmed = trim((string) $line);
+            if ($trimmed === '') {
+                continue;
+            }
+            if (str_contains($trimmed, '[dply-rollback]') || str_contains($trimmed, '[dply-step]')) {
+                continue;
+            }
+            $meaningful[] = $trimmed;
+        }
+        if ($meaningful === []) {
+            return null;
+        }
+
+        // Prefer high-signal lines: scan from the end for a known error shape.
+        $errorPatterns = [
+            '/^E:\s/i',                                  // apt
+            '/^Err:/i',                                  // apt
+            '/^Error:\s/i',                              // generic
+            '/^FATAL:/i',
+            '/^fatal:/i',
+            '/Cannot\s/i',
+            '/Permission denied/i',
+            '/No such file or directory/i',
+            '/command not found/i',
+            '/exited with (?:status|code)\s+\d+/i',
+            '/Timeout was reached/i',
+            '/Connection (?:timed out|refused)/i',
+            '/Failed to (?:fetch|start|connect|enable)/i',
+            '/dpkg:\s+error/i',
+            '/Sub-process\s+\S+\s+returned/i',
+        ];
+
+        $headline = null;
+        $contextStart = max(0, count($meaningful) - 8);
+        $tail = array_slice($meaningful, $contextStart);
+
+        foreach (array_reverse($tail, true) as $line) {
+            foreach ($errorPatterns as $pattern) {
+                if (preg_match($pattern, $line) === 1) {
+                    $headline = $line;
+                    break 2;
+                }
+            }
+        }
+
+        if ($headline === null) {
+            // Fall back to the last meaningful line.
+            $headline = end($tail) ?: end($meaningful);
+        }
+
+        $exitCode = null;
+        if (preg_match('/exited with (?:status|code)\s+(\d+)/i', $source, $m) === 1) {
+            $exitCode = (int) $m[1];
+        } elseif ($task && $task->exit_code !== null) {
+            $exitCode = (int) $task->exit_code;
+        }
+
+        // Trim very long lines for the headline so we don't overflow the banner.
+        if (mb_strlen($headline) > 280) {
+            $headline = mb_substr($headline, 0, 277).'…';
+        }
+
+        return [
+            'headline' => $headline,
+            'context' => array_slice($meaningful, max(0, count($meaningful) - 5)),
+            'exit_code' => $exitCode,
+        ];
+    }
+
+    /**
+     * Parse `[dply-rollback] <relpath> :: <action> :: <detail>` markers emitted by the
+     * bootstrap script's ERR trap + dply_restore_backups helper. Lets us tell the user
+     * whether automatic rollback ran and what files it touched.
+     *
+     * @return array{
+     *     triggered: bool,
+     *     restored: list<string>,
+     *     removed: list<string>,
+     *     other: list<array{path:string, action:string, detail:string}>,
+     *     total: int
+     * }|null
+     */
+    protected function rollbackSummary(?Task $task): ?array
+    {
+        if (! $task || ! is_string($task->output) || trim($task->output) === '') {
+            return null;
+        }
+
+        $triggered = false;
+        $restored = [];
+        $removed = [];
+        $other = [];
+
+        $lines = preg_split('/\r\n|\r|\n/', $task->output) ?: [];
+        foreach ($lines as $line) {
+            if (! str_contains($line, '[dply-rollback]')) {
+                continue;
+            }
+
+            // Strip prefix and split "<path> :: <action> :: <detail>".
+            $body = trim((string) preg_replace('/^.*\[dply-rollback\]\s*/', '', $line));
+            $segments = array_map('trim', explode('::', $body, 3));
+            $path = $segments[0] ?? '';
+            $action = strtolower($segments[1] ?? '');
+            $detail = $segments[2] ?? '';
+
+            if ($path === 'automatic' && $action === 'started') {
+                $triggered = true;
+
+                continue;
+            }
+
+            if ($action === 'restored') {
+                $restored[] = $path;
+            } elseif ($action === 'removed') {
+                $removed[] = $path;
+            } elseif ($action !== 'checkpoint' && $action !== '') {
+                $other[] = ['path' => $path, 'action' => $action, 'detail' => $detail];
+            }
+        }
+
+        if (! $triggered && $restored === [] && $removed === [] && $other === []) {
+            return null;
+        }
+
+        return [
+            'triggered' => $triggered,
+            'restored' => $restored,
+            'removed' => $removed,
+            'other' => $other,
+            'total' => count($restored) + count($removed),
+        ];
     }
 
     /**

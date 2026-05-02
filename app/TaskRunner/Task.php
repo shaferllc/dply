@@ -576,7 +576,7 @@ abstract class Task
             'output' => $this->output,
             'exit_code' => $this->exitCode,
             'options' => $this->options,
-            'instance' => Models\Task::storeInstance($this),
+            'instance' => TaskModel::storeInstance($this),
         ]);
 
         return $model;

@@ -74,6 +74,7 @@ use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\OpenLiteSpeedWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\TraefikWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
+use App\Services\Webhooks\OutboundWebhookDispatcher;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -241,6 +242,51 @@ class AppServiceProvider extends ServiceProvider
             if ($server->status === Server::STATUS_READY && ! empty($server->ssh_private_key)) {
                 ProvisionDefaultUserSshKeysToServerJob::dispatch($server->id);
             }
+        });
+
+        Site::created(function (Site $site): void {
+            $server = $site->server;
+            if ($server === null) {
+                return;
+            }
+            rescue(
+                fn () => app(OutboundWebhookDispatcher::class)->dispatchForServer(
+                    'site.created',
+                    $server,
+                    [
+                        'site' => [
+                            'id' => $site->id,
+                            'name' => $site->name,
+                            'primary_domain' => $site->primaryDomain()?->hostname,
+                            'webserver' => $site->webserver(),
+                            'application_type' => $site->application_type,
+                        ],
+                    ],
+                    'Site '.$site->name.' created'
+                ),
+                report: false,
+            );
+        });
+
+        Site::deleted(function (Site $site): void {
+            $server = $site->server;
+            if ($server === null) {
+                return;
+            }
+            rescue(
+                fn () => app(OutboundWebhookDispatcher::class)->dispatchForServer(
+                    'site.deleted',
+                    $server,
+                    [
+                        'site' => [
+                            'id' => $site->id,
+                            'name' => $site->name,
+                        ],
+                    ],
+                    'Site '.$site->name.' deleted'
+                ),
+                report: false,
+            );
         });
 
         Server::updated(function (Server $server): void {

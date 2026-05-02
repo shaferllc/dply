@@ -4,10 +4,11 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
-use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
 use App\Models\Server;
+use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerRemovalAdvisor;
@@ -23,7 +24,10 @@ class WorkspaceManage extends Component
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
-    use StreamsRemoteSshLivewire;
+    use RunsServerInventoryProbe;
+
+    /** @var string Manage sub-page slug (see config server_manage.workspace_tabs). */
+    public string $section = 'overview';
 
     public string $manage_db_bind_host = '';
 
@@ -42,8 +46,21 @@ class WorkspaceManage extends Component
      */
     public ?string $manageRemoteTaskId = null;
 
-    public function mount(Server $server): void
+    public function mount(Server $server, ?string $section = null): void
     {
+        if ($section === null) {
+            $this->redirect(route('servers.manage', ['server' => $server, 'section' => 'overview']), navigate: true);
+
+            return;
+        }
+
+        $allowed = array_keys(config('server_manage.workspace_tabs', []));
+        if (! in_array($section, $allowed, true)) {
+            abort(404);
+        }
+
+        $this->section = $section;
+
         $this->bootWorkspace($server);
         $meta = $server->meta ?? [];
         $this->manage_db_bind_host = (string) ($meta['manage_db_bind_host'] ?? '');
@@ -84,6 +101,25 @@ class WorkspaceManage extends Component
 
     public function previewConfig(string $key): void
     {
+        $previews = config('server_manage.config_previews', []);
+        $entry = $previews[$key] ?? null;
+        if (! is_array($entry) || empty($entry['path'])) {
+            $this->remote_error = __('Unknown configuration preview.');
+
+            return;
+        }
+
+        $this->runConfigPreview('manage-config-preview:'.$key, (string) $entry['path']);
+    }
+
+    public function previewConfigPath(string $path): void
+    {
+        $taskName = 'manage-config-preview-path:'.substr(sha1($path), 0, 12);
+        $this->runConfigPreview($taskName, $path);
+    }
+
+    protected function runConfigPreview(string $taskName, string $path): void
+    {
         $this->authorize('update', $this->server);
         $this->remote_output = null;
         $this->remote_error = null;
@@ -94,15 +130,6 @@ class WorkspaceManage extends Component
             return;
         }
 
-        $previews = config('server_manage.config_previews', []);
-        $entry = $previews[$key] ?? null;
-        if (! is_array($entry) || empty($entry['path'])) {
-            $this->remote_error = __('Unknown configuration preview.');
-
-            return;
-        }
-
-        $path = (string) $entry['path'];
         try {
             $this->assertAllowlistedConfigPath($path);
         } catch (\InvalidArgumentException) {
@@ -133,27 +160,18 @@ BASH;
 
         try {
             $server = $this->server->fresh();
+            $title = __('TaskRunner (SSH)').' — '.__('Configuration preview').': '.$path;
             if ($this->shouldQueueManageRemoteTasks()) {
-                $this->dispatchQueuedManageScript(
-                    $server,
-                    'manage-config-preview:'.$key,
-                    $inline,
-                    120,
-                    null,
-                    __('TaskRunner (SSH)').' — '.__('Configuration preview'),
-                );
+                $this->dispatchQueuedManageScript($server, $taskName, $inline, 120, null, $title);
 
                 return;
             }
 
             $this->resetRemoteSshStreamTargets();
-            $this->remoteSshStreamSetMeta(
-                __('TaskRunner (SSH)').' — '.__('Configuration preview'),
-                $this->manageSshConnectionLabel($server)."\n".__('Remote script').":\n".$inline
-            );
+            $this->remoteSshStreamSetMeta($title, $this->manageSshConnectionLabel($server)."\n".__('Remote script').":\n".$inline);
             $out = $this->runManageInlineBash(
                 $server,
-                'manage-config-preview:'.$key,
+                $taskName,
                 $inline,
                 fn (string $type, string $buffer) => $this->remoteSshStreamAppendStdout($buffer),
                 120,
@@ -162,6 +180,27 @@ BASH;
         } catch (\Throwable $e) {
             $this->remote_error = $e->getMessage();
         }
+    }
+
+    public function cancelQueuedManageTasks(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot cancel queued tasks.'));
+
+            return;
+        }
+
+        $cleared = 0;
+        if ($this->manageRemoteTaskId !== null && $this->manageRemoteTaskId !== '') {
+            Cache::forget(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
+            $cleared++;
+        }
+        $this->manageRemoteTaskId = null;
+        $this->remote_output = null;
+        $this->remote_error = null;
+        $this->resetRemoteSshStreamTargets();
+        $this->toastSuccess(__('Cleared :n queued task(s) from this view.', ['n' => $cleared]));
     }
 
     public function runAllowlistedAction(string $key): void
@@ -194,13 +233,16 @@ BASH;
         set_time_limit((int) ($def['timeout'] ?? 120) + 30);
 
         $script = (string) $def['script'];
-        if ($key === 'restart_php_fpm') {
-            $meta = $this->server->meta ?? [];
+        $meta = $this->server->meta ?? [];
+        if (in_array($key, ['restart_php_fpm', 'reload_php_fpm'], true)) {
             $v = (string) ($meta['default_php_version'] ?? '8.3');
             if (! preg_match('/^\d+\.\d+$/', $v)) {
                 $v = '8.3';
             }
             $script = 'export DPLY_PHP_VERSION='.escapeshellarg($v)."\n".$script;
+        }
+        if (str_starts_with($key, 'mysql_') && ! empty($meta['manage_internal_db_password']) && is_string($meta['manage_internal_db_password'])) {
+            $script = 'export DPLY_DB_PASSWORD='.escapeshellarg($meta['manage_internal_db_password'])."\n".$script;
         }
 
         try {
@@ -294,11 +336,20 @@ BASH;
     {
         $this->server->refresh();
 
+        $recentActions = $this->section === 'overview'
+            ? ServerManageAction::query()
+                ->where('server_id', $this->server->id)
+                ->orderByDesc('created_at')
+                ->limit(5)
+                ->get()
+            : collect();
+
         return view('livewire.servers.workspace-manage', [
             'configPreviews' => config('server_manage.config_previews', []),
             'serviceActions' => config('server_manage.service_actions', []),
             'dangerousActions' => config('server_manage.dangerous_actions', []),
             'autoUpdateIntervals' => config('server_manage.auto_update_intervals', []),
+            'recentActions' => $recentActions,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
@@ -310,6 +361,12 @@ BASH;
         $normalized = str_starts_with($path, '/') ? $path : '/'.$path;
         if (str_contains($normalized, '..')) {
             throw new \InvalidArgumentException;
+        }
+
+        foreach (config('server_manage.allowed_config_paths_exact', []) as $exact) {
+            if ($normalized === $exact) {
+                return;
+            }
         }
 
         foreach (config('server_manage.allowed_config_path_prefixes', []) as $prefix) {
@@ -374,6 +431,9 @@ BASH;
             );
         }
 
+        // Persist a recent-activity row so Overview can show what's happened.
+        $logId = $this->logManageActionStart($server, $taskName, $streamTitle);
+
         ServerManageRemoteSshJob::dispatch(
             $server->id,
             $id,
@@ -381,6 +441,7 @@ BASH;
             $inlineBash,
             $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
             $flashSuccess,
+            $logId,
         );
 
         $this->manageRemoteTaskId = $id;
@@ -407,5 +468,40 @@ BASH;
         }
 
         return 'root@'.$host.' ('.__('falls back to').' '.$deploy.'@'.$host.')';
+    }
+
+    /** Manage tabs always want the extended snapshot regardless of the user's inventory depth setting. */
+    protected function forceExtendedInventoryProbe(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Persist a recent-activity row so Overview can show "what just happened".
+     * Returns the row id so the queued job can update status as it progresses.
+     */
+    protected function logManageActionStart(Server $server, string $taskName, string $streamTitle): string
+    {
+        $serviceActions = config('server_manage.service_actions', []);
+        $dangerous = config('server_manage.dangerous_actions', []);
+
+        // Best-effort label: try the action key after the colon (e.g. "manage-action:reload_nginx").
+        $label = $streamTitle;
+        if (preg_match('/^manage-action:(.+)$/', $taskName, $m)) {
+            $key = $m[1];
+            $label = (string) ($serviceActions[$key]['label'] ?? $dangerous[$key]['label'] ?? $key);
+        } elseif (str_starts_with($taskName, 'manage-config-preview')) {
+            $label = __('Configuration preview');
+        }
+
+        $row = ServerManageAction::create([
+            'server_id' => $server->id,
+            'user_id' => auth()->id(),
+            'task_name' => $taskName,
+            'label' => $label,
+            'status' => ServerManageAction::STATUS_QUEUED,
+        ]);
+
+        return $row->id;
     }
 }

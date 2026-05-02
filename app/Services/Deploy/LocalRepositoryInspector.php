@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy;
 
+use App\Enums\SiteType;
 use Illuminate\Support\Str;
 
 class LocalRepositoryInspector
@@ -24,7 +25,7 @@ class LocalRepositoryInspector
      *     detection: array{
      *         target_runtime: 'docker_web'|'kubernetes_web',
      *         target_kind: 'docker'|'kubernetes',
-     *         site_type: \App\Enums\SiteType,
+     *         site_type: SiteType,
      *         framework: string,
      *         language: string,
      *         confidence: string,

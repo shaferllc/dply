@@ -4,6 +4,7 @@ use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
 
 if (! function_exists('reverb_health_check_url')) {
@@ -41,6 +42,49 @@ if (! function_exists('server_workspace_nav_item_url')) {
         }
 
         return route($routeName, $server);
+    }
+}
+
+if (! function_exists('server_workspace_nav_for_server')) {
+    /**
+     * Server workspace sidebar items filtered to those whose backing service is installed.
+     * Items without `requires_any_tags` always show. Items with it only show if at least
+     * one tag is in {@see ServerInstalledServices::tagsFor}. Fails open when the provision
+     * stack summary is unavailable so freshly-imported servers still see every tab.
+     *
+     * @return list<array<string, mixed>>
+     */
+    function server_workspace_nav_for_server(Server $server): array
+    {
+        $items = config('server_workspace.nav', []);
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $installed = ServerInstalledServices::tagsFor($server);
+        $unknownStack = array_key_exists('unknown', $installed);
+
+        $filtered = array_filter($items, static function ($item) use ($installed, $unknownStack): bool {
+            if (! is_array($item)) {
+                return false;
+            }
+            $required = $item['requires_any_tags'] ?? null;
+            if (! is_array($required) || $required === []) {
+                return true;
+            }
+            if ($unknownStack) {
+                return true;
+            }
+            foreach ($required as $tag) {
+                if (is_string($tag) && array_key_exists($tag, $installed)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        return array_values($filtered);
     }
 }
 

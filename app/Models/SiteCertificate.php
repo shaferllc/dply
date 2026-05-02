@@ -12,24 +12,37 @@ class SiteCertificate extends Model
     use HasFactory, HasUlids;
 
     public const SCOPE_CUSTOMER = 'customer';
+
     public const SCOPE_PREVIEW = 'preview';
 
     public const PROVIDER_LETSENCRYPT = 'letsencrypt';
+
     public const PROVIDER_ZEROSSL = 'zerossl';
+
     public const PROVIDER_IMPORTED = 'imported';
+
     public const PROVIDER_CSR = 'csr';
 
     public const CHALLENGE_HTTP = 'http';
+
     public const CHALLENGE_DNS = 'dns';
+
     public const CHALLENGE_MANUAL = 'manual';
+
     public const CHALLENGE_IMPORTED = 'imported';
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_ISSUED = 'issued';
+
     public const STATUS_INSTALLING = 'installing';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_FAILED = 'failed';
+
     public const STATUS_EXPIRED = 'expired';
+
     public const STATUS_REMOVED = 'removed';
 
     protected $fillable = [

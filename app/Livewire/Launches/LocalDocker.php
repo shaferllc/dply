@@ -13,6 +13,7 @@ use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\SiteDeployment;
 use App\Services\Deploy\LocalRepositoryInspector;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Contracts\View\View;
@@ -24,20 +25,35 @@ use Livewire\Component;
 class LocalDocker extends Component
 {
     public string $repo_source = 'manual';
+
     public string $repository_url = '';
+
     public string $repository_branch = 'main';
+
     public string $repository_subdirectory = '';
+
     public string $source_control_account_id = '';
+
     public string $repository_selection = '';
+
     public string $target_family = '';
+
     public string $provider_credential_id = '';
+
     public string $cloud_region = '';
+
     public string $cloud_size = '';
+
     public string $cluster_name = '';
+
     public string $kubernetes_namespace = 'default';
+
     public array $linkedSourceControlAccounts = [];
+
     public array $availableRepositories = [];
+
     public array $inspection = [];
+
     public bool $has_inspection = false;
 
     public function mount(SourceControlRepositoryBrowser $repositoryBrowser): void
@@ -116,7 +132,7 @@ class LocalDocker extends Component
 
             Bus::chain([
                 new ProvisionSiteJob($site->id),
-                new RunSiteDeploymentJob($site, \App\Models\SiteDeployment::TRIGGER_API, null, (string) $user->id),
+                new RunSiteDeploymentJob($site, SiteDeployment::TRIGGER_API, null, (string) $user->id),
             ])->dispatch();
 
             return $this->redirect(route('sites.show', [$server, $site]), navigate: true);
@@ -129,7 +145,7 @@ class LocalDocker extends Component
 
             Bus::chain([
                 new ProvisionSiteJob($site->id),
-                new RunSiteDeploymentJob($site, \App\Models\SiteDeployment::TRIGGER_API, null, (string) $user->id),
+                new RunSiteDeploymentJob($site, SiteDeployment::TRIGGER_API, null, (string) $user->id),
             ])->dispatch();
 
             return $this->redirect(route('sites.show', [$server, $site]), navigate: true);

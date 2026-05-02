@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\OrganizationSupervisorProgramTemplate;
@@ -26,6 +27,7 @@ use Livewire\Component;
 class WorkspaceDaemons extends Component
 {
     use ConfirmsActionWithModal;
+    use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -37,7 +39,7 @@ class WorkspaceDaemons extends Component
 
     public string $new_sv_directory = '';
 
-    public string $new_sv_user = 'www-data';
+    public string $new_sv_user = 'dply';
 
     public int $new_sv_numprocs = 1;
 
@@ -47,8 +49,13 @@ class WorkspaceDaemons extends Component
 
     public ?string $new_sv_site_id = null;
 
-    /** @var 'quick'|'advanced' When {@see} is queue, structured builder vs raw command. */
-    public string $queue_builder_mode = 'quick';
+    /**
+     * @var 'quick'|'advanced' Storage values: 'quick' = structured builder (granular fields),
+     *                         'advanced' = raw command. UX labels are inverted (raw command is the friendlier "Quick"
+     *                         default) — see workspace-daemons.blade.php. Default to the raw-command path so a brand-new
+     *                         program shows a single command box rather than 10 queue-specific knobs.
+     */
+    public string $queue_builder_mode = 'advanced';
 
     public string $quick_php_binary = 'php';
 
@@ -114,6 +121,9 @@ class WorkspaceDaemons extends Component
 
     public bool $log_follow_enabled = false;
 
+    /** Generic supervisord daemon log (separate from per-program logs). null = not loaded yet. */
+    public ?string $supervisord_log_body = null;
+
     /** @var array<string, array{state: string, lines: array<int, string>}> */
     public array $program_status_map = [];
 
@@ -142,7 +152,8 @@ class WorkspaceDaemons extends Component
         }
 
         $this->bootWorkspace($server);
-        $this->new_sv_directory = '/var/www/app/current';
+        $this->new_sv_user = $this->defaultProgramUser();
+        $this->new_sv_directory = $this->defaultProgramDirectory();
         $this->supervisor_installed = match ($server->supervisor_package_status) {
             Server::SUPERVISOR_PACKAGE_INSTALLED => true,
             Server::SUPERVISOR_PACKAGE_MISSING => false,
@@ -243,32 +254,32 @@ class WorkspaceDaemons extends Component
                 'laravel-horizon',
                 'horizon',
                 'php artisan horizon',
-                '/var/www/app/current'
+                $this->defaultAppDirectory()
             ),
             'reverb' => $this->applySupervisorPresetValues(
                 'laravel-reverb',
                 'custom',
                 'php artisan reverb:start',
-                '/var/www/app/current'
+                $this->defaultAppDirectory()
             ),
             'laravel-schedule' => $this->applySupervisorPresetValues(
                 'laravel-schedule',
                 'custom',
                 'php artisan schedule:work',
-                '/var/www/app/current'
+                $this->defaultAppDirectory()
             ),
             'laravel-octane' => $this->applyLaravelOctanePreset(),
             'nodejs' => $this->applySupervisorPresetValues(
                 'nodejs-app',
                 'custom',
                 'node server.js',
-                '/var/www/app/current'
+                $this->defaultAppDirectory()
             ),
             'sidekiq' => $this->applySupervisorPresetValues(
                 'sidekiq',
                 'custom',
                 'bundle exec sidekiq -C config/sidekiq.yml',
-                '/var/www/app/current'
+                $this->defaultAppDirectory()
             ),
             default => null,
         };
@@ -293,8 +304,8 @@ class WorkspaceDaemons extends Component
         $this->new_sv_numprocs = 1;
         $this->resetExpertFormFields();
 
-        $dir = '/var/www/app/current';
-        $user = 'www-data';
+        $dir = $this->defaultAppDirectory();
+        $user = $this->defaultProgramUser();
         if ($this->new_sv_site_id !== null && $this->new_sv_site_id !== '') {
             $site = Site::query()
                 ->where('server_id', $this->server->id)
@@ -323,7 +334,7 @@ class WorkspaceDaemons extends Component
     protected function applyLaravelOctanePreset(): void
     {
         $command = 'php artisan octane:start --server=swoole --host=127.0.0.1 --port=8000';
-        $directory = '/var/www/app/current';
+        $directory = $this->defaultAppDirectory();
 
         if ($this->new_sv_site_id !== null && $this->new_sv_site_id !== '') {
             $site = Site::query()
@@ -350,7 +361,7 @@ class WorkspaceDaemons extends Component
         $this->new_sv_type = $type;
         $this->new_sv_command = $command;
         $this->new_sv_directory = $directory;
-        $this->new_sv_user = str_contains($slug, 'sidekiq') ? 'deploy' : 'www-data';
+        $this->new_sv_user = $this->defaultProgramUser();
         $this->new_sv_numprocs = 1;
         $this->resetExpertFormFields();
     }
@@ -384,11 +395,57 @@ class WorkspaceDaemons extends Component
         ];
     }
 
+    /**
+     * Best guess at which Linux user a Supervisor program should run as on this server.
+     * Prefers the configured deploy user (matches the bootstrap's `useradd dply`); falls back
+     * to whatever ssh_user is on the server row, then 'dply' as a last resort.
+     */
+    protected function defaultProgramUser(): string
+    {
+        $candidate = (string) config('server_provision.deploy_ssh_user', 'dply');
+        $candidate = trim($candidate) !== '' ? trim($candidate) : 'dply';
+
+        // The Server's ssh_user reflects what auth currently uses; on a finished provision it
+        // is typically the deploy user, so honour that if the config disagrees.
+        $serverUser = trim((string) ($this->server->ssh_user ?? ''));
+        if ($serverUser !== '' && $serverUser !== 'root') {
+            return $serverUser;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * Default Working directory for a fresh, generic program — i.e. when the user
+     * hasn't picked a Laravel/Node/Sidekiq preset yet. Just the deploy user's home.
+     * Server-only daemons (system tasks, monitoring sidecars, etc.) shouldn't be
+     * pointed at an app `current/` symlink that may not exist.
+     */
+    protected function defaultProgramDirectory(): string
+    {
+        return '/home/'.$this->defaultProgramUser();
+    }
+
+    /**
+     * Working directory for application-style presets (queue worker, Horizon, Octane,
+     * Reverb, schedule:work, Node, Sidekiq) — points at the canonical Dply app layout
+     * the bootstrap creates: /home/<deploy_user>/apps/<server-slug>/current.
+     */
+    protected function defaultAppDirectory(): string
+    {
+        $user = $this->defaultProgramUser();
+        $name = trim((string) ($this->server->name ?? '')) !== ''
+            ? Str::slug($this->server->name)
+            : 'app';
+
+        return '/home/'.$user.'/apps/'.$name.'/current';
+    }
+
     protected function rulesForProgramForm(): array
     {
         return [
             'new_sv_slug' => 'required|string|max:64|regex:/^[a-z0-9\-]+$/',
-            'new_sv_type' => 'required|string|max:32',
+            // new_sv_type is no longer user-editable; presets set it, otherwise it stays 'custom'.
             'new_sv_command' => 'required|string|max:2000',
             'new_sv_directory' => 'required|string|max:512',
             'new_sv_user' => 'required|string|max:64',
@@ -541,8 +598,13 @@ class WorkspaceDaemons extends Component
 
     protected function resetDefaultsForNewProgramForm(): void
     {
-        $this->new_sv_type = 'queue';
-        $this->queue_builder_mode = 'quick';
+        // 'custom' is the safe default — the user-facing Program type field was removed; presets
+        // override this when applied (laravel-queue → 'queue', laravel-horizon → 'horizon', etc.).
+        $this->new_sv_type = 'custom';
+        // Default new programs to the raw-command path (UX label "Quick") rather than
+        // the queue-specific granular builder. Users on non-Laravel-queue workloads
+        // never wanted those 10 knobs as their first impression.
+        $this->queue_builder_mode = 'advanced';
         $this->quick_php_binary = 'php';
         $this->quick_queue_connection = '';
         $this->quick_queue_name = 'default';
@@ -976,9 +1038,12 @@ class WorkspaceDaemons extends Component
         }
     }
 
-    public function restartAllPrograms(SupervisorProvisioner $provisioner): void
+    public function restartAllPrograms(SupervisorProvisioner $provisioner, bool $override = false): void
     {
         $this->authorize('update', $this->server);
+        if (! $this->disruptiveActionAllowed(__('Restart all programs'), $override)) {
+            return;
+        }
         try {
             $out = $provisioner->restartAllManagedPrograms($this->server->fresh());
             SupervisorDaemonAudit::log($this->server->fresh(), null, 'restart_all', ['output' => Str::limit($out, 1200)]);
@@ -1016,7 +1081,33 @@ class WorkspaceDaemons extends Component
         }
 
         try {
-            $this->inspect_supervisor_body = $provisioner->fetchSupervisorctlStatus($this->server->fresh());
+            $this->inspect_supervisor_body = $provisioner->inspect($this->server->fresh());
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function tailSupervisordDaemonLog(SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('view', $this->server);
+        $this->supervisord_log_body = null;
+
+        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
+            $this->toastError(__('Server must be ready with SSH before tailing the supervisord log.'));
+
+            return;
+        }
+
+        $this->server->refresh();
+        if ($this->server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_MISSING) {
+            $this->toastError(__('Supervisor is not installed on this server yet. Use Install Supervisor at the top of this page.'));
+
+            return;
+        }
+
+        try {
+            $body = $provisioner->tailSupervisordDaemonLog($this->server->fresh(), 200);
+            $this->supervisord_log_body = $body !== '' ? $body : __('(supervisord log is empty)');
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
@@ -1070,6 +1161,7 @@ class WorkspaceDaemons extends Component
             'sitesForServer' => $sitesForServer,
             'filteredSupervisorPrograms' => $filteredSupervisorPrograms,
             'contextSiteModel' => $contextSiteModel,
+            'restartAllConfirmMessage' => $this->disruptiveConfirmMessage(__('Restart all programs')),
         ]);
     }
 }

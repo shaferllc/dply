@@ -11,8 +11,11 @@ class WorkspaceDeployRun extends Model
     use HasUlids;
 
     public const STATUS_QUEUED = 'queued';
+
     public const STATUS_RUNNING = 'running';
+
     public const STATUS_SUCCESS = 'success';
+
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [

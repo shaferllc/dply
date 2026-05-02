@@ -52,6 +52,12 @@ return [
         '/etc/redis/',
         '/etc/php/',
         '/etc/supervisor/',
+        '/etc/apt/apt.conf.d/',
+    ],
+
+    /** Exact-match allowed config paths (used in addition to allowed_config_path_prefixes). */
+    'allowed_config_paths_exact' => [
+        '/etc/ssh/sshd_config',
     ],
 
     /** Max bytes read when previewing a config file over SSH. */
@@ -154,7 +160,155 @@ if command -v systemctl >/dev/null 2>&1; then
 else
   (sudo -n service mysql restart || service mysql restart) 2>&1
 fi
-BASH
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'reload_php_fpm' => [
+            'label' => 'Reload PHP-FPM',
+            'description' => 'Graceful reload (USR2) of php{version}-fpm. Uses default_php_version meta or 8.3.',
+            'confirm' => 'Reload PHP-FPM workers gracefully?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+V="${DPLY_PHP_VERSION:-8.3}"
+UNIT="php${V}-fpm"
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl reload "$UNIT" || systemctl reload "$UNIT") 2>&1
+else
+  (sudo -n service "$UNIT" reload || service "$UNIT" reload) 2>&1
+fi
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'nginx_test_config' => [
+            'label' => 'Test nginx config',
+            'description' => 'Runs nginx -t to validate configuration without reloading.',
+            'confirm' => 'Test the nginx configuration now?',
+            'timeout' => 60,
+            'script' => '(sudo -n nginx -t 2>&1 || nginx -t 2>&1)',
+        ],
+
+        'apt_upgrade' => [
+            'label' => 'Install all upgrades',
+            'description' => 'apt-get -y upgrade. Long-running; may restart services.',
+            'confirm' => 'Install all available upgrades? Some services may restart.',
+            'timeout' => 1800,
+            'script' => <<<'BASH'
+export DEBIAN_FRONTEND=noninteractive
+(sudo -n apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade \
+  || apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade) 2>&1
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'apt_dist_upgrade' => [
+            'label' => 'Distro upgrade',
+            'description' => 'apt-get -y dist-upgrade. May replace held packages and require reboot.',
+            'confirm' => 'Run apt-get dist-upgrade? Held packages may change; reboot may be required.',
+            'timeout' => 1800,
+            'script' => <<<'BASH'
+export DEBIAN_FRONTEND=noninteractive
+(sudo -n apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade \
+  || apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade) 2>&1
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'apt_autoremove' => [
+            'label' => 'Autoremove unused',
+            'description' => 'apt-get -y autoremove. Removes unused dependencies.',
+            'confirm' => 'Remove unused package dependencies?',
+            'timeout' => 300,
+            'script' => 'export DEBIAN_FRONTEND=noninteractive; (sudo -n apt-get -y autoremove || apt-get -y autoremove) 2>&1',
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'apt_clean' => [
+            'label' => 'Clean apt cache',
+            'description' => 'apt-get clean. Frees /var/cache/apt/archives.',
+            'confirm' => 'Clean the apt cache?',
+            'timeout' => 60,
+            'script' => '(sudo -n apt-get clean || apt-get clean) 2>&1; echo "---"; df -h /var 2>/dev/null',
+        ],
+
+        'unattended_upgrades_enable' => [
+            'label' => 'Enable unattended-upgrades',
+            'description' => 'Writes /etc/apt/apt.conf.d/20auto-upgrades enabling daily update lists and unattended upgrades.',
+            'confirm' => 'Enable unattended-upgrades on this server?',
+            'timeout' => 60,
+            'script' => <<<'BASH'
+TMP=$(mktemp)
+cat > "$TMP" <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+(sudo -n install -m 0644 "$TMP" /etc/apt/apt.conf.d/20auto-upgrades \
+  || install -m 0644 "$TMP" /etc/apt/apt.conf.d/20auto-upgrades) 2>&1
+rm -f "$TMP"
+echo "---"
+cat /etc/apt/apt.conf.d/20auto-upgrades
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'unattended_upgrades_disable' => [
+            'label' => 'Disable unattended-upgrades',
+            'description' => 'Writes /etc/apt/apt.conf.d/20auto-upgrades disabling automatic upgrades.',
+            'confirm' => 'Disable unattended-upgrades on this server?',
+            'timeout' => 60,
+            'script' => <<<'BASH'
+TMP=$(mktemp)
+cat > "$TMP" <<'EOF'
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF
+(sudo -n install -m 0644 "$TMP" /etc/apt/apt.conf.d/20auto-upgrades \
+  || install -m 0644 "$TMP" /etc/apt/apt.conf.d/20auto-upgrades) 2>&1
+rm -f "$TMP"
+echo "---"
+cat /etc/apt/apt.conf.d/20auto-upgrades
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'certbot_renew_dry_run' => [
+            'label' => 'Dry-run renew',
+            'description' => 'certbot renew --dry-run. Safe — does not change certs on disk.',
+            'confirm' => 'Run certbot renew --dry-run?',
+            'timeout' => 600,
+            'script' => '(sudo -n certbot renew --dry-run --no-color 2>&1 || certbot renew --dry-run --no-color 2>&1)',
+        ],
+
+        'certbot_renew_all' => [
+            'label' => 'Renew certificates',
+            'description' => 'certbot renew. Renews any cert near expiry.',
+            'confirm' => 'Renew certificates? Only those within the renewal window will actually renew.',
+            'timeout' => 900,
+            'script' => '(sudo -n certbot renew --no-color 2>&1 || certbot renew --no-color 2>&1)',
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'redis_info' => [
+            'label' => 'Show Redis INFO',
+            'description' => 'redis-cli INFO snapshot.',
+            'confirm' => 'Show Redis INFO?',
+            'timeout' => 30,
+            'script' => 'redis-cli INFO 2>&1 | head -n 200',
+        ],
+
+        'mysql_processlist' => [
+            'label' => 'MySQL processlist',
+            'description' => 'SHOW PROCESSLIST. Requires manage_internal_db_password if root needs auth.',
+            'confirm' => 'Show MySQL processlist?',
+            'timeout' => 30,
+            'script' => <<<'BASH'
+if [ -n "${DPLY_DB_PASSWORD:-}" ]; then
+  mysql -uroot -p"$DPLY_DB_PASSWORD" -e "SHOW PROCESSLIST" 2>&1 | head -n 200
+else
+  (sudo -n mysql -e "SHOW PROCESSLIST" 2>&1 || mysql -e "SHOW PROCESSLIST" 2>&1) | head -n 200
+fi
+BASH,
         ],
     ],
 
@@ -175,6 +329,19 @@ BASH
         'off' => 'Disabled',
         'daily' => 'Daily',
         'weekly' => 'Weekly',
+    ],
+
+    /**
+     * Server "Manage" workspace sub-pages (URL segment after /manage/). Order matches the tab bar.
+     */
+    'workspace_tabs' => [
+        'overview' => ['label' => 'Overview', 'icon' => 'squares-2x2'],
+        'services' => ['label' => 'Services', 'icon' => 'bolt'],
+        'web' => ['label' => 'Web', 'icon' => 'globe-alt'],
+        'data' => ['label' => 'Data', 'icon' => 'circle-stack'],
+        'updates' => ['label' => 'Updates', 'icon' => 'arrow-path'],
+        'configuration' => ['label' => 'Configuration', 'icon' => 'document-text'],
+        'danger' => ['label' => 'Danger', 'icon' => 'exclamation-triangle'],
     ],
 
 ];

@@ -42,6 +42,35 @@
             <x-alert tone="success">{{ session('success') }}</x-alert>
         @endif
 
+        @if ($serverCreateDraft)
+            @php
+                $stepLabels = [
+                    1 => __('Type & name'),
+                    2 => __('Where it runs'),
+                    3 => __('What it runs'),
+                    4 => __('Review'),
+                ];
+                $stepLabel = $stepLabels[$serverCreateDraft->step] ?? __('In progress');
+            @endphp
+            <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-5 py-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-sky-900">{{ __('You have an in-progress server draft.') }}</p>
+                        <p class="mt-0.5 text-sm text-sky-800">{{ __('Step :n of :total · :label · last touched :ago', ['n' => $serverCreateDraft->step, 'total' => \App\Models\ServerCreateDraft::TOTAL_STEPS, 'label' => $stepLabel, 'ago' => $serverCreateDraft->updated_at?->diffForHumans()]) }}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700">
+                            {{ __('Continue') }}
+                            <x-heroicon-o-arrow-right class="h-4 w-4" />
+                        </a>
+                        <button type="button" wire:click="openDiscardServerCreateDraftModal" class="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-100">
+                            {{ __('Discard') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <x-page-header
             :title="__('Servers')"
             :description="__('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
@@ -414,4 +443,28 @@
         'serverId' => (string) ($deleteModalServer?->id ?? ''),
         'deletionSummary' => $deletionSummary,
     ])
+
+    @if ($showDiscardServerCreateDraftModal)
+        @teleport('body')
+        <div class="fixed inset-0 isolate z-[100] overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeDiscardServerCreateDraftModal"></div>
+            <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
+                <div class="w-full max-w-md dply-modal-panel" @click.stop>
+                    <div class="border-b border-zinc-100 px-6 py-5">
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Discard this draft?') }}</h2>
+                        <p class="mt-2 text-sm text-brand-moss">{{ __("You'll lose the values you've entered so far. This can't be undone.") }}</p>
+                    </div>
+                    <div class="flex flex-col-reverse gap-3 border-t border-zinc-100 bg-zinc-50/80 px-6 py-4 sm:flex-row sm:justify-end">
+                        <button type="button" wire:click="closeDiscardServerCreateDraftModal" class="inline-flex justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-zinc-50">
+                            {{ __('Keep editing') }}
+                        </button>
+                        <button type="button" wire:click="confirmDiscardServerCreateDraft" wire:loading.attr="disabled" wire:target="confirmDiscardServerCreateDraft" class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:cursor-wait disabled:opacity-60">
+                            {{ __('Discard draft') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endteleport
+    @endif
 </div>

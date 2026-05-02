@@ -293,7 +293,6 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  mixed  $decoded
      * @return array<string, mixed>
      */
     protected function decodeResponse(int $status, mixed $decoded, string $rawBody): array

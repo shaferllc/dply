@@ -56,14 +56,24 @@ class ServerFirewallProvisioner
 
         $log = "Applying UFW rules (ensure SSH is reachable before tightening UFW).\n";
 
+        // Safety rail: always allow the configured SSH port (whatever it is — 22 in the
+        // common case, 2222 for the local fake-cloud container) so the user can never
+        // lock themselves out by removing/disabling the SSH rule in the panel.
+        $sshPort = (int) ($server->ssh_port ?: 22);
+
         $log .= app(ServerSshConnectionRunner::class)->run(
             $server,
-            function ($ssh) use ($rules, $server): string {
-                $output = '';
+            function ($ssh) use ($rules, $server, $sshPort): string {
+                $output = $ssh->exec($this->ufwExecLine($server, 'allow '.$sshPort.'/tcp comment '.escapeshellarg('Dply: keep SSH reachable')), 60);
 
                 foreach ($rules as $rule) {
                     $output .= $this->applyRuleViaSsh($ssh, $server, $rule);
                 }
+
+                // Make sure UFW is actually loaded — fresh installs leave it inactive,
+                // and rules with no enable are a silent no-op. `--force` skips the
+                // "Command may disrupt existing ssh connections" prompt.
+                $output .= $ssh->exec($this->ufwExecLine($server, '--force enable'), 30);
 
                 return $output;
             },
@@ -72,6 +82,44 @@ class ServerFirewallProvisioner
         );
 
         return $log;
+    }
+
+    /**
+     * Run a curated set of read-only UFW/iptables commands for diagnostics. Returns a single
+     * combined log so the workspace can render it in one console panel.
+     */
+    public function diagnostics(Server $server): string
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $iptablesPrefix = $this->privilegedBinaryPrefix($server, 'iptables');
+        $commands = [
+            ['label' => 'ufw status verbose', 'cmd' => $this->ufwExecLine($server, 'status verbose')],
+            ['label' => 'ufw status numbered', 'cmd' => $this->ufwExecLine($server, 'status numbered')],
+            ['label' => 'ss -ltn (listening TCP)', 'cmd' => 'ss -ltn 2>&1 || netstat -ltn 2>&1'],
+            ['label' => 'iptables -L INPUT -n -v --line-numbers (head)',
+                'cmd' => $iptablesPrefix.' -L INPUT -n -v --line-numbers 2>&1 | head -40'],
+        ];
+
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($commands): string {
+                $out = '';
+                foreach ($commands as $entry) {
+                    $out .= str_repeat('═', 60)."\n";
+                    $out .= '$ '.$entry['label']."\n";
+                    $out .= str_repeat('═', 60)."\n";
+                    $out .= $ssh->exec($entry['cmd'], 30);
+                    $out .= "\n";
+                }
+
+                return $out;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
     }
 
     /**
@@ -95,7 +143,9 @@ class ServerFirewallProvisioner
     }
 
     /**
-     * UFW must run as root. Non-root SSH users (e.g. deploy) use passwordless sudo, same as Supervisor/cron helpers.
+     * UFW lives in /usr/sbin which sudoers' default `secure_path` strips, so plain
+     * `sudo -n ufw …` fails with "ufw: command not found". Re-set PATH inside the sudo
+     * shell so /usr/sbin and /sbin are reachable for both ufw and iptables.
      */
     private function ufwBinaryPrefix(Server $server): string
     {
@@ -104,7 +154,21 @@ class ServerFirewallProvisioner
             return 'ufw';
         }
 
-        return 'sudo -n ufw';
+        return 'sudo -n env PATH=/usr/sbin:/usr/bin:/sbin:/bin ufw';
+    }
+
+    /**
+     * Same PATH-extending wrapper for any other privileged binary we need to run via sudo
+     * (iptables, etc.). Returns the prefix the caller appends arguments to.
+     */
+    private function privilegedBinaryPrefix(Server $server, string $binary): string
+    {
+        $user = trim((string) $server->ssh_user);
+        if ($user === '' || $user === 'root') {
+            return $binary;
+        }
+
+        return 'sudo -n env PATH=/usr/sbin:/usr/bin:/sbin:/bin '.$binary;
     }
 
     private function ufwExecLine(Server $server, string $arguments): string

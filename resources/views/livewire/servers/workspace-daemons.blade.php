@@ -53,22 +53,40 @@
 
         <x-server-workspace-tablist :aria-label="__('Daemons workspace sections')">
             <x-server-workspace-tab id="daemons-tab-programs" :active="$daemons_workspace_tab === 'programs'" wire:click="$set('daemons_workspace_tab', 'programs')">
-                {{ __('Programs') }}
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-cpu-chip class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Programs') }}
+                </span>
             </x-server-workspace-tab>
             <x-server-workspace-tab id="daemons-tab-service" :active="$daemons_workspace_tab === 'service'" wire:click="$set('daemons_workspace_tab', 'service')">
-                {{ __('Service') }}
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-server class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Service') }}
+                </span>
             </x-server-workspace-tab>
             <x-server-workspace-tab id="daemons-tab-sync" :active="$daemons_workspace_tab === 'sync'" wire:click="$set('daemons_workspace_tab', 'sync')">
-                {{ __('Sync') }}
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-arrow-path-rounded-square class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Sync') }}
+                </span>
             </x-server-workspace-tab>
             <x-server-workspace-tab id="daemons-tab-logs" :active="$daemons_workspace_tab === 'logs'" wire:click="$set('daemons_workspace_tab', 'logs')">
-                {{ __('Logs') }}
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Logs') }}
+                </span>
             </x-server-workspace-tab>
             <x-server-workspace-tab id="daemons-tab-inspect" :active="$daemons_workspace_tab === 'inspect'" wire:click="$set('daemons_workspace_tab', 'inspect')">
-                {{ __('Inspect') }}
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-magnifying-glass class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Inspect') }}
+                </span>
             </x-server-workspace-tab>
             <x-server-workspace-tab id="daemons-tab-activity" :active="$daemons_workspace_tab === 'activity'" wire:click="$set('daemons_workspace_tab', 'activity')">
-                {{ __('Activity') }}
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Activity') }}
+                </span>
             </x-server-workspace-tab>
         </x-server-workspace-tablist>
 
@@ -90,42 +108,26 @@
                         {{ __('Each program becomes a conf file on the server. After saving here, use “Sync Supervisor on server” to write files and reload Supervisor.') }}
                     </p>
 
-                    <div class="mt-6 flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            wire:click="applySupervisorPreset('laravel-queue')"
-                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
-                        >{{ __('Preset: queue worker') }}</button>
-                        <button
-                            type="button"
-                            wire:click="applySupervisorPreset('laravel-horizon')"
-                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
-                        >{{ __('Preset: Horizon') }}</button>
-                        <button
-                            type="button"
-                            wire:click="applySupervisorPreset('reverb')"
-                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
-                        >{{ __('Preset: Reverb') }}</button>
-                        <button
-                            type="button"
-                            wire:click="applySupervisorPreset('laravel-schedule')"
-                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
-                        >{{ __('Preset: schedule:work') }}</button>
-                        <button
-                            type="button"
-                            wire:click="applySupervisorPreset('laravel-octane')"
-                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
-                        >{{ __('Preset: Laravel Octane') }}</button>
-                        <button
-                            type="button"
-                            wire:click="applySupervisorPreset('nodejs')"
-                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
-                        >{{ __('Preset: Node') }}</button>
-                        <button
-                            type="button"
-                            wire:click="applySupervisorPreset('sidekiq')"
-                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
-                        >{{ __('Preset: Sidekiq') }}</button>
+                    <div class="mt-6">
+                        <x-input-label for="supervisor_preset_picker" value="{{ __('Start from a preset (optional)') }}" />
+                        <div class="mt-1 flex items-stretch gap-2">
+                            <select
+                                id="supervisor_preset_picker"
+                                x-data
+                                x-on:change="if ($event.target.value) { $wire.applySupervisorPreset($event.target.value); $event.target.value = ''; }"
+                                class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 sm:max-w-md"
+                            >
+                                <option value="">{{ __('— Pick a preset to fill the form —') }}</option>
+                                <option value="laravel-queue">{{ __('Laravel queue worker (queue:work)') }}</option>
+                                <option value="laravel-horizon">{{ __('Laravel Horizon') }}</option>
+                                <option value="reverb">{{ __('Laravel Reverb (websockets)') }}</option>
+                                <option value="laravel-schedule">{{ __('Laravel scheduler (schedule:work)') }}</option>
+                                <option value="laravel-octane">{{ __('Laravel Octane') }}</option>
+                                <option value="nodejs">{{ __('Node.js process') }}</option>
+                                <option value="sidekiq">{{ __('Sidekiq (Ruby)') }}</option>
+                            </select>
+                        </div>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Selecting a preset fills the form below — you can still tweak anything before saving.') }}</p>
                     </div>
 
                     <form id="daemon-program-form" wire:submit="saveSupervisorProgram" class="mt-6 space-y-6">
@@ -135,33 +137,17 @@
                                 <button type="button" wire:click="cancelEditProgram" class="ml-2 font-semibold underline">{{ __('Cancel') }}</button>
                             </div>
                         @endif
-                        <div class="grid gap-6 sm:grid-cols-2">
-                            <div>
-                                <x-input-label for="new_sv_slug" value="{{ __('Program name (slug)') }}" />
-                                <input
-                                    id="new_sv_slug"
-                                    type="text"
-                                    wire:model="new_sv_slug"
-                                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                                    placeholder="{{ __('e.g. horizon') }}"
-                                    autocomplete="off"
-                                />
-                                <x-input-error :messages="$errors->get('new_sv_slug')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="new_sv_type" value="{{ __('Program type') }}" />
-                                <select
-                                    id="new_sv_type"
-                                    wire:model="new_sv_type"
-                                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                                >
-                                    <option value="horizon">horizon</option>
-                                    <option value="queue">queue</option>
-                                    <option value="octane">octane</option>
-                                    <option value="custom">custom</option>
-                                </select>
-                                <x-input-error :messages="$errors->get('new_sv_type')" class="mt-1" />
-                            </div>
+                        <div>
+                            <x-input-label for="new_sv_slug" value="{{ __('Program name (slug)') }}" />
+                            <input
+                                id="new_sv_slug"
+                                type="text"
+                                wire:model="new_sv_slug"
+                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                placeholder="{{ __('e.g. horizon') }}"
+                                autocomplete="off"
+                            />
+                            <x-input-error :messages="$errors->get('new_sv_slug')" class="mt-1" />
                         </div>
 
                         <div>
@@ -181,15 +167,20 @@
 
                         @if ($new_sv_type === 'queue')
                             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-4">
-                                <p class="text-sm font-medium text-brand-ink">{{ __('Laravel queue worker') }}</p>
-                                <p class="mt-1 text-xs text-brand-moss">{{ __('Quick mode builds the `php artisan queue:work` line; advanced mode uses the raw fields below.') }}</p>
+                                <p class="text-sm font-medium text-brand-ink">{{ __('Program command') }}</p>
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Quick mode lets you write any raw command (queue:work, scheduler, custom binaries — anything Supervisor can run). Advanced mode is a Laravel queue builder that assembles a `php artisan queue:work` line for you.') }}</p>
                                 <div class="mt-3 flex flex-wrap gap-4">
+                                    {{-- Labels are intentionally swapped vs. the underlying values:
+                                         the granular builder is "Advanced" (many knobs), and the
+                                         single raw-command path is "Quick" — matches user expectation
+                                         that "Quick" = least to fill in. Backend `queue_builder_mode`
+                                         keeps its 'quick'/'advanced' values for compatibility. --}}
                                     <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
-                                        <input type="radio" wire:model.live="queue_builder_mode" value="quick" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                        <input type="radio" wire:model.live="queue_builder_mode" value="advanced" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
                                         <span class="text-brand-ink">{{ __('Quick') }}</span>
                                     </label>
                                     <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
-                                        <input type="radio" wire:model.live="queue_builder_mode" value="advanced" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                        <input type="radio" wire:model.live="queue_builder_mode" value="quick" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
                                         <span class="text-brand-ink">{{ __('Advanced') }}</span>
                                     </label>
                                 </div>
@@ -272,8 +263,9 @@
                                     type="text"
                                     wire:model="new_sv_directory"
                                     class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                                    placeholder="/var/www/app/current"
+                                    placeholder="/home/dply"
                                 />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Supervisor `cd`s here before running the command. Defaults to the deploy user\'s home for server-only daemons. App-style presets (queue worker, Horizon, Octane, Reverb, schedule:work, Node, Sidekiq) point at /home/<user>/apps/<server>/current — change to a different app path if needed.') }}</p>
                                 <x-input-error :messages="$errors->get('new_sv_directory')" class="mt-1" />
                             </div>
 
@@ -284,8 +276,9 @@
                                     type="text"
                                     wire:model="new_sv_user"
                                     class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                                    placeholder="www-data"
+                                    placeholder="dply"
                                 />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Defaults to the deploy user (dply). Use `root` for system services, or another user that owns the working directory.') }}</p>
                                 <x-input-error :messages="$errors->get('new_sv_user')" class="mt-1" />
                             </div>
                         </div>
@@ -306,95 +299,114 @@
                             </div>
                         </div>
 
-                        <div>
-                            <x-input-label for="new_sv_env_lines" value="{{ __('Environment (optional, KEY=value per line)') }}" />
-                            <textarea
-                                id="new_sv_env_lines"
-                                wire:model="new_sv_env_lines"
-                                rows="3"
-                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-xs text-brand-ink shadow-sm"
-                                placeholder="APP_ENV=production"
-                            ></textarea>
-                            <p class="mt-1 text-xs text-brand-moss">{{ __('Stored encrypted in Dply and written into the Supervisor program config.') }}</p>
-                            <x-input-error :messages="$errors->get('new_sv_env_lines')" class="mt-1" />
-                        </div>
-                        <div>
-                            <x-input-label for="new_sv_stdout_logfile" value="{{ __('Custom stdout log path (optional)') }}" />
-                            <input
-                                id="new_sv_stdout_logfile"
-                                type="text"
-                                wire:model="new_sv_stdout_logfile"
-                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm"
-                                placeholder="/var/log/dply-worker.log"
-                            />
-                            <x-input-error :messages="$errors->get('new_sv_stdout_logfile')" class="mt-1" />
-                        </div>
-
-                        <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-                            <summary class="cursor-pointer text-sm font-semibold text-brand-ink">{{ __('Expert Supervisor settings') }}</summary>
-                            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                        @php
+                            // Auto-open the advanced block when any of these fields have values
+                            // (e.g. when editing a program that uses env vars or custom log paths).
+                            $advancedOpen = trim((string) ($new_sv_env_lines ?? '')) !== ''
+                                || trim((string) ($new_sv_stdout_logfile ?? '')) !== ''
+                                || trim((string) ($new_sv_priority ?? '')) !== ''
+                                || trim((string) ($new_sv_startsecs ?? '')) !== ''
+                                || trim((string) ($new_sv_stopwaitsecs ?? '')) !== ''
+                                || trim((string) ($new_sv_autorestart ?? '')) !== ''
+                                || ! ($new_sv_redirect_stderr ?? true);
+                        @endphp
+                        <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3" @if ($advancedOpen) open @endif>
+                            <summary class="cursor-pointer text-sm font-semibold text-brand-ink">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-brand-mist" />
+                                    {{ __('More advanced — env, logs, supervisor tuning') }}
+                                </span>
+                            </summary>
+                            <div class="mt-4 space-y-5">
                                 <div>
-                                    <x-input-label for="new_sv_priority" value="{{ __('priority (optional)') }}" />
-                                    <input
-                                        id="new_sv_priority"
-                                        type="number"
-                                        wire:model="new_sv_priority"
-                                        min="1"
-                                        max="999"
-                                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
-                                        placeholder="{{ __('omit for default') }}"
-                                    />
-                                    <x-input-error :messages="$errors->get('new_sv_priority')" class="mt-1" />
+                                    <x-input-label for="new_sv_env_lines" value="{{ __('Environment (optional, KEY=value per line)') }}" />
+                                    <textarea
+                                        id="new_sv_env_lines"
+                                        wire:model="new_sv_env_lines"
+                                        rows="3"
+                                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-xs text-brand-ink shadow-sm"
+                                        placeholder="APP_ENV=production"
+                                    ></textarea>
+                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Stored encrypted in Dply and written into the Supervisor program config.') }}</p>
+                                    <x-input-error :messages="$errors->get('new_sv_env_lines')" class="mt-1" />
                                 </div>
                                 <div>
-                                    <x-input-label for="new_sv_startsecs" value="{{ __('startsecs (optional)') }}" />
+                                    <x-input-label for="new_sv_stdout_logfile" value="{{ __('Custom stdout log path (optional)') }}" />
                                     <input
-                                        id="new_sv_startsecs"
-                                        type="number"
-                                        wire:model="new_sv_startsecs"
-                                        min="0"
-                                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
-                                        placeholder="1"
-                                    />
-                                </div>
-                                <div>
-                                    <x-input-label for="new_sv_stopwaitsecs" value="{{ __('stopwaitsecs (optional)') }}" />
-                                    <input
-                                        id="new_sv_stopwaitsecs"
-                                        type="number"
-                                        wire:model="new_sv_stopwaitsecs"
-                                        min="0"
-                                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
-                                        placeholder="3600"
-                                    />
-                                </div>
-                                <div>
-                                    <x-input-label for="new_sv_autorestart" value="{{ __('autorestart (optional)') }}" />
-                                    <input
-                                        id="new_sv_autorestart"
+                                        id="new_sv_stdout_logfile"
                                         type="text"
-                                        wire:model="new_sv_autorestart"
-                                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
-                                        placeholder="true, false, unexpected, or a number"
+                                        wire:model="new_sv_stdout_logfile"
+                                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm text-brand-ink shadow-sm"
+                                        placeholder="/var/log/dply-worker.log"
                                     />
+                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Every program is logged automatically — Supervisor writes stdout to /var/log/supervisor/<slug>-stdout-<pid>.log unless you override the path here.') }}</p>
+                                    <x-input-error :messages="$errors->get('new_sv_stdout_logfile')" class="mt-1" />
                                 </div>
-                                <div class="sm:col-span-2">
-                                    <label class="flex items-center gap-2 text-sm text-brand-ink">
-                                        <input type="checkbox" wire:model.live="new_sv_redirect_stderr" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage" />
-                                        {{ __('Redirect stderr to stdout (Supervisor default)') }}
-                                    </label>
-                                </div>
-                                @if (! $new_sv_redirect_stderr)
-                                    <div class="sm:col-span-2">
-                                        <x-input-label for="new_sv_stderr_logfile" value="{{ __('stderr log path') }}" />
+
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="new_sv_priority" value="{{ __('priority (optional)') }}" />
                                         <input
-                                            id="new_sv_stderr_logfile"
-                                            type="text"
-                                            wire:model="new_sv_stderr_logfile"
+                                            id="new_sv_priority"
+                                            type="number"
+                                            wire:model="new_sv_priority"
+                                            min="1"
+                                            max="999"
                                             class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
+                                            placeholder="{{ __('omit for default') }}"
+                                        />
+                                        <x-input-error :messages="$errors->get('new_sv_priority')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="new_sv_startsecs" value="{{ __('startsecs (optional)') }}" />
+                                        <input
+                                            id="new_sv_startsecs"
+                                            type="number"
+                                            wire:model="new_sv_startsecs"
+                                            min="0"
+                                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
+                                            placeholder="1"
                                         />
                                     </div>
-                                @endif
+                                    <div>
+                                        <x-input-label for="new_sv_stopwaitsecs" value="{{ __('stopwaitsecs (optional)') }}" />
+                                        <input
+                                            id="new_sv_stopwaitsecs"
+                                            type="number"
+                                            wire:model="new_sv_stopwaitsecs"
+                                            min="0"
+                                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
+                                            placeholder="3600"
+                                        />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="new_sv_autorestart" value="{{ __('autorestart (optional)') }}" />
+                                        <input
+                                            id="new_sv_autorestart"
+                                            type="text"
+                                            wire:model="new_sv_autorestart"
+                                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
+                                            placeholder="true, false, unexpected, or a number"
+                                        />
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label class="flex items-center gap-2 text-sm text-brand-ink">
+                                            <input type="checkbox" wire:model.live="new_sv_redirect_stderr" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage" />
+                                            {{ __('Redirect stderr to stdout (Supervisor default)') }}
+                                        </label>
+                                    </div>
+                                    @if (! $new_sv_redirect_stderr)
+                                        <div class="sm:col-span-2">
+                                            <x-input-label for="new_sv_stderr_logfile" value="{{ __('stderr log path') }}" />
+                                            <input
+                                                id="new_sv_stderr_logfile"
+                                                type="text"
+                                                wire:model="new_sv_stderr_logfile"
+                                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 font-mono text-sm"
+                                            />
+                                        </div>
+                                    @endif
+                                </div>
                             </div>
                         </details>
                     </form>
@@ -440,7 +452,10 @@
                 <div class="flex flex-col-reverse items-stretch justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:flex-row sm:items-center sm:justify-end sm:flex-wrap">
                     <button
                         type="button"
-                        wire:click="restartAllPrograms"
+                        wire:click="restartAllPrograms({{ $restartAllConfirmMessage !== '' ? 'true' : 'false' }})"
+                        @if ($restartAllConfirmMessage !== '')
+                            wire:confirm="{{ $restartAllConfirmMessage }}"
+                        @endif
                         wire:loading.attr="disabled"
                         wire:target="restartAllPrograms"
                         @disabled($supervisor_installed !== true)
@@ -911,6 +926,36 @@
             aria-labelledby="daemons-tab-logs"
             aria-hidden="{{ $daemons_workspace_tab !== 'logs' ? 'true' : 'false' }}"
         >
+            <div @class([$card, 'mb-6' => $server->supervisorPrograms->isNotEmpty()])>
+                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Supervisord daemon log') }}</h2>
+                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">
+                        {{ __('Tail of /var/log/supervisor/supervisord.log — supervisord itself logs here (startup, config reloads, child-process spawn failures). Independent of program stdout/stderr.') }}
+                    </p>
+                </div>
+                <div class="space-y-4 p-6 sm:p-8">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-sm text-brand-moss">{{ __('Loads the last 200 lines.') }}</p>
+                        <button
+                            type="button"
+                            wire:click="tailSupervisordDaemonLog"
+                            wire:loading.attr="disabled"
+                            wire:target="tailSupervisordDaemonLog"
+                            @disabled($supervisor_installed === false)
+                            class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <span wire:loading.remove wire:target="tailSupervisordDaemonLog">{{ __('Tail daemon log') }}</span>
+                            <span wire:loading wire:target="tailSupervisordDaemonLog" class="inline-flex items-center gap-2">
+                                <x-spinner variant="forest" />
+                                {{ __('Loading…') }}
+                            </span>
+                        </button>
+                    </div>
+                    <pre class="max-h-[min(55vh,28rem)] overflow-auto whitespace-pre-wrap break-all rounded-xl bg-zinc-950 px-4 py-3 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">@if ($supervisord_log_body !== null){{ $supervisord_log_body }}@else{{ __('Click “Tail daemon log”.') }}@endif</pre>
+                </div>
+            </div>
+
+            @if ($server->supervisorPrograms->isNotEmpty())
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Program logs') }}</h2>
@@ -971,6 +1016,7 @@
                     <pre class="max-h-[min(55vh,28rem)] overflow-auto whitespace-pre-wrap break-all rounded-xl bg-zinc-950 px-4 py-3 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">{{ $log_tail_body !== '' ? $log_tail_body : __('Choose a program and tail the log.') }}</pre>
                 </div>
             </div>
+            @endif
         </div>
 
         {{-- Inspect --}}
@@ -987,17 +1033,17 @@
                 <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Supervisor on the server') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss leading-relaxed">
-                        {{ __('Read-only: runs supervisorctl status over SSH. When the login user is not root, Dply uses sudo -n supervisorctl (passwordless sudo must be allowed for that user, same as provisioning).') }}
+                        {{ __('Read-only diagnostics: systemd unit status, supervisorctl version + status, and the tail of the supervisord daemon log. When the login user is not root, Dply uses sudo -n (passwordless sudo must be allowed, same as provisioning).') }}
                     </p>
                 </div>
                 <div class="space-y-4 p-6 sm:p-8">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p class="text-sm text-brand-moss">{{ __('Loads live status from the server (same SSH user as deploys).') }}</p>
+                        <p class="text-sm text-brand-moss">{{ __('Runs systemctl + supervisorctl + tails the daemon log over SSH.') }}</p>
                         <button
                             type="button"
                             wire:click="loadSupervisorInspect"
                             wire:loading.attr="disabled"
-                            @disabled($supervisor_installed !== true)
+                            @disabled($supervisor_installed === false)
                             class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <span wire:loading.remove wire:target="loadSupervisorInspect">{{ __('Load status') }}</span>

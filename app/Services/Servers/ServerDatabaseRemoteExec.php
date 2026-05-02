@@ -86,6 +86,7 @@ BASH;
         }
 
         $inner = $prefix.'mysql -u '.escapeshellarg($user).' -N -e '.escapeshellarg($sql).' 2>&1';
+
         return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
 

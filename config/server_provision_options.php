@@ -153,6 +153,10 @@ return [
     'cache_services' => [
         ['id' => 'redis', 'label' => 'Redis'],
         ['id' => 'valkey', 'label' => 'Valkey', 'exclude_providers' => ['fly_io']],
+        ['id' => 'memcached', 'label' => 'Memcached'],
+        ['id' => 'keydb', 'label' => 'KeyDB (Redis-compatible, multithreaded)'],
+        ['id' => 'dragonfly', 'label' => 'Dragonfly (Redis-compatible)'],
+        ['id' => 'none', 'label' => 'No cache service'],
     ],
     'webservers' => [
         [
@@ -199,6 +203,8 @@ return [
         ['id' => 'none', 'label' => 'Not applicable', 'only_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain', 'worker']],
     ],
     'php_versions' => [
+        ['id' => '8.6', 'label' => 'PHP 8.6 (not yet released)', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
+        ['id' => '8.5', 'label' => 'PHP 8.5 (preview from ondrej/php)', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
         ['id' => '8.4', 'label' => 'PHP 8.4', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
         ['id' => '8.3', 'label' => 'PHP 8.3', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
         ['id' => '8.2', 'label' => 'PHP 8.2', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],

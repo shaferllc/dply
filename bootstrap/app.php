@@ -6,11 +6,13 @@ use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
+use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnsureApiTokenAbility;
+use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
@@ -79,6 +81,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
+        $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
 
         $schedule->command(CheckSupervisorHealthCommand::class)
             ->everyFifteenMinutes()
@@ -144,6 +147,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ability' => EnsureApiTokenAbility::class,
             'fleet.operator' => ValidateFleetOperatorToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
+            'server.service.installed' => EnsureServerServiceInstalled::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             'hooks/*',

@@ -4,6 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Forms\FirewallRuleForm;
+use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesFirewallWorkspaceAdvanced;
@@ -24,6 +25,7 @@ use Livewire\Component;
 class WorkspaceFirewall extends Component
 {
     use ConfirmsActionWithModal;
+    use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesFirewallWorkspaceAdvanced;
@@ -460,9 +462,13 @@ class WorkspaceFirewall extends Component
         ServerFirewallProvisioner $firewall,
         ServerFirewallAuditLogger $audit,
         ServerFirewallApplyRecorder $recorder,
+        bool $override = false,
     ): void {
         $this->authorize('update', $this->server);
         $this->server->refresh();
+        if (! $this->disruptiveActionAllowed(__('Apply firewall rules'), $override)) {
+            return;
+        }
 
         $sshWarn = $firewall->sshAccessNotExplicitlyAllowed($this->server)
             ? ' '.__('Warning: no enabled Dply rule allows TCP :port from “any” — confirm SSH access before locking yourself out.', ['port' => $this->server->ssh_port ?: 22])
@@ -503,6 +509,27 @@ class WorkspaceFirewall extends Component
         }
     }
 
+    public bool $ufw_diagnostics_modal_open = false;
+
+    public ?string $ufw_diagnostics_text = null;
+
+    public function runFirewallDiagnostics(ServerFirewallProvisioner $firewall): void
+    {
+        $this->authorize('update', $this->server);
+        try {
+            $this->server->refresh();
+            $this->ufw_diagnostics_text = $firewall->diagnostics($this->server);
+            $this->ufw_diagnostics_modal_open = true;
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function closeFirewallDiagnostics(): void
+    {
+        $this->ufw_diagnostics_modal_open = false;
+    }
+
     public function render(): View
     {
         $this->server->refresh();
@@ -530,6 +557,7 @@ class WorkspaceFirewall extends Component
             'auditEvents' => $this->server->firewallAuditEvents()->with('user')->limit(40)->get(),
             'applyLogs' => $this->server->firewallApplyLogs()->with(['user'])->limit(25)->get(),
             'sshNotCovered' => $provisioner->sshAccessNotExplicitlyAllowed($this->server),
+            'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
         ]);
     }
 }

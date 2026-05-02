@@ -16,16 +16,28 @@
         <div class="space-y-6">
             <x-server-workspace-tablist :aria-label="__('Firewall workspace sections')">
                 <x-server-workspace-tab id="firewall-tab-rules" :active="$firewall_workspace_tab === 'rules'" wire:click="$set('firewall_workspace_tab', 'rules')">
-                    {{ __('Rules') }}
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Rules') }}
+                    </span>
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="firewall-tab-templates" :active="$firewall_workspace_tab === 'templates'" wire:click="$set('firewall_workspace_tab', 'templates')">
-                    {{ __('Templates') }}
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-document-duplicate class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Templates') }}
+                    </span>
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="firewall-tab-history" :active="$firewall_workspace_tab === 'history'" wire:click="$set('firewall_workspace_tab', 'history')">
-                    {{ __('History') }}
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
+                        {{ __('History') }}
+                    </span>
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="firewall-tab-audit" :active="$firewall_workspace_tab === 'audit'" wire:click="$set('firewall_workspace_tab', 'audit')">
-                    {{ __('Audit') }}
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-list-bullet class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Audit') }}
+                    </span>
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
 
@@ -34,37 +46,31 @@
                 labelled-by="firewall-tab-rules"
                 :hidden="$firewall_workspace_tab !== 'rules'"
             >
-        <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                {{ __('Rules are stored in Dply and applied to the server with UFW. Keep this page focused on the ports and sources you actually want reachable.') }}
-                            </p>
-                            @if ($sshNotCovered ?? false)
-                                <p class="mt-3 rounded-lg border border-amber-300/80 bg-amber-50/90 px-3 py-2 text-sm text-amber-950">
-                                    {{ __('No enabled Dply rule allows TCP :port from “any”. Add an allow for your SSH port (or a trusted CIDR) before applying deny-heavy changes.', ['port' => $server->ssh_port ?: 22]) }}
-                                </p>
-                                <label class="mt-3 flex items-start gap-2 text-sm text-brand-ink">
-                                    <input
-                                        type="checkbox"
-                                        wire:model.live="firewall_ack_ssh_risk"
-                                        class="mt-0.5 rounded border-amber-400 text-brand-forest focus:ring-brand-forest"
-                                    />
-                                    <span>{{ __('I understand SSH may be unreachable if these rules block access—I still want to apply.') }}</span>
-                                </label>
-                            @endif
+        <div class="{{ $card }} overflow-hidden">
+                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest ring-1 ring-brand-forest/20">
+                                <x-heroicon-o-shield-check class="h-5 w-5" />
+                            </span>
+                            <div class="min-w-0">
+                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
+                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Stored in Dply, applied to the server with UFW.') }}</p>
+                            </div>
                         </div>
-                        <div class="flex flex-wrap gap-2">
+                        <div class="flex shrink-0 flex-wrap gap-2">
                             <button
                                 type="button"
-                                wire:click="applyFirewall"
+                                wire:click="applyFirewall({{ $applyFirewallConfirmMessage !== '' ? 'true' : 'false' }})"
+                                @if ($applyFirewallConfirmMessage !== '')
+                                    wire:confirm="{{ $applyFirewallConfirmMessage }}"
+                                @endif
                                 wire:loading.attr="disabled"
-                                class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3.5 py-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-50"
                             >
-                                <span wire:loading.remove wire:target="applyFirewall">{{ __('Apply firewall rules') }}</span>
-                                <span wire:loading wire:target="applyFirewall" class="inline-flex items-center gap-2">
-                                    <x-spinner variant="forest" />
+                                <x-heroicon-o-bolt wire:loading.remove wire:target="applyFirewall" class="h-3.5 w-3.5" />
+                                <span wire:loading.remove wire:target="applyFirewall">{{ __('Apply rules') }}</span>
+                                <span wire:loading wire:target="applyFirewall" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="cream" size="sm" />
                                     {{ __('Applying…') }}
                                 </span>
                             </button>
@@ -72,16 +78,66 @@
                                 type="button"
                                 wire:click="refreshUfwStatus"
                                 wire:loading.attr="disabled"
-                                class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50 disabled:opacity-50"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                             >
-                                <span wire:loading.remove wire:target="refreshUfwStatus">{{ __('Refresh UFW status') }}</span>
-                                <span wire:loading wire:target="refreshUfwStatus" class="inline-flex items-center gap-2">
-                                    <x-spinner variant="forest" />
+                                <x-heroicon-o-arrow-path wire:loading.remove wire:target="refreshUfwStatus" class="h-3.5 w-3.5" />
+                                <span wire:loading.remove wire:target="refreshUfwStatus">{{ __('Refresh status') }}</span>
+                                <span wire:loading wire:target="refreshUfwStatus" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
                                     {{ __('Reading…') }}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="runFirewallDiagnostics"
+                                wire:loading.attr="disabled"
+                                title="{{ __('Run ufw status verbose, status numbered, ss -ltn, and iptables -L INPUT on the server.') }}"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                            >
+                                <x-heroicon-o-command-line wire:loading.remove wire:target="runFirewallDiagnostics" class="h-3.5 w-3.5" />
+                                <span wire:loading.remove wire:target="runFirewallDiagnostics">{{ __('Diagnostics') }}</span>
+                                <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Running…') }}
                                 </span>
                             </button>
                         </div>
                     </div>
+
+                    @if ($sshNotCovered ?? false)
+                        <div class="mx-6 mt-4 rounded-xl border border-amber-300 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 sm:mx-8">
+                            <div class="flex items-start gap-2">
+                                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                                <div class="min-w-0 flex-1">
+                                    <p>{{ __('No enabled Dply rule allows TCP :port from "any". Add an allow for your SSH port (or a trusted CIDR) before applying deny-heavy changes.', ['port' => $server->ssh_port ?: 22]) }}</p>
+                                    <label class="mt-2 flex items-start gap-2 text-xs">
+                                        <input
+                                            type="checkbox"
+                                            wire:model.live="firewall_ack_ssh_risk"
+                                            class="mt-0.5 rounded border-amber-400 text-brand-forest focus:ring-brand-forest"
+                                        />
+                                        <span>{{ __('I understand SSH may be unreachable—still apply.') }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if (\App\Support\Servers\FakeCloudProvision::isFakeServer($server))
+                        <div class="mx-6 mt-4 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm text-sky-900 sm:mx-8">
+                            <div class="flex items-start gap-2">
+                                <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-sky-700" />
+                                <div class="min-w-0 flex-1">
+                                    <p>
+                                        <span class="font-semibold">{{ __('Local Docker container — UFW rules here are cosmetic.') }}</span>
+                                        {{ __('Docker manages the host\'s iptables; ufw inside the container does not actually filter inbound traffic. Rules added via Dply will appear in `ufw status` and exercise the apply pipeline, but real packet filtering is the host\'s job. On a real DigitalOcean droplet (or any cloud VM) ufw is the actual firewall and rules apply normally.') }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="px-6 py-5 sm:px-8 sm:py-6">
 
             @if ($server->firewallRules->isNotEmpty())
                         <div class="mt-6 flex flex-wrap items-center gap-2">
@@ -279,140 +335,106 @@
                                 @endforeach
                             </div>
                         @endif
-                        <form wire:submit="saveFirewallRule" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            <div class="sm:col-span-2 lg:col-span-3">
-                                <x-input-label for="fw-name" :value="__('Label (optional)')" />
-                                <x-text-input
-                                    id="fw-name"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    wire:model="form.name"
-                                    placeholder="{{ __('e.g. Monitoring, Office VPN') }}"
-                                />
-                                <x-input-error :messages="$errors->get('form.name')" class="mt-2" />
-                            </div>
-                            <div>
-                                <x-input-label for="fw-profile" :value="__('Profile (optional)')" />
-                                <x-text-input
-                                    id="fw-profile"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    wire:model="form.profile"
-                                    placeholder="{{ __('web, db, admin…') }}"
-                                />
-                                <x-input-error :messages="$errors->get('form.profile')" class="mt-2" />
-                            </div>
-                            <div class="sm:col-span-2">
-                                <x-input-label for="fw-tags" :value="__('Tags (comma-separated)')" />
-                                <x-text-input
-                                    id="fw-tags"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    wire:model="form.tags"
-                                    placeholder="{{ __('monitoring, prod, …') }}"
-                                />
-                                <x-input-error :messages="$errors->get('form.tags')" class="mt-2" />
-                            </div>
-                            <div class="sm:col-span-2">
-                                <x-input-label for="fw-runbook" :value="__('Runbook URL (optional)')" />
-                                <x-text-input
-                                    id="fw-runbook"
-                                    type="url"
-                                    class="mt-1 block w-full"
-                                    wire:model="form.runbook_url"
-                                    placeholder="https://…"
-                                />
-                                <x-input-error :messages="$errors->get('form.runbook_url')" class="mt-2" />
-                            </div>
-                            <div class="sm:col-span-2 lg:col-span-3">
-                                <x-input-label for="fw-site" :value="__('Related site (optional)')" />
-                                <select
-                                    id="fw-site"
-                                    wire:model="form.site_id"
-                                    class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm"
-                                >
-                                    <option value="">{{ __('— None —') }}</option>
-                                    @foreach ($server->sites as $site)
-                                        <option value="{{ $site->id }}">{{ $site->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('form.site_id')" class="mt-2" />
-                            </div>
-                            @if (! in_array($form->protocol, ['icmp', 'ipv6-icmp'], true))
-                                <div>
-                                    <x-input-label for="fw-port" :value="__('Port')" />
-                                    <x-text-input
-                                        id="fw-port"
-                                        type="number"
-                                        class="mt-1 block w-full"
-                                        wire:model="form.port"
-                                        min="1"
-                                        max="65535"
-                                    />
-                                    <x-input-error :messages="$errors->get('form.port')" class="mt-2" />
+                        @php
+                            $hasAdvanced = trim((string) ($form->name ?? '')) !== ''
+                                || trim((string) ($form->profile ?? '')) !== ''
+                                || trim((string) ($form->tags ?? '')) !== ''
+                                || trim((string) ($form->runbook_url ?? '')) !== ''
+                                || trim((string) ($form->site_id ?? '')) !== '';
+                        @endphp
+                        <form wire:submit="saveFirewallRule" class="mt-4 space-y-4">
+                            {{-- Essentials: Port · Protocol · Action on one row, Source on the next. --}}
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                @if (! in_array($form->protocol, ['icmp', 'ipv6-icmp'], true))
+                                    <div>
+                                        <x-input-label for="fw-port" :value="__('Port')" />
+                                        <x-text-input id="fw-port" type="number" class="mt-1 block w-full" wire:model="form.port" min="1" max="65535" />
+                                        <x-input-error :messages="$errors->get('form.port')" class="mt-1" />
+                                    </div>
+                                @endif
+                                <div @class([
+                                    'sm:col-span-1' => ! in_array($form->protocol, ['icmp', 'ipv6-icmp'], true),
+                                    'sm:col-span-2' => in_array($form->protocol, ['icmp', 'ipv6-icmp'], true),
+                                ])>
+                                    <x-input-label for="fw-proto" :value="__('Protocol')" />
+                                    <select id="fw-proto" wire:model.live="form.protocol" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
+                                        <option value="tcp">TCP</option>
+                                        <option value="udp">UDP</option>
+                                        <option value="icmp">ICMP (IPv4)</option>
+                                        <option value="ipv6-icmp">{{ __('ICMPv6') }}</option>
+                                    </select>
                                 </div>
-                            @endif
-                            <div>
-                                <x-input-label for="fw-proto" :value="__('Protocol')" />
-                                <select
-                                    id="fw-proto"
-                                    wire:model.live="form.protocol"
-                                    class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm"
-                                >
-                                    <option value="tcp">TCP</option>
-                                    <option value="udp">UDP</option>
-                                    <option value="icmp">ICMP (IPv4)</option>
-                                    <option value="ipv6-icmp">{{ __('ICMPv6 (NDP, etc.)') }}</option>
-                                </select>
-                                <x-input-error :messages="$errors->get('form.protocol')" class="mt-2" />
+                                <div>
+                                    <x-input-label for="fw-action" :value="__('Action')" />
+                                    <select id="fw-action" wire:model="form.action" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
+                                        <option value="allow">{{ __('Allow') }}</option>
+                                        <option value="deny">{{ __('Deny') }}</option>
+                                    </select>
+                                </div>
                             </div>
+
                             <div>
-                                <x-input-label for="fw-action" :value="__('Action')" />
-                                <select
-                                    id="fw-action"
-                                    wire:model="form.action"
-                                    class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm"
-                                >
-                                    <option value="allow">{{ __('Allow') }}</option>
-                                    <option value="deny">{{ __('Deny') }}</option>
-                                </select>
-                                <x-input-error :messages="$errors->get('form.action')" class="mt-2" />
-                            </div>
-                            <div class="sm:col-span-2">
                                 <x-input-label for="fw-source" :value="__('Source')" />
-                                <x-text-input
-                                    id="fw-source"
-                                    type="text"
-                                    class="mt-1 block w-full font-mono text-sm"
-                                    wire:model="form.source"
-                                    placeholder="any"
-                                    autocomplete="off"
-                                />
-                                <p class="mt-1 text-xs text-brand-moss">
-                                    {{ __('Use :keyword for any host, or an IPv4/IPv6 address or CIDR.', ['keyword' => 'any']) }}
-                                </p>
-                                <x-input-error :messages="$errors->get('form.source')" class="mt-2" />
+                                <x-text-input id="fw-source" type="text" class="mt-1 block w-full font-mono text-sm" wire:model="form.source" placeholder="any" autocomplete="off" />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Use :keyword for any host, or an IPv4/IPv6 address or CIDR.', ['keyword' => 'any']) }}</p>
+                                <x-input-error :messages="$errors->get('form.source')" class="mt-1" />
                             </div>
-                            <div class="flex items-center gap-2 sm:col-span-2">
-                                <input
-                                    id="fw-enabled"
-                                    type="checkbox"
-                                    wire:model="form.enabled"
-                                    class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest"
-                                />
-                                <x-input-label for="fw-enabled" :value="__('Enabled (included when applying)')" class="!mb-0" />
-                            </div>
-                            <div class="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-3">
+
+                            <label class="flex items-center gap-2 text-sm">
+                                <input id="fw-enabled" type="checkbox" wire:model="form.enabled" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest" />
+                                <span>{{ __('Enabled (included when applying)') }}</span>
+                            </label>
+
+                            {{-- Advanced — label / profile / tags / runbook / related site. Auto-opens
+                                 when any of these have content (e.g. when editing an existing rule). --}}
+                            <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3" @if ($hasAdvanced) open @endif>
+                                <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wide text-brand-mist">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <x-heroicon-o-chevron-down class="h-3.5 w-3.5" />
+                                        {{ __('Advanced — naming, tags, runbook, related site') }}
+                                    </span>
+                                </summary>
+                                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <div class="sm:col-span-2">
+                                        <x-input-label for="fw-name" :value="__('Label (optional)')" />
+                                        <x-text-input id="fw-name" type="text" class="mt-1 block w-full" wire:model="form.name" placeholder="{{ __('e.g. Monitoring, Office VPN') }}" />
+                                        <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="fw-profile" :value="__('Profile (optional)')" />
+                                        <x-text-input id="fw-profile" type="text" class="mt-1 block w-full" wire:model="form.profile" placeholder="{{ __('web, db, admin…') }}" />
+                                        <x-input-error :messages="$errors->get('form.profile')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="fw-tags" :value="__('Tags (comma-separated)')" />
+                                        <x-text-input id="fw-tags" type="text" class="mt-1 block w-full" wire:model="form.tags" placeholder="{{ __('monitoring, prod, …') }}" />
+                                        <x-input-error :messages="$errors->get('form.tags')" class="mt-1" />
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <x-input-label for="fw-runbook" :value="__('Runbook URL (optional)')" />
+                                        <x-text-input id="fw-runbook" type="url" class="mt-1 block w-full" wire:model="form.runbook_url" placeholder="https://…" />
+                                        <x-input-error :messages="$errors->get('form.runbook_url')" class="mt-1" />
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <x-input-label for="fw-site" :value="__('Related site (optional)')" />
+                                        <select id="fw-site" wire:model="form.site_id" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
+                                            <option value="">{{ __('— None —') }}</option>
+                                            @foreach ($server->sites as $site)
+                                                <option value="{{ $site->id }}">{{ $site->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <x-input-error :messages="$errors->get('form.site_id')" class="mt-1" />
+                                    </div>
+                                </div>
+                            </details>
+
+                            <div class="flex flex-wrap items-end gap-2 border-t border-brand-ink/5 pt-4">
                                 @if ($editing_rule_id)
                                     <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
                                         <span wire:loading.remove wire:target="saveFirewallRule">{{ __('Save changes') }}</span>
                                         <span wire:loading wire:target="saveFirewallRule">{{ __('Saving…') }}</span>
                                     </x-primary-button>
-                                    <button
-                                        type="button"
-                                        wire:click="cancelEditRule"
-                                        class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm"
-                                    >
+                                    <button type="button" wire:click="cancelEditRule" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm">
                                         {{ __('Cancel') }}
                                     </button>
                                 @else
@@ -427,13 +449,65 @@
 
                     @if ($ufw_status_text !== null && $ufw_status_text !== '')
                         <div class="mt-8 overflow-hidden rounded-2xl border border-brand-ink/10">
-                            <div class="border-b border-brand-ink/10 px-5 py-3 text-sm font-medium text-brand-ink">
-                                {{ __('UFW status (verbose)') }}
+                            <div class="flex items-center gap-2 border-b border-brand-ink/10 bg-zinc-50 px-5 py-3 text-sm font-medium text-brand-ink">
+                                <x-heroicon-o-shield-check class="h-4 w-4 text-brand-mist" />
+                                {{ __('UFW status') }}
                             </div>
                             <pre class="max-h-96 overflow-x-auto bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">{{ $ufw_status_text }}</pre>
                         </div>
                     @endif
+                    </div>
                 </div>
+
+                {{-- Full diagnostics modal — runs ufw status verbose/numbered + ss + iptables. --}}
+                @if ($ufw_diagnostics_modal_open)
+                    @teleport('body')
+                    <div
+                        class="fixed inset-0 z-[100] overflow-y-auto"
+                        role="dialog"
+                        aria-modal="true"
+                        x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.diagPre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                        x-on:keydown.escape.window="$wire.closeFirewallDiagnostics()"
+                    >
+                        <div class="fixed inset-0 z-0 bg-brand-ink/55 backdrop-blur-sm" wire:click="closeFirewallDiagnostics"></div>
+                        <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-6">
+                            <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl" @click.stop>
+                                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest ring-1 ring-brand-forest/20">
+                                                <x-heroicon-o-command-line class="h-5 w-5" />
+                                            </span>
+                                            <div class="min-w-0">
+                                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Firewall diagnostics') }}</h2>
+                                                <p class="text-xs text-brand-moss">{{ __('Live snapshot from the server: ufw status verbose · numbered · ss -ltn · iptables -L INPUT.') }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" wire:click="runFirewallDiagnostics" wire:loading.attr="disabled" wire:target="runFirewallDiagnostics" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-o-arrow-path wire:loading.remove wire:target="runFirewallDiagnostics" class="h-3.5 w-3.5" />
+                                            <span wire:loading.remove wire:target="runFirewallDiagnostics">{{ __('Re-run') }}</span>
+                                            <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex items-center gap-1.5">
+                                                <x-spinner variant="forest" size="sm" />
+                                                {{ __('Running…') }}
+                                            </span>
+                                        </button>
+                                        <button type="button" x-on:click="copy()" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <template x-if="!copied"><span class="inline-flex items-center gap-1.5"><x-heroicon-o-clipboard class="h-3.5 w-3.5" />{{ __('Copy') }}</span></template>
+                                            <template x-if="copied"><span class="inline-flex items-center gap-1.5 text-emerald-700"><x-heroicon-m-check class="h-3.5 w-3.5" />{{ __('Copied') }}</span></template>
+                                        </button>
+                                        <button type="button" wire:click="closeFirewallDiagnostics" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-mist transition hover:border-brand-ink/20 hover:bg-brand-sand/40 hover:text-brand-ink" aria-label="{{ __('Close') }}">
+                                            <x-heroicon-m-x-mark class="h-5 w-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <pre x-ref="diagPre" class="flex-1 min-h-0 overflow-auto whitespace-pre bg-zinc-950 px-6 py-5 font-mono text-xs leading-relaxed text-zinc-100">{{ $ufw_diagnostics_text }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                    @endteleport
+                @endif
             </x-server-workspace-tab-panel>
 
             <x-server-workspace-tab-panel

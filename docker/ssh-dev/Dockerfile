@@ -12,6 +12,15 @@ RUN apt-get update \
         systemd systemd-sysv dbus dbus-user-session \
         openssh-server sudo \
         ca-certificates curl iproute2 lsb-release locales \
+ # Pre-install common bootstrap deps so they survive `docker compose down && up`.
+ # On a real cloud VM the bootstrap installs these and they persist for the life
+ # of the box; in our throwaway dev container they get wiped on recreate, which
+ # makes ufw/firewall, supervisor/daemons, etc. workspaces useless after a reset.
+ # Pinning them in the image is cheap (they're already in the bootstrap path) and
+ # keeps the workspace UIs functional immediately.
+        ufw iptables \
+        supervisor \
+        fail2ban \
  && rm -rf /var/lib/apt/lists/* \
  && locale-gen en_US.UTF-8
 
@@ -29,7 +38,10 @@ RUN find /lib/systemd/system/sysinit.target.wants -type l ! -name 'systemd-tmpfi
         systemd-udevd.service \
         systemd-modules-load.service \
         getty@.service \
-        getty.target
+        getty.target \
+ # systemd-user-sessions clears /run/nologin once boot is multi-user — without it,
+ # PAM keeps blocking non-root SSH (the dply deploy user) with "System is booting up".
+ && systemctl enable systemd-user-sessions.service
 
 # Configure sshd: listen on 2222, root login by key only.
 RUN mkdir -p /var/run/sshd /root/.ssh \

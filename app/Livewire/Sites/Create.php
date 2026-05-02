@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Sites;
 
-use App\Enums\SiteType;
 use App\Enums\ServerProvider;
+use App\Enums\SiteType;
 use App\Jobs\ProvisionSiteJob;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
@@ -54,8 +54,7 @@ class Create extends Component
         Server $server,
         ServerPhpManager $phpManager,
         SourceControlRepositoryBrowser $repositoryBrowser,
-    ): void
-    {
+    ): void {
         $this->authorize('view', $server);
         $this->authorize('update', $server);
 

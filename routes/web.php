@@ -37,7 +37,10 @@ use App\Livewire\Scripts\Create as ScriptsCreate;
 use App\Livewire\Scripts\Edit as ScriptsEdit;
 use App\Livewire\Scripts\Index as ScriptsIndex;
 use App\Livewire\Scripts\Marketplace as ScriptsMarketplace;
-use App\Livewire\Servers\Create as ServersCreate;
+use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
+use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
+use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
+use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceCron;
@@ -190,7 +193,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('launches/edge-network', LaunchesPath::class)->defaults('path', 'edge-network')->name('launches.edge-network');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
-    Route::livewire('servers/create', ServersCreate::class)->name('servers.create');
+    // Multi-step server-create wizard. /servers/create is Step 1 directly; if a draft
+    // is past step 1, StepType::mount() redirects on to the current step.
+    Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
+    Route::livewire('servers/create/where', ServerCreateStepWhere::class)->name('servers.create.where');
+    Route::livewire('servers/create/what', ServerCreateStepWhat::class)->name('servers.create.what');
+    Route::livewire('servers/create/review', ServerCreateStepReview::class)->name('servers.create.review');
     Route::get('servers/{server}', function (Server $server) {
         Gate::authorize('view', $server);
 
@@ -241,17 +249,17 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
     Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
-    Route::livewire('servers/{server}/php', WorkspacePhp::class)->name('servers.php');
-    Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
+    Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
+    Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
-    Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->name('servers.daemons');
+    Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
     Route::livewire('servers/{server}/recipes', WorkspaceRecipes::class)->name('servers.recipes');
     Route::livewire('servers/{server}/deploy', WorkspaceDeploy::class)->name('servers.deploy');
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
-    Route::livewire('servers/{server}/manage', WorkspaceManage::class)->name('servers.manage');
+    Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
 
     Route::get('credentials', function () {

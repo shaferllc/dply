@@ -101,10 +101,46 @@
                 <div class="flex flex-col gap-6 border-b border-brand-ink/10 px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Provision journey') }}</p>
+                            @php
+                                $autoRetryAt = isset($server->meta['auto_retry_at']) ? \Illuminate\Support\Carbon::parse($server->meta['auto_retry_at']) : null;
+                                $autoRetryAttempt = $server->meta['auto_retry_attempt'] ?? null;
+                                $autoRetryMax = $server->meta['auto_retry_max'] ?? null;
+                                $autoRetryPending = $autoRetryAt && $autoRetryAt->isFuture();
+                                $journeyHasFailed = $server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED || $server->status === \App\Models\Server::STATUS_ERROR;
+                                $journeyIsDone = $server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE;
+                            @endphp
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Provision journey') }}</p>
+                                @if ($journeyHasFailed)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800 ring-1 ring-red-200">
+                                        <x-heroicon-s-x-mark class="h-3 w-3" />
+                                        {{ __('Failed') }}
+                                    </span>
+                                @elseif ($autoRetryPending)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                        <x-heroicon-o-arrow-path class="h-3 w-3" />
+                                        {{ __('Retrying') }}
+                                    </span>
+                                @elseif ($journeyIsDone)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                        <x-heroicon-s-check class="h-3 w-3" />
+                                        {{ __('Ready') }}
+                                    </span>
+                                @endif
+                            </div>
                             <h2 class="mt-2 text-xl font-semibold tracking-tight text-brand-ink sm:text-2xl">{{ __('Installation tasks (:done/:total)', ['done' => $completedCount, 'total' => $totalCount]) }}</h2>
                             <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss">
-                                {{ __('Provisioning and stack setup update automatically here.') }}
+                                @if ($journeyHasFailed)
+                                    {{ __('Provisioning hit an error. Review the failure details below, or click Resume install to try again.') }}
+                                @elseif ($autoRetryPending && $autoRetryAttempt && $autoRetryMax)
+                                    {{ __('A transient failure was detected. Auto-retrying — attempt :n of :max, starting :when.', [
+                                        'n' => $autoRetryAttempt,
+                                        'max' => $autoRetryMax,
+                                        'when' => $autoRetryAt->diffForHumans(),
+                                    ]) }}
+                                @else
+                                    {{ __('Provisioning and stack setup update automatically here.') }}
+                                @endif
                             </p>
                         </div>
                         <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
@@ -156,35 +192,129 @@
 
                 <div class="flex flex-col gap-6 px-5 py-6 sm:px-8 sm:py-8">
                     @if ($failedStep)
-                        <div class="rounded-2xl border border-red-200/90 bg-red-50/90 px-4 py-4 sm:px-5">
+                        <div class="rounded-2xl border-2 border-red-300 bg-red-50/95 px-5 py-5 shadow-sm">
                             <div class="flex items-start justify-between gap-4">
-                                <div class="min-w-0">
-                                    <p class="text-sm font-semibold text-red-900">{{ $failedStep['label'] }}</p>
-                                    @if ($failedStep['detail'])
-                                        <p class="mt-1 text-sm leading-6 text-red-800">{{ $failedStep['detail'] }}</p>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-start gap-3">
+                                        <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-600 text-white">
+                                            <x-heroicon-s-x-mark class="h-4 w-4" aria-hidden="true" />
+                                        </span>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-base font-semibold text-red-900 sm:text-lg">{{ __('Provisioning failed at: :step', ['step' => $failedStep['label']]) }}</p>
+                                            @if ($failureReason)
+                                                <div class="mt-2 rounded-xl border border-red-300 bg-white/80 px-4 py-3">
+                                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">
+                                                        {{ __('Reason') }}
+                                                        @if ($failureReason['exit_code'] !== null)
+                                                            <span class="ml-1 font-normal normal-case text-red-600/80">· {{ __('exit code :code', ['code' => $failureReason['exit_code']]) }}</span>
+                                                        @endif
+                                                    </p>
+                                                    <p class="mt-1 break-words font-mono text-sm leading-6 text-red-900">{{ $failureReason['headline'] }}</p>
+                                                    @if (count($failureReason['context']) > 1)
+                                                        <details class="mt-2">
+                                                            <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-red-700">
+                                                                <span class="inline-flex items-center gap-1.5">
+                                                                    <x-heroicon-o-chevron-down class="h-3.5 w-3.5" />
+                                                                    {{ __('Last :n lines', ['n' => count($failureReason['context'])]) }}
+                                                                </span>
+                                                            </summary>
+                                                            <pre class="mt-2 whitespace-pre-wrap break-all font-mono text-[11px] leading-5 text-red-900">{{ implode("\n", $failureReason['context']) }}</pre>
+                                                        </details>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <p class="mt-1 text-sm leading-6 text-red-800">{{ $failedStep['detail'] ?: __('The setup script aborted before this step finished. The server is in an unknown state — review the captured output and the rollback summary below before retrying.') }}</p>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    @if ($rollbackSummary)
+                                        <div class="mt-4 rounded-xl border border-red-200 bg-white/80 p-4">
+                                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                                <div>
+                                                    <p class="text-xs font-semibold uppercase tracking-wide text-red-700">{{ __('Automatic rollback') }}</p>
+                                                    @if ($rollbackSummary['triggered'])
+                                                        <p class="mt-1 text-sm font-medium text-red-900">
+                                                            @if ($rollbackSummary['total'] > 0)
+                                                                {{ __('Rollback ran and reverted :count change(s) on the server.', ['count' => $rollbackSummary['total']]) }}
+                                                            @else
+                                                                {{ __('Rollback ran. No file changes needed reverting (failure happened before any backups were recorded).') }}
+                                                            @endif
+                                                        </p>
+                                                    @else
+                                                        <p class="mt-1 text-sm text-amber-800">{{ __('No rollback marker was emitted — the failure may have skipped the trap. Server state is uncertain.') }}</p>
+                                                    @endif
+                                                </div>
+                                                @if ($rollbackSummary['triggered'])
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
+                                                        <x-heroicon-m-check-circle class="h-3.5 w-3.5" />
+                                                        {{ __('Restored') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+
+                                            @if ($rollbackSummary['restored'] !== [] || $rollbackSummary['removed'] !== [])
+                                                <details class="mt-3">
+                                                    <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-red-700">
+                                                        <span class="inline-flex items-center gap-1.5">
+                                                            <x-heroicon-o-chevron-down class="h-3.5 w-3.5" />
+                                                            {{ __('What was reverted') }}
+                                                            <span class="font-normal text-red-600/80">
+                                                                ·
+                                                                @if ($rollbackSummary['restored'] !== []) {{ __(':n restored', ['n' => count($rollbackSummary['restored'])]) }}@endif
+                                                                @if ($rollbackSummary['restored'] !== [] && $rollbackSummary['removed'] !== []) , @endif
+                                                                @if ($rollbackSummary['removed'] !== []) {{ __(':n removed', ['n' => count($rollbackSummary['removed'])]) }}@endif
+                                                            </span>
+                                                        </span>
+                                                    </summary>
+                                                    <ul class="mt-2 space-y-1 text-xs leading-5 text-red-900">
+                                                        @foreach ($rollbackSummary['restored'] as $path)
+                                                            <li class="flex items-start gap-2">
+                                                                <x-heroicon-m-arrow-uturn-left class="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                                                                <code class="break-all font-mono text-[11px]">/{{ $path }}</code>
+                                                                <span class="text-[10px] uppercase tracking-wide text-emerald-700">{{ __('restored') }}</span>
+                                                            </li>
+                                                        @endforeach
+                                                        @foreach ($rollbackSummary['removed'] as $path)
+                                                            <li class="flex items-start gap-2">
+                                                                <x-heroicon-m-trash class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                                                                <code class="break-all font-mono text-[11px]">/{{ $path }}</code>
+                                                                <span class="text-[10px] uppercase tracking-wide text-amber-700">{{ __('removed') }}</span>
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                </details>
+                                            @endif
+                                        </div>
                                     @endif
+
                                     @if ($failedStep['output'])
                                         <details class="mt-4 rounded-xl border border-red-200 bg-white/80 p-4">
                                             <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-red-700">
                                                 <div class="flex items-center justify-between gap-3">
-                                                    <span>{{ __('Captured output') }}</span>
+                                                    <span>{{ __('Captured step output') }}</span>
                                                     <x-heroicon-o-chevron-down class="h-4 w-4" />
                                                 </div>
                                             </summary>
-                                            <pre class="mt-3 whitespace-pre-wrap font-mono text-xs leading-6 text-red-900">{{ $failedStep['output'] }}</pre>
+                                            <pre class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6 text-red-900">{{ $failedStep['output'] }}</pre>
                                         </details>
                                     @endif
                                 </div>
-                                <span class="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-red-800">{{ __('Failed') }}</span>
+                                <span class="shrink-0 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-red-800">{{ __('Failed') }}</span>
                             </div>
                         </div>
                     @elseif ($activeStep)
                         <div class="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/95 to-white px-4 py-4 sm:px-5">
                             <div class="flex items-start justify-between gap-4">
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-3">
-                                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full border-[3px] border-sky-200 border-t-sky-600" aria-hidden="true"></span>
-                                        <p class="text-base font-semibold text-brand-ink sm:text-lg">{{ $activeStep['label'] }}</p>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <div class="flex min-w-0 items-center gap-3">
+                                            <span class="inline-flex h-7 w-7 animate-spin items-center justify-center rounded-full border-[3px] border-sky-200 border-t-sky-600" aria-hidden="true"></span>
+                                            <p class="text-base font-semibold text-brand-ink sm:text-lg">{{ $activeStep['label'] }}</p>
+                                        </div>
+                                        @if ($activeStep['duration'])
+                                            <span class="shrink-0 text-sm font-medium text-brand-moss">{{ $activeStep['duration'] }}</span>
+                                        @endif
                                     </div>
                                     @if ($activeStep['detail'])
                                         <p class="mt-3 text-sm leading-6 text-brand-moss whitespace-pre-line">{{ $activeStep['detail'] }}</p>
@@ -200,34 +330,82 @@
                                         </div>
                                     @endif
                                     @if ($activeStep['output'])
-                                        <div class="mt-4 rounded-xl border border-brand-ink/10 bg-white/90 p-4">
+                                        <div
+                                            x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            class="mt-4 rounded-xl border border-brand-ink/10 bg-white/90 p-4"
+                                        >
                                             <div class="flex items-center justify-between gap-3">
                                                 <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Live step output') }}</p>
-                                                @if ($taskUpdatedAt)
-                                                    <p class="text-[11px] text-brand-mist">{{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
-                                                @endif
+                                                <div class="flex items-center gap-2">
+                                                    @if ($taskUpdatedAt)
+                                                        <p class="text-[11px] text-brand-mist">{{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
+                                                    @endif
+                                                    <button type="button" x-on:click="copy()" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                                        <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
+                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-700"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                                    </button>
+                                                </div>
                                             </div>
                                             <pre
-                                                x-data
+                                                x-ref="pre"
                                                 x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
                                                 x-effect="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
                                                 class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6 text-brand-ink"
                                             >{{ $activeStep['output'] }}</pre>
                                         </div>
                                     @endif
-                                    @if ($task && $liveTaskOutput && (! $activeStep['output'] || trim($activeStep['output']) !== trim($liveTaskOutput)))
-                                        <div class="mt-4 rounded-xl border border-brand-ink/10 bg-white/90 p-4">
+                                    @if ($task && $liveTaskOutput && $activeStep['output'])
+                                        {{-- Step-specific output is the primary view; offer the raw task tail
+                                             behind a toggle for users who want the full firehose. --}}
+                                        <details
+                                            x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            class="mt-4 rounded-xl border border-brand-ink/10 bg-white/70"
+                                        >
+                                            <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3">
+                                                <span class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Show full task tail') }}</span>
+                                                <span class="flex items-center gap-2 text-[11px] text-brand-mist">
+                                                    <span>
+                                                        {{ __(':count lines', ['count' => $liveTaskOutputLineCount]) }}
+                                                        @if ($taskUpdatedAt)
+                                                            · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
+                                                        @endif
+                                                    </span>
+                                                    <button type="button" x-on:click.stop.prevent="copy()" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                                        <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
+                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-700"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                                    </button>
+                                                </span>
+                                            </summary>
+                                            <pre
+                                                x-ref="pre"
+                                                x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
+                                                x-effect="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
+                                                class="max-h-96 overflow-auto whitespace-pre-wrap break-all border-t border-brand-ink/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                            >{{ $liveTaskOutput }}</pre>
+                                        </details>
+                                    @elseif ($task && $liveTaskOutput)
+                                        {{-- No step-specific output yet — show the task tail expanded as the only signal. --}}
+                                        <div
+                                            x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            class="mt-4 rounded-xl border border-brand-ink/10 bg-white/90 p-4"
+                                        >
                                             <div class="flex flex-wrap items-center justify-between gap-3">
                                                 <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Live task output (tail)') }}</p>
-                                                <p class="text-[11px] text-brand-mist">
-                                                    {{ __(':count lines', ['count' => $liveTaskOutputLineCount]) }}
-                                                    @if ($taskUpdatedAt)
-                                                        · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
-                                                    @endif
-                                                </p>
+                                                <div class="flex items-center gap-2">
+                                                    <p class="text-[11px] text-brand-mist">
+                                                        {{ __(':count lines', ['count' => $liveTaskOutputLineCount]) }}
+                                                        @if ($taskUpdatedAt)
+                                                            · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
+                                                        @endif
+                                                    </p>
+                                                    <button type="button" x-on:click="copy()" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                                        <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
+                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-700"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                                    </button>
+                                                </div>
                                             </div>
                                             <pre
-                                                x-data
+                                                x-ref="pre"
                                                 x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
                                                 x-effect="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
                                                 class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-brand-ink"
@@ -243,9 +421,6 @@
                                         </div>
                                     @endif
                                 </div>
-                                @if ($activeStep['duration'])
-                                    <span class="shrink-0 text-sm font-medium text-brand-moss">{{ $activeStep['duration'] }}</span>
-                                @endif
                             </div>
                         </div>
                     @endif
@@ -494,7 +669,7 @@
                 @endif
 
                 @if ($task)
-                    <section class="{{ $card }} p-6">
+                    <section class="{{ $card }} p-6" x-data="{ outputModalOpen: false }">
                         <h3 class="text-lg font-semibold text-brand-ink">{{ __('Setup task') }}</h3>
                         <div class="mt-4 space-y-3 text-sm">
                             <p class="text-brand-moss">{{ __('Status') }}: <span class="font-medium text-brand-ink">{{ ucfirst($task->status->value) }}</span></p>
@@ -502,10 +677,76 @@
                                 <p class="text-brand-moss">{{ __('Started') }}: <span class="font-medium text-brand-ink">{{ $task->started_at->diffForHumans() }}</span></p>
                             @endif
                             <div class="min-w-0 rounded-xl bg-brand-sand/20 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Recent output') }}</p>
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Recent output') }}</p>
+                                    @if ($fullTaskOutput !== '')
+                                        <button
+                                            type="button"
+                                            x-on:click="outputModalOpen = true; $nextTick(() => { const el = $refs.modalPre; if (el) el.scrollTop = el.scrollHeight })"
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                        >
+                                            <x-heroicon-m-arrows-pointing-out class="h-3.5 w-3.5" />
+                                            {{ __('View full') }}
+                                        </button>
+                                    @endif
+                                </div>
                                 <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-brand-ink">{{ $task->tailOutput(6) ?: __('No task output yet.') }}</pre>
                             </div>
                         </div>
+
+                        {{-- Full task output modal --}}
+                        @if ($fullTaskOutput !== '')
+                            <template x-teleport="body">
+                                <div
+                                    x-show="outputModalOpen"
+                                    x-cloak
+                                    x-transition.opacity
+                                    class="fixed inset-0 z-[100] overflow-y-auto"
+                                    role="dialog"
+                                    aria-modal="true"
+                                    x-on:keydown.escape.window="outputModalOpen = false"
+                                >
+                                    <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="outputModalOpen = false"></div>
+                                    <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-8 sm:px-6">
+                                        <div class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl" @click.stop>
+                                            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-6 py-5">
+                                                <div>
+                                                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Full setup task output') }}</h2>
+                                                    <p class="mt-1 text-xs text-brand-moss">
+                                                        {{ __(':count lines · status :status', ['count' => $fullTaskOutputLineCount, 'status' => ucfirst($task->status->value)]) }}
+                                                        @if ($taskUpdatedAt)
+                                                            · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
+                                                        @endif
+                                                    </p>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        x-on:click="navigator.clipboard?.writeText($refs.modalPre.textContent)"
+                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-zinc-50"
+                                                    >
+                                                        <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                                                        {{ __('Copy') }}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        x-on:click="outputModalOpen = false"
+                                                        class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-slate-500 transition hover:bg-zinc-50 hover:text-slate-700"
+                                                        aria-label="{{ __('Close') }}"
+                                                    >
+                                                        <x-heroicon-m-x-mark class="h-5 w-5" aria-hidden="true" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <pre
+                                                x-ref="modalPre"
+                                                class="flex-1 min-h-0 overflow-auto whitespace-pre-wrap break-all bg-brand-cream/30 px-6 py-5 font-mono text-xs leading-relaxed text-brand-ink"
+                                            >{{ $fullTaskOutput }}</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        @endif
                     </section>
                 @endif
 
@@ -539,13 +780,13 @@
                             @foreach ($verificationChecks as $check)
                                 <div class="rounded-xl border {{ $check['status'] === 'ok' ? 'border-emerald-100 bg-emerald-50/70' : 'border-red-200 bg-red-50/70' }} px-4 py-3">
                                     <div class="flex items-start justify-between gap-3">
-                                        <div>
+                                        <div class="min-w-0 flex-1">
                                             <p class="text-sm font-semibold text-brand-ink">{{ $check['label'] }}</p>
                                             @if ($check['detail'])
                                                 <p class="mt-1 text-sm {{ $check['status'] === 'ok' ? 'text-brand-moss' : 'text-red-800' }}">{{ $check['detail'] }}</p>
                                             @endif
                                         </div>
-                                        <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide {{ $check['status'] === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800' }}">
+                                        <span class="ml-auto inline-flex shrink-0 items-center self-start whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide {{ $check['status'] === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800' }}">
                                             {{ $check['status'] === 'ok' ? __('Passed') : __('Needs attention') }}
                                         </span>
                                     </div>
@@ -574,42 +815,74 @@
                 @endif
 
                 @if ($stackSummary)
-                    <section class="{{ $card }} p-6">
-                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Installed stack') }}</h3>
-                        <dl class="mt-4 space-y-3 text-sm">
-                            <div><dt class="text-brand-moss">{{ __('Role') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['role'] ?: '—' }}</dd></div>
-                            <div><dt class="text-brand-moss">{{ __('Web server') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['webserver'] ?: '—' }}</dd></div>
-                            <div><dt class="text-brand-moss">{{ __('PHP') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['php_version'] ?: '—' }}</dd></div>
-                            <div><dt class="text-brand-moss">{{ __('Database') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['database'] ?: '—' }}</dd></div>
-                            <div><dt class="text-brand-moss">{{ __('Cache') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['cache_service'] ?: '—' }}</dd></div>
-                            <div><dt class="text-brand-moss">{{ __('Deploy user') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $stackSummary['deploy_user'] ?: '—' }}</dd></div>
-                        </dl>
-                        @if ($stackSummary['expected_services'] !== [])
-                            <div class="mt-4">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Expected services') }}</p>
-                                <p class="mt-2 text-sm text-brand-ink">{{ implode(', ', $stackSummary['expected_services']) }}</p>
-                            </div>
-                        @endif
-                        @if ($stackSummary['paths'] !== [])
-                            <div class="mt-4">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Deploy paths') }}</p>
-                                <div class="mt-2 space-y-2">
-                                    @foreach ($stackSummary['paths'] as $label => $path)
-                                        <div class="text-sm text-brand-ink"><span class="font-medium">{{ ucfirst($label) }}:</span> <span class="font-mono">{{ $path }}</span></div>
-                                    @endforeach
+                    <section class="{{ $card }} overflow-hidden p-0">
+                        <div class="border-b border-brand-ink/10 bg-gradient-to-br from-brand-sand/30 via-white to-brand-cream/40 px-5 py-5 sm:px-6">
+                            <div class="flex items-center gap-3">
+                                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest ring-1 ring-brand-forest/20">
+                                    <x-heroicon-o-cube class="h-6 w-6" aria-hidden="true" />
+                                </span>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-brand-ink">{{ __('Installed stack') }}</h3>
+                                    <p class="text-xs text-brand-moss">{{ __('What this provision installed and where it lives.') }}</p>
                                 </div>
                             </div>
-                        @endif
-                        @if ($stackSummary['config_files'] !== [])
-                            <div class="mt-4">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Config files') }}</p>
-                                <div class="mt-2 space-y-2">
-                                    @foreach ($stackSummary['config_files'] as $file)
-                                        <div class="text-sm font-mono text-brand-ink">{{ $file }}</div>
-                                    @endforeach
+                        </div>
+
+                        <div class="px-5 py-5 sm:px-6">
+                            <dl class="divide-y divide-brand-ink/5 rounded-xl border border-brand-ink/10 bg-white/70">
+                                @foreach ($stackTiles as $tile)
+                                    <div class="flex items-center gap-3 px-3 py-2.5 first:rounded-t-xl last:rounded-b-xl">
+                                        <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/40 text-brand-forest">
+                                            <x-dynamic-component :component="$tile['icon']" class="h-4 w-4" aria-hidden="true" />
+                                        </span>
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $tile['label'] }}</dt>
+                                        <dd class="ml-auto min-w-0 truncate text-right text-sm font-semibold text-brand-ink">{{ $tile['value'] ?: '—' }}</dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+
+                            @if ($stackSummary['expected_services'] !== [])
+                                <div class="mt-5">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Expected services') }}</p>
+                                    <div class="mt-2 flex flex-wrap gap-1.5">
+                                        @foreach ($stackSummary['expected_services'] as $service)
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                                {{ $service }}
+                                            </span>
+                                        @endforeach
+                                    </div>
                                 </div>
-                            </div>
-                        @endif
+                            @endif
+
+                            @if ($stackSummary['paths'] !== [])
+                                <div class="mt-5">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy paths') }}</p>
+                                    <dl class="mt-2 space-y-1.5">
+                                        @foreach ($stackSummary['paths'] as $label => $path)
+                                            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg bg-brand-sand/15 px-3 py-2">
+                                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ ucfirst($label) }}</dt>
+                                                <dd class="break-all font-mono text-[11px] text-brand-ink">{{ $path }}</dd>
+                                            </div>
+                                        @endforeach
+                                    </dl>
+                                </div>
+                            @endif
+
+                            @if ($stackSummary['config_files'] !== [])
+                                <div class="mt-5">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Config files') }}</p>
+                                    <ul class="mt-2 space-y-1">
+                                        @foreach ($stackSummary['config_files'] as $file)
+                                            <li class="flex items-start gap-2 rounded-lg bg-brand-sand/15 px-3 py-2">
+                                                <x-heroicon-o-document-text class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-mist" />
+                                                <code class="break-all font-mono text-[11px] text-brand-ink">{{ $file }}</code>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                        </div>
                     </section>
                 @endif
             </aside>

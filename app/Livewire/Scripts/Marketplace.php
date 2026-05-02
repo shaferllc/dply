@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Scripts;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Script;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -11,6 +12,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Marketplace extends Component
 {
+    use DispatchesToastNotifications;
+
     public function mount(): void
     {
         $this->authorize('create', Script::class);
