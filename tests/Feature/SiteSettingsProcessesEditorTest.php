@@ -219,6 +219,60 @@ class SiteSettingsProcessesEditorTest extends TestCase
         $this->assertSame(1, (int) $process->refresh()->scale);
     }
 
+    public function test_restart_site_process_calls_provisioner(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makeNodeSite();
+        $process = $site->processes()->create([
+            'type' => SiteProcess::TYPE_WORKER,
+            'name' => 'sidekiq',
+            'command' => 'bundle exec sidekiq',
+        ]);
+
+        $provisioner = \Mockery::mock(\App\Services\Sites\SiteSystemdProvisioner::class);
+        $provisioner->shouldReceive('restartUnit')->once()->andReturn('');
+        $this->app->instance(\App\Services\Sites\SiteSystemdProvisioner::class, $provisioner);
+
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('restartSiteProcess', $process->id)
+            ->assertHasNoErrors();
+    }
+
+    public function test_restart_refuses_web_process(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makeNodeSite();
+        $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
+
+        $provisioner = \Mockery::mock(\App\Services\Sites\SiteSystemdProvisioner::class);
+        $provisioner->shouldNotReceive('restartUnit');
+        $this->app->instance(\App\Services\Sites\SiteSystemdProvisioner::class, $provisioner);
+
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('restartSiteProcess', $web->id);
+    }
+
+    public function test_restart_refuses_php_site(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makePhpSite();
+        $process = $site->processes()->create([
+            'type' => SiteProcess::TYPE_WORKER,
+            'name' => 'horizon',
+            'command' => 'php artisan horizon',
+        ]);
+
+        $provisioner = \Mockery::mock(\App\Services\Sites\SiteSystemdProvisioner::class);
+        $provisioner->shouldNotReceive('restartUnit');
+        $this->app->instance(\App\Services\Sites\SiteSystemdProvisioner::class, $provisioner);
+
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('restartSiteProcess', $process->id);
+    }
+
     public function test_does_not_dispatch_systemd_job_for_php_site(): void
     {
         Queue::fake();

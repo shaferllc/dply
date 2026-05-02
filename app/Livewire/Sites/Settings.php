@@ -2216,6 +2216,50 @@ class Settings extends Show
         return $this->site->latestDeployment();
     }
 
+    /**
+     * Restart a single non-web SiteProcess via systemctl.
+     *
+     * Mirror of the dply:site:restart-process CLI — both routes call
+     * SiteSystemdProvisioner::restartUnit so UI and CLI behavior
+     * stay aligned. Refuses to touch the web row (NGINX upstream —
+     * the deploy pipeline's restart phase owns that). Refuses for
+     * PHP/static sites that have no systemd units.
+     */
+    public function restartSiteProcess(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        $runtime = $this->site->runtimeKey();
+        if (in_array($runtime, ['php', 'static', null], true)) {
+            $this->toastError(__('PHP and static sites have no systemd units to restart.'));
+
+            return;
+        }
+
+        $process = $this->site->processes()->whereKey($id)->first();
+        if ($process === null) {
+            return;
+        }
+        if ($process->type === SiteProcess::TYPE_WEB) {
+            $this->toastError(__('The web process is owned by the deploy pipeline; trigger the restart phase instead.'));
+
+            return;
+        }
+
+        $unitName = app(\App\Services\Sites\SiteSystemdUnitBuilder::class)
+            ->processUnitName($this->site, $process);
+
+        try {
+            app(\App\Services\Sites\SiteSystemdProvisioner::class)->restartUnit($this->site, $unitName);
+        } catch (\Throwable $e) {
+            $this->toastError(__('Restart failed: :msg', ['msg' => $e->getMessage()]));
+
+            return;
+        }
+
+        $this->toastSuccess(__('Restarted :name.', ['name' => $process->name]));
+    }
+
     public function render(): View
     {
         if (! $this->site->isReadyForWorkspace()) {

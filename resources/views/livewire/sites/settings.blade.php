@@ -390,6 +390,9 @@
                                                                 class="w-14 rounded border-slate-300 px-2 py-1 text-xs"
                                                             />
                                                         </label>
+                                                        <button type="button" wire:click="restartSiteProcess('{{ $process->id }}')" wire:loading.attr="disabled" wire:target="restartSiteProcess" class="font-medium text-sky-700 hover:text-sky-800 disabled:opacity-50">
+                                                            {{ __('Restart') }}
+                                                        </button>
                                                         <button type="button" wire:click="toggleSiteProcessActive('{{ $process->id }}')" class="font-medium {{ $process->is_active ? 'text-amber-700 hover:text-amber-800' : 'text-emerald-700 hover:text-emerald-800' }}">
                                                             {{ $process->is_active ? __('Deactivate') : __('Activate') }}
                                                         </button>
