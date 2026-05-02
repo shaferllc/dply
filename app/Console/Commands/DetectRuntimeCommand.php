@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlanComposer;
+use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use Illuminate\Console\Command;
 
 /**
@@ -22,14 +23,28 @@ use Illuminate\Console\Command;
 class DetectRuntimeCommand extends Command
 {
     protected $signature = 'dply:detect-runtime
-        {path : Path to a checked-out repository (defaults to current directory)}
+        {path? : Path to a checked-out repository (defaults to current directory)}
+        {--url= : Clone a remote repository for detection (mutually exclusive with path)}
+        {--branch=main : Branch to clone when using --url}
         {--json : Output the plan as JSON}';
 
-    protected $description = 'Run runtime detection + dply.yaml manifest composition against a local repo and print the resulting plan.';
+    protected $description = 'Run runtime detection + dply.yaml manifest composition against a local repo or a remote URL and print the resulting plan.';
 
-    public function handle(RepositoryRuntimePlanComposer $composer): int
+    public function handle(RepositoryRuntimePreview $preview): int
     {
-        $rawPath = (string) $this->argument('path');
+        $url = (string) ($this->option('url') ?? '');
+        $rawPath = (string) ($this->argument('path') ?? '');
+
+        if ($url !== '' && $rawPath !== '') {
+            $this->error('Pass either a path or --url, not both.');
+
+            return self::FAILURE;
+        }
+
+        if ($url !== '') {
+            return $this->handleUrl($preview, $url, (string) ($this->option('branch') ?? 'main'));
+        }
+
         $path = $rawPath !== '' ? $rawPath : getcwd();
 
         if ($path === false || ! is_dir($path)) {
@@ -45,7 +60,7 @@ class DetectRuntimeCommand extends Command
             return self::FAILURE;
         }
 
-        $plan = $composer->compose($absolute);
+        $plan = $preview->fromPath($absolute);
 
         if ($plan === null) {
             if ($this->option('json')) {
@@ -65,6 +80,49 @@ class DetectRuntimeCommand extends Command
         }
 
         $this->renderHumanReadable($plan, $absolute);
+
+        return self::SUCCESS;
+    }
+
+    private function handleUrl(RepositoryRuntimePreview $preview, string $url, string $branch): int
+    {
+        try {
+            $plan = $preview->fromUrl($url, $branch);
+        } catch (GitCloneException $e) {
+            if ($this->option('json')) {
+                $this->line(json_encode([
+                    'plan' => null,
+                    'url' => $url,
+                    'branch' => $branch,
+                    'error' => $e->getMessage(),
+                ], JSON_PRETTY_PRINT));
+            } else {
+                $this->error($e->getMessage());
+            }
+
+            return self::FAILURE;
+        }
+
+        $label = "{$url}@{$branch}";
+
+        if ($plan === null) {
+            if ($this->option('json')) {
+                $this->line(json_encode(['plan' => null, 'url' => $url, 'branch' => $branch], JSON_PRETTY_PRINT));
+            } else {
+                $this->warn("No runtime detected at {$label}.");
+                $this->line('No dply.yaml manifest, no recognized runtime signals.');
+            }
+
+            return self::SUCCESS;
+        }
+
+        if ($this->option('json')) {
+            $this->line(json_encode($this->planToArray($plan, $label), JSON_PRETTY_PRINT));
+
+            return self::SUCCESS;
+        }
+
+        $this->renderHumanReadable($plan, $label);
 
         return self::SUCCESS;
     }

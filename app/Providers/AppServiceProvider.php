@@ -52,9 +52,11 @@ use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
 use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
 use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesDeployEngine;
+use App\Services\Deploy\RuntimeDetection\GitCloner;
 use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\NodeRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\ProcessGitCloner;
 use App\Services\Deploy\RuntimeDetection\PythonRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\RubyRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
@@ -178,6 +180,8 @@ class AppServiceProvider extends ServiceProvider
             GoRuntimeDetector::class,
             StaticRuntimeDetector::class,
         ], 'site.runtime.detectors');
+
+        $this->app->bind(GitCloner::class, ProcessGitCloner::class);
     }
 
     /**
