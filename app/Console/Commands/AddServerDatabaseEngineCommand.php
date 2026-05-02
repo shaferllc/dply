@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\Servers\AttachDatabaseEngineToServer;
+use App\Actions\Servers\InstallDatabaseEngineOnServer;
 use App\Models\Server;
 use Illuminate\Console\Command;
 
@@ -30,11 +31,12 @@ class AddServerDatabaseEngineCommand extends Command
         {server : Server ID, name, or IP}
         {engine : Engine key (postgres / mysql84 / mariadb / etc.)}
         {--engine-version= : Engine version (e.g. 17, 8.4)}
-        {--default : Mark this engine as the server\'s default}';
+        {--default : Mark this engine as the server\'s default}
+        {--install : Also install the apt package via SSH before registering}';
 
-    protected $description = 'Register a database engine as installed on a server.';
+    protected $description = 'Register a database engine as installed on a server (and optionally install it via SSH).';
 
-    public function handle(AttachDatabaseEngineToServer $action): int
+    public function handle(AttachDatabaseEngineToServer $attach, InstallDatabaseEngineOnServer $install): int
     {
         $server = $this->resolveServer((string) $this->argument('server'));
         if ($server === null) {
@@ -47,9 +49,26 @@ class AddServerDatabaseEngineCommand extends Command
         $version = $this->option('engine-version');
         $version = is_string($version) && trim($version) !== '' ? trim($version) : null;
         $isDefault = (bool) $this->option('default');
+        $shouldInstall = (bool) $this->option('install');
 
         try {
-            $row = $action->execute($server, $engine, $version, $isDefault);
+            if ($shouldInstall) {
+                $result = $install->execute($server, $engine, $version, $isDefault);
+                if (! ($result['ok'] ?? false)) {
+                    $this->warn('No install steps known for engine: '.$engine);
+                    $this->line('Falling back to data-only registration. Install the package separately.');
+                    $row = $attach->execute($server, $engine, $version, $isDefault);
+                } else {
+                    $row = $result['row'];
+                    $output = trim((string) $result['output']);
+                    if ($output !== '') {
+                        $this->line('<fg=cyan>Install output:</>');
+                        $this->line($output);
+                    }
+                }
+            } else {
+                $row = $attach->execute($server, $engine, $version, $isDefault);
+            }
         } catch (\Throwable $e) {
             $this->error($e->getMessage());
 

@@ -719,6 +719,20 @@ final class ServerProvisionCommandBuilder
     /**
      * @return list<string>
      */
+    /**
+     * Public wrapper around the private install-database flow. Lets ad-hoc
+     * server-management tooling (the dply:server:add-engine flow, on-demand
+     * installer actions) reuse the same shell content the bootstrap path
+     * emits, without duplicating the per-engine package map or the
+     * idempotent install guards.
+     *
+     * @return list<string>
+     */
+    public function installEngineLines(string $engineId): array
+    {
+        return $this->installDatabaseIfNeeded($engineId);
+    }
+
     private function installDatabaseIfNeeded(string $database): array
     {
         if ($database === 'none') {
