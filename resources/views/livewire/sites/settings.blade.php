@@ -344,6 +344,35 @@
                                 @endif
                             </dl>
 
+                            @if ($site->processes->isNotEmpty())
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                        <h3 class="text-sm font-semibold text-slate-900">{{ __('Site processes') }}</h3>
+                                        <p class="text-xs text-slate-500">{{ trans_choice('{1} 1 process|[2,*] :count processes', $site->processes->count(), ['count' => $site->processes->count()]) }}</p>
+                                    </div>
+                                    <p class="mt-1 text-xs text-slate-600">{{ __('The web row drives NGINX upstream. Workers and schedulers run as separate systemd units (dply-site-:id-:name.service).', ['id' => $site->id, 'name' => '<name>']) }}</p>
+                                    <ul class="mt-3 space-y-2">
+                                        @foreach ($site->processes as $process)
+                                            <li class="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">{{ $process->type }}</span>
+                                                        <span class="text-sm font-semibold text-slate-900">{{ $process->name }}</span>
+                                                        @if (! $process->is_active)
+                                                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900">{{ __('inactive') }}</span>
+                                                        @endif
+                                                        @if ((int) $process->scale > 1)
+                                                            <span class="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-900">{{ __('scale :n', ['n' => $process->scale]) }}</span>
+                                                        @endif
+                                                    </div>
+                                                    <p class="mt-1 break-all font-mono text-xs text-slate-700">{{ $process->command ?? __('(unset — runtime-default applies)') }}</p>
+                                                </div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+
                             <div class="grid gap-4 lg:grid-cols-2">
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                     <h3 class="text-sm font-semibold text-slate-900">{{ __('Launch preflight') }}</h3>
