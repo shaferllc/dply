@@ -10,7 +10,9 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Actions\Servers\InstallRuntimeOnServer;
+use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
+use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
@@ -772,6 +774,25 @@ class Create extends Component
                 'command' => $detected['command'],
                 'scale' => 1,
                 'is_active' => true,
+            ]);
+        }
+
+        // Materialize the canonical default deploy step set for this
+        // runtime + framework so the user's first deploy has sensible
+        // build/release steps without requiring a trip to the deploy-
+        // pipeline editor. Skips when no defaults apply (custom / null
+        // runtime / unknown runtime).
+        $effectiveFramework = (string) ($this->detectedPlan['framework'] ?? '');
+        $defaults = app(RuntimeAwareDeployStepDefaults::class)
+            ->defaultsFor($site->runtime, $effectiveFramework !== '' ? $effectiveFramework : null);
+        foreach ($defaults as $step) {
+            SiteDeployStep::create([
+                'site_id' => $site->id,
+                'sort_order' => $step['sort_order'],
+                'step_type' => $step['step_type'],
+                'phase' => $step['phase'],
+                'custom_command' => $step['custom_command'] ?? null,
+                'timeout_seconds' => $step['timeout_seconds'],
             ]);
         }
 

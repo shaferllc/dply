@@ -276,6 +276,49 @@ class SiteCreateRuntimeDetectionTest extends TestCase
         $this->assertSame(SiteProcess::TYPE_WORKER, $worker->type);
     }
 
+    public function test_store_materializes_runtime_aware_default_deploy_steps(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        [$user, $server] = $this->makeServerWithUser();
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.name', 'rails-app')
+            ->set('form.primary_hostname', 'rails-app.example.com')
+            ->set('form.runtime', 'ruby')
+            ->set('form.runtime_version', '3.3')
+            ->set('form.type', 'node')
+            ->set('form.start_command', 'bundle exec puma')
+            ->set('detectedPlan', ['framework' => 'rails'])
+            ->call('store');
+
+        $site = Site::query()->where('name', 'rails-app')->firstOrFail();
+        $steps = $site->deploySteps()->orderBy('sort_order')->get();
+
+        $this->assertCount(3, $steps);
+        $commands = $steps->pluck('custom_command')->all();
+        $this->assertContains('bundle install --deployment --without development:test', $commands);
+        $this->assertContains('bundle exec rails assets:precompile', $commands);
+        $this->assertContains('bundle exec rails db:migrate', $commands);
+    }
+
+    public function test_store_skips_default_steps_for_static_runtime(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        [$user, $server] = $this->makeServerWithUser();
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.name', 'plain-static')
+            ->set('form.primary_hostname', 'plain-static.example.com')
+            ->set('form.runtime', 'static')
+            ->set('form.type', 'static')
+            ->call('store');
+
+        $site = Site::query()->where('name', 'plain-static')->firstOrFail();
+        $this->assertSame(0, $site->deploySteps()->count());
+    }
+
     public function test_create_form_loads_server_database_engines_and_picks_default(): void
     {
         [$user, $server] = $this->makeServerWithUser();
