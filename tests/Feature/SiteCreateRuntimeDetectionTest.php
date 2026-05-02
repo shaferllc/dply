@@ -319,6 +319,40 @@ class SiteCreateRuntimeDetectionTest extends TestCase
         $this->assertSame(0, $site->deploySteps()->count());
     }
 
+    public function test_engine_picker_renders_only_for_multi_engine_servers(): void
+    {
+        [$user, $server] = $this->makeServerWithUser();
+        \App\Models\ServerDatabaseEngine::create([
+            'server_id' => $server->id,
+            'engine' => 'postgres',
+            'is_default' => true,
+        ]);
+        \App\Models\ServerDatabaseEngine::create([
+            'server_id' => $server->id,
+            'engine' => 'mysql84',
+            'is_default' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->assertSeeHtml('id="database_engine"')
+            ->assertSeeHtml('wire:model="form.database_engine"');
+    }
+
+    public function test_engine_picker_hidden_for_single_engine_server(): void
+    {
+        [$user, $server] = $this->makeServerWithUser();
+        \App\Models\ServerDatabaseEngine::create([
+            'server_id' => $server->id,
+            'engine' => 'postgres',
+            'is_default' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->assertDontSeeHtml('id="database_engine"');
+    }
+
     public function test_create_form_loads_server_database_engines_and_picks_default(): void
     {
         [$user, $server] = $this->makeServerWithUser();

@@ -450,6 +450,19 @@
                                 {{ __('Static sites ship with a placeholder page first so the temporary testing hostname can return a healthy response before your real assets are deployed.') }}
                             </div>
                         @endif
+
+                        @if (count($availableDatabaseEngines) > 1 && ! $functionsHost && $form->type !== 'static')
+                            <div>
+                                <x-input-label for="database_engine" :value="__('Database engine')" />
+                                <select id="database_engine" wire:model="form.database_engine" class="mt-1 block w-full max-w-xs rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                    @foreach ($availableDatabaseEngines as $engine)
+                                        <option value="{{ $engine['id'] }}">{{ $engine['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-2 text-sm text-slate-600">{{ __('This server has multiple engines installed. Pick which one this site connects to — defaults to the server\'s default engine.') }}</p>
+                                <x-input-error :messages="$errors->get('form.database_engine')" class="mt-1" />
+                            </div>
+                        @endif
                     </div>
                 </section>
 
