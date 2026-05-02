@@ -18,6 +18,7 @@ use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
+use App\Models\SiteProcess;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
 use App\Models\Workspace;
@@ -199,6 +200,18 @@ class Settings extends Show
     public string $sync_group_add_site_id = '';
 
     public string $sync_group_leader_site_id = '';
+
+    /**
+     * New SiteProcess form. The user fills these in and clicks "Add" to
+     * materialize a row. Type is one of SiteProcess::TYPE_WORKER /
+     * TYPE_SCHEDULER / TYPE_CUSTOM — the auto-created `web` row is
+     * managed by the Site::created hook, not this form.
+     */
+    public string $new_site_process_type = 'worker';
+
+    public string $new_site_process_name = '';
+
+    public string $new_site_process_command = '';
 
     public function mount(Server $server, Site $site, ?string $section = null): void
     {
@@ -1985,6 +1998,100 @@ class Settings extends Show
         $this->new_certificate_certificate_pem = '';
         $this->new_certificate_private_key_pem = '';
         $this->new_certificate_chain_pem = '';
+    }
+
+    /**
+     * Add a SiteProcess (worker / scheduler / custom) to the site.
+     *
+     * The auto-created `web` row is owned by the Site::created hook —
+     * users edit its command via the start_command field, not this
+     * form. The form only accepts non-web types so a duplicate web
+     * SiteProcess can't appear (the relation already enforces unique
+     * `(site_id, name)`, but we belt-and-suspenders here for clarity).
+     */
+    public function addSiteProcess(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $allowedTypes = [SiteProcess::TYPE_WORKER, SiteProcess::TYPE_SCHEDULER, SiteProcess::TYPE_CUSTOM];
+        $validated = $this->validate([
+            'new_site_process_type' => ['required', 'string', 'in:'.implode(',', $allowedTypes)],
+            'new_site_process_name' => ['required', 'string', 'max:64', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'new_site_process_command' => ['required', 'string', 'max:2000'],
+        ], attributes: [
+            'new_site_process_type' => __('process type'),
+            'new_site_process_name' => __('process name'),
+            'new_site_process_command' => __('process command'),
+        ]);
+
+        $name = trim($validated['new_site_process_name']);
+        if ($name === 'web') {
+            $this->addError(
+                'new_site_process_name',
+                __('The name "web" is reserved for the upstream process.'),
+            );
+
+            return;
+        }
+
+        if ($this->site->processes()->where('name', $name)->exists()) {
+            $this->addError(
+                'new_site_process_name',
+                __('A process named ":name" already exists for this site.', ['name' => $name]),
+            );
+
+            return;
+        }
+
+        $this->site->processes()->create([
+            'type' => $validated['new_site_process_type'],
+            'name' => $name,
+            'command' => trim($validated['new_site_process_command']),
+            'scale' => 1,
+            'is_active' => true,
+        ]);
+
+        // Re-provision systemd units so the new process gets its own unit
+        // file installed without waiting for the next deploy. The job
+        // skips PHP/static sites internally so this is safe to call
+        // unconditionally for non-PHP runtimes.
+        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
+            \App\Jobs\ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
+        }
+
+        $this->new_site_process_name = '';
+        $this->new_site_process_command = '';
+        $this->new_site_process_type = SiteProcess::TYPE_WORKER;
+
+        $this->toastSuccess(__('Process :name added.', ['name' => $name]));
+    }
+
+    /**
+     * Remove a non-web SiteProcess. The web row is the upstream the
+     * NGINX vhost depends on — deleting it would break routing — so
+     * the method refuses to touch it. The auto-created systemd unit
+     * (if any) is removed in a follow-up commit when we wire teardown
+     * for individual process removals.
+     */
+    public function removeSiteProcess(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        $process = $this->site->processes()->whereKey($id)->first();
+        if ($process === null) {
+            return;
+        }
+
+        if ($process->type === SiteProcess::TYPE_WEB) {
+            $this->toastError(__('The web process is managed by dply and cannot be removed from this UI.'));
+
+            return;
+        }
+
+        $name = $process->name;
+        $process->delete();
+
+        $this->toastSuccess(__('Process :name removed.', ['name' => $name]));
     }
 
     public function render(): View

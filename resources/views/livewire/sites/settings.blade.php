@@ -367,9 +367,39 @@
                                                     </div>
                                                     <p class="mt-1 break-all font-mono text-xs text-slate-700">{{ $process->command ?? __('(unset — runtime-default applies)') }}</p>
                                                 </div>
+                                                @if ($process->type !== 'web')
+                                                    <button type="button" wire:click="removeSiteProcess('{{ $process->id }}')" wire:confirm="{{ __('Remove the :name process? Its systemd unit will be torn down on the next deploy.', ['name' => $process->name]) }}" class="text-xs font-medium text-rose-700 hover:text-rose-800">{{ __('Remove') }}</button>
+                                                @endif
                                             </li>
                                         @endforeach
                                     </ul>
+
+                                    <div class="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">
+                                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Add a process') }}</p>
+                                        <div class="mt-2 grid gap-2 sm:grid-cols-[110px,200px,1fr,auto] sm:items-end">
+                                            <div>
+                                                <label for="new_site_process_type" class="block text-[11px] font-medium text-slate-600">{{ __('Type') }}</label>
+                                                <select id="new_site_process_type" wire:model="new_site_process_type" class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm">
+                                                    <option value="worker">{{ __('worker') }}</option>
+                                                    <option value="scheduler">{{ __('scheduler') }}</option>
+                                                    <option value="custom">{{ __('custom') }}</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label for="new_site_process_name" class="block text-[11px] font-medium text-slate-600">{{ __('Name') }}</label>
+                                                <input type="text" id="new_site_process_name" wire:model="new_site_process_name" placeholder="sidekiq" class="mt-1 block w-full rounded-lg border-slate-300 font-mono text-sm shadow-sm" />
+                                                <x-input-error :messages="$errors->get('new_site_process_name')" class="mt-1" />
+                                            </div>
+                                            <div>
+                                                <label for="new_site_process_command" class="block text-[11px] font-medium text-slate-600">{{ __('Command') }}</label>
+                                                <input type="text" id="new_site_process_command" wire:model="new_site_process_command" placeholder="bundle exec sidekiq -C config/sidekiq.yml" class="mt-1 block w-full rounded-lg border-slate-300 font-mono text-sm shadow-sm" />
+                                                <x-input-error :messages="$errors->get('new_site_process_command')" class="mt-1" />
+                                            </div>
+                                            <button type="button" wire:click="addSiteProcess" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
+                                                {{ __('Add') }}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             @endif
 
