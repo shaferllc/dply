@@ -9,6 +9,7 @@ use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
+use App\Services\Servers\ServerCreatePresetCatalog;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -26,6 +27,12 @@ class StepWhat extends Component
     use ServerCreateActions;
 
     public ServerCreateForm $form;
+
+    /**
+     * Slug of the preset that drove the current form values, when one
+     * was applied. Empty when the user is hand-rolling the stack.
+     */
+    public string $selectedPreset = '';
 
     public function mount(): mixed
     {
@@ -83,6 +90,65 @@ class StepWhat extends Component
         return 3;
     }
 
+    /**
+     * Apply a preset from {@see ServerCreatePresetCatalog} to the form.
+     *
+     * Each preset bundles role / webserver / PHP version / database /
+     * cache so the user gets a Forge-style "I'm a Laravel app" tile
+     * rather than picking 6 fields one by one. Per the strategy memo:
+     * "Preset row at the top pre-fills runtimes + role + db + cache +
+     * web; users can override anything below."
+     *
+     * Custom is intentionally a no-op (clears selection without
+     * changing form state) so it acts as the "I'll pick myself"
+     * escape hatch from a previous preset choice.
+     */
+    public function applyPreset(string $presetId, ServerCreatePresetCatalog $catalog): void
+    {
+        $preset = $catalog->find($presetId);
+        if ($preset === null) {
+            return;
+        }
+
+        $this->selectedPreset = $presetId;
+
+        if ($presetId === ServerCreatePresetCatalog::ID_CUSTOM) {
+            return;
+        }
+
+        // Preset → form field mapping. Empty / null preset values stay
+        // empty so the user can fill them manually for the static-host
+        // and database-node tiles (which intentionally clear PHP).
+        $this->form->server_role = $preset['role'];
+        if ($preset['webserver'] !== null) {
+            $this->form->webserver = $preset['webserver'];
+        }
+        if ($preset['php_version'] !== null) {
+            $this->form->php_version = $preset['php_version'];
+        }
+        if ($preset['database'] !== null) {
+            $this->form->database = $preset['database'];
+        }
+        if ($preset['cache'] !== null) {
+            $this->form->cache_service = $preset['cache'];
+        }
+
+        // Persist the preset choice on the draft so re-entering the step
+        // remembers the tile the user clicked. Stored under the existing
+        // form->install_profile slot for now since the wizard's draft
+        // schema already round-trips that field.
+        $this->form->install_profile = match ($presetId) {
+            ServerCreatePresetCatalog::ID_LARAVEL => 'laravel_app',
+            ServerCreatePresetCatalog::ID_RAILS,
+            ServerCreatePresetCatalog::ID_NEXTJS,
+            ServerCreatePresetCatalog::ID_DJANGO => 'plain',
+            ServerCreatePresetCatalog::ID_POLYGLOT => 'plain',
+            ServerCreatePresetCatalog::ID_STATIC => 'static_app_host',
+            ServerCreatePresetCatalog::ID_DATABASE => 'plain',
+            default => $this->form->install_profile,
+        };
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -93,6 +159,8 @@ class StepWhat extends Component
             'reachedStep' => $this->currentDraft()?->step ?? 3,
             'provisionOptions' => $context['provisionOptions'],
             'installProfiles' => config('server_provision_options.install_profiles', []),
+            'serverPresets' => app(ServerCreatePresetCatalog::class)->all(),
+            'selectedPreset' => $this->selectedPreset,
         ]);
     }
 }

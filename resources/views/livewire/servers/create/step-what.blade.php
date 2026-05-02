@@ -8,6 +8,52 @@
             <p class="mt-2 text-sm text-brand-moss">{{ __('Step 3 of :total — pick a stack preset, then tweak any defaults you want.', ['total' => $totalSteps]) }}</p>
         </header>
 
+        {{-- Preset tiles. Featured tiles surface first; the polyglot
+             host is the marketing-pixel-level differentiator and stays
+             in the featured row alongside Laravel / Rails / Next.js /
+             Django. Static / Database / Custom appear as a secondary row. --}}
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+            <div>
+                <h2 class="text-base font-semibold text-slate-900">{{ __('Pick a preset') }}</h2>
+                <p class="mt-1 text-sm text-slate-600">{{ __('Each preset pre-fills runtimes, role, database, cache, and web server. Click a tile, then override anything below.') }}</p>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach (collect($serverPresets)->where('featured', true) as $preset)
+                    <button
+                        type="button"
+                        wire:click="applyPreset('{{ $preset['id'] }}')"
+                        class="group relative flex flex-col items-start rounded-xl border-2 p-4 text-left shadow-sm transition-colors {{ $selectedPreset === $preset['id'] ? 'border-sky-500 bg-sky-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' }}"
+                    >
+                        @if ($preset['id'] === 'polyglot')
+                            <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900">{{ __('Differentiator') }}</span>
+                        @endif
+                        <span class="text-sm font-semibold text-slate-900">{{ $preset['name'] }}</span>
+                        <span class="mt-1 text-xs leading-5 text-slate-600">{{ $preset['description'] }}</span>
+                        @if ($selectedPreset === $preset['id'])
+                            <span class="absolute right-3 top-3 inline-flex items-center justify-center rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-semibold text-white">{{ __('Selected') }}</span>
+                        @endif
+                    </button>
+                @endforeach
+            </div>
+
+            <details class="text-sm" @if ($selectedPreset !== '' && ! collect($serverPresets)->where('featured', true)->pluck('id')->contains($selectedPreset)) open @endif>
+                <summary class="cursor-pointer font-medium text-slate-700 hover:text-slate-900">{{ __('Other presets (Static / Database node / Custom)') }}</summary>
+                <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                    @foreach (collect($serverPresets)->where('featured', false) as $preset)
+                        <button
+                            type="button"
+                            wire:click="applyPreset('{{ $preset['id'] }}')"
+                            class="flex flex-col items-start rounded-xl border-2 p-4 text-left shadow-sm transition-colors {{ $selectedPreset === $preset['id'] ? 'border-sky-500 bg-sky-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' }}"
+                        >
+                            <span class="text-sm font-semibold text-slate-900">{{ $preset['name'] }}</span>
+                            <span class="mt-1 text-xs leading-5 text-slate-600">{{ $preset['description'] }}</span>
+                        </button>
+                    @endforeach
+                </div>
+            </details>
+        </section>
+
         @php
             $selectedInstallProfile = collect($installProfiles)->firstWhere('id', $form->install_profile);
             $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
