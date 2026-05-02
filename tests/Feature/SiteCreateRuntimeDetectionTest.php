@@ -32,6 +32,34 @@ class SiteCreateRuntimeDetectionTest extends TestCase
         return $user;
     }
 
+    public function test_create_view_shows_auto_detect_panel_for_non_functions_host(): void
+    {
+        [$user, $server] = $this->makeServerWithUser();
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->assertSeeHtml('id="git_repository_url"')
+            ->assertSeeHtml('wire:click="detectFromRepository"')
+            ->assertSee('Auto-detect');
+    }
+
+    public function test_create_view_renders_plan_details_after_detection(): void
+    {
+        [$user, $server] = $this->makeServerWithUser();
+        $this->fakeClonerThatProducesNodeRepoWithBullmq();
+
+        $component = Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.git_repository_url', 'https://example.com/jobs.git')
+            ->call('detectFromRepository');
+
+        $component
+            ->assertSee('node')
+            ->assertSee('npm run build')
+            ->assertSee('npm start')
+            ->assertSee('confidence');
+    }
+
     public function test_detect_from_repository_pre_fills_runtime_fields_from_plan(): void
     {
         [$user, $server] = $this->makeServerWithUser();

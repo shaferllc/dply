@@ -105,6 +105,109 @@
                 </section>
 
                 @if (! $functionsHost)
+                <section aria-labelledby="auto-detect-heading">
+                    <h2 id="auto-detect-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('Auto-detect (optional)') }}</h2>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-900">{{ __('Detect runtime from a repository URL') }}</h3>
+                            <p class="mt-1 text-sm text-slate-600">{{ __('Paste a git URL and dply will inspect the repo to suggest the runtime, version, build command, start command, and any worker / scheduler processes. You can override anything before saving.') }}</p>
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-[1fr,180px,auto] sm:items-end">
+                            <div>
+                                <x-input-label for="git_repository_url" :value="__('Repository URL')" />
+                                <x-text-input id="git_repository_url" wire:model="form.git_repository_url" placeholder="https://github.com/your/app.git" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                            </div>
+                            <div>
+                                <x-input-label for="git_branch" :value="__('Branch')" />
+                                <x-text-input id="git_branch" wire:model="form.git_branch" placeholder="main" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                            </div>
+                            <button type="button" wire:click="detectFromRepository" wire:loading.attr="disabled" wire:target="detectFromRepository" class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-ink/90 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="detectFromRepository">{{ __('Detect') }}</span>
+                                <span wire:loading wire:target="detectFromRepository">{{ __('Detecting…') }}</span>
+                            </button>
+                        </div>
+
+                        @if (! empty($detectedPlan['error']))
+                            <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+                                <p class="font-medium">{{ __('Could not clone the repository.') }}</p>
+                                <p class="mt-1 font-mono text-xs">{{ $detectedPlan['error'] }}</p>
+                            </div>
+                        @elseif (! empty($detectedPlan['no_match']))
+                            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                <p class="font-medium">{{ __('No runtime detected.') }}</p>
+                                <p class="mt-1">{{ __('No dply.yaml manifest and no recognized runtime signals (composer.json, package.json, requirements.txt, Gemfile, go.mod, index.html, etc.) at the repo root.') }}</p>
+                            </div>
+                        @elseif (! empty($detectedPlan['runtime']))
+                            <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-950 space-y-3">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <span class="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900">
+                                        {{ $detectedPlan['runtime'] }}
+                                        @if (! empty($detectedPlan['framework']) && $detectedPlan['framework'] !== $detectedPlan['runtime'])
+                                            · {{ $detectedPlan['framework'] }}
+                                        @endif
+                                    </span>
+                                    @if (! empty($detectedPlan['version']))
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-white/70 px-3 py-1 font-mono text-xs text-emerald-900">{{ $detectedPlan['version'] }}</span>
+                                    @endif
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['confidence'] }} confidence</span>
+                                    @if (! empty($detectedPlan['has_manifest']))
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-900/80">{{ __('dply.yaml present') }}</span>
+                                    @endif
+                                </div>
+
+                                <dl class="grid gap-3 sm:grid-cols-2">
+                                    @if (! empty($detectedPlan['build_command']))
+                                        <div>
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Build command') }}</dt>
+                                            <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['build_command'] }}</dd>
+                                        </div>
+                                    @endif
+                                    @if (! empty($detectedPlan['start_command']))
+                                        <div>
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Start command') }}</dt>
+                                            <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['start_command'] }}</dd>
+                                        </div>
+                                    @endif
+                                </dl>
+
+                                @if (! empty($detectedPlan['processes']))
+                                    <div>
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Suggested processes') }}</p>
+                                        <ul class="mt-1 space-y-1 text-xs">
+                                            @foreach ($detectedPlan['processes'] as $process)
+                                                <li class="flex items-start gap-2">
+                                                    <span class="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-white/70 px-2 py-0.5 font-semibold uppercase tracking-[0.12em] text-[10px] text-emerald-900">{{ $process['type'] }}</span>
+                                                    <span><span class="font-semibold">{{ $process['name'] }}</span> — <span class="font-mono">{{ $process['command'] }}</span></span>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
+
+                                @if (! empty($detectedPlan['reasons']))
+                                    <details class="text-xs text-emerald-900/80">
+                                        <summary class="cursor-pointer font-semibold uppercase tracking-[0.16em]">{{ __('Detection details') }}</summary>
+                                        <ul class="mt-2 space-y-1 pl-3 list-disc">
+                                            @foreach ($detectedPlan['reasons'] as $reason)
+                                                <li>{!! \Illuminate\Support\Str::of($reason)->replaceMatches('/`([^`]+)`/', '<code class="font-mono">$1</code>') !!}</li>
+                                            @endforeach
+                                        </ul>
+                                    </details>
+                                @endif
+
+                                @if (! empty($detectedPlan['warnings']))
+                                    <ul class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+                                        @foreach ($detectedPlan['warnings'] as $warning)
+                                            <li>{{ $warning }}</li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                </section>
+
                 <section aria-labelledby="deploy-paths-heading">
                     <h2 id="deploy-paths-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('3. Deploy paths') }}</h2>
                     <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
