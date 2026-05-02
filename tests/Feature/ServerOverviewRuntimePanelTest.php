@@ -50,7 +50,7 @@ class ServerOverviewRuntimePanelTest extends TestCase
             ->assertSee('1.22');
     }
 
-    public function test_overview_omits_panel_when_no_runtimes_installed(): void
+    public function test_overview_renders_empty_state_when_no_runtimes_installed(): void
     {
         $user = $this->seedUser();
         $org = $user->currentOrganization();
@@ -61,14 +61,17 @@ class ServerOverviewRuntimePanelTest extends TestCase
             'meta' => [
                 'webserver' => 'nginx',
                 // No php_version, no runtime_defaults — pure DB / cache /
-                // load-balancer node shouldn't render the panel.
+                // load-balancer node still renders the panel as an empty
+                // state with the install affordance (PP).
             ],
         ]);
 
         $response = $this->actingAs($user)->get(route('servers.overview', $server));
 
         $response->assertOk()
-            ->assertDontSee('Installed runtimes');
+            ->assertSee('Installed runtimes')
+            ->assertSee('No runtimes are installed')
+            ->assertSee('dply:install-runtime');
     }
 
     public function test_overview_renders_php_only_for_legacy_servers(): void

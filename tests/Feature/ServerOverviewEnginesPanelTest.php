@@ -43,14 +43,15 @@ class ServerOverviewEnginesPanelTest extends TestCase
             ->assertSee('dply:server:add-engine');
     }
 
-    public function test_overview_omits_engines_panel_when_none_registered(): void
+    public function test_overview_renders_engines_empty_state_with_install_hint(): void
     {
         [$user, $server] = $this->makeUserAndServer();
 
         $response = $this->actingAs($user)->get(route('servers.overview', $server));
 
         $response->assertOk()
-            ->assertDontSee('Database engines');
+            ->assertSee('No database engines are registered')
+            ->assertSee('dply:server:add-engine');
     }
 
     /**

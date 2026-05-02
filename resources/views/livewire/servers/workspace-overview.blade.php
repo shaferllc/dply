@@ -398,16 +398,25 @@
             @endif
 
             @php($installedRuntimeKeys = $server->installedRuntimeKeys())
-            @if ($installedRuntimeKeys !== [] || ! empty($server->meta['php_version']))
-                <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div class="max-w-2xl">
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Installed runtimes') }}</h3>
-                            <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Runtime versions pinned globally on this server. Sites pick from these (or override per repo via .tool-versions / dply.yaml).') }}</p>
-                        </div>
+            @php($hasPhp = ! empty($server->meta['php_version']))
+            <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div class="max-w-2xl">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Installed runtimes') }}</h3>
+                        <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Runtime versions pinned globally on this server. Sites pick from these (or override per repo via .tool-versions / dply.yaml).') }}</p>
                     </div>
+                </div>
+                @if ($installedRuntimeKeys === [] && ! $hasPhp)
+                    <div class="mt-5 rounded-xl border border-dashed border-brand-ink/20 bg-slate-50/60 p-6 text-center">
+                        <p class="text-sm text-brand-moss">{{ __('No runtimes are installed on this server yet.') }}</p>
+                        <p class="mt-3 text-[12px] text-brand-moss">{{ __('Install a runtime from the terminal:') }}</p>
+                        <pre class="mx-auto mt-2 inline-block rounded bg-slate-900 px-3 py-2 text-left text-[11px] leading-5 text-emerald-200"><code>dply:install-runtime {{ $server->id }} --runtime=node --version=20.10.0
+dply:install-runtime {{ $server->id }} --runtime=python --version=3.12</code></pre>
+                        <p class="mt-3 text-[11px] text-brand-moss">{{ __('See') }} <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px]">dply:list-runtimes</code> {{ __('for the catalog.') }}</p>
+                    </div>
+                @else
                     <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        @if (! empty($server->meta['php_version']))
+                        @if ($hasPhp)
                             <div class="rounded-xl border border-brand-ink/10 bg-slate-50/70 p-4">
                                 <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('PHP') }}</dt>
                                 <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $server->meta['php_version'] }}</dd>
@@ -423,6 +432,14 @@
                             </div>
                         @endforeach
                     </dl>
+                    <p class="mt-4 text-[11px] text-brand-moss">{{ __('Add another with') }} <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px]">dply:install-runtime</code>.</p>
+                @endif
+            </section>
+
+            @if ($databaseEngines->isEmpty())
+                <section class="mt-4 rounded-2xl border border-dashed border-brand-ink/20 bg-slate-50/60 p-6 text-center">
+                    <p class="text-sm text-brand-moss">{{ __('No database engines are registered on this server.') }}</p>
+                    <p class="mt-2 text-[11px] text-brand-moss">{{ __('Attach an engine with') }} <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px]">dply:server:add-engine</code>{{ __(' or run') }} <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px]">dply:list-engines</code> {{ __('to see options.') }}</p>
                 </section>
             @endif
 
