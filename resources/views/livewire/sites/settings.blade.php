@@ -419,6 +419,12 @@
                                 </div>
                             @endif
 
+                            @if ($this->recentDeploymentsWithPhases->isNotEmpty())
+                                @include('livewire.sites.partials.recent-deployments', [
+                                    'deployments' => $this->recentDeploymentsWithPhases,
+                                ])
+                            @endif
+
                             <div class="grid gap-4 lg:grid-cols-2">
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                     <h3 class="text-sm font-semibold text-slate-900">{{ __('Launch preflight') }}</h3>

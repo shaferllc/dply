@@ -115,6 +115,46 @@ class SiteDeployment extends Model
         return $total;
     }
 
+    /**
+     * Steps recorded for a phase, or an empty list when the phase
+     * isn't in phase_results at all. Drives the dashboard's per-phase
+     * step list without forcing the view into nested @php blocks.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function phaseSteps(string $phase): array
+    {
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $steps = $results[$phase] ?? null;
+
+        return is_array($steps) ? array_values($steps) : [];
+    }
+
+    /**
+     * Whether the phase is recorded AND every step succeeded.
+     */
+    public function phaseOk(string $phase): bool
+    {
+        $steps = $this->phaseSteps($phase);
+        if ($steps === []) {
+            return false;
+        }
+        foreach ($steps as $step) {
+            if (($step['ok'] ?? false) !== true) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function hasPhase(string $phase): bool
+    {
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+
+        return is_array($results[$phase] ?? null);
+    }
+
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

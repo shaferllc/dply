@@ -2190,6 +2190,22 @@ class Settings extends Show
         ]));
     }
 
+    /**
+     * Recent SiteDeployment rows that carry structured phase_results
+     * (i.e. went through the new DeployPhaseRunner). Used by the
+     * settings.blade.php "Recent deployments" panel so the view stays
+     * free of inline @php(…) blocks that fight Blade's lexer when the
+     * expression has nested parens / method chains.
+     */
+    public function getRecentDeploymentsWithPhasesProperty()
+    {
+        return $this->site->deployments()
+            ->whereNotNull('phase_results')
+            ->orderByDesc('started_at')
+            ->limit(5)
+            ->get();
+    }
+
     public function render(): View
     {
         if (! $this->site->isReadyForWorkspace()) {
