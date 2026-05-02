@@ -155,6 +155,39 @@ class SiteDeployment extends Model
         return is_array($results[$phase] ?? null);
     }
 
+    /**
+     * Tailwind class string for the per-step status pill in dashboard
+     * partials. Consolidated here so Blade doesn't need a nested
+     * ternary inside @php (the lexer chokes on those).
+     *
+     * @param  array<string, mixed>  $step
+     */
+    public function stepClasses(array $step): string
+    {
+        $skipped = ($step['skipped'] ?? false) === true;
+        $ok = ($step['ok'] ?? false) === true;
+
+        if ($skipped) {
+            return 'bg-amber-100 text-amber-900';
+        }
+
+        return $ok ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900';
+    }
+
+    /**
+     * One-character glyph for the per-step status pill.
+     *
+     * @param  array<string, mixed>  $step
+     */
+    public function stepGlyph(array $step): string
+    {
+        if (($step['skipped'] ?? false) === true) {
+            return '·';
+        }
+
+        return ($step['ok'] ?? false) === true ? '✓' : '✗';
+    }
+
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

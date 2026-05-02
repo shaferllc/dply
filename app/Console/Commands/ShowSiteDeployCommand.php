@@ -100,19 +100,45 @@ class ShowSiteDeployCommand extends Command
             return;
         }
 
-        foreach ($phaseResults as $phaseName => $payload) {
-            $this->newLine();
-            $ok = (bool) ($payload['ok'] ?? false);
-            $marker = $ok ? '<fg=green>✓</>' : '<fg=red>✗</>';
-            $this->line(sprintf('%s <fg=cyan>%s</>', $marker, $phaseName));
-            $steps = $payload['steps'] ?? [];
+        // phase_results[$phase] is a flat list of step result arrays
+        // (see DeploymentRunner::run() — it passes runBuild() etc. directly
+        // to recordPhaseResults). Compute "phase ok" by inspecting steps,
+        // not by reading a non-existent payload['ok'] key.
+        foreach ($phaseResults as $phaseName => $steps) {
             if (! is_array($steps)) {
                 continue;
             }
+            $this->newLine();
+            $ok = $this->stepsAllOk($steps);
+            $marker = $ok ? '<fg=green>✓</>' : '<fg=red>✗</>';
+            $this->line(sprintf('%s <fg=cyan>%s</>', $marker, $phaseName));
             foreach ($steps as $step) {
+                if (! is_array($step)) {
+                    continue;
+                }
                 $this->renderStep($step, $showOutput);
             }
         }
+    }
+
+    /**
+     * @param  array<int, mixed>  $steps
+     */
+    private function stepsAllOk(array $steps): bool
+    {
+        if ($steps === []) {
+            return false;
+        }
+        foreach ($steps as $step) {
+            if (! is_array($step)) {
+                continue;
+            }
+            if (($step['ok'] ?? false) !== true && ($step['skipped'] ?? false) !== true) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

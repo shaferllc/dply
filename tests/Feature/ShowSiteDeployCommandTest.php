@@ -17,13 +17,12 @@ class ShowSiteDeployCommandTest extends TestCase
 
     public function test_renders_phase_tree_with_step_status(): void
     {
+        // phase_results[$phase] is a flat list of steps (matches what
+        // DeploymentRunner produces when it calls recordPhaseResults).
         $deployment = $this->seedDeployment(SiteDeployment::STATUS_SUCCESS, [
             'build' => [
-                'ok' => true,
-                'steps' => [
-                    ['step_type' => 'install', 'command' => 'npm ci', 'ok' => true, 'duration_ms' => 1234],
-                    ['step_type' => 'build', 'command' => 'npm run build', 'ok' => true, 'duration_ms' => 5678],
-                ],
+                ['step_type' => 'install', 'command' => 'npm ci', 'ok' => true, 'duration_ms' => 1234],
+                ['step_type' => 'build', 'command' => 'npm run build', 'ok' => true, 'duration_ms' => 5678],
             ],
         ]);
 
@@ -40,8 +39,8 @@ class ShowSiteDeployCommandTest extends TestCase
     public function test_phase_filter_limits_render(): void
     {
         $deployment = $this->seedDeployment(SiteDeployment::STATUS_SUCCESS, [
-            'build' => ['ok' => true, 'steps' => [['step_type' => 'b1', 'command' => 'BUILD_CMD', 'ok' => true]]],
-            'release' => ['ok' => true, 'steps' => [['step_type' => 'r1', 'command' => 'RELEASE_CMD', 'ok' => true]]],
+            'build' => [['step_type' => 'b1', 'command' => 'BUILD_CMD', 'ok' => true]],
+            'release' => [['step_type' => 'r1', 'command' => 'RELEASE_CMD', 'ok' => true]],
         ]);
 
         Artisan::call('dply:site:show-deploy', [
@@ -58,10 +57,7 @@ class ShowSiteDeployCommandTest extends TestCase
     {
         $deployment = $this->seedDeployment(SiteDeployment::STATUS_FAILED, [
             'build' => [
-                'ok' => false,
-                'steps' => [
-                    ['step_type' => 'install', 'command' => 'npm ci', 'ok' => false, 'output' => 'error: missing lockfile'],
-                ],
+                ['step_type' => 'install', 'command' => 'npm ci', 'ok' => false, 'output' => 'error: missing lockfile'],
             ],
         ]);
 
@@ -79,10 +75,7 @@ class ShowSiteDeployCommandTest extends TestCase
     {
         $deployment = $this->seedDeployment(SiteDeployment::STATUS_SUCCESS, [
             'build' => [
-                'ok' => true,
-                'steps' => [
-                    ['step_type' => 'install', 'command' => 'npm ci', 'ok' => true, 'output' => 'INTERNAL_DEBUG_TRACE'],
-                ],
+                ['step_type' => 'install', 'command' => 'npm ci', 'ok' => true, 'output' => 'INTERNAL_DEBUG_TRACE'],
             ],
         ]);
 
@@ -95,7 +88,7 @@ class ShowSiteDeployCommandTest extends TestCase
     public function test_failed_deployment_exits_non_zero(): void
     {
         $deployment = $this->seedDeployment(SiteDeployment::STATUS_FAILED, [
-            'build' => ['ok' => false, 'steps' => []],
+            'build' => [],
         ]);
 
         $exit = Artisan::call('dply:site:show-deploy', ['id' => $deployment->id]);

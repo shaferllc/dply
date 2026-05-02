@@ -18,7 +18,7 @@
                             @if ($deployment->phaseTotalDurationMs() > 0)
                                 <span class="font-mono text-[11px] text-slate-500">· {{ number_format($deployment->phaseTotalDurationMs() / 1000, 1) }}s</span>
                             @endif
-                            <span class="ml-auto select-all rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500" title="{{ __('Deployment ID — use with') }} dply:site:show-deploy">{{ $deployment->id }}</span>
+                            <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}" wire:navigate class="ml-auto rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 hover:bg-slate-200 hover:text-slate-700" title="{{ __('Open deployment detail') }}">{{ $deployment->id }}</a>
                         </div>
                         <div class="mt-1 flex flex-wrap gap-1.5 text-[10px]">
                             @foreach (['build', 'swap', 'release', 'restart'] as $phase)
