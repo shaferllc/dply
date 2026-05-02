@@ -100,6 +100,16 @@
         </div>
         <x-primary-button type="submit">{{ __('Add domain') }}</x-primary-button>
     </form>
+
+    <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+        <summary class="cursor-pointer font-semibold text-slate-700">{{ __('Manage from the terminal') }}</summary>
+        <ul class="mt-2 space-y-1 font-mono text-[11px]">
+            <li>{{ __('Add') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:domain-add {{ $site->slug }} new.example.com --primary</code></li>
+            <li>{{ __('Remove') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:domain-remove {{ $site->slug }} old.example.com</code></li>
+            <li>{{ __('Print primary URL') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:url {{ $site->slug }}</code></li>
+            <li>{{ __('Find by hostname') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:fleet:domain-find example.com</code></li>
+        </ul>
+    </details>
 </section>
 @elseif ($routingTab === 'aliases')
 <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
