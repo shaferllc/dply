@@ -68,6 +68,17 @@
             <x-primary-button type="submit">{{ __('Save variable') }}</x-primary-button>
         </div>
     </form>
+
+    <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+        <summary class="cursor-pointer font-semibold text-slate-700">{{ __('Bulk-edit from the terminal') }}</summary>
+        <p class="mt-2">{{ __('When you have many keys to manage at once, the dply CLI is faster than this form:') }}</p>
+        <ul class="mt-2 space-y-1 font-mono text-[11px]">
+            <li>{{ __('Set one') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-set {{ $site->slug }} KEY=value</code></li>
+            <li>{{ __('Bulk import from .env') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-import {{ $site->slug }} --file=.env</code></li>
+            <li>{{ __('Export current as .env') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-export {{ $site->slug }} --to=.env</code></li>
+            <li>{{ __('Diff prod vs staging') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-diff {{ $site->slug }}</code></li>
+        </ul>
+    </details>
 </section>
 
 <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-4">
