@@ -109,4 +109,68 @@ class FleetDoctorCommandTest extends TestCase
         $this->assertContains('edge-ready', $names);
         $this->assertNotContains('edge-pending', $names);
     }
+
+    public function test_totals_include_running_and_long_running_deploys(): void
+    {
+        $server = Server::factory()->create();
+        $site = Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
+        // Two running deploys: one fresh, one long-running.
+        \App\Models\SiteDeployment::query()->create([
+            'site_id' => $site->id,
+            'project_id' => $site->project_id,
+            'status' => \App\Models\SiteDeployment::STATUS_RUNNING,
+            'trigger' => 'manual',
+            'started_at' => now()->subMinutes(2),
+        ]);
+        \App\Models\SiteDeployment::query()->create([
+            'site_id' => $site->id,
+            'project_id' => $site->project_id,
+            'status' => \App\Models\SiteDeployment::STATUS_RUNNING,
+            'trigger' => 'manual',
+            'started_at' => now()->subMinutes(30),
+        ]);
+
+        Artisan::call('dply:fleet:doctor', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame(2, $decoded['totals']['running_deploys']);
+        $this->assertSame(1, $decoded['totals']['long_running_deploys']);
+    }
+
+    public function test_failed_latest_count_reflects_unrecovered_failures(): void
+    {
+        $server = Server::factory()->create();
+        $broken = Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
+        $recovered = Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
+        \App\Models\SiteDeployment::query()->create([
+            'site_id' => $broken->id,
+            'project_id' => $broken->project_id,
+            'status' => \App\Models\SiteDeployment::STATUS_FAILED,
+            'trigger' => 'manual',
+            'started_at' => now()->subHour(),
+            'finished_at' => now()->subHour(),
+        ]);
+        \App\Models\SiteDeployment::query()->create([
+            'site_id' => $recovered->id,
+            'project_id' => $recovered->project_id,
+            'status' => \App\Models\SiteDeployment::STATUS_FAILED,
+            'trigger' => 'manual',
+            'started_at' => now()->subDay(),
+            'finished_at' => now()->subDay(),
+        ]);
+        \App\Models\SiteDeployment::query()->create([
+            'site_id' => $recovered->id,
+            'project_id' => $recovered->project_id,
+            'status' => \App\Models\SiteDeployment::STATUS_SUCCESS,
+            'trigger' => 'manual',
+            'started_at' => now()->subHour(),
+            'finished_at' => now()->subHour(),
+        ]);
+
+        $exit = Artisan::call('dply:fleet:doctor', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame(1, $exit);
+        $this->assertSame(1, $decoded['totals']['sites_with_failed_latest_deploy']);
+    }
 }

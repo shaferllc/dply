@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use Illuminate\Console\Command;
 
 /**
@@ -66,11 +67,16 @@ class FleetDoctorCommand extends Command
             ];
         });
 
+        $deployHealth = $this->collectDeployHealth();
+
         $totals = [
             'servers_checked' => $reports->count(),
             'servers_with_drift' => $reports->where('has_drift', true)->count(),
             'sites_with_unregistered_engine' => (int) $reports->sum('sites_with_unregistered_engine'),
             'sites_needing_runtime_install' => (int) $reports->sum('sites_needing_runtime_install'),
+            'running_deploys' => $deployHealth['running'],
+            'long_running_deploys' => $deployHealth['long_running'],
+            'sites_with_failed_latest_deploy' => $deployHealth['failed_latest'],
         ];
 
         if ($this->option('json')) {
@@ -79,7 +85,9 @@ class FleetDoctorCommand extends Command
                 'servers' => $reports->all(),
             ], JSON_PRETTY_PRINT));
 
-            return $totals['servers_with_drift'] > 0 ? self::FAILURE : self::SUCCESS;
+            return ($totals['servers_with_drift'] + $totals['sites_with_failed_latest_deploy'] + $totals['long_running_deploys']) > 0
+                ? self::FAILURE
+                : self::SUCCESS;
         }
 
         $this->newLine();
@@ -88,6 +96,12 @@ class FleetDoctorCommand extends Command
             '  %d servers checked, %d with drift.',
             $totals['servers_checked'],
             $totals['servers_with_drift'],
+        ));
+        $this->line(sprintf(
+            '  %d running deploy(s), %d long-running (>=15m), %d site(s) with failed latest deploy.',
+            $totals['running_deploys'],
+            $totals['long_running_deploys'],
+            $totals['sites_with_failed_latest_deploy'],
         ));
         $this->newLine();
 
@@ -109,7 +123,54 @@ class FleetDoctorCommand extends Command
         $this->table(['server', 'unregistered engine', 'unpinned runtime'], array_values($rows));
         $this->newLine();
         $this->line('<fg=gray>Run </><fg=white>dply:server:doctor &lt;server&gt;</><fg=gray> for per-server details.</>');
+        if ($totals['sites_with_failed_latest_deploy'] > 0) {
+            $this->line('<fg=gray>Run </><fg=white>dply:fleet:failed-deploys</><fg=gray> for the failure list.</>');
+        }
+        if ($totals['long_running_deploys'] > 0) {
+            $this->line('<fg=gray>Run </><fg=white>dply:fleet:running-deploys --older-than=15</><fg=gray> for stuck deploys.</>');
+        }
 
-        return $totals['servers_with_drift'] > 0 ? self::FAILURE : self::SUCCESS;
+        return ($totals['servers_with_drift'] + $totals['sites_with_failed_latest_deploy'] + $totals['long_running_deploys']) > 0
+            ? self::FAILURE
+            : self::SUCCESS;
+    }
+
+    /**
+     * @return array{running: int, long_running: int, failed_latest: int}
+     */
+    private function collectDeployHealth(): array
+    {
+        $running = SiteDeployment::query()
+            ->where('status', SiteDeployment::STATUS_RUNNING)
+            ->count();
+
+        $longRunning = SiteDeployment::query()
+            ->where('status', SiteDeployment::STATUS_RUNNING)
+            ->where('started_at', '<', now()->subMinutes(15))
+            ->count();
+
+        // Count sites where the most recent settled deploy was failed.
+        $failedLatest = 0;
+        $sites = Site::query()->pluck('id');
+        foreach ($sites as $siteId) {
+            $latest = SiteDeployment::query()
+                ->where('site_id', $siteId)
+                ->whereIn('status', [
+                    SiteDeployment::STATUS_SUCCESS,
+                    SiteDeployment::STATUS_FAILED,
+                    SiteDeployment::STATUS_SKIPPED,
+                ])
+                ->orderByDesc('started_at')
+                ->first(['status']);
+            if ($latest !== null && $latest->status === SiteDeployment::STATUS_FAILED) {
+                $failedLatest++;
+            }
+        }
+
+        return [
+            'running' => $running,
+            'long_running' => $longRunning,
+            'failed_latest' => $failedLatest,
+        ];
     }
 }
