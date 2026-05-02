@@ -268,6 +268,22 @@
                                                 <dt class="text-slate-500">{{ __('Web server') }}</dt>
                                                 <dd class="font-medium capitalize text-slate-900">{{ $site->webserver() }}</dd>
                                             </div>
+                                            @if ($site->runtimeKey())
+                                                <div class="flex items-start justify-between gap-3">
+                                                    <dt class="text-slate-500">{{ __('Runtime') }}</dt>
+                                                    <dd class="font-medium text-slate-900">
+                                                        <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
+                                                            <span class="font-mono text-slate-500"> · {{ $site->runtimeVersion() }}</span>
+                                                        @endif
+                                                    </dd>
+                                                </div>
+                                            @endif
+                                            @if ($site->internal_port)
+                                                <div class="flex items-start justify-between gap-3">
+                                                    <dt class="text-slate-500">{{ __('Internal port') }}</dt>
+                                                    <dd class="font-mono text-slate-900">{{ $site->internal_port }}</dd>
+                                                </div>
+                                            @endif
                                             <div class="flex items-start justify-between gap-3">
                                                 <dt class="text-slate-500">{{ __('Current step') }}</dt>
                                                 <dd class="font-medium text-slate-900">{{ $statusSteps[$provisioningState] ?? str_replace('_', ' ', $provisioningState) }}</dd>
@@ -538,6 +554,22 @@
                         <div><dt class="text-slate-500">Deploy path</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveRepositoryPath() }}</dd></div>
                         <div><dt class="text-slate-500">Web root</dt><dd class="font-mono text-xs break-all">{{ $site->effectiveDocumentRoot() }}</dd></div>
                         <div><dt class="text-slate-500">{{ __('Zero downtime') }}</dt><dd class="font-medium">{{ $site->deploy_strategy === 'atomic' ? __('Enabled') : __('Disabled') }}</dd></div>
+                        @if ($site->runtimeKey())
+                            <div>
+                                <dt class="text-slate-500">{{ __('Runtime') }}</dt>
+                                <dd class="font-medium">
+                                    <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
+                                        <span class="font-mono text-slate-500"> · {{ $site->runtimeVersion() }}</span>
+                                    @endif
+                                </dd>
+                            </div>
+                        @endif
+                        @if ($site->internal_port)
+                            <div>
+                                <dt class="text-slate-500">{{ __('Internal port') }}</dt>
+                                <dd class="font-mono text-xs">127.0.0.1:{{ $site->internal_port }}</dd>
+                            </div>
+                        @endif
                     @endif
                     @if (!empty($site->meta['site_health_last_check_at']))
                         <div><dt class="text-slate-500">URL health (scheduler)</dt><dd class="font-medium">

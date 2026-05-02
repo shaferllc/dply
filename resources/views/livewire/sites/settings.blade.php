@@ -314,6 +314,34 @@
                                     <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Launch preflight') }}</dt>
                                     <dd class="mt-2 text-sm font-medium text-slate-900">{{ $preflightErrors->isEmpty() ? __('Ready to review') : __('Needs attention') }}</dd>
                                 </div>
+                                @if ($site->runtimeKey())
+                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Runtime') }}</dt>
+                                        <dd class="mt-2 text-sm font-medium text-slate-900">
+                                            <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
+                                                <span class="font-mono text-slate-500"> · {{ $site->runtimeVersion() }}</span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                @endif
+                                @if ($site->internal_port)
+                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Internal port') }}</dt>
+                                        <dd class="mt-2 font-mono text-xs text-slate-900">127.0.0.1:{{ $site->internal_port }}</dd>
+                                    </div>
+                                @endif
+                                @if ($site->build_command)
+                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-3">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Build command') }}</dt>
+                                        <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $site->build_command }}</dd>
+                                    </div>
+                                @endif
+                                @if ($site->start_command)
+                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-3">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Start command') }}</dt>
+                                        <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $site->start_command }}</dd>
+                                    </div>
+                                @endif
                             </dl>
 
                             <div class="grid gap-4 lg:grid-cols-2">
