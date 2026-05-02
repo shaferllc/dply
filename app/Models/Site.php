@@ -70,9 +70,12 @@ class Site extends Model
         'document_root',
         'repository_path',
         'php_version',
+        'runtime',
         'runtime_version',
         'app_port',
+        'internal_port',
         'build_command',
+        'start_command',
         'status',
         'ssl_status',
         'nginx_installed_at',
@@ -606,6 +609,25 @@ class Site extends Model
         }
 
         return $this->php_version;
+    }
+
+    /**
+     * Returns the canonical runtime key for this site (php/node/python/
+     * ruby/go/static).
+     *
+     * Prefers the new `runtime` column; falls back to the existing `type`
+     * enum for rows that predate the column. The fallback only covers the
+     * three values the form historically supported (php/node/static) —
+     * python/ruby/go sites can only exist via the new code path.
+     */
+    public function runtimeKey(): ?string
+    {
+        $runtime = $this->runtime;
+        if (is_string($runtime) && $runtime !== '') {
+            return $runtime;
+        }
+
+        return $this->type?->value;
     }
 
     public function runtimeProfile(): string
