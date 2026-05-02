@@ -117,6 +117,23 @@ class SiteDeployStep extends Model
         return $query->where('phase', $phase);
     }
 
+    /**
+     * Tailwind class fragment for the per-phase pill in the deploy-step
+     * UI. Lives on the model so the view stays free of inline match()
+     * expressions (Blade's @php(...) inline form chokes on the nested
+     * parens + braces of a match expression — the block form has its
+     * own gotchas — so the cleanest path is to compute here).
+     */
+    public function phaseBadgeClass(): string
+    {
+        return match ($this->phase ?? self::PHASE_BUILD) {
+            self::PHASE_RELEASE => 'bg-emerald-100 text-emerald-900',
+            self::PHASE_SWAP => 'bg-violet-100 text-violet-900',
+            self::PHASE_RESTART => 'bg-amber-100 text-amber-900',
+            default => 'bg-sky-100 text-sky-900',
+        };
+    }
+
     public static function typeLabels(): array
     {
         return [

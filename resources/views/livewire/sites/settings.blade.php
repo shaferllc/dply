@@ -1075,7 +1075,8 @@
                                                 @foreach ($site->deploySteps->sortBy('sort_order') as $step)
                                                     <li class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
                                                         <div class="flex flex-wrap items-start justify-between gap-3">
-                                                            <span>
+                                                            <span class="flex flex-wrap items-center gap-2">
+                                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $step->phaseBadgeClass() }}">{{ $step->phase ?? 'build' }}</span>
                                                                 <span class="font-mono text-xs text-brand-ink">{{ $step->step_type }}</span>
                                                                 <span class="text-xs text-brand-moss">· {{ (int) ($step->timeout_seconds ?? 900) }}s</span>
                                                                 @if ($step->custom_command)
