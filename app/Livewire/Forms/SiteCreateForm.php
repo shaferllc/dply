@@ -91,6 +91,14 @@ class SiteCreateForm extends Form
      */
     public string $git_branch = 'main';
 
+    /**
+     * Database engine override for multi-engine servers. Empty means "use
+     * the server's default" — see {@see Site::databaseEngine()}. Set to
+     * one of the engines from {@see ServerDatabaseEngine} on the target
+     * server when the user picks a non-default engine.
+     */
+    public string $database_engine = '';
+
     public function applyDefaultsForType(string $type): void
     {
         $this->type = $type;

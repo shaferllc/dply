@@ -98,6 +98,16 @@ class Create extends Component
      */
     public array $runtimeInstallResult = [];
 
+    /**
+     * Database engines installed on the target server, formatted for the
+     * site-create form's engine picker. Each entry is `{id, label}`.
+     * Picker is surfaced in the view only when this list has more than
+     * one entry — single-engine servers don't need to ask.
+     *
+     * @var list<array{id: string, label: string}>
+     */
+    public array $availableDatabaseEngines = [];
+
     public function mount(
         Server $server,
         ServerPhpManager $phpManager,
@@ -140,6 +150,20 @@ class Create extends Component
         }
 
         $this->form->applyPathDefaults();
+
+        // Build the list of database engines the user can pick from. The
+        // default ServerDatabaseEngine row pre-selects in the picker; the
+        // form->database_engine column override only applies when the
+        // user explicitly chooses a different engine.
+        $engines = $server->databaseEngines()->orderBy('engine')->get();
+        $this->availableDatabaseEngines = $engines->map(fn ($e) => [
+            'id' => (string) $e->engine,
+            'label' => trim((string) $e->engine.' '.($e->version ?? '')),
+        ])->values()->all();
+        $defaultEngine = $engines->firstWhere('is_default', true);
+        if ($defaultEngine !== null && $this->form->database_engine === '') {
+            $this->form->database_engine = (string) $defaultEngine->engine;
+        }
     }
 
     public function updatedFormType(string $value): void
@@ -349,6 +373,27 @@ class Create extends Component
                 $this->form->app_port = $plan->appPort;
             }
         }
+    }
+
+    /**
+     * Resolve the value to write to Site.database_engine. Returns null
+     * (use server default at read time) when the user accepted the
+     * server's default; returns the picked engine string when they
+     * chose a non-default one.
+     */
+    private function resolveDatabaseEngineOverride(): ?string
+    {
+        $picked = trim($this->form->database_engine);
+        if ($picked === '') {
+            return null;
+        }
+
+        $default = $this->server->defaultDatabaseEngine();
+        if ($default !== null && $default->engine === $picked) {
+            return null;
+        }
+
+        return $picked;
     }
 
     /**
@@ -676,6 +721,13 @@ class Create extends Component
             'build_command' => $this->form->build_command !== '' ? $this->form->build_command : null,
             'start_command' => $this->form->start_command !== '' ? $this->form->start_command : null,
             'internal_port' => $internalPort,
+            // Persist the engine override only when the user picked one
+            // that differs from the server's default; otherwise leave the
+            // column null so the Site::databaseEngine() accessor falls
+            // back to the server's default. Keeps "follow the server's
+            // default" implicit and lets re-default-ing the server
+            // automatically apply to sites that haven't pinned.
+            'database_engine' => $this->resolveDatabaseEngineOverride(),
             'document_root' => $functionsHost
                 ? ($this->server->isAwsLambdaHost()
                     ? '/lambda/'.trim($this->form->functions_entrypoint, '/')

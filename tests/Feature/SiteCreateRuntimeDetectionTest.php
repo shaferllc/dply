@@ -276,6 +276,85 @@ class SiteCreateRuntimeDetectionTest extends TestCase
         $this->assertSame(SiteProcess::TYPE_WORKER, $worker->type);
     }
 
+    public function test_create_form_loads_server_database_engines_and_picks_default(): void
+    {
+        [$user, $server] = $this->makeServerWithUser();
+        \App\Models\ServerDatabaseEngine::create([
+            'server_id' => $server->id,
+            'engine' => 'postgres',
+            'version' => '17',
+            'is_default' => true,
+        ]);
+        \App\Models\ServerDatabaseEngine::create([
+            'server_id' => $server->id,
+            'engine' => 'mysql84',
+            'version' => '8.4',
+            'is_default' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->assertCount('availableDatabaseEngines', 2)
+            ->assertSet('form.database_engine', 'postgres');
+    }
+
+    public function test_store_persists_null_engine_when_user_keeps_server_default(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        [$user, $server] = $this->makeServerWithUser();
+        \App\Models\ServerDatabaseEngine::create([
+            'server_id' => $server->id,
+            'engine' => 'postgres',
+            'is_default' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.name', 'svc')
+            ->set('form.primary_hostname', 'svc.example.com')
+            ->set('form.runtime', 'node')
+            ->set('form.runtime_version', '22')
+            ->set('form.type', 'node')
+            ->set('form.start_command', 'npm start')
+            // form.database_engine stays at the default that mount() set.
+            ->call('store');
+
+        $site = Site::query()->where('name', 'svc')->firstOrFail();
+        $this->assertNull($site->database_engine);
+        // Accessor still returns 'postgres' via fallback.
+        $this->assertSame('postgres', $site->databaseEngine());
+    }
+
+    public function test_store_persists_engine_override_when_user_picks_non_default(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        [$user, $server] = $this->makeServerWithUser();
+        \App\Models\ServerDatabaseEngine::create([
+            'server_id' => $server->id,
+            'engine' => 'postgres',
+            'is_default' => true,
+        ]);
+        \App\Models\ServerDatabaseEngine::create([
+            'server_id' => $server->id,
+            'engine' => 'mysql84',
+            'is_default' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.name', 'mysql-svc')
+            ->set('form.primary_hostname', 'mysql-svc.example.com')
+            ->set('form.runtime', 'php')
+            ->set('form.type', 'php')
+            ->set('form.php_version', '8.4')
+            ->set('form.database_engine', 'mysql84')
+            ->call('store');
+
+        $site = Site::query()->where('name', 'mysql-svc')->firstOrFail();
+        $this->assertSame('mysql84', $site->database_engine);
+        $this->assertSame('mysql84', $site->databaseEngine());
+    }
+
     /**
      * @return array{0: \App\Models\User, 1: Server}
      */
