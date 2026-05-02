@@ -510,7 +510,10 @@ class ServerPhpManager
             $installedIds[] = $detectedDefaultVersion;
         }
 
-        $siteCount = (int) $server->sites()->where('php_version', $version)->count();
+        $siteCount = (int) $server->sites()
+            ->where('runtime', 'php')
+            ->where('runtime_version', $version)
+            ->count();
         $defaults = $this->currentDefaults($server, [
             'installed_versions' => array_map(fn (string $id) => [
                 'id' => $id,
