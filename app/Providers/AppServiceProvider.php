@@ -75,6 +75,7 @@ use App\Services\Sites\SiteCaddyProvisioner;
 use App\Services\Sites\SiteNginxProvisioner;
 use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
+use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
 use App\Services\Sites\WebserverConfig\ApacheWebserverConfigEngine;
@@ -342,6 +343,25 @@ class AppServiceProvider extends ServiceProvider
             } elseif ($site->server?->hostCapabilities()->supportsFunctionDeploy()) {
                 // Non-DO serverless targets do not have remote SSH artifacts to clean up here.
             } else {
+                // Compute systemd unit names from the live site so the
+                // cleanup job (which runs after the row is gone) can
+                // disable + remove them. Empty for PHP/static sites —
+                // SiteSystemdProvisioner only manages units for
+                // long-running non-PHP runtimes.
+                $unitBuilder = app(SiteSystemdUnitBuilder::class);
+                $systemdUnitNames = [];
+                $runtimeKey = $site->runtimeKey();
+                if ($runtimeKey !== null && $runtimeKey !== 'php' && $runtimeKey !== 'static') {
+                    $systemdUnitNames[] = $unitBuilder->webUnitName($site);
+                    $site->loadMissing('processes');
+                    foreach ($site->processes as $process) {
+                        if ($process->type === \App\Models\SiteProcess::TYPE_WEB) {
+                            continue;
+                        }
+                        $systemdUnitNames[] = $unitBuilder->processUnitName($site, $process);
+                    }
+                }
+
                 CleanupRemoteSiteArtifactsJob::dispatch([
                     'server_id' => $site->server_id,
                     'webserver' => $site->webserver(),
@@ -352,6 +372,7 @@ class AppServiceProvider extends ServiceProvider
                     'ssl_was_active' => $site->ssl_status === Site::SSL_ACTIVE,
                     'supervisor_program_ids' => $svIds,
                     'site_id' => $site->id,
+                    'systemd_unit_names' => $systemdUnitNames,
                 ]);
             }
             SupervisorProgram::query()->where('site_id', $site->id)->delete();
