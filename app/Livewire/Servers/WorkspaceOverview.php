@@ -473,6 +473,11 @@ class WorkspaceOverview extends Component
                 'warning_count' => count($preflight['warnings'] ?? []),
                 'runtime_drifted' => (bool) data_get($contract->status, 'runtime_drifted', false),
                 'resource_bindings' => $contract->resourceBindingArrays(),
+                // Runtime metadata so the overview's per-site row can
+                // surface a runtime/version pill — makes the polyglot
+                // story visible at a glance.
+                'runtime' => $site->runtimeKey(),
+                'runtime_version' => $site->runtimeVersion(),
             ];
         })->values();
         $resourceSummary = $siteFoundationSummaries

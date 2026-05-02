@@ -351,6 +351,11 @@
                                             </p>
                                         </div>
                                         <div class="flex flex-wrap items-center gap-2">
+                                            @if (! empty($siteFoundation['runtime']))
+                                                <span class="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+                                                    <span class="capitalize">{{ $siteFoundation['runtime'] }}</span>@if (! empty($siteFoundation['runtime_version']))<span class="font-mono text-slate-300"> · {{ $siteFoundation['runtime_version'] }}</span>@endif
+                                                </span>
+                                            @endif
                                             <span class="rounded-full px-3 py-1 text-xs font-medium {{ $siteFoundation['preflight_ok'] ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800' }}">
                                                 {{ $siteFoundation['preflight_ok'] ? __('Ready') : __('Blocked') }}
                                             </span>
