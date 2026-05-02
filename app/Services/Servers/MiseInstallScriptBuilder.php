@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Servers;
+
+/**
+ * Builds the bash lines that install mise on an Ubuntu server and
+ * provision per-runtime versions for the deploy user.
+ *
+ * Per the multi-runtime strategy memo:
+ *   - mise manages Node / Python / Ruby / Go.
+ *   - PHP is installed via the ondrej/php apt repository instead — mise's
+ *     PHP plugin source-builds, which is too slow and unsuitable for a
+ *     production FPM server. So this builder ignores `php` if a caller
+ *     accidentally asks for it.
+ *
+ * Pure builder — returns shell lines for the higher-level script
+ * assembler ({@see ServerProvisionCommandBuilder}) to splice into the
+ * provision script. The actual SSH + execution layer lives elsewhere.
+ *
+ * Idempotent shape: each apt step probes for prior installation before
+ * running, matching the pattern the existing provision builder uses for
+ * redis / supervisor / haproxy so re-runs of the bootstrap script are a
+ * no-op when mise is already present.
+ */
+class MiseInstallScriptBuilder
+{
+    /**
+     * Allowed runtime keys. Pinned to the polyglot-five-minus-PHP because
+     * mise is the wrong tool for PHP on this platform (see class docblock).
+     */
+    public const SUPPORTED_RUNTIMES = ['node', 'python', 'ruby', 'go'];
+
+    /**
+     * Bash lines that install mise system-wide via the official apt
+     * repository. Idempotent: skips when mise is already on $PATH.
+     *
+     * @return list<string>
+     */
+    public function installLines(): array
+    {
+        return [
+            'if command -v mise >/dev/null 2>&1; then',
+            '  echo "[dply] mise already installed; skipping installer."',
+            'else',
+            '  echo "[dply] installing mise via apt"',
+            '  install -m 0755 -d /etc/apt/keyrings',
+            '  curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg',
+            '  chmod a+r /etc/apt/keyrings/mise-archive-keyring.gpg',
+            '  echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list',
+            '  apt-get update -y',
+            '  apt-get install -y --no-install-recommends mise',
+            'fi',
+        ];
+    }
+
+    /**
+     * Bash lines that hook mise into the deploy user's shell so subsequent
+     * SSH sessions / systemd ExecStart lines see the runtime executables
+     * mise installs (`/home/<user>/.local/share/mise/shims/...`).
+     *
+     * Adds the activation snippet to ~/.bashrc if not already present,
+     * idempotent. Does not source the file; the next login picks it up.
+     *
+     * @return list<string>
+     */
+    public function activateForUserLines(string $deployUser): array
+    {
+        $userArg = escapeshellarg($deployUser);
+        $bashrc = '/home/'.$deployUser.'/.bashrc';
+        $bashrcArg = escapeshellarg($bashrc);
+        $marker = '# dply: mise activation';
+
+        return [
+            "if [ -f {$bashrcArg} ] && ! grep -qF '{$marker}' {$bashrcArg}; then",
+            "  echo \"[dply] adding mise activation to {$bashrc}\"",
+            "  printf '\\n%s\\neval \"\$(mise activate bash)\"\\n' '{$marker}' >> {$bashrcArg}",
+            "  chown {$userArg}:{$userArg} {$bashrcArg}",
+            'fi',
+        ];
+    }
+
+    /**
+     * Bash lines that install a single mise-managed runtime + version
+     * **globally for the deploy user**. Per-site pinning happens at
+     * deploy time via `mise use` in the site's working dir; the global
+     * default here is what new sites fall back to before the detector
+     * has run.
+     *
+     * Returns an empty array for unsupported runtimes (silent skip
+     * matches the rest of the provision builder's defensive style).
+     *
+     * @return list<string>
+     */
+    public function installRuntimeForUserLines(string $deployUser, string $runtime, string $version): array
+    {
+        if (! in_array($runtime, self::SUPPORTED_RUNTIMES, true)) {
+            return [];
+        }
+
+        $version = trim($version);
+        if ($version === '') {
+            return [];
+        }
+
+        $miseTool = $this->miseToolKey($runtime);
+        $userArg = escapeshellarg($deployUser);
+        $cmd = escapeshellarg("mise use --global {$miseTool}@{$version}");
+
+        return [
+            "echo \"[dply] installing {$miseTool}@{$version} globally for {$deployUser}\"",
+            "sudo -u {$userArg} -H bash -lc {$cmd}",
+        ];
+    }
+
+    /**
+     * Map our canonical runtime keys onto mise's plugin names. The
+     * mapping is mostly identity but Go's plugin is `go` while detection
+     * already uses `go` too — kept here so future divergence is one-line.
+     */
+    private function miseToolKey(string $runtime): string
+    {
+        return match ($runtime) {
+            'node' => 'node',
+            'python' => 'python',
+            'ruby' => 'ruby',
+            'go' => 'go',
+            default => $runtime,
+        };
+    }
+}
