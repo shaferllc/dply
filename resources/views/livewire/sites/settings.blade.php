@@ -296,9 +296,19 @@
                                     <h2 class="text-lg font-semibold text-slate-900">{{ __('Deployment foundation') }}</h2>
                                     <p class="mt-1 text-sm text-slate-600">{{ __('Shared preflight, revision drift, and resource attachment state for this site.') }}</p>
                                 </div>
-                                <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ ($foundationStatus['runtime_drifted'] ?? false) ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800' }}">
-                                    {{ ($foundationStatus['runtime_drifted'] ?? false) ? __('Detected') : __('In sync') }}
-                                </span>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    @if ($this->latestDeployment !== null)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ $this->latestDeployment->status === 'success' ? 'bg-emerald-100 text-emerald-900' : ($this->latestDeployment->status === 'failed' ? 'bg-rose-100 text-rose-900' : 'bg-slate-100 text-slate-700') }}">
+                                            {{ __('Last deploy') }} · {{ $this->latestDeployment->status }}
+                                            @if ($this->latestDeployment->started_at)
+                                                <span class="font-mono text-[10px] opacity-80">{{ $this->latestDeployment->started_at->diffForHumans(null, true) }}</span>
+                                            @endif
+                                        </span>
+                                    @endif
+                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ ($foundationStatus['runtime_drifted'] ?? false) ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800' }}">
+                                        {{ ($foundationStatus['runtime_drifted'] ?? false) ? __('Detected') : __('In sync') }}
+                                    </span>
+                                </div>
                             </div>
 
                             <dl class="grid gap-4 sm:grid-cols-3">

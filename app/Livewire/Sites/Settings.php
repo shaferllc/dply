@@ -2206,6 +2206,16 @@ class Settings extends Show
             ->get();
     }
 
+    /**
+     * Most recent SiteDeployment for the dashboard's "Last deploy"
+     * badge. Computed in PHP because Blade's @php(...) inline form
+     * trips on the method-chain length of `$site->latestDeployment()`.
+     */
+    public function getLatestDeploymentProperty()
+    {
+        return $this->site->latestDeployment();
+    }
+
     public function render(): View
     {
         if (! $this->site->isReadyForWorkspace()) {
