@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Site;
 use App\Services\Servers\MiseInstallScriptBuilder;
 use Illuminate\Console\Command;
 
@@ -22,6 +23,7 @@ use Illuminate\Console\Command;
 class ListRuntimesCommand extends Command
 {
     protected $signature = 'dply:list-runtimes
+        {--with-usage : Include site count per runtime from the fleet}
         {--json : Output as JSON}';
 
     protected $description = 'List runtimes dply manages and the canonical recent versions used by wizard presets.';
@@ -41,26 +43,41 @@ class ListRuntimesCommand extends Command
     public function handle(): int
     {
         $supported = MiseInstallScriptBuilder::SUPPORTED_RUNTIMES;
+        $withUsage = (bool) $this->option('with-usage');
+        $usage = $withUsage ? $this->collectUsage() : [];
 
         // PHP gets its own row because the polyglot preset includes it
         // and the install path differs (ondrej/php apt). Doesn't appear
         // in MiseInstallScriptBuilder's set.
-        $rows = [['php', '8.4', 'ondrej/php apt']];
+        $rows = [['php', '8.4', 'ondrej/php apt', $usage['php'] ?? null]];
         foreach ($supported as $runtime) {
             $rows[] = [
                 $runtime,
                 self::RECOMMENDED[$runtime] ?? '—',
                 'mise',
+                $usage[$runtime] ?? null,
             ];
+        }
+        // 'static' isn't a runtime in the install sense but sites can use it.
+        if ($withUsage && ($usage['static'] ?? 0) > 0) {
+            $rows[] = ['static', '—', '<fg=gray>(no install)</>', $usage['static']];
         }
 
         if ($this->option('json')) {
             $this->line(json_encode([
-                'runtimes' => array_map(fn (array $row) => [
-                    'runtime' => $row[0],
-                    'recommended_version' => $row[1],
-                    'install_path' => $row[2],
-                ], $rows),
+                'with_usage' => $withUsage,
+                'runtimes' => array_map(function (array $row) {
+                    $out = [
+                        'runtime' => $row[0],
+                        'recommended_version' => $row[1],
+                        'install_path' => strip_tags($row[2]),
+                    ];
+                    if ($row[3] !== null) {
+                        $out['site_count'] = $row[3];
+                    }
+
+                    return $out;
+                }, $rows),
             ], JSON_PRETTY_PRINT));
 
             return self::SUCCESS;
@@ -69,10 +86,32 @@ class ListRuntimesCommand extends Command
         $this->newLine();
         $this->line('<fg=cyan>Runtimes managed by dply</>');
         $this->newLine();
-        $this->table(['runtime', 'recommended', 'install path'], $rows);
+        $headers = $withUsage
+            ? ['runtime', 'recommended', 'install path', 'sites in fleet']
+            : ['runtime', 'recommended', 'install path'];
+        $tableRows = array_map(function (array $row) use ($withUsage) {
+            return $withUsage
+                ? [$row[0], $row[1], $row[2], $row[3] !== null ? (string) $row[3] : '—']
+                : [$row[0], $row[1], $row[2]];
+        }, $rows);
+        $this->table($headers, $tableRows);
         $this->newLine();
         $this->line('<fg=gray>Use </><fg=white>dply:install-runtime &lt;server&gt; &lt;runtime&gt; &lt;version&gt;</><fg=gray> to install on a server.</>');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function collectUsage(): array
+    {
+        return Site::query()
+            ->selectRaw('runtime, COUNT(*) as count')
+            ->whereNotNull('runtime')
+            ->groupBy('runtime')
+            ->pluck('count', 'runtime')
+            ->map(fn ($n) => (int) $n)
+            ->all();
     }
 }
