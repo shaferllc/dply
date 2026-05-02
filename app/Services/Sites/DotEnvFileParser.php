@@ -88,7 +88,14 @@ class DotEnvFileParser
         if ($len >= 2) {
             $first = $value[0];
             $last = $value[$len - 1];
-            if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+            if ($first === '"' && $last === '"') {
+                $inner = substr($value, 1, -1);
+
+                // Unescape \" and \\ inside double-quoted values to round-trip
+                // with our writer. Single-quoted values are taken literally.
+                return str_replace(['\\"', '\\\\'], ['"', '\\'], $inner);
+            }
+            if ($first === "'" && $last === "'") {
                 return substr($value, 1, -1);
             }
         }
