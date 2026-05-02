@@ -106,6 +106,28 @@ class SiteSettingsProcessesEditorTest extends TestCase
             ->call('removeSiteProcess', $process->id);
 
         $this->assertSame(0, $site->processes()->where('name', 'celery')->count());
+
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\TearDownSiteSystemdUnitJob::class, function ($job) use ($site) {
+            return $job->siteId === $site->id
+                && str_contains($job->unitName, 'celery.service');
+        });
+    }
+
+    public function test_remove_site_process_skips_teardown_job_for_php_site(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makePhpSite();
+        $process = $site->processes()->create([
+            'type' => SiteProcess::TYPE_WORKER,
+            'name' => 'horizon',
+            'command' => 'php artisan horizon',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('removeSiteProcess', $process->id);
+
+        Queue::assertNotPushed(\App\Jobs\TearDownSiteSystemdUnitJob::class);
     }
 
     public function test_remove_site_process_refuses_to_delete_web_row(): void

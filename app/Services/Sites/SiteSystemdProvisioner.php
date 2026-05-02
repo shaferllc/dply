@@ -106,6 +106,31 @@ class SiteSystemdProvisioner
     }
 
     /**
+     * Tear down a single named unit. Used when a specific SiteProcess
+     * is deleted — we don't want to teardown all the site's units, just
+     * the one whose row went away. The teardown sequence is identical to
+     * the bulk version; sharing the inner shell calls keeps the
+     * disable+rm+reload semantics consistent.
+     *
+     * @param  (Closure(Server): RemoteShell)|null  $shellFactory
+     */
+    public function teardownUnit(Site $site, string $unitName, ?Closure $shellFactory = null): void
+    {
+        $server = $site->server;
+        if ($server === null || ! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $shell = $shellFactory !== null ? $shellFactory($server) : new SshConnection($server);
+        $shell->exec(
+            'sudo systemctl disable --now '.escapeshellarg($unitName).' || true; '.
+            'sudo rm -f /etc/systemd/system/'.escapeshellarg($unitName).' && '.
+            'sudo systemctl daemon-reload',
+            90,
+        );
+    }
+
+    /**
      * @return array<string, string> unit filename => content
      */
     private function collectUnits(Site $site, string $deployUser): array

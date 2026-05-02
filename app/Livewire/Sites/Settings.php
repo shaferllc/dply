@@ -2069,9 +2069,13 @@ class Settings extends Show
     /**
      * Remove a non-web SiteProcess. The web row is the upstream the
      * NGINX vhost depends on — deleting it would break routing — so
-     * the method refuses to touch it. The auto-created systemd unit
-     * (if any) is removed in a follow-up commit when we wire teardown
-     * for individual process removals.
+     * the method refuses to touch it.
+     *
+     * Side effect: dispatches TearDownSiteSystemdUnitJob to disable +
+     * remove the matching systemd unit file on the server. Computed
+     * from the live process before deletion (the unit name is derived
+     * from the process name), then queued so the SSH round-trip
+     * doesn't block the form response.
      */
     public function removeSiteProcess(string $id): void
     {
@@ -2089,7 +2093,18 @@ class Settings extends Show
         }
 
         $name = $process->name;
+        $unitName = app(\App\Services\Sites\SiteSystemdUnitBuilder::class)
+            ->processUnitName($this->site, $process);
         $process->delete();
+
+        // For non-PHP/static sites, dispatch the per-unit teardown so
+        // the systemd unit file goes away alongside the row. PHP and
+        // static runtimes never had a unit installed in the first
+        // place, so dispatching for them is a guaranteed no-op (the
+        // job's runtime guard would skip).
+        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
+            \App\Jobs\TearDownSiteSystemdUnitJob::dispatch($this->site->id, $unitName);
+        }
 
         $this->toastSuccess(__('Process :name removed.', ['name' => $name]));
     }

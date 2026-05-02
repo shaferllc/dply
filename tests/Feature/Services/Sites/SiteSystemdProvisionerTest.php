@@ -133,6 +133,41 @@ class SiteSystemdProvisionerTest extends TestCase
             ->provision($site, fn () => new RecordingShell);
     }
 
+    public function test_teardown_unit_disables_and_removes_a_single_unit(): void
+    {
+        $server = Server::factory()->ready()->create([
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'runtime' => 'node',
+        ]);
+
+        $shell = new RecordingShell;
+        (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+            ->teardownUnit($site, 'dply-site-'.$site->id.'-celery.service', fn () => $shell);
+
+        $combined = implode("\n", array_column($shell->execCalls, 'command'));
+        $this->assertStringContainsString('systemctl disable --now', $combined);
+        $this->assertStringContainsString('rm -f /etc/systemd/system/', $combined);
+        $this->assertStringContainsString('celery.service', $combined);
+        $this->assertStringContainsString('daemon-reload', $combined);
+    }
+
+    public function test_teardown_unit_throws_when_server_not_ready(): void
+    {
+        $server = Server::factory()->create([
+            'status' => Server::STATUS_PROVISIONING,
+            'ssh_private_key' => null,
+        ]);
+        $site = Site::factory()->create(['server_id' => $server->id]);
+
+        $this->expectException(\RuntimeException::class);
+
+        (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+            ->teardownUnit($site, 'dply-site-'.$site->id.'.service', fn () => new RecordingShell);
+    }
+
     public function test_teardown_disables_and_removes_each_unit(): void
     {
         $server = Server::factory()->ready()->create([
