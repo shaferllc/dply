@@ -6,10 +6,14 @@ use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
+use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
+use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnsureApiTokenAbility;
+use App\Http\Middleware\EnsureServerServiceInstalled;
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
@@ -17,9 +21,11 @@ use App\Jobs\CheckServerHealthJob;
 use App\Jobs\CheckSiteUrlHealthJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSiteInsightsJob;
+use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteUptimeMonitor;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -46,11 +52,26 @@ return Application::configure(basePath: dirname(__DIR__))
                 return;
             }
             Site::query()
-                ->where('status', Site::STATUS_NGINX_ACTIVE)
+                ->whereIn('status', [
+                    Site::STATUS_NGINX_ACTIVE,
+                    Site::STATUS_APACHE_ACTIVE,
+                    Site::STATUS_CADDY_ACTIVE,
+                    Site::STATUS_OPENLITESPEED_ACTIVE,
+                    Site::STATUS_TRAEFIK_ACTIVE,
+                ])
                 ->whereHas('domains')
                 ->pluck('id')
                 ->each(fn (int $id) => CheckSiteUrlHealthJob::dispatch($id));
         })->everyTenMinutes();
+
+        $schedule->call(function (): void {
+            if (! config('site_uptime.enabled', true)) {
+                return;
+            }
+            SiteUptimeMonitor::query()
+                ->pluck('id')
+                ->each(fn (string $id) => RunSiteUptimeMonitorCheckJob::dispatch($id));
+        })->everyFiveMinutes();
 
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()
@@ -59,6 +80,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
+        $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
+        $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
 
         $schedule->command(CheckSupervisorHealthCommand::class)
             ->everyFifteenMinutes()
@@ -79,7 +102,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->call(function (): void {
             Site::query()
-                ->where('status', Site::STATUS_NGINX_ACTIVE)
+                ->whereIn('status', [
+                    Site::STATUS_NGINX_ACTIVE,
+                    Site::STATUS_APACHE_ACTIVE,
+                    Site::STATUS_CADDY_ACTIVE,
+                    Site::STATUS_OPENLITESPEED_ACTIVE,
+                    Site::STATUS_TRAEFIK_ACTIVE,
+                ])
                 ->pluck('id')
                 ->each(fn (string $id) => RunSiteInsightsJob::dispatch($id));
         })->everyTwoHours();
@@ -118,14 +147,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'ability' => EnsureApiTokenAbility::class,
             'fleet.operator' => ValidateFleetOperatorToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
+            'server.service.installed' => EnsureServerServiceInstalled::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             'hooks/*',
             'webhook/*',
+            'webauthn/*',
         ]);
 
         $middleware->appendToGroup('web', [
             CaptureReferralCode::class,
+            RedirectGuestsToComingSoon::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

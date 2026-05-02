@@ -79,4 +79,24 @@ class OrganizationModelTest extends TestCase
         $this->assertTrue($org->hasMember($user));
         $this->assertFalse($org->hasAdminAccess($user));
     }
+
+    public function test_plan_tier_label_defaults_to_trial_without_a_pro_subscription(): void
+    {
+        $org = new Organization();
+
+        $this->assertSame('Trial', $org->planTierLabel());
+    }
+
+    public function test_plan_tier_label_returns_pro_when_org_is_on_pro(): void
+    {
+        $org = new class extends Organization
+        {
+            public function onProSubscription(): bool
+            {
+                return true;
+            }
+        };
+
+        $this->assertSame('Pro', $org->planTierLabel());
+    }
 }

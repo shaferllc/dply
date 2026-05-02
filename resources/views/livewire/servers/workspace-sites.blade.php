@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
 @endphp
 
 <x-server-workspace-layout
@@ -58,14 +58,14 @@
             <x-heroicon-o-funnel class="h-4 w-4 text-brand-mist" aria-hidden="true" />
         </div>
         @if ($server->sites->isEmpty())
-            <p class="px-5 py-10 sm:px-8 text-center text-sm text-brand-moss">{{ __('No sites yet. Add a site to manage Nginx, SSL, Git deploys, and environment files.') }}</p>
+            <p class="px-5 py-10 sm:px-8 text-center text-sm text-brand-moss">{{ __('No sites yet. Add a site to manage web server config, SSL, Git deploys, and environment files.') }}</p>
         @else
             <ul class="divide-y divide-brand-ink/10">
                 @foreach ($server->sites as $s)
                     @php
                         $primaryDomain = $s->domains->sortByDesc('is_primary')->first();
                         $displayHost = $primaryDomain?->hostname ?? $s->name;
-                        $statusOk = $s->status === \App\Models\Site::STATUS_NGINX_ACTIVE;
+                        $statusOk = $s->isReadyForTraffic();
                         $sslOn = $s->ssl_status === \App\Models\Site::SSL_ACTIVE;
                         $gitRef = $s->git_repository_url;
                         $gitShort = $gitRef ? (preg_match('#([^/:]+/[^/]+?)(?:\.git)?$#', $gitRef, $m) ? $m[1] : \Illuminate\Support\Str::limit($gitRef, 40)) : null;
@@ -106,7 +106,7 @@
                                 @endif
                                 <span class="inline-flex items-center gap-1">
                                     <x-heroicon-o-user class="h-3.5 w-3.5 opacity-80" />
-                                    {{ $s->php_fpm_user ?: $server->ssh_user }}
+                                    {{ $s->effectiveSystemUser($server) }}
                                 </span>
                                 @if ($s->type?->value === 'php' && $s->php_version)
                                     <span class="inline-flex items-center gap-1 font-mono text-brand-ink/80">PHP {{ $s->php_version }}</span>

@@ -2,7 +2,7 @@
     <x-livewire-validation-errors />
     <div class="mb-6 flex gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm text-brand-moss">
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-brand-sage shadow-sm ring-1 ring-brand-ink/5" aria-hidden="true">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            <x-heroicon-o-device-tablet class="h-5 w-5" />
         </span>
         <p class="leading-relaxed">{{ __('Enter the code from your authenticator app, or one of your recovery codes.') }}</p>
     </div>

@@ -1,5 +1,5 @@
 <div>
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="dply-page-shell py-8">
         <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
             <ol class="flex flex-wrap items-center gap-2">
                 <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Dashboard') }}</a></li>
@@ -10,10 +10,12 @@
             </ol>
         </nav>
 
-        <h1 class="text-2xl font-semibold text-brand-ink mb-2">{{ __('Create script') }}</h1>
-        <p class="text-sm text-brand-moss mb-8 max-w-2xl leading-relaxed">
-            {{ __('Use non-interactive flags (for example -y) so the script does not hang waiting for input.') }}
-        </p>
+        <x-page-header
+            :title="__('Create script')"
+            :description="__('Use non-interactive flags (for example -y) so the script does not hang waiting for input.')"
+            doc-route="docs.index"
+            flush
+        />
 
         <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm p-6 space-y-6">
             <div>

@@ -1,50 +1,54 @@
-# Organization roles, API tokens, and plan limits (BYO)
+# Organization roles & plan limits
 
-This applies to the **bring-your-own-server (BYO)** app at the repository root. Billing and usage limits are **per organization**. Profile, 2FA, and OAuth are **per user** (see `docs/MULTI_PRODUCT_PLATFORM_PLAN.md` §2 in the repo).
+How membership works in your workspace, what each role can do, and how trial versus Pro affects servers, sites, and API access.
 
-## Roles (organization membership)
+## Organization roles
+
+Roles apply **per organization**. The same person can belong to multiple organizations with different roles in each.
 
 | Role | Typical use |
-|------|-------------|
-| **Owner** | Full control; only the owner can delete the organization (see `OrganizationPolicy`). |
-| **Admin** | Billing, invites, API tokens, integration webhooks, delete **servers** and **sites**, manage teams. Same “admin” powers as owner for day-to-day infra except org delete. |
-| **Member** | Use servers and sites: create **servers** and **sites** within plan limits, run deploys, edit site settings, use credentials (not deployer). **Cannot** delete sites (only owner/admin). **Cannot** access billing or org-level admin features. |
-| **Deployer** | CI-style access: trigger deploys and use the API within token scope. **Cannot** create **servers** or **sites**, **cannot** open provider credentials, and **cannot** manage billing. API tokens with deploy scope also block `commands.run` even if the token lists `*`. |
+| --- | --- |
+| **Owner** | Created the organization or was transferred ownership. Can delete the organization. Billing and subscription are tied to the organization the owner upgrades. |
+| **Admin** | Same operational control as an owner for day‑to‑day work **except** deleting the organization (only an owner can do that). |
+| **Member** | Full participant: servers, sites, credentials, and settings that are not restricted to admins only. |
+| **Deployer** | Deployment‑focused access: push releases and run deploy‑shaped actions. API tokens created by a deployer are limited to deploy‑related abilities (see below). |
 
-Invites are sent from **Organization → Members** (admins only).
+**Who counts as an “admin” in the product:** owners and admins share **admin** privileges for organization settings, invites, and many destructive or org‑wide actions.
 
-## Plan limits (servers & sites)
+## Trial limits (non‑Pro)
 
-Limits apply to the **entire organization** (every server and every site in that org). They are **not** billed or counted per site.
+If your organization does **not** have an active **Pro** subscription (monthly or yearly), limits apply **across the whole organization**—they are not per user:
 
-| Tier | Servers | Sites |
-|------|---------|--------|
-| **Free** (no active Pro subscription) | Up to `SUBSCRIPTION_SERVERS_FREE_LIMIT` (default **3**) | Up to `SUBSCRIPTION_SITES_FREE_LIMIT` (default **10**) |
-| **Pro** (Stripe price IDs match `pro_monthly` / `pro_yearly` in `config/subscription.php`) | **Unlimited** | **Unlimited** |
+- **Servers:** up to the configured free cap (default **3**). Creating another server is blocked until you remove a server or upgrade.
+- **Sites:** up to the configured free cap (default **10**), counting every site on every server in that organization.
 
-Configure defaults in `.env`:
+These defaults can differ on self‑hosted installs if an administrator changes environment configuration.
 
-- `SUBSCRIPTION_SERVERS_FREE_LIMIT`
-- `SUBSCRIPTION_SITES_FREE_LIMIT`
-- `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_YEARLY` (and optional seat price)
+## Pro
 
-**Member seat cap:** Optional Stripe seat line item plus `DPLY_MAX_ORG_MEMBERS` — see `Organization::effectiveMemberSeatCap()`.
+With an active **Pro** subscription:
 
-## Where this appears in the app
+- **Servers** and **sites** are **unlimited** for that organization (subject to fair use and provider capacity).
+- The UI may still show **Trial** or **Pro** labels so you can see plan state at a glance.
 
-- **Organization** page: **Plan & usage** (all members).
-- **Billing** (admins): same numbers plus subscribe / Stripe portal.
-- **Servers / sites UI:** “Cannot add site” or server create blocked when at limit or role disallows it.
+Optional **seat** billing (when configured) can cap how many members and pending invitations you may have; if both an environment cap and Stripe seats exist, the **lower** limit wins.
 
-## API (summary)
+## API tokens and the deployer role
 
-- Tokens are created by **org admins** only.
-- Deployer role and deploy-scoped tokens cannot use `POST /api/v1/servers/{id}/run-command` (`commands.run`).
-- Plan limits do not add separate API quotas beyond the global rate limit; they affect **whether** new servers/sites can be created in the UI (and the same policies apply if you add create endpoints later).
+Organization **HTTP API tokens** can include granular abilities (read servers, deploy sites, run commands, and so on).
 
-Full API reference: `docs/API.md` in the repository.
+If your role is **deployer**, tokens you create can only include abilities on the deployer **allowlist** (for example read servers/sites and deploy)—even if the UI would normally offer broader scopes for admins.
 
-## Related docs (repository)
+Creating new API tokens may require **Pro** when your app instance enables that gate (`DPLY_API_TOKENS_REQUIRE_PAID_PLAN`).
 
-- `docs/DEPLOYMENT_FLOW.md` — deploy pipeline and webhooks
-- `docs/MULTI_PRODUCT_PLATFORM_PLAN.md` — multi-product roadmap
+## Profile versus organization settings
+
+- **Profile** (your user): email, password, two‑factor, OAuth accounts, personal SSH keys, **Git source control** connections.
+- **Organization**: servers, sites, server provider credentials, billing, members, org‑scoped SSH keys, notification channels, and API tokens.
+
+Git providers live under **profile** so one GitHub (or GitLab, Bitbucket) connection can serve repos across orgs you belong to.
+
+## Related
+
+- [Connect a cloud provider](/docs/connect-provider) — infrastructure API tokens for provisioning.
+- [Source control & deploy flow](/docs/source-control) — repos, webhooks, and deployments.

@@ -1,48 +1,61 @@
 @if ($showConfirmActionModal ?? false)
-    @php
-        $confirmButtonClass = ($confirmActionModalDestructive ?? false)
-            ? 'inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50'
-            : 'inline-flex items-center justify-center rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-50';
-    @endphp
+    @teleport('body')
     <div
-        class="fixed inset-0 z-50 overflow-y-auto"
+        class="fixed inset-0 isolate z-[100] overflow-y-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-action-modal-title"
-        x-data
-        x-on:keydown.escape.window="$wire.closeConfirmActionModal()"
+        x-data="{
+            focusables() {
+                let selector = 'a, button, input:not([type=\'hidden\']), textarea, select, details, [tabindex]:not([tabindex=\'-1\'])'
+                return [...$el.querySelectorAll(selector)].filter(el => ! el.hasAttribute('disabled'))
+            },
+            firstFocusable() { return this.focusables()[0] },
+            lastFocusable() { return this.focusables().slice(-1)[0] },
+            nextFocusable() { return this.focusables()[this.nextFocusableIndex()] || this.firstFocusable() },
+            prevFocusable() { return this.focusables()[this.prevFocusableIndex()] || this.lastFocusable() },
+            nextFocusableIndex() { return (this.focusables().indexOf(document.activeElement) + 1) % (this.focusables().length + 1) },
+            prevFocusableIndex() { return Math.max(0, this.focusables().indexOf(document.activeElement)) - 1 },
+            close() {
+                document.body.classList.remove('overflow-y-hidden')
+                $wire.closeConfirmActionModal()
+            },
+        }"
+        x-init="
+            document.body.classList.add('overflow-y-hidden');
+            setTimeout(() => firstFocusable()?.focus(), 100);
+            return () => document.body.classList.remove('overflow-y-hidden')
+        "
+        x-on:keydown.escape.window="close()"
+        x-on:keydown.tab.prevent="!$event.shiftKey && nextFocusable().focus()"
+        x-on:keydown.shift.tab.prevent="prevFocusable().focus()"
     >
-        <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeConfirmActionModal"></div>
-        <div class="relative flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
-            <div
-                class="relative w-full max-w-md rounded-2xl border border-brand-ink/10 bg-white shadow-xl"
-                wire:click.stop
-            >
-                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-7">
-                    <h2 id="confirm-action-modal-title" class="text-lg font-semibold text-brand-ink">{{ $confirmActionModalTitle }}</h2>
-                </div>
-                <div class="px-6 py-5 sm:px-7">
+        <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="close()"></div>
+        <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
+            <x-dialog-shell :title="$confirmActionModalTitle" title-id="confirm-action-modal-title" max-width="md">
+                <div>
                     <p class="text-sm leading-relaxed text-brand-moss">{{ $confirmActionModalMessage }}</p>
                 </div>
-                <div class="flex flex-col-reverse gap-2 border-t border-brand-ink/10 px-6 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-7">
-                    <button
-                        type="button"
-                        wire:click="closeConfirmActionModal"
-                        class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50"
-                    >
+
+                <x-slot name="footer">
+                    <x-secondary-button type="button" x-on:click="close()">
                         {{ __('Cancel') }}
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="confirmActionModal"
-                        wire:loading.attr="disabled"
-                        class="{{ $confirmButtonClass }}"
-                    >
-                        <span wire:loading.remove wire:target="confirmActionModal">{{ $confirmActionModalConfirmLabel }}</span>
-                        <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>
-                    </button>
-                </div>
-            </div>
+                    </x-secondary-button>
+
+                    @if ($confirmActionModalDestructive ?? false)
+                        <x-danger-button type="button" wire:click="confirmActionModal" wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="confirmActionModal">{{ $confirmActionModalConfirmLabel }}</span>
+                            <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>
+                        </x-danger-button>
+                    @else
+                        <x-primary-button type="button" wire:click="confirmActionModal" wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="confirmActionModal">{{ $confirmActionModalConfirmLabel }}</span>
+                            <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>
+                        </x-primary-button>
+                    @endif
+                </x-slot>
+            </x-dialog-shell>
         </div>
     </div>
+    @endteleport
 @endif

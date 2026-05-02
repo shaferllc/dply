@@ -53,6 +53,10 @@ final class ResolveServerCreateCatalog
         }
 
         $credentials = GetProviderCredentialsForServerType::run($org, $type);
+        if (in_array($type, ['digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
+            return array_merge($empty, ['credentials' => $credentials]);
+        }
+
         if ($type === 'fly_io') {
             return $this->catalogFlyIo($credentials);
         }
@@ -375,9 +379,9 @@ final class ResolveServerCreateCatalog
                     $sizes[] = [
                         'value' => $v,
                         'label' => $v,
-                    'memory_mb' => null,
-                    'vcpus' => $this->extractInt($t, ['ncpus', 'cpus']),
-                    'disk_gb' => null,
+                        'memory_mb' => null,
+                        'vcpus' => $this->extractInt($t, ['ncpus', 'cpus']),
+                        'disk_gb' => null,
                     ];
                 }
             }

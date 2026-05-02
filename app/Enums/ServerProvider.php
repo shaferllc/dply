@@ -20,6 +20,7 @@ enum ServerProvider: string
     case Coolify = 'coolify';
     case CapRover = 'cap_rover';
     case Aws = 'aws';
+    case Cloudflare = 'cloudflare';
     case Gcp = 'gcp';
     case Azure = 'azure';
     case Oracle = 'oracle';
@@ -47,6 +48,7 @@ enum ServerProvider: string
             self::Coolify => 'Coolify',
             self::CapRover => 'CapRover',
             self::Aws => 'AWS',
+            self::Cloudflare => 'Cloudflare',
             self::Gcp => 'GCP',
             self::Azure => 'Azure',
             self::Oracle => 'Oracle Cloud',
@@ -71,6 +73,7 @@ enum ServerProvider: string
             self::Akamai,
             self::FlyIo,
             self::Aws => true,
+            self::Cloudflare => false,
             default => false,
         };
     }

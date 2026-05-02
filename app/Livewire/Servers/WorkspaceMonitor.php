@@ -10,14 +10,15 @@ use App\Livewire\Servers\Concerns\RunsServerPackageInstalls;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
+use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Insights\InsightCorrelationService;
 use App\Services\Servers\ServerManageSshExecutor;
+use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;
 use App\Services\Servers\ServerMetricsGuestScript;
-use App\Services\Servers\ServerMetricsGuestPushService;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -95,8 +96,7 @@ class WorkspaceMonitor extends Component
 
         $pending = $this->probePendingFromMeta($meta);
         if ($this->wasProbePending && ! $pending) {
-            $this->flash_success = __('Monitoring status updated.');
-            $this->flash_error = null;
+            $this->toastSuccess(__('Monitoring status updated.'));
         }
         $this->wasProbePending = $pending;
     }
@@ -176,15 +176,13 @@ class WorkspaceMonitor extends Component
                 $queuedRepairs[] = __('monitor script repair');
             }
 
-            $this->flash_success = $queuedRepairs === []
+            $this->toastSuccess($queuedRepairs === []
                 ? __('Guest monitoring wiring verified.')
-                : __('Monitor rechecked. Queued: :items.', ['items' => implode(', ', $queuedRepairs)]);
+                : __('Monitor rechecked. Queued: :items.', ['items' => implode(', ', $queuedRepairs)]));
 
             $this->server->refresh();
-            $this->flash_error = null;
         } catch (\Throwable $e) {
             $this->metrics_error = $e->getMessage();
-            $this->flash_success = null;
         }
     }
 
@@ -195,7 +193,9 @@ class WorkspaceMonitor extends Component
         $this->remote_error = null;
 
         if (! $this->serverOpsReady()) {
-            $this->remote_error = __('Provisioning and SSH must be ready before inspecting the callback env.');
+            $msg = __('Provisioning and SSH must be ready before inspecting the callback env.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
 
             return;
         }
@@ -270,9 +270,11 @@ BASH);
 
             $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
             $this->remote_error = null;
-            $this->flash_success = __('Callback env inspection finished.');
+            $this->toastSuccess(__('Callback env inspection finished.'));
         } catch (\Throwable $e) {
-            $this->remote_error = $e->getMessage();
+            $msg = $e->getMessage();
+            $this->remote_error = $msg;
+            $this->toastError($msg);
         }
     }
 
@@ -283,7 +285,9 @@ BASH);
         $this->remote_error = null;
 
         if (! $this->serverOpsReady()) {
-            $this->remote_error = __('Provisioning and SSH must be ready before running callback diagnostics.');
+            $msg = __('Provisioning and SSH must be ready before running callback diagnostics.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
 
             return;
         }
@@ -392,9 +396,11 @@ BASH);
 
             $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
             $this->remote_error = null;
-            $this->flash_success = __('Monitor callback diagnostics finished.');
+            $this->toastSuccess(__('Monitor callback diagnostics finished.'));
         } catch (\Throwable $e) {
-            $this->remote_error = $e->getMessage();
+            $msg = $e->getMessage();
+            $this->remote_error = $msg;
+            $this->toastError($msg);
         }
     }
 
@@ -405,13 +411,17 @@ BASH);
         $this->remote_error = null;
 
         if ($this->currentUserIsDeployer()) {
-            $this->remote_error = __('Deployers cannot repair monitor installs on servers.');
+            $msg = __('Deployers cannot repair monitor installs on servers.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
 
             return;
         }
 
         if (! $this->serverOpsReady()) {
-            $this->remote_error = __('Provisioning and SSH must be ready before repairing the monitor.');
+            $msg = __('Provisioning and SSH must be ready before repairing the monitor.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
 
             return;
         }
@@ -451,10 +461,11 @@ BASH);
 
             app(ServerMetricsGuestPushVerifier::class)->refreshRemoteState($server->fresh());
             $this->server->refresh();
-            $this->flash_success = __('Monitor repaired directly over SSH.');
+            $this->toastSuccess(__('Monitor repaired directly over SSH.'));
         } catch (\Throwable $e) {
-            $this->remote_error = $e->getMessage();
-            $this->flash_success = null;
+            $msg = $e->getMessage();
+            $this->remote_error = $msg;
+            $this->toastError($msg);
         }
     }
 
@@ -490,7 +501,7 @@ BASH);
      */
     protected function deploymentContext(Server $server): array
     {
-        /** @var EloquentCollection<int, \App\Models\Site> $sites */
+        /** @var EloquentCollection<int, Site> $sites */
         $sites = $server->sites()
             ->with(['deployments' => fn ($query) => $query->limit(1)])
             ->orderBy('name')
@@ -509,7 +520,7 @@ BASH);
             ->orderByDesc('created_at')
             ->first();
 
-        $activeSiteCount = $sites->filter(fn ($site) => $site->status !== \App\Models\Site::STATUS_ERROR)->count();
+        $activeSiteCount = $sites->filter(fn ($site) => $site->status !== Site::STATUS_ERROR)->count();
         $siteSummaries = $sites->take(3)->map(function ($site): array {
             $deployment = $site->deployments->first();
 

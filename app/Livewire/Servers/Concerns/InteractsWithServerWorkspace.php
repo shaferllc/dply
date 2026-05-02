@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Workspace;
 use Illuminate\Support\Collection;
@@ -9,16 +10,22 @@ use Livewire\Attributes\On;
 
 trait InteractsWithServerWorkspace
 {
+    use DispatchesToastNotifications;
+
     public Server $server;
-
-    public ?string $flash_success = null;
-
-    public ?string $flash_error = null;
 
     protected function bootWorkspace(Server $server): void
     {
         $this->authorize('view', $server);
         $this->server = $server;
+
+        if (! $server->isVmHost()) {
+            $allowedRoutes = ['servers.show', 'servers.overview', 'servers.sites'];
+            $currentRoute = request()->route()?->getName();
+            if (is_string($currentRoute) && ! in_array($currentRoute, $allowedRoutes, true)) {
+                $this->redirect(route('servers.show', $server), navigate: true);
+            }
+        }
     }
 
     protected function currentUserIsDeployer(): bool
@@ -34,6 +41,7 @@ trait InteractsWithServerWorkspace
         $s = $this->server;
 
         return $s->isReady()
+            && $s->isVmHost()
             && filled($s->ip_address)
             && filled($s->ssh_private_key);
     }
@@ -78,7 +86,7 @@ trait InteractsWithServerWorkspace
             'meta' => $meta,
         ]);
         $this->server = $server->fresh();
-        session()->flash('success', __('Scheduled removal was cancelled.'));
+        $this->toastSuccess(__('Scheduled removal was cancelled.'));
     }
 
     /**

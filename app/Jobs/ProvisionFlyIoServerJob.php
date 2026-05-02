@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\FlyIoService;
+use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -22,6 +23,26 @@ class ProvisionFlyIoServerJob implements ShouldQueue
         $credential = $this->server->providerCredential;
         if (! $credential || $credential->provider !== 'fly_io') {
             $this->server->update(['status' => Server::STATUS_ERROR]);
+
+            return;
+        }
+
+        if (FakeCloudProvision::shouldInterceptFlyIoUiStub($this->server)) {
+            $appName = $this->slugAppName($this->server->name);
+            $vmSize = $this->server->size ?: config('services.fly_io.default_vm_size', 'shared-cpu-1x');
+            $this->server->update([
+                'provider_id' => FakeCloudProvision::sentinelProviderId(),
+                'region' => $this->server->region,
+                'size' => $vmSize,
+                'ip_address' => $appName.'.fly.dev',
+                'status' => Server::STATUS_READY,
+                'meta' => array_merge($this->server->meta ?? [], [
+                    'app_name' => $appName,
+                    'fake_cloud_provision' => true,
+                    'fake_fly_io_ui_stub' => true,
+                ]),
+                'ssh_user' => config('services.fly_io.ssh_user', 'root'),
+            ]);
 
             return;
         }

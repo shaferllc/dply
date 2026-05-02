@@ -15,6 +15,12 @@ return [
         'queue' => env('SERVER_CRON_RUN_QUEUE'),
     ],
 
+    /*
+    | `requires_any_tags` hides the item when the server has none of the listed
+    | service tags (see {@see App\Support\Servers\ServerInstalledServices}). Items
+    | without the key are always shown. Fails open when the provision stack summary
+    | is unavailable so freshly-imported servers still surface everything.
+    */
     'nav' => [
         ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites'],
         ['key' => 'deploy', 'route' => 'servers.deploy', 'icon' => 'rocket-launch', 'label' => 'Deploy'],
@@ -22,10 +28,10 @@ return [
         ['key' => 'insights', 'route' => 'servers.insights', 'icon' => 'light-bulb', 'label' => 'Insights'],
         ['key' => 'monitor', 'route' => 'servers.monitor', 'icon' => 'chart-bar', 'label' => 'Metrics'],
         ['key' => 'services', 'route' => 'servers.services', 'icon' => 'rectangle-stack', 'label' => 'Services'],
-        ['key' => 'php', 'route' => 'servers.php', 'icon' => 'command-line', 'label' => 'PHP'],
-        ['key' => 'databases', 'route' => 'servers.databases', 'icon' => 'circle-stack', 'label' => 'Databases'],
+        ['key' => 'php', 'route' => 'servers.php', 'icon' => 'command-line', 'label' => 'PHP', 'requires_any_tags' => ['php']],
+        ['key' => 'databases', 'route' => 'servers.databases', 'icon' => 'circle-stack', 'label' => 'Databases', 'requires_any_tags' => ['mysql', 'postgres']],
         ['key' => 'cron', 'route' => 'servers.cron', 'icon' => 'clock', 'label' => 'Cron jobs'],
-        ['key' => 'daemons', 'route' => 'servers.daemons', 'icon' => 'server-stack', 'label' => 'Daemons'],
+        ['key' => 'daemons', 'route' => 'servers.daemons', 'icon' => 'server-stack', 'label' => 'Daemons', 'requires_any_tags' => ['supervisor']],
         ['key' => 'firewall', 'route' => 'servers.firewall', 'icon' => 'shield-check', 'label' => 'Firewall'],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys'],
         ['key' => 'recipes', 'route' => 'servers.recipes', 'icon' => 'document-text', 'label' => 'Saved commands'],

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Scripts;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Script;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -11,6 +12,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Marketplace extends Component
 {
+    use DispatchesToastNotifications;
+
     public function mount(): void
     {
         $this->authorize('create', Script::class);
@@ -45,7 +48,7 @@ class Marketplace extends Component
             'marketplace_key' => $key,
         ]);
 
-        session()->flash('success', __('Script added to your organization. You can edit it below.'));
+        $this->toastSuccess(__('Script added to your organization. You can edit it below.'));
 
         return $this->redirect(route('scripts.edit', $script), navigate: true);
     }

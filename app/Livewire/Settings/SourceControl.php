@@ -2,8 +2,9 @@
 
 namespace App\Livewire\Settings;
 
-use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Actions\Auth\UnlinkSocialAccount;
 use App\Http\Controllers\Auth\OAuthController;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\SocialAccount;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
@@ -84,8 +85,8 @@ class SourceControl extends Component
             ->where('user_id', $user->id)
             ->findOrFail($accountId);
 
-        if ($user->password === null && $user->socialAccounts()->count() <= 1) {
-            $this->addError('unlink', __('Set a password on your account before unlinking your only sign-in method.'));
+        if (! UnlinkSocialAccount::allowed($user)) {
+            $this->addError('unlink', UnlinkSocialAccount::denyMessage());
 
             return;
         }

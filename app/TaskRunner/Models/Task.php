@@ -14,6 +14,7 @@ use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Helper;
 use App\Modules\TaskRunner\Jobs\UpdateTaskOutput;
 use App\Modules\TaskRunner\TaskDispatcher;
+use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -439,7 +440,12 @@ class Task extends Model
         $name = Str::kebab($name);
         $routeName = 'webhook.task.'.$name;
 
-        $publicRoot = config('dply.public_app_url');
+        // Fake-cloud servers run inside docker-compose.ssh-dev and reach the app via
+        // extra_hosts → host gateway. The tunnel/public URL is irrelevant (and often
+        // unreachable) from there, so anchor webhooks to APP_URL instead.
+        $usePublicRoot = ! FakeCloudProvision::isFakeServer($this->server);
+
+        $publicRoot = $usePublicRoot ? config('dply.public_app_url') : null;
         if (is_string($publicRoot) && $publicRoot !== '') {
             $publicRoot = rtrim($publicRoot, '/');
             $restoreRoot = rtrim((string) config('app.url'), '/');

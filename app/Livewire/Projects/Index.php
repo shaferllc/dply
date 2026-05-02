@@ -2,10 +2,11 @@
 
 namespace App\Livewire\Projects;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\Workspace;
 use App\Models\WorkspaceLabel;
 use App\Models\WorkspaceMember;
 use App\Models\WorkspaceView;
-use App\Models\Workspace;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -13,6 +14,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use DispatchesToastNotifications;
+
     public string $name = '';
 
     public string $description = '';
@@ -25,6 +28,24 @@ class Index extends Component
 
     public string $savedViewName = '';
 
+    public function openCreateProjectModal(): void
+    {
+        $this->authorize('create', Workspace::class);
+
+        $this->name = '';
+        $this->description = '';
+        $this->resetValidation(['name', 'description']);
+        $this->dispatch('open-modal', 'create-project-modal');
+    }
+
+    public function closeCreateProjectModal(): void
+    {
+        $this->name = '';
+        $this->description = '';
+        $this->resetValidation(['name', 'description']);
+        $this->dispatch('close-modal', 'create-project-modal');
+    }
+
     public function createProject(): void
     {
         $this->authorize('create', Workspace::class);
@@ -32,7 +53,7 @@ class Index extends Component
         $user = auth()->user();
         $org = $user->currentOrganization();
         if (! $org) {
-            session()->flash('error', __('Select an organization first.'));
+            $this->toastError(__('Select an organization first.'));
 
             return;
         }
@@ -49,7 +70,8 @@ class Index extends Component
         ]);
 
         $this->reset('name', 'description');
-        session()->flash('success', __('Project created.'));
+        $this->toastSuccess(__('Project created.'));
+        $this->dispatch('close-modal', 'create-project-modal');
     }
 
     public function saveView(): void
@@ -76,7 +98,7 @@ class Index extends Component
         ]);
 
         $this->savedViewName = '';
-        session()->flash('success', __('Saved view created.'));
+        $this->toastSuccess(__('Saved view created.'));
     }
 
     public function applySavedView(string $viewId): void

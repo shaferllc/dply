@@ -12,11 +12,33 @@ use App\Models\Site;
 final class DeployEngineResolver
 {
     public function __construct(
-        private ByoServerDeployEngine $byoServerDeployEngine,
+        private DeployEngine $byoServerDeployEngine,
+        private DeployEngine $digitalOceanFunctionsDeployEngine,
+        private DeployEngine $awsLambdaDeployEngine,
+        private DeployEngine $dockerDeployEngine,
+        private DeployEngine $kubernetesDeployEngine,
     ) {}
 
     public function forProject(Project $project): DeployEngine
     {
+        $project->loadMissing('site.server');
+
+        if ($project->site?->usesDockerRuntime()) {
+            return $this->dockerDeployEngine;
+        }
+
+        if ($project->site?->usesKubernetesRuntime()) {
+            return $this->kubernetesDeployEngine;
+        }
+
+        if ($project->site?->server?->isDigitalOceanFunctionsHost()) {
+            return $this->digitalOceanFunctionsDeployEngine;
+        }
+
+        if ($project->site?->server?->isAwsLambdaHost()) {
+            return $this->awsLambdaDeployEngine;
+        }
+
         return $this->byoServerDeployEngine;
     }
 

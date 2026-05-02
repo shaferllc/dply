@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Sites;
 
-use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Jobs\ApplyInsightFixJob;
 use App\Jobs\RunSiteInsightsJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
@@ -79,7 +79,7 @@ class WorkspaceInsights extends Component
             'parameters' => $this->parameters,
         ])->save();
 
-        session()->flash('success', __('Settings saved.'));
+        $this->toastSuccess(__('Settings saved.'));
     }
 
     /**
@@ -135,7 +135,7 @@ class WorkspaceInsights extends Component
         $this->running = true;
         RunSiteInsightsJob::dispatch($this->site->id);
         $this->running = false;
-        session()->flash('success', __('Insights check queued. Refresh in a moment for results.'));
+        $this->toastSuccess(__('Insights check queued. Refresh in a moment for results.'));
     }
 
     public function applyFix(int $findingId): void
@@ -156,7 +156,7 @@ class WorkspaceInsights extends Component
         }
 
         ApplyInsightFixJob::dispatch($finding->id, $user->id);
-        session()->flash('success', __('Fix has been queued. This may take up to a minute.'));
+        $this->toastSuccess(__('Fix has been queued. This may take up to a minute.'));
     }
 
     public function render(): View

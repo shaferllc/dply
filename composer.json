@@ -5,18 +5,13 @@
     "description": "The skeleton application for the Laravel framework.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
-    "repositories": [
-        {
-            "type": "path",
-            "url": "./packages/dply-core"
-        }
-    ],
     "require": {
         "php": "^8.3",
         "aws/aws-sdk-php": "^3.373",
         "bacon/bacon-qr-code": "^3.0",
         "blade-ui-kit/blade-heroicons": "^2.7",
         "blade-ui-kit/blade-icons": "^1.9",
+        "laragear/webauthn": "^5.0",
         "laravel/cashier": "^16.5",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.45",
@@ -27,10 +22,10 @@
         "livewire/livewire": "^4.0",
         "phpseclib/phpseclib": "^3.0",
         "pragmarx/google2fa": "^9.0",
-        "shaferllc/dply-core": "^0.1",
         "spatie/temporary-directory": "^2.3"
     },
     "require-dev": {
+        "barryvdh/laravel-debugbar": "^4.2",
         "beyondcode/expose": "^3.2",
         "doctrine/dbal": "^4.0",
         "fakerphp/faker": "^1.23",
@@ -91,7 +86,6 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
         "pre-package-uninstall": [

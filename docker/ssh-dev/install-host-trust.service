@@ -1,0 +1,13 @@
+[Unit]
+Description=Install host-mounted SSH key and Valet CA into trust stores
+DefaultDependencies=no
+Before=ssh.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/install-host-trust.sh
+
+[Install]
+WantedBy=multi-user.target

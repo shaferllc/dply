@@ -1,23 +1,34 @@
 # Optional local SSH target for health checks, deploy smoke tests, and integration work.
-# Start: docker compose -f docker-compose.ssh-dev.yml up -d
-# SSH: ssh -p 2222 dplytest@127.0.0.1  (password: dplylocal — local only; prefer keys in real tests)
-# Add a Custom server in BYO: host 127.0.0.1, port 2222, user dplytest, paste a private key if you switch to key auth.
+# Start: docker compose -f docker-compose.ssh-dev.yml up -d --build
+# Custom Ubuntu image (docker/ssh-dev/Dockerfile) booting systemd as PID 1 so the
+# provisioner's bootstrap (apt installs, systemctl enable/start, polkit, dbus)
+# behaves the same as on a fresh cloud VM. Requires the privileged + cgroup
+# mount block below; OrbStack and Docker Desktop both support this.
+# SSH: ssh -p 2222 -i docker/ssh-dev/local_fake_cloud_ed25519 root@127.0.0.1
+# BYO "existing server": host 127.0.0.1, port 2222, user root, private key = docker/ssh-dev/local_fake_cloud_ed25519
+#
+# Webhook reachability: extra_hosts maps your Valet site (default dplyi.test) to the
+# Docker host gateway, and the Valet CA is mounted + installed at boot so HTTPS verifies.
+# Override DPLY_LOCAL_APP_HOST / DPLY_VALET_CA_PATH if your setup differs.
 services:
   ssh-dev:
-    image: lscr.io/linuxserver/openssh-server:latest
+    build:
+      context: ./docker/ssh-dev
+      dockerfile: Dockerfile
     container_name: dply-ssh-dev
-    environment:
-      PUID: '1000'
-      PGID: '1000'
-      TZ: Etc/UTC
-      USER_NAME: dplytest
-      USER_PASSWORD: dplylocal
-      PASSWORD_ACCESS: 'true'
+    privileged: true
+    cgroup: host
+    stop_signal: SIGRTMIN+3
+    tmpfs:
+      - /run
+      - /run/lock
+      - /tmp
+    extra_hosts:
+      - "${DPLY_LOCAL_APP_HOST:-dplyi.test}:host-gateway"
     volumes:
-      - ssh-dev-config:/config
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ./docker/ssh-dev/local_fake_cloud_ed25519.pub:/etc/ssh/authorized_keys.pub:ro
+      - ${DPLY_VALET_CA_PATH:-${HOME}/.config/valet/CA/LaravelValetCASelfSigned.pem}:/usr/local/share/ca-certificates/valet-ca.crt:ro
     ports:
       - '127.0.0.1:2222:2222'
     restart: unless-stopped
-
-volumes:
-  ssh-dev-config:

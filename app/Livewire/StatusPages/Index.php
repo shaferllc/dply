@@ -39,7 +39,7 @@ class Index extends Component
         ]);
 
         $this->reset('name', 'description');
-        session()->flash('success', __('Status page created.'));
+        $this->toastSuccess(__('Status page created.'));
     }
 
     public function render(): View

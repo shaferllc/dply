@@ -1,0 +1,3 @@
+The OpenSSH key pair local_fake_cloud_ed25519 in this directory is for the
+optional docker-compose.ssh-dev.yml container only (localhost). Do not reuse on
+real infrastructure or production.

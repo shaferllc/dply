@@ -55,6 +55,11 @@ class AtomicSiteDeployer
 
         $log .= $ssh->exec("mkdir -p {$baseEsc}/releases", 60);
 
+        $previousActiveRelease = SiteRelease::query()
+            ->where('site_id', $site->id)
+            ->where('is_active', true)
+            ->first();
+
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $base);
         $this->hookRunner->assertHooksSucceeded($log, 'before_clone');
 
@@ -72,6 +77,8 @@ class AtomicSiteDeployer
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $newRelease);
         $this->hookRunner->assertHooksSucceeded($log, 'after_clone');
 
+        app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
+
         $log .= $this->pipelineRunner->run($ssh, $site, $newRelease);
 
         $post = trim((string) $site->post_deploy_command);
@@ -87,6 +94,33 @@ class AtomicSiteDeployer
         $this->hookRunner->assertHooksSucceeded($log, 'after_activate');
 
         $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
+
+        try {
+            $log .= app(AtomicDeployHealthChecker::class)->verify($site, $ssh);
+        } catch (\Throwable $e) {
+            $meta = is_array($site->meta) ? $site->meta : [];
+            $autoRollback = (bool) ($meta['deploy_health_auto_rollback'] ?? false);
+            if ($autoRollback && $previousActiveRelease !== null) {
+                try {
+                    $log .= "\n--- auto rollback ---\n";
+                    $log .= app(SiteReleaseRollback::class)->rollbackTo($site->fresh(), $previousActiveRelease);
+                } catch (\Throwable $rollbackEx) {
+                    throw new \RuntimeException(
+                        $e->getMessage().' '.__('Automatic rollback failed: :msg', ['msg' => $rollbackEx->getMessage()]),
+                        0,
+                        $rollbackEx
+                    );
+                }
+
+                throw new \RuntimeException(
+                    $e->getMessage().' '.__('The previous release was restored.'),
+                    0,
+                    $e
+                );
+            }
+
+            throw $e;
+        }
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $newEsc), 30));
 

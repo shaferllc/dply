@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\User;
+use App\Models\UserSshKey;
 use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -67,7 +68,116 @@ class ServerWorkspaceSshKeysTest extends TestCase
             ->assertSee('Recent audit history')
             ->assertDontSee('Bulk import')
             ->assertDontSee('Export CSV')
-            ->assertDontSee('Export audit CSV');
+            ->assertDontSee('Export audit CSV')
+            ->assertSee('Generate key pair');
+    }
+
+    public function test_generate_key_pair_prefills_public_and_dispatches_browser_event(): void
+    {
+        if (! function_exists('sodium_crypto_sign_keypair')) {
+            $this->markTestSkipped('sodium extension required for Ed25519 generation.');
+        }
+
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->call('generateNewAuthorizedKeyPair')
+            ->assertHasNoErrors()
+            ->assertSet('new_auth_key', fn ($v) => is_string($v) && str_starts_with($v, 'ssh-ed25519'))
+            ->assertSet('new_auth_name', __('Generated key'))
+            ->assertDispatched('dply-ssh-keypair-generated', function ($name, $params) {
+                return isset($params['privateKey'], $params['publicKey'])
+                    && str_contains((string) $params['privateKey'], 'BEGIN OPENSSH PRIVATE KEY')
+                    && str_starts_with((string) $params['publicKey'], 'ssh-ed25519');
+            });
+
+        $this->assertSame(
+            0,
+            ServerAuthorizedKey::query()->where('server_id', $server->id)->count(),
+            'Generating a key pair must not persist an authorized key row until the user adds it.'
+        );
+
+        $this->assertSame(
+            0,
+            UserSshKey::query()->where('user_id', $user->id)->count(),
+            'Generating a key pair must not save to profile keys automatically.'
+        );
+    }
+
+    public function test_component_reminds_user_when_server_has_no_personal_profile_key_attached(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('p', 43).' reminder-test',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertSee('Add one of your personal SSH keys to this server')
+            ->assertSee('Select a key from your profile')
+            ->assertSee('Sync authorized_keys');
+    }
+
+    public function test_component_uses_shared_modal_when_no_profile_keys_exist(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertSee('Add profile key')
+            ->assertSee('Add a personal SSH key');
+    }
+
+    public function test_component_hides_reminder_when_server_has_current_users_personal_key_attached(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $profileKey = UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('q', 43).' attached-test',
+        ]);
+
+        ServerAuthorizedKey::query()->create([
+            'server_id' => $server->id,
+            'managed_key_type' => UserSshKey::class,
+            'managed_key_id' => $profileKey->id,
+            'name' => $profileKey->name,
+            'public_key' => $profileKey->public_key,
+            'target_linux_user' => '',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertDontSee('Add one of your personal SSH keys to this server');
+    }
+
+    public function test_component_hides_reminder_when_matching_profile_key_was_added_manually(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $profileKey = UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Work laptop',
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('u', 43).' pasted-test',
+        ]);
+
+        ServerAuthorizedKey::query()->create([
+            'server_id' => $server->id,
+            'managed_key_type' => null,
+            'managed_key_id' => null,
+            'name' => 'Imported manually',
+            'public_key' => $profileKey->public_key,
+            'target_linux_user' => '',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSshKeys::class, ['server' => $server])
+            ->assertDontSee('Add one of your personal SSH keys to this server');
     }
 
     public function test_delete_key_writes_audit_event(): void
@@ -158,9 +268,10 @@ class ServerWorkspaceSshKeysTest extends TestCase
             ->test(WorkspaceSshKeys::class, ['server' => $server])
             ->call('syncAuthorizedKeys')
             ->assertHasNoErrors()
-            ->assertSet(
-                'flash_error',
-                "Dply could not connect to the server to sync authorized_keys. Check that the server SSH login user still accepts Dply's provisioned key. The server rejected the SSH key for root@{$server->ip_address}."
+            ->assertDispatched(
+                'notify',
+                message: "Dply could not connect to the server to sync authorized_keys. Check that the server SSH login user still accepts Dply's provisioned key. The server rejected the SSH key for root@{$server->ip_address}.",
+                type: 'error'
             );
     }
 }

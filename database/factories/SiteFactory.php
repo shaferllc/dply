@@ -30,10 +30,18 @@ class SiteFactory extends Factory
             'document_root' => '/var/www/app/public',
             'repository_path' => '/var/www/app',
             'php_version' => '8.3',
+            'runtime_version' => '8.3',
             'app_port' => null,
+            'build_command' => null,
             'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
+            'git_branch' => 'main',
             'webhook_secret' => Str::random(48),
+            'deploy_strategy' => 'simple',
+            'releases_to_keep' => 5,
+            'laravel_scheduler' => false,
+            'deployment_environment' => 'production',
+            'restart_supervisor_programs_after_deploy' => false,
         ];
     }
 }

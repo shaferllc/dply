@@ -6,6 +6,7 @@ use App\Livewire\Profile\DeleteAccount;
 use App\Livewire\Profile\Edit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -22,6 +23,18 @@ class ProfileTest extends TestCase
             ->get('/profile');
 
         $response->assertOk();
+    }
+
+    public function test_profile_edit_shows_dashboard_profile_breadcrumb(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSeeText('Dashboard')
+            ->assertSeeText('Profile')
+            ->assertSee('aria-current="page"', false);
     }
 
     public function test_security_page_is_displayed(): void
@@ -43,7 +56,8 @@ class ProfileTest extends TestCase
             ->set('profileForm.name', 'Test User')
             ->set('profileForm.email', 'test@example.com')
             ->call('updateProfile')
-            ->assertHasNoErrors();
+            ->assertHasNoErrors()
+            ->assertDispatched('notify', message: __('Profile details saved.'), type: 'success');
 
         $user->refresh();
 
@@ -68,6 +82,15 @@ class ProfileTest extends TestCase
 
     public function test_billing_details_can_be_updated(): void
     {
+        Http::fake([
+            'ec.europa.eu/*' => Http::response(
+                '<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">'
+                .'<soap:Body><checkVatResponse><valid>true</valid></checkVatResponse></soap:Body></soap:Envelope>',
+                200,
+                ['Content-Type' => 'text/xml']
+            ),
+        ]);
+
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
@@ -77,7 +100,8 @@ class ProfileTest extends TestCase
             ->set('billingForm.billing_currency', 'EUR')
             ->set('billingForm.billing_details', "Acme Co.\n123 Main St")
             ->call('updateBilling')
-            ->assertHasNoErrors();
+            ->assertHasNoErrors()
+            ->assertDispatched('notify', message: __('Billing details saved.'), type: 'success');
 
         $user->refresh();
 
@@ -85,6 +109,19 @@ class ProfileTest extends TestCase
         $this->assertSame('NL123456789B01', $user->vat_number);
         $this->assertSame('EUR', $user->billing_currency);
         $this->assertSame("Acme Co.\n123 Main St", $user->billing_details);
+    }
+
+    public function test_billing_vat_number_must_match_supported_format(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(Edit::class)
+            ->set('billingForm.vat_number', 'weewrewerwrewrweew')
+            ->call('updateBilling')
+            ->assertHasErrors(['billingForm.vat_number']);
+
+        $this->assertNull($user->refresh()->vat_number);
     }
 
     public function test_delete_account_page_is_displayed_for_authenticated_user(): void

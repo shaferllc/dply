@@ -14,12 +14,16 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\User;
+use App\Services\Deploy\DeploymentContractBuilder;
+use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -90,7 +94,7 @@ class WorkspaceOverview extends Component
         if ($this->server->status === Server::STATUS_READY && ! empty($this->server->ip_address)) {
             CheckServerHealthJob::dispatch($this->server);
         }
-        $this->flash_success = 'Health check has been queued. Status will update shortly.';
+        $this->toastSuccess('Health check has been queued. Status will update shortly.');
     }
 
     public function saveHealthCheckUrl(): void
@@ -103,7 +107,7 @@ class WorkspaceOverview extends Component
             unset($meta['health_check_url']);
         }
         $this->server->update(['meta' => $meta]);
-        $this->flash_success = 'Health check URL updated.';
+        $this->toastSuccess('Health check URL updated.');
     }
 
     public function rerunSetup(): void
@@ -112,7 +116,7 @@ class WorkspaceOverview extends Component
 
         $server = $this->server->fresh();
         if (! $server || ! RunSetupScriptJob::shouldDispatch($server)) {
-            $this->flash_error = 'This server is not ready for a setup re-run yet.';
+            $this->toastError('This server is not ready for a setup re-run yet.');
 
             return;
         }
@@ -178,7 +182,7 @@ class WorkspaceOverview extends Component
             }
         }
 
-        $this->flash_success = __('Saved :count new notification subscription(s) for this server.', ['count' => $created]);
+        $this->toastSuccess(__('Saved :count new notification subscription(s) for this server.', ['count' => $created]));
     }
 
     public function createQuickNotificationChannel(): void
@@ -189,8 +193,8 @@ class WorkspaceOverview extends Component
 
         $rules = array_merge(
             [
-                'quick_new_type' => ['required', 'string', \Illuminate\Validation\Rule::in(NotificationChannel::typesForUi())],
-                'quick_new_owner_scope' => ['required', 'string', \Illuminate\Validation\Rule::in($this->quickAddOwnerScopes())],
+                'quick_new_type' => ['required', 'string', Rule::in(NotificationChannel::typesForUi())],
+                'quick_new_owner_scope' => ['required', 'string', Rule::in($this->quickAddOwnerScopes())],
             ],
             $this->quickChannelValidationRulesForType($this->quick_new_type)
         );
@@ -210,7 +214,7 @@ class WorkspaceOverview extends Component
 
         $this->resetQuickNotificationChannelFields();
         $this->showQuickNotificationChannelModal = false;
-        $this->flash_success = __('Channel created and selected for this server.');
+        $this->toastSuccess(__('Channel created and selected for this server.'));
     }
 
     public function openQuickNotificationChannelModal(): void
@@ -224,7 +228,7 @@ class WorkspaceOverview extends Component
         $this->showQuickNotificationChannelModal = false;
     }
 
-    protected function quickNotificationChannelOwner(): \App\Models\User|Organization
+    protected function quickNotificationChannelOwner(): User|Organization
     {
         if ($this->quick_new_owner_scope === 'organization' && $this->canManageOrganizationNotificationChannels()) {
             return $this->server->organization;
@@ -380,12 +384,13 @@ class WorkspaceOverview extends Component
     public function render(): View
     {
         $this->server->refresh();
-
-        $siteSummaries = $this->server->sites()
+        $sites = $this->server->sites()
             ->with(['domains'])
             ->orderBy('name')
-            ->limit(4)
-            ->get()
+            ->get();
+
+        $siteSummaries = $sites
+            ->take(4)
             ->map(function (Site $site): array {
                 $primaryDomain = $site->domains->firstWhere('is_primary', true) ?? $site->domains->first();
 
@@ -397,7 +402,7 @@ class WorkspaceOverview extends Component
                 ];
             });
 
-        $siteIds = $this->server->sites()->pluck('id');
+        $siteIds = $sites->pluck('id');
         $latestDeployment = $siteIds->isEmpty()
             ? null
             : SiteDeployment::query()
@@ -409,6 +414,10 @@ class WorkspaceOverview extends Component
         $monitorLastSampleAt = isset(($this->server->meta ?? [])['monitoring_last_sample_at'])
             ? Carbon::parse($this->server->meta['monitoring_last_sample_at'])->timezone(config('app.timezone'))
             : null;
+
+        $currentUser = Auth::user();
+        $hasProfileSshKeys = $currentUser?->sshKeys()->exists() ?? false;
+        $serverHasPersonalProfileKey = $this->server->hasPersonalUserSshKey($currentUser);
 
         $opsSummary = [
             'firewall_rules_enabled' => $this->server->firewallRules()->where('enabled', true)->count(),
@@ -422,6 +431,7 @@ class WorkspaceOverview extends Component
             'last_checked_at' => $this->server->last_health_check_at,
             'monitor_last_sample_at' => $monitorLastSampleAt,
         ];
+        $containerLaunch = $this->containerLaunchSummary();
 
         $insightFindings = InsightFinding::query()
             ->where('server_id', $this->server->id)
@@ -448,22 +458,114 @@ class WorkspaceOverview extends Component
         $assignableChannels = AssignableNotificationChannels::forUser(Auth::user(), Auth::user()?->currentOrganization());
         $serverEventOptions = collect(config('notification_events.categories.server.events', []))->all();
         $quickAddTypes = NotificationChannel::typesForUi();
+        $contractBuilder = app(DeploymentContractBuilder::class);
+        $preflightValidator = app(DeploymentPreflightValidator::class);
+        $siteFoundationSummaries = $sites->map(function (Site $site) use ($contractBuilder, $preflightValidator): array {
+            $contract = $contractBuilder->build($site);
+            $preflight = $preflightValidator->validate($site);
+
+            return [
+                'site_id' => (string) $site->id,
+                'name' => $site->name,
+                'route' => route('sites.show', ['server' => $this->server, 'site' => $site]),
+                'preflight_ok' => (bool) ($preflight['ok'] ?? false),
+                'error_count' => count($preflight['errors'] ?? []),
+                'warning_count' => count($preflight['warnings'] ?? []),
+                'runtime_drifted' => (bool) data_get($contract->status, 'runtime_drifted', false),
+                'resource_bindings' => $contract->resourceBindingArrays(),
+            ];
+        })->values();
+        $resourceSummary = $siteFoundationSummaries
+            ->flatMap(function (array $summary): array {
+                return array_filter(
+                    $summary['resource_bindings'],
+                    fn (mixed $binding): bool => is_array($binding)
+                        && (($binding['required'] ?? false)
+                            || ($binding['status'] ?? 'pending') === 'configured'
+                            || (($binding['status'] ?? 'pending') === 'pending'
+                                && ($binding['source'] ?? '') === 'environment'))
+                );
+            })
+            ->groupBy(fn (array $binding): string => (string) ($binding['type'] ?? 'resource'))
+            ->map(function ($bindings, string $type): array {
+                $bindingCollection = collect($bindings)->filter(fn (mixed $binding): bool => is_array($binding));
+
+                return [
+                    'type' => $type,
+                    'site_count' => $bindingCollection->count(),
+                    'configured_count' => $bindingCollection->where('status', 'configured')->count(),
+                    'pending_count' => $bindingCollection->where('status', '!=', 'configured')->count(),
+                ];
+            })
+            ->sortBy('type')
+            ->values();
+        $foundationSummary = [
+            'site_count' => $siteFoundationSummaries->count(),
+            'preflight_blocked_count' => $siteFoundationSummaries->where('preflight_ok', false)->count(),
+            'drifted_count' => $siteFoundationSummaries->where('runtime_drifted', true)->count(),
+            'warning_site_count' => $siteFoundationSummaries->filter(fn (array $summary): bool => $summary['warning_count'] > 0)->count(),
+        ];
 
         return view('livewire.servers.workspace-overview', [
             'siteSummaries' => $siteSummaries,
-            'siteCount' => $this->server->sites()->count(),
+            'siteCount' => $sites->count(),
             'latestDeployment' => $latestDeployment,
             'opsSummary' => $opsSummary,
             'healthSummary' => $healthSummary,
+            'containerLaunch' => $containerLaunch,
+            'hasProfileSshKeys' => $hasProfileSshKeys,
             'insightFindings' => $insightFindings,
             'insightSummary' => $insightSummary,
             'assignableChannels' => $assignableChannels,
             'serverEventOptions' => $serverEventOptions,
+            'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
             'quickAddTypes' => $quickAddTypes,
             'canManageOrganizationNotificationChannels' => $this->canManageOrganizationNotificationChannels(),
+            'foundationSummary' => $foundationSummary,
+            'resourceSummary' => $resourceSummary,
+            'siteFoundationSummaries' => $siteFoundationSummaries,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function containerLaunchSummary(): ?array
+    {
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $launch = is_array($meta['container_launch'] ?? null) ? $meta['container_launch'] : [];
+        if ($launch === []) {
+            return null;
+        }
+
+        $status = (string) ($launch['status'] ?? '');
+        if ($status === '' || $status === 'completed') {
+            return null;
+        }
+
+        $siteId = is_string($launch['site_id'] ?? null) ? $launch['site_id'] : null;
+        $site = $siteId ? $this->server->sites()->with('domains')->find($siteId) : null;
+        $events = collect(is_array($launch['events'] ?? null) ? $launch['events'] : [])
+            ->filter(fn (mixed $event): bool => is_array($event) && is_string($event['message'] ?? null))
+            ->take(-5)
+            ->values()
+            ->all();
+
+        return [
+            'status' => $status,
+            'target_family' => (string) ($launch['target_family'] ?? 'container'),
+            'repository_url' => (string) ($launch['repository_url'] ?? ''),
+            'repository_branch' => (string) ($launch['repository_branch'] ?? ''),
+            'repository_subdirectory' => (string) ($launch['repository_subdirectory'] ?? ''),
+            'current_step_label' => (string) ($launch['current_step_label'] ?? 'Container launch in progress'),
+            'summary' => (string) ($launch['summary'] ?? 'Dply is still preparing this container launch.'),
+            'updated_at' => isset($launch['updated_at']) ? Carbon::parse((string) $launch['updated_at']) : null,
+            'events' => $events,
+            'site' => $site,
+            'site_route' => $site ? route('sites.show', ['server' => $this->server, 'site' => $site]) : null,
+        ];
     }
 }

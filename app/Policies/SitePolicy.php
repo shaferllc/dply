@@ -45,6 +45,11 @@ class SitePolicy
         return $user->can('update', $site->server);
     }
 
+    public function clone(User $user, Site $site): bool
+    {
+        return $this->update($user, $site) && $this->create($user);
+    }
+
     public function delete(User $user, Site $site): bool
     {
         if (! $user->can('view', $site->server)) {

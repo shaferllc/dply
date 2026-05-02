@@ -50,6 +50,6 @@ class WorkspaceSettingsRepairAccessTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
             ->call('repairSshAccess')
-            ->assertSet('flash_success', 'SSH access repaired. Dply reinstalled the operational key for this server.');
+            ->assertDispatched('notify', message: 'SSH access repaired. Dply reinstalled the operational key for this server.', type: 'success');
     }
 }

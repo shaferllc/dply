@@ -217,6 +217,7 @@ class SupervisorProvisioner
             throw new \RuntimeException('Program not found.');
         }
         $group = 'dply-sv-'.$prog->id;
+
         return app(ServerSshConnectionRunner::class)->run(
             $server,
             function ($ssh) use ($server, $verb, $group): string {
@@ -241,6 +242,7 @@ class SupervisorProvisioner
         if ($programs->isEmpty()) {
             return 'No active programs to restart.';
         }
+
         return app(ServerSshConnectionRunner::class)->run(
             $server,
             function ($ssh) use ($server, $programs): string {
@@ -302,6 +304,7 @@ class SupervisorProvisioner
         if (! $server->isReady() || empty($server->ssh_private_key)) {
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
+
         return app(ServerSshConnectionRunner::class)->run(
             $server,
             function ($ssh) use ($server): string {
@@ -312,6 +315,98 @@ class SupervisorProvisioner
             $this->useRootSsh(),
             $this->fallbackToDeployUserSsh()
         );
+    }
+
+    /**
+     * Multi-section Supervisor diagnostics — systemd status + supervisorctl version/status + tail
+     * of the supervisord daemon log. Returns one combined log so the workspace can render it in
+     * a single console panel even when no programs are configured (in which case `supervisorctl
+     * status` is silent and the Inspect tab would otherwise look empty).
+     */
+    public function inspect(Server $server): string
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $unit = (string) config('sites.supervisor_systemd_unit', 'supervisor');
+        $unitEsc = escapeshellarg($unit);
+        $systemctl = $this->privilegedBinaryPrefix($server, 'systemctl');
+        $sc = $this->supervisorctlInv($server);
+        $daemonLog = $this->supervisordDaemonLogPath();
+        $tailCmd = $this->privilegedBinaryPrefix($server, 'tail').' -n 80 '.escapeshellarg($daemonLog).' 2>&1';
+
+        $sections = [
+            ['label' => 'systemctl is-active '.$unit, 'cmd' => $systemctl.' is-active '.$unitEsc.' 2>&1'],
+            ['label' => 'systemctl status '.$unit.' (head)', 'cmd' => $systemctl.' status --no-pager '.$unitEsc.' 2>&1 | head -20'],
+            ['label' => 'supervisorctl version', 'cmd' => $sc.' version 2>&1'],
+            ['label' => 'supervisorctl status', 'cmd' => $sc.' status 2>&1'],
+            ['label' => 'tail '.$daemonLog, 'cmd' => $tailCmd],
+        ];
+
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($sections): string {
+                $out = '';
+                foreach ($sections as $entry) {
+                    $out .= str_repeat('═', 60)."\n";
+                    $out .= '$ '.$entry['label']."\n";
+                    $out .= str_repeat('═', 60)."\n";
+                    $body = trim((string) $ssh->exec($entry['cmd'], 60));
+                    $out .= ($body === '' ? '(no output)' : $body)."\n\n";
+                }
+
+                return $out;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
+    }
+
+    /**
+     * Tail the supervisord *daemon* log (not a program's stdout/stderr). This is where supervisord
+     * itself logs startup, config reloads, and child-process spawn failures.
+     */
+    public function tailSupervisordDaemonLog(Server $server, int $lines = 200): string
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+        $lines = max(10, min(2000, $lines));
+        $path = $this->supervisordDaemonLogPath();
+        $tailCmd = $this->privilegedBinaryPrefix($server, 'tail').' -n '.(int) $lines.' '.escapeshellarg($path).' 2>&1';
+
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => trim((string) $ssh->exec($tailCmd, 60)),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
+    }
+
+    /**
+     * Path to the supervisord daemon log. Debian/Ubuntu writes here by default; if the user has
+     * customised `logfile=` in /etc/supervisor/supervisord.conf this won't match, but the tail
+     * just returns "No such file or directory" which is a clear-enough hint.
+     */
+    protected function supervisordDaemonLogPath(): string
+    {
+        return (string) config('sites.supervisor_daemon_log', '/var/log/supervisor/supervisord.log');
+    }
+
+    /**
+     * Wrap a binary with `sudo -n env PATH=…` for non-root SSH users so privileged paths like
+     * /usr/sbin (systemctl) and /var/log files owned by root are reachable. Matches the firewall
+     * provisioner's pattern.
+     */
+    protected function privilegedBinaryPrefix(Server $server, string $binary): string
+    {
+        $user = trim((string) $server->ssh_user);
+        if ($user === '' || $user === 'root') {
+            return $binary;
+        }
+
+        return 'sudo -n env PATH=/usr/sbin:/usr/bin:/sbin:/bin '.$binary;
     }
 
     /**

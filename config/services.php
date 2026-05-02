@@ -44,6 +44,12 @@ return [
          * uses the selected ProviderCredential.
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
+        'auto_testing_hostname_enabled' => (bool) env('DPLY_AUTO_TESTING_HOSTNAME_ENABLED', false),
+        'testing_domains' => array_values(array_filter(array_map(
+            static fn (string $value): string => trim($value),
+            explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))
+        ))),
+        'testing_domain_strategy' => env('DPLY_TESTING_DOMAIN_STRATEGY', 'deterministic'),
     ],
 
     /*
@@ -56,6 +62,12 @@ return [
         'client_id' => env('DIGITALOCEAN_OAUTH_CLIENT_ID'),
         'client_secret' => env('DIGITALOCEAN_OAUTH_CLIENT_SECRET'),
         'redirect' => env('DIGITALOCEAN_OAUTH_REDIRECT_URI'),
+    ],
+
+    'zerossl' => [
+        'access_key' => env('ZEROSSL_ACCESS_KEY'),
+        'poll_attempts' => (int) env('ZEROSSL_POLL_ATTEMPTS', 10),
+        'poll_sleep_ms' => (int) env('ZEROSSL_POLL_SLEEP_MS', 2000),
     ],
 
     'hetzner' => [
@@ -142,18 +154,22 @@ return [
         'client_id' => env('GITHUB_CLIENT_ID'),
         'client_secret' => env('GITHUB_CLIENT_SECRET'),
         'redirect' => env('GITHUB_REDIRECT_URI', env('APP_URL').'/auth/github/callback'),
+        /** Used for Quick deploy (repo webhooks). Re-link accounts after changing scopes. */
+        'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('GITHUB_SCOPES', 'read:user,repo,admin:repo_hook'))))),
     ],
 
     'bitbucket' => [
         'client_id' => env('BITBUCKET_CLIENT_ID'),
         'client_secret' => env('BITBUCKET_CLIENT_SECRET'),
         'redirect' => env('BITBUCKET_REDIRECT_URI', env('APP_URL').'/auth/bitbucket/callback'),
+        'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('BITBUCKET_SCOPES', 'account,repository:write,webhook'))))),
     ],
 
     'gitlab' => [
         'client_id' => env('GITLAB_CLIENT_ID'),
         'client_secret' => env('GITLAB_CLIENT_SECRET'),
         'redirect' => env('GITLAB_REDIRECT_URI', env('APP_URL').'/auth/gitlab/callback'),
+        'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('GITLAB_SCOPES', 'read_user,api'))))),
     ],
 
 ];

@@ -11,8 +11,11 @@ class WorkspaceMember extends Model
     use HasUlids;
 
     public const ROLE_OWNER = 'owner';
+
     public const ROLE_MAINTAINER = 'maintainer';
+
     public const ROLE_DEPLOYER = 'deployer';
+
     public const ROLE_VIEWER = 'viewer';
 
     protected $fillable = [

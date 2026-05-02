@@ -22,6 +22,8 @@ class WebhookDeliveryLog extends Model
         'http_status',
         'outcome',
         'detail',
+        'provider_event',
+        'provider_delivery_id',
     ];
 
     public function site(): BelongsTo

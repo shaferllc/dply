@@ -7,6 +7,7 @@ use App\Models\Server;
 use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Net\SFTP;
 use phpseclib3\Net\SSH2;
+use Throwable;
 
 class SshConnection implements RemoteShell
 {
@@ -56,10 +57,26 @@ class SshConnection implements RemoteShell
         $this->ssh = new SSH2($host, $port, $timeout);
 
         $privateKey = $this->privateKeyForConnection();
+        $password = $this->passwordForConnection();
 
         if ($privateKey) {
-            $key = PublicKeyLoader::load($privateKey);
-            if (! $this->ssh->login($user, $key)) {
+            try {
+                $key = PublicKeyLoader::load($privateKey);
+            } catch (Throwable) {
+                $key = null;
+            }
+
+            if ($key !== null && $this->ssh->login($user, $key)) {
+                return true;
+            }
+
+            if ($password === null || ! $this->ssh->login($user, $password)) {
+                $this->ssh = null;
+
+                return false;
+            }
+        } elseif ($password !== null) {
+            if (! $this->ssh->login($user, $password)) {
                 $this->ssh = null;
 
                 return false;
@@ -148,14 +165,29 @@ class SshConnection implements RemoteShell
         $port = (int) $this->server->ssh_port;
         $user = $this->effectiveUsername();
         $privateKey = $this->privateKeyForConnection();
+        $password = $this->passwordForConnection();
 
-        if (empty($host) || $host === '0.0.0.0' || ! $privateKey) {
+        if (empty($host) || $host === '0.0.0.0' || (! $privateKey && ! $password)) {
             throw new \RuntimeException('SSH connection failed for server: '.$this->server->name);
         }
 
         $sftp = new SFTP($host, $port, $timeoutSeconds);
-        $key = PublicKeyLoader::load($privateKey);
-        if (! $sftp->login($user, $key)) {
+        $loggedIn = false;
+
+        if ($privateKey) {
+            try {
+                $key = PublicKeyLoader::load($privateKey);
+                $loggedIn = $sftp->login($user, $key);
+            } catch (Throwable) {
+                $loggedIn = false;
+            }
+        }
+
+        if (! $loggedIn && $password !== null) {
+            $loggedIn = $sftp->login($user, $password);
+        }
+
+        if (! $loggedIn) {
             throw new \RuntimeException('SFTP login failed for server: '.$this->server->name);
         }
 
@@ -201,5 +233,14 @@ class SshConnection implements RemoteShell
             self::ROLE_RECOVERY => $this->server->recoverySshPrivateKey(),
             default => $this->server->operationalSshPrivateKey(),
         };
+    }
+
+    protected function passwordForConnection(): ?string
+    {
+        $password = data_get($this->server->meta, 'local_runtime.ssh_password');
+
+        return is_string($password) && trim($password) !== ''
+            ? trim($password)
+            : null;
     }
 }

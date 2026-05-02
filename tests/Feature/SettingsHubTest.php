@@ -19,6 +19,42 @@ class SettingsHubTest extends TestCase
         $this->get(route('settings.index'))->assertRedirect();
     }
 
+    public function test_settings_hub_shows_breadcrumb_dashboard_settings_profile(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('settings.profile'))
+            ->assertOk()
+            ->assertSeeText('Dashboard')
+            ->assertSeeText('Settings')
+            ->assertSeeText('Profile')
+            ->assertSee('aria-current="page"', false);
+    }
+
+    public function test_settings_hub_servers_tab_shows_servers_and_sites_in_breadcrumb(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('settings.servers'))
+            ->assertOk()
+            ->assertSeeText('Servers & Sites')
+            ->assertSee('aria-current="page"', false);
+    }
+
+    public function test_settings_shell_uses_horizontal_nav_when_navigation_layout_is_top(): void
+    {
+        $user = User::factory()->create([
+            'ui_preferences' => ['navigation_layout' => 'top'],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('settings.profile'))
+            ->assertOk()
+            ->assertSee('data-settings-nav-layout="top"', false);
+    }
+
     public function test_authenticated_user_can_save_profile_preferences(): void
     {
         $user = User::factory()->create();
@@ -35,6 +71,69 @@ class SettingsHubTest extends TestCase
         $this->assertSame('dark', $user->mergedUiPreferences()['theme']);
     }
 
+    public function test_user_can_save_profile_timezone_from_servers_settings_section(): void
+    {
+        $user = User::factory()->create(['timezone' => 'UTC']);
+
+        Livewire::actingAs($user)
+            ->test(Hub::class)
+            ->set('section', 'servers')
+            ->set('profileTimezone', 'America/New_York')
+            ->call('saveProfileTimezone')
+            ->assertHasNoErrors();
+
+        $user->refresh();
+        $this->assertSame('America/New_York', $user->timezone);
+    }
+
+    public function test_discard_profile_timezone_restores_saved_value(): void
+    {
+        $user = User::factory()->create(['timezone' => 'UTC']);
+
+        Livewire::actingAs($user)
+            ->test(Hub::class)
+            ->set('section', 'servers')
+            ->set('profileTimezone', 'America/New_York')
+            ->call('discardProfileTimezoneUnsaved')
+            ->assertSet('profileTimezone', 'UTC');
+    }
+
+    public function test_persist_theme_saves_immediately_without_save_profile(): void
+    {
+        $user = User::factory()->create();
+        $user->update([
+            'ui_preferences' => array_merge($user->ui_preferences ?? [], [
+                'theme' => 'system',
+            ]),
+        ]);
+
+        Livewire::actingAs($user->fresh())
+            ->test(Hub::class)
+            ->call('persistTheme', 'dark')
+            ->assertHasNoErrors();
+
+        $user->refresh();
+        $this->assertSame('dark', $user->mergedUiPreferences()['theme']);
+    }
+
+    public function test_persist_navigation_layout_saves_immediately_without_save_profile(): void
+    {
+        $user = User::factory()->create();
+        $user->update([
+            'ui_preferences' => array_merge($user->ui_preferences ?? [], [
+                'navigation_layout' => 'sidebar',
+            ]),
+        ]);
+
+        Livewire::actingAs($user->fresh())
+            ->test(Hub::class)
+            ->call('persistNavigationLayout', 'top')
+            ->assertHasNoErrors();
+
+        $user->refresh();
+        $this->assertSame('top', $user->mergedUiPreferences()['navigation_layout']);
+    }
+
     public function test_org_admin_can_save_organization_server_site_preferences(): void
     {
         $user = User::factory()->create();
@@ -44,7 +143,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('organizationServerSite.email_server_passwords', false)
             ->set('organizationServerSite.set_timezone_on_new_servers', true)
             ->call('saveOrganizationServersSites')
@@ -64,7 +163,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('organizationServerSite.email_server_passwords', false)
             ->call('saveOrganizationServersSites')
             ->assertForbidden();
@@ -79,7 +178,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('organizationInsights.digest_non_critical', true)
             ->set('organizationInsights.digest_frequency', 'weekly')
             ->set('organizationInsights.quiet_hours_enabled', true)
@@ -108,7 +207,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('selectedTeamId', $team->id)
             ->set('teamServerSite.default_server_sort', 'name')
             ->set('teamServerSite.show_server_updates_in_list', true)
@@ -131,7 +230,7 @@ class SettingsHubTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Hub::class)
-            ->set('activeTab', 'servers')
+            ->set('section', 'servers')
             ->set('selectedTeamId', $team->id)
             ->set('teamServerSite.default_server_sort', 'name')
             ->call('saveTeamServersSites')

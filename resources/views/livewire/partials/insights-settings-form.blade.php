@@ -5,7 +5,7 @@
 ])
 
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     $keys = array_keys($catalog);
     $half = (int) ceil(count($keys) / 2);
     $columns = $twoColumns ? array_chunk($keys, $half, true) : [$keys];

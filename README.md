@@ -1,17 +1,17 @@
-# Dply (BYO)
+# Dply
 
-**Bring-your-own-server** platform: connect providers, provision or attach servers, manage sites, and deploy over **SSH**. This repository’s **primary app** is the **Laravel application at the repository root** (not under `apps/`).
+Single Laravel application that runs the dply platform: connect providers, provision or attach servers, manage sites, and deploy across BYO (SSH), Serverless (AWS Lambda, DigitalOcean Functions, etc.), Docker, and Kubernetes engines. Future product lines (Cloud, WordPress, Edge) re-enter as additional engines + modules in this same app.
 
-> **Start here:** [docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md) — step-by-step local setup for BYO only.
+> **Start here:** [docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md) — step-by-step local setup.
 
-**Monorepo:** This repo also contains `apps/dply-serverless`, `apps/dply-cloud`, and `packages/dply-core`. See **[docs/MONOREPO_AND_APPS.md](docs/MONOREPO_AND_APPS.md)** for how they relate to the root app, **per-app `composer install`**, and separate databases.
+**Repository:** the Laravel app lives at the repository root. The only other tracked piece is **`packages/dply-core`**, a small shared PHP library consumed via a Composer path repository. There are no `apps/*` Laravel installs and no separate identity service. See **[docs/MONOREPO_AND_APPS.md](docs/MONOREPO_AND_APPS.md)**.
 
 ## Product focus
 
-- **Active (default):** **BYO** — develop and run from the repo root with one `.env` and one database.
-- **On hold** for day-to-day onboarding: separate product apps under `apps/` (**Serverless**, **Cloud**) and future **WordPress** / **Edge** lines. They are **not** required to run BYO; each has its own Composer install and database when you choose to work on them.
+- **Active:** BYO + Serverless + Docker + Kubernetes engines, all served from the root app.
+- **Planned:** Cloud, WordPress, Edge — added as new engines + modules in this same app when their behavior is real.
 
-Long-term multi-product context (rollout order, separate DBs): [docs/MULTI_PRODUCT_PLATFORM_PLAN.md](docs/MULTI_PRODUCT_PLATFORM_PLAN.md).
+Long-term product roadmap: [docs/MULTI_PRODUCT_PLATFORM_PLAN.md](docs/MULTI_PRODUCT_PLATFORM_PLAN.md).
 
 ## Quick start (summary)
 
@@ -19,14 +19,16 @@ Long-term multi-product context (rollout order, separate DBs): [docs/MULTI_PRODU
 composer install
 cp .env.example .env
 php artisan key:generate
-touch database/database.sqlite   # if using SQLite
+# Create an empty PostgreSQL database matching DB_DATABASE in .env (see docs/BYO_LOCAL_SETUP.md).
 php artisan migrate
 npm install && npm run build
-php artisan queue:work           # second terminal — provisioning / deploy jobs
+php artisan queue:work           # second terminal — provisioning / deploy jobs (required)
 php artisan serve
 ```
 
-Then open the app URL, register, and use **Credentials** / **Servers** as needed. Full detail, troubleshooting, and optional services are in **[docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md)**.
+Or run **`composer dev`** (server + queue + Vite + Reverb + logs together), or **`php artisan solo`** for panes (Queue, Reverb, optional Jetty when `JETTY_START_COMMAND` is set).
+
+Then open the app URL, register, and use **Credentials** / **Servers** as needed. Full detail (DigitalOcean from localhost, tunnels, `DPLY_PUBLIC_APP_URL`, Jetty) is in **[docs/BYO_LOCAL_SETUP.md](docs/BYO_LOCAL_SETUP.md)**.
 
 ## Features (BYO)
 

@@ -4,6 +4,7 @@ namespace App\Services\Projects;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use App\Models\Workspace;
 
 class WorkspaceHealthSummaryService
@@ -38,7 +39,7 @@ class WorkspaceHealthSummaryService
         $pendingDeploys = $sites->filter(function (Site $site): bool {
             $latest = $site->deployments->first();
 
-            return $latest?->status === \App\Models\SiteDeployment::STATUS_RUNNING;
+            return $latest?->status === SiteDeployment::STATUS_RUNNING;
         })->count();
 
         $issues = [];

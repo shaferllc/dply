@@ -14,6 +14,51 @@ if (! class_exists('\SoloTerm\Solo\Manager')) {
     ];
 }
 
+$commands = [
+    'About' => 'php artisan solo:about',
+    // For enhanced log viewing with vendor frame collapsing, see soloterm/vtail
+    'Logs' => 'tail -f -n 100 '.storage_path('logs/laravel.log'),
+    'Vite' => 'npm run dev',
+    'Make' => new MakeCommand,
+    // 'HTTP' => 'php artisan serve',
+
+    // Lazy commands do not automatically start when Solo starts.
+    'Dumps' => Command::from('php artisan solo:dumps')->lazy(),
+    'Reverb' => Command::from('php artisan reverb:start --debug')->lazy(),
+    'Pint' => Command::from('./vendor/bin/pint --ansi')->lazy(),
+    /*
+     * Redis queues + Horizon (set QUEUE_CONNECTION=redis; run redis-server). Uses Horizon's
+     * built-in file watcher so code/config changes restart Horizon automatically in local dev.
+     * Use “Queue” for database-backed workers without Redis.
+     */
+    'Horizon' => Command::from('php artisan horizon:listen')->lazy(),
+    'Queue' => Command::from('php artisan queue:work')->lazy(),
+    /*
+     * Beyond Code Expose — uses project binary (beyondcode/expose) so Solo’s shell does not
+     * need a global `expose` on PATH. Override with SOLO_EXPOSE_COMMAND=expose if yours is global.
+     */
+    'Expose' => Command::from(
+        (static function (): string {
+            $share = escapeshellarg((string) env('SOLO_EXPOSE_SHARE_URL', 'https://dplyi.test'));
+            $custom = env('SOLO_EXPOSE_COMMAND');
+            if (is_string($custom) && trim($custom) !== '') {
+                return trim($custom).' share '.$share;
+            }
+
+            return escapeshellarg(\PHP_BINARY).' '.escapeshellarg(base_path('vendor/bin/expose')).' share '.$share;
+        })()
+    )->lazy(),
+    'Tests' => TestCommand::artisan(),
+];
+
+/*
+ * Optional local Jetty (or any shell) used as tunnel target for inbound HTTPS callbacks; proxy to Laravel.
+ * Set JETTY_START_COMMAND in .env (see .env.example). Lazy = does not auto-start when Solo opens.
+ */
+if (filled(env('JETTY_START_COMMAND'))) {
+    $commands['Jetty'] = Command::from((string) env('JETTY_START_COMMAND'))->lazy();
+}
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -43,44 +88,8 @@ return [
     |--------------------------------------------------------------------------
     | Commands
     |--------------------------------------------------------------------------
-    |
     */
-    'commands' => [
-        'About' => 'php artisan solo:about',
-        // For enhanced log viewing with vendor frame collapsing, see soloterm/vtail
-        'Logs' => 'tail -f -n 100 '.storage_path('logs/laravel.log'),
-        'Vite' => 'npm run dev',
-        'Make' => new MakeCommand,
-        // 'HTTP' => 'php artisan serve',
-
-        // Lazy commands do not automatically start when Solo starts.
-        'Dumps' => Command::from('php artisan solo:dumps')->lazy(),
-        'Reverb' => Command::from('php artisan reverb:start --debug')->lazy(),
-        'Pint' => Command::from('./vendor/bin/pint --ansi')->lazy(),
-        /*
-         * Redis queues + Horizon (set QUEUE_CONNECTION=redis; run redis-server). Uses Horizon's
-         * built-in file watcher so code/config changes restart Horizon automatically in local dev.
-         * Use “Queue” for database-backed workers without Redis.
-         */
-        'Horizon' => Command::from('php artisan horizon:listen')->lazy(),
-        'Queue' => Command::from('php artisan queue:work')->lazy(),
-        /*
-         * Beyond Code Expose — uses project binary (beyondcode/expose) so Solo’s shell does not
-         * need a global `expose` on PATH. Override with SOLO_EXPOSE_COMMAND=expose if yours is global.
-         */
-        'Expose' => Command::from(
-            (static function (): string {
-                $share = escapeshellarg((string) env('SOLO_EXPOSE_SHARE_URL', 'https://dplyi.test'));
-                $custom = env('SOLO_EXPOSE_COMMAND');
-                if (is_string($custom) && trim($custom) !== '') {
-                    return trim($custom).' share '.$share;
-                }
-
-                return escapeshellarg(\PHP_BINARY).' '.escapeshellarg(base_path('vendor/bin/expose')).' share '.$share;
-            })()
-        )->lazy(),
-        'Tests' => TestCommand::artisan(),
-    ],
+    'commands' => $commands,
 
     /*
     |--------------------------------------------------------------------------

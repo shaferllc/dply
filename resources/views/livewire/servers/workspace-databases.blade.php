@@ -1,5 +1,5 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     $opsReady = $server->isReady() && $server->ssh_private_key;
     $capabilities = $capabilities ?? ['mysql' => false, 'postgres' => false, 'redis' => false];
     $anyDatabaseEngine = !empty($capabilities['mysql']) || !empty($capabilities['postgres']);
@@ -53,6 +53,9 @@
             <p class="font-semibold">{{ __('Create and connect to databases') }}</p>
             <p class="mt-1 leading-relaxed text-brand-moss">
                 {{ __('Keep the basics here: create a database, review what Dply tracks on this server, and copy the connection details your app needs.') }}
+            </p>
+            <p class="mt-2 leading-relaxed text-brand-moss">
+                {{ __('Redis, queues, object storage, and other app resources now live in the site deployment contract. This workspace stays focused on server databases while those other attachments show up from each site workspace.') }}
             </p>
         </div>
 
@@ -720,7 +723,7 @@ DB_PASSWORD=********</pre>
             >
                 <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeCredentialsModal"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-lg rounded-2xl border border-brand-ink/10 bg-white shadow-xl" @click.stop>
+                    <div class="my-auto w-full max-w-lg dply-modal-panel" @click.stop>
                         <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
                             <h2 id="db-credentials-title" class="text-lg font-semibold text-brand-ink">{{ __('Database credentials') }}</h2>
                             <p class="mt-1 font-mono text-sm text-brand-moss">{{ $credentialsModalDatabase->name }}</p>

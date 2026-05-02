@@ -4,6 +4,14 @@
     'title',
     'description' => null,
     'showNavigation' => null,
+    /** @var \App\Models\Site|null Optional site context (site-scoped cron/daemons routes). */
+    'contextSite' => null,
+    'docRoute' => null,
+    'docSlug' => null,
+    'docLabel' => null,
+    /** Match fleet-style headers (Servers / Sites): icon + title left, docs + actions right on large screens. */
+    'pageHeaderToolbar' => false,
+    'pageHeaderCompact' => false,
 ])
 
 <x-server-workspace-shell :server="$server" :active="$active" :show-navigation="$showNavigation">
@@ -11,38 +19,61 @@
         @include('livewire.servers.partials.workspace-mobile-nav', ['server' => $server, 'active' => $active])
     @endif
 
-    <nav class="text-sm text-brand-moss mb-6" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Servers') }}</a></li>
-            @if ($server->workspace)
-                <li class="text-brand-mist" aria-hidden="true">/</li>
-                <li><a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ $server->workspace->name }}</a></li>
-            @endif
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium truncate max-w-[12rem] sm:max-w-none" title="{{ $server->name }}">{{ $server->name }}</li>
-        </ol>
-    </nav>
+    @php
+        $workspaceBreadcrumbs = [
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
+        ];
+        if ($server->workspace) {
+            $workspaceBreadcrumbs[] = [
+                'label' => $server->workspace->name,
+                'href' => route('projects.resources', $server->workspace),
+                'icon' => 'rectangle-group',
+            ];
+        }
+        if ($contextSite) {
+            $workspaceBreadcrumbs[] = [
+                'label' => $server->name,
+                'href' => route('servers.overview', $server),
+                'icon' => 'server-stack',
+            ];
+            $workspaceBreadcrumbs[] = [
+                'label' => $contextSite->name,
+                'href' => route('sites.show', ['server' => $server, 'site' => $contextSite]),
+                'icon' => 'globe-alt',
+            ];
+        } else {
+            $workspaceBreadcrumbs[] = [
+                'label' => $server->name,
+                'icon' => 'server-stack',
+            ];
+        }
+    @endphp
+    <x-breadcrumb-trail :items="$workspaceBreadcrumbs" />
 
-    <header class="mb-8 pb-6 border-b border-brand-ink/10">
-        <h1 class="text-2xl font-bold tracking-tight text-brand-ink">{{ $title }}</h1>
-        @if ($description)
-            <p class="mt-1 text-sm text-brand-moss">{{ $description }}</p>
-        @endif
+    <x-page-header
+        :title="$contextSite ? $title.' — '.$contextSite->name : $title"
+        :description="$description"
+        :doc-route="$docRoute"
+        :doc-slug="$docSlug"
+        :doc-label="$docLabel"
+        :toolbar="(bool) $pageHeaderToolbar"
+        :compact="(bool) $pageHeaderCompact"
+        flush
+    >
+        @isset($headerLeading)
+            <x-slot name="leading">
+                {{ $headerLeading }}
+            </x-slot>
+        @endisset
         @if ($server->workspace)
-            <p class="mt-3 text-sm text-brand-moss">
-                {{ __('Project:') }}
-                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
-                    {{ $server->workspace->name }}
-                </a>
-                <span class="text-brand-mist">·</span>
-                <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
+            <x-slot name="actions">
+                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                     {{ __('Open project workspace') }}
                 </a>
-            </p>
+            </x-slot>
         @endif
-    </header>
+    </x-page-header>
 
     <div class="space-y-8">
         {{ $slot }}

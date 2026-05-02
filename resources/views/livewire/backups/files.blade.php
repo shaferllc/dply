@@ -10,12 +10,13 @@
             </ol>
         </nav>
 
-        <header class="mb-6">
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('File backups') }}</h1>
-            <p class="mt-2 text-sm text-brand-moss max-w-3xl leading-relaxed">
-                {{ __('Protect uploads, shared assets, and app-specific paths for :org with a recovery policy your team can explain. File backups should say what is included, what is excluded, and how operators restore traffic when a release or server goes wrong.', ['org' => $organization->name]) }}
-            </p>
-        </header>
+        <x-page-header
+            :title="__('File backups')"
+            :description="__('Protect uploads, shared assets, and app-specific paths for :org with a recovery policy your team can explain. Queue a full archive (tar.gz) of each site’s repository root from here, with standard excludes such as vendor and node_modules—pair that with database exports on the Databases tab for a complete restore story.', ['org' => $organization->name])"
+            doc-route="docs.index"
+            flush
+            compact
+        />
 
         <x-backups-subnav active="files" />
 
@@ -43,7 +44,7 @@
             </section>
         </div>
 
-        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-gradient-to-r from-brand-sand/40 to-white px-5 py-4 shadow-sm">
+        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-brand-sand/50 px-5 py-4 shadow-sm">
             <p class="text-sm font-semibold text-brand-ink">{{ __('Good file backup hygiene') }}</p>
             <ul class="mt-2 space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
                 <li>{{ __('List the paths you would miss in the first hour of an outage.') }}</li>
@@ -91,7 +92,7 @@
             </section>
         </div>
 
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="px-4 py-3 sm:px-6 border-b border-brand-ink/10 bg-brand-sand/30">
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Sites in this organization') }}</h2>
                     <p class="text-xs text-brand-moss mt-0.5">{{ __('Use each site as the source of truth for what should be archived, excluded, and restored.') }}</p>
@@ -100,7 +101,7 @@
                 <div class="px-6 py-12 text-center">
                     <p class="text-sm text-brand-moss">{{ __('No sites yet. Create a server and add a site to enable file backups.') }}</p>
                     <div class="mt-4 flex flex-wrap justify-center gap-3">
-                        <a href="{{ route('servers.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Create server') }}</a>
+                        <a href="{{ route('launches.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Open launchpad') }}</a>
                         <span class="text-brand-mist" aria-hidden="true">·</span>
                         <a href="{{ route('sites.index') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View sites') }}</a>
                     </div>
@@ -113,6 +114,7 @@
                                 <th class="px-4 py-3">{{ __('Site') }}</th>
                                 <th class="px-4 py-3">{{ __('Server') }}</th>
                                 <th class="px-4 py-3">{{ __('Archive scope') }}</th>
+                                <th class="px-4 py-3 min-w-[14rem]">{{ __('Full backup') }}</th>
                                 <th class="px-4 py-3">{{ __('Recovery note') }}</th>
                             </tr>
                         </thead>
@@ -121,6 +123,7 @@
                                 @php
                                     $runbookCount = $site->workspace?->runbooks?->count() ?? 0;
                                     $effectiveRoot = $site->effectiveRepositoryPath();
+                                    $siteBackups = $recentBackups->get($site->id) ?? collect();
                                 @endphp
                                 <tr wire:key="file-backup-{{ $site->id }}" class="hover:bg-brand-sand/20">
                                     <td class="px-4 py-3 font-medium text-brand-ink">
@@ -135,8 +138,39 @@
                                                     {{ __('Repository root: :path. Add excludes for caches, vendor trees, and other deploy-generated content.', ['path' => $effectiveRoot]) }}
                                                 @else
                                                     {{ __('Add excludes for caches, vendor trees, and other deploy-generated content.') }}
-                                                @endif
-                                            </p>
+                                            @endif
+                                        </p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-brand-moss align-top">
+                                        <div class="space-y-2">
+                                            @if ($site->supportsSshFileArchive())
+                                                <button
+                                                    type="button"
+                                                    wire:click="queueFullBackup('{{ $site->id }}')"
+                                                    class="inline-flex items-center rounded-lg bg-brand-sage px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-sage/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                                                >
+                                                    {{ __('Queue full backup') }}
+                                                </button>
+                                                <p class="text-xs text-brand-mist">{{ __('Full snapshot of the repository root (compressed). Vendor, node_modules, .git, and similar paths are excluded by default.') }}</p>
+                                            @else
+                                                <p class="text-sm">{{ __('Full file backup requires an SSH-ready VM site.') }}</p>
+                                            @endif
+                                            @if ($siteBackups->isNotEmpty())
+                                                <ul class="mt-2 space-y-1 text-xs">
+                                                    @foreach ($siteBackups as $b)
+                                                        <li wire:key="site-file-bu-{{ $b->id }}" class="flex flex-wrap items-center gap-2">
+                                                            <span class="text-brand-mist">{{ $b->created_at->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</span>
+                                                            <span class="font-medium text-brand-ink">{{ str($b->status)->replace('_', ' ')->title() }}</span>
+                                                            @if ($b->status === \App\Models\SiteFileBackup::STATUS_COMPLETED && $b->disk_path)
+                                                                <button type="button" wire:click="downloadSiteFileBackup('{{ $b->id }}')" class="text-brand-sage hover:text-brand-ink font-medium">
+                                                                    {{ __('Download') }}
+                                                                </button>
+                                                            @endif
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-brand-moss">
@@ -159,9 +193,9 @@
         </div>
 
         <div class="mt-6 rounded-2xl border border-brand-ink/10 bg-white px-5 py-4 shadow-sm">
-            <p class="text-sm font-semibold text-brand-ink">{{ __('Current operating model') }}</p>
+            <p class="text-sm font-semibold text-brand-ink">{{ __('Database plus files') }}</p>
             <p class="mt-2 text-sm leading-relaxed text-brand-moss max-w-3xl">
-                {{ __('Large trees still need explicit excludes, destination choices, and bandwidth guardrails. Until file scheduling is fully productized for every path, use this page to agree on coverage, then drive the archive job from the server or agent path with the same conventions recorded here.') }}
+                {{ __('Database exports remain full logical dumps from the server workspace. File backups here are full tar.gz archives of the site repository root with shared excludes. There is no single combined artifact—restore SQL and files as two steps using your runbooks.') }}
             </p>
         </div>
     </div>

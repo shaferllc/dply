@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Support\NotificationSubscriptionRules;
 use App\Support\ServerSystemdServiceNotificationKeys;
@@ -15,12 +17,15 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 #[Layout('layouts.settings')]
 class BulkNotificationAssignments extends Component
 {
+    use DispatchesToastNotifications;
+
     /** @var list<int|string> */
     public array $selected_channel_ids = [];
 
@@ -36,8 +41,6 @@ class BulkNotificationAssignments extends Component
     public ?string $context_server_id = null;
 
     public ?string $context_site_id = null;
-
-    public ?string $flash_success = null;
 
     public bool $showQuickNotificationChannelModal = false;
 
@@ -329,7 +332,7 @@ class BulkNotificationAssignments extends Component
             }
         });
 
-        $this->flash_success = __('Assignments saved. :count new subscription(s) added.', ['count' => $created]);
+        $this->toastSuccess(__('Assignments saved. :count new subscription(s) added.', ['count' => $created]));
     }
 
     public function createQuickNotificationChannel(): void
@@ -340,8 +343,8 @@ class BulkNotificationAssignments extends Component
 
         $rules = array_merge(
             [
-                'quick_new_type' => ['required', 'string', \Illuminate\Validation\Rule::in(NotificationChannel::typesForUi())],
-                'quick_new_owner_scope' => ['required', 'string', \Illuminate\Validation\Rule::in($this->quickAddOwnerScopes())],
+                'quick_new_type' => ['required', 'string', Rule::in(NotificationChannel::typesForUi())],
+                'quick_new_owner_scope' => ['required', 'string', Rule::in($this->quickAddOwnerScopes())],
             ],
             $this->quickChannelValidationRulesForType($this->quick_new_type)
         );
@@ -361,7 +364,7 @@ class BulkNotificationAssignments extends Component
 
         $this->resetQuickNotificationChannelFields();
         $this->showQuickNotificationChannelModal = false;
-        $this->flash_success = __('Channel created and selected for assignment.');
+        $this->toastSuccess(__('Channel created and selected for assignment.'));
     }
 
     public function openQuickNotificationChannelModal(): void
@@ -375,7 +378,7 @@ class BulkNotificationAssignments extends Component
         $this->showQuickNotificationChannelModal = false;
     }
 
-    protected function quickNotificationChannelOwner(): \App\Models\User|Organization
+    protected function quickNotificationChannelOwner(): User|Organization
     {
         $org = Auth::user()?->currentOrganization();
 

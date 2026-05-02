@@ -4,7 +4,10 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Events\Servers\ServerWorkspaceLogSnapshotBroadcast;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
+use App\Models\Server;
+use App\Models\Site;
 use App\Services\Servers\ServerSystemLogReader;
+use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 
@@ -61,6 +64,9 @@ trait ManagesServerSystemLogs
     /** null = no time filter; 5 / 15 / 60 = minutes */
     public ?int $logTimeRangeMinutes = null;
 
+    /** When set, the log viewer only lists this site’s platform + access/error sources. */
+    public ?Site $scopedSite = null;
+
     /**
      * @return array<string, array<string, mixed>>
      */
@@ -72,20 +78,76 @@ trait ManagesServerSystemLogs
             return $sources;
         }
 
+        // Filter the global (non-site-scoped) catalog by what's actually installed on this
+        // server — if the user picked Apache there's no point listing Nginx logs, etc.
+        // Site-scoped flow already builds its own list and skips this branch.
+        if ($this->scopedSite === null) {
+            $sources = $this->filterSourcesByInstalledServices($sources, $server);
+        }
+
+        if ($this->scopedSite !== null) {
+            $site = $this->scopedSite;
+            $id = (string) $site->getKey();
+            $logDirectory = $site->webserverLogDirectory();
+            $basename = $site->webserverConfigBasename();
+
+            $sources = [
+                'site_'.$id.'_platform' => [
+                    'type' => 'dply_site',
+                    'label' => __('Platform activity'),
+                    'group' => 'site',
+                ],
+                'site_'.$id.'_access' => [
+                    'type' => 'file',
+                    'label' => __('Site access log'),
+                    'path' => $logDirectory.'/'.$basename.'-access.log',
+                    'group' => 'site',
+                ],
+                'site_'.$id.'_error' => [
+                    'type' => 'file',
+                    'label' => __('Site error log'),
+                    'path' => $logDirectory.'/'.$basename.'-error.log',
+                    'group' => 'site',
+                ],
+            ];
+
+            if ($site->isLaravelFrameworkDetected()) {
+                $sources['site_'.$id.'_laravel'] = [
+                    'type' => 'file',
+                    'label' => __('Laravel log'),
+                    'path' => $site->effectiveEnvDirectory().'/storage/logs/laravel.log',
+                    'group' => 'site',
+                ];
+            }
+
+            if ($site->isLaravelFrameworkDetected() && $site->resolvedLaravelPackageFlag('horizon')) {
+                $sources['site_'.$id.'_laravel_horizon'] = [
+                    'type' => 'file',
+                    'label' => __('Horizon log'),
+                    'path' => $site->effectiveEnvDirectory().'/storage/logs/horizon.log',
+                    'group' => 'site',
+                ];
+            }
+
+            return $sources;
+        }
+
         $server->loadMissing('sites');
 
         foreach ($server->sites as $site) {
             $id = (string) $site->getKey();
+            $logDirectory = $site->webserverLogDirectory();
+            $basename = $site->webserverConfigBasename();
             $sources['site_'.$id.'_access'] = [
                 'type' => 'file',
                 'label' => __('Site access: :name', ['name' => $site->name]),
-                'path' => '/var/log/nginx/'.$site->nginxConfigBasename().'-access.log',
+                'path' => $logDirectory.'/'.$basename.'-access.log',
                 'group' => 'sites',
             ];
             $sources['site_'.$id.'_error'] = [
                 'type' => 'file',
                 'label' => __('Site error: :name', ['name' => $site->name]),
-                'path' => '/var/log/nginx/'.$site->nginxConfigBasename().'-error.log',
+                'path' => $logDirectory.'/'.$basename.'-error.log',
                 'group' => 'sites',
             ];
         }
@@ -100,6 +162,10 @@ trait ManagesServerSystemLogs
     {
         $user = auth()->user();
         if ($user === null || ! $user->can('view', $this->server)) {
+            return false;
+        }
+
+        if ($this->scopedSite !== null && ! $user->can('view', $this->scopedSite)) {
             return false;
         }
 
@@ -123,6 +189,9 @@ trait ManagesServerSystemLogs
     public function selectLogSource(string $key): void
     {
         $this->authorize('view', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         $keys = array_keys($this->availableLogSources());
         if (! in_array($key, $keys, true)) {
@@ -180,6 +249,9 @@ trait ManagesServerSystemLogs
     public function clearLogDisplay(): void
     {
         $this->authorize('view', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         $this->remoteLogRaw = '';
         $this->remoteLogOutput = '';
@@ -197,6 +269,9 @@ trait ManagesServerSystemLogs
     public function applyLogTailLines(): void
     {
         $this->authorize('update', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         $n = max(50, min(5000, (int) $this->logTailLines));
         $this->logTailLines = $n;
@@ -226,6 +301,9 @@ trait ManagesServerSystemLogs
     public function loadSystemLog(bool $fromPoll = false): void
     {
         $this->authorize('view', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         if (! $fromPoll) {
             $this->logPollBackoffUntil = null;
@@ -246,9 +324,10 @@ trait ManagesServerSystemLogs
         }
 
         $def = $this->availableLogSources()[$this->logKey] ?? [];
-        $isDply = ($def['type'] ?? '') === 'dply';
+        $type = (string) ($def['type'] ?? 'file');
+        $isDbOnly = in_array($type, ['dply', 'dply_site'], true);
 
-        if (! $isDply) {
+        if (! $isDbOnly) {
             if (auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user())) {
                 $this->remoteLogRaw = null;
                 $this->remoteLogOutput = '';
@@ -275,7 +354,8 @@ trait ManagesServerSystemLogs
             (int) config('server_system_logs.fetch_lock_seconds', 120),
             $budget > 0 ? $budget + 30 : 120,
         );
-        $lock = Cache::lock('log-viewer-fetch:'.(string) $this->server->id.':'.$this->logKey, $lockTtl);
+        $siteLockSegment = $this->scopedSite !== null ? (string) $this->scopedSite->getKey() : '0';
+        $lock = Cache::lock('log-viewer-fetch:'.(string) $this->server->id.':'.$siteLockSegment.':'.$this->logKey, $lockTtl);
         $waitSeconds = $fromPoll
             ? max(1, (int) config('server_system_logs.fetch_lock_wait_poll_seconds', 10))
             : max(1, (int) config('server_system_logs.fetch_lock_wait_manual_seconds', 15));
@@ -361,7 +441,7 @@ trait ManagesServerSystemLogs
     {
         $logKeys = array_keys($this->availableLogSources());
         if (! in_array($this->logKey, $logKeys, true)) {
-            $this->logKey = $logKeys[0] ?? 'dply_activity';
+            $this->logKey = $logKeys[0] ?? ($this->scopedSite !== null ? 'site_'.$this->scopedSite->getKey().'_platform' : 'dply_activity');
         }
 
         $this->syncLogViewerPreferencesFromServer();
@@ -412,6 +492,9 @@ trait ManagesServerSystemLogs
     public function setLogTimeRange(?int $minutes): void
     {
         $this->authorize('view', $this->server);
+        if ($this->scopedSite !== null) {
+            $this->authorize('view', $this->scopedSite);
+        }
 
         if ($minutes !== null && ! in_array($minutes, [5, 15, 60], true)) {
             $minutes = null;
@@ -475,6 +558,17 @@ trait ManagesServerSystemLogs
             return;
         }
 
+        $rawSiteId = $payload['site_id'] ?? null;
+        $payloadSiteId = is_string($rawSiteId) && $rawSiteId !== '' ? $rawSiteId : null;
+
+        if ($this->scopedSite === null) {
+            if ($payloadSiteId !== null) {
+                return;
+            }
+        } elseif ($payloadSiteId !== (string) $this->scopedSite->getKey()) {
+            return;
+        }
+
         if (($payload['log_key'] ?? '') !== $this->logKey) {
             return;
         }
@@ -535,6 +629,7 @@ trait ManagesServerSystemLogs
             logLastFetchTruncated: $this->logLastFetchTruncated,
             logLastFetchRawBytes: $this->logLastFetchRawBytes,
             broadcastPayloadTruncated: $broadcastPayloadTruncated,
+            siteId: $this->scopedSite !== null ? (string) $this->scopedSite->getKey() : null,
         ))->toOthers();
     }
 
@@ -599,6 +694,51 @@ trait ManagesServerSystemLogs
         } else {
             $this->remoteLogOutput = $body;
         }
+    }
+
+    /**
+     * Drop catalog rows whose backing service isn't on this server. Always-on groups
+     * (dply audit trail, Let's Encrypt, UFW, system/auth logs) stay regardless. If we have
+     * no provision artifact yet (still bootstrapping or pre-existing server), fail open
+     * and return the full list.
+     *
+     * @param  array<string, array<string, mixed>>  $sources
+     * @return array<string, array<string, mixed>>
+     */
+    private function filterSourcesByInstalledServices(array $sources, Server $server): array
+    {
+        $installed = ServerInstalledServices::tagsFor($server);
+        if (array_key_exists('unknown', $installed)) {
+            return $sources;
+        }
+
+        // Map config groups → required service tag(s). Groups not listed here are treated
+        // as always-on (firewall/security/system/ssl/dply/sites and any unrecognised group).
+        $groupRequires = [
+            'nginx' => ['nginx'],
+            'apache' => ['apache'],
+            'openlitespeed' => ['openlitespeed'],
+            'traefik' => ['traefik'],
+            'php' => ['php'],
+            'database' => ['mysql', 'postgres'],
+            'services' => ['redis'],
+            'daemons' => ['supervisor'],
+        ];
+
+        return array_filter($sources, function (array $row) use ($installed, $groupRequires): bool {
+            $group = (string) ($row['group'] ?? '');
+            $required = $groupRequires[$group] ?? null;
+            if ($required === null) {
+                return true;
+            }
+            foreach ($required as $tag) {
+                if (array_key_exists($tag, $installed)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
     }
 
     private function buildSafeRegexPattern(string $body): ?string

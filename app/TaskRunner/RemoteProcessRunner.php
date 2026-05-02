@@ -45,9 +45,12 @@ class RemoteProcessRunner
      */
     public function verifyScriptDirectoryExists(): self
     {
+        // 30s instead of 10s: the dev container's Docker port-forward occasionally stalls
+        // for 5-15s after the container restarts, and `mkdir` over SSH timing out at 10s
+        // wedges the whole background-task kickoff on the local fake-cloud path.
         $output = $this->run(
             script: 'mkdir -p '.$this->connection->scriptPath,
-            timeout: 10
+            timeout: 30
         );
 
         if ($output->isTimeout() || $output->getExitCode() !== 0) {
@@ -65,7 +68,8 @@ class RemoteProcessRunner
     public function sshOptions(): array
     {
         $options = [
-            '-o LogLevel=ERROR', // Suppress "Permanently added … known hosts" on stderr (still logs real errors)
+            // INFO: ERROR hides typical auth/connection stderr (exit 255 with empty streams); strip known-host noise in cleanupOutput instead.
+            '-o LogLevel=INFO',
             '-o IdentitiesOnly=yes', // Only use the configured public key
             '-o UserKnownHostsFile=/dev/null', // Don't use known hosts
             '-o StrictHostKeyChecking=no', // Disable host key checking

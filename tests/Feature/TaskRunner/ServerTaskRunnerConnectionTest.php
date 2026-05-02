@@ -4,6 +4,7 @@ namespace Tests\Feature\TaskRunner;
 
 use App\Models\Server;
 use App\Modules\TaskRunner\Connection;
+use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -98,6 +99,25 @@ class ServerTaskRunnerConnectionTest extends TestCase
         $this->assertSame('root', $connection->username);
         $this->assertSame($this->validPrivateKey(), $connection->privateKey);
         $this->assertSame('/root/.dply-task-runner', $connection->scriptPath);
+    }
+
+    public function test_fake_cloud_server_ssh_user_dply_uses_default_home_script_path(): void
+    {
+        config(['server_provision_fake.provider_id_sentinel' => 'fake-local-test']);
+
+        $server = Server::factory()->create([
+            'ip_address' => '127.0.0.1',
+            'ssh_port' => 2222,
+            'ssh_user' => 'dply',
+            'ssh_private_key' => $this->validPrivateKey(),
+            'provider_id' => 'fake-local-test',
+        ]);
+
+        $this->assertTrue(FakeCloudProvision::isFakeServer($server));
+
+        $connection = $server->connectionAsUser();
+
+        $this->assertSame('/home/dply/.dply-task-runner', $connection->scriptPath);
     }
 
     public function test_connection_helpers_fall_back_to_legacy_private_key_during_rollout(): void

@@ -170,16 +170,59 @@ function bindDplyServerCronRunChannel() {
     });
 }
 
+function bindDplySiteProvisioningChannel() {
+    if (!window.Echo || typeof window.Livewire === 'undefined') {
+        return;
+    }
+
+    const el = document.getElementById('dply-site-provisioning-context');
+    const siteId = el?.dataset?.siteId?.trim() ?? '';
+    const subscribe = el?.dataset?.subscribe === '1';
+
+    if (!subscribe || !siteId) {
+        if (window.__dplySiteProvisioningEchoSite) {
+            window.Echo.leave('site.' + window.__dplySiteProvisioningEchoSite);
+            window.__dplySiteProvisioningEchoSite = null;
+        }
+
+        return;
+    }
+
+    if (window.__dplySiteProvisioningEchoSite === siteId) {
+        return;
+    }
+
+    if (window.__dplySiteProvisioningEchoSite) {
+        window.Echo.leave('site.' + window.__dplySiteProvisioningEchoSite);
+    }
+
+    window.__dplySiteProvisioningEchoSite = siteId;
+
+    window.Echo.private('site.' + siteId).listen('.site.provisioning.updated', (payload) => {
+        if (payload?.site_id !== siteId) {
+            return;
+        }
+
+        window.Livewire.dispatch('site-provisioning-updated', {
+            siteId: payload.site_id,
+            status: payload.status,
+            provisioningState: payload.provisioning_state,
+        });
+    });
+}
+
 document.addEventListener('livewire:init', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplySiteProvisioningChannel();
 });
 
 document.addEventListener('livewire:navigated', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplySiteProvisioningChannel();
 });
 
 // Echo loads in a deferred <head> module (before this bundle); if Livewire beat it, bind when ready.
@@ -187,4 +230,5 @@ document.addEventListener('dply:echo-ready', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplySiteProvisioningChannel();
 });

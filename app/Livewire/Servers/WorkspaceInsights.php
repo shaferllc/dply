@@ -9,6 +9,7 @@ use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Services\Insights\InsightSettingsRepository;
+use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -76,8 +77,7 @@ class WorkspaceInsights extends Component
             'parameters' => $this->parameters,
         ])->save();
 
-        $this->flash_success = __('Settings saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Settings saved.'));
     }
 
     /**
@@ -134,7 +134,7 @@ class WorkspaceInsights extends Component
         $this->running = true;
         RunServerInsightsJob::dispatch($this->server->id);
         $this->running = false;
-        $this->flash_success = __('Insights check queued. Refresh in a moment for results.');
+        $this->toastSuccess(__('Insights check queued. Refresh in a moment for results.'));
     }
 
     public function openApplyFixModal(int $findingId): void
@@ -198,7 +198,7 @@ class WorkspaceInsights extends Component
         }
 
         ApplyInsightFixJob::dispatch($finding->id, $user->id);
-        $this->flash_success = __('Fix has been queued. This may take up to a minute.');
+        $this->toastSuccess(__('Fix has been queued. This may take up to a minute.'));
     }
 
     public function render(): View
@@ -209,11 +209,31 @@ class WorkspaceInsights extends Component
         $catalog = [];
         $enabledChecks = 0;
         $implementedChecks = 0;
+        $installedServiceTags = ServerInstalledServices::tagsFor($this->server);
+        $hasUnknownStack = array_key_exists('unknown', $installedServiceTags);
         foreach (config('insights.insights', []) as $key => $def) {
             $scope = $def['scope'] ?? 'server';
             if (! in_array($scope, ['server', 'both'], true)) {
                 continue;
             }
+
+            // Skip checks whose backing service isn't installed (e.g. InnoDB on a
+            // database-less server). Fail open if the stack summary is unavailable so
+            // freshly-imported servers still surface everything.
+            $requires = is_array($def['requires'] ?? null) ? $def['requires'] : [];
+            if (! $hasUnknownStack && $requires !== []) {
+                $present = false;
+                foreach ($requires as $tag) {
+                    if (array_key_exists($tag, $installedServiceTags)) {
+                        $present = true;
+                        break;
+                    }
+                }
+                if (! $present) {
+                    continue;
+                }
+            }
+
             $catalog[$key] = $def;
 
             $enabled = (bool) ($this->enabled_map[$key] ?? false);

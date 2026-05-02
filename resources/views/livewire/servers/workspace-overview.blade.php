@@ -1,6 +1,26 @@
 @php
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     $setupIncomplete = $server->status !== \App\Models\Server::STATUS_READY || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE;
+    $containerLaunchTranscript = collect($containerLaunch['events'] ?? [])->map(function (array $event): string {
+        $timestamp = (string) ($event['at'] ?? '');
+        $level = strtoupper((string) ($event['level'] ?? 'info'));
+        $message = (string) ($event['message'] ?? 'Container launch update');
+        $lines = [];
+
+        $prefixParts = array_values(array_filter([$timestamp, $level]));
+        $lines[] = ($prefixParts !== [] ? '['.implode('] [', $prefixParts).'] ' : '').$message;
+
+        foreach (collect($event['context'] ?? [])->filter(fn ($value) => ! is_array($value)) as $contextKey => $contextValue) {
+            $rendered = is_bool($contextValue) ? ($contextValue ? 'true' : 'false') : (string) $contextValue;
+            if ($rendered === '') {
+                continue;
+            }
+
+            $lines[] = '  > '.str_replace('_', ' ', (string) $contextKey).': '.$rendered;
+        }
+
+        return implode("\n", $lines);
+    })->implode("\n\n");
 @endphp
 
 <x-server-workspace-layout
@@ -9,6 +29,8 @@
     :title="__('Overview')"
     :description="__('At-a-glance health, sites, deploy status, and operations shortcuts for this server.')"
     :show-navigation="! $setupIncomplete"
+    doc-route="docs.create-first-server"
+    :doc-label="__('First server guide')"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -149,51 +171,199 @@
                 </div>
             </section>
 
-            <section class="mt-6 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
-                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Health') }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-brand-ink">
-                        {{ $healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? __('Reachable') : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? __('Unreachable') : __('Not checked yet')) }}
-                    </p>
-                    <p class="mt-2 text-sm text-brand-moss">
-                        @if ($healthSummary['last_checked_at'])
-                            {{ __('Last checked :time', ['time' => $healthSummary['last_checked_at']->diffForHumans()]) }}
-                        @else
-                            {{ __('No health checks recorded yet.') }}
-                        @endif
-                    </p>
-                </div>
-
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Sites') }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-brand-ink">{{ $siteCount }}</p>
-                    <p class="mt-2 text-sm text-brand-moss">
-                        {{ trans_choice('{0} No hosted sites yet.|{1} 1 site connected to this server.|[2,*] :count sites connected to this server.', $siteCount, ['count' => $siteCount]) }}
-                    </p>
-                </div>
-
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Latest deploy') }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-brand-ink">
-                        {{ $latestDeployment?->status ? str($latestDeployment->status)->headline() : __('None yet') }}
-                    </p>
-                    <p class="mt-2 text-sm text-brand-moss">
-                        @if ($latestDeployment?->site)
-                            {{ __('Latest run for :site', ['site' => $latestDeployment->site->name]) }}
-                            @if ($latestDeployment->finished_at)
-                                {{ __('(:time)', ['time' => $latestDeployment->finished_at->diffForHumans()]) }}
+            @if (! $serverHasPersonalProfileKey)
+                <section class="mt-6 rounded-2xl border border-brand-gold/40 bg-brand-sand/35 p-6">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="max-w-2xl">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Add your personal SSH key before you need this server') }}</h3>
+                            <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                @if ($hasProfileSshKeys)
+                                    {{ __('This server is ready, but it does not yet include one of your personal profile SSH keys. Attach one from the SSH keys workspace and sync authorized_keys so your own login access is on the machine.') }}
+                                @else
+                                    {{ __('This server is ready, but you do not have any personal SSH keys saved in your profile yet. Add one first, then attach it from the SSH keys workspace so your own login access is on the machine.') }}
+                                @endif
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream transition-colors hover:bg-brand-forest">
+                                <x-heroicon-o-key class="h-4 w-4" />
+                                {{ __('Open SSH keys') }}
+                            </a>
+                            @if (! $hasProfileSshKeys)
+                                <a href="{{ route('profile.ssh-keys') }}" wire:navigate class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
+                                    {{ __('Add profile key') }}
+                                </a>
                             @endif
-                        @else
-                            {{ __('No deploys have been recorded for this server yet.') }}
+                        </div>
+                    </div>
+                </section>
+            @endif
+
+            @if ($containerLaunch)
+                <section class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-sky-50/90 p-6 shadow-sm">
+                    <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+                        <div class="max-w-3xl">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-700">
+                                    <span class="inline-flex h-2 w-2 rounded-full bg-sky-500 shadow-[0_0_0_4px_rgba(14,165,233,0.16)]"></span>
+                                    {{ __('Container launch in progress') }}
+                                </span>
+                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-moss">
+                                    {{ $containerLaunch['target_family'] }}
+                                </span>
+                            </div>
+
+                            <div class="mt-5">
+                                <h3 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ $containerLaunch['current_step_label'] }}</h3>
+                                <p class="mt-2 max-w-2xl text-sm leading-6 text-brand-moss">{{ $containerLaunch['summary'] }}</p>
+                                @if ($containerLaunch['updated_at'])
+                                    <p class="mt-3 text-xs text-brand-mist">{{ __('Updated :time', ['time' => $containerLaunch['updated_at']->diffForHumans()]) }}</p>
+                                @endif
+                            </div>
+
+                            <dl class="mt-6 grid gap-4 md:grid-cols-3">
+                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Repository') }}</dt>
+                                    <dd class="mt-2 break-all text-sm font-medium text-brand-ink">{{ $containerLaunch['repository_url'] !== '' ? $containerLaunch['repository_url'] : __('Not recorded') }}</dd>
+                                </div>
+                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Branch') }}</dt>
+                                    <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $containerLaunch['repository_branch'] !== '' ? $containerLaunch['repository_branch'] : '—' }}</dd>
+                                </div>
+                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Subdirectory') }}</dt>
+                                    <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $containerLaunch['repository_subdirectory'] !== '' ? $containerLaunch['repository_subdirectory'] : __('Repo root') }}</dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        <div class="w-full max-w-xl">
+                            @include('livewire.partials.deployment-activity-console', [
+                                'title' => __('Install activity'),
+                                'meta' => __('last :count entries', ['count' => count($containerLaunch['events'])]),
+                                'transcript' => $containerLaunchTranscript,
+                                'maxHeight' => '26rem',
+                                'linkHref' => $containerLaunch['site_route'],
+                                'linkLabel' => $containerLaunch['site_route'] ? __('Open site') : null,
+                            ])
+                        </div>
+                    </div>
+                </section>
+            @endif
+
+            <section class="mt-6 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
+                <x-stat-card
+                    :label="__('Health')"
+                    :value="$healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? __('Reachable') : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? __('Unreachable') : __('Not checked yet'))"
+                    :meta="$healthSummary['last_checked_at'] ? __('Last checked :time', ['time' => $healthSummary['last_checked_at']->diffForHumans()]) : __('No health checks recorded yet.')"
+                    tone="subtle"
+                />
+                <x-stat-card
+                    :label="__('Sites')"
+                    :value="$siteCount"
+                    :meta="trans_choice('{0} No hosted sites yet.|{1} 1 site connected to this server.|[2,*] :count sites connected to this server.', $siteCount, ['count' => $siteCount])"
+                />
+                <x-stat-card
+                    :label="__('Latest deploy')"
+                    :value="$latestDeployment?->status ? str($latestDeployment->status)->headline() : __('None yet')"
+                    :meta="$latestDeployment?->site ? __('Latest run for :site', ['site' => $latestDeployment->site->name]).($latestDeployment->finished_at ? ' '.__('(:time)', ['time' => $latestDeployment->finished_at->diffForHumans()]) : '') : __('No deploys have been recorded for this server yet.')"
+                />
+                <x-stat-card
+                    :label="__('Operations')"
+                    :value="array_sum($opsSummary)"
+                    :meta="__('Configured items across firewall, cron, daemons, and SSH keys.')"
+                />
+            </section>
+
+            <section class="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div class="max-w-2xl">
+                        <h3 class="text-lg font-semibold text-slate-900">{{ __('Deployment foundation') }}</h3>
+                        <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('Shared preflight, runtime drift, and attached resource state aggregated across sites on this server.') }}</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-badge tone="{{ ($foundationSummary['preflight_blocked_count'] ?? 0) > 0 ? 'danger' : 'accent' }}">
+                            {{ trans_choice('{0} No blocked sites|{1} :count blocked site|[2,*] :count blocked sites', $foundationSummary['preflight_blocked_count'] ?? 0, ['count' => $foundationSummary['preflight_blocked_count'] ?? 0]) }}
+                        </x-badge>
+                        @if (($foundationSummary['drifted_count'] ?? 0) > 0)
+                            <x-badge tone="warning">
+                                {{ trans_choice('{1} :count drifted runtime|[2,*] :count drifted runtimes', $foundationSummary['drifted_count'], ['count' => $foundationSummary['drifted_count']]) }}
+                            </x-badge>
                         @endif
-                    </p>
+                        @if (($foundationSummary['warning_site_count'] ?? 0) > 0)
+                            <x-badge tone="warning">
+                                {{ trans_choice('{1} :count site with warnings|[2,*] :count sites with warnings', $foundationSummary['warning_site_count'], ['count' => $foundationSummary['warning_site_count']]) }}
+                            </x-badge>
+                        @endif
+                    </div>
                 </div>
 
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Operations') }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-brand-ink">{{ array_sum($opsSummary) }}</p>
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('Configured items across firewall, cron, daemons, and SSH keys.') }}</p>
-                </div>
+                @if (($foundationSummary['site_count'] ?? 0) === 0)
+                    <x-empty-state
+                        :title="__('No site foundation data yet.')"
+                        :description="__('Attach a site to this server and Dply will summarize preflight and resource state here.')"
+                        class="mt-5"
+                    />
+                @else
+                    <div class="mt-5 grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
+                        <div class="space-y-4">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <h4 class="text-sm font-semibold text-slate-900">{{ __('Attached resources') }}</h4>
+                                <div class="mt-3 space-y-2">
+                                    @forelse ($resourceSummary as $resource)
+                                        <div class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                            <div>
+                                                <p class="text-sm font-medium text-slate-900">{{ str($resource['type'])->headline() }}</p>
+                                                <p class="mt-1 text-xs text-slate-500">
+                                                    {{ trans_choice('{1} :count site|[2,*] :count sites', $resource['site_count'], ['count' => $resource['site_count']]) }}
+                                                </p>
+                                            </div>
+                                            <div class="text-right text-xs">
+                                                <p class="font-medium text-sky-700">{{ __('Configured: :count', ['count' => $resource['configured_count']]) }}</p>
+                                                @if ($resource['pending_count'] > 0)
+                                                    <p class="mt-1 text-amber-700">{{ __('Pending: :count', ['count' => $resource['pending_count']]) }}</p>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
+                                            {{ __('No resource bindings are summarized yet.') }}
+                                        </div>
+                                    @endforelse
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            @foreach ($siteFoundationSummaries as $siteFoundation)
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <a href="{{ $siteFoundation['route'] }}" wire:navigate class="font-semibold text-slate-900 hover:text-sky-700">{{ $siteFoundation['name'] }}</a>
+                                            <p class="mt-1 text-sm text-slate-600">
+                                                @if (! $siteFoundation['preflight_ok'])
+                                                    {{ trans_choice('{1} :count blocking preflight issue|[2,*] :count blocking preflight issues', $siteFoundation['error_count'], ['count' => $siteFoundation['error_count']]) }}
+                                                @elseif ($siteFoundation['warning_count'] > 0)
+                                                    {{ trans_choice('{1} :count warning|[2,*] :count warnings', $siteFoundation['warning_count'], ['count' => $siteFoundation['warning_count']]) }}
+                                                @else
+                                                    {{ __('Preflight clear') }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="rounded-full px-3 py-1 text-xs font-medium {{ $siteFoundation['preflight_ok'] ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800' }}">
+                                                {{ $siteFoundation['preflight_ok'] ? __('Ready') : __('Blocked') }}
+                                            </span>
+                                            <span class="rounded-full px-3 py-1 text-xs font-medium {{ $siteFoundation['runtime_drifted'] ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700' }}">
+                                                {{ $siteFoundation['runtime_drifted'] ? __('Drift detected') : __('In sync') }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </section>
 
             <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
@@ -203,28 +373,29 @@
                         <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Open server findings are summarized here so you can spot issues without leaving overview.') }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <span class="rounded-full border border-brand-ink/10 bg-brand-sand/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-ink">
+                        <x-badge tone="accent">
                             {{ trans_choice('{0} No open findings|{1} :count open finding|[2,*] :count open findings', $insightSummary['open_count'], ['count' => $insightSummary['open_count']]) }}
-                        </span>
+                        </x-badge>
                         @if ($insightSummary['critical_count'] > 0)
-                            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-900">
+                            <x-badge tone="danger">
                                 {{ trans_choice('{1} :count critical|[2,*] :count critical', $insightSummary['critical_count'], ['count' => $insightSummary['critical_count']]) }}
-                            </span>
+                            </x-badge>
                         @endif
                         @if ($insightSummary['warning_count'] > 0)
-                            <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-950">
+                            <x-badge tone="warning">
                                 {{ trans_choice('{1} :count warning|[2,*] :count warnings', $insightSummary['warning_count'], ['count' => $insightSummary['warning_count']]) }}
-                            </span>
+                            </x-badge>
                         @endif
                         <a href="{{ route('servers.insights', $server) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Open Insights') }}</a>
                     </div>
                 </div>
 
                 @if ($insightFindings->isEmpty())
-                    <div class="mt-5 rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/10 px-5 py-6">
-                        <p class="text-sm font-medium text-brand-ink">{{ __('No open server insights right now.') }}</p>
-                        <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('If you expected to see something here, open Insights to refresh checks, review enabled settings, and confirm this server has recent metrics when metric-based checks are enabled.') }}</p>
-                    </div>
+                    <x-empty-state
+                        :title="__('No open server insights right now.')"
+                        :description="__('If you expected to see something here, open Insights to refresh checks, review enabled settings, and confirm this server has recent metrics when metric-based checks are enabled.')"
+                        class="mt-5"
+                    />
                 @else
                     <div class="mt-5 grid gap-3 lg:grid-cols-3">
                         @foreach ($insightFindings as $finding)

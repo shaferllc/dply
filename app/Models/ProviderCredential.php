@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ServerProvider;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -115,5 +116,27 @@ class ProviderCredential extends Model
             'expires_at' => now()->addSeconds(max(60, $expiresIn))->toIso8601String(),
         ]);
         $this->save();
+    }
+
+    /**
+     * Provider keys that can manage DNS for sites (may differ from where servers are hosted).
+     *
+     * @return list<string>
+     */
+    public static function dnsAutomationProviderKeys(): array
+    {
+        return ['digitalocean', 'cloudflare'];
+    }
+
+    public function supportsDnsAutomation(): bool
+    {
+        return in_array($this->provider, self::dnsAutomationProviderKeys(), true);
+    }
+
+    public function dnsProviderLabel(): string
+    {
+        $enum = ServerProvider::tryFrom($this->provider);
+
+        return $enum?->label() ?? $this->provider;
     }
 }

@@ -3,9 +3,11 @@
 namespace App\Livewire\Servers;
 
 use App\Actions\Servers\DeleteServerAction;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\ServerCreateDraft;
 use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Carbon\Carbon;
@@ -19,6 +21,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use DispatchesToastNotifications;
     use ManagesServerRemovalForm;
 
     public string $search = '';
@@ -49,6 +52,26 @@ class Index extends Component
         $this->sort = 'created_at';
         $this->statusFilter = '';
         $this->viewMode = 'list';
+    }
+
+    public bool $showDiscardServerCreateDraftModal = false;
+
+    public function openDiscardServerCreateDraftModal(): void
+    {
+        $this->showDiscardServerCreateDraftModal = true;
+    }
+
+    public function closeDiscardServerCreateDraftModal(): void
+    {
+        $this->showDiscardServerCreateDraftModal = false;
+    }
+
+    public function confirmDiscardServerCreateDraft(): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        $draft = ServerCreateDraft::forCurrentScope(auth()->user(), $org);
+        $draft?->delete();
+        $this->showDiscardServerCreateDraftModal = false;
     }
 
     #[On('server-state-updated')]
@@ -94,12 +117,6 @@ class Index extends Component
         $server = Server::query()->findOrFail($this->deleteModalServerId);
         $this->authorize('delete', $server);
 
-        if (! hash_equals($server->name, trim($this->deleteConfirmName))) {
-            $this->addError('deleteConfirmName', __('The name does not match exactly.'));
-
-            return;
-        }
-
         if ($this->removeMode === 'scheduled') {
             $this->validate([
                 'scheduledRemovalDate' => ['required', 'date'],
@@ -138,7 +155,7 @@ class Index extends Component
             $this->notifyOrgAdminsOfScheduledRemoval($server->fresh(['organization']), $at, $reason !== '' ? $reason : null);
             $this->closeRemoveServerModal();
             $this->serverListEpoch++;
-            session()->flash('success', __(':name is scheduled for removal at the end of :date.', [
+            $this->toastSuccess(__(':name is scheduled for removal at the end of :date.', [
                 'name' => $server->name,
                 'date' => $at->toFormattedDateString(),
             ]));
@@ -153,7 +170,10 @@ class Index extends Component
         }
 
         $summary = ServerRemovalAdvisor::summary($server);
-        $this->validate($this->immediateServerRemovalRules($summary));
+        $rules = $this->immediateServerRemovalRules($summary);
+        if ($rules !== []) {
+            $this->validate($rules);
+        }
 
         $reason = trim($this->deletionReason);
         $auditExtras = ['immediate' => true];
@@ -170,7 +190,7 @@ class Index extends Component
         $this->closeRemoveServerModal();
         $deleteServer->execute($server, $actor, $auditExtras, $emailContext);
         $this->serverListEpoch++;
-        session()->flash('success', __('Server removed.'));
+        $this->toastSuccess(__('Server removed.'));
     }
 
     public function cancelScheduledServerRemoval(string $serverId): void
@@ -195,7 +215,7 @@ class Index extends Component
             'meta' => $meta,
         ]);
         $this->serverListEpoch++;
-        session()->flash('success', __('Scheduled removal was cancelled.'));
+        $this->toastSuccess(__('Scheduled removal was cancelled.'));
     }
 
     /**
@@ -308,6 +328,8 @@ class Index extends Component
             ? ServerRemovalAdvisor::summary($deleteModalServer)
             : null;
 
+        $serverCreateDraft = ServerCreateDraft::forCurrentScope(auth()->user(), $org);
+
         return view('livewire.servers.index', [
             'hasServersInScope' => $hasServersInScope,
             'servers' => $servers,
@@ -318,6 +340,7 @@ class Index extends Component
             'hasProviderCredentials' => $hasProviderCredentials,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
+            'serverCreateDraft' => $serverCreateDraft,
             'sortOptions' => config('user_preferences.server_sort_options', []),
             'statusOptions' => [
                 '' => __('All statuses'),

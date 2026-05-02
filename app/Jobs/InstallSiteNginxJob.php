@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Site;
-use App\Services\Sites\SiteNginxProvisioner;
+use App\Services\Sites\SiteWebserverConfigApplier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -21,7 +21,7 @@ class InstallSiteNginxJob implements ShouldQueue
         public Site $site
     ) {}
 
-    public function handle(SiteNginxProvisioner $provisioner): void
+    public function handle(SiteWebserverConfigApplier $applier): void
     {
         $this->site = $this->site->fresh();
         if (! $this->site) {
@@ -29,7 +29,7 @@ class InstallSiteNginxJob implements ShouldQueue
         }
 
         try {
-            $provisioner->provision($this->site);
+            $applier->apply($this->site);
         } catch (\Throwable $e) {
             $this->site->update([
                 'status' => Site::STATUS_ERROR,

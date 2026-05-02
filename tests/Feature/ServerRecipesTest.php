@@ -39,10 +39,10 @@ class ServerRecipesTest extends TestCase
             ->get(route('servers.recipes', $server))
             ->assertOk()
             ->assertSee('Saved commands')
-            ->assertSee('Choose the right scope')
+            ->assertSee('Browse library')
+            ->assertSee('Where else commands live')
             ->assertSee('Open deploy')
-            ->assertSee('Open scripts')
-            ->assertSee('Browse marketplace');
+            ->assertSee('Open scripts');
     }
 
     public function test_user_can_copy_organization_script_to_server_saved_commands(): void
@@ -65,12 +65,35 @@ class ServerRecipesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceRecipes::class, ['server' => $server])
-            ->set('import_script_id', (string) $script->id)
-            ->call('importOrganizationScript');
+            ->call('setLibraryTab', 'organization')
+            ->call('saveOrganizationScriptToServer', (string) $script->id);
 
         $this->assertDatabaseHas('server_recipes', [
             'server_id' => $server->id,
             'name' => 'Queue restart',
+        ]);
+    }
+
+    public function test_user_can_save_marketplace_preset_to_server(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()?->id,
+            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+        ]);
+
+        $presets = config('script_marketplace');
+        $key = array_key_first($presets);
+        $name = $presets[$key]['name'];
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceRecipes::class, ['server' => $server])
+            ->call('saveMarketplacePresetToServer', $key);
+
+        $this->assertDatabaseHas('server_recipes', [
+            'server_id' => $server->id,
+            'name' => $name,
         ]);
     }
 

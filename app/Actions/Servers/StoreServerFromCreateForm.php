@@ -15,6 +15,8 @@ use App\Jobs\ProvisionLinodeServerJob;
 use App\Jobs\ProvisionScalewayServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
+use App\Jobs\RunSetupScriptJob;
+use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -42,7 +44,30 @@ final class StoreServerFromCreateForm
 
         $scriptKeys = array_keys(config('setup_scripts.scripts', []));
 
-        if ($form->type !== 'custom') {
+        if ($form->type === 'custom') {
+            $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
+            $installProfileIds = collect(config('server_provision_options.install_profiles', []))->pluck('id')->filter()->values()->all();
+            Validator::make(
+                [
+                    'install_profile' => $form->install_profile,
+                    'server_role' => $form->server_role,
+                    'cache_service' => $form->cache_service,
+                    'webserver' => $form->webserver,
+                    'php_version' => $form->php_version,
+                    'database' => $form->database,
+                    'setup_script_key' => $form->setup_script_key,
+                ],
+                array_merge(
+                    [
+                        'install_profile' => ['required', 'string', Rule::in($installProfileIds)],
+                        'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
+                    ],
+                    ServerProvisionPreferenceRules::rules('custom', $hasLinkedCredential, $form->server_role)
+                )
+            )->validate();
+        }
+
+        if (! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
             $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
             Validator::make(
                 [
@@ -58,6 +83,9 @@ final class StoreServerFromCreateForm
 
         return match ($form->type) {
             'digitalocean' => $this->storeDigitalOcean($user, $org, $form, $scriptKeys),
+            'digitalocean_functions' => $this->storeDigitalOceanFunctions($user, $org, $form),
+            'digitalocean_kubernetes' => $this->storeDigitalOceanKubernetes($user, $org, $form),
+            'aws_lambda' => $this->storeAwsLambda($user, $org, $form),
             'hetzner' => $this->storeHetzner($user, $org, $form, $scriptKeys),
             'linode' => $this->storeLinode($user, $org, $form, $scriptKeys),
             'vultr' => $this->storeVultr($user, $org, $form, $scriptKeys),
@@ -146,6 +174,149 @@ final class StoreServerFromCreateForm
         ]);
 
         ProvisionDigitalOceanDropletJob::dispatch($server);
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    private function storeDigitalOceanFunctions(User $user, Organization $org, ServerCreateForm $form): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'do_functions_api_host' => $form->do_functions_api_host,
+                'do_functions_namespace' => $form->do_functions_namespace,
+                'do_functions_access_key' => $form->do_functions_access_key,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'do_functions_api_host' => 'required|url|max:255',
+                'do_functions_namespace' => 'required|string|max:255',
+                'do_functions_access_key' => ['required', 'string', 'max:500', 'regex:/^.+:.+$/'],
+            ],
+            [
+                'do_functions_access_key.regex' => __('Use the DigitalOcean Functions access key format `id:secret`.'),
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'digitalocean')
+            ->findOrFail($form->provider_credential_id);
+
+        $meta = [
+            'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+            'digitalocean_functions' => [
+                'api_host' => rtrim($form->do_functions_api_host, '/'),
+                'namespace' => trim($form->do_functions_namespace),
+                'access_key' => trim($form->do_functions_access_key),
+            ],
+        ];
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::DigitalOcean,
+            'provider_credential_id' => $credential->id,
+            'ssh_port' => 22,
+            'ssh_user' => 'functions',
+            'status' => Server::STATUS_READY,
+            'health_status' => Server::HEALTH_REACHABLE,
+            'meta' => $meta,
+        ]);
+
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    private function storeDigitalOceanKubernetes(User $user, Organization $org, ServerCreateForm $form): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'do_kubernetes_cluster_name' => $form->do_kubernetes_cluster_name,
+                'do_kubernetes_namespace' => $form->do_kubernetes_namespace,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'do_kubernetes_cluster_name' => 'required|string|max:255',
+                'do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'digitalocean')
+            ->findOrFail($form->provider_credential_id);
+
+        $meta = [
+            'host_kind' => Server::HOST_KIND_KUBERNETES,
+            'kubernetes' => [
+                'provider' => 'digitalocean',
+                'cluster_name' => trim($form->do_kubernetes_cluster_name),
+                'namespace' => trim($form->do_kubernetes_namespace) !== '' ? trim($form->do_kubernetes_namespace) : 'default',
+            ],
+        ];
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::DigitalOcean,
+            'provider_credential_id' => $credential->id,
+            'ssh_port' => 22,
+            'ssh_user' => 'kubernetes',
+            'status' => Server::STATUS_PENDING,
+            'health_status' => null,
+            'meta' => $meta,
+        ]);
+
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    private function storeAwsLambda(User $user, Organization $org, ServerCreateForm $form): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'aws_lambda_region' => $form->aws_lambda_region,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'aws_lambda_region' => 'required|string|max:255',
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'aws')
+            ->findOrFail($form->provider_credential_id);
+
+        $meta = [
+            'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
+            'aws_lambda' => [
+                'region' => trim($form->aws_lambda_region),
+            ],
+        ];
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::Aws,
+            'provider_credential_id' => $credential->id,
+            'ssh_port' => 22,
+            'ssh_user' => 'lambda',
+            'region' => trim($form->aws_lambda_region),
+            'status' => Server::STATUS_READY,
+            'health_status' => Server::HEALTH_REACHABLE,
+            'meta' => $meta,
+        ]);
+
         audit_log($org, $user, 'server.created', $server);
 
         return $server;
@@ -583,6 +754,7 @@ final class StoreServerFromCreateForm
                 'ssh_port' => $form->ssh_port,
                 'ssh_user' => $form->ssh_user,
                 'ssh_private_key' => $form->ssh_private_key,
+                'custom_host_kind' => $form->custom_host_kind,
             ],
             [
                 'name' => 'required|string|max:255',
@@ -590,8 +762,16 @@ final class StoreServerFromCreateForm
                 'ssh_port' => 'nullable|integer|min:1|max:65535',
                 'ssh_user' => 'required|string|max:255',
                 'ssh_private_key' => 'required|string',
+                'custom_host_kind' => 'required|string|in:vm,docker',
             ]
         )->validate();
+
+        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
+
+        $meta = $this->meta($form);
+        $meta['host_kind'] = $form->custom_host_kind === 'docker'
+            ? Server::HOST_KIND_DOCKER
+            : Server::HOST_KIND_VM;
 
         $server = $user->servers()->create([
             'organization_id' => $org->id,
@@ -601,10 +781,18 @@ final class StoreServerFromCreateForm
             'ssh_port' => (int) ($form->ssh_port ?: 22),
             'ssh_user' => $form->ssh_user,
             'ssh_private_key' => $form->ssh_private_key,
+            'setup_script_key' => $setupScriptKey,
+            'setup_status' => $setupStatus,
             'status' => Server::STATUS_READY,
+            'meta' => $meta,
         ]);
 
         audit_log($org, $user, 'server.created', $server);
+
+        $fresh = $server->fresh();
+        if ($fresh && RunSetupScriptJob::shouldDispatch($fresh)) {
+            WaitForServerSshReadyJob::dispatch($fresh);
+        }
 
         return $server;
     }

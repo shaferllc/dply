@@ -68,4 +68,26 @@ class SshConnectionCredentialSelectionTest extends TestCase
 
         $this->assertSame($this->validPrivateKey(), $connection->exposedPrivateKey());
     }
+
+    public function test_local_runtime_password_is_available_for_orbstack_fallback(): void
+    {
+        $connection = new class(new Server([
+            'ssh_user' => 'dplytest',
+            'ssh_private_key' => 'not-a-real-key',
+            'meta' => [
+                'local_runtime' => [
+                    'provider' => 'orbstack',
+                    'ssh_password' => 'dplylocal',
+                ],
+            ],
+        ]), 'dplytest', 'operational') extends SshConnection
+        {
+            public function exposedPassword(): ?string
+            {
+                return $this->passwordForConnection();
+            }
+        };
+
+        $this->assertSame('dplylocal', $connection->exposedPassword());
+    }
 }

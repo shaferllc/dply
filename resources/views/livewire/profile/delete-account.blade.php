@@ -1,23 +1,19 @@
 <div>
     <x-livewire-validation-errors />
 
-    <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('profile.edit') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Profile') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('Delete account') }}</li>
-        </ol>
-    </nav>
+    <x-breadcrumb-trail :items="[
+        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+        ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
+        ['label' => __('Delete account'), 'icon' => 'trash'],
+    ]" />
 
     <div class="max-w-2xl space-y-6">
-        <header>
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Delete account') }}</h1>
-            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                {{ __('This will permanently delete your user account, personal settings, and access to organizations you belong to. Organization data may remain for other members. This action cannot be undone.') }}
-            </p>
-        </header>
+        <x-page-header
+            :title="__('Delete account')"
+            :description="__('This will permanently delete your user account, personal settings, and access to organizations you belong to. Organization data may remain for other members. This action cannot be undone.')"
+            doc-route="docs.index"
+            flush
+        />
 
         <div class="rounded-2xl border border-red-200/80 bg-white shadow-sm overflow-hidden">
             <div class="p-6 sm:p-8">

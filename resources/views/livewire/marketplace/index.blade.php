@@ -6,12 +6,12 @@
             <span class="text-brand-ink">{{ __('Marketplace') }}</span>
         </nav>
 
-        <div class="mb-8">
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Marketplace') }}</h1>
-            <p class="mt-2 max-w-3xl text-sm text-brand-moss">
-                {{ __('Import curated starters into the right scope: webserver templates go to your organization, deploy starters go to Deploy on a server, and server runbooks go to Saved commands. Guides and integrations stay linked here for discovery.') }}
-            </p>
-        </div>
+        <x-page-header
+            :title="__('Marketplace')"
+            :description="__('Import curated starters into the right scope: webserver templates go to your organization, deploy starters go to Deploy on a server, and server runbooks go to Saved commands. Guides and integrations stay linked here for discovery.')"
+            doc-route="docs.index"
+            flush
+        />
 
         @if (! $hasOrganization)
             <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">

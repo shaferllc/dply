@@ -6,8 +6,8 @@ use App\Livewire\Sites\Show as SitesShow;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Servers\ServerPhpManager;
 use App\Models\User;
+use App\Services\Servers\ServerPhpManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Livewire\Livewire;
@@ -267,7 +267,7 @@ class SiteCreationGateTest extends TestCase
             ->set('php_max_execution_time', '300')
             ->call('savePhpSettings')
             ->assertHasNoErrors()
-            ->assertSet('flash_success', 'PHP settings saved.');
+            ->assertDispatched('notify', message: 'PHP settings saved.', type: 'success');
 
         $site->refresh();
 
@@ -282,7 +282,6 @@ class SiteCreationGateTest extends TestCase
             ->test(SitesShow::class, ['server' => $server->fresh(), 'site' => $site->fresh()])
             ->set('php_version', '8.2')
             ->call('savePhpSettings')
-            ->assertHasErrors(['php_version'])
-            ->assertSet('flash_success', null);
+            ->assertHasErrors(['php_version']);
     }
 }

@@ -39,10 +39,22 @@ class ServerAuthorizedKeysDiffPreview
         $targets = array_values(array_unique(array_merge($prev, $fromDb, [$connectionUser])));
         sort($targets);
 
+        // Dply uses the recovery key to log in as root for repair operations
+        // (Server::connectionAsRecoveryRoot). That key MUST stay in root's
+        // authorized_keys regardless of the panel state, otherwise the next sync
+        // would lock Dply out of the box. Inject it into the desired set for root.
+        $recoveryPubKey = trim((string) ($server->openSshPublicKeyFromRecoveryPrivate() ?? ''));
+
         $out = [];
         foreach ($targets as $targetUser) {
             $rows = $groups->get($targetUser) ?? collect();
             $desired = $this->desiredLines($rows);
+
+            if ($targetUser === 'root' && $recoveryPubKey !== '' && ! in_array($recoveryPubKey, $desired, true)) {
+                $desired[] = $recoveryPubKey;
+                sort($desired);
+            }
+
             $remote = $this->reader->normalizedKeyLines($server, $targetUser);
             $out[$targetUser] = [
                 'remote' => $remote,

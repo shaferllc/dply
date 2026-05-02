@@ -7,6 +7,7 @@ namespace App\Modules\TaskRunner;
 use App\Modules\TaskRunner\Contracts\HasCallbacks;
 use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Enums\TaskStatus;
+use App\Modules\TaskRunner\Exceptions\TaskValidationException;
 use App\Modules\TaskRunner\Services\BackgroundTaskTracker;
 use App\Modules\TaskRunner\Services\CallbackService;
 use App\Modules\TaskRunner\Traits\HandlesCallbacks;
@@ -349,7 +350,7 @@ class TrackTaskInBackground extends Task implements HasCallbacks
         }
 
         if (! empty($errors)) {
-            throw \App\Modules\TaskRunner\Exceptions\TaskValidationException::withErrors($errors);
+            throw TaskValidationException::withErrors($errors);
         }
     }
 

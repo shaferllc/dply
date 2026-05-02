@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\User;
+use App\Modules\TaskRunner\ProcessOutput;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 
@@ -238,7 +239,7 @@ class ServerAuthorizedKeysSynchronizer
             : [];
     }
 
-    protected function runSyncScript(Server $server, string $name, string $script, int $timeoutSeconds): \App\Modules\TaskRunner\ProcessOutput
+    protected function runSyncScript(Server $server, string $name, string $script, int $timeoutSeconds): ProcessOutput
     {
         $useRoot = (bool) config('server_ssh_keys.use_root_ssh', true);
         $fallback = (bool) config('server_ssh_keys.fallback_to_deploy_user_ssh', true);

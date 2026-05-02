@@ -31,6 +31,17 @@ trait ManagesServerSystemdServices
     public ?string $remote_error = null;
 
     /**
+     * Persist the latest SSH/systemd error for UI that reads {@see $remote_error} and surface it as a toast.
+     */
+    protected function setSystemdRemoteError(?string $message): void
+    {
+        $this->remote_error = $message;
+        if (is_string($message) && $message !== '') {
+            $this->toastError($message);
+        }
+    }
+
+    /**
      * When a queued systemd SSH task finishes, whether to dispatch {@see SyncServerSystemdServicesJob} (false for read-only status).
      */
     protected ?bool $systemdQueueInventoryAfterRemoteTask = null;
@@ -178,16 +189,15 @@ trait ManagesServerSystemdServices
     {
         $this->authorize('update', $this->server);
         $this->remote_error = null;
-        $this->flash_success = null;
 
         if ($this->systemdDeployerWorkspaceBlocked()) {
-            $this->remote_error = __('Deployers cannot control services on servers.');
+            $this->setSystemdRemoteError(__('Deployers cannot control services on servers.'));
 
             return;
         }
 
         if (! $this->serverOpsReady()) {
-            $this->remote_error = __('Provisioning and SSH must be ready before running actions.');
+            $this->setSystemdRemoteError(__('Provisioning and SSH must be ready before running actions.'));
 
             return;
         }
@@ -195,7 +205,7 @@ trait ManagesServerSystemdServices
         try {
             $normalized = app(ServerSystemdServicesCatalog::class)->assertSafeUnitNameForStatus($unit);
         } catch (\InvalidArgumentException $e) {
-            $this->remote_error = $e->getMessage();
+            $this->setSystemdRemoteError($e->getMessage());
 
             return;
         }
@@ -305,7 +315,7 @@ trait ManagesServerSystemdServices
     {
         $this->authorize('update', $this->server);
         if ($this->currentUserIsDeployer()) {
-            $this->flash_error = __('Deployers cannot change notification routing.');
+            $this->toastError(__('Deployers cannot change notification routing.'));
 
             return;
         }
@@ -355,8 +365,7 @@ trait ManagesServerSystemdServices
             }
         });
 
-        $this->flash_success = __('Alert preferences saved.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Alert preferences saved.'));
         $this->loadSystemdStatusModalAlertMatrix();
         $this->hydrateSystemdInventoryFromDatabase();
     }
@@ -536,26 +545,26 @@ trait ManagesServerSystemdServices
         $this->remote_error = null;
 
         if ($this->currentUserIsDeployer()) {
-            $this->remote_error = __('Deployers cannot sync services on servers.');
+            $this->setSystemdRemoteError(__('Deployers cannot sync services on servers.'));
 
             return;
         }
 
         if (! $this->serverOpsReady()) {
-            $this->remote_error = __('Provisioning and SSH must be ready before syncing services.');
+            $this->setSystemdRemoteError(__('Provisioning and SSH must be ready before syncing services.'));
 
             return;
         }
 
         if (! (bool) config('server_services.systemd_inventory_job_enabled', true)) {
-            $this->remote_error = __('Service sync jobs are disabled in configuration.');
+            $this->setSystemdRemoteError(__('Service sync jobs are disabled in configuration.'));
 
             return;
         }
 
         SyncServerSystemdServicesJob::dispatch($this->server->id);
         if (! $silent) {
-            $this->flash_success = __('Service sync queued. This page refreshes from the database every few seconds while you stay here—ensure a queue worker is running.');
+            $this->toastSuccess(__('Service sync queued. This page refreshes from the database every few seconds while you stay here—ensure a queue worker is running.'));
         }
     }
 
@@ -607,20 +616,20 @@ trait ManagesServerSystemdServices
         $this->remote_error = null;
 
         if ($this->systemdDeployerWorkspaceBlocked()) {
-            $this->remote_error = __('Deployers cannot control services on servers.');
+            $this->setSystemdRemoteError(__('Deployers cannot control services on servers.'));
 
             return;
         }
 
         if (! $this->serverOpsReady()) {
-            $this->remote_error = __('Provisioning and SSH must be ready before running actions.');
+            $this->setSystemdRemoteError(__('Provisioning and SSH must be ready before running actions.'));
 
             return;
         }
 
         $allowedActions = ['start', 'stop', 'restart', 'reload', 'disable', 'enable'];
         if (! in_array($action, $allowedActions, true)) {
-            $this->remote_error = __('Unknown action.');
+            $this->setSystemdRemoteError(__('Unknown action.'));
 
             return;
         }
@@ -628,14 +637,14 @@ trait ManagesServerSystemdServices
         try {
             $normalized = app(ServerSystemdServicesCatalog::class)->assertAllowedOnServer($this->server->fresh(), $unit);
         } catch (\InvalidArgumentException $e) {
-            $this->remote_error = $e->getMessage();
+            $this->setSystemdRemoteError($e->getMessage());
 
             return;
         }
 
         $catalog = app(ServerSystemdServicesCatalog::class);
         if ($catalog->isUnitStatusOnlyForServer($this->server->fresh(), $normalized)) {
-            $this->remote_error = __('This unit is status-only for your organization. Inspect it with Status; mutating actions are disabled.');
+            $this->setSystemdRemoteError(__('This unit is status-only for your organization. Inspect it with Status; mutating actions are disabled.'));
 
             return;
         }
@@ -678,13 +687,13 @@ trait ManagesServerSystemdServices
                 static function (string $type, string $buffer): void {},
                 $timeout,
             );
-            $this->flash_success = $flash;
+            $this->toastSuccess($flash);
             $this->remote_error = null;
             if ($syncInventoryAfter && (bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
         } catch (\Throwable $e) {
-            $this->remote_error = $e->getMessage();
+            $this->setSystemdRemoteError($e->getMessage());
         } finally {
             if (! $this->shouldQueueManageRemoteTasks()) {
                 $this->clearSystemdActionBusyState();
@@ -709,7 +718,7 @@ trait ManagesServerSystemdServices
     {
         $units = array_values(array_unique($this->systemdSelectedList));
         if ($units === []) {
-            $this->flash_error = __('Select at least one service.');
+            $this->toastError(__('Select at least one service.'));
 
             return;
         }
@@ -719,7 +728,7 @@ trait ManagesServerSystemdServices
             try {
                 $normalized[] = $catalog->assertAllowedOnServer($this->server->fresh(), $u);
             } catch (\InvalidArgumentException $e) {
-                $this->flash_error = $e->getMessage();
+                $this->toastError($e->getMessage());
 
                 return;
             }
@@ -727,7 +736,7 @@ trait ManagesServerSystemdServices
         $normalized = array_unique($normalized);
         foreach ($normalized as $u) {
             if ($catalog->isUnitStatusOnlyForServer($this->server->fresh(), $u)) {
-                $this->flash_error = __('One or more selected units are status-only and cannot be changed from here.');
+                $this->toastError(__('One or more selected units are status-only and cannot be changed from here.'));
 
                 return;
             }
@@ -739,16 +748,15 @@ trait ManagesServerSystemdServices
 
         $this->authorize('update', $this->server);
         $this->remote_error = null;
-        $this->flash_error = null;
 
         if ($this->systemdDeployerWorkspaceBlocked()) {
-            $this->remote_error = __('Deployers cannot control services on servers.');
+            $this->setSystemdRemoteError(__('Deployers cannot control services on servers.'));
 
             return;
         }
 
         if (! $this->serverOpsReady()) {
-            $this->remote_error = __('Provisioning and SSH must be ready before running actions.');
+            $this->setSystemdRemoteError(__('Provisioning and SSH must be ready before running actions.'));
 
             return;
         }
@@ -781,12 +789,12 @@ trait ManagesServerSystemdServices
                 static function (string $type, string $buffer): void {},
                 $timeout,
             );
-            $this->flash_success = $flash;
+            $this->toastSuccess($flash);
             if ((bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
         } catch (\Throwable $e) {
-            $this->remote_error = $e->getMessage();
+            $this->setSystemdRemoteError($e->getMessage());
         } finally {
             if (! $this->shouldQueueManageRemoteTasks()) {
                 $this->clearSystemdActionBusyState();
@@ -798,7 +806,7 @@ trait ManagesServerSystemdServices
     {
         $this->authorize('update', $this->server);
         if ($this->currentUserIsDeployer()) {
-            $this->flash_error = __('Deployers cannot change custom services.');
+            $this->toastError(__('Deployers cannot change custom services.'));
 
             return;
         }
@@ -806,7 +814,7 @@ trait ManagesServerSystemdServices
         try {
             $normalized = app(ServerSystemdServicesCatalog::class)->validateAndNormalizeCustomUnit($this->newCustomSystemdUnit);
         } catch (\InvalidArgumentException $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -823,7 +831,7 @@ trait ManagesServerSystemdServices
             }
         }
         if (in_array($normalized, $strings, true)) {
-            $this->flash_error = __('That unit is already listed.');
+            $this->toastError(__('That unit is already listed.'));
 
             return;
         }
@@ -835,15 +843,14 @@ trait ManagesServerSystemdServices
         if ((bool) config('server_services.systemd_inventory_job_enabled', true)) {
             SyncServerSystemdServicesJob::dispatch($this->server->id);
         }
-        $this->flash_success = __('Custom unit saved. A background sync will refresh the list when the worker runs.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Custom unit saved. A background sync will refresh the list when the worker runs.'));
     }
 
     public function removeCustomSystemdUnit(string $unit): void
     {
         $this->authorize('update', $this->server);
         if ($this->currentUserIsDeployer()) {
-            $this->flash_error = __('Deployers cannot change custom services.');
+            $this->toastError(__('Deployers cannot change custom services.'));
 
             return;
         }
@@ -851,7 +858,7 @@ trait ManagesServerSystemdServices
         try {
             $normalized = app(ServerSystemdServicesCatalog::class)->validateAndNormalizeCustomUnit($unit);
         } catch (\InvalidArgumentException $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -873,8 +880,7 @@ trait ManagesServerSystemdServices
         if ((bool) config('server_services.systemd_inventory_job_enabled', true)) {
             SyncServerSystemdServicesJob::dispatch($this->server->id);
         }
-        $this->flash_success = __('Custom unit removed. A background sync will refresh the list when the worker runs.');
-        $this->flash_error = null;
+        $this->toastSuccess(__('Custom unit removed. A background sync will refresh the list when the worker runs.'));
     }
 
     public function isCustomSystemdUnit(string $normalizedUnit): bool
@@ -926,7 +932,7 @@ trait ManagesServerSystemdServices
         };
 
         $err = $payload['error'] ?? null;
-        $this->remote_error = is_string($err) && $err !== '' ? $err : null;
+        $this->setSystemdRemoteError(is_string($err) && $err !== '' ? $err : null);
 
         $pendingKind = $this->systemdPendingKind;
         if ($pendingKind === 'status_modal') {
@@ -941,7 +947,7 @@ trait ManagesServerSystemdServices
 
         if (! in_array($status, ['finished', 'failed'], true)) {
             if ($pendingKind === 'action' && $statusHint !== '') {
-                $this->flash_success = $statusHint;
+                $this->toastSuccess($statusHint);
             }
 
             return;
@@ -970,17 +976,15 @@ trait ManagesServerSystemdServices
 
         if ($status === 'finished' && $pendingKind === 'action') {
             $flash = $payload['flash_success'] ?? null;
-            $this->flash_success = is_string($flash) && $flash !== ''
+            $this->toastSuccess(is_string($flash) && $flash !== ''
                 ? $flash
-                : __('Service action finished.');
+                : __('Service action finished.'));
             $this->remote_error = null;
             if ($shouldSyncInventory && (bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
         } elseif ($status === 'failed' && $pendingKind === 'action') {
-            $this->flash_success = null;
         } else {
-            $this->flash_success = null;
         }
 
         Cache::forget(ServerManageRemoteSshJob::cacheKey($this->systemdRemoteTaskId));
@@ -1073,16 +1077,15 @@ trait ManagesServerSystemdServices
     public function openSystemdBulkNotifyModal(): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_error = null;
         if ($this->currentUserIsDeployer()) {
-            $this->flash_error = __('Deployers cannot configure service notifications.');
+            $this->toastError(__('Deployers cannot configure service notifications.'));
 
             return;
         }
 
         $units = array_values(array_unique($this->systemdSelectedList));
         if ($units === []) {
-            $this->flash_error = __('Select at least one service.');
+            $this->toastError(__('Select at least one service.'));
 
             return;
         }
@@ -1094,7 +1097,7 @@ trait ManagesServerSystemdServices
 
         $channels = AssignableNotificationChannels::forUser($user, $user->currentOrganization());
         if ($channels->isEmpty()) {
-            $this->flash_error = __('No notification channels are available for your account.');
+            $this->toastError(__('No notification channels are available for your account.'));
 
             return;
         }
@@ -1114,9 +1117,8 @@ trait ManagesServerSystemdServices
     public function saveSystemdBulkNotifySubscriptions(): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_error = null;
         if ($this->currentUserIsDeployer()) {
-            $this->flash_error = __('Deployers cannot configure service notifications.');
+            $this->toastError(__('Deployers cannot configure service notifications.'));
 
             return;
         }
@@ -1138,7 +1140,7 @@ trait ManagesServerSystemdServices
         }
 
         if (! Gate::allows('manageNotificationChannels', $channel->owner)) {
-            $this->flash_error = __('You cannot manage that notification channel.');
+            $this->toastError(__('You cannot manage that notification channel.'));
 
             return;
         }
@@ -1150,7 +1152,7 @@ trait ManagesServerSystemdServices
             }
         }
         if ($kinds === []) {
-            $this->flash_error = __('Choose at least one event type.');
+            $this->toastError(__('Choose at least one event type.'));
 
             return;
         }
@@ -1177,7 +1179,7 @@ trait ManagesServerSystemdServices
             }
         });
 
-        $this->flash_success = __('Notification subscriptions saved for the selected services.');
+        $this->toastSuccess(__('Notification subscriptions saved for the selected services.'));
         $this->showSystemdBulkNotifyModal = false;
         $this->hydrateSystemdInventoryFromDatabase();
     }
@@ -1234,7 +1236,7 @@ trait ManagesServerSystemdServices
 
         $this->systemdRemoteTaskId = $id;
         $this->remote_error = null;
-        $this->flash_success = __('SSH task queued. The list will refresh automatically while you stay on this page.');
+        $this->toastSuccess(__('SSH task queued. The list will refresh automatically while you stay on this page.'));
     }
 
     protected function normalizeUnitStatic(string $name): string

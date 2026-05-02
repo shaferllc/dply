@@ -10,12 +10,13 @@
             </ol>
         </nav>
 
-        <header class="mb-6">
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Database backups') }}</h1>
-            <p class="mt-2 text-sm text-brand-moss max-w-3xl leading-relaxed">
-                {{ __('Define how production data for :org should be captured, retained, and restored. Storage destinations give every site a recovery target, while the backup plan here keeps schedules, ownership, and restore expectations visible to the whole team.', ['org' => $organization->name]) }}
-            </p>
-        </header>
+        <x-page-header
+            :title="__('Database backups')"
+            :description="__('Define how production data for :org should be captured, retained, and restored. Storage destinations give every site a recovery target, while the backup plan here keeps schedules, ownership, and restore expectations visible to the whole team.', ['org' => $organization->name])"
+            doc-route="docs.index"
+            flush
+            compact
+        />
 
         <x-backups-subnav active="databases" />
 
@@ -43,7 +44,7 @@
             </section>
         </div>
 
-        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-gradient-to-r from-brand-sand/40 to-white px-5 py-4 shadow-sm">
+        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-brand-sand/50 px-5 py-4 shadow-sm">
             <p class="text-sm font-semibold text-brand-ink">{{ __('What a trustworthy database backup setup includes') }}</p>
             <ul class="mt-2 space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
                 <li>{{ __('A storage destination with retention you can explain to the team.') }}</li>
@@ -91,7 +92,7 @@
             </section>
         </div>
 
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="px-4 py-3 sm:px-6 border-b border-brand-ink/10 bg-brand-sand/30">
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Sites in this organization') }}</h2>
                 <p class="text-xs text-brand-moss mt-0.5">{{ __('Use each site to define the intended database backup path, storage destination, and restore notes for its primary data.') }}</p>
@@ -100,7 +101,7 @@
                 <div class="px-6 py-12 text-center">
                     <p class="text-sm text-brand-moss">{{ __('No sites yet. Create a server and add a site to enable database backups.') }}</p>
                     <div class="mt-4 flex flex-wrap justify-center gap-3">
-                        <a href="{{ route('servers.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Create server') }}</a>
+                        <a href="{{ route('launches.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Open launchpad') }}</a>
                         <span class="text-brand-mist" aria-hidden="true">·</span>
                         <a href="{{ route('sites.index') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View sites') }}</a>
                     </div>

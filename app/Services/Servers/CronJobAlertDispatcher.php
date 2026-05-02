@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Notifications\CronJobAlertNotification;
 use App\Services\Notifications\NotificationPublisher;
+use Illuminate\Support\Str;
 
 final class CronJobAlertDispatcher
 {
@@ -55,11 +56,11 @@ final class CronJobAlertDispatcher
                         'server_name' => $server->name,
                         'organization_name' => $org->name,
                         'cron_job_id' => $job->id,
-                        'cron_job_description' => $job->description ?: \Illuminate\Support\Str::limit($job->command, 80),
+                        'cron_job_description' => $job->description ?: Str::limit($job->command, 80),
                         'failure' => $failure,
                         'pattern_hit' => $patternHit,
                         'exit_code' => $result->exitCode,
-                        'output_excerpt' => \Illuminate\Support\Str::limit($result->output, 2000),
+                        'output_excerpt' => Str::limit($result->output, 2000),
                     ],
                 );
 

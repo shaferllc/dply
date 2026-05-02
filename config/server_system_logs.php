@@ -75,6 +75,12 @@ return [
     'journal_allowed_units' => [
         'nginx',
         'nginx.service',
+        'apache2',
+        'apache2.service',
+        'caddy',
+        'caddy.service',
+        'traefik',
+        'traefik.service',
         'mysql',
         'mysql.service',
         'mariadb',
@@ -117,6 +123,55 @@ return [
             'label' => 'Journal: nginx',
             'unit' => 'nginx.service',
             'group' => 'nginx',
+        ],
+
+        'apache_error' => [
+            'type' => 'file',
+            'label' => 'Apache error log',
+            'path' => '/var/log/apache2/error.log',
+            'group' => 'apache',
+        ],
+
+        'apache_access' => [
+            'type' => 'file',
+            'label' => 'Apache access log',
+            'path' => '/var/log/apache2/access.log',
+            'group' => 'apache',
+        ],
+
+        'journal_apache' => [
+            'type' => 'journal',
+            'label' => 'Journal: apache',
+            'unit' => 'apache2.service',
+            'group' => 'apache',
+        ],
+
+        'openlitespeed_error' => [
+            'type' => 'file',
+            'label' => 'OpenLiteSpeed error log',
+            'path' => '/var/log/lshttpd/error.log',
+            'group' => 'openlitespeed',
+        ],
+
+        'traefik_log' => [
+            'type' => 'file',
+            'label' => 'Traefik log',
+            'path' => '/var/log/traefik/traefik.log',
+            'group' => 'traefik',
+        ],
+
+        'traefik_access' => [
+            'type' => 'file',
+            'label' => 'Traefik access log',
+            'path' => '/var/log/traefik/access.log',
+            'group' => 'traefik',
+        ],
+
+        'journal_traefik' => [
+            'type' => 'journal',
+            'label' => 'Journal: traefik',
+            'unit' => 'traefik.service',
+            'group' => 'traefik',
         ],
 
         'journal_php_fpm' => [

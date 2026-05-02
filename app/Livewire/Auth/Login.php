@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Auth;
 
+use App\Actions\Auth\EnsureLocalDevAdminUser;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -89,6 +90,10 @@ class Login extends Component
             abort(404);
         }
 
+        if (User::query()->where('email', 'tj@tjshafer.com')->doesntExist()) {
+            EnsureLocalDevAdminUser::run();
+        }
+
         $this->email = 'tj@tjshafer.com';
         $this->password = '';
         $this->remember = true;
@@ -101,6 +106,8 @@ class Login extends Component
         return view('livewire.auth.login', [
             'oauthProviders' => OAuthController::getEnabledProviders(),
             'showQuickLoginButton' => $this->canUseQuickLoginButton(),
+            'webauthnLoginOptionsUrl' => route('webauthn.login.options', absolute: false),
+            'webauthnLoginUrl' => route('webauthn.login', absolute: false),
         ])->layout('layouts.guest-livewire', ['title' => $this->title]);
     }
 

@@ -35,30 +35,39 @@
             'title' => __('Provider credentials'),
             'description' => __('Connect DigitalOcean, Hetzner, and other providers before provisioning infrastructure.'),
             'href' => route('credentials.index'),
+            'icon_bg' => 'bg-brand-sage',
         ],
         [
             'title' => __('Security settings'),
             'description' => __('Review two-factor, profile security, and access controls for your account.'),
             'href' => route('profile.security'),
+            'icon_bg' => 'bg-brand-copper',
         ],
         [
             'title' => __('API keys'),
             'description' => __('Issue organization-scoped API tokens with only the permissions you need.'),
             'href' => route('profile.api-keys'),
+            'icon_bg' => 'bg-brand-forest',
         ],
         [
             'title' => __('Setup guide'),
             'description' => __('Follow the guided checklist for connecting a provider and launching your first server.'),
             'href' => route('docs.connect-provider'),
+            'icon_bg' => 'bg-brand-olive',
         ],
+    ];
+    $surfaceAccents = [
+        ['border' => 'border-cyan-700/20', 'bar' => 'bg-cyan-600'],
+        ['border' => 'border-brand-sage/30', 'bar' => 'bg-brand-sage'],
+        ['border' => 'border-brand-gold/35', 'bar' => 'bg-brand-gold'],
+        ['border' => 'border-brand-copper/30', 'bar' => 'bg-brand-copper'],
     ];
 @endphp
 
 <div class="py-8 sm:py-10 lg:py-12">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <section class="relative overflow-hidden rounded-[2rem] border border-brand-ink/10 bg-brand-ink text-brand-cream shadow-xl shadow-brand-ink/10">
+        <section class="relative overflow-hidden rounded-[2rem] border border-brand-ink/10 bg-brand-ink text-brand-cream shadow-xl shadow-brand-ink/15 ring-1 ring-white/10">
             <div class="absolute inset-0 bg-mesh-brand opacity-90"></div>
-            <div class="absolute inset-y-0 right-0 w-2/5 bg-gradient-to-l from-brand-gold/18 via-transparent to-transparent"></div>
             <div class="relative px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
                 <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
                     <div class="max-w-3xl">
@@ -82,8 +91,8 @@
                         </p>
 
                         <div class="mt-8 flex flex-wrap gap-3">
-                            <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
-                                {{ __('Add server') }}
+                            <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
+                                {{ __('Open launchpad') }}
                             </a>
                             <a href="{{ route('credentials.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/8 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/12">
                                 {{ __('Provider credentials') }}
@@ -92,20 +101,20 @@
                     </div>
 
                     <div class="grid gap-3 sm:grid-cols-3 lg:w-[28rem]">
-                        <div class="rounded-2xl border border-white/12 bg-white/7 p-4 backdrop-blur-sm">
-                            <p class="text-xs font-medium uppercase tracking-wide text-brand-cream/65">{{ __('Servers in scope') }}</p>
-                            <p class="mt-3 text-3xl font-semibold text-white">{{ $serverCount }}</p>
-                            <p class="mt-1 text-sm text-brand-cream/70">{{ $serverCount === 1 ? __('1 server') : __(':count servers', ['count' => $serverCount]) }}</p>
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                            <p class="text-xs font-medium uppercase tracking-wide text-emerald-100/90">{{ __('Servers in scope') }}</p>
+                            <p class="mt-3 text-3xl font-semibold tabular-nums text-white">{{ $serverCount }}</p>
+                            <p class="mt-1 text-sm text-brand-cream/75">{{ $serverCount === 1 ? __('1 server') : __(':count servers', ['count' => $serverCount]) }}</p>
                         </div>
-                        <div class="rounded-2xl border border-white/12 bg-white/7 p-4 backdrop-blur-sm">
-                            <p class="text-xs font-medium uppercase tracking-wide text-brand-cream/65">{{ __('Open findings') }}</p>
-                            <p class="mt-3 text-3xl font-semibold text-white">{{ $openFindings }}</p>
-                            <p class="mt-1 text-sm text-brand-cream/70">{{ __('Across your organization') }}</p>
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                            <p class="text-xs font-medium uppercase tracking-wide text-amber-100/90">{{ __('Open findings') }}</p>
+                            <p class="mt-3 text-3xl font-semibold tabular-nums text-white">{{ $openFindings }}</p>
+                            <p class="mt-1 text-sm text-brand-cream/75">{{ __('Across your organization') }}</p>
                         </div>
-                        <div class="rounded-2xl border border-white/12 bg-white/7 p-4 backdrop-blur-sm">
-                            <p class="text-xs font-medium uppercase tracking-wide text-brand-cream/65">{{ __('Avg health score') }}</p>
-                            <p class="mt-3 text-3xl font-semibold text-white">{{ $avgHealthScore !== null ? (int) $avgHealthScore : '—' }}</p>
-                            <p class="mt-1 text-sm text-brand-cream/70">{{ $avgHealthScore !== null ? __('0–100, higher is better') : __('Available when insights are ready') }}</p>
+                        <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                            <p class="text-xs font-medium uppercase tracking-wide text-brand-sand">{{ __('Avg health score') }}</p>
+                            <p class="mt-3 text-3xl font-semibold tabular-nums text-white">{{ $avgHealthScore !== null ? (int) $avgHealthScore : '—' }}</p>
+                            <p class="mt-1 text-sm text-brand-cream/75">{{ $avgHealthScore !== null ? __('0–100, higher is better') : __('Available when insights are ready') }}</p>
                         </div>
                     </div>
                 </div>
@@ -135,36 +144,38 @@
         @endunless
 
         <div class="mt-8 grid gap-6 xl:grid-cols-[1.7fr_1fr]">
-            <section class="rounded-[1.75rem] border border-brand-ink/10 bg-white/95 p-6 shadow-sm shadow-brand-ink/[0.04] sm:p-7">
+            <section class="dply-card p-6 sm:p-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Platform surfaces') }}</p>
                         <h2 class="mt-2 text-2xl font-semibold tracking-tight text-brand-ink">{{ __('Everything you need to operate from one place') }}</h2>
                     </div>
-                    <a href="{{ route('marketplace.index') }}" wire:navigate class="text-sm font-semibold text-brand-sage transition hover:text-brand-forest">
+                    <a href="{{ route('marketplace.index') }}" wire:navigate class="inline-flex items-center gap-1 rounded-full bg-brand-sage/10 px-3 py-1.5 text-sm font-semibold text-brand-forest transition hover:bg-brand-sage/20">
                         {{ __('Browse marketplace') }} →
                     </a>
                 </div>
 
                 <div class="mt-6 grid gap-4 md:grid-cols-2">
                     @foreach ($platformSurfaces as $surface)
-                        <a href="{{ $surface['href'] }}" wire:navigate class="group rounded-2xl border border-brand-ink/10 bg-brand-cream/70 p-5 transition hover:-translate-y-0.5 hover:border-brand-sage/30 hover:bg-white hover:shadow-lg hover:shadow-brand-ink/[0.03]">
-                            <div class="flex items-start justify-between gap-3">
+                        @php $acc = $surfaceAccents[$loop->index % count($surfaceAccents)]; @endphp
+                        <a href="{{ $surface['href'] }}" wire:navigate class="group relative overflow-hidden rounded-2xl border {{ $acc['border'] }} bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md">
+                            <span class="absolute left-0 top-3 bottom-3 w-1 rounded-full {{ $acc['bar'] }} opacity-90"></span>
+                            <div class="relative flex items-start justify-between gap-3 ps-2">
                                 <div>
                                     <h3 class="text-lg font-semibold text-brand-ink">{{ $surface['title'] }}</h3>
                                     <p class="mt-2 text-sm leading-6 text-brand-moss">{{ $surface['description'] }}</p>
                                 </div>
-                                <span class="rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-moss">
+                                <span class="rounded-full border border-brand-ink/10 bg-white/90 px-2.5 py-1 text-xs font-medium text-brand-moss shadow-sm">
                                     {{ __('Open') }}
                                 </span>
                             </div>
-                            <p class="mt-5 text-sm font-semibold text-brand-sage transition group-hover:text-brand-forest">{{ $surface['cta'] }} →</p>
+                            <p class="relative mt-5 ps-2 text-sm font-semibold text-brand-sage transition group-hover:text-brand-forest">{{ $surface['cta'] }} →</p>
                         </a>
                     @endforeach
                 </div>
             </section>
 
-            <section class="rounded-[1.75rem] border border-brand-ink/10 bg-white/95 p-6 shadow-sm shadow-brand-ink/[0.04] sm:p-7">
+            <section class="dply-card p-6 sm:p-7">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Quick actions') }}</p>
                 <h2 class="mt-2 text-2xl font-semibold tracking-tight text-brand-ink">{{ __('Keep the workspace ready') }}</h2>
                 <p class="mt-3 text-sm leading-6 text-brand-moss">
@@ -173,9 +184,9 @@
 
                 <div class="mt-6 space-y-3">
                     @foreach ($quickActions as $action)
-                        <a href="{{ $action['href'] }}" wire:navigate class="group flex items-start gap-4 rounded-2xl border border-brand-ink/10 bg-brand-cream/60 px-4 py-4 transition hover:border-brand-sage/30 hover:bg-white">
-                            <span class="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-ink text-brand-cream">
-                                <x-heroicon-o-arrow-up-right class="h-5 w-5" />
+                        <a href="{{ $action['href'] }}" wire:navigate class="group flex items-start gap-4 rounded-2xl border border-brand-ink/10 bg-white/80 px-4 py-4 shadow-sm transition hover:border-brand-gold/25 hover:bg-white hover:shadow-md">
+                            <span class="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $action['icon_bg'] }} text-white shadow-sm ring-1 ring-brand-ink/10">
+                                <x-heroicon-o-arrow-up-right class="h-5 w-5 opacity-95" />
                             </span>
                             <span class="min-w-0">
                                 <span class="block text-sm font-semibold text-brand-ink">{{ $action['title'] }}</span>
@@ -188,7 +199,7 @@
         </div>
 
         <div class="mt-6 grid gap-6 lg:grid-cols-[1.35fr_0.95fr]">
-            <section class="rounded-[1.75rem] border border-brand-ink/10 bg-white/95 p-6 shadow-sm shadow-brand-ink/[0.04] sm:p-7">
+            <section class="dply-card p-6 sm:p-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Fleet insights') }}</p>
@@ -238,7 +249,7 @@
                     <div class="mt-6 rounded-[1.5rem] border border-dashed border-brand-ink/15 bg-brand-cream/50 p-6">
                         <h3 class="text-lg font-semibold text-brand-ink">{{ __('A clean slate for new infrastructure') }}</h3>
                         <p class="mt-2 max-w-2xl text-sm leading-6 text-brand-moss">
-                            {{ __('Connect provider credentials, launch your first server, and insights will start surfacing here as your fleet grows.') }}
+                            {{ __('Connect provider credentials, choose a launch path, and insights will start surfacing here as your infrastructure grows.') }}
                         </p>
                         <div class="mt-5 flex flex-wrap gap-3">
                             <a href="{{ route('credentials.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink transition hover:bg-brand-cream">
@@ -252,7 +263,7 @@
                 @endif
             </section>
 
-            <section class="rounded-[1.75rem] border border-brand-ink/10 bg-white/95 p-6 shadow-sm shadow-brand-ink/[0.04] sm:p-7">
+            <section class="dply-card p-6 sm:p-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Your servers') }}</p>
@@ -267,13 +278,13 @@
 
                 @if ($servers->isEmpty())
                     <div class="mt-6 rounded-[1.5rem] border border-brand-ink/10 bg-brand-cream/65 p-6">
-                        <p class="text-base font-medium text-brand-ink">{{ __('No servers yet. Create your first server to get started.') }}</p>
+                        <p class="text-base font-medium text-brand-ink">{{ __('No servers yet. Choose a launch path to get started.') }}</p>
                         <p class="mt-2 text-sm leading-6 text-brand-moss">
-                            {{ __('Start with provider credentials, then launch a server and connect your first site when the workspace is ready.') }}
+                            {{ __('Start with the launchpad, then continue into BYO, local Docker, remote Docker, serverless, Kubernetes, edge, or cloud network setup as the workspace grows.') }}
                         </p>
                         <div class="mt-5 flex flex-wrap gap-3 text-sm">
-                            <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 font-semibold text-brand-cream transition hover:bg-brand-forest">
-                                {{ __('Create your first server') }}
+                            <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 font-semibold text-brand-cream transition hover:bg-brand-forest">
+                                {{ __('Open launchpad') }}
                             </a>
                             <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 font-semibold text-brand-ink transition hover:bg-brand-cream">
                                 {{ __('New? Read the guide') }}

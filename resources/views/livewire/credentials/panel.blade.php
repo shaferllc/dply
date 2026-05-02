@@ -4,18 +4,20 @@
     $code = 'rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-xs font-mono text-brand-ink';
 @endphp
 
-@if (session('success') || $flash_success)
-    <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ $flash_success ?? session('success') }}</div>
-@endif
-@if (session('error') || $flash_error)
-    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">{{ $flash_error ?? session('error') }}</div>
-@endif
-
 @if ($credentials->isNotEmpty())
-    <section class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+    <section class="dply-card overflow-hidden">
         <div class="px-5 py-4 border-b border-brand-ink/10 bg-brand-cream/50 flex flex-wrap items-center justify-between gap-2">
-            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Saved in this organization') }}</h3>
-            <span class="text-xs text-brand-moss">{{ __('Encrypted at rest') }}</span>
+            <h3 class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
+                <x-heroicon-o-archive-box class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                {{ __('Saved in this organization') }}
+            </h3>
+            <span
+                class="inline-flex max-w-[min(100%,18rem)] items-start gap-1.5 text-xs leading-snug text-brand-moss sm:text-end"
+                title="{{ __('Tokens and keys are encrypted in the database before they are stored on disk (encryption at rest).') }}"
+            >
+                <x-heroicon-o-lock-closed class="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                <span>{{ __('Stored encrypted in our database') }}</span>
+            </span>
         </div>
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($credentials as $cred)
@@ -26,21 +28,30 @@
                     </div>
                     <div class="flex flex-wrap items-center gap-3 shrink-0">
                         @if ($this->canVerifyCredentialProvider($cred->provider))
+                            @php $verifyingThis = $verifyingCredentialId === (string) $cred->id; @endphp
                             <button
                                 type="button"
-                                wire:click="verifyCredential({{ $cred->id }})"
-                                wire:loading.attr="disabled"
-                                wire:target="verifyCredential"
-                                class="text-sm font-medium text-brand-sage hover:text-brand-ink"
+                                wire:click="verifyCredential('{{ $cred->id }}')"
+                                @if ($verifyingCredentialId !== null) disabled @endif
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:text-brand-ink disabled:pointer-events-none disabled:opacity-60"
                             >
-                                <span wire:loading.remove wire:target="verifyCredential">{{ __('Verify') }}</span>
-                                <span wire:loading wire:target="verifyCredential" class="inline-flex items-center gap-2">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Verifying…') }}
-                                </span>
+                                @if ($verifyingThis)
+                                    <span class="inline-flex items-center gap-2">
+                                        <x-spinner variant="forest" size="sm" />
+                                        {{ __('Verifying…') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                        {{ __('Verify with provider') }}
+                                    </span>
+                                @endif
                             </button>
                         @endif
-                        <button type="button" wire:click="openConfirmActionModal('destroy', ['{{ $cred->id }}'], @js(__('Remove credential')), @js(__('Remove this credential?')), @js(__('Remove')), true)" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Remove') }}</button>
+                        <button type="button" wire:click="openConfirmActionModal('destroy', ['{{ $cred->id }}'], @js(__('Remove credential')), @js(__('Remove this credential?')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 hover:text-red-900">
+                            <x-heroicon-o-trash class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                            {{ __('Remove') }}
+                        </button>
                     </div>
                 </li>
             @endforeach
@@ -50,7 +61,7 @@
 
 @switch($active_provider)
     @case('digitalocean')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 @if (! empty($digitalOceanOAuthConfigured))
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
@@ -68,8 +79,11 @@
                         @endenv
                         <a
                             href="{{ route('credentials.oauth.digitalocean.redirect') }}"
-                            class="inline-flex items-center justify-center rounded-xl bg-[#0080FF] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0066CC] transition-colors"
-                        >{{ __('Continue with DigitalOcean') }}</a>
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0080FF] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0066CC] transition-colors"
+                        >
+                            <x-heroicon-o-cloud class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                            {{ __('Continue with DigitalOcean') }}
+                        </a>
                     </div>
                     <p class="text-xs text-brand-mist text-center">{{ __('or use an API token') }}</p>
                 @else
@@ -77,17 +91,26 @@
                 @endif
                 <div class="space-y-5">
                     <div>
-                        <x-input-label for="do_name" :value="__('Label (optional)')" />
+                        <x-input-label for="do_name" class="flex items-center gap-2">
+                            <x-heroicon-o-tag class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Label (optional)') }}
+                        </x-input-label>
                         <x-text-input id="do_name" wire:model="do_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production billing') }}" />
                     </div>
                     <div>
-                        <x-input-label for="do_api_token" :value="__('API token')" />
+                        <x-input-label for="do_api_token" class="flex items-center gap-2">
+                            <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('API token') }}
+                        </x-input-label>
                         <x-text-input id="do_api_token" wire:model="do_api_token" type="password" class="mt-1 block w-full" placeholder="dop_v1_…" required autocomplete="off" />
                         <p class="{{ $hint }}">{!! __('Create a token at :link.', ['link' => '<a href="https://cloud.digitalocean.com/account/api/tokens" target="_blank" rel="noopener" class="'.$link.'">DigitalOcean → API</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('do_api_token')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeDigitalOcean" wire:loading.attr="disabled" wire:target="storeDigitalOcean">
-                        <span wire:loading.remove wire:target="storeDigitalOcean">{{ __('Connect DigitalOcean') }}</span>
+                        <span wire:loading.remove wire:target="storeDigitalOcean" class="inline-flex items-center justify-center gap-2">
+                            <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Connect DigitalOcean') }}
+                        </span>
                         <span wire:loading wire:target="storeDigitalOcean" class="inline-flex items-center justify-center gap-2">
                             <x-spinner variant="cream" />
                             {{ __('Connecting…') }}
@@ -98,8 +121,46 @@
         </div>
         @break
 
+    @case('cloudflare')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Use an API token with Zone:DNS:Edit (and Zone:Zone:Read) for the zones Dply should manage. This is independent of where servers are hosted.') }}
+                </p>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="cloudflare_name" class="flex items-center gap-2">
+                            <x-heroicon-o-tag class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Label (optional)') }}
+                        </x-input-label>
+                        <x-text-input id="cloudflare_name" wire:model="cloudflare_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production DNS') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="cloudflare_api_token" class="flex items-center gap-2">
+                            <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('API token') }}
+                        </x-input-label>
+                        <x-text-input id="cloudflare_api_token" wire:model="cloudflare_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in the :link with DNS permissions for your zones.', ['link' => '<a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener" class="'.$link.'">Cloudflare dashboard</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('cloudflare_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeCloudflare" wire:loading.attr="disabled" wire:target="storeCloudflare">
+                        <span wire:loading.remove wire:target="storeCloudflare" class="inline-flex items-center justify-center gap-2">
+                            <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Connect Cloudflare') }}
+                        </span>
+                        <span wire:loading wire:target="storeCloudflare" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
     @case('hetzner')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -125,7 +186,7 @@
         @break
 
     @case('linode')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -151,7 +212,7 @@
         @break
 
     @case('vultr')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -177,7 +238,7 @@
         @break
 
     @case('akamai')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <p class="text-sm text-brand-moss leading-relaxed">{{ __('Uses the same API as Linode. Your Linode Cloud token works here.') }}</p>
                 <div class="space-y-5">
@@ -204,7 +265,7 @@
         @break
 
     @case('equinix_metal')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -235,7 +296,7 @@
         @break
 
     @case('upcloud')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -266,7 +327,7 @@
         @break
 
     @case('scaleway')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -297,7 +358,7 @@
         @break
 
     @case('ovh')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
                     {{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}
@@ -319,7 +380,7 @@
         @break
 
     @case('rackspace')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
                     {{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}
@@ -341,7 +402,7 @@
         @break
 
     @case('fly_io')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -372,7 +433,7 @@
         @break
 
     @case('render')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <p class="text-sm text-brand-moss">{{ __('Saved for future integrations. Not used for VM provisioning in Dply today.') }}</p>
                 <div class="space-y-5">
@@ -391,7 +452,7 @@
         @break
 
     @case('railway')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <p class="text-sm text-brand-moss">{{ __('Saved for future integrations.') }}</p>
                 <div class="space-y-5">
@@ -410,7 +471,7 @@
         @break
 
     @case('coolify')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -434,7 +495,7 @@
         @break
 
     @case('cap_rover')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -458,7 +519,7 @@
         @break
 
     @case('aws')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -482,7 +543,7 @@
         @break
 
     @case('gcp')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -500,7 +561,7 @@
         @break
 
     @case('azure')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>
@@ -518,7 +579,7 @@
         @break
 
     @case('oracle')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
+        <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="space-y-5">
                     <div>

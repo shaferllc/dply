@@ -6,7 +6,7 @@ class SystemdUnitFileBuilder
 {
     public function buildDeployPrepareUnit(): string
     {
-        return <<<UNIT
+        return <<<'UNIT'
 [Unit]
 Description=Dply deploy layout preparation
 After=network.target

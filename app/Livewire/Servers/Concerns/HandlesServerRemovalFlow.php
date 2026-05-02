@@ -47,12 +47,6 @@ trait HandlesServerRemovalFlow
         $this->authorize('delete', $this->server);
         $server = $this->server->fresh();
 
-        if (! hash_equals($server->name, trim($this->deleteConfirmName))) {
-            $this->addError('deleteConfirmName', __('The name does not match exactly.'));
-
-            return null;
-        }
-
         if ($this->removeMode === 'scheduled') {
             $this->validate([
                 'scheduledRemovalDate' => ['required', 'date'],
@@ -91,7 +85,7 @@ trait HandlesServerRemovalFlow
             $this->notifyOrgAdminsOfScheduledRemoval($server->fresh(['organization']), $at, $reason !== '' ? $reason : null);
             $this->server = $server->fresh();
             $this->closeRemoveServerModal();
-            session()->flash('success', __('This server is scheduled for removal at the end of :date.', [
+            $this->toastSuccess(__('This server is scheduled for removal at the end of :date.', [
                 'date' => $at->toFormattedDateString(),
             ]));
 
@@ -105,7 +99,10 @@ trait HandlesServerRemovalFlow
         }
 
         $summary = ServerRemovalAdvisor::summary($server);
-        $this->validate($this->immediateServerRemovalRules($summary));
+        $rules = $this->immediateServerRemovalRules($summary);
+        if ($rules !== []) {
+            $this->validate($rules);
+        }
 
         $reason = trim($this->deletionReason);
         $auditExtras = ['immediate' => true];

@@ -7,8 +7,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\User;
-use App\Services\Servers\ServerCrontabReader;
 use App\Services\Servers\ServerCronSynchronizer;
+use App\Services\Servers\ServerCrontabReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
@@ -119,7 +119,7 @@ class ServerCronBasicsTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceCron::class, ['server' => $server])
             ->call('syncCronJobs')
-            ->assertSet('flash_success', __('Crontab sync finished. Output: :out', ['out' => 'installed']));
+            ->assertDispatched('notify', message: __('Crontab sync finished. Output: :out', ['out' => 'installed']), type: 'success');
     }
 
     public function test_loading_crontab_keeps_user_on_troubleshooting_tab(): void

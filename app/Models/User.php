@@ -15,12 +15,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Laragear\WebAuthn\Contracts\WebAuthnAuthenticatable;
+use Laragear\WebAuthn\WebAuthnAuthentication;
+use Ramsey\Uuid\Uuid;
+use Ramsey\Uuid\UuidInterface;
 
 #[Fillable([
     'name',
     'email',
-    'dply_auth_id',
     'password',
     'country_code',
     'locale',
@@ -36,10 +40,15 @@ use Illuminate\Support\Str;
     'ui_preferences',
 ])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUlids, Notifiable;
+    use HasFactory, HasUlids, Notifiable, WebAuthnAuthentication;
+
+    public function webAuthnId(): UuidInterface
+    {
+        return Uuid::uuid5(Uuid::NAMESPACE_DNS, 'dply:user:'.$this->getKey());
+    }
 
     protected static function booted(): void
     {
@@ -52,6 +61,10 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public static function newUniqueReferralCode(): string
     {
+        if (! Schema::hasTable((new static)->getTable())) {
+            return Str::lower(Str::random(20));
+        }
+
         do {
             $code = Str::lower(Str::random(20));
         } while (static::query()->where('referral_code', $code)->exists());

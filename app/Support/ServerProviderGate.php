@@ -14,6 +14,8 @@ final class ServerProviderGate
      */
     private const SERVER_CREATE_ORDER = [
         'digitalocean',
+        'digitalocean_functions',
+        'digitalocean_kubernetes',
         'hetzner',
         'vultr',
         'linode',
@@ -23,6 +25,7 @@ final class ServerProviderGate
         'equinix_metal',
         'fly_io',
         'aws',
+        'aws_lambda',
         'custom',
     ];
 

@@ -7,6 +7,25 @@ return [
     'nginx_sites_enabled' => env('DPLY_NGINX_SITES_ENABLED', '/etc/nginx/sites-enabled'),
 
     /*
+    | Per-site layer snippets (before/*.conf, after/*.conf) live under this directory.
+    */
+    'nginx_dply_site_path' => env('DPLY_NGINX_DPLY_SITE_PATH', '/etc/nginx/dply'),
+
+    'apache_sites_available' => env('DPLY_APACHE_SITES_AVAILABLE', '/etc/apache2/sites-available'),
+
+    'apache_sites_enabled' => env('DPLY_APACHE_SITES_ENABLED', '/etc/apache2/sites-enabled'),
+
+    'caddy_sites_enabled' => env('DPLY_CADDY_SITES_ENABLED', '/etc/caddy/sites-enabled'),
+
+    'openlitespeed_vhosts_path' => env('DPLY_OLS_VHOSTS_PATH', '/usr/local/lsws/conf/vhosts'),
+
+    'openlitespeed_httpd_config' => env('DPLY_OLS_HTTPD_CONFIG', '/usr/local/lsws/conf/httpd_config.conf'),
+
+    'traefik_dynamic_config_path' => env('DPLY_TRAEFIK_DYNAMIC_CONFIG_PATH', '/etc/traefik/dynamic'),
+
+    'traefik_static_config' => env('DPLY_TRAEFIK_STATIC_CONFIG', '/etc/traefik/traefik.yml'),
+
+    /*
     | {version} is replaced with site php_version (e.g. 8.3).
     */
     'php_fpm_socket' => env('DPLY_PHP_FPM_SOCKET', '/run/php/php{version}-fpm.sock'),
@@ -27,5 +46,19 @@ return [
     'webhook_timestamp_tolerance' => (int) env('DPLY_WEBHOOK_TIMESTAMP_TOLERANCE', 300),
 
     'webhook_max_attempts_per_minute' => (int) env('DPLY_WEBHOOK_MAX_ATTEMPTS_PER_MINUTE', 30),
+
+    'local_runtime_git_timeout_seconds' => max(30, (int) env('DPLY_LOCAL_RUNTIME_GIT_TIMEOUT_SECONDS', 900)),
+
+    'local_runtime_docker_timeout_seconds' => max(30, (int) env('DPLY_LOCAL_RUNTIME_DOCKER_TIMEOUT_SECONDS', 1800)),
+
+    /*
+    | Shared nginx zones for Dply “engine HTTP cache” (FastCGI + reverse_proxy). Written to
+    | conf.d by SiteNginxProvisioner; vhosts reference these names when a site enables cache.
+    */
+    'nginx_engine_fcgi_cache_zone' => env('DPLY_NGINX_ENGINE_FCGI_CACHE_ZONE', 'dply_engine_fcgi'),
+    'nginx_engine_proxy_cache_zone' => env('DPLY_NGINX_ENGINE_PROXY_CACHE_ZONE', 'dply_engine_proxy'),
+    'nginx_engine_fcgi_cache_path' => env('DPLY_NGINX_ENGINE_FCGI_CACHE_PATH', '/var/cache/nginx/dply-engine-fcgi'),
+    'nginx_engine_proxy_cache_path' => env('DPLY_NGINX_ENGINE_PROXY_CACHE_PATH', '/var/cache/nginx/dply-engine-proxy'),
+    'nginx_engine_http_cache_conf' => env('DPLY_NGINX_ENGINE_HTTP_CACHE_CONF', '/etc/nginx/conf.d/99-dply-engine-http-cache.conf'),
 
 ];

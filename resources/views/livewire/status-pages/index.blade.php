@@ -1,8 +1,13 @@
 <div>
     <header class="border-b border-slate-200 bg-white">
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ __('Status pages') }}</h2>
-            <p class="mt-1 text-sm text-slate-600">{{ __('Public status pages and incidents for your servers and sites—similar to other hosting panels.') }}</p>
+            <x-page-header
+                :title="__('Status pages')"
+                :description="__('Public status pages and incidents for your servers and sites—similar to other hosting panels.')"
+                doc-route="docs.index"
+                flush
+                compact
+            />
         </div>
     </header>
     <div class="py-12">

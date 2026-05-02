@@ -2,8 +2,9 @@
 
 namespace App\Livewire\Servers;
 
-use App\Livewire\Forms\FirewallRuleForm;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Forms\FirewallRuleForm;
+use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesFirewallWorkspaceAdvanced;
@@ -24,6 +25,7 @@ use Livewire\Component;
 class WorkspaceFirewall extends Component
 {
     use ConfirmsActionWithModal;
+    use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesFirewallWorkspaceAdvanced;
@@ -33,6 +35,8 @@ class WorkspaceFirewall extends Component
     public ?string $editing_rule_id = null;
 
     public ?string $ufw_status_text = null;
+
+    protected ?string $lastUfwHostSyncError = null;
 
     public function mount(Server $server): void
     {
@@ -89,7 +93,7 @@ class WorkspaceFirewall extends Component
                 return;
             }
         }
-        $this->flash_error = null;
+        $this->lastUfwHostSyncError = null;
 
         $port = in_array($this->form->protocol, ['icmp', 'ipv6-icmp'], true) ? null : $this->form->port;
         $tags = FirewallRuleForm::tagsStringToArray($this->form->tags);
@@ -138,9 +142,13 @@ class WorkspaceFirewall extends Component
             ], auth()->user());
             $rule->refresh();
             $this->syncRuleOnHostAfterMutation($firewall, $before, $rule);
-            $this->flash_success = $this->flash_error
-                ? __('Rule saved in the panel. Fix the UFW error below, then apply again if needed.')
-                : __('Rule updated and synced to UFW.');
+            if ($this->lastUfwHostSyncError) {
+                $this->toastWarning(
+                    __('Rule updated in the panel, but the host could not be synced: :err', ['err' => $this->lastUfwHostSyncError])
+                );
+            } else {
+                $this->toastSuccess(__('Rule updated and synced to UFW.'));
+            }
             $this->editing_rule_id = null;
             $this->form->resetForNew();
         } else {
@@ -165,20 +173,20 @@ class WorkspaceFirewall extends Component
                 try {
                     $this->server->refresh();
                     $out = $firewall->applyRule($this->server, $rule);
-                    $this->flash_success = __('Rule saved and applied. :detail', [
+                    $this->toastSuccess(__('Rule saved and applied. :detail', [
                         'detail' => Str::limit(trim($out), 400),
-                    ]);
+                    ]));
                 } catch (\Throwable $e) {
-                    $this->flash_error = $e->getMessage();
-                    $this->flash_success = __('Rule saved. Apply failed; use Apply or fix SSH.');
+                    $this->lastUfwHostSyncError = $e->getMessage();
+                    $this->toastWarning(
+                        __('Rule saved. Apply failed: :msg. You can use “Apply firewall rules” or fix SSH.', ['msg' => $e->getMessage()])
+                    );
                 }
             } else {
-                $this->flash_success = __('Rule saved. Use “Apply firewall rules” to push enabled rules to the server.');
+                $this->toastSuccess(__('Rule saved. Use “Apply firewall rules” to push enabled rules to the server.'));
             }
             $this->form->resetForNew();
         }
-
-        $this->flash_error = $this->flash_error ?? null;
     }
 
     /**
@@ -203,7 +211,7 @@ class WorkspaceFirewall extends Component
                 $firewall->applyRule($this->server, $after->fresh());
             }
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->lastUfwHostSyncError = $e->getMessage();
         }
     }
 
@@ -221,34 +229,33 @@ class WorkspaceFirewall extends Component
         $rule->refresh();
 
         if (! $this->opsReady()) {
-            $this->flash_success = $rule->enabled
+            $this->toastSuccess($rule->enabled
                 ? __('Rule enabled. Apply firewall rules when SSH is ready to sync.')
-                : __('Rule disabled. Re-enable and apply to restore on the server if needed.');
+                : __('Rule disabled. Re-enable and apply to restore on the server if needed.'));
 
             return;
         }
 
         $this->server->refresh();
-        $this->flash_error = null;
 
         try {
             if ($wasEnabled && ! $rule->enabled) {
                 $snapshot->enabled = true;
 
-                $this->flash_success = Str::limit(
+                $this->toastSuccess(Str::limit(
                     trim($firewall->removeFromHost($this->server, $snapshot)),
                     900
-                );
+                ));
             } elseif (! $wasEnabled && $rule->enabled) {
-                $this->flash_success = Str::limit(
+                $this->toastSuccess(Str::limit(
                     trim($firewall->applyRule($this->server, $rule)),
                     900
-                );
+                ));
             } else {
-                $this->flash_success = __('Preference saved.');
+                $this->toastSuccess(__('Preference saved.'));
             }
         } catch (\Throwable $e) {
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -280,11 +287,11 @@ class WorkspaceFirewall extends Component
             $this->cancelEditRule();
         }
 
-        $this->flash_success = __('Rule removed from the panel.');
+        $removedMsg = __('Rule removed from the panel.');
         if ($remote !== null && $remote !== '') {
-            $this->flash_success .= ' '.Str::limit($remote, 500);
+            $removedMsg .= ' '.Str::limit($remote, 500);
         }
-        $this->flash_error = null;
+        $this->toastSuccess($removedMsg);
     }
 
     public function selectAllFirewallRules(): void
@@ -304,7 +311,7 @@ class WorkspaceFirewall extends Component
         $this->authorize('update', $this->server);
         $ids = array_values(array_unique(array_filter($this->firewall_bulk_ids)));
         if ($ids === []) {
-            $this->flash_error = __('Select at least one rule.');
+            $this->toastError(__('Select at least one rule.'));
 
             return;
         }
@@ -317,7 +324,7 @@ class WorkspaceFirewall extends Component
             'bulk' => 'enable',
             'count' => $n,
         ], auth()->user());
-        $this->flash_success = __('Enabled :n rule(s) in the panel. Use “Apply firewall rules” to sync the host.', ['n' => $n]);
+        $this->toastSuccess(__('Enabled :n rule(s) in the panel. Use “Apply firewall rules” to sync the host.', ['n' => $n]));
     }
 
     public function bulkDisableFirewallRules(ServerFirewallAuditLogger $audit): void
@@ -325,7 +332,7 @@ class WorkspaceFirewall extends Component
         $this->authorize('update', $this->server);
         $ids = array_values(array_unique(array_filter($this->firewall_bulk_ids)));
         if ($ids === []) {
-            $this->flash_error = __('Select at least one rule.');
+            $this->toastError(__('Select at least one rule.'));
 
             return;
         }
@@ -338,7 +345,7 @@ class WorkspaceFirewall extends Component
             'bulk' => 'disable',
             'count' => $n,
         ], auth()->user());
-        $this->flash_success = __('Disabled :n rule(s) in the panel. Use “Apply firewall rules” to sync the host.', ['n' => $n]);
+        $this->toastSuccess(__('Disabled :n rule(s) in the panel. Use “Apply firewall rules” to sync the host.', ['n' => $n]));
     }
 
     public function bulkDeleteFirewallRules(ServerFirewallProvisioner $firewall, ServerFirewallAuditLogger $audit): void
@@ -346,7 +353,7 @@ class WorkspaceFirewall extends Component
         $this->authorize('update', $this->server);
         $ids = array_values(array_unique(array_filter($this->firewall_bulk_ids)));
         if ($ids === []) {
-            $this->flash_error = __('Select at least one rule.');
+            $this->toastError(__('Select at least one rule.'));
 
             return;
         }
@@ -379,7 +386,7 @@ class WorkspaceFirewall extends Component
             'rule_ids' => $ruleIds,
             'count' => count($ruleIds),
         ], auth()->user());
-        $this->flash_success = __('Removed :n rule(s).', ['n' => count($ruleIds)]);
+        $this->toastSuccess(__('Removed :n rule(s).', ['n' => count($ruleIds)]));
     }
 
     public function trimDuplicateFirewallRules(ServerFirewallProvisioner $firewall, ServerFirewallAuditLogger $audit): void
@@ -388,7 +395,7 @@ class WorkspaceFirewall extends Component
 
         $rules = $this->server->firewallRules()->orderBy('sort_order')->orderBy('id')->get();
         if ($rules->isEmpty()) {
-            $this->flash_error = __('There are no firewall rules to trim.');
+            $this->toastError(__('There are no firewall rules to trim.'));
 
             return;
         }
@@ -416,7 +423,7 @@ class WorkspaceFirewall extends Component
             ->values();
 
         if ($duplicates->isEmpty()) {
-            $this->flash_success = __('No duplicate firewall rules were found.');
+            $this->toastSuccess(__('No duplicate firewall rules were found.'));
 
             return;
         }
@@ -448,25 +455,29 @@ class WorkspaceFirewall extends Component
             'count' => count($removedRuleIds),
         ], auth()->user());
 
-        $this->flash_success = __('Trimmed :n duplicate rule(s).', ['n' => count($removedRuleIds)]);
+        $this->toastSuccess(__('Trimmed :n duplicate rule(s).', ['n' => count($removedRuleIds)]));
     }
 
     public function applyFirewall(
         ServerFirewallProvisioner $firewall,
         ServerFirewallAuditLogger $audit,
         ServerFirewallApplyRecorder $recorder,
+        bool $override = false,
     ): void {
         $this->authorize('update', $this->server);
-        $this->flash_success = null;
-        $this->flash_error = null;
         $this->server->refresh();
+        if (! $this->disruptiveActionAllowed(__('Apply firewall rules'), $override)) {
+            return;
+        }
 
         $sshWarn = $firewall->sshAccessNotExplicitlyAllowed($this->server)
             ? ' '.__('Warning: no enabled Dply rule allows TCP :port from “any” — confirm SSH access before locking yourself out.', ['port' => $this->server->ssh_port ?: 22])
             : '';
 
         if ($firewall->sshAccessNotExplicitlyAllowed($this->server) && ! $this->firewall_ack_ssh_risk) {
-            $this->flash_error = __('Check “I understand SSH may be unreachable” below, or add an allow rule for your SSH port, before applying.');
+            $this->toastError(
+                __('Check “I understand SSH may be unreachable” below, or add an allow rule for your SSH port, before applying.')
+            );
 
             return;
         }
@@ -478,25 +489,45 @@ class WorkspaceFirewall extends Component
             ], auth()->user());
             $recorder->recordSuccess($this->server, auth()->user(), null, $out, 'livewire');
             $this->firewall_ack_ssh_risk = false;
-            $this->flash_success = Str::limit(trim($out).$sshWarn, 2200);
+            $this->toastSuccess(Str::limit(trim($out).$sshWarn, 2200));
         } catch (\Throwable $e) {
             $recorder->recordFailure($this->server, auth()->user(), null, $e->getMessage(), 'livewire');
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
     }
 
     public function refreshUfwStatus(ServerFirewallProvisioner $firewall): void
     {
         $this->authorize('update', $this->server);
-        $this->flash_error = null;
         try {
             $this->server->refresh();
             $this->ufw_status_text = $firewall->status($this->server);
-            $this->flash_success = __('Refreshed UFW status from the server.');
+            $this->toastSuccess(__('Refreshed UFW status from the server.'));
         } catch (\Throwable $e) {
             $this->ufw_status_text = null;
-            $this->flash_error = $e->getMessage();
+            $this->toastError($e->getMessage());
         }
+    }
+
+    public bool $ufw_diagnostics_modal_open = false;
+
+    public ?string $ufw_diagnostics_text = null;
+
+    public function runFirewallDiagnostics(ServerFirewallProvisioner $firewall): void
+    {
+        $this->authorize('update', $this->server);
+        try {
+            $this->server->refresh();
+            $this->ufw_diagnostics_text = $firewall->diagnostics($this->server);
+            $this->ufw_diagnostics_modal_open = true;
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function closeFirewallDiagnostics(): void
+    {
+        $this->ufw_diagnostics_modal_open = false;
     }
 
     public function render(): View
@@ -526,6 +557,7 @@ class WorkspaceFirewall extends Component
             'auditEvents' => $this->server->firewallAuditEvents()->with('user')->limit(40)->get(),
             'applyLogs' => $this->server->firewallApplyLogs()->with(['user'])->limit(25)->get(),
             'sshNotCovered' => $provisioner->sshAccessNotExplicitlyAllowed($this->server),
+            'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
         ]);
     }
 }

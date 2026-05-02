@@ -1,16 +1,14 @@
 <div class="py-12">
-    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Notifications') }}</h1>
-                <p class="mt-1 text-sm text-brand-moss">
-                    {{ $notificationsReady
-                        ? __('Unread: :count', ['count' => $unreadCount])
-                        : __('Run the latest database migrations to enable the shared inbox.') }}
-                </p>
-            </div>
-            @if ($notificationsReady)
-                <div class="flex flex-wrap items-center gap-2">
+    <div class="dply-page-shell space-y-6">
+        <x-page-header
+            :title="__('Notifications')"
+            :description="$notificationsReady ? __('Unread: :count', ['count' => $unreadCount]) : __('Run the latest database migrations to enable the shared inbox.')"
+            doc-route="docs.index"
+            flush
+            compact
+        >
+            <x-slot name="actions">
+                @if ($notificationsReady)
                     <button
                         type="button"
                         wire:click="$set('filter', 'unread')"
@@ -34,9 +32,9 @@
                             {{ __('Mark all read') }}
                         </button>
                     @endif
-                </div>
-            @endif
-        </div>
+                @endif
+            </x-slot>
+        </x-page-header>
 
         <div class="space-y-3">
             @forelse ($items as $item)

@@ -27,6 +27,12 @@ return [
     'ssh_ready_retry_seconds' => max(3, (int) env('DPLY_SSH_READY_RETRY_SECONDS', 8)),
 
     /*
+    | Log SSH readiness polling at info level every N attempts (1 = every attempt).
+    | Attempts between those use debug level.
+    */
+    'ssh_ready_log_every_n_attempts' => max(1, (int) env('DPLY_SSH_READY_LOG_EVERY_N_ATTEMPTS', 5)),
+
+    /*
     |--------------------------------------------------------------------------
     | Deploy user created on the server (same key as root from provisioning)
     |--------------------------------------------------------------------------
@@ -70,5 +76,18 @@ return [
     |
     */
     'install_supervisor_on_provision' => (bool) env('DPLY_INSTALL_SUPERVISOR_ON_PROVISION', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Local dev: shell hints on provision journey (APP_ENV=local only)
+    |--------------------------------------------------------------------------
+    |
+    | docker-compose.ssh-dev.yml uses container name dply-ssh-dev by default.
+    | Optional: URL of a self-hosted web terminal (e.g. ttyd) for ssh to the test host.
+    |
+    */
+    'local_dev_ssh_compose_container' => env('DPLY_DEV_SSH_COMPOSE_CONTAINER', 'dply-ssh-dev'),
+
+    'local_dev_web_terminal_url' => env('DPLY_DEV_SSH_WEB_TERMINAL_URL'),
 
 ];

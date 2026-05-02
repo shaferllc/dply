@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\ServerProvider;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
+use App\Support\Hosts\HostCapabilities;
+use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +30,16 @@ class Server extends Model
     public const STATUS_ERROR = 'error';
 
     public const STATUS_DISCONNECTED = 'disconnected';
+
+    public const HOST_KIND_VM = 'vm';
+
+    public const HOST_KIND_DOCKER = 'docker';
+
+    public const HOST_KIND_KUBERNETES = 'kubernetes';
+
+    public const HOST_KIND_DIGITALOCEAN_FUNCTIONS = 'digitalocean_functions';
+
+    public const HOST_KIND_AWS_LAMBDA = 'aws_lambda';
 
     public const HEALTH_REACHABLE = 'reachable';
 
@@ -216,6 +228,71 @@ class Server extends Model
         return $this->status === self::STATUS_READY;
     }
 
+    public function hostKind(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $hostKind = $meta['host_kind'] ?? self::HOST_KIND_VM;
+
+        return in_array($hostKind, [
+            self::HOST_KIND_VM,
+            self::HOST_KIND_DOCKER,
+            self::HOST_KIND_KUBERNETES,
+            self::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+            self::HOST_KIND_AWS_LAMBDA,
+        ], true) ? $hostKind : self::HOST_KIND_VM;
+    }
+
+    public function hostCapabilities(): HostCapabilities
+    {
+        return new HostCapabilities($this);
+    }
+
+    public function isVmHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_VM;
+    }
+
+    public function isDigitalOceanFunctionsHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DIGITALOCEAN_FUNCTIONS;
+    }
+
+    public function isAwsLambdaHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_AWS_LAMBDA;
+    }
+
+    public function isDockerHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DOCKER;
+    }
+
+    public function isKubernetesCluster(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_KUBERNETES;
+    }
+
+    public function providerDisplayLabel(): string
+    {
+        if ($this->isDigitalOceanFunctionsHost()) {
+            return 'DigitalOcean Functions';
+        }
+
+        if ($this->isAwsLambdaHost()) {
+            return 'AWS Lambda';
+        }
+
+        if ($this->isDockerHost()) {
+            return 'Docker';
+        }
+
+        if ($this->isKubernetesCluster()) {
+            return 'Kubernetes';
+        }
+
+        return $this->provider?->label() ?? 'Custom';
+    }
+
     /**
      * OpenSSH one-line public key derived from the stored provisioned private key.
      */
@@ -236,6 +313,11 @@ class Server extends Model
 
     public function operationalSshPrivateKey(): ?string
     {
+        $fakeOverride = FakeCloudProvision::sshPrivateKeyOverrideForFakeServer($this);
+        if ($fakeOverride !== null) {
+            return $fakeOverride;
+        }
+
         $key = $this->ssh_operational_private_key;
 
         if (is_string($key) && trim($key) !== '') {
@@ -249,6 +331,11 @@ class Server extends Model
 
     public function recoverySshPrivateKey(): ?string
     {
+        $fakeOverride = FakeCloudProvision::sshPrivateKeyOverrideForFakeServer($this);
+        if ($fakeOverride !== null) {
+            return $fakeOverride;
+        }
+
         $key = $this->ssh_recovery_private_key;
 
         if (is_string($key) && trim($key) !== '') {
@@ -263,6 +350,40 @@ class Server extends Model
     public function hasAnySshPrivateKey(): bool
     {
         return $this->operationalSshPrivateKey() !== null || $this->recoverySshPrivateKey() !== null;
+    }
+
+    public function hasPersonalUserSshKey(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        $userKeys = $user->sshKeys()
+            ->select(['id', 'public_key'])
+            ->get();
+
+        if ($userKeys->isEmpty()) {
+            return false;
+        }
+
+        $managedKeyIds = $userKeys->pluck('id');
+        $publicKeys = $userKeys
+            ->pluck('public_key')
+            ->filter(fn ($key): bool => is_string($key) && trim($key) !== '')
+            ->map(fn ($key): string => trim($key));
+
+        return $this->authorizedKeys()
+            ->where(function ($query) use ($managedKeyIds, $publicKeys): void {
+                $query->where(function ($managed) use ($managedKeyIds): void {
+                    $managed->where('managed_key_type', UserSshKey::class)
+                        ->whereIn('managed_key_id', $managedKeyIds);
+                });
+
+                if ($publicKeys->isNotEmpty()) {
+                    $query->orWhereIn('public_key', $publicKeys);
+                }
+            })
+            ->exists();
     }
 
     public function hasDedicatedOperationalSshPrivateKey(): bool
@@ -341,11 +462,20 @@ class Server extends Model
             throw new \RuntimeException('Server has no IP address.');
         }
 
-        return TaskRunnerConnection::fromArray([
+        $connection = [
             'host' => $host,
             'port' => (int) ($this->ssh_port ?: 22),
             'username' => $username,
             'private_key' => $key,
-        ]);
+        ];
+
+        if (FakeCloudProvision::isFakeServer($this)) {
+            $scriptPath = config('server_provision_fake.ssh_script_path');
+            if (is_string($scriptPath) && trim($scriptPath) !== '') {
+                $connection['script_path'] = trim($scriptPath);
+            }
+        }
+
+        return TaskRunnerConnection::fromArray($connection);
     }
 }

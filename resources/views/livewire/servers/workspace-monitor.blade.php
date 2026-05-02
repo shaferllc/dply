@@ -1,7 +1,7 @@
 @php
     $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
     $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $card = 'rounded-2xl border border-brand-ink/10 bg-white shadow-sm overflow-hidden';
+    $card = 'dply-card overflow-hidden';
     $m = $server->meta ?? [];
     $sshKnown = array_key_exists('monitoring_ssh_reachable', $m);
     $sshOk = (bool) ($m['monitoring_ssh_reachable'] ?? false);
@@ -67,7 +67,7 @@
         <div wire:poll.{{ $pollAutoRefreshSeconds }}s class="hidden" aria-hidden="true"></div>
     @endif
 
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null, 'command_error' => $remote_error ?? null])
+    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 14])
@@ -92,7 +92,7 @@
     @endif
     {{-- Always-visible install path when Python is missing (matches server_workspace / overview copy) --}}
     @if ($opsReady && ! $pyOk)
-        <div class="rounded-2xl border-2 border-brand-sage/35 bg-gradient-to-b from-brand-sand/50 to-white p-6 sm:p-8 shadow-sm">
+        <div class="rounded-2xl border-2 border-brand-sage/35 bg-brand-sand/35 p-6 sm:p-8 shadow-sm">
             <p class="text-xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Monitor setup') }}</p>
             <h2 class="mt-2 text-xl font-bold tracking-tight text-brand-ink">{{ __('Install monitor on this server') }}</h2>
             <p class="mt-3 max-w-3xl text-sm leading-relaxed text-brand-moss">

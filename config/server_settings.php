@@ -88,15 +88,15 @@ return [
      * Order matches the horizontal tab bar.
      */
     'workspace_tabs' => [
-        'connection' => ['label' => 'Connection'],
-        'keys' => ['label' => 'Keys'],
-        'alerts' => ['label' => 'Alerts & downtime'],
-        'inventory' => ['label' => 'Inventory & host'],
-        'governance' => ['label' => 'Cost & compliance'],
-        'notes' => ['label' => 'Timezone & notes'],
-        'webhook' => ['label' => 'Webhook'],
-        'export' => ['label' => 'Export'],
-        'danger' => ['label' => 'Danger'],
+        'connection' => ['label' => 'Connection', 'icon' => 'link'],
+        'keys' => ['label' => 'Keys', 'icon' => 'key'],
+        'alerts' => ['label' => 'Alerts & downtime', 'icon' => 'bell-alert'],
+        'inventory' => ['label' => 'Inventory & host', 'icon' => 'clipboard-document-list'],
+        'governance' => ['label' => 'Cost & compliance', 'icon' => 'currency-dollar'],
+        'notes' => ['label' => 'Timezone & notes', 'icon' => 'document-text'],
+        'webhook' => ['label' => 'Webhook', 'icon' => 'bolt'],
+        'export' => ['label' => 'Export', 'icon' => 'arrow-down-tray'],
+        'danger' => ['label' => 'Danger', 'icon' => 'exclamation-triangle'],
     ],
 
 ];

@@ -2,17 +2,16 @@
 
 namespace App\Contracts;
 
-use App\Services\Deploy\ByoDeployContext;
-use App\Services\Sites\SiteGitDeployer;
+use App\Services\Deploy\DeployContext;
 
 interface DeployEngine
 {
     /**
-     * Execute the deploy for the given context (BYO: git/SSH pipeline).
+     * Execute the deploy for the given context.
      *
      * @return array{output: string, sha: ?string}
      *
-     * @throws \Throwable On deploy failure (same contract as {@see SiteGitDeployer::run}).
+     * @throws \Throwable On deploy failure.
      */
-    public function run(ByoDeployContext $context): array;
+    public function run(DeployContext $context): array;
 }

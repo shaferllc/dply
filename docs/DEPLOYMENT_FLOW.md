@@ -1,56 +1,46 @@
-# Deployment flow (Dply)
+# Source control & deploy flow
 
-For **organization roles, deployer restrictions, and Free vs Pro server/site limits**, see **[ORG_ROLES_AND_LIMITS.md](./ORG_ROLES_AND_LIMITS.md)** (also available in-app under **Docs → Roles & plan limits**).
+How Git connects to dply, how sites pull code, and what happens when you deploy.
 
-Order of operations for a **simple** deploy (git directly in the deploy path):
+## Two different kinds of “connection”
 
-1. **`before_clone` hooks** — run in the deploy directory (after `mkdir -p`).
-2. **Git** — `git clone` (first time) or `fetch` / `checkout` / `pull`.
-3. **`after_clone` hooks** — run in the repository root after code is updated.
-4. **Pipeline steps** — ordered steps (Composer, npm, Artisan, custom) with per-step timeouts.
-5. **Post-deploy command** — single legacy shell string from the site settings.
-6. **`after_activate` hooks** — for simple deploys, same working directory as the repo root.
+dply keeps these separate on purpose:
 
-**Atomic** deploys use the same hook phases, but:
+1. **Git (source control)** — OAuth to GitHub, GitLab, or Bitbucket under **Profile → Source control**. Used to pick repositories, receive webhooks, and clone code during deploys.
+2. **Server providers** — API tokens for **DigitalOcean**, **Hetzner**, etc., under **Settings → Server providers** (organization‑scoped). Used to create and manage VMs, DNS where supported, and related infrastructure.
 
-- `before_clone` runs in the site root (parent of `releases/`).
-- `after_clone` and the **pipeline** run inside the new `releases/<timestamp>` directory.
-- The post-deploy command runs there **before** the `current` symlink is updated.
-- `after_activate` runs with working directory set to the **activated** `current` path.
+You need both when your workflow is “spin up a server here” and “deploy this repo there.”
 
-## Webhook signing
+## Linking a repository to a site
 
-**Recommended (replay-resistant):**
+When you configure a site, you choose:
 
-- Header `X-Dply-Timestamp`: Unix time in seconds.
-- Header `X-Dply-Signature`: `sha256=` + `hash_hmac('sha256', "{timestamp}." . raw_request_body, webhook_secret)`.
-- Clock skew must be within `DPLY_WEBHOOK_TIMESTAMP_TOLERANCE` seconds (default 300).
-- Identical timestamp + body within ~15 minutes returns `409` (duplicate delivery).
+- **Repository** — from your linked Git account (or compatible URL flow your install supports).
+- **Branch** — usually `main` or `production`.
+- **Deploy settings** — strategy (for example atomic vs simple), commands, and environment.
 
-**Legacy:** `X-Dply-Signature: sha256=` + `hash_hmac('sha256', raw_request_body, webhook_secret)` with no timestamp (still supported).
+The control plane stores enough metadata to clone or pull on the remote server and to validate webhook payloads.
 
-Optional **IP allow list** on the site (one IPv4/IPv6 or IPv4 CIDR per line). Empty list = any client IP (signature still required).
+## Webhooks
 
-## API idempotency
+For supported hosts, dply can register or guide you to register a **push webhook** so new commits trigger or queue a deployment without clicking deploy manually—depending on how your organization configures automation.
 
-`POST /api/v1/sites/{id}/deploy` accepts `Idempotency-Key`. The first response is `202` (queued) or `200` with a body when `sync=true`. Retries with the same key return the **cached** JSON for 24 hours after completion, or `409` while a deploy for that key is still running.
+If webhooks are misconfigured, you can still deploy from the UI or API.
 
-## Concurrent deploys
+## What happens on deploy (high level)
 
-Only **one** deploy runs per site at a time (cache lock). Additional triggers create a deployment row with status **`skipped`** and a short message.
+1. The app records a deployment and assigns it a release path or directory strategy based on your **deploy strategy** (for example zero‑downtime atomic layouts using release dirs and a `current` symlink vs updating a single checkout in place).
+2. The server’s deploy user fetches the requested **commit** from Git using credentials or deploy keys your setup provides.
+3. Build steps you defined (Composer, npm, artisan, etc.) run in the context of that release.
+4. Traffic is switched to the new release (strategy‑dependent), health checks may run, and old releases can be pruned.
 
-## Remote cleanup on site delete
+Exact commands and paths appear in your site’s deploy configuration and server setup—not duplicated here so this page stays accurate across versions.
 
-When a site is deleted in Dply, a queued job removes the Nginx vhost file and enabled symlink on the server (when SSH is available) and reloads Nginx. It does **not** remove Git data, releases, or SSL certificates automatically.
+## Notifications
 
-## Configuration reference
+Organizations can route deploy notifications through **notification channels** (email, Slack‑compatible webhooks, etc.). Per‑organization toggles exist for deploy‑finish email versus other alerts—check **Organization** settings if your team wants quieter email.
 
-| Env / config | Purpose |
-|--------------|---------|
-| `DPLY_WEBHOOK_TIMESTAMP_TOLERANCE` | Max clock skew for webhook timestamp (seconds). |
-| `DPLY_WEBHOOK_MAX_ATTEMPTS_PER_MINUTE` | Per-site webhook throttle. |
-| `DPLY_MAX_ORG_MEMBERS` | Hard cap on members + pending invites (null = unlimited). |
-| `DPLY_SITE_HEALTH_CHECK` | Enable scheduled HTTPS/HTTP checks for nginx-active sites with domains. |
-| `DPLY_DEPLOY_NOTIFICATIONS` | Email site owner + org admins on deploy success/failure/skip. |
-| `SUBSCRIPTION_SERVERS_FREE_LIMIT` | Max servers per org on Free (default 3). Pro = unlimited. |
-| `SUBSCRIPTION_SITES_FREE_LIMIT` | Max sites per org on Free (default 10). Pro = unlimited. |
+## Related
+
+- [Connect a cloud provider](/docs/connect-provider)
+- [Organization roles & plan limits](/docs/org-roles-and-limits)

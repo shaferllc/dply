@@ -3,8 +3,8 @@
 namespace App\Livewire\Concerns;
 
 use BadMethodCallException;
-use ReflectionMethod;
 use Livewire\Component;
+use ReflectionMethod;
 
 /**
  * @phpstan-require-extends Component
@@ -26,9 +26,6 @@ trait ConfirmsActionWithModal
 
     public bool $confirmActionModalDestructive = false;
 
-    /**
-     * @param  mixed  $arguments
-     */
     public function openConfirmActionModal(
         string $method,
         mixed $arguments = [],

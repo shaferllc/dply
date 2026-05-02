@@ -35,83 +35,162 @@
 @endphp
 
 <div wire:key="servers-epoch-{{ $serverListEpoch }}">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
-            <ol class="flex flex-wrap items-center gap-2">
-                <li><a href="{{ route('dashboard') }}" class="hover:text-brand-ink transition-colors" wire:navigate>{{ __('Dashboard') }}</a></li>
-                <li class="text-brand-mist" aria-hidden="true">/</li>
-                <li class="text-brand-ink font-medium">{{ __('Servers') }}</li>
-            </ol>
-        </nav>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <x-dashboard-breadcrumb :current="__('Servers')" current-icon="server-stack" />
 
         @if (session('success'))
-            <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status">{{ session('success') }}</div>
+            <x-alert tone="success">{{ session('success') }}</x-alert>
         @endif
 
-        <section class="relative mb-8 overflow-hidden rounded-[2rem] border border-brand-ink/10 bg-brand-ink text-brand-cream shadow-xl shadow-brand-ink/10">
-            <div class="absolute inset-0 bg-mesh-brand opacity-90"></div>
-            <div class="absolute inset-y-0 right-0 w-2/5 bg-gradient-to-l from-brand-gold/18 via-transparent to-transparent"></div>
-            <div class="relative px-6 py-8 sm:px-8 sm:py-9 lg:px-10">
-                <div class="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-                    <div class="max-w-3xl">
-                        <div class="flex flex-wrap items-center gap-3">
-                            <span class="inline-flex items-center rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-brand-sand">
-                                {{ __('Fleet control') }}
-                            </span>
-                            <span class="inline-flex items-center rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-medium text-brand-cream/85">
-                                {{ __('Full filtered dataset') }}
-                            </span>
-                            @if ($openInsights > 0)
-                                <span class="inline-flex items-center rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-100">
-                                    {{ trans_choice(':count open insight|:count open insights', $openInsights, ['count' => $openInsights]) }}
-                                </span>
-                            @endif
-                        </div>
-
-                        <h1 class="mt-6 text-3xl font-semibold tracking-tight text-white sm:text-4xl lg:text-[2.8rem] lg:leading-[1.05]">
-                            {{ __('Servers') }}
-                        </h1>
-                        <p class="mt-4 max-w-2xl text-base leading-7 text-brand-cream/78 sm:text-lg">
-                            {{ __('Scan fleet readiness, spot servers that need attention, and move from provider setup to hands-on management without leaving the command rail.') }}
-                        </p>
-
-                        <div class="mt-8 flex flex-wrap gap-3">
-                            @can('create', App\Models\Server::class)
-                                <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
-                                    {{ __('Create server') }}
-                                </a>
-                            @endcan
-                            <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/8 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/12">
-                                {{ __('Provider setup guide') }}
-                            </a>
-                        </div>
+        @if ($serverCreateDraft)
+            @php
+                $stepLabels = [
+                    1 => __('Type & name'),
+                    2 => __('Where it runs'),
+                    3 => __('What it runs'),
+                    4 => __('Review'),
+                ];
+                $stepLabel = $stepLabels[$serverCreateDraft->step] ?? __('In progress');
+            @endphp
+            <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-5 py-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-sky-900">{{ __('You have an in-progress server draft.') }}</p>
+                        <p class="mt-0.5 text-sm text-sky-800">{{ __('Step :n of :total · :label · last touched :ago', ['n' => $serverCreateDraft->step, 'total' => \App\Models\ServerCreateDraft::TOTAL_STEPS, 'label' => $stepLabel, 'ago' => $serverCreateDraft->updated_at?->diffForHumans()]) }}</p>
                     </div>
-
-                    <div class="grid gap-3 sm:grid-cols-2 xl:w-[32rem] xl:grid-cols-4">
-                        <div class="rounded-2xl border border-white/12 bg-white/7 p-4 backdrop-blur-sm">
-                            <p class="text-xs font-medium uppercase tracking-wide text-brand-cream/65">{{ __('Visible servers') }}</p>
-                            <p class="mt-3 text-3xl font-semibold text-white">{{ $summary['total'] }}</p>
-                            <p class="mt-1 text-sm text-brand-cream/70">{{ __('Current result set') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-white/12 bg-white/7 p-4 backdrop-blur-sm">
-                            <p class="text-xs font-medium uppercase tracking-wide text-brand-cream/65">{{ __('Ready now') }}</p>
-                            <p class="mt-3 text-3xl font-semibold text-white">{{ $summary['ready'] }}</p>
-                            <p class="mt-1 text-sm text-brand-cream/70">{{ __('Provisioned and available') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-white/12 bg-white/7 p-4 backdrop-blur-sm">
-                            <p class="text-xs font-medium uppercase tracking-wide text-brand-cream/65">{{ __('Need attention') }}</p>
-                            <p class="mt-3 text-3xl font-semibold text-white">{{ $summary['attention'] }}</p>
-                            <p class="mt-1 text-sm text-brand-cream/70">{{ __('Errors, reachability, removals') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-white/12 bg-white/7 p-4 backdrop-blur-sm">
-                            <p class="text-xs font-medium uppercase tracking-wide text-brand-cream/65">{{ __('Hosted sites') }}</p>
-                            <p class="mt-3 text-3xl font-semibold text-white">{{ $summary['sites'] }}</p>
-                            <p class="mt-1 text-sm text-brand-cream/70">{{ __('Across visible servers') }}</p>
-                        </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700">
+                            {{ __('Continue') }}
+                            <x-heroicon-o-arrow-right class="h-4 w-4" />
+                        </a>
+                        <button type="button" wire:click="openDiscardServerCreateDraftModal" class="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-100">
+                            {{ __('Discard') }}
+                        </button>
                     </div>
                 </div>
             </div>
-        </section>
+        @endif
+
+        <x-page-header
+            :title="__('Servers')"
+            :description="__('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
+            doc-route="docs.index"
+            flush
+            compact
+            toolbar
+        >
+            <x-slot name="leading">
+                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                    <x-heroicon-o-server-stack class="h-7 w-7 text-brand-ink" aria-hidden="true" />
+                </span>
+            </x-slot>
+            <x-slot name="actions">
+                @can('create', App\Models\Server::class)
+                    <a
+                        href="{{ route('launches.create') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Open launchpad') }}
+                    </a>
+                    <a
+                        href="{{ route('docs.create-first-server') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('First server guide') }}
+                    </a>
+                @endcan
+            </x-slot>
+        </x-page-header>
+
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    {{ __('Servers') }}
+                </div>
+                <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $summary['total'] }}</p>
+            </div>
+            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    {{ __('Ready') }}
+                </div>
+                <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $summary['ready'] }}</p>
+            </div>
+            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    {{ __('Attention') }}
+                </div>
+                <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $summary['attention'] }}</p>
+            </div>
+            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    {{ __('Sites') }}
+                </div>
+                <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $summary['sites'] }}</p>
+            </div>
+        </div>
+
+        @if ($hasServersInScope)
+            <x-section-card padding="sm">
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="button" wire:click="resetFilters" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            {{ __('Reset filters') }}
+                        </button>
+                        <div class="inline-flex rounded-xl border border-brand-ink/15 bg-brand-sand/30 p-0.5" role="group" aria-label="{{ __('View') }}">
+                            <button
+                                type="button"
+                                wire:click="$set('viewMode', 'list')"
+                                class="rounded-lg px-3 py-2 text-sm font-medium transition-colors {{ $viewMode === 'list' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-white/80' }}"
+                                aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
+                            >
+                                <span class="sr-only">{{ __('List') }}</span>
+                                <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="$set('viewMode', 'grid')"
+                                class="rounded-lg px-3 py-2 text-sm font-medium transition-colors {{ $viewMode === 'grid' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-white/80' }}"
+                                aria-pressed="{{ $viewMode === 'grid' ? 'true' : 'false' }}"
+                            >
+                                <span class="sr-only">{{ __('Grid') }}</span>
+                                <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center">
+                    <div class="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
+                        <div class="w-full md:max-w-sm">
+                            <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
+                            <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="block w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <label for="servers_status" class="sr-only">{{ __('Options') }}</label>
+                            <x-select id="servers_status" wire:model.live="statusFilter" class="mt-0">
+                                @foreach ($statusOptions as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </x-select>
+                            <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
+                            <x-select id="servers_sort" wire:model.live="sort" class="mt-0">
+                                @foreach ($sortOptions as $value => $label)
+                                    <option value="{{ $value }}">{{ __($label) }}</option>
+                                @endforeach
+                            </x-select>
+                        </div>
+                    </div>
+                </div>
+            </x-section-card>
+        @endif
 
         @unless ($hasProviderCredentials)
             <section class="mb-8 rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-5 shadow-sm shadow-amber-100/40 sm:p-6">
@@ -136,91 +215,77 @@
         @endunless
 
         @if (! $hasServersInScope)
-            <div class="rounded-[2rem] border border-brand-ink/10 bg-white shadow-sm p-10 text-center text-sm text-brand-moss">
-                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-brand-sage">{{ __('No servers yet') }}</p>
-                <h2 class="mt-3 text-2xl font-semibold text-brand-ink">{{ __('Create your first server-ready workspace') }}</h2>
-                <p class="mx-auto mt-3 max-w-2xl leading-relaxed">{{ __('Connect a provider, provision infrastructure, and return here to manage sites, SSH, automation, and health from one place.') }}</p>
-                <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-                @can('create', App\Models\Server::class)
-                    <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream transition hover:bg-brand-forest">{{ __('Add your first server') }}</a>
-                @endcan
-                    <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-brand-cream px-4 py-2.5 text-sm font-semibold text-brand-ink transition hover:bg-white">{{ __('Connect a provider') }}</a>
+            <section class="rounded-[2rem] border-2 border-brand-sage/35 bg-brand-cream shadow-lg shadow-brand-ink/10 ring-1 ring-brand-ink/[0.07]" aria-labelledby="servers-empty-heading">
+                <div class="px-6 py-12 text-center sm:px-10 sm:py-14">
+                    <div class="mx-auto flex max-w-xl flex-col items-center">
+                        <span class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-sand/55 text-brand-forest ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-server-stack class="h-9 w-9" aria-hidden="true" />
+                        </span>
+                        <h2 id="servers-empty-heading" class="mt-6 text-2xl font-semibold tracking-tight text-brand-ink">
+                            {{ __('No servers yet') }}
+                        </h2>
+                        <p class="mt-3 text-base leading-relaxed text-brand-moss">
+                            {{ __('Create a VM from here once a cloud provider is connected—or pick a guided path first.') }}
+                        </p>
+                        <ul class="mt-8 w-full space-y-3 text-left text-sm leading-snug text-brand-moss">
+                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <x-heroicon-o-plus-circle class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span>
+                                    <span class="font-semibold text-brand-ink">{{ __('Create a server') }}</span>
+                                    <span class="text-brand-mist"> — </span>
+                                    {{ __('Fast path to provision when credentials are ready.') }}
+                                </span>
+                            </li>
+                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <x-heroicon-o-squares-2x2 class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span>
+                                    <span class="font-semibold text-brand-ink">{{ __('Open launchpad') }}</span>
+                                    <span class="text-brand-mist"> — </span>
+                                    {{ __('Explore BYO, Docker, serverless, Kubernetes, and more.') }}
+                                </span>
+                            </li>
+                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <x-heroicon-o-link class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span>
+                                    <span class="font-semibold text-brand-ink">{{ __('Connect a provider') }}</span>
+                                    <span class="text-brand-mist"> — </span>
+                                    {{ __('Add API tokens so Dply can reach your cloud account.') }}
+                                </span>
+                            </li>
+                        </ul>
+                        <div class="mt-10 flex w-full flex-wrap items-center justify-center gap-3">
+                            @can('create', App\Models\Server::class)
+                                <a
+                                    href="{{ route('servers.create') }}"
+                                    wire:navigate
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-3 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition hover:bg-brand-forest"
+                                >
+                                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('Create a server') }}
+                                </a>
+                                <a
+                                    href="{{ route('launches.create') }}"
+                                    wire:navigate
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-5 py-3 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                    {{ __('Open launchpad') }}
+                                </a>
+                            @endcan
+                            <a
+                                href="{{ route('credentials.index') }}"
+                                wire:navigate
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-sage/40 bg-brand-sand/30 px-5 py-3 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/50"
+                            >
+                                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Connect a provider') }}
+                            </a>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
         @else
-            <div class="rounded-[2rem] border border-brand-ink/10 bg-white shadow-sm overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-4 sm:px-6">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Command rail') }}</p>
-                            <h2 class="mt-2 text-2xl font-semibold tracking-tight text-brand-ink">{{ __('Search, filter, and switch views without losing context') }}</h2>
-                            <p class="mt-2 max-w-2xl text-sm leading-6 text-brand-moss">
-                                {{ __('Metrics above reflect the full filtered result set. Use the controls below to narrow the fleet and move quickly between tactical list and card views.') }}
-                            </p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-3">
-                            <button type="button" wire:click="resetFilters" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink transition hover:bg-brand-cream">
-                                {{ __('Reset filters') }}
-                            </button>
-                            <div class="inline-flex rounded-xl border border-brand-ink/15 p-0.5 bg-white" role="group" aria-label="{{ __('View') }}">
-                            <button
-                                type="button"
-                                wire:click="$set('viewMode', 'list')"
-                                class="rounded-lg px-3 py-2 text-sm font-medium transition-colors {{ $viewMode === 'list' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:text-brand-ink' }}"
-                                aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
-                            >
-                                <span class="sr-only">{{ __('List') }}</span>
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.008v.008H3.75V6.75zm0 5.25h.008v.008H3.75v-.008zm0 5.25h.008v.008H3.75v-.008z"/></svg>
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="$set('viewMode', 'grid')"
-                                class="rounded-lg px-3 py-2 text-sm font-medium transition-colors {{ $viewMode === 'grid' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:text-brand-ink' }}"
-                                aria-pressed="{{ $viewMode === 'grid' ? 'true' : 'false' }}"
-                            >
-                                <span class="sr-only">{{ __('Grid') }}</span>
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25A2.25 2.25 0 018.25 8.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 8.25h-2.25A2.25 2.25 0 0113.5 6V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
-                            </button>
-                        </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
-                            <div class="w-full md:max-w-sm">
-                                <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
-                                <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="block w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <label for="servers_status" class="sr-only">{{ __('Options') }}</label>
-                                <select
-                                    id="servers_status"
-                                    wire:model.live="statusFilter"
-                                    class="rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                                >
-                                    @foreach ($statusOptions as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
-                                <select
-                                    id="servers_sort"
-                                    wire:model.live="sort"
-                                    class="rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                                >
-                                    @foreach ($sortOptions as $value => $label)
-                                        <option value="{{ $value }}">{{ __($label) }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-brand-moss">
-                            <span class="rounded-full border border-brand-ink/10 bg-white px-3 py-1.5">{{ trans_choice(':count server|:count servers', $summary['total'], ['count' => $summary['total']]) }}</span>
-                            <span class="rounded-full border border-brand-ink/10 bg-white px-3 py-1.5">{{ trans_choice(':count open insight|:count open insights', $openInsights, ['count' => $openInsights]) }}</span>
-                        </div>
-                    </div>
-                </div>
-
+            <div class="dply-card overflow-hidden rounded-[2rem]">
                 @if ($groupedServers->flatten()->isEmpty())
                     <div class="px-6 py-14 text-center">
                         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('No results') }}</p>
@@ -278,7 +343,7 @@
                                                 </p>
                                                 <div class="flex items-center justify-end gap-2 pt-1 mt-auto">
                                                     <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/50" title="{{ __('Manage') }}">
-                                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/></svg>
+                                                        <x-heroicon-o-bars-3 class="h-4 w-4" aria-hidden="true" />
                                                     </a>
                                                     @can('delete', $server)
                                                         <button type="button" wire:click="openRemoveServerModal(@js($server->id))" class="text-xs font-semibold text-red-600 hover:text-red-800">
@@ -378,4 +443,28 @@
         'serverId' => (string) ($deleteModalServer?->id ?? ''),
         'deletionSummary' => $deletionSummary,
     ])
+
+    @if ($showDiscardServerCreateDraftModal)
+        @teleport('body')
+        <div class="fixed inset-0 isolate z-[100] overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeDiscardServerCreateDraftModal"></div>
+            <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
+                <div class="w-full max-w-md dply-modal-panel" @click.stop>
+                    <div class="border-b border-zinc-100 px-6 py-5">
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Discard this draft?') }}</h2>
+                        <p class="mt-2 text-sm text-brand-moss">{{ __("You'll lose the values you've entered so far. This can't be undone.") }}</p>
+                    </div>
+                    <div class="flex flex-col-reverse gap-3 border-t border-zinc-100 bg-zinc-50/80 px-6 py-4 sm:flex-row sm:justify-end">
+                        <button type="button" wire:click="closeDiscardServerCreateDraftModal" class="inline-flex justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-zinc-50">
+                            {{ __('Keep editing') }}
+                        </button>
+                        <button type="button" wire:click="confirmDiscardServerCreateDraft" wire:loading.attr="disabled" wire:target="confirmDiscardServerCreateDraft" class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:cursor-wait disabled:opacity-60">
+                            {{ __('Discard draft') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endteleport
+    @endif
 </div>

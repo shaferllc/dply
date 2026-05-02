@@ -425,9 +425,6 @@ class ServerPhpManager
         }
     }
 
-    /**
-     * @param  mixed  $value
-     */
     protected function normalizeVersionId(mixed $value): ?string
     {
         if (! is_string($value) && ! is_numeric($value)) {
@@ -447,7 +444,6 @@ class ServerPhpManager
     }
 
     /**
-     * @param  mixed  $value
      * @return list<string>
      */
     protected function normalizeVersionList(mixed $value): array

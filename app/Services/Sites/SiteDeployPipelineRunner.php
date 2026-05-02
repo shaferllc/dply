@@ -6,6 +6,9 @@ use App\Contracts\RemoteShell;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 
+/**
+ * Runs ordered {@see SiteDeployStep} records over SSH in the deploy working directory.
+ */
 class SiteDeployPipelineRunner
 {
     public function run(RemoteShell $ssh, Site $site, string $workingDirectory): string
@@ -30,22 +33,9 @@ class SiteDeployPipelineRunner
 
     protected function resolveShellCommand(SiteDeployStep $step): ?string
     {
-        $custom = trim((string) ($step->custom_command ?? ''));
-
-        return match ($step->step_type) {
-            SiteDeployStep::TYPE_COMPOSER_INSTALL => 'composer install --no-dev --no-interaction --prefer-dist --no-ansi',
-            SiteDeployStep::TYPE_NPM_CI => 'npm ci --no-audit --no-fund',
-            SiteDeployStep::TYPE_NPM_INSTALL => 'npm install --no-audit --no-fund',
-            SiteDeployStep::TYPE_NPM_RUN => $custom !== ''
-                ? 'npm run '.escapeshellarg($custom)
-                : 'npm run build',
-            SiteDeployStep::TYPE_ARTISAN_MIGRATE => 'php artisan migrate --force --no-interaction',
-            SiteDeployStep::TYPE_ARTISAN_CONFIG_CACHE => 'php artisan config:cache',
-            SiteDeployStep::TYPE_ARTISAN_ROUTE_CACHE => 'php artisan route:cache',
-            SiteDeployStep::TYPE_ARTISAN_VIEW_CACHE => 'php artisan view:cache',
-            SiteDeployStep::TYPE_ARTISAN_OPTIMIZE => 'php artisan optimize',
-            SiteDeployStep::TYPE_CUSTOM => $custom !== '' ? $custom : null,
-            default => null,
-        };
+        return SiteDeployPipelineCommands::fragmentFor(
+            $step->step_type,
+            trim((string) ($step->custom_command ?? ''))
+        );
     }
 }

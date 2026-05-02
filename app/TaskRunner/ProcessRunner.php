@@ -189,12 +189,14 @@ class ProcessRunner
             return;
         }
 
+        $successful = $result->exitCode() === 0 && ! $timeout;
+
         $logData = [
             'command' => $result->command(),
             'exit_code' => $result->exitCode(),
             'timed_out' => $timeout,
             'attempt' => $attempt + 1,
-            'successful' => $result->exitCode() === 0 && ! $timeout,
+            'successful' => $successful,
         ];
 
         // Include output in logs if configured
@@ -202,9 +204,37 @@ class ProcessRunner
             $logData['output'] = $output->getBuffer();
         }
 
-        $logLevel = $result->exitCode() === 0 && ! $timeout ? 'info' : 'warning';
+        // On failure, log separated streams (e.g. SSH writes errors to stderr; exit 255 alone is opaque).
+        if (! $successful && config('task-runner.logging.include_output_on_failure', true)) {
+            $maxBytes = max(0, (int) config('task-runner.logging.failure_output_max_bytes', 8192));
+            [$stdout, $stdoutTrunc] = $this->truncateForProcessLog($result->output(), $maxBytes);
+            [$stderr, $stderrTrunc] = $this->truncateForProcessLog($result->errorOutput(), $maxBytes);
+            $logData['stdout'] = $stdout;
+            $logData['stderr'] = $stderr;
+            if ($stdoutTrunc || $stderrTrunc) {
+                $logData['process_stream_output_truncated'] = true;
+            }
+        }
+
+        $logLevel = $successful ? 'info' : 'warning';
 
         Log::log($logLevel, 'Process executed', $logData);
+    }
+
+    /**
+     * @return array{0: string, 1: bool}
+     */
+    private function truncateForProcessLog(string $value, int $maxBytes): array
+    {
+        if ($maxBytes <= 0) {
+            return ['', false];
+        }
+
+        if (strlen($value) <= $maxBytes) {
+            return [$value, false];
+        }
+
+        return [substr($value, 0, $maxBytes).'…', true];
     }
 
     /**

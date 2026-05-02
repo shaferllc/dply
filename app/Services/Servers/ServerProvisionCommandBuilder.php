@@ -388,21 +388,72 @@ final class ServerProvisionCommandBuilder
      */
     private function installAppCache(string $cache): array
     {
-        if ($cache === 'valkey') {
-            return $this->withStep('Installing Valkey', [
+        return match ($cache) {
+            'none' => [],
+            'valkey' => $this->withStep('Installing Valkey', [
                 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi',
                 $this->writeFileWithRollback('/etc/valkey/valkey.conf', "bind 127.0.0.1 ::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),
                 'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true',
-            ]);
-        }
+            ]),
+            'memcached' => $this->withStep('Installing Memcached', [
+                ...$this->ensurePackagesInstalled(
+                    ['memcached', 'libmemcached-tools'],
+                    '[dply] memcached already installed; skipping package install.'
+                ),
+                $this->writeFileWithRollback('/etc/memcached.conf', "-d\nlogfile /var/log/memcached.log\n-m 256\n-p 11211\n-l 127.0.0.1\n-U 0\n"),
+                'systemctl enable --now memcached',
+            ]),
+            'keydb' => $this->installKeyDb(),
+            'dragonfly' => $this->installDragonfly(),
+            default => $this->withStep('Installing Redis', [
+                ...$this->ensurePackagesInstalled(
+                    ['redis-server'],
+                    '[dply] redis-server already installed; skipping package install.'
+                ),
+                $this->writeFileWithRollback('/etc/redis/redis.conf', "bind 127.0.0.1 -::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),
+                'systemctl enable --now redis-server',
+            ]),
+        };
+    }
 
-        return $this->withStep('Installing Redis', [
-            ...$this->ensurePackagesInstalled(
-                ['redis-server'],
-                '[dply] redis-server already installed; skipping package install.'
-            ),
-            $this->writeFileWithRollback('/etc/redis/redis.conf', "bind 127.0.0.1 -::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),
-            'systemctl enable --now redis-server',
+    /**
+     * Install KeyDB from the project's launchpad PPA. Drop-in Redis replacement;
+     * provides redis-cli compatibility and a `keydb-server` systemd unit.
+     *
+     * @return list<string>
+     */
+    private function installKeyDb(): array
+    {
+        return $this->withStep('Installing KeyDB', [
+            'if dpkg -s keydb-server >/dev/null 2>&1 || dpkg -s keydb >/dev/null 2>&1; then echo "[dply] keydb already installed; skipping repository + package install."; else '
+                .'apt-get install -y --no-install-recommends software-properties-common ca-certificates && '
+                .'add-apt-repository -y ppa:eq-alpha/keydb 2>/dev/null || true; '
+                .'apt-get update -y && '
+                .'apt-get install -y --no-install-recommends keydb-server keydb-tools; fi',
+            $this->writeFileWithRollback('/etc/keydb/keydb.conf', "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nport 6379\n"),
+            'systemctl enable --now keydb-server 2>/dev/null || systemctl enable --now keydb 2>/dev/null || true',
+        ]);
+    }
+
+    /**
+     * Install Dragonfly from the official apt repo. Wire-compatible with Redis on port 6379;
+     * verified with redis-cli.
+     *
+     * @return list<string>
+     */
+    private function installDragonfly(): array
+    {
+        return $this->withStep('Installing Dragonfly', [
+            'if dpkg -s dragonfly >/dev/null 2>&1; then echo "[dply] dragonfly already installed; skipping repository + package install."; else '
+                .'install -d /etc/apt/keyrings && '
+                .'curl -fsSL https://packages.dragonflydb.io/keys/release.asc | gpg --dearmor --yes -o /etc/apt/keyrings/dragonfly.gpg && '
+                .'chmod 0644 /etc/apt/keyrings/dragonfly.gpg && '
+                .'. /etc/os-release && '
+                .'echo "deb [signed-by=/etc/apt/keyrings/dragonfly.gpg] https://packages.dragonflydb.io/dragonfly/ubuntu ${VERSION_CODENAME:-jammy} main" > /etc/apt/sources.list.d/dragonfly.list && '
+                .'apt-get update -y && '
+                .'apt-get install -y --no-install-recommends dragonfly; fi',
+            // Dragonfly ships its own systemd unit; just ensure it's enabled.
+            'systemctl enable --now dragonfly 2>/dev/null || true',
         ]);
     }
 
@@ -435,6 +486,14 @@ final class ServerProvisionCommandBuilder
             $lines[] = 'ufw allow "Apache Full"';
             $lines[] = 'systemctl enable --now apache2';
             $lines = array_merge($lines, $this->certbotForWeb($web));
+        } elseif ($web === 'openlitespeed') {
+            $lines[] = $this->stepMarker('Installing webserver');
+            $lines[] = 'wget -qO - https://repo.litespeed.sh | bash';
+            $lines[] = 'apt-get update -y';
+            $lines[] = 'apt-get install -y --no-install-recommends openlitespeed';
+            $lines[] = 'ufw allow 80/tcp';
+            $lines[] = 'ufw allow 443/tcp';
+            $lines[] = '/usr/local/lsws/bin/lswsctrl start || true';
         } elseif ($web === 'caddy') {
             $lines[] = $this->stepMarker('Installing webserver');
             $lines[] = 'install -d /usr/share/keyrings';
@@ -445,6 +504,15 @@ final class ServerProvisionCommandBuilder
             $lines[] = 'ufw allow 80/tcp';
             $lines[] = 'ufw allow 443/tcp';
             $lines[] = 'systemctl enable --now caddy';
+        } elseif ($web === 'traefik') {
+            $lines[] = $this->stepMarker('Installing webserver');
+            $lines[] = 'apt-get install -y --no-install-recommends traefik caddy';
+            $lines[] = 'install -d -m 0755 /etc/traefik/dynamic /etc/caddy/sites-enabled /var/log/traefik';
+            $lines[] = $this->writeFileWithRollback('/etc/traefik/traefik.yml', "entryPoints:\n  web:\n    address: \":80\"\nproviders:\n  file:\n    directory: \"/etc/traefik/dynamic\"\n    watch: true\nlog:\n  filePath: \"/var/log/traefik/traefik.log\"\naccessLog:\n  filePath: \"/var/log/traefik/access.log\"\n");
+            $lines[] = 'ufw allow 80/tcp';
+            $lines[] = 'ufw allow 443/tcp';
+            $lines[] = 'systemctl enable --now caddy';
+            $lines[] = 'systemctl enable --now traefik';
         }
 
         return $lines;
@@ -512,6 +580,11 @@ final class ServerProvisionCommandBuilder
             '[dply] PHP packages already installed; skipping package install.'
         ));
 
+        // apt-get respects /usr/sbin/policy-rc.d during install (returns 101 → don't start services),
+        // so php-fpm ends up enabled but inactive. Explicitly start it the same way nginx/mysql/redis
+        // are started; the verification check `systemctl is-active php{ver}-fpm` then passes.
+        $lines[] = 'systemctl enable --now '.$stem.'-fpm';
+
         $lines = array_merge($lines, $this->wireWebserverToPhp($web, $php));
 
         return $lines;
@@ -533,6 +606,13 @@ final class ServerProvisionCommandBuilder
                 'apt-get install -y --no-install-recommends libapache2-mod-'.$stem,
                 'a2enmod '.$stem,
                 'systemctl reload apache2',
+            ];
+        }
+
+        if ($web === 'openlitespeed') {
+            return [
+                'apt-get install -y --no-install-recommends lsphp'.str_replace('.', '', $php).' lsphp'.str_replace('.', '', $php).'-mysql lsphp'.str_replace('.', '', $php).'-pgsql || true',
+                '/usr/local/lsws/bin/lswsctrl restart || true',
             ];
         }
 
@@ -704,6 +784,44 @@ NGINX,
             ];
         }
 
+        if ($web === 'apache') {
+            $configs['apache-starter'] = [
+                'label' => 'Apache starter site',
+                'path' => '/etc/apache2/sites-available/dply.conf',
+                'content' => <<<APACHE
+<VirtualHost *:80>
+    ServerName localhost
+    DocumentRoot {$layout['current']}/public
+    <Directory {$layout['current']}/public>
+        AllowOverride All
+        Require all granted
+        DirectoryIndex index.php index.html
+        FallbackResource /index.php
+    </Directory>
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:{$phpSocket}|fcgi://localhost/"
+    </FilesMatch>
+</VirtualHost>
+APACHE,
+            ];
+        }
+
+        if ($web === 'openlitespeed') {
+            $configs['openlitespeed-starter'] = [
+                'label' => 'OpenLiteSpeed starter site',
+                'path' => '/usr/local/lsws/conf/vhosts/dply/vhconf.conf',
+                'content' => "docRoot {$layout['current']}/public/\nvhDomain localhost\nindex  {\n  useServer 0\n  indexFiles index.php, index.html\n}\n",
+            ];
+        }
+
+        if ($web === 'traefik') {
+            $configs['traefik-starter'] = [
+                'label' => 'Traefik starter config',
+                'path' => '/etc/traefik/traefik.yml',
+                'content' => "entryPoints:\n  web:\n    address: \":80\"\nproviders:\n  file:\n    directory: \"/etc/traefik/dynamic\"\n    watch: true\n",
+            ];
+        }
+
         if (in_array($role, ['worker', 'plain', 'application'], true)) {
             $configs['supervisor-default'] = [
                 'label' => 'Supervisor default worker',
@@ -753,6 +871,23 @@ NGINX,
                 $lines[] = 'systemctl reload caddy || systemctl restart caddy';
             }
 
+            if ($config['path'] === '/etc/apache2/sites-available/dply.conf') {
+                $lines[] = 'a2enmod proxy proxy_fcgi rewrite headers >/dev/null 2>&1 || true';
+                $lines[] = 'a2ensite dply.conf';
+                $lines[] = 'apachectl configtest';
+                $lines[] = 'systemctl reload apache2 || service apache2 reload';
+            }
+
+            if ($config['path'] === '/usr/local/lsws/conf/vhosts/dply/vhconf.conf') {
+                $lines[] = 'install -d -m 0755 /usr/local/lsws/conf/vhosts/dply';
+                $lines[] = '/usr/local/lsws/bin/lswsctrl restart || true';
+            }
+
+            if ($config['path'] === '/etc/traefik/traefik.yml') {
+                $lines[] = 'install -d -m 0755 /etc/traefik/dynamic /var/log/traefik';
+                $lines[] = 'systemctl restart traefik';
+            }
+
             if ($config['path'] === '/etc/haproxy/haproxy.cfg') {
                 $lines[] = 'haproxy -c -f /etc/haproxy/haproxy.cfg';
                 $lines[] = 'systemctl restart haproxy';
@@ -794,6 +929,11 @@ NGINX,
             $checks['caddy'] = 'caddy validate --config /etc/caddy/Caddyfile';
         } elseif ($web === 'apache') {
             $checks['apache'] = 'apachectl configtest';
+        } elseif ($web === 'openlitespeed') {
+            $checks['openlitespeed'] = '/usr/local/lsws/bin/lswsctrl status';
+        } elseif ($web === 'traefik') {
+            $checks['traefik'] = 'systemctl is-active traefik';
+            $checks['caddy-backend'] = 'caddy validate --config /etc/caddy/Caddyfile';
         }
 
         if (str_starts_with($database, 'postgres')) {
@@ -806,6 +946,12 @@ NGINX,
             $checks['redis'] = 'redis-cli ping';
         } elseif ($cache === 'valkey') {
             $checks['valkey'] = 'valkey-cli ping || redis-cli ping';
+        } elseif ($cache === 'memcached') {
+            $checks['memcached'] = 'systemctl is-active memcached';
+        } elseif ($cache === 'keydb') {
+            $checks['keydb'] = 'keydb-cli ping 2>/dev/null || redis-cli ping';
+        } elseif ($cache === 'dragonfly') {
+            $checks['dragonfly'] = 'systemctl is-active dragonfly && redis-cli ping';
         }
 
         if ($role === 'load_balancer') {
@@ -915,15 +1061,31 @@ NGINX,
      */
     private function ensureOndrejPhpRepository(): array
     {
+        // Use the keyring-file + sources.list.d approach instead of `add-apt-repository`.
+        // add-apt-repository fetches the GPG key from a slow Launchpad endpoint and frequently
+        // hits its `timeout 120s` cap on small/remote/ARM hosts (Docker-on-macOS, Hetzner ARM,
+        // etc.), reporting "Error: Timeout was reached" with no real problem to retry against.
+        // The curl fetch below is single-URL, has its own retries, and is ~10x faster.
+        $setupRepo = implode(' && ', [
+            'install -d -m 0755 /etc/apt/keyrings',
+            'curl -fsSL --retry 3 --retry-delay 2 --max-time 60 '
+                .'"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14aa40ec0831756756d7f66c4f4ea0aae5267a6c" '
+                .'| gpg --dearmor --yes -o /etc/apt/keyrings/ondrej-php.gpg',
+            'chmod 0644 /etc/apt/keyrings/ondrej-php.gpg',
+            'echo "deb [signed-by=/etc/apt/keyrings/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu $(lsb_release -cs) main" '
+                .'> /etc/apt/sources.list.d/ondrej-php.list',
+            'timeout 300s apt-get update -y',
+        ]);
+
         if ($this->forceReinstall()) {
-            return [
-                'timeout 120s add-apt-repository -y ppa:ondrej/php',
-                'timeout 300s apt-get update -y',
-            ];
+            return [$setupRepo];
         }
 
         return [
-            'if grep -RqsE "ondrej-ubuntu-php|ppa\\.launchpadcontent\\.net/ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d; then echo "[dply] ondrej/php repository already installed; skipping repository setup."; else timeout 120s add-apt-repository -y ppa:ondrej/php && timeout 300s apt-get update -y; fi',
+            'if grep -RqsE "ondrej-ubuntu-php|ppa\\.launchpadcontent\\.net/ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d; then '
+                .'echo "[dply] ondrej/php repository already installed; skipping repository setup."; '
+                .'else '.$setupRepo.'; '
+                .'fi',
         ];
     }
 

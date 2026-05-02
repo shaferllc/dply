@@ -232,7 +232,7 @@ SH,
                 'category' => MarketplaceItem::CATEGORY_INTEGRATIONS,
                 'recipe_type' => MarketplaceItem::RECIPE_EXTERNAL_LINK,
                 'payload' => [
-                    'url' => '/settings',
+                    'url' => '/settings/profile',
                     'open_new_tab' => false,
                     'hint' => __('Open Settings → Notification channels in your organization.'),
                 ],

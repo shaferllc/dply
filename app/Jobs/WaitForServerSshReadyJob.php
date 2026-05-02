@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Support\Servers\ProvisionPipelineLog;
+use App\Support\Servers\TcpPortProbe;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -30,7 +32,25 @@ class WaitForServerSshReadyJob implements ShouldQueue
     public function handle(): void
     {
         $server = $this->server->fresh();
-        if ($server === null || $server->status !== Server::STATUS_READY || empty($server->ip_address)) {
+        $attempt = $this->attempts();
+        $maxAttempts = $this->tries;
+
+        if ($server === null) {
+            Log::debug('server.provision.ssh_ready.skip_missing_server', [
+                'server_id' => $this->server->id,
+                'attempt' => $attempt,
+            ]);
+
+            return;
+        }
+
+        if ($server->status !== Server::STATUS_READY || empty($server->ip_address)) {
+            ProvisionPipelineLog::debug('server.provision.ssh_ready.skip_ineligible', $server, [
+                'attempt' => $attempt,
+                'server_status' => $server->status,
+                'has_ip' => filled($server->ip_address),
+            ]);
+
             return;
         }
 
@@ -39,52 +59,64 @@ class WaitForServerSshReadyJob implements ShouldQueue
         $host = trim((string) $server->ip_address);
         $port = (int) ($server->ssh_port ?: 22);
 
-        if ($this->tcpPortOpen($host, $port)) {
+        $logEvery = max(1, (int) config('server_provision.ssh_ready_log_every_n_attempts', 5));
+        $shouldInfoThisAttempt = $attempt === 1
+            || $attempt >= $maxAttempts
+            || ($attempt % $logEvery === 0);
+
+        if ($shouldInfoThisAttempt) {
+            ProvisionPipelineLog::info('server.provision.ssh_ready.poll', $server, [
+                'phase' => 'tcp_check',
+                'attempt' => $attempt,
+                'max_attempts' => $maxAttempts,
+                'host' => $host,
+                'port' => $port,
+                'retry_in_seconds' => $retrySeconds,
+            ]);
+        } else {
+            ProvisionPipelineLog::debug('server.provision.ssh_ready.poll', $server, [
+                'phase' => 'tcp_check',
+                'attempt' => $attempt,
+                'max_attempts' => $maxAttempts,
+                'host' => $host,
+                'port' => $port,
+            ]);
+        }
+
+        if (TcpPortProbe::isOpen($host, $port)) {
+            ProvisionPipelineLog::info('server.provision.ssh_ready.open_dispatching_setup', $server, [
+                'phase' => 'tcp_open',
+                'attempt' => $attempt,
+                'host' => $host,
+                'port' => $port,
+            ]);
             RunSetupScriptJob::dispatch($server);
 
             return;
         }
 
-        if ($this->attempts() >= $this->tries) {
-            Log::warning('SSH port did not become reachable before max attempts; stack setup was not started.', [
-                'server_id' => $server->id,
-                'ip' => $host,
+        if ($attempt >= $maxAttempts) {
+            ProvisionPipelineLog::warning('server.provision.ssh_ready.max_attempts', $server, [
+                'phase' => 'tcp_timeout',
+                'attempt' => $attempt,
+                'max_attempts' => $maxAttempts,
+                'host' => $host,
                 'port' => $port,
-                'attempts' => $this->attempts(),
-                'max_tries' => $this->tries,
+                'detail' => 'SSH port did not become reachable; stack setup was not started.',
             ]);
 
             return;
         }
 
-        $this->release($retrySeconds);
-    }
-
-    private function tcpPortOpen(string $host, int $port, int $timeoutSeconds = 5): bool
-    {
-        $errno = 0;
-        $errstr = '';
-        $context = stream_context_create([
-            'socket' => [
-                'connect_timeout' => $timeoutSeconds,
-            ],
+        ProvisionPipelineLog::debug('server.provision.ssh_ready.retry', $server, [
+            'phase' => 'tcp_closed',
+            'attempt' => $attempt,
+            'next_attempt' => $attempt + 1,
+            'release_seconds' => $retrySeconds,
+            'host' => $host,
+            'port' => $port,
         ]);
 
-        $fp = @stream_socket_client(
-            "tcp://{$host}:{$port}",
-            $errno,
-            $errstr,
-            $timeoutSeconds,
-            STREAM_CLIENT_CONNECT,
-            $context
-        );
-
-        if (! is_resource($fp)) {
-            return false;
-        }
-
-        fclose($fp);
-
-        return true;
+        $this->release($retrySeconds);
     }
 }

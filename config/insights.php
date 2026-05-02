@@ -95,6 +95,7 @@ return [
             'requires_pro' => false,
             'runner' => PhpEolSitesInsightRunner::class,
             'fix' => null,
+            'requires' => ['php'],
         ],
 
         'disk_capacity_forecast' => [
@@ -140,6 +141,7 @@ return [
             'requires_pro' => false,
             'runner' => null,
             'fix' => null,
+            'requires' => ['php'],
         ],
 
         'load_average_high' => [
@@ -176,6 +178,7 @@ return [
             'requires_pro' => false,
             'runner' => null,
             'fix' => null,
+            'requires' => ['mysql'],
         ],
 
         'package_security_updates' => [
@@ -212,6 +215,7 @@ return [
             'requires_pro' => false,
             'runner' => null,
             'fix' => null,
+            'requires' => ['php'],
         ],
 
         'opcache_full' => [
@@ -221,6 +225,7 @@ return [
             'requires_pro' => false,
             'runner' => null,
             'fix' => null,
+            'requires' => ['php'],
         ],
 
         'supervisor_running' => [
@@ -232,6 +237,7 @@ return [
             'fix' => [
                 'action' => 'supervisor_start',
             ],
+            'requires' => ['supervisor'],
         ],
 
         'nodejs_updates' => [
@@ -250,6 +256,7 @@ return [
             'requires_pro' => false,
             'runner' => null,
             'fix' => null,
+            'requires' => ['mysql'],
         ],
 
         'database_connections' => [
@@ -259,6 +266,7 @@ return [
             'requires_pro' => false,
             'runner' => null,
             'fix' => null,
+            'requires' => ['mysql', 'postgres'],
         ],
 
         'nginx_worker_connections' => [
@@ -268,6 +276,7 @@ return [
             'requires_pro' => false,
             'runner' => null,
             'fix' => null,
+            'requires' => ['nginx'],
         ],
 
         'composer_vulnerabilities' => [

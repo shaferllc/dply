@@ -14,12 +14,20 @@ use App\Livewire\Billing\Show as BillingShow;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
+use App\Livewire\Launches\Create as LaunchesCreate;
+use App\Livewire\Launches\LocalDocker as LaunchesLocalDocker;
+use App\Livewire\Launches\Path as LaunchesPath;
+use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
+use App\Livewire\Organizations\Activity as OrganizationsActivity;
+use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
+use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Livewire\Organizations\Show as OrganizationsShow;
+use App\Livewire\Organizations\Teams as OrganizationsTeams;
 use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
 use App\Livewire\Profile\Edit as ProfileEdit;
 use App\Livewire\Profile\Referrals as ProfileReferrals;
@@ -29,7 +37,10 @@ use App\Livewire\Scripts\Create as ScriptsCreate;
 use App\Livewire\Scripts\Edit as ScriptsEdit;
 use App\Livewire\Scripts\Index as ScriptsIndex;
 use App\Livewire\Scripts\Marketplace as ScriptsMarketplace;
-use App\Livewire\Servers\Create as ServersCreate;
+use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
+use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
+use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
+use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceCron;
@@ -57,23 +68,29 @@ use App\Livewire\Settings\Security as SettingsSecurity;
 use App\Livewire\Settings\SourceControl as SettingsSourceControl;
 use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
+use App\Livewire\Sites\Commits as SitesCommits;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Index as SitesIndex;
-use App\Livewire\Sites\Show as SitesShow;
+use App\Livewire\Sites\Monitor as SitesMonitor;
+use App\Livewire\Sites\Settings as SiteSettings;
+use App\Livewire\Sites\SiteClone as SitesClone;
+use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Livewire\StatusPages\Manage as StatusPagesManage;
 use App\Livewire\Teams\NotificationChannels as TeamsNotificationChannels;
 use App\Livewire\TwoFactor\Page as TwoFactorPage;
+use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\Site;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 Broadcast::routes(['middleware' => ['web', 'auth']]);
 
-Route::post('/hooks/sites/{site}/deploy', SiteDeployWebhookController::class)
+Route::match(['post', 'options'], '/hooks/sites/{site}/deploy', SiteDeployWebhookController::class)
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.site.deploy');
 
@@ -88,6 +105,9 @@ Route::get('/pricing', function () {
 Route::get('/features', function () {
     return view('features');
 })->name('features');
+
+Route::livewire('/coming-soon', MarketingComingSoonSignup::class)
+    ->name('coming-soon');
 
 Route::livewire('/status/{statusPage}', StatusPublicPage::class)
     ->middleware(['throttle:120,1'])
@@ -108,10 +128,14 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('/docs', [DocsController::class, 'index'])->name('docs.index');
     Route::get('/docs/connect-provider', [DocsController::class, 'connectProvider'])->name('docs.connect-provider');
     Route::get('/docs/create-first-server', [DocsController::class, 'createFirstServer'])->name('docs.create-first-server');
-    Route::get('/docs/org-roles-and-limits', [DocsController::class, 'orgRolesAndLimits'])->name('docs.org-roles-and-limits');
-    Route::get('/docs/source-control', [DocsController::class, 'sourceControl'])->name('docs.source-control');
+    Route::get('/docs/api', [DocsController::class, 'apiDocumentation'])->name('docs.api');
+    Route::get('/docs/{slug}', [DocsController::class, 'markdown'])
+        ->whereIn('slug', array_keys(config('docs.markdown', [])))
+        ->name('docs.markdown');
 
-    Route::livewire('/settings', SettingsHub::class)->name('settings.index');
+    Route::redirect('/settings', '/settings/profile')->name('settings.index');
+    Route::livewire('/settings/profile', SettingsHub::class)->name('settings.profile');
+    Route::livewire('/settings/servers', SettingsHub::class)->name('settings.servers');
     Route::livewire('/notifications', NotificationsIndex::class)->name('notifications.index');
 
     Route::livewire('/profile', ProfileEdit::class)->name('profile.edit');
@@ -130,6 +154,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations', OrganizationsIndex::class)->name('organizations.index');
     Route::livewire('organizations/create', OrganizationsCreate::class)->name('organizations.create');
     Route::livewire('organizations/{organization}', OrganizationsShow::class)->name('organizations.show');
+    Route::livewire('organizations/{organization}/members', OrganizationsMembers::class)->name('organizations.members');
+    Route::livewire('organizations/{organization}/teams', OrganizationsTeams::class)->name('organizations.teams');
+    Route::livewire('organizations/{organization}/activity', OrganizationsActivity::class)->name('organizations.activity');
+    Route::livewire('organizations/{organization}/automation', OrganizationsAutomation::class)->name('organizations.automation');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
     Route::livewire('organizations/{organization}/billing', BillingShow::class)->name('billing.show');
@@ -157,8 +185,20 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('projects/{workspace}/delivery', ProjectsShow::class)->defaults('section', 'delivery')->name('projects.delivery');
     Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
     Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
+    Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
+    Route::livewire('launches/containers', LaunchesPath::class)->defaults('path', 'containers')->name('launches.containers');
+    Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
+    Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
+    Route::livewire('launches/local/docker', LaunchesLocalDocker::class)->name('launches.local-docker');
+    Route::livewire('launches/edge-network', LaunchesPath::class)->defaults('path', 'edge-network')->name('launches.edge-network');
+    Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
-    Route::livewire('servers/create', ServersCreate::class)->name('servers.create');
+    // Multi-step server-create wizard. /servers/create is Step 1 directly; if a draft
+    // is past step 1, StepType::mount() redirects on to the current step.
+    Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
+    Route::livewire('servers/create/where', ServerCreateStepWhere::class)->name('servers.create.where');
+    Route::livewire('servers/create/what', ServerCreateStepWhat::class)->name('servers.create.what');
+    Route::livewire('servers/create/review', ServerCreateStepReview::class)->name('servers.create.review');
     Route::get('servers/{server}', function (Server $server) {
         Gate::authorize('view', $server);
 
@@ -176,31 +216,57 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('servers.show');
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
+    Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
-    Route::livewire('servers/{server}/sites/{site}', SitesShow::class)->name('sites.show');
+    Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
+    Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
+    Route::livewire('servers/{server}/sites/{site}/commits', SitesCommits::class)->name('sites.commits');
+    Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
+    Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
+    Route::get('servers/{server}/sites/{site}/settings/{section?}', function (Server $server, Site $site, ?string $section = null) {
+        $targetSection = $section;
+        $query = request()->query();
+
+        if ($targetSection === null) {
+            $targetSection = 'general';
+        } elseif ($targetSection === 'webhooks') {
+            $targetSection = 'notifications';
+        } elseif (in_array($targetSection, ['domains', 'aliases', 'redirects', 'preview', 'tenants'], true)) {
+            $query['tab'] = $targetSection;
+            $targetSection = 'routing';
+        }
+
+        return redirect()->route('sites.show', [
+            'server' => $server,
+            'site' => $site,
+            'section' => $targetSection,
+            ...$query,
+        ]);
+    })->name('sites.settings');
+    Route::livewire('servers/{server}/sites/{site}', SiteSettings::class)->defaults('section', 'general')->name('sites.show');
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
     Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
     Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
-    Route::livewire('servers/{server}/php', WorkspacePhp::class)->name('servers.php');
-    Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
+    Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
+    Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
-    Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->name('servers.daemons');
+    Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
     Route::livewire('servers/{server}/recipes', WorkspaceRecipes::class)->name('servers.recipes');
     Route::livewire('servers/{server}/deploy', WorkspaceDeploy::class)->name('servers.deploy');
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
-    Route::livewire('servers/{server}/manage', WorkspaceManage::class)->name('servers.manage');
+    Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
 
     Route::get('credentials', function () {
         $user = auth()->user();
         $organization = $user?->currentOrganization();
 
-        app(\Illuminate\Contracts\Auth\Access\Gate::class)->authorize('viewAny', \App\Models\ProviderCredential::class);
+        app(Illuminate\Contracts\Auth\Access\Gate::class)->authorize('viewAny', ProviderCredential::class);
         abort_unless($organization, 404);
 
         $params = request()->query();

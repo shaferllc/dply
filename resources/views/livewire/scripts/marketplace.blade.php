@@ -10,17 +10,18 @@
             </ol>
         </nav>
 
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
-            <div>
-                <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Script presets') }}</h1>
-                <p class="mt-2 text-sm text-brand-moss max-w-2xl leading-relaxed">
-                    {{ __('Clone a reusable starter into your organization, then open it from Scripts to edit and run across servers. If a command belongs to only one machine, copy it from Scripts into that server’s Saved commands page.') }}
-                </p>
-            </div>
-            <a href="{{ route('scripts.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 shrink-0">
-                {{ __('Back to scripts') }}
-            </a>
-        </div>
+        <x-page-header
+            :title="__('Script presets')"
+            :description="__('Clone a reusable starter into your organization, then open it from Scripts to edit and run across servers. If a command belongs to only one machine, copy it from Scripts into that server’s Saved commands page.')"
+            doc-route="docs.index"
+            flush
+        >
+            <x-slot name="actions">
+                <a href="{{ route('scripts.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                    {{ __('Back to scripts') }}
+                </a>
+            </x-slot>
+        </x-page-header>
 
         @error('marketplace')
             <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{{ $message }}</div>

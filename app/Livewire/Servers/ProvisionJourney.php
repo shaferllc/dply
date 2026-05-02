@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Servers;
 
 use App\Jobs\RunSetupScriptJob;
@@ -7,15 +9,19 @@ use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
+use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
+use App\Services\Servers\ServerJourneyInfrastructureAlerts;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ClassifyProvisionFailure;
-use App\Support\Servers\ProvisionVerificationSummary;
+use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProvisionPipelineLog;
 use App\Support\Servers\ProvisionStepSnapshots;
-use Illuminate\Support\Collection;
+use App\Support\Servers\ProvisionVerificationSummary;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Livewire;
@@ -28,6 +34,9 @@ class ProvisionJourney extends Component
 
     public bool $showCancelProvisionModal = false;
 
+    /** @var string SHA-256 of last logged journey snapshot (avoids log spam on wire:poll). */
+    public string $journeyViewLogSignature = '';
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -35,29 +44,26 @@ class ProvisionJourney extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
+        // Server may have been deleted out from under us (e.g. user just confirmed
+        // the remove-server modal). Bail to the index instead of letting refresh()
+        // throw ModelNotFoundException, which surfaces in the UI as a 404 inside
+        // any lingering modal/poll response.
+        $fresh = Server::query()->find($this->server->getKey());
+        if ($fresh === null) {
+            $this->showRemoveServerModal = false;
+            $this->showCancelProvisionModal = false;
+
+            if (Livewire::isLivewireRequest()) {
+                $this->dispatch('provision-journey-complete', url: route('servers.index'));
+            } else {
+                $this->redirectRoute('servers.index', navigate: true);
+            }
+
+            return view('livewire.servers.provision-journey-removed');
+        }
+        $this->server = $fresh;
 
         if ($this->shouldRedirectToServerOverview()) {
-            // #region agent log
-            @file_put_contents(
-                base_path('.cursor/debug-182f08.log'),
-                json_encode([
-                    'sessionId' => '182f08',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'H1',
-                    'location' => 'app/Livewire/Servers/ProvisionJourney.php:30',
-                    'message' => 'Journey render reached completion branch',
-                    'data' => [
-                        'serverId' => (string) $this->server->id,
-                        'serverStatus' => (string) $this->server->status,
-                        'setupStatus' => (string) $this->server->setup_status,
-                        'isLivewireRequest' => Livewire::isLivewireRequest(),
-                    ],
-                    'timestamp' => round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL,
-                FILE_APPEND
-            );
-            // #endregion
             if (Livewire::isLivewireRequest()) {
                 $this->dispatch('provision-journey-complete', url: route('servers.overview', $this->server));
             } else {
@@ -77,9 +83,43 @@ class ProvisionJourney extends Component
         $stackSummary = $this->stackSummary($artifacts);
         $stallState = $this->stallState($task, $steps);
 
+        $stepStatesSig = collect($steps)
+            ->map(fn (array $s): string => ($s['key'] ?? '').':'.$s['state'])
+            ->implode('|');
+        $activeRow = collect($steps)->firstWhere('state', 'active');
+        $failedRow = collect($steps)->firstWhere('state', 'failed');
+        $sigPayload = [
+            'server_status' => $this->server->status,
+            'setup_status' => $this->server->setup_status,
+            'task_id' => $task?->id,
+            'task_status' => $task?->status?->value,
+            'run_id' => $run?->id,
+            'run_status' => $run?->status,
+            'step_signature' => $stepStatesSig,
+            'active_key' => $activeRow['key'] ?? null,
+            'failed_key' => $failedRow['key'] ?? null,
+            'should_poll' => $shouldPoll,
+        ];
+        $sig = hash('sha256', json_encode($sigPayload, JSON_THROW_ON_ERROR));
+        if ($this->journeyViewLogSignature !== $sig) {
+            $this->journeyViewLogSignature = $sig;
+            ProvisionPipelineLog::info('server.provision.journey.view_state', $this->server, [
+                'phase' => 'ui',
+                'active_step' => $activeRow['label'] ?? null,
+                'failed_step' => $failedRow['label'] ?? null,
+                'completed_steps' => $completedCount,
+                'total_steps' => count($steps),
+                'task_status' => $task?->status?->value,
+                'run_status' => $run?->status,
+                'should_poll' => $shouldPoll,
+            ]);
+        }
+
         return view('livewire.servers.provision-journey', [
             'task' => $task,
             'run' => $run,
+            'infrastructureAlerts' => app(ServerJourneyInfrastructureAlerts::class)->forServer($this->server),
+            'localDevShellHints' => $this->localDevShellHints(),
             'artifacts' => $artifacts,
             'steps' => $steps,
             'completedCount' => $completedCount,
@@ -92,9 +132,24 @@ class ProvisionJourney extends Component
             'failureClassification' => $failureClassification,
             'repairGuidance' => $repairGuidance,
             'stackSummary' => $stackSummary,
+            'stackTiles' => $stackSummary ? [
+                ['label' => __('Role'),        'value' => $stackSummary['role'],         'icon' => 'heroicon-o-rectangle-stack'],
+                ['label' => __('Web server'),  'value' => $stackSummary['webserver'],    'icon' => 'heroicon-o-globe-alt'],
+                ['label' => __('PHP'),         'value' => $stackSummary['php_version'],  'icon' => 'heroicon-o-code-bracket'],
+                ['label' => __('Database'),    'value' => $stackSummary['database'],     'icon' => 'heroicon-o-circle-stack'],
+                ['label' => __('Cache'),       'value' => $stackSummary['cache_service'], 'icon' => 'heroicon-o-bolt'],
+                ['label' => __('Deploy user'), 'value' => $stackSummary['deploy_user'],  'icon' => 'heroicon-o-user-circle'],
+            ] : [],
             'stallState' => $stallState,
             'shouldPoll' => $shouldPoll,
             'canCancelProvision' => $this->canCancelProvision($task),
+            'liveTaskOutput' => $this->liveTaskOutput($task),
+            'liveTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
+            'fullTaskOutput' => $this->fullTaskOutput($task),
+            'fullTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
+            'taskUpdatedAt' => $task?->updated_at,
+            'rollbackSummary' => $this->rollbackSummary($task),
+            'failureReason' => $this->failureReason($task, collect($steps)->firstWhere('state', 'failed')),
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server->fresh())
                 : null,
@@ -118,7 +173,7 @@ class ProvisionJourney extends Component
 
         $task = $this->activeProvisionTask();
         if (! $task) {
-            $this->flash_error = __('There is no active build task to cancel right now.');
+            $this->toastError(__('There is no active build task to cancel right now.'));
             $this->showCancelProvisionModal = false;
 
             return;
@@ -127,14 +182,14 @@ class ProvisionJourney extends Component
         $result = $taskRunner->cancelTask((string) $task->id);
 
         if (! ($result['success'] ?? false)) {
-            $this->flash_error = (string) ($result['error'] ?? __('Could not cancel the build task.'));
+            $this->toastError((string) ($result['error'] ?? __('Could not cancel the build task.')));
 
             return;
         }
 
         $this->server->refresh();
         $this->showCancelProvisionModal = false;
-        session()->flash('success', __('Build cancelled. You can keep this server or remove it.'));
+        $this->toastSuccess(__('Build cancelled. You can keep this server or remove it.'));
     }
 
     public function cancelProvisionAndOpenDelete(TaskRunnerService $taskRunner): void
@@ -146,7 +201,7 @@ class ProvisionJourney extends Component
             $result = $taskRunner->cancelTask((string) $task->id);
 
             if (! ($result['success'] ?? false)) {
-                $this->flash_error = (string) ($result['error'] ?? __('Could not cancel the build task.'));
+                $this->toastError((string) ($result['error'] ?? __('Could not cancel the build task.')));
 
                 return;
             }
@@ -162,12 +217,51 @@ class ProvisionJourney extends Component
         return ! $this->shouldRedirectToServerOverview();
     }
 
-    protected function shouldRedirectToServerOverview(): bool
+    /**
+     * Copy/paste hints for local SSH dev (docker-compose.ssh-dev, fake cloud). Not used in production UI.
+     *
+     * @return array{
+     *     ssh:string,
+     *     docker_exec:string,
+     *     web_terminal_url:?string,
+     *     fake_cloud_enabled:bool,
+     *     is_fake_server:bool
+     * }|null
+     */
+    protected function localDevShellHints(): ?array
     {
-        if (app()->environment('local')) {
-            return false;
+        if (! app()->environment('local')) {
+            return null;
         }
 
+        $ip = trim((string) ($this->server->ip_address ?? ''));
+        $port = (int) ($this->server->ssh_port ?: 22);
+        $user = trim((string) ($this->server->ssh_user ?? ''));
+        if ($user === '') {
+            $user = 'root';
+        }
+
+        $ssh = $ip !== ''
+            ? ($port === 22 ? "ssh {$user}@{$ip}" : "ssh -p {$port} {$user}@{$ip}")
+            : '';
+
+        $container = (string) config('server_provision.local_dev_ssh_compose_container', 'dply-ssh-dev');
+        $dockerExec = "docker exec -it {$container} /bin/bash";
+
+        $webUrl = config('server_provision.local_dev_web_terminal_url');
+        $webTerminalUrl = is_string($webUrl) && $webUrl !== '' ? $webUrl : null;
+
+        return [
+            'ssh' => $ssh,
+            'docker_exec' => $dockerExec,
+            'web_terminal_url' => $webTerminalUrl,
+            'fake_cloud_enabled' => FakeCloudProvision::enabled(),
+            'is_fake_server' => FakeCloudProvision::isFakeServer($this->server),
+        ];
+    }
+
+    protected function shouldRedirectToServerOverview(): bool
+    {
         return $this->server->status === Server::STATUS_READY
             && $this->server->setup_status === Server::SETUP_STATUS_DONE;
     }
@@ -178,7 +272,7 @@ class ProvisionJourney extends Component
 
         $server = $this->server->fresh();
         if (! $server || ! RunSetupScriptJob::shouldDispatch($server)) {
-            $this->flash_error = 'This server is not ready for a setup re-run yet.';
+            $this->toastError('This server is not ready for a setup re-run yet.');
 
             return;
         }
@@ -192,7 +286,13 @@ class ProvisionJourney extends Component
             'meta' => $meta,
         ]);
 
-        WaitForServerSshReadyJob::dispatch($server->fresh());
+        $fresh = $server->fresh();
+        if ($fresh) {
+            ProvisionPipelineLog::info('server.provision.journey.rerun_setup_dispatched', $fresh, [
+                'phase' => 'ui',
+            ]);
+        }
+        WaitForServerSshReadyJob::dispatch($fresh ?? $server);
 
         $this->redirectRoute('servers.journey', $server, navigate: true);
     }
@@ -370,16 +470,230 @@ class ProvisionJourney extends Component
     {
         $scriptLabel = $this->scriptStepLabelForKey($task, $key);
         if ($scriptLabel !== null) {
-            return $this->persistedStepOutput($server, $key) ?? $this->scriptStepOutput($task, $scriptLabel);
+            $stepSpecific = $this->persistedStepOutput($server, $key) ?? $this->scriptStepOutput($task, $scriptLabel);
+            if ($stepSpecific !== null) {
+                return $stepSpecific;
+            }
+
+            // Step marker hasn't appeared yet — fall back to the latest raw output so the user still sees activity.
+            if ($state === 'active' && $task) {
+                $output = trim((string) $task->tailOutput(40));
+
+                return $output !== '' ? $output : null;
+            }
+
+            return null;
         }
 
         if ($key === 'setup' && $task && in_array($state, ['active', 'failed', 'completed'], true)) {
-            $output = trim((string) $task->tailOutput(12));
+            $output = trim((string) $task->tailOutput(40));
 
             return $output !== '' ? $output : null;
         }
 
         return null;
+    }
+
+    /**
+     * Raw tail of the task output regardless of step framing — gives the user a "tail -f" view of progress.
+     */
+    protected function liveTaskOutput(?Task $task): ?string
+    {
+        if (! $task) {
+            return null;
+        }
+
+        $output = trim((string) $task->tailOutput(150));
+
+        return $output !== '' ? $output : null;
+    }
+
+    protected function liveTaskOutputLineCount(?Task $task): int
+    {
+        if (! $task || ! is_string($task->output) || trim($task->output) === '') {
+            return 0;
+        }
+
+        return count(preg_split('/\r\n|\r|\n/', $task->output) ?: []);
+    }
+
+    /**
+     * Full untrimmed task output for the "View full" modal — capped to keep page size sane.
+     */
+    protected function fullTaskOutput(?Task $task): string
+    {
+        if (! $task || ! is_string($task->output)) {
+            return '';
+        }
+
+        $output = trim($task->output);
+        // Hard cap to ~1MB so a runaway log doesn't bloat the rendered HTML.
+        if (strlen($output) > 1_000_000) {
+            $output = '… [truncated to last 1 MB] …'."\n".substr($output, -1_000_000);
+        }
+
+        return $output;
+    }
+
+    /**
+     * Extract a one-line "why did this fail" headline + a few supporting lines from the
+     * captured step output (or full task output as a fallback). Surfaces the actual error
+     * message to the user instead of a generic "step failed before finishing" framing.
+     *
+     * @param  array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}|null  $failedStep
+     * @return array{headline:string, context:list<string>, exit_code:?int}|null
+     */
+    protected function failureReason(?Task $task, ?array $failedStep): ?array
+    {
+        if ($failedStep === null) {
+            return null;
+        }
+
+        $source = trim((string) ($failedStep['output'] ?? ''));
+        if ($source === '' && $task !== null && is_string($task->output)) {
+            $source = trim($task->output);
+        }
+        if ($source === '') {
+            return null;
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $source) ?: [];
+
+        // Drop noise: rollback markers, step markers, empty lines, locale warnings.
+        $meaningful = [];
+        foreach ($lines as $line) {
+            $trimmed = trim((string) $line);
+            if ($trimmed === '') {
+                continue;
+            }
+            if (str_contains($trimmed, '[dply-rollback]') || str_contains($trimmed, '[dply-step]')) {
+                continue;
+            }
+            $meaningful[] = $trimmed;
+        }
+        if ($meaningful === []) {
+            return null;
+        }
+
+        // Prefer high-signal lines: scan from the end for a known error shape.
+        $errorPatterns = [
+            '/^E:\s/i',                                  // apt
+            '/^Err:/i',                                  // apt
+            '/^Error:\s/i',                              // generic
+            '/^FATAL:/i',
+            '/^fatal:/i',
+            '/Cannot\s/i',
+            '/Permission denied/i',
+            '/No such file or directory/i',
+            '/command not found/i',
+            '/exited with (?:status|code)\s+\d+/i',
+            '/Timeout was reached/i',
+            '/Connection (?:timed out|refused)/i',
+            '/Failed to (?:fetch|start|connect|enable)/i',
+            '/dpkg:\s+error/i',
+            '/Sub-process\s+\S+\s+returned/i',
+        ];
+
+        $headline = null;
+        $contextStart = max(0, count($meaningful) - 8);
+        $tail = array_slice($meaningful, $contextStart);
+
+        foreach (array_reverse($tail, true) as $line) {
+            foreach ($errorPatterns as $pattern) {
+                if (preg_match($pattern, $line) === 1) {
+                    $headline = $line;
+                    break 2;
+                }
+            }
+        }
+
+        if ($headline === null) {
+            // Fall back to the last meaningful line.
+            $headline = end($tail) ?: end($meaningful);
+        }
+
+        $exitCode = null;
+        if (preg_match('/exited with (?:status|code)\s+(\d+)/i', $source, $m) === 1) {
+            $exitCode = (int) $m[1];
+        } elseif ($task && $task->exit_code !== null) {
+            $exitCode = (int) $task->exit_code;
+        }
+
+        // Trim very long lines for the headline so we don't overflow the banner.
+        if (mb_strlen($headline) > 280) {
+            $headline = mb_substr($headline, 0, 277).'…';
+        }
+
+        return [
+            'headline' => $headline,
+            'context' => array_slice($meaningful, max(0, count($meaningful) - 5)),
+            'exit_code' => $exitCode,
+        ];
+    }
+
+    /**
+     * Parse `[dply-rollback] <relpath> :: <action> :: <detail>` markers emitted by the
+     * bootstrap script's ERR trap + dply_restore_backups helper. Lets us tell the user
+     * whether automatic rollback ran and what files it touched.
+     *
+     * @return array{
+     *     triggered: bool,
+     *     restored: list<string>,
+     *     removed: list<string>,
+     *     other: list<array{path:string, action:string, detail:string}>,
+     *     total: int
+     * }|null
+     */
+    protected function rollbackSummary(?Task $task): ?array
+    {
+        if (! $task || ! is_string($task->output) || trim($task->output) === '') {
+            return null;
+        }
+
+        $triggered = false;
+        $restored = [];
+        $removed = [];
+        $other = [];
+
+        $lines = preg_split('/\r\n|\r|\n/', $task->output) ?: [];
+        foreach ($lines as $line) {
+            if (! str_contains($line, '[dply-rollback]')) {
+                continue;
+            }
+
+            // Strip prefix and split "<path> :: <action> :: <detail>".
+            $body = trim((string) preg_replace('/^.*\[dply-rollback\]\s*/', '', $line));
+            $segments = array_map('trim', explode('::', $body, 3));
+            $path = $segments[0] ?? '';
+            $action = strtolower($segments[1] ?? '');
+            $detail = $segments[2] ?? '';
+
+            if ($path === 'automatic' && $action === 'started') {
+                $triggered = true;
+
+                continue;
+            }
+
+            if ($action === 'restored') {
+                $restored[] = $path;
+            } elseif ($action === 'removed') {
+                $removed[] = $path;
+            } elseif ($action !== 'checkpoint' && $action !== '') {
+                $other[] = ['path' => $path, 'action' => $action, 'detail' => $detail];
+            }
+        }
+
+        if (! $triggered && $restored === [] && $removed === [] && $other === []) {
+            return null;
+        }
+
+        return [
+            'triggered' => $triggered,
+            'restored' => $restored,
+            'removed' => $removed,
+            'other' => $other,
+            'total' => count($restored) + count($removed),
+        ];
     }
 
     /**
@@ -477,6 +791,7 @@ class ProvisionJourney extends Component
         foreach ($lines as $line) {
             if (str_contains($line, ProvisionStepSnapshots::SCRIPT_STEP_PREFIX.$label)) {
                 $capture = true;
+
                 continue;
             }
 
@@ -522,7 +837,7 @@ class ProvisionJourney extends Component
      */
     protected function verificationChecks(Collection $artifacts): array
     {
-        /** @var \App\Models\ServerProvisionArtifact|null $artifact */
+        /** @var ServerProvisionArtifact|null $artifact */
         $artifact = $artifacts->firstWhere('type', 'verification_report');
 
         return ProvisionVerificationSummary::fromArtifact($artifact);
@@ -609,7 +924,7 @@ class ProvisionJourney extends Component
      */
     protected function stackSummary(Collection $artifacts): ?array
     {
-        /** @var \App\Models\ServerProvisionArtifact|null $artifact */
+        /** @var ServerProvisionArtifact|null $artifact */
         $artifact = $artifacts->firstWhere('type', 'stack_summary');
         if (! $artifact) {
             return null;
@@ -656,7 +971,7 @@ class ProvisionJourney extends Component
             default => 'Usually a few minutes',
         };
 
-        $stalled = $minutesSinceUpdate >= 6 || $minutesRunning >= 8;
+        $stalled = $minutesSinceUpdate >= 3 || $minutesRunning >= 8;
 
         return [
             'eta' => $eta,

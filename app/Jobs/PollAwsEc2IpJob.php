@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Jobs\Concerns\DispatchesServerProvisionJob;
+use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\Server;
 use App\Services\AwsEc2Service;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,6 +12,7 @@ use Illuminate\Foundation\Queue\Queueable;
 class PollAwsEc2IpJob implements ShouldQueue
 {
     use DispatchesServerProvisionJob;
+    use HandlesFakeCloudPoll;
     use Queueable;
 
     public int $tries = 60;
@@ -27,6 +29,10 @@ class PollAwsEc2IpJob implements ShouldQueue
         if (! $credential) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
 
+            return;
+        }
+
+        if ($this->finishFakeCloudPollIfNeeded($this->server)) {
             return;
         }
 

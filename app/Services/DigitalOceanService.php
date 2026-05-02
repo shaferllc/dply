@@ -48,6 +48,35 @@ class DigitalOceanService
      *
      * @return array<string, mixed>
      */
+    /**
+     * Whether the droplet still exists (404 means deleted / wrong account).
+     *
+     * @return array{state: 'present'|'gone'|'unknown', detail?: string}
+     */
+    public function inspectDropletPresence(int $id): array
+    {
+        $response = $this->request('get', '/droplets/'.$id);
+        $status = $response->status();
+
+        if ($status === 404) {
+            return ['state' => 'gone'];
+        }
+
+        if ($response->successful()) {
+            return ['state' => 'present'];
+        }
+
+        $detail = $response->json('message');
+        if (! is_string($detail) || $detail === '') {
+            $detail = $response->body();
+        }
+        if (! is_string($detail) || trim($detail) === '') {
+            $detail = 'HTTP '.$status;
+        }
+
+        return ['state' => 'unknown', 'detail' => $detail];
+    }
+
     public function getDroplet(int $id): array
     {
         $response = $this->request('get', '/droplets/'.$id);
@@ -253,6 +282,117 @@ class DigitalOceanService
         }
 
         return $key;
+    }
+
+    /**
+     * Whether the domain exists in this DigitalOcean account (Networking → Domains).
+     */
+    public function domainExistsInAccount(string $domain): bool
+    {
+        return $this->fetchDomain($domain) !== null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function fetchDomain(string $domain): ?array
+    {
+        $domain = strtolower(trim($domain));
+        if ($domain === '') {
+            return null;
+        }
+
+        $encoded = rawurlencode($domain);
+        $response = $this->request('get', '/domains/'.$encoded);
+        if ($response->status() === 404) {
+            return null;
+        }
+        $this->assertSuccess($response, 'get domain');
+        $data = $response->json();
+        $payload = $data['domain'] ?? null;
+
+        return is_array($payload) ? $payload : null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getDomainRecords(string $domain, array $query = []): array
+    {
+        $response = $this->request('get', '/domains/'.$domain.'/records', $query);
+        $this->assertSuccess($response, 'list domain records');
+        $data = $response->json();
+        $records = $data['domain_records'] ?? $data['data'] ?? [];
+
+        return is_array($records) ? $records : [];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findDomainRecord(string $domain, string $type, string $name, ?string $data = null): ?array
+    {
+        $type = strtoupper($type);
+        $records = $this->getDomainRecords($domain, ['type' => $type, 'name' => $name]);
+
+        if ($records === []) {
+            $records = $this->getDomainRecords($domain);
+        }
+
+        foreach ($records as $record) {
+            if (! is_array($record)) {
+                continue;
+            }
+
+            if (strtoupper((string) ($record['type'] ?? '')) !== $type) {
+                continue;
+            }
+
+            if ((string) ($record['name'] ?? '') !== $name) {
+                continue;
+            }
+
+            if ($data !== null && (string) ($record['data'] ?? '') !== $data) {
+                continue;
+            }
+
+            return $record;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createDomainRecord(
+        string $domain,
+        string $type,
+        string $name,
+        string $data,
+        int $ttl = 60
+    ): array {
+        $response = $this->request('post', '/domains/'.$domain.'/records', [
+            'type' => strtoupper($type),
+            'name' => $name,
+            'data' => $data,
+            'ttl' => $ttl,
+        ]);
+        $this->assertSuccess($response, 'create domain record');
+        $payload = $response->json();
+        $record = $payload['domain_record'] ?? $payload;
+
+        if (! is_array($record) || $record === []) {
+            throw new \RuntimeException('DigitalOcean API did not return a domain record.');
+        }
+
+        return $record;
+    }
+
+    public function deleteDomainRecord(string $domain, int $recordId): void
+    {
+        $response = $this->request('delete', '/domains/'.$domain.'/records/'.$recordId);
+        $this->assertSuccess($response, 'delete domain record');
     }
 
     /**
