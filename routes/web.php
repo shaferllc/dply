@@ -120,6 +120,7 @@ Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareContro
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
+    Route::livewire('/fleet/health', \App\Livewire\Fleet\Health::class)->name('fleet.health');
     Route::livewire('/admin', AdminDashboard::class)
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.dashboard');
