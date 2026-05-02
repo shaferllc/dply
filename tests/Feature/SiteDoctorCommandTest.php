@@ -51,6 +51,7 @@ class SiteDoctorCommandTest extends TestCase
             'env_value' => 'x',
             'environment' => 'production',
         ]);
+        $site->domains()->create(['hostname' => 'jobs.example.com', 'is_primary' => true]);
 
         Artisan::call('dply:site:doctor', [
             'site' => $site->slug,
@@ -67,7 +68,27 @@ class SiteDoctorCommandTest extends TestCase
         $this->assertSame(1, $decoded['processes']['active']);
         $this->assertSame(2, $decoded['processes']['total_scale']);
         $this->assertSame(1, $decoded['env_var_counts']['production']);
+        $this->assertCount(1, $decoded['domains']);
+        $this->assertSame('jobs.example.com', $decoded['domains'][0]['hostname']);
+        $this->assertTrue($decoded['domains'][0]['is_primary']);
+        $this->assertSame('https://jobs.example.com', $decoded['domains'][0]['url']);
         $this->assertSame([], $decoded['drift']);
+    }
+
+    public function test_no_domains_surfaces_as_drift(): void
+    {
+        $server = \App\Models\Server::factory()->create();
+        $site = \App\Models\Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
+
+        Artisan::call('dply:site:doctor', [
+            'site' => $site->slug,
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame([], $decoded['domains']);
+        $this->assertNotEmpty($decoded['drift']);
+        $this->assertStringContainsString('domain-add', implode(' ', $decoded['drift']));
     }
 
     public function test_drift_reports_unregistered_database_engine(): void
@@ -147,6 +168,7 @@ class SiteDoctorCommandTest extends TestCase
         $this->assertStringContainsString('Processes', $output);
         $this->assertStringContainsString('Latest deployment', $output);
         $this->assertStringContainsString('Environment variables', $output);
+        $this->assertStringContainsString('Domains', $output);
     }
 
     public function test_command_fails_when_site_not_found(): void

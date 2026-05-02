@@ -102,6 +102,20 @@ class SiteDoctorCommand extends Command
             'staging' => $site->environmentVariables()->where('environment', 'staging')->count(),
         ];
 
+        $domains = $site->domains()
+            ->orderByDesc('is_primary')
+            ->orderBy('hostname')
+            ->get(['id', 'hostname', 'is_primary'])
+            ->map(fn ($d) => [
+                'hostname' => $d->hostname,
+                'is_primary' => (bool) $d->is_primary,
+                'url' => 'https://'.$d->hostname,
+            ])
+            ->all();
+        if ($domains === []) {
+            $drift[] = 'Site has no domains configured. Add one with dply:site:domain-add.';
+        }
+
         return [
             'site_id' => $site->id,
             'site_name' => $site->name,
@@ -134,6 +148,7 @@ class SiteDoctorCommand extends Command
             ],
             'latest_deployment' => $latestSummary,
             'env_var_counts' => $envCounts,
+            'domains' => $domains,
             'drift' => $drift,
         ];
     }
@@ -179,6 +194,17 @@ class SiteDoctorCommand extends Command
         foreach ($p['list'] as $proc) {
             $marker = $proc['is_active'] ? '<fg=green>●</>' : '<fg=gray>○</>';
             $this->line(sprintf('    %s %s/%s  ×%d', $marker, $proc['type'], $proc['name'], $proc['scale']));
+        }
+
+        $this->newLine();
+        $this->line('<fg=cyan>Domains</>');
+        if ($r['domains'] === []) {
+            $this->line('  <fg=yellow>None configured.</>');
+        } else {
+            foreach ($r['domains'] as $d) {
+                $marker = $d['is_primary'] ? '<fg=green>★</>' : ' ';
+                $this->line(sprintf('  %s %s', $marker, $d['hostname']));
+            }
         }
 
         $this->newLine();
