@@ -366,6 +366,35 @@
                 @endif
             </section>
 
+            @php($installedRuntimeKeys = $server->installedRuntimeKeys())
+            @if ($installedRuntimeKeys !== [] || ! empty($server->meta['php_version']))
+                <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+                    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div class="max-w-2xl">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Installed runtimes') }}</h3>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Runtime versions pinned globally on this server. Sites pick from these (or override per repo via .tool-versions / dply.yaml).') }}</p>
+                        </div>
+                    </div>
+                    <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        @if (! empty($server->meta['php_version']))
+                            <div class="rounded-xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('PHP') }}</dt>
+                                <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $server->meta['php_version'] }}</dd>
+                                <p class="mt-2 text-[11px] text-brand-moss">{{ __('Native via ondrej/php apt — not mise.') }}</p>
+                            </div>
+                        @endif
+                        @php($defaults = is_array($server->meta['runtime_defaults'] ?? null) ? $server->meta['runtime_defaults'] : [])
+                        @foreach ($installedRuntimeKeys as $runtimeKey)
+                            <div class="rounded-xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ ucfirst($runtimeKey) }}</dt>
+                                <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $defaults[$runtimeKey] ?? '—' }}</dd>
+                                <p class="mt-2 text-[11px] text-brand-moss">{{ __('Managed by mise.') }}</p>
+                            </div>
+                        @endforeach
+                    </dl>
+                </section>
+            @endif
+
             <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
                 <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div class="max-w-2xl">
