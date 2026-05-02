@@ -309,6 +309,19 @@ class Site extends Model
         return $this->hasMany(SiteDeployment::class)->orderByDesc('id');
     }
 
+    /**
+     * Convenience accessor for the most recent SiteDeployment by start
+     * time. Used by dashboard headers and "latest deploy" badges so
+     * callers don't have to repeatedly write the orderBy + limit.
+     */
+    public function latestDeployment(): ?SiteDeployment
+    {
+        // The deployments() relation pre-orders by id desc; reorder()
+        // resets so started_at desc is the only sort and ULIDs created
+        // out-of-order (test fixtures, backdated rows) sort correctly.
+        return $this->deployments()->reorder('started_at', 'desc')->first();
+    }
+
     public function webhookDeliveryLogs(): HasMany
     {
         return $this->hasMany(WebhookDeliveryLog::class)->orderByDesc('id');
