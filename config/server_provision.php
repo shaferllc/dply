@@ -79,6 +79,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | mise (multi-runtime version manager)
+    |--------------------------------------------------------------------------
+    |
+    | When true (default), application + worker servers get mise installed
+    | system-wide and activated for the deploy user during initial setup.
+    | mise manages Node / Python / Ruby / Go versions per the multi-runtime
+    | strategy; PHP stays on ondrej/php apt instead.
+    |
+    | Set DPLY_INSTALL_MISE_ON_PROVISION=false to skip on hosts that should
+    | be PHP-only (or behind isolated networks where the mise apt repo is
+    | unreachable).
+    |
+    */
+    'install_mise_on_provision' => (bool) env('DPLY_INSTALL_MISE_ON_PROVISION', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Local dev: shell hints on provision journey (APP_ENV=local only)
     |--------------------------------------------------------------------------
     |

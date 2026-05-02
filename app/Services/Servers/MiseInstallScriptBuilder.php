@@ -34,25 +34,42 @@ class MiseInstallScriptBuilder
 
     /**
      * Bash lines that install mise system-wide via the official apt
-     * repository. Idempotent: skips when mise is already on $PATH.
+     * repository.
+     *
+     * Idempotent by default ($forceReinstall = false): wraps the install
+     * in a `command -v mise` guard so re-runs of the bootstrap are a
+     * no-op when mise is already there. When $forceReinstall is true
+     * (matches the existing server_provision.force_reinstall flag the
+     * composer/php paths honor), the guard is omitted and the apt steps
+     * always run.
      *
      * @return list<string>
      */
-    public function installLines(): array
+    public function installLines(bool $forceReinstall = false): array
     {
-        return [
-            'if command -v mise >/dev/null 2>&1; then',
-            '  echo "[dply] mise already installed; skipping installer."',
-            'else',
-            '  echo "[dply] installing mise via apt"',
-            '  install -m 0755 -d /etc/apt/keyrings',
-            '  curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg',
-            '  chmod a+r /etc/apt/keyrings/mise-archive-keyring.gpg',
-            '  echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list',
-            '  apt-get update -y',
-            '  apt-get install -y --no-install-recommends mise',
-            'fi',
+        $aptSteps = [
+            'echo "[dply] installing mise via apt"',
+            'install -m 0755 -d /etc/apt/keyrings',
+            'curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg',
+            'chmod a+r /etc/apt/keyrings/mise-archive-keyring.gpg',
+            'echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list',
+            'apt-get update -y',
+            'apt-get install -y --no-install-recommends mise',
         ];
+
+        if ($forceReinstall) {
+            return $aptSteps;
+        }
+
+        return array_merge(
+            [
+                'if command -v mise >/dev/null 2>&1; then',
+                '  echo "[dply] mise already installed; skipping installer."',
+                'else',
+            ],
+            array_map(fn (string $line) => '  '.$line, $aptSteps),
+            ['fi'],
+        );
     }
 
     /**

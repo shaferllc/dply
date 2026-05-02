@@ -245,6 +245,7 @@ final class ServerProvisionCommandBuilder
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
         $lines = array_merge($lines, $this->installAppCache($cache));
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
+        $lines = array_merge($lines, $this->maybeInstallMise());
         $lines = array_merge($lines, $this->writeRenderedConfigs('application', $web, $php, $layout));
 
         if (config('server_provision.install_composer', true) && $php !== 'none') {
@@ -285,6 +286,7 @@ final class ServerProvisionCommandBuilder
         $lines = array_merge($lines, $this->installPhpIfNeeded('none', $php, $database));
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
+        $lines = array_merge($lines, $this->maybeInstallMise());
         $lines = array_merge($lines, $this->writeRenderedConfigs('worker', 'none', $php, $layout));
 
         return $lines;
@@ -373,6 +375,32 @@ final class ServerProvisionCommandBuilder
             ),
             'systemctl enable --now supervisor',
         ];
+    }
+
+    /**
+     * Install mise system-wide via apt and activate it for the deploy user.
+     * mise manages non-PHP runtimes (Node / Python / Ruby / Go) per the
+     * multi-runtime strategy. The actual `mise use --global <tool>@<ver>`
+     * call happens later — at site-create time when a wizard preset asks
+     * for a specific version, or at deploy time when the repo's
+     * .tool-versions / dply.yaml pins one.
+     *
+     * @return list<string>
+     */
+    private function maybeInstallMise(): array
+    {
+        if (! config('server_provision.install_mise_on_provision', true)) {
+            return [];
+        }
+
+        $mise = app(MiseInstallScriptBuilder::class);
+        $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
+
+        return array_merge(
+            [$this->stepMarker('Installing mise (Node / Python / Ruby / Go manager)')],
+            $mise->installLines($this->forceReinstall()),
+            $mise->activateForUserLines($deployUser),
+        );
     }
 
     /** @return list<string> */

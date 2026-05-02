@@ -209,6 +209,50 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('[dply] composer already installed; skipping installer.', $joined);
     }
 
+    public function test_build_application_stack_installs_mise_for_non_php_runtimes(): void
+    {
+        config(['server_provision.install_mise_on_provision' => true]);
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+        $this->assertStringContainsString('Installing mise', $joined);
+        $this->assertStringContainsString('mise.jdx.dev/gpg-key.pub', $joined);
+        $this->assertStringContainsString('apt-get install -y --no-install-recommends mise', $joined);
+        $this->assertStringContainsString('# dply: mise activation', $joined);
+    }
+
+    public function test_build_application_stack_skips_mise_when_disabled_via_config(): void
+    {
+        config(['server_provision.install_mise_on_provision' => false]);
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+        $this->assertStringNotContainsString('Installing mise', $joined);
+        $this->assertStringNotContainsString('mise.jdx.dev', $joined);
+    }
+
     public function test_build_can_force_reinstall_via_config(): void
     {
         config([
