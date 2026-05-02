@@ -32,6 +32,69 @@ class SiteCreateRuntimeDetectionTest extends TestCase
         return $user;
     }
 
+    public function test_install_missing_runtime_button_appears_for_uninstalled_runtime(): void
+    {
+        [$user, $server] = $this->makeServerWithUser();
+        // Server's runtime_defaults is empty (the makeServerWithUser helper
+        // doesn't seed it), so a Node detection should surface the install
+        // affordance.
+        $this->fakeClonerThatProducesNodeRepoWithBullmq();
+
+        $component = Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.git_repository_url', 'https://example.com/jobs.git')
+            ->call('detectFromRepository');
+
+        $component->assertSeeHtml('wire:click="installDetectedRuntimeOnServer"');
+    }
+
+    public function test_install_missing_runtime_button_hidden_when_runtime_already_installed(): void
+    {
+        [$user, $server] = $this->makeServerWithUser();
+        // Mark Node as already installed via runtime_defaults — the polyglot
+        // wizard preset path. The install affordance should not surface.
+        $server->update(['meta' => array_merge((array) $server->meta, [
+            'runtime_defaults' => ['node' => '22'],
+        ])]);
+        $this->fakeClonerThatProducesNodeRepoWithBullmq();
+
+        $component = Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.git_repository_url', 'https://example.com/jobs.git')
+            ->call('detectFromRepository');
+
+        $component->assertDontSeeHtml('wire:click="installDetectedRuntimeOnServer"');
+    }
+
+    public function test_install_missing_runtime_button_hidden_for_php_detection(): void
+    {
+        // PHP uses ondrej/php apt, not mise — even though Laravel/PHP isn't
+        // in `runtime_defaults`, we don't surface the affordance because
+        // the install path is fundamentally different and assumed already
+        // configured by ServerProvisionCommandBuilder's PHP install step.
+        [$user, $server] = $this->makeServerWithUser();
+
+        $this->app->instance(GitCloner::class, new class implements GitCloner
+        {
+            public function shallowClone(string $url, string $branch, string $destination): void
+            {
+                mkdir($destination, 0o755, true);
+                file_put_contents(
+                    $destination.'/composer.json',
+                    json_encode(['require' => ['laravel/framework' => '^11.0']]),
+                );
+            }
+        });
+        unset($this->app[RepositoryRuntimePreview::class]);
+
+        $component = Livewire::actingAs($user)
+            ->test(SitesCreate::class, ['server' => $server])
+            ->set('form.git_repository_url', 'https://example.com/laravel.git')
+            ->call('detectFromRepository');
+
+        $component->assertDontSeeHtml('wire:click="installDetectedRuntimeOnServer"');
+    }
+
     public function test_create_view_shows_auto_detect_panel_for_non_functions_host(): void
     {
         [$user, $server] = $this->makeServerWithUser();

@@ -203,6 +203,29 @@
                                         @endforeach
                                     </ul>
                                 @endif
+
+                                @if ($this->detectedRuntimeNeedsInstall)
+                                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                                        <p class="font-medium">{{ __('Heads up: this server hasn\'t pinned :runtime yet.', ['runtime' => ucfirst((string) $detectedPlan['runtime'])]) }}</p>
+                                        <p class="mt-1 text-xs">{{ __('mise will install it on demand at deploy time, but you can preinstall now to keep the first deploy fast.') }}</p>
+                                        <button
+                                            type="button"
+                                            wire:click="installDetectedRuntimeOnServer"
+                                            wire:loading.attr="disabled"
+                                            wire:target="installDetectedRuntimeOnServer"
+                                            class="mt-3 inline-flex items-center justify-center rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sky-800 disabled:opacity-50"
+                                        >
+                                            <span wire:loading.remove wire:target="installDetectedRuntimeOnServer">{{ __('Install :runtime :version on this server', ['runtime' => ucfirst((string) $detectedPlan['runtime']), 'version' => $detectedPlan['version'] ?? '']) }}</span>
+                                            <span wire:loading wire:target="installDetectedRuntimeOnServer">{{ __('Installing…') }}</span>
+                                        </button>
+                                    </div>
+                                @endif
+
+                                @if (! empty($runtimeInstallResult))
+                                    <div class="rounded-xl border {{ ($runtimeInstallResult['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900' }} p-3 text-xs">
+                                        {{ $runtimeInstallResult['message'] ?? '' }}
+                                    </div>
+                                @endif
                             </div>
                         @endif
                     </div>

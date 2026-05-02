@@ -153,6 +153,42 @@ class Server extends Model
         return $this->databaseEngines()->where('is_default', true)->first();
     }
 
+    /**
+     * Runtime keys (node / python / ruby / go / etc.) the server has a
+     * pinned global version for, derived from `meta.runtime_defaults`.
+     *
+     * Empty when the server hasn't been provisioned with any runtime
+     * defaults yet — mise itself may still be installed (the strategy
+     * memo's polyglot pitch lets any non-PHP runtime be installed on
+     * demand at the site-create moment), but the wizard hasn't pre-set
+     * a server-level default. The site-create form uses this list to
+     * decide whether to surface an "install missing runtime" affordance.
+     *
+     * @return list<string>
+     */
+    public function installedRuntimeKeys(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $defaults = $meta['runtime_defaults'] ?? null;
+        if (! is_array($defaults)) {
+            return [];
+        }
+
+        $keys = [];
+        foreach (array_keys($defaults) as $key) {
+            if (is_string($key) && $key !== '') {
+                $keys[] = $key;
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    public function hasRuntimeInstalled(string $runtime): bool
+    {
+        return in_array($runtime, $this->installedRuntimeKeys(), true);
+    }
+
     public function databaseAdminCredential(): HasOne
     {
         return $this->hasOne(ServerDatabaseAdminCredential::class);

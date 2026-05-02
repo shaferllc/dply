@@ -9,6 +9,7 @@ use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
+use App\Actions\Servers\InstallRuntimeOnServer;
 use App\Models\SiteProcess;
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
@@ -87,6 +88,15 @@ class Create extends Component
      * stomp manual edits.
      */
     public bool $runtimeOverridesTouched = false;
+
+    /**
+     * Surfaces the result of the most recent "install runtime on server"
+     * click for inline UI feedback. Empty until the user invokes
+     * {@see installDetectedRuntimeOnServer}.
+     *
+     * @var array<string, mixed>
+     */
+    public array $runtimeInstallResult = [];
 
     public function mount(
         Server $server,
@@ -339,6 +349,76 @@ class Create extends Component
                 $this->form->app_port = $plan->appPort;
             }
         }
+    }
+
+    /**
+     * Whether the inline "Install <runtime> on this server" affordance
+     * should appear in the detection panel. True when:
+     *   - detection has produced a runtime,
+     *   - that runtime is one mise can manage (not PHP, not static), and
+     *   - the server hasn't already pinned it via meta.runtime_defaults.
+     *
+     * Exposed as a Livewire-magic computed property so the Blade panel
+     * can call `$this->detectedRuntimeNeedsInstall` without an in-template
+     * @php block (Blade's compileString has trouble parsing block-form
+     * @php with array literals containing 'php'/'static' string keys —
+     * Livewire-side computation sidesteps that entirely).
+     */
+    public function getDetectedRuntimeNeedsInstallProperty(): bool
+    {
+        $runtime = (string) ($this->detectedPlan['runtime'] ?? '');
+        if ($runtime === '' || in_array($runtime, ['php', 'static'], true)) {
+            return false;
+        }
+
+        return ! $this->server->hasRuntimeInstalled($runtime);
+    }
+
+    /**
+     * Trigger runtime installation on the current server using the
+     * detected runtime + version. Used by the inline "Install <runtime>
+     * on this server" affordance the panel surfaces when the detected
+     * runtime is missing from `server->installedRuntimeKeys()`.
+     */
+    public function installDetectedRuntimeOnServer(InstallRuntimeOnServer $action): void
+    {
+        $this->authorize('update', $this->server);
+
+        $runtime = (string) ($this->detectedPlan['runtime'] ?? '');
+        $version = (string) ($this->detectedPlan['version'] ?? '');
+
+        if ($runtime === '' || $version === '') {
+            $this->runtimeInstallResult = [
+                'ok' => false,
+                'message' => __('Run detection first so we have a runtime + version to install.'),
+            ];
+
+            return;
+        }
+
+        try {
+            $result = $action->execute($this->server, $runtime, $version);
+        } catch (\Throwable $e) {
+            $this->runtimeInstallResult = [
+                'ok' => false,
+                'runtime' => $runtime,
+                'version' => $version,
+                'message' => $e->getMessage(),
+            ];
+
+            return;
+        }
+
+        $this->server->refresh();
+
+        $this->runtimeInstallResult = [
+            'ok' => $result['installed'],
+            'runtime' => $result['runtime'],
+            'version' => $result['version'],
+            'message' => $result['installed']
+                ? __('Installed :runtime :version on this server.', ['runtime' => $runtime, 'version' => $version])
+                : __('Skipped — runtime not eligible for mise-managed install.'),
+        ];
     }
 
     /**
