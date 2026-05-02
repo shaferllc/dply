@@ -9,10 +9,15 @@ use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
+use App\Models\SiteProcess;
+use App\Services\Deploy\RuntimeDetection\GitCloneException;
+use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
+use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Servers\ServerPhpManager;
+use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
@@ -49,6 +54,39 @@ class Create extends Component
     public array $functionsDetection = [];
 
     public bool $functionsOverridesTouched = false;
+
+    /**
+     * Surfaces the merged manifest+detection plan for the URL-first flow.
+     * Empty array when no detection has run; an associative array of plan
+     * fields (runtime, version, framework, build_command, start_command,
+     * app_port, confidence, sources, processes, reasons, warnings,
+     * has_manifest, error?) once it has.
+     *
+     * Mirrors the JSON shape produced by the dply:detect-runtime CLI so
+     * the Blade panel can render the same structure the CLI prints.
+     *
+     * @var array<string, mixed>
+     */
+    public array $detectedPlan = [];
+
+    /**
+     * Suggested non-web processes carried forward from the last detection
+     * run. The Site::created hook already creates a `web` SiteProcess
+     * (with command=null); after store() persists the site, we create
+     * one row per entry here so workers/schedulers/etc. land alongside.
+     *
+     * @var list<array{type: string, name: string, command: string, reason: string}>
+     */
+    public array $detectedProcesses = [];
+
+    /**
+     * Suppress detection-driven form pre-fills when the user has manually
+     * edited any of the managed fields (runtime / runtime_version /
+     * build_command / start_command). Mirrors the
+     * {@see $functionsOverridesTouched} pattern so a re-detect doesn't
+     * stomp manual edits.
+     */
+    public bool $runtimeOverridesTouched = false;
 
     public function mount(
         Server $server,
@@ -202,6 +240,156 @@ class Create extends Component
         if (! $value) {
             $this->form->applyPathDefaults();
         }
+    }
+
+    public function updatedFormRuntime(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    public function updatedFormRuntimeVersion(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    public function updatedFormBuildCommand(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    public function updatedFormStartCommand(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    /**
+     * Run URL-first runtime detection against the form's git URL + branch.
+     *
+     * Pulls the merged dply.yaml + detector plan via {@see RepositoryRuntimePreview}
+     * and pre-fills runtime / runtime_version / build_command / start_command on
+     * the form when the user hasn't manually edited any of those fields.
+     * Suggested non-web processes are stashed in {@see $detectedProcesses} for
+     * {@see store()} to materialize after the Site row is created.
+     *
+     * Errors (clone failures, missing branch, etc.) land in
+     * `$detectedPlan['error']` so the Blade panel can render them inline
+     * without aborting the form.
+     */
+    public function detectFromRepository(RepositoryRuntimePreview $preview): void
+    {
+        $url = trim($this->form->git_repository_url);
+        $branch = trim($this->form->git_branch) !== '' ? trim($this->form->git_branch) : 'main';
+
+        if ($url === '') {
+            $this->detectedPlan = [];
+            $this->detectedProcesses = [];
+
+            return;
+        }
+
+        try {
+            $plan = $preview->fromUrl($url, $branch);
+        } catch (GitCloneException $e) {
+            $this->detectedPlan = [
+                'error' => $e->getMessage(),
+                'url' => $url,
+                'branch' => $branch,
+            ];
+            $this->detectedProcesses = [];
+
+            return;
+        }
+
+        if ($plan === null) {
+            $this->detectedPlan = [
+                'url' => $url,
+                'branch' => $branch,
+                'no_match' => true,
+            ];
+            $this->detectedProcesses = [];
+
+            return;
+        }
+
+        $this->detectedPlan = $this->planToArray($plan, $url, $branch);
+        $this->detectedProcesses = array_map(
+            fn ($p) => [
+                'type' => $p->type,
+                'name' => $p->name,
+                'command' => $p->command,
+                'reason' => $p->reason,
+            ],
+            $plan->processes,
+        );
+
+        if (! $this->runtimeOverridesTouched) {
+            $this->form->runtime = $plan->runtime;
+            $this->form->runtime_version = $plan->version ?? '';
+            $this->form->build_command = $plan->buildCommand ?? '';
+            $this->form->start_command = $plan->startCommand ?? '';
+            // Sync the legacy `type` enum + php_version + app_port so the
+            // existing UI sections (which still bind on those) reflect the
+            // detected runtime instead of staying on the previous default.
+            $this->form->type = $this->mapRuntimeToLegacyType($plan->runtime);
+            $this->form->applyPathDefaults();
+            if ($plan->runtime === 'php' && $plan->version !== null) {
+                $this->form->php_version = $plan->version;
+            }
+            if ($plan->runtime === 'node' && $plan->appPort !== null) {
+                $this->form->app_port = $plan->appPort;
+            }
+        }
+    }
+
+    /**
+     * Pure-PHP renderer for the plan into the array shape the Blade panel
+     * and any tests assert against.
+     *
+     * @return array<string, mixed>
+     */
+    private function planToArray(RepositoryRuntimePlan $plan, string $url, string $branch): array
+    {
+        return [
+            'url' => $url,
+            'branch' => $branch,
+            'runtime' => $plan->runtime,
+            'version' => $plan->version,
+            'framework' => $plan->framework,
+            'build_command' => $plan->buildCommand,
+            'start_command' => $plan->startCommand,
+            'app_port' => $plan->appPort,
+            'confidence' => $plan->confidence,
+            'sources' => $plan->sources,
+            'reasons' => $plan->reasons,
+            'warnings' => $plan->warnings,
+            'has_manifest' => $plan->hasManifest(),
+            'processes' => array_map(
+                fn ($p) => [
+                    'type' => $p->type,
+                    'name' => $p->name,
+                    'command' => $p->command,
+                    'reason' => $p->reason,
+                ],
+                $plan->processes,
+            ),
+        ];
+    }
+
+    /**
+     * Map a detected runtime onto the existing {@see SiteType} enum. The
+     * enum still drives a lot of legacy UI/provisioner branches; we'll
+     * collapse it into the new `runtime` column in a follow-up. For
+     * runtimes the enum doesn't yet model (python/ruby/go) we fall back
+     * to "node" as the closest approximation — the new `runtime` column
+     * carries the truth, and downstream provisioners read that.
+     */
+    private function mapRuntimeToLegacyType(string $runtime): string
+    {
+        return match ($runtime) {
+            'php' => 'php',
+            'static' => 'static',
+            default => 'node',
+        };
     }
 
     public function store(SiteProvisioner $siteProvisioner): mixed
@@ -361,6 +549,31 @@ class Create extends Component
             ];
         }
 
+        // The new runtime-agnostic fields drive the URL-first flow. When
+        // they aren't populated (legacy flow, or non-VM hosts) we fall
+        // back to the existing type-based logic so behavior is unchanged.
+        $effectiveRuntime = $this->form->runtime !== ''
+            ? $this->form->runtime
+            : $this->form->type;
+        $allocatesInternalPort = ! $functionsHost
+            && ! $containerHost
+            && ! in_array($effectiveRuntime, ['php', 'static'], true);
+        $internalPort = null;
+        if ($allocatesInternalPort) {
+            $internalPort = app(InternalPortAllocator::class)->allocate($this->server->id);
+            if ($internalPort === null) {
+                $this->addError(
+                    'form.runtime',
+                    __('No free internal port available on this server (range 30000–39999 is full).'),
+                );
+
+                return null;
+            }
+        }
+
+        $vmGitUrl = trim($this->form->git_repository_url);
+        $vmGitBranch = trim($this->form->git_branch) !== '' ? trim($this->form->git_branch) : 'main';
+
         $site = Site::query()->create([
             'server_id' => $this->server->id,
             'user_id' => auth()->id(),
@@ -369,6 +582,11 @@ class Create extends Component
             'name' => $this->form->name,
             'slug' => Str::slug($this->form->name) ?: 'site',
             'type' => SiteType::from($this->form->type),
+            'runtime' => $this->form->runtime !== '' ? $this->form->runtime : null,
+            'runtime_version' => $this->form->runtime_version !== '' ? $this->form->runtime_version : null,
+            'build_command' => $this->form->build_command !== '' ? $this->form->build_command : null,
+            'start_command' => $this->form->start_command !== '' ? $this->form->start_command : null,
+            'internal_port' => $internalPort,
             'document_root' => $functionsHost
                 ? ($this->server->isAwsLambdaHost()
                     ? '/lambda/'.trim($this->form->functions_entrypoint, '/')
@@ -379,8 +597,10 @@ class Create extends Component
             'app_port' => $this->form->type === 'node' ? $this->form->app_port : null,
             'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
-            'git_repository_url' => $functionsHost ? trim($this->form->functions_repository_url) : null,
-            'git_branch' => $functionsHost ? trim($this->form->functions_repository_branch) : 'main',
+            'git_repository_url' => $functionsHost
+                ? trim($this->form->functions_repository_url)
+                : ($vmGitUrl !== '' ? $vmGitUrl : null),
+            'git_branch' => $functionsHost ? trim($this->form->functions_repository_branch) : $vmGitBranch,
             'webhook_secret' => Str::random(48),
             'deploy_strategy' => 'simple',
             'releases_to_keep' => 5,
@@ -392,6 +612,28 @@ class Create extends Component
 
         $site->ensureUniqueSlug();
         $site->save();
+
+        // The Site::created hook auto-creates a `web` SiteProcess with
+        // command=null. For non-PHP runtimes with a detected start command,
+        // backfill that command now so the process row is immediately
+        // useful.
+        if ($this->form->start_command !== '') {
+            $site->processes()
+                ->where('type', SiteProcess::TYPE_WEB)
+                ->update(['command' => $this->form->start_command]);
+        }
+
+        // Materialize detector-suggested non-web processes (workers,
+        // schedulers) alongside the auto-created web row.
+        foreach ($this->detectedProcesses as $detected) {
+            $site->processes()->create([
+                'type' => $detected['type'],
+                'name' => $detected['name'],
+                'command' => $detected['command'],
+                'scale' => 1,
+                'is_active' => true,
+            ]);
+        }
 
         SiteDomain::query()->create([
             'site_id' => $site->id,
