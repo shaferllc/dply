@@ -19,8 +19,27 @@ final class ServerProvisionCommandBuilder
 
     private const ROLLBACK_PREFIX = '[dply-rollback] ';
 
+    /**
+     * In-progress server, populated for the duration of a single build()
+     * call so role helpers can read meta without threading it through
+     * every signature. Reset to null on exit so a builder reused across
+     * builds doesn't leak state.
+     */
+    private ?Server $server = null;
+
     /** @return list<string> */
     public function build(Server $server): array
+    {
+        $this->server = $server;
+        try {
+            return $this->buildInner($server);
+        } finally {
+            $this->server = null;
+        }
+    }
+
+    /** @return list<string> */
+    private function buildInner(Server $server): array
     {
         $meta = $server->meta ?? [];
         if (! is_array($meta) || empty($meta['server_role']) || ! is_string($meta['server_role'])) {
@@ -378,12 +397,19 @@ final class ServerProvisionCommandBuilder
     }
 
     /**
-     * Install mise system-wide via apt and activate it for the deploy user.
+     * Install mise system-wide via apt, activate it for the deploy user,
+     * and pin any per-runtime defaults the wizard recorded on the server.
+     *
      * mise manages non-PHP runtimes (Node / Python / Ruby / Go) per the
-     * multi-runtime strategy. The actual `mise use --global <tool>@<ver>`
-     * call happens later — at site-create time when a wizard preset asks
-     * for a specific version, or at deploy time when the repo's
-     * .tool-versions / dply.yaml pins one.
+     * multi-runtime strategy. The polyglot-host preset (or any wizard
+     * preset that pre-selects runtimes) writes a `runtime_defaults` map
+     * onto the server's meta:
+     *
+     *   meta.runtime_defaults = ['node' => '22', 'python' => '3.12', ...]
+     *
+     * Each entry becomes a `mise use --global <tool>@<ver>` line so a
+     * site without its own pin (no .tool-versions, no Site-level
+     * runtime_version) gets the server default at deploy time.
      *
      * @return list<string>
      */
@@ -396,11 +422,54 @@ final class ServerProvisionCommandBuilder
         $mise = app(MiseInstallScriptBuilder::class);
         $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
 
-        return array_merge(
+        $lines = array_merge(
             [$this->stepMarker('Installing mise (Node / Python / Ruby / Go manager)')],
             $mise->installLines($this->forceReinstall()),
             $mise->activateForUserLines($deployUser),
         );
+
+        $defaults = $this->serverRuntimeDefaults();
+        foreach ($defaults as $runtime => $version) {
+            $lines = array_merge(
+                $lines,
+                $mise->installRuntimeForUserLines($deployUser, $runtime, $version),
+            );
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Pull the wizard-defined per-runtime defaults from the server meta.
+     * Returns an empty array when nothing was recorded — mise still
+     * installs but no specific runtime versions are pinned globally.
+     *
+     * @return array<string, string>
+     */
+    private function serverRuntimeDefaults(): array
+    {
+        $meta = $this->server?->meta ?? [];
+        if (! is_array($meta)) {
+            return [];
+        }
+        $defaults = $meta['runtime_defaults'] ?? null;
+        if (! is_array($defaults)) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($defaults as $runtime => $version) {
+            if (! is_string($runtime) || ! is_string($version)) {
+                continue;
+            }
+            $version = trim($version);
+            if ($version === '') {
+                continue;
+            }
+            $clean[$runtime] = $version;
+        }
+
+        return $clean;
     }
 
     /** @return list<string> */

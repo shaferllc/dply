@@ -232,6 +232,66 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('# dply: mise activation', $joined);
     }
 
+    public function test_build_application_stack_pins_runtime_defaults_via_mise_use_global(): void
+    {
+        config(['server_provision.install_mise_on_provision' => true]);
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+                'runtime_defaults' => [
+                    'node' => '22',
+                    'python' => '3.12',
+                    'ruby' => '3.3',
+                    'go' => '1.22',
+                ],
+            ],
+        ]);
+
+        $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+        $this->assertStringContainsString('mise use --global node@22', $joined);
+        $this->assertStringContainsString('mise use --global python@3.12', $joined);
+        $this->assertStringContainsString('mise use --global ruby@3.3', $joined);
+        $this->assertStringContainsString('mise use --global go@1.22', $joined);
+    }
+
+    public function test_build_application_stack_skips_unknown_runtime_defaults(): void
+    {
+        config(['server_provision.install_mise_on_provision' => true]);
+
+        // PHP and unknown runtimes silently no-op via MiseInstallScriptBuilder's
+        // SUPPORTED_RUNTIMES guard — bootstrap script must not try to mise-install
+        // PHP (ondrej/php handles that path) or invent commands for runtimes we
+        // don't know.
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+                'runtime_defaults' => [
+                    'php' => '8.3',
+                    'erlang' => '27',
+                    'node' => '22',
+                ],
+            ],
+        ]);
+
+        $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+        $this->assertStringContainsString('mise use --global node@22', $joined);
+        $this->assertStringNotContainsString('mise use --global php@', $joined);
+        $this->assertStringNotContainsString('mise use --global erlang@', $joined);
+    }
+
     public function test_build_application_stack_skips_mise_when_disabled_via_config(): void
     {
         config(['server_provision.install_mise_on_provision' => false]);
