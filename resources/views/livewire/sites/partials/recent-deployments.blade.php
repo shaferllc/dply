@@ -1,7 +1,10 @@
 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
         <h3 class="text-sm font-semibold text-slate-900">{{ __('Recent deployments') }}</h3>
-        <p class="text-xs text-slate-500">{{ trans_choice('{1} 1 with phase data|[2,*] :count with phase data', $deployments->count(), ['count' => $deployments->count()]) }}</p>
+        <div class="flex items-baseline gap-3">
+            <p class="text-xs text-slate-500">{{ trans_choice('{1} 1 with phase data|[2,*] :count with phase data', $deployments->count(), ['count' => $deployments->count()]) }}</p>
+            <a href="{{ route('sites.deployments.index', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="text-xs font-medium text-slate-700 hover:text-slate-900 hover:underline">{{ __('View all') }} →</a>
+        </div>
     </div>
     <p class="mt-1 text-xs text-slate-600">{{ __('Per-phase build → swap → release → restart status from the deploy runner. Click to expand step details.') }}</p>
     <ul class="mt-3 space-y-2">

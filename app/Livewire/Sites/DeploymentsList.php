@@ -1,0 +1,102 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\Sites;
+
+use App\Models\Server;
+use App\Models\Site;
+use App\Models\SiteDeployment;
+use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Url;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+/**
+ * Index of every deployment for a site, with status + trigger
+ * filtering. Pairs with the deployment-detail page (one row →
+ * detail) so operators can browse historic deploys without
+ * scrolling through the recent-deployments collapsibles.
+ */
+class DeploymentsList extends Component
+{
+    use WithPagination;
+
+    public Server $server;
+
+    public Site $site;
+
+    #[Url(as: 'status', except: '')]
+    public string $statusFilter = '';
+
+    #[Url(as: 'trigger', except: '')]
+    public string $triggerFilter = '';
+
+    /** @var array<int, string> */
+    public const ALLOWED_STATUSES = [
+        SiteDeployment::STATUS_RUNNING,
+        SiteDeployment::STATUS_SUCCESS,
+        SiteDeployment::STATUS_FAILED,
+        SiteDeployment::STATUS_SKIPPED,
+    ];
+
+    public function mount(Server $server, Site $site): void
+    {
+        if ($site->server_id !== $server->id) {
+            abort(404);
+        }
+        if ($server->organization_id !== auth()->user()?->currentOrganization()?->id) {
+            abort(404);
+        }
+
+        $this->server = $server;
+        $this->site = $site;
+    }
+
+    public function updatedStatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedTriggerFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearFilters(): void
+    {
+        $this->statusFilter = '';
+        $this->triggerFilter = '';
+        $this->resetPage();
+    }
+
+    public function render(): View
+    {
+        $query = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->orderByDesc('started_at');
+
+        if (in_array($this->statusFilter, self::ALLOWED_STATUSES, true)) {
+            $query->where('status', $this->statusFilter);
+        }
+        if ($this->triggerFilter !== '') {
+            $query->where('trigger', $this->triggerFilter);
+        }
+
+        $deployments = $query->paginate(25);
+
+        $triggers = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->whereNotNull('trigger')
+            ->distinct()
+            ->orderBy('trigger')
+            ->pluck('trigger')
+            ->all();
+
+        return view('livewire.sites.deployments-list', [
+            'deployments' => $deployments,
+            'triggers' => $triggers,
+            'statuses' => self::ALLOWED_STATUSES,
+        ])->layout('layouts.app');
+    }
+}

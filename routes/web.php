@@ -217,6 +217,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
+    Route::livewire('servers/{server}/sites/{site}/deployments', \App\Livewire\Sites\DeploymentsList::class)->name('sites.deployments.index');
     Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', \App\Livewire\Sites\DeploymentDetail::class)->name('sites.deployments.show');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
