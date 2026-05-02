@@ -1,0 +1,18 @@
+# Example dply.yaml for a Rails app.
+
+runtime: ruby
+version: "3.3"
+
+build:
+  - bundle install --deployment --without development:test
+  - bundle exec rails assets:precompile
+
+release:
+  - bundle exec rails db:migrate
+
+processes:
+  web:
+    command: bundle exec puma -C config/puma.rb
+  sidekiq:
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    scale: 1

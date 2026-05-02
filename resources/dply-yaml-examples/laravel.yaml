@@ -1,0 +1,34 @@
+# Example dply.yaml for a Laravel app.
+#
+# Place this file at the root of a repo as `dply.yaml`. dply's
+# manifest parser will read it and merge with auto-detection
+# (manifest wins per-field; detection fills gaps; dashboard
+# config is the baseline).
+#
+# All keys are optional — a repo with no manifest deploys via
+# auto-detection alone.
+
+runtime: php
+version: "8.4"
+
+# Build phase: runs in releases/{id}/ before the swap.
+build:
+  - composer install --no-dev --optimize-autoloader
+  - npm ci
+  - npm run build
+
+# Release phase: runs after the swap when the new release is live.
+release:
+  - php artisan migrate --force
+  - php artisan optimize
+
+# Long-running processes. The `web` key is reserved for the upstream
+# (NGINX → PHP-FPM is implicit on PHP, so the value is ignored on PHP
+# runtimes; for non-PHP runtimes this drives the systemd unit).
+processes:
+  horizon:
+    command: php artisan horizon
+    scale: 1
+  scheduler:
+    command: php artisan schedule:work
+    scale: 1
