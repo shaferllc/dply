@@ -155,6 +155,21 @@ class Site extends Model
                 'slug' => $site->slug.'-'.$site->id,
                 'name' => $site->name,
             ]);
+
+            // Every site that runs *something* (i.e. not a pure static host) gets a
+            // canonical "web" process row. The row's command is null at create time:
+            // PHP-FPM is implicit (the FPM master + per-site pool serve the site, no
+            // dedicated process here), and for other runtimes the command is filled in
+            // later by runtime detection / dply.yaml / the user.
+            if ($site->type !== SiteType::Static) {
+                $site->processes()->create([
+                    'type' => SiteProcess::TYPE_WEB,
+                    'name' => SiteProcess::TYPE_WEB,
+                    'command' => null,
+                    'scale' => 1,
+                    'is_active' => true,
+                ]);
+            }
         });
 
         static::deleted(function (Site $site): void {
@@ -299,6 +314,11 @@ class Site extends Model
     public function releases(): HasMany
     {
         return $this->hasMany(SiteRelease::class)->orderByDesc('id');
+    }
+
+    public function processes(): HasMany
+    {
+        return $this->hasMany(SiteProcess::class)->orderBy('name');
     }
 
     public function environmentVariables(): HasMany
