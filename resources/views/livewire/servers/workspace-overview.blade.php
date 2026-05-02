@@ -366,6 +366,32 @@
                 @endif
             </section>
 
+            @php($databaseEngines = $server->databaseEngines()->orderBy('engine')->get())
+            @if ($databaseEngines->isNotEmpty())
+                <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+                    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div class="max-w-2xl">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Database engines') }}</h3>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Engines installed on this server. Sites pick from these via the engine override on site-create; sites without an explicit override fall back to the default below.') }}</p>
+                        </div>
+                    </div>
+                    <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        @foreach ($databaseEngines as $engine)
+                            <div class="rounded-xl border {{ $engine->is_default ? 'border-emerald-300 bg-emerald-50/60' : 'border-brand-ink/10 bg-slate-50/70' }} p-4">
+                                <dt class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">
+                                    <span>{{ $engine->engine }}</span>
+                                    @if ($engine->is_default)
+                                        <span class="inline-flex items-center rounded-full bg-emerald-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-900">{{ __('default') }}</span>
+                                    @endif
+                                </dt>
+                                <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $engine->version ?? '—' }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                    <p class="mt-4 text-[11px] text-brand-moss">{{ __('Manage with') }} <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px]">dply:server:add-engine</code> {{ __('and') }} <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px]">dply:server:remove-engine</code>.</p>
+                </section>
+            @endif
+
             @php($installedRuntimeKeys = $server->installedRuntimeKeys())
             @if ($installedRuntimeKeys !== [] || ! empty($server->meta['php_version']))
                 <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
