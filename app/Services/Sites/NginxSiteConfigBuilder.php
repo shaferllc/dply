@@ -102,8 +102,30 @@ class NginxSiteConfigBuilder
         return match ($site->type) {
             SiteType::Php => $this->phpBlock($basename, $names, $root, $phpSock, $redirectBlock, $layerPrefix, $extraBlock, $poolNote, $site),
             SiteType::Static => $this->staticBlock($basename, $names, $root, $redirectBlock, $layerPrefix, $extraBlock, $site),
-            SiteType::Node => $this->nodeBlock($basename, $names, (int) ($site->app_port ?? 3000), $redirectBlock, $layerPrefix, $extraBlock, $site),
+            SiteType::Node => $this->nodeBlock($basename, $names, $this->resolveUpstreamPort($site), $redirectBlock, $layerPrefix, $extraBlock, $site),
         };
+    }
+
+    /**
+     * Resolve the upstream port for non-PHP/static sites.
+     *
+     * Prefers the new `internal_port` column (allocated from 30000–39999
+     * by InternalPortAllocator and unique per server) and falls back to
+     * the legacy `app_port` (which sites created before the runtime-
+     * agnostic columns landed still carry). The 3000 default is the last
+     * resort for sites that have neither — a typical Node convention.
+     */
+    private function resolveUpstreamPort(Site $site): int
+    {
+        if ($site->internal_port !== null && $site->internal_port > 0) {
+            return (int) $site->internal_port;
+        }
+
+        if ($site->app_port !== null && $site->app_port > 0) {
+            return (int) $site->app_port;
+        }
+
+        return 3000;
     }
 
     /**

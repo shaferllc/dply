@@ -18,6 +18,51 @@ class NginxSiteConfigBuilderTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_node_block_routes_to_internal_port_when_set(): void
+    {
+        $site = Site::factory()->create([
+            'slug' => 'jobs-app',
+            'type' => SiteType::Node,
+            'app_port' => 3000,
+            'internal_port' => 30007,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'jobs.example.test',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $site->refresh()->load('domains', 'redirects');
+        $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+        $this->assertStringContainsString('proxy_pass http://127.0.0.1:30007;', $nginx);
+        $this->assertStringNotContainsString('proxy_pass http://127.0.0.1:3000;', $nginx);
+    }
+
+    public function test_node_block_falls_back_to_app_port_when_internal_port_is_null(): void
+    {
+        // Sites created before the runtime-agnostic columns landed only
+        // have app_port. Routing must still work for them.
+        $site = Site::factory()->create([
+            'slug' => 'legacy-node',
+            'type' => SiteType::Node,
+            'app_port' => 4001,
+            'internal_port' => null,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'legacy.example.test',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $site->refresh()->load('domains', 'redirects');
+        $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+        $this->assertStringContainsString('proxy_pass http://127.0.0.1:4001;', $nginx);
+    }
+
     public function test_per_site_access_and_error_log_paths_are_included(): void
     {
         $site = Site::factory()->create([
