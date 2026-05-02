@@ -71,6 +71,7 @@ class Site extends Model
         'repository_path',
         'runtime',
         'runtime_version',
+        'database_engine',
         'app_port',
         'internal_port',
         'build_command',
@@ -648,6 +649,33 @@ class Site extends Model
         $version = $this->runtime_version;
 
         return is_string($version) && $version !== '' ? $version : null;
+    }
+
+    /**
+     * The database engine this site targets.
+     *
+     * Prefers the explicit `database_engine` column when set (the user
+     * picked an engine on a multi-engine server), and falls back to the
+     * server's default ServerDatabaseEngine row. Returns null on hosts
+     * with no DB at all (cache-only / load-balancer / static-only servers).
+     *
+     * Per the strategy memo: "Site database_engine defaults to server's
+     * default; can be overridden to any engine installed on the server."
+     */
+    public function databaseEngine(): ?string
+    {
+        if (is_string($this->database_engine) && $this->database_engine !== '') {
+            return $this->database_engine;
+        }
+
+        $server = $this->server ?? Server::query()->find($this->server_id);
+        if ($server === null) {
+            return null;
+        }
+
+        $default = $server->defaultDatabaseEngine();
+
+        return $default?->engine;
     }
 
     /**
