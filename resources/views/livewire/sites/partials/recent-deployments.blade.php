@@ -18,6 +18,7 @@
                             @if ($deployment->phaseTotalDurationMs() > 0)
                                 <span class="font-mono text-[11px] text-slate-500">· {{ number_format($deployment->phaseTotalDurationMs() / 1000, 1) }}s</span>
                             @endif
+                            <span class="ml-auto select-all rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500" title="{{ __('Deployment ID — use with') }} dply:site:show-deploy">{{ $deployment->id }}</span>
                         </div>
                         <div class="mt-1 flex flex-wrap gap-1.5 text-[10px]">
                             @foreach (['build', 'swap', 'release', 'restart'] as $phase)
@@ -45,6 +46,10 @@
                             @endif
                         @endforeach
                     </div>
+                    <p class="mt-3 text-[10px] text-slate-500">
+                        {{ __('Drill in from the terminal:') }}
+                        <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">dply:site:show-deploy {{ $deployment->id }} --output</code>
+                    </p>
                 </details>
             </li>
         @endforeach

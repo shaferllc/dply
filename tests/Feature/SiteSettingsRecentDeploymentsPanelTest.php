@@ -45,7 +45,10 @@ class SiteSettingsRecentDeploymentsPanelTest extends TestCase
             ->assertSee('webhook')
             ->assertSee('build (1)')
             ->assertSee('release (1)')
-            ->assertSee('restart (1)');
+            ->assertSee('restart (1)')
+            // Deployment ID + CLI hint are visible so operators can drill in via terminal.
+            ->assertSee($deployment->id)
+            ->assertSee('dply:site:show-deploy');
     }
 
     public function test_panel_omits_when_no_deployments_have_phase_results(): void
