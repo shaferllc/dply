@@ -133,6 +133,26 @@ class Server extends Model
         return $this->hasMany(ServerDatabase::class);
     }
 
+    /**
+     * Database engines installed on this server (multi-engine support).
+     * Distinct from {@see serverDatabases} which lists user-created
+     * named DBs on top of an engine. See ServerDatabaseEngine docblock.
+     */
+    public function databaseEngines(): HasMany
+    {
+        return $this->hasMany(ServerDatabaseEngine::class);
+    }
+
+    /**
+     * The engine row marked is_default — the implicit choice for new sites
+     * that don't pick an engine explicitly. Null when nothing is installed
+     * (cache-only / load-balancer / static-only servers).
+     */
+    public function defaultDatabaseEngine(): ?ServerDatabaseEngine
+    {
+        return $this->databaseEngines()->where('is_default', true)->first();
+    }
+
     public function databaseAdminCredential(): HasOne
     {
         return $this->hasOne(ServerDatabaseAdminCredential::class);
