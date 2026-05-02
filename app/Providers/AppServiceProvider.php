@@ -52,6 +52,13 @@ use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
 use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
 use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesDeployEngine;
+use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\NodeRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\PythonRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\RubyRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
+use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
 use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
@@ -158,6 +165,19 @@ class AppServiceProvider extends ServiceProvider
             ImportedCertificateInstaller::class,
             CertificateSigningRequestGenerator::class,
         ], 'site.certificate.engines');
+
+        $this->app->singleton(RuntimeDetectionEngine::class, function ($app) {
+            return new RuntimeDetectionEngine($app->tagged('site.runtime.detectors'));
+        });
+
+        $this->app->tag([
+            PhpRuntimeDetector::class,
+            NodeRuntimeDetector::class,
+            PythonRuntimeDetector::class,
+            RubyRuntimeDetector::class,
+            GoRuntimeDetector::class,
+            StaticRuntimeDetector::class,
+        ], 'site.runtime.detectors');
     }
 
     /**
