@@ -82,4 +82,32 @@ class FleetSummaryCommandTest extends TestCase
         $this->assertSame(1, $decoded['site_runtimes']['unset']);
         $this->assertSame(1, $decoded['site_runtimes']['go']);
     }
+
+    public function test_fly_io_section_reports_eligible_sites_when_not_connected(): void
+    {
+        $server = Server::factory()->create();
+        Site::factory()->create(['server_id' => $server->id, 'runtime' => 'node']);
+        Site::factory()->create(['server_id' => $server->id, 'runtime' => 'static']);
+        Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']); // not eligible
+
+        Artisan::call('dply:fleet:summary', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertFalse($decoded['fly_io']['connected']);
+        $this->assertSame(2, $decoded['fly_io']['edge_eligible_sites']);
+    }
+
+    public function test_fly_io_section_marks_connected_when_credential_exists(): void
+    {
+        \App\Models\ProviderCredential::factory()->create([
+            'provider' => 'fly_io',
+            'name' => 'Fly token',
+            'credentials' => ['api_token' => 't'],
+        ]);
+
+        Artisan::call('dply:fleet:summary', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertTrue($decoded['fly_io']['connected']);
+    }
 }

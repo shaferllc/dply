@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
@@ -44,6 +45,11 @@ class FleetSummaryCommand extends Command
         $totalServers = Server::query()->count();
         $totalSites = Site::query()->count();
 
+        $flyConnected = ProviderCredential::query()->where('provider', 'fly_io')->exists();
+        $edgeEligibleSites = Site::query()
+            ->whereIn('runtime', ['node', 'static'])
+            ->count();
+
         $payload = [
             'totals' => [
                 'servers' => $totalServers,
@@ -52,6 +58,10 @@ class FleetSummaryCommand extends Command
             'server_statuses' => $serverStatuses->toArray(),
             'site_runtimes' => $siteRuntimes->toArray(),
             'engine_usage' => $engineUsage->toArray(),
+            'fly_io' => [
+                'connected' => $flyConnected,
+                'edge_eligible_sites' => $edgeEligibleSites,
+            ],
         ];
 
         if ($this->option('json')) {
@@ -92,6 +102,16 @@ class FleetSummaryCommand extends Command
             )->values()->all());
         } else {
             $this->line('<fg=gray>No database engines registered yet.</>');
+        }
+
+        if (! $flyConnected && $edgeEligibleSites > 0) {
+            $this->newLine();
+            $this->line(sprintf(
+                '<fg=cyan>Fly.io edge:</> <fg=gray>not connected.</> %d %s could deploy at the edge.',
+                $edgeEligibleSites,
+                trans_choice('{1} Node/static site|[2,*] Node/static sites', $edgeEligibleSites),
+            ));
+            $this->line('<fg=gray>  Connect: dply:list-engines | docs: https://fly.io/docs/about/pricing</>');
         }
 
         return self::SUCCESS;
