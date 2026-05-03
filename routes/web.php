@@ -254,6 +254,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
     Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
+    Route::livewire('servers/{server}/deploys', \App\Livewire\Servers\Deploys::class)->name('servers.deploys');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
     Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
