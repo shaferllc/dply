@@ -3,29 +3,34 @@
 
     <form wire:submit.prevent="next" class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
       <div class="space-y-8 min-w-0">
-        <header>
-            <h1 class="text-2xl font-semibold text-brand-ink sm:text-3xl">
-                @if ($form->mode === 'provider')
-                    {{ __('Where it runs') }}
-                @else
-                    {{ __('Connect your server') }}
-                @endif
-            </h1>
-            <p class="mt-2 text-sm text-brand-moss">
-                @if ($form->mode === 'provider')
-                    {{ __('Step 2 of :total — pick the provider, account, region, and size for the new VM.', ['total' => $totalSteps]) }}
-                @else
-                    {{ __('Step 2 of :total — give Dply SSH access to the server you already have.', ['total' => $totalSteps]) }}
-                @endif
-            </p>
+        <header class="relative overflow-hidden rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-brand-cream via-white to-brand-sand/20 px-6 py-8 shadow-sm sm:px-10 sm:py-10">
+            <div class="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-brand-sage/10 blur-3xl" aria-hidden="true"></div>
+            <div class="absolute -bottom-16 -left-12 h-40 w-40 rounded-full bg-brand-gold/10 blur-3xl" aria-hidden="true"></div>
+            <div class="relative">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Step :n of :total', ['n' => 2, 'total' => $totalSteps]) }}</p>
+                <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">
+                    @if ($form->mode === 'provider')
+                        {{ __('Where it runs') }}
+                    @else
+                        {{ __('Connect your server') }}
+                    @endif
+                </h1>
+                <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">
+                    @if ($form->mode === 'provider')
+                        {{ __('Pick the cloud provider, account, region, and size for the new VM.') }}
+                    @else
+                        {{ __('Give dply SSH access to the server you already have. We connect read-only at first to verify before doing anything destructive.') }}
+                    @endif
+                </p>
+            </div>
         </header>
 
         @if ($form->mode === 'provider')
             {{-- Provider tile picker --}}
-            <section class="space-y-3">
+            <section class="space-y-4">
                 <div class="flex items-baseline justify-between gap-2">
-                    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('Provider') }}</h2>
-                    <a href="{{ route('credentials.index') }}" wire:navigate class="text-sm font-medium text-sky-700 hover:text-sky-900">{{ __('Manage credentials') }}</a>
+                    <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Provider') }}</h2>
+                    <a href="{{ route('credentials.index') }}" wire:navigate class="text-sm font-medium text-brand-sage transition-colors hover:text-brand-forest">{{ __('Manage credentials') }} →</a>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($providerCards as $card)
@@ -35,14 +40,19 @@
                             wire:loading.attr="disabled"
                             wire:target="chooseProvider"
                             @class([
-                                'rounded-2xl border p-4 text-left transition disabled:cursor-wait disabled:opacity-60',
-                                'border-sky-500 bg-sky-50 ring-2 ring-sky-200' => $form->type === $card['id'],
-                                'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' => $form->type !== $card['id'],
+                                'group rounded-2xl border-2 p-4 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-60',
+                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->type === $card['id'],
+                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->type !== $card['id'],
                             ])
                         >
                             <div class="flex items-center justify-between gap-3">
-                                <p class="text-sm font-semibold text-slate-900">{{ $card['label'] }}</p>
-                                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $card['linked'] ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800' }}">
+                                <p class="text-sm font-semibold text-brand-ink">{{ $card['label'] }}</p>
+                                <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $card['linked'] ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200' }}">
+                                    @if ($card['linked'])
+                                        <x-heroicon-m-check-circle class="h-3 w-3" />
+                                    @else
+                                        <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
+                                    @endif
                                     {{ $card['linked'] ? __('Connected') : __('Needs account') }}
                                 </span>
                             </div>
@@ -53,8 +63,8 @@
             </section>
 
             {{-- Account / credential picker --}}
-            <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-                <h2 class="text-base font-semibold text-slate-900">{{ __('Account') }}</h2>
+            <section class="space-y-4 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+                <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Account') }}</h2>
 
                 @if ($catalog['credentials']->isEmpty())
                     <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
@@ -80,61 +90,76 @@
 
             {{-- Region + size pickers, only when there's a credential --}}
             @if ($form->provider_credential_id !== '')
-                <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2">
+                <section class="grid gap-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:grid-cols-2">
                     @include('livewire.servers.create._provider-region-picker')
                     @include('livewire.servers.create._provider-size-picker')
                 </section>
             @endif
         @else
             {{-- Custom / BYO --}}
-            <section class="space-y-3">
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('Host kind') }}</h2>
-                <div class="grid gap-3 sm:grid-cols-2">
+            <section class="space-y-4">
+                <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Host kind') }}</h2>
+                <div class="grid gap-4 sm:grid-cols-2">
                     <button
                         type="button"
                         wire:click="chooseHostKind('vm')"
                         @class([
-                            'rounded-2xl border-2 p-4 text-left transition',
-                            'border-sky-500 bg-sky-50' => $form->custom_host_kind === 'vm',
-                            'border-slate-200 bg-white hover:border-slate-300' => $form->custom_host_kind !== 'vm',
+                            'group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all',
+                            'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->custom_host_kind === 'vm',
+                            'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->custom_host_kind !== 'vm',
                         ])
                     >
-                        <p class="text-sm font-semibold text-slate-900">{{ __('Standard VM / VPS') }}</p>
-                        <p class="mt-1 text-sm text-slate-600">{{ __('Dply will install Nginx, PHP, your database, etc. — full stack setup.') }}</p>
+                        <span @class([
+                            'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors',
+                            'bg-brand-sage text-white shadow-md shadow-brand-sage/20' => $form->custom_host_kind === 'vm',
+                            'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15' => $form->custom_host_kind !== 'vm',
+                        ])>
+                            <x-heroicon-o-server class="h-6 w-6" />
+                        </span>
+                        <p class="mt-4 text-base font-semibold text-brand-ink">{{ __('Standard VM / VPS') }}</p>
+                        <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">{{ __('Dply will install Nginx, PHP, your database, etc. — full stack setup.') }}</p>
                     </button>
                     <button
                         type="button"
                         wire:click="chooseHostKind('docker')"
                         @class([
-                            'rounded-2xl border-2 p-4 text-left transition',
-                            'border-sky-500 bg-sky-50' => $form->custom_host_kind === 'docker',
-                            'border-slate-200 bg-white hover:border-slate-300' => $form->custom_host_kind !== 'docker',
+                            'group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all',
+                            'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->custom_host_kind === 'docker',
+                            'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->custom_host_kind !== 'docker',
                         ])
                     >
-                        <p class="text-sm font-semibold text-slate-900">{{ __('Docker host') }}</p>
-                        <p class="mt-1 text-sm text-slate-600">{{ __('Skip stack install. Dply just connects over SSH and orchestrates containers.') }}</p>
+                        <span @class([
+                            'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors',
+                            'bg-brand-sage text-white shadow-md shadow-brand-sage/20' => $form->custom_host_kind === 'docker',
+                            'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15' => $form->custom_host_kind !== 'docker',
+                        ])>
+                            <x-heroicon-o-cube-transparent class="h-6 w-6" />
+                        </span>
+                        <p class="mt-4 text-base font-semibold text-brand-ink">{{ __('Docker host') }}</p>
+                        <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">{{ __('Skip stack install. Dply just connects over SSH and orchestrates containers.') }}</p>
                     </button>
                 </div>
                 <x-input-error :messages="$errors->get('form.custom_host_kind')" class="mt-1" />
             </section>
 
-            <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+            <section class="space-y-5 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7">
+                <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('SSH connection') }}</h2>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <x-input-label for="ip_address" :value="__('IP address or hostname')" />
-                        <x-text-input id="ip_address" wire:model.live.debounce.500ms="form.ip_address" type="text" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-text-input id="ip_address" wire:model.live.debounce.500ms="form.ip_address" type="text" class="mt-1 block w-full font-mono" required autocomplete="off" placeholder="203.0.113.10" />
                         <x-input-error :messages="$errors->get('form.ip_address')" class="mt-1" />
                     </div>
                     <div>
                         <x-input-label for="ssh_port" :value="__('SSH port')" />
-                        <x-text-input id="ssh_port" wire:model.live.debounce.500ms="form.ssh_port" type="text" class="mt-1 block w-full" autocomplete="off" placeholder="22" />
+                        <x-text-input id="ssh_port" wire:model.live.debounce.500ms="form.ssh_port" type="text" class="mt-1 block w-full font-mono" autocomplete="off" placeholder="22" />
                         <x-input-error :messages="$errors->get('form.ssh_port')" class="mt-1" />
                     </div>
                 </div>
 
                 <div>
                     <x-input-label for="ssh_user" :value="__('SSH user')" />
-                    <x-text-input id="ssh_user" wire:model.live.debounce.500ms="form.ssh_user" type="text" class="mt-1 block w-full" required autocomplete="off" />
+                    <x-text-input id="ssh_user" wire:model.live.debounce.500ms="form.ssh_user" type="text" class="mt-1 block w-full font-mono" required autocomplete="off" placeholder="root" />
                     <p class="mt-1 text-xs text-brand-mist">{{ __('Usually root, ubuntu, or a sudo-enabled deploy user.') }}</p>
                     <x-input-error :messages="$errors->get('form.ssh_user')" class="mt-1" />
                 </div>
@@ -145,22 +170,26 @@
                         id="ssh_private_key"
                         wire:model.live.debounce.750ms="form.ssh_private_key"
                         rows="8"
-                        class="mt-1 block w-full rounded-md border-gray-300 font-mono text-xs shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                        class="mt-1 block w-full rounded-xl border-brand-ink/15 bg-brand-cream/30 font-mono text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                         placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;…&#10;-----END OPENSSH PRIVATE KEY-----"
                         required
                     ></textarea>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Stored encrypted at rest. Used only to connect to this server.') }}</p>
+                    <p class="mt-1 inline-flex items-center gap-1 text-xs text-brand-mist">
+                        <x-heroicon-m-lock-closed class="h-3 w-3" />
+                        {{ __('Stored encrypted at rest. Used only to connect to this server.') }}
+                    </p>
                     <x-input-error :messages="$errors->get('form.ssh_private_key')" class="mt-1" />
                 </div>
 
-                <div class="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+                <div class="flex flex-wrap items-center gap-3 border-t border-brand-ink/10 pt-4">
                     <button
                         type="button"
                         wire:click="testCustomConnection"
                         wire:loading.attr="disabled"
                         wire:target="testCustomConnection"
-                        class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+                        class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage hover:text-brand-sage disabled:cursor-wait disabled:opacity-60"
                     >
+                        <x-heroicon-o-bolt wire:loading.remove wire:target="testCustomConnection" class="h-4 w-4" />
                         <span wire:loading.remove wire:target="testCustomConnection">{{ __('Test connection') }}</span>
                         <span wire:loading wire:target="testCustomConnection" class="inline-flex items-center gap-2">
                             <x-spinner variant="zinc" size="sm" />
@@ -169,21 +198,30 @@
                     </button>
                     @if ($customConnectionTestState !== 'idle' && $customConnectionTestMessage !== '')
                         <span @class([
-                            'text-sm',
+                            'inline-flex items-center gap-1.5 text-sm',
                             'text-emerald-700' => $customConnectionTestState === 'success',
                             'text-amber-800' => $customConnectionTestState === 'warning',
                             'text-red-700' => $customConnectionTestState === 'error',
-                        ])>{{ $customConnectionTestMessage }}</span>
+                        ])>
+                            @if ($customConnectionTestState === 'success')
+                                <x-heroicon-m-check-circle class="h-4 w-4" />
+                            @elseif ($customConnectionTestState === 'warning')
+                                <x-heroicon-m-exclamation-triangle class="h-4 w-4" />
+                            @else
+                                <x-heroicon-m-x-circle class="h-4 w-4" />
+                            @endif
+                            {{ $customConnectionTestMessage }}
+                        </span>
                     @endif
                 </div>
             </section>
         @endif
 
-        <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-5">
+        <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-6">
             <button
                 type="button"
                 wire:click="openDiscardDraftModal"
-                class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50"
             >
                 <x-heroicon-o-trash class="h-4 w-4" />
                 {{ __('Discard draft') }}
@@ -192,7 +230,7 @@
                 <button
                     type="button"
                     wire:click="previous"
-                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-5 text-sm font-semibold text-brand-ink transition-colors hover:border-brand-sage hover:text-brand-sage"
                 >
                     <x-heroicon-o-arrow-left class="h-4 w-4" />
                     {{ __('Back') }}
@@ -201,11 +239,11 @@
                     type="submit"
                     wire:loading.attr="disabled"
                     wire:target="next"
-                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:cursor-wait disabled:opacity-60"
+                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-ink px-6 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest disabled:cursor-wait disabled:opacity-60"
                 >
                     <span wire:loading.remove wire:target="next">{{ __('Continue') }}</span>
                     <span wire:loading wire:target="next" class="inline-flex items-center gap-2">
-                        <x-spinner variant="white" size="sm" />
+                        <x-spinner variant="cream" size="sm" />
                         {{ __('Saving…') }}
                     </span>
                     <x-heroicon-o-arrow-right wire:loading.remove wire:target="next" class="h-4 w-4" />
