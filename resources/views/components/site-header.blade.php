@@ -153,6 +153,12 @@
                                         </x-slot>
                                         {{ __('Sites') }}
                                     </x-dropdown-link>
+                                    <x-dropdown-link :href="route('fleet.health')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-heart class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Fleet health') }}
+                                    </x-dropdown-link>
                                     <x-dropdown-link :href="route('projects.index')">
                                         <x-slot name="icon">
                                             <x-heroicon-o-rectangle-stack class="{{ $hi }}" />
@@ -386,6 +392,12 @@
                         <x-heroicon-o-globe-alt class="{{ $hi }}" />
                     </x-slot>
                     {{ __('Sites') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('fleet.health')" :active="request()->routeIs('fleet.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-heart class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Fleet health') }}
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
                     <x-slot name="icon">

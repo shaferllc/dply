@@ -124,6 +124,16 @@ class FleetHealthPageTest extends TestCase
             ->assertSee('longer than 15m');
     }
 
+    public function test_fleet_link_renders_in_top_nav(): void
+    {
+        [$user, $org] = $this->makeUserOrg();
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk()
+            ->assertSee(route('fleet.health'), false);
+    }
+
     public function test_only_shows_servers_in_current_org(): void
     {
         [$user, $org] = $this->makeUserOrg();
