@@ -131,7 +131,7 @@
                             <h2 class="mt-2 text-xl font-semibold tracking-tight text-brand-ink sm:text-2xl">{{ __('Installation tasks (:done/:total)', ['done' => $completedCount, 'total' => $totalCount]) }}</h2>
                             <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss">
                                 @if ($journeyHasFailed)
-                                    {{ __('Provisioning hit an error. Review the failure details below, or click Resume install to try again.') }}
+                                    {{ __('Provisioning hit an error. Review the failure details below, then click Resume install — it re-runs the full script, but already-completed steps (installed packages, written configs) are detected and skipped quickly.') }}
                                 @elseif ($autoRetryPending && $autoRetryAttempt && $autoRetryMax)
                                     {{ __('A transient failure was detected. Auto-retrying — attempt :n of :max, starting :when.', [
                                         'n' => $autoRetryAttempt,
@@ -158,6 +158,8 @@
                             <button
                                 type="button"
                                 wire:click="rerunSetup"
+                                wire:confirm="{{ __('Re-run the full setup script? Steps that already completed (e.g. installed packages) will skip in seconds — but the script does run from the top.') }}"
+                                title="{{ __('Re-runs the full bootstrap script from the top. Already-installed packages and applied configs are detected and skipped quickly, so a re-run after a transient failure usually finishes in seconds, not minutes.') }}"
                                 class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:border-brand-sage hover:text-brand-sage"
                             >
                                 <x-heroicon-o-arrow-path class="h-4 w-4" />
