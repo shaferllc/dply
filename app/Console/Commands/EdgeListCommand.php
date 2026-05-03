@@ -21,7 +21,10 @@ class EdgeListCommand extends Command
     protected $signature = 'dply:edge:list
         {--json : Output as JSON}
         {--backend= : Filter to a single backend slug}
-        {--status= : Filter to a single status (active, provisioning, failed)}';
+        {--status= : Filter to a single status (active, provisioning, failed)}
+        {--mode= : Filter by deployment mode (image or source)}
+        {--previews : Only show preview deployments}
+        {--no-previews : Hide preview deployments (parents only)}';
 
     protected $description = 'List edge container sites across the fleet.';
 
@@ -55,7 +58,35 @@ class EdgeListCommand extends Command
             $query->where('status', $statusMap[$statusKey]);
         }
 
+        $modeOption = $this->option('mode');
+        if (is_string($modeOption) && $modeOption !== '') {
+            $modeKey = strtolower($modeOption);
+            if (! in_array($modeKey, ['image', 'source'], true)) {
+                $this->error('Unknown --mode. Use one of: image, source');
+
+                return self::FAILURE;
+            }
+        }
+
         $sites = $query->get();
+
+        // Apply mode + preview filters in-memory: meta JSON queries
+        // differ subtly across DB drivers, and the fleet is small enough
+        // that the post-fetch filter has no real cost.
+        if (is_string($modeOption) && $modeOption !== '') {
+            $modeKey = strtolower($modeOption);
+            $sites = $sites->filter(function (Site $site) use ($modeKey): bool {
+                $hasSource = is_array($site->meta['container']['source'] ?? null);
+
+                return $modeKey === 'source' ? $hasSource : ! $hasSource;
+            })->values();
+        }
+
+        if ($this->option('previews')) {
+            $sites = $sites->filter(fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id']))->values();
+        } elseif ($this->option('no-previews')) {
+            $sites = $sites->filter(fn (Site $s) => empty($s->meta['container']['preview_parent_site_id']))->values();
+        }
 
         $rows = $sites->map(function (Site $site): array {
             $meta = is_array($site->meta) ? $site->meta : [];

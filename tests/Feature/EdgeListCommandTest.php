@@ -109,6 +109,65 @@ class EdgeListCommandTest extends TestCase
         $this->assertNull($payload['sites'][0]['image']);
     }
 
+    public function test_filter_mode_source(): void
+    {
+        $this->makeContainerSite('Source Site', 'digitalocean_app_platform', Site::STATUS_CONTAINER_ACTIVE, [
+            'container_image' => null,
+            'meta' => ['container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']]],
+        ]);
+        $this->makeContainerSite('Image Site', 'digitalocean_app_platform');
+
+        Artisan::call('dply:edge:list', ['--json' => true, '--mode' => 'source']);
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertSame(1, $payload['total']);
+        $this->assertSame('Source Site', $payload['sites'][0]['site']);
+    }
+
+    public function test_filter_previews_only(): void
+    {
+        $parent = $this->makeContainerSite('Parent', 'digitalocean_app_platform', Site::STATUS_CONTAINER_ACTIVE);
+        $this->makeContainerSite('Preview', 'digitalocean_app_platform', Site::STATUS_CONTAINER_ACTIVE, [
+            'meta' => [
+                'container' => [
+                    'source' => ['repo' => 'acme/api', 'branch' => 'feature/x'],
+                    'preview_parent_site_id' => $parent->id,
+                    'preview_branch' => 'feature/x',
+                ],
+            ],
+        ]);
+
+        Artisan::call('dply:edge:list', ['--json' => true, '--previews' => true]);
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertSame(1, $payload['total']);
+        $this->assertSame('Preview', $payload['sites'][0]['site']);
+    }
+
+    public function test_filter_no_previews_excludes_them(): void
+    {
+        $parent = $this->makeContainerSite('Parent', 'digitalocean_app_platform', Site::STATUS_CONTAINER_ACTIVE);
+        $this->makeContainerSite('Preview', 'digitalocean_app_platform', Site::STATUS_CONTAINER_ACTIVE, [
+            'meta' => [
+                'container' => ['preview_parent_site_id' => $parent->id, 'preview_branch' => 'feature/x'],
+            ],
+        ]);
+
+        Artisan::call('dply:edge:list', ['--json' => true, '--no-previews' => true]);
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertSame(1, $payload['total']);
+        $this->assertSame('Parent', $payload['sites'][0]['site']);
+    }
+
+    public function test_unknown_mode_returns_failure(): void
+    {
+        $exit = Artisan::call('dply:edge:list', ['--mode' => 'nope']);
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('Unknown --mode', Artisan::output());
+    }
+
     public function test_empty_fleet_message(): void
     {
         $exit = Artisan::call('dply:edge:list');
@@ -117,7 +176,10 @@ class EdgeListCommandTest extends TestCase
         $this->assertStringContainsString('No edge sites found', Artisan::output());
     }
 
-    private function makeContainerSite(string $name, string $backend, string $status = Site::STATUS_CONTAINER_ACTIVE): Site
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function makeContainerSite(string $name, string $backend, string $status = Site::STATUS_CONTAINER_ACTIVE, array $overrides = []): Site
     {
         $user = User::factory()->create();
         $org = Organization::factory()->create();
@@ -128,7 +190,7 @@ class EdgeListCommandTest extends TestCase
             'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
         ]);
 
-        return Site::factory()->create([
+        return Site::factory()->create(array_merge([
             'server_id' => $server->id,
             'user_id' => $user->id,
             'organization_id' => $org->id,
@@ -142,7 +204,7 @@ class EdgeListCommandTest extends TestCase
             'container_backend' => $backend,
             'container_region' => 'nyc',
             'status' => $status,
-        ]);
+        ], $overrides));
     }
 
     private function makeVmSite(string $name): Site
