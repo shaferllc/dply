@@ -158,6 +158,57 @@
         </div>
     @endif
 
+    @if ($isSourceMode && empty($containerMeta['preview_parent_site_id']))
+        @php
+            $previews = \App\Actions\Edge\CreateEdgePreviewSite::listForParent($site);
+        @endphp
+        @if ($previews->isNotEmpty())
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Preview deployments') }}</p>
+                        <p class="mt-1 text-xs text-slate-500">{{ __('One preview per branch — typically driven by your CI on PR open / sync / close.') }}</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-800">{{ $previews->count() }}</span>
+                </div>
+                <ul class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
+                    @foreach ($previews as $preview)
+                        @php
+                            $previewMeta = is_array($preview->meta['container'] ?? null) ? $preview->meta['container'] : [];
+                            $previewBranch = $previewMeta['preview_branch'] ?? '—';
+                            $previewPrNumber = $previewMeta['preview_pr_number'] ?? null;
+                            $previewLiveUrl = $preview->containerLiveUrl();
+                            $previewStatusClass = match ($preview->status) {
+                                \App\Models\Site::STATUS_CONTAINER_ACTIVE => 'bg-emerald-100 text-emerald-800',
+                                \App\Models\Site::STATUS_CONTAINER_PROVISIONING => 'bg-sky-100 text-sky-800',
+                                \App\Models\Site::STATUS_CONTAINER_FAILED => 'bg-rose-100 text-rose-800',
+                                default => 'bg-slate-100 text-slate-700',
+                            };
+                        @endphp
+                        <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs">
+                            <div class="min-w-0 flex-1">
+                                <p class="font-mono text-slate-900">
+                                    @if ($previewPrNumber)
+                                        <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">PR #{{ $previewPrNumber }}</span>
+                                    @endif
+                                    {{ $previewBranch }}
+                                </p>
+                                @if ($previewLiveUrl)
+                                    <a href="{{ $previewLiveUrl }}" target="_blank" rel="noopener" class="break-all text-sky-700 hover:underline">{{ $previewLiveUrl }}</a>
+                                @else
+                                    <span class="text-slate-500">{{ __('No live URL yet') }}</span>
+                                @endif
+                            </div>
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $previewStatusClass }}">
+                                {{ str_replace('_', ' ', (string) $preview->status) }}
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+    @endif
+
     @php
         $activity = \App\Support\Edge\ContainerActivityTimeline::for($site);
     @endphp
