@@ -15,6 +15,10 @@ class InsightSettingsRepositoryTest extends TestCase
     #[Test]
     public function default_enabled_map_turns_off_pro_insights_without_subscription(): void
     {
+        // Heartbeat default_enabled is env-driven (INSIGHTS_HEARTBEAT_DEFAULT_ENABLED).
+        // Pin it to false here so the test doesn't depend on the developer's local env.
+        config(['insights.insights.insights_pipeline_heartbeat.default_enabled' => false]);
+
         $org = Organization::factory()->create();
         $repo = new InsightSettingsRepository;
 
