@@ -40,6 +40,12 @@
                     <x-input-error :messages="$errors->get('name')" class="mt-2" />
                 </div>
                 @if ($mode === 'source')
+                    @if ($backend === 'aws_app_runner' && ! $awsSourceReady)
+                        <div data-testid="aws-github-connection-missing" class="rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-sm text-amber-900">
+                            <p class="font-semibold">{{ __('AWS App Runner needs a GitHub connection') }}</p>
+                            <p class="mt-1">{{ __('App Runner can only build from a GitHub repo when an authorized connection ARN is attached to the credential. Set up the connection in the AWS console, then store the ARN as github_connection_arn on this credential.') }}</p>
+                        </div>
+                    @endif
                     <div>
                         <x-input-label for="repo" :value="__('GitHub repo')" />
                         <x-text-input id="repo" wire:model="repo" type="text" class="mt-1 block w-full font-mono" required placeholder="acme/api" />

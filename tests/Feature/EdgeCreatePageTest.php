@@ -134,6 +134,46 @@ class EdgeCreatePageTest extends TestCase
             ->assertHasErrors(['repo']);
     }
 
+    public function test_source_mode_warns_when_aws_lacks_github_connection(): void
+    {
+        $user = $this->ownerWithOrg();
+        ProviderCredential::query()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'aws_app_runner',
+            'name' => 'AWS',
+            'credentials' => ['access_key_id' => 'k', 'secret_access_key' => 's'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->set('backend', 'aws_app_runner')
+            ->assertSee('AWS App Runner needs a GitHub connection');
+    }
+
+    public function test_source_mode_skips_warning_when_aws_has_github_connection(): void
+    {
+        $user = $this->ownerWithOrg();
+        ProviderCredential::query()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'aws_app_runner',
+            'name' => 'AWS',
+            'credentials' => [
+                'access_key_id' => 'k',
+                'secret_access_key' => 's',
+                'github_connection_arn' => 'arn:aws:apprunner:us-east-1:1234:connection/dply/xyz',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->set('backend', 'aws_app_runner')
+            ->assertDontSee('AWS App Runner needs a GitHub connection');
+    }
+
     public function test_source_mode_dispatches_provision_with_source_meta(): void
     {
         Queue::fake();

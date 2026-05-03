@@ -171,11 +171,21 @@ class Create extends Component
         $connected = $org === null ? collect() : ProviderCredential::query()
             ->where('organization_id', $org->id)
             ->whereIn('provider', ['digitalocean_app_platform', 'aws_app_runner'])
-            ->get(['id', 'provider', 'name']);
+            ->get(['id', 'provider', 'name', 'credentials']);
+
+        // Source mode on AWS App Runner needs an authorized GitHub
+        // connection on the credential. Surface this in the form so
+        // we don't let the user submit then fail at provision time.
+        $awsCred = $connected->firstWhere('provider', 'aws_app_runner');
+        $awsSourceReady = $awsCred !== null
+            && is_array($awsCred->credentials)
+            && is_string($awsCred->credentials['github_connection_arn'] ?? null)
+            && $awsCred->credentials['github_connection_arn'] !== '';
 
         return view('livewire.edge.create', [
             'connectedBackends' => $connected,
             'regions' => $this->backendRegions($this->backend),
+            'awsSourceReady' => $awsSourceReady,
         ])->layout('layouts.app');
     }
 }
