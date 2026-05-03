@@ -28,6 +28,14 @@ trait ManagesContainerSite
 
     public string $container_build_env_file_input = '';
 
+    /**
+     * Populated by fetchContainerLogs(); shape matches
+     * EdgeBackend::latestDeploymentLogs return: { content?, url?, message? }.
+     *
+     * @var array<string, ?string>|null
+     */
+    public ?array $container_logs_result = null;
+
     public function bootManagesContainerSite(): void
     {
         if ($this->container_image_input === '' && isset($this->site)) {
@@ -184,6 +192,36 @@ trait ManagesContainerSite
 
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Domain detach queued.'));
+        }
+    }
+
+    public function fetchContainerLogs(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('view', $this->site);
+
+        $backend = EdgeRouter::backendFor($this->site);
+        $credential = EdgeRouter::credentialFor($this->site);
+        if ($backend === null || $credential === null) {
+            $this->container_logs_result = [
+                'content' => null,
+                'url' => null,
+                'message' => __('No backend or credential resolvable for this site.'),
+            ];
+
+            return;
+        }
+
+        try {
+            $this->container_logs_result = $backend->latestDeploymentLogs($this->site, $credential);
+        } catch (\Throwable $e) {
+            $this->container_logs_result = [
+                'content' => null,
+                'url' => null,
+                'message' => __('Failed to fetch logs: :err', ['err' => $e->getMessage()]),
+            ];
         }
     }
 

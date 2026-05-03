@@ -248,6 +248,34 @@
         @endif
     @endif
 
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Latest deployment logs') }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ __('Fetches the most recent build / deploy log link from the backend on demand.') }}</p>
+            </div>
+            <button type="button" wire:click="fetchContainerLogs" wire:loading.attr="disabled" wire:target="fetchContainerLogs" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+                <span wire:loading.remove wire:target="fetchContainerLogs">{{ __('Fetch logs') }}</span>
+                <span wire:loading wire:target="fetchContainerLogs">{{ __('Fetching…') }}</span>
+            </button>
+        </div>
+        @if (is_array($container_logs_result))
+            <div class="mt-3">
+                @if (! empty($container_logs_result['url']))
+                    <a href="{{ $container_logs_result['url'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-sky-700 hover:underline">
+                        {{ $container_logs_result['url'] }} →
+                    </a>
+                @elseif (! empty($container_logs_result['content']))
+                    <pre class="max-h-64 overflow-auto rounded-lg border border-slate-200 bg-slate-900 p-3 font-mono text-[11px] leading-5 text-slate-100">{{ $container_logs_result['content'] }}</pre>
+                @elseif (! empty($container_logs_result['message']))
+                    <p class="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{{ $container_logs_result['message'] }}</p>
+                @else
+                    <p class="text-xs text-slate-500">{{ __('No logs returned by backend.') }}</p>
+                @endif
+            </div>
+        @endif
+    </div>
+
     @php
         $activity = \App\Support\Edge\ContainerActivityTimeline::for($site);
     @endphp
