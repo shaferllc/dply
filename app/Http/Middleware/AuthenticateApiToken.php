@@ -4,8 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Models\ApiToken;
 use Closure;
-use Dply\Core\Net\IpAllowList;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthenticateApiToken
@@ -31,7 +31,10 @@ class AuthenticateApiToken
         $allowed = $token->allowed_ips;
         if (is_array($allowed) && $allowed !== []) {
             $ip = (string) $request->ip();
-            if (! IpAllowList::contains($ip, $allowed)) {
+            // The Dply\Core\Net\IpAllowList helper this used to call was
+            // never extracted into a real package. Symfony ships an
+            // equivalent helper that handles both exact IPs and CIDR.
+            if (! IpUtils::checkIp($ip, $allowed)) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         }
