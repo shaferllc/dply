@@ -2,6 +2,12 @@
 # bootstrap script (apt installs, useradd, systemctl enable/start, /etc writes)
 # behaves the same way as on a fresh Ubuntu cloud VM. Requires the compose
 # privileged + cgroup mount setup in docker-compose.ssh-dev.yml.
+#
+# Pinned to ubuntu:24.04 (noble) to match what dply provisions on
+# DigitalOcean by default — see ProvisionDigitalOceanDropletJob:52
+# (`ubuntu-24-04-x64`). Keep these in lockstep so a script that
+# passes locally will also pass on a real droplet without surprise
+# package-availability or systemd-unit differences.
 FROM ubuntu:24.04
 
 ENV container=docker
@@ -12,6 +18,17 @@ RUN apt-get update \
         systemd systemd-sysv dbus dbus-user-session \
         openssh-server sudo \
         ca-certificates curl gnupg iproute2 lsb-release locales \
+ # Match DigitalOcean's ubuntu-24-04-x64 cloud image baseline so a script
+ # that runs locally won't bomb on missing utilities the droplet would
+ # have shipped with: cron + rsyslog (logging), wget + dnsutils (network
+ # debug), unattended-upgrades (DO enables it by default), tzdata + xz-utils
+ # + bzip2 (archive helpers commonly used in apt-installable .deb scripts).
+ # Without these, dply's bootstrap "just works" on droplets but fails
+ # locally with "command not found" on subtle paths.
+        cron rsyslog \
+        wget dnsutils \
+        unattended-upgrades \
+        tzdata xz-utils bzip2 \
  # Pre-install common bootstrap deps so they survive `docker compose down && up`.
  # On a real cloud VM the bootstrap installs these and they persist for the life
  # of the box; in our throwaway dev container they get wiped on recreate, which
