@@ -124,11 +124,17 @@
                         <x-input-error :messages="$errors->get('image')" class="mt-2" />
                     </div>
                 @endif
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>
                         <x-input-label for="port" :value="__('HTTP port')" />
                         <x-text-input id="port" wire:model="port" type="number" min="1" max="65535" class="mt-1 block w-full" required />
                         <x-input-error :messages="$errors->get('port')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="instances" :value="__('Instances')" />
+                        <x-text-input id="instances" wire:model="instances" type="number" min="1" max="50" class="mt-1 block w-full" required />
+                        <p class="mt-1 text-xs text-slate-500">{{ __('Fixed instance count. Use dply:edge:scale to change later.') }}</p>
+                        <x-input-error :messages="$errors->get('instances')" class="mt-2" />
                     </div>
                     <div>
                         <x-input-label for="backend" :value="__('Backend')" />

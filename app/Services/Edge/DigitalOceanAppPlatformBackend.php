@@ -28,6 +28,7 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
             port: (int) ($site->container_port ?: 8080),
             envVars: $env,
             buildEnvVars: $buildEnv,
+            instanceCount: $this->siteInstanceCount($site),
         );
 
         return [
@@ -51,6 +52,7 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
             dockerfilePath: $source['dockerfile_path'],
             envVars: $this->siteEnvVars($site),
             buildEnvVars: $this->siteBuildEnvVars($site),
+            instanceCount: $this->siteInstanceCount($site),
         );
 
         return [
@@ -137,6 +139,10 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
             $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
         }
         $spec['services'][0]['envs'] = $envSpec;
+        // Re-push instance_count too — operators may have called
+        // dply:edge:scale; pushing only envs would leave the spec
+        // out of sync with what the Site says it should run.
+        $spec['services'][0]['instance_count'] = $this->siteInstanceCount($site);
         $service->updateApp($site->container_backend_id, $spec);
     }
 
@@ -220,6 +226,18 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         $content = $meta['container']['build_env_file_content'] ?? '';
 
         return $this->parseEnvLines(is_string($content) ? $content : '');
+    }
+
+    /**
+     * Desired instance count for the site. Operators set this via
+     * dply:edge:scale; defaults to 1 when not configured.
+     */
+    private function siteInstanceCount(Site $site): int
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $raw = $meta['container']['instance_count'] ?? null;
+
+        return is_int($raw) && $raw > 0 ? $raw : 1;
     }
 
     /**

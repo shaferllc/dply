@@ -32,6 +32,7 @@ class CreateEdgeSite
         $slug = Str::slug($name) ?: 'edge-app-'.Str::random(6);
         $image = (string) ($payload['image'] ?? '');
         $port = (int) ($payload['port'] ?? 8080);
+        $instances = max(1, (int) ($payload['instances'] ?? 1));
         $region = (string) ($payload['region'] ?? '');
         $envFile = (string) ($payload['env_file_content'] ?? '');
 
@@ -81,6 +82,11 @@ class CreateEdgeSite
             'env_file_content' => $envFile,
             'status' => Site::STATUS_PENDING,
             'webhook_secret' => Str::random(48),
+            'meta' => [
+                'container' => [
+                    'instance_count' => $instances,
+                ],
+            ],
         ]);
 
         ProvisionEdgeSiteJob::dispatch($site->id);

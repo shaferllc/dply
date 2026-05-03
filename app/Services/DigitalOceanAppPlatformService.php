@@ -55,6 +55,7 @@ class DigitalOceanAppPlatformService
         int $port,
         array $envVars = [],
         array $buildEnvVars = [],
+        int $instanceCount = 1,
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -78,7 +79,7 @@ class DigitalOceanAppPlatformService
                         'tag' => $tag,
                     ],
                     'http_port' => $port,
-                    'instance_count' => 1,
+                    'instance_count' => max(1, $instanceCount),
                     'instance_size_slug' => 'basic-xxs',
                     'envs' => $envSpec,
                 ]],
@@ -117,6 +118,7 @@ class DigitalOceanAppPlatformService
         ?string $dockerfilePath = null,
         array $envVars = [],
         array $buildEnvVars = [],
+        int $instanceCount = 1,
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -134,7 +136,7 @@ class DigitalOceanAppPlatformService
                 'deploy_on_push' => $deployOnPush,
             ],
             'http_port' => $port,
-            'instance_count' => 1,
+            'instance_count' => max(1, $instanceCount),
             'instance_size_slug' => 'basic-xxs',
             'envs' => $envSpec,
         ];

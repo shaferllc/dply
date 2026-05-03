@@ -237,6 +237,21 @@ class AwsAppRunnerBackend implements EdgeBackend
     }
 
     /**
+     * Desired instance count for the site. AWS App Runner uses
+     * AutoScalingConfiguration ARNs for full scaling control; this
+     * value is the "intent" the operator sets via dply:edge:scale,
+     * surfaced in the dashboard / CLI even when the live App Runner
+     * config differs.
+     */
+    private function siteInstanceCount(Site $site): int
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $raw = $meta['container']['instance_count'] ?? null;
+
+        return is_int($raw) && $raw > 0 ? $raw : 1;
+    }
+
+    /**
      * @return array<string, string>
      */
     private function parseEnvLines(string $envContent): array

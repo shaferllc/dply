@@ -43,6 +43,7 @@ class CreateEdgeSiteFromSource
         }
         $branch = (string) ($payload['branch'] ?? 'main') ?: 'main';
         $port = (int) ($payload['port'] ?? 8080);
+        $instances = max(1, (int) ($payload['instances'] ?? 1));
         $region = (string) ($payload['region'] ?? '');
         $dockerfilePath = (string) ($payload['dockerfile_path'] ?? '');
         $deployOnPush = ! array_key_exists('deploy_on_push', $payload) || (bool) $payload['deploy_on_push'];
@@ -102,6 +103,7 @@ class CreateEdgeSiteFromSource
             'meta' => [
                 'container' => [
                     'source' => $sourceSpec,
+                    'instance_count' => $instances,
                 ],
             ],
         ]);

@@ -64,6 +64,10 @@
             <dd class="mt-1 text-sm font-medium text-slate-900">{{ $site->container_port ?: '—' }}</dd>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Instances') }}</dt>
+            <dd class="mt-1 text-sm font-medium text-slate-900">{{ (int) ($containerMeta['instance_count'] ?? 1) }}</dd>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Live URL') }}</dt>
             <dd class="mt-1 text-sm font-medium text-slate-900">
                 @if ($liveUrl)

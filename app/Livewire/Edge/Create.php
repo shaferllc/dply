@@ -69,6 +69,8 @@ class Create extends Component
 
     public int $port = 8080;
 
+    public int $instances = 1;
+
     public string $region = '';
 
     public string $env_file_content = '';
@@ -78,6 +80,7 @@ class Create extends Component
         $rules = [
             'name' => ['required', 'string', 'max:80'],
             'port' => ['required', 'integer', 'min:1', 'max:65535'],
+            'instances' => ['required', 'integer', 'min:1', 'max:50'],
             'region' => ['required', 'string', 'max:50'],
             'backend' => ['required', 'in:auto,digitalocean_app_platform,aws_app_runner'],
             'mode' => ['required', 'in:image,source'],
@@ -205,6 +208,7 @@ class Create extends Component
                     'dockerfile_path' => $this->dockerfile_path,
                     'deploy_on_push' => $this->deploy_on_push,
                     'port' => $this->port,
+                    'instances' => $this->instances,
                     'region' => $this->region,
                     'backend' => $this->backend,
                     'env_file_content' => $this->env_file_content,
@@ -213,6 +217,7 @@ class Create extends Component
                     'name' => $this->name,
                     'image' => $this->image,
                     'port' => $this->port,
+                    'instances' => $this->instances,
                     'region' => $this->region,
                     'backend' => $this->backend,
                     'env_file_content' => $this->env_file_content,
