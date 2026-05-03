@@ -41,8 +41,8 @@ class MetricsIngestTest extends TestCase
 
         $this->assertDatabaseHas('server_metric_ingest_events', [
             'source_snapshot_id' => 42,
-            'organization_id' => '01hzexampleorg0000000000000',
-            'server_id' => '01hzexampleserver00000000000',
+            'organization_id' => '01hzexampleorg000000000000',
+            'server_id' => '01hzexampleserver000000000',
             'server_name' => 'web-1',
         ]);
 
@@ -57,8 +57,8 @@ class MetricsIngestTest extends TestCase
     {
         return [
             'snapshot_id' => 42,
-            'server_id' => '01hzexampleserver00000000000',
-            'organization_id' => '01hzexampleorg0000000000000',
+            'server_id' => '01hzexampleserver000000000',
+            'organization_id' => '01hzexampleorg000000000000',
             'server_name' => 'web-1',
             'captured_at' => '2026-03-30T12:00:00Z',
             'metrics' => [
