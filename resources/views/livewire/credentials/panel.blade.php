@@ -404,6 +404,11 @@
     @case('fly_io')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('What Fly.io adds to Dply') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect a Fly.io API token to deploy your Node and static sites globally on Fly\'s edge platform. Best fit for stateless workloads where you want sub-100ms response times in 30+ regions for ~$3/mo per app.') }}</p>
+                    <p class="text-xs text-brand-moss leading-relaxed">{{ __('Your existing VM-hosted PHP/Ruby/Python sites stay where they are — Fly.io is purely additive.') }}</p>
+                </div>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="fly_io_name" :value="__('Label (optional)')" />

@@ -54,6 +54,21 @@ class CredentialTest extends TestCase
         $response->assertSee('Server providers');
     }
 
+    public function test_organization_credentials_fly_io_panel_shows_value_prop(): void
+    {
+        config(['server_providers.enabled.fly_io' => true]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $response = $this->actingAs($user)->get(route('organizations.credentials', ['organization' => $org, 'provider' => 'fly_io']));
+
+        $response->assertOk()
+            ->assertSee('What Fly.io adds to Dply')
+            ->assertSee('Node and static sites')
+            ->assertSee('Connect Fly.io');
+    }
+
     public function test_credentials_index_forbidden_for_deployer(): void
     {
         $user = User::factory()->create();
