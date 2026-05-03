@@ -115,11 +115,13 @@ class ServerWorkspaceSshKeysTest extends TestCase
             'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('p', 43).' reminder-test',
         ]);
 
+        // The dedicated reminder banner was retired; the workspace now
+        // exposes the profile-key affordance via the standard "Add SSH key"
+        // panel + a Profile key dropdown. Assert those are still surfaced.
         Livewire::actingAs($user)
             ->test(WorkspaceSshKeys::class, ['server' => $server])
-            ->assertSee('Add one of your personal SSH keys to this server')
-            ->assertSee('Select a key from your profile')
-            ->assertSee('Sync authorized_keys');
+            ->assertSee('Add SSH key')
+            ->assertSee('From profile');
     }
 
     public function test_component_uses_shared_modal_when_no_profile_keys_exist(): void
