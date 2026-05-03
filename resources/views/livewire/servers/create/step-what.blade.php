@@ -9,28 +9,38 @@
             <div class="relative">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Step :n of :total', ['n' => 3, 'total' => $totalSteps]) }}</p>
                 <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ __('What it runs') }}</h1>
-                <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">{{ __('Pick a stack preset, then tweak any defaults you want. Each preset pre-fills runtimes, role, database, cache, and web server.') }}</p>
+                <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">{{ __('Pick a stack template and dply fills in everything else. The underlying knobs are tucked below in case you want to override.') }}</p>
             </div>
         </header>
 
-        {{-- Preset tiles. Featured tiles surface first; the polyglot
-             host is the marketing-pixel-level differentiator and stays
-             in the featured row alongside Laravel / Rails / Next.js /
-             Django. Static / Database / Custom appear as a secondary row. --}}
-        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm space-y-5 sm:p-7">
-            <div>
-                <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Pick a preset') }}</h2>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Click a tile, then override anything below.') }}</p>
+        @php
+            $selectedInstallProfile = collect($installProfiles)->firstWhere('id', $form->install_profile);
+            $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
+            $featuredPresets = collect($serverPresets)->where('featured', true);
+            $otherPresets = collect($serverPresets)->where('featured', false);
+            $hasOverrides = $selectedInstallProfile || $selectedServerRole;
+        @endphp
+
+        {{-- 1. THE CHOICE: stack template (was "preset"). --}}
+        <section class="rounded-2xl border-2 border-brand-sage/20 bg-white p-6 shadow-sm space-y-5 sm:p-7">
+            <div class="flex items-start gap-4">
+                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest">
+                    <x-heroicon-o-rectangle-stack class="h-5 w-5" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Pick a stack template') }}</h2>
+                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Each template pre-fills the package bundle, machine job, and stack details. Click to choose.') }}</p>
+                </div>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach (collect($serverPresets)->where('featured', true) as $preset)
+                @foreach ($featuredPresets as $preset)
                     <button
                         type="button"
                         wire:click="applyPreset('{{ $preset['id'] }}')"
                         @class([
                             'group relative flex flex-col items-start rounded-2xl border-2 p-5 text-left shadow-sm transition-all',
-                            'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $selectedPreset === $preset['id'],
+                            'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $selectedPreset === $preset['id'],
                             'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $selectedPreset !== $preset['id'],
                         ])
                     >
@@ -42,23 +52,23 @@
                         @if ($selectedPreset === $preset['id'])
                             <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
                                 <x-heroicon-m-check class="h-3 w-3" />
-                                {{ __('Selected') }}
+                                {{ __('Picked') }}
                             </span>
                         @endif
                     </button>
                 @endforeach
             </div>
 
-            <details class="text-sm" @if ($selectedPreset !== '' && ! collect($serverPresets)->where('featured', true)->pluck('id')->contains($selectedPreset)) open @endif>
-                <summary class="cursor-pointer font-medium text-brand-moss transition-colors hover:text-brand-ink">{{ __('Other presets (Static / Database node / Custom)') }}</summary>
+            <details class="text-sm" @if ($selectedPreset !== '' && ! $featuredPresets->pluck('id')->contains($selectedPreset)) open @endif>
+                <summary class="cursor-pointer font-medium text-brand-moss transition-colors hover:text-brand-ink">{{ __('Other templates (Static / Database node / Custom)') }}</summary>
                 <div class="mt-3 grid gap-3 sm:grid-cols-3">
-                    @foreach (collect($serverPresets)->where('featured', false) as $preset)
+                    @foreach ($otherPresets as $preset)
                         <button
                             type="button"
                             wire:click="applyPreset('{{ $preset['id'] }}')"
                             @class([
                                 'flex flex-col items-start rounded-2xl border-2 p-4 text-left shadow-sm transition-all',
-                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $selectedPreset === $preset['id'],
+                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $selectedPreset === $preset['id'],
                                 'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $selectedPreset !== $preset['id'],
                             ])
                         >
@@ -70,82 +80,148 @@
             </details>
         </section>
 
-        @php
-            $selectedInstallProfile = collect($installProfiles)->firstWhere('id', $form->install_profile);
-            $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
-        @endphp
-
-        {{-- Install profile + Server role: rich-select dropdowns (compact, slick) --}}
-        <section class="grid gap-4 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:grid-cols-2 sm:p-7">
-            @include('livewire.servers.create._rich-select', [
-                'id' => 'install_profile',
-                'label' => __('Install profile'),
-                'field' => 'form.install_profile',
-                'value' => $form->install_profile,
-                'options' => collect($installProfiles)->map(fn ($p) => [
-                    'id' => (string) ($p['id'] ?? ''),
-                    'label' => (string) ($p['label'] ?? ''),
-                    'summary' => (string) ($p['summary'] ?? ''),
-                ])->all(),
-                'errorKey' => 'form.install_profile',
-                'eyebrow' => __('Profile'),
-                'placeholder' => __('Choose a preset'),
-            ])
-            @include('livewire.servers.create._rich-select', [
-                'id' => 'server_role',
-                'label' => __('Server role'),
-                'field' => 'form.server_role',
-                'value' => $form->server_role,
-                'options' => collect($provisionOptions['server_roles'] ?? [])->map(fn ($r) => [
-                    'id' => (string) ($r['id'] ?? ''),
-                    'label' => (string) ($r['label'] ?? ''),
-                    'summary' => (string) ($r['summary'] ?? ''),
-                ])->all(),
-                'errorKey' => 'form.server_role',
-                'eyebrow' => __('Role'),
-                'placeholder' => __('Choose a role'),
-            ])
-        </section>
-
-        {{-- Stack details --}}
-        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7">
-            <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Stack details') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Pre-filled from the install profile and role. Override any of these before continuing.') }}</p>
-            <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                @include('livewire.servers.create._rich-select', [
-                    'id' => 'webserver',
-                    'label' => __('Web server'),
-                    'field' => 'form.webserver',
-                    'value' => $form->webserver,
-                    'options' => $provisionOptions['webservers'] ?? [],
-                    'errorKey' => 'form.webserver',
-                ])
-                @include('livewire.servers.create._rich-select', [
-                    'id' => 'php_version',
-                    'label' => __('PHP version'),
-                    'field' => 'form.php_version',
-                    'value' => $form->php_version,
-                    'options' => $provisionOptions['php_versions'] ?? [],
-                    'errorKey' => 'form.php_version',
-                ])
-                @include('livewire.servers.create._rich-select', [
-                    'id' => 'database',
-                    'label' => __('Database'),
-                    'field' => 'form.database',
-                    'value' => $form->database,
-                    'options' => $provisionOptions['databases'] ?? [],
-                    'errorKey' => 'form.database',
-                ])
-                @include('livewire.servers.create._rich-select', [
-                    'id' => 'cache_service',
-                    'label' => __('Cache service'),
-                    'field' => 'form.cache_service',
-                    'value' => $form->cache_service,
-                    'options' => $provisionOptions['cache_services'] ?? [],
-                    'errorKey' => 'form.cache_service',
-                ])
+        {{-- 2. WHAT THE TEMPLATE FILLED IN: read-at-a-glance summary chips. --}}
+        @if ($hasOverrides || $form->webserver || $form->php_version || $form->database || $form->cache_service)
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/40 p-5">
+                <div class="flex items-baseline justify-between gap-2">
+                    <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                        <x-heroicon-m-sparkles class="h-3.5 w-3.5" />
+                        {{ __('Template filled in') }}
+                    </p>
+                    <p class="text-[11px] text-brand-mist">{{ __('Override below if needed') }}</p>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-1.5 text-xs">
+                    @if ($selectedInstallProfile)
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bundle') }}</span>
+                            <span class="font-medium text-brand-ink">{{ $selectedInstallProfile['label'] }}</span>
+                        </span>
+                    @endif
+                    @if ($selectedServerRole)
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Job') }}</span>
+                            <span class="font-medium text-brand-ink">{{ $selectedServerRole['label'] }}</span>
+                        </span>
+                    @endif
+                    @if ($form->webserver)
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Web') }}</span>
+                            <span class="font-medium text-brand-ink">{{ $form->webserver }}</span>
+                        </span>
+                    @endif
+                    @if ($form->php_version)
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PHP') }}</span>
+                            <span class="font-medium text-brand-ink">{{ $form->php_version }}</span>
+                        </span>
+                    @endif
+                    @if ($form->database)
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB') }}</span>
+                            <span class="font-medium text-brand-ink">{{ $form->database }}</span>
+                        </span>
+                    @endif
+                    @if ($form->cache_service)
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache') }}</span>
+                            <span class="font-medium text-brand-ink">{{ $form->cache_service }}</span>
+                        </span>
+                    @endif
+                </div>
             </div>
-        </section>
+        @endif
+
+        {{-- 3. POWER-USER OVERRIDES: collapsed by default. --}}
+        <details class="group rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+            <summary class="flex cursor-pointer list-none items-start gap-4 px-6 py-5 sm:px-7">
+                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest transition-colors group-hover:bg-brand-sage/15">
+                    <x-heroicon-o-adjustments-horizontal class="h-5 w-5" />
+                </span>
+                <span class="min-w-0 flex-1">
+                    <span class="flex items-baseline justify-between gap-3">
+                        <span class="text-base font-semibold text-brand-ink">{{ __('Override the template') }}</span>
+                        <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition-transform group-open:rotate-180" />
+                    </span>
+                    <span class="mt-1 block text-sm text-brand-moss">{{ __('Pick a different package bundle, change the machine\'s job, or swap individual stack components. Most setups don\'t need this.') }}</span>
+                </span>
+            </summary>
+
+            <div class="border-t border-brand-ink/10 px-6 py-6 space-y-6 sm:px-7">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('High-level controls') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Profile bundles a default package set; role narrows what actually installs (web vs db node vs LB).') }}</p>
+                    <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                        @include('livewire.servers.create._rich-select', [
+                            'id' => 'install_profile',
+                            'label' => __('Package bundle (profile)'),
+                            'field' => 'form.install_profile',
+                            'value' => $form->install_profile,
+                            'options' => collect($installProfiles)->map(fn ($p) => [
+                                'id' => (string) ($p['id'] ?? ''),
+                                'label' => (string) ($p['label'] ?? ''),
+                                'summary' => (string) ($p['summary'] ?? ''),
+                            ])->all(),
+                            'errorKey' => 'form.install_profile',
+                            'eyebrow' => __('Bundle'),
+                            'placeholder' => __('Choose a bundle'),
+                        ])
+                        @include('livewire.servers.create._rich-select', [
+                            'id' => 'server_role',
+                            'label' => __('Machine\'s job (role)'),
+                            'field' => 'form.server_role',
+                            'value' => $form->server_role,
+                            'options' => collect($provisionOptions['server_roles'] ?? [])->map(fn ($r) => [
+                                'id' => (string) ($r['id'] ?? ''),
+                                'label' => (string) ($r['label'] ?? ''),
+                                'summary' => (string) ($r['summary'] ?? ''),
+                            ])->all(),
+                            'errorKey' => 'form.server_role',
+                            'eyebrow' => __('Job'),
+                            'placeholder' => __('Choose a job'),
+                        ])
+                    </div>
+                </div>
+
+                <div class="border-t border-brand-ink/10 pt-6">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Individual stack components') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Swap a single piece (e.g. switch from Nginx to Caddy) without leaving the bundle.') }}</p>
+                    <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                        @include('livewire.servers.create._rich-select', [
+                            'id' => 'webserver',
+                            'label' => __('Web server'),
+                            'field' => 'form.webserver',
+                            'value' => $form->webserver,
+                            'options' => $provisionOptions['webservers'] ?? [],
+                            'errorKey' => 'form.webserver',
+                        ])
+                        @include('livewire.servers.create._rich-select', [
+                            'id' => 'php_version',
+                            'label' => __('PHP version'),
+                            'field' => 'form.php_version',
+                            'value' => $form->php_version,
+                            'options' => $provisionOptions['php_versions'] ?? [],
+                            'errorKey' => 'form.php_version',
+                        ])
+                        @include('livewire.servers.create._rich-select', [
+                            'id' => 'database',
+                            'label' => __('Database'),
+                            'field' => 'form.database',
+                            'value' => $form->database,
+                            'options' => $provisionOptions['databases'] ?? [],
+                            'errorKey' => 'form.database',
+                        ])
+                        @include('livewire.servers.create._rich-select', [
+                            'id' => 'cache_service',
+                            'label' => __('Cache service'),
+                            'field' => 'form.cache_service',
+                            'value' => $form->cache_service,
+                            'options' => $provisionOptions['cache_services'] ?? [],
+                            'errorKey' => 'form.cache_service',
+                        ])
+                    </div>
+                </div>
+            </div>
+        </details>
 
         <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-6">
             <button
@@ -182,49 +258,40 @@
         </footer>
       </div>
 
-      {{-- Sidebar: selected profile + role detail, install previews --}}
+      {{-- Sidebar: explain the new vocabulary so the user gets it. --}}
       <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
-        @if ($selectedInstallProfile)
-            <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Install profile') }}</p>
-                <p class="mt-2 text-sm font-semibold text-brand-ink">{{ $selectedInstallProfile['label'] }}</p>
-                @if (! empty($selectedInstallProfile['summary']))
-                    <p class="mt-1 text-xs leading-5 text-brand-moss">{{ $selectedInstallProfile['summary'] }}</p>
-                @endif
-            </div>
-        @endif
-
-        @if ($selectedServerRole)
-            <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Server role') }}</p>
-                <p class="mt-2 text-sm font-semibold text-brand-ink">{{ $selectedServerRole['label'] }}</p>
-                @if (! empty($selectedServerRole['summary']))
-                    <p class="mt-1 text-xs leading-5 text-brand-moss">{{ $selectedServerRole['summary'] }}</p>
-                @endif
-                @if (! empty($selectedServerRole['installs']) && is_array($selectedServerRole['installs']))
-                    <div class="mt-3 border-t border-brand-ink/10 pt-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Will install') }}</p>
-                        <ul class="mt-1.5 space-y-1 text-xs text-brand-moss">
-                            @foreach (array_slice($selectedServerRole['installs'], 0, 6) as $item)
-                                <li class="inline-flex items-start gap-1.5"><x-heroicon-m-check-circle class="mt-0.5 h-3 w-3 text-brand-sage" />{{ is_array($item) ? ($item['label'] ?? '') : $item }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
-            </div>
-        @endif
-
-        <div class="rounded-2xl border border-brand-sage/20 bg-gradient-to-br from-brand-sand/15 to-brand-cream p-5 text-sm text-brand-moss shadow-sm">
+        <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
             <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
-                <x-heroicon-m-light-bulb class="h-3.5 w-3.5" />
-                {{ __('Tips') }}
+                <x-heroicon-m-academic-cap class="h-3.5 w-3.5" />
+                {{ __('How these fit together') }}
             </p>
-            <ul class="mt-2 space-y-1.5">
-                <li class="inline-flex items-start gap-1.5"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand-sage"></span>{{ __('Picking a profile sets sensible defaults for the stack — you can override any.') }}</li>
-                <li class="inline-flex items-start gap-1.5"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand-sage"></span>{{ __('The role determines what gets installed: e.g. load_balancer skips PHP, database skips the web stack, redis only installs Redis.') }}</li>
-                <li class="inline-flex items-start gap-1.5"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand-sage"></span>{{ __('Only the Application and Worker roles install PHP and Composer; Supervisor is included on roles that need long-running processes.') }}</li>
-            </ul>
+            <dl class="mt-3 space-y-3 text-sm">
+                <div>
+                    <dt class="font-semibold text-brand-ink">{{ __('Template') }}</dt>
+                    <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('"I want to deploy a Laravel app." Sets the bundle + job + stack to a known-good combo for that use case.') }}</dd>
+                </div>
+                <div class="border-t border-brand-ink/10 pt-3">
+                    <dt class="font-semibold text-brand-ink">{{ __('Package bundle (profile)') }}</dt>
+                    <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('Which set of system packages to install. Templates pick this for you; override only if you know your bundle differs from the defaults.') }}</dd>
+                </div>
+                <div class="border-t border-brand-ink/10 pt-3">
+                    <dt class="font-semibold text-brand-ink">{{ __('Machine\'s job (role)') }}</dt>
+                    <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('What this server actually does in your fleet — application, worker, database node, cache, load balancer. Drives which packages from the bundle actually get installed.') }}</dd>
+                </div>
+            </dl>
         </div>
+
+        @if ($selectedServerRole && ! empty($selectedServerRole['installs']) && is_array($selectedServerRole['installs']))
+            <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Will install') }}</p>
+                <p class="mt-1 text-xs text-brand-mist">{{ __('From your current job choice') }}</p>
+                <ul class="mt-2 space-y-1 text-xs text-brand-moss">
+                    @foreach (array_slice($selectedServerRole['installs'], 0, 6) as $item)
+                        <li class="inline-flex items-start gap-1.5"><x-heroicon-m-check-circle class="mt-0.5 h-3 w-3 text-brand-sage" />{{ is_array($item) ? ($item['label'] ?? '') : $item }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
       </aside>
     </form>
 
