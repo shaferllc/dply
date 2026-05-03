@@ -314,6 +314,23 @@
                                 </div>
                             </div>
 
+                            @php
+                                $isEdgeEligible = in_array($site->runtime, ['node', 'static'], true);
+                                $orgHasFly = $isEdgeEligible
+                                    ? \App\Models\ProviderCredential::query()
+                                        ->where('organization_id', $site->organization_id)
+                                        ->where('provider', 'fly_io')
+                                        ->exists()
+                                    : true;
+                            @endphp
+                            @if ($isEdgeEligible && ! $orgHasFly)
+                                <div class="mt-4 rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs text-sky-900">
+                                    <span class="font-semibold">{{ __('Edge-eligible') }}</span> —
+                                    {{ __('this :runtime site could deploy globally on Fly.io for ~$3/mo with sub-100ms response times.', ['runtime' => $site->runtime]) }}
+                                    <a href="{{ route('credentials.index', ['provider' => 'fly_io']) }}" wire:navigate class="ml-1 font-medium underline hover:text-sky-950">{{ __('Connect Fly.io') }} →</a>
+                                </div>
+                            @endif
+
                             <dl class="grid gap-4 sm:grid-cols-3">
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                     <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Current revision') }}</dt>
