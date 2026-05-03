@@ -201,13 +201,16 @@ class SiteTest extends TestCase
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
+        // 5.6 is far below the supported floor (server_provision_options
+        // lists 8.5 / 8.4 / 8.3 / 7.4); 8.5 and 7.4 are still listed
+        // in the config so they don't make good "unsupported" fixtures.
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'meta' => [
                 'php_inventory' => [
                     'supported' => true,
-                    'installed_versions' => ['8.4', '8.5'],
+                    'installed_versions' => ['8.4', '5.6'],
                     'detected_default_version' => '8.4',
                 ],
             ],
@@ -224,7 +227,7 @@ class SiteTest extends TestCase
 
         $response->assertOk()
             ->assertSee('PHP 8.4')
-            ->assertDontSee('value="8.5"', escape: false);
+            ->assertDontSee('value="5.6"', escape: false);
     }
 
     public function test_site_php_settings_can_be_saved_from_site_settings_for_installed_versions_only(): void
