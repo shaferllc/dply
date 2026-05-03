@@ -11,7 +11,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
         systemd systemd-sysv dbus dbus-user-session \
         openssh-server sudo \
-        ca-certificates curl iproute2 lsb-release locales \
+        ca-certificates curl gnupg iproute2 lsb-release locales \
  # Pre-install common bootstrap deps so they survive `docker compose down && up`.
  # On a real cloud VM the bootstrap installs these and they persist for the life
  # of the box; in our throwaway dev container they get wiped on recreate, which
@@ -23,6 +23,28 @@ RUN apt-get update \
         fail2ban \
  && rm -rf /var/lib/apt/lists/* \
  && locale-gen en_US.UTF-8
+
+# Pre-install the ondrej/php PPA + PHP 8.4 packages so the bootstrap script's
+# skip-if-already-present checks short-circuit the launchpad fetch path
+# entirely. Docker on macOS regularly fails to reach
+# ppa.launchpadcontent.net (185.125.190.*) due to its NAT/IPv4 routing,
+# which would otherwise stall fake-cloud provisioning for ~80s before
+# bombing out. Baking the artifacts into the image makes the local UX
+# instant and matches what a "fresh + already-bootstrapped" cloud VM
+# would look like to dply.
+RUN install -d -m 0755 /etc/apt/keyrings \
+ && curl -fsSL --retry 5 --retry-delay 3 --max-time 90 \
+        "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14aa40ec0831756756d7f66c4f4ea0aae5267a6c" \
+        | gpg --dearmor --yes -o /etc/apt/keyrings/ondrej-php.gpg \
+ && chmod 0644 /etc/apt/keyrings/ondrej-php.gpg \
+ && echo "deb [signed-by=/etc/apt/keyrings/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu noble main" \
+        > /etc/apt/sources.list.d/ondrej-php.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+        php8.4-cli php8.4-fpm php8.4-common \
+        php8.4-mbstring php8.4-xml php8.4-curl php8.4-zip \
+        php8.4-intl php8.4-bcmath php8.4-opcache php8.4-mysql \
+ && rm -rf /var/lib/apt/lists/*
 
 # Strip systemd units that don't make sense in a container so boot stays fast and clean.
 RUN find /lib/systemd/system/sysinit.target.wants -type l ! -name 'systemd-tmpfiles-setup*' -delete \
