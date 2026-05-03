@@ -179,6 +179,96 @@ class EdgeIndexPageTest extends TestCase
             ->assertSee('PR #42');
     }
 
+    public function test_filter_source_only_shows_source_sites(): void
+    {
+        $user = $this->ownerWithOrg();
+        $org = $user->currentOrganization();
+        $this->makeContainerSite($user, $org, 'image-only', 'digitalocean_app_platform');
+
+        $sourceServer = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        Site::factory()->create([
+            'server_id' => $sourceServer->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'source-only',
+            'type' => SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'meta' => ['container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']]],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(EdgeIndex::class)
+            ->set('filter', 'source')
+            ->assertSee('source-only')
+            ->assertDontSee('image-only');
+    }
+
+    public function test_filter_previews_only_shows_preview_sites(): void
+    {
+        $user = $this->ownerWithOrg();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        $parent = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'parent-prod',
+            'type' => SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'meta' => ['container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']]],
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'pr-preview',
+            'type' => SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'meta' => [
+                'container' => [
+                    'source' => ['repo' => 'acme/api', 'branch' => 'feature/x'],
+                    'preview_parent_site_id' => $parent->id,
+                    'preview_branch' => 'feature/x',
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(EdgeIndex::class)
+            ->set('filter', 'previews')
+            ->assertSee('pr-preview')
+            ->assertDontSee('parent-prod');
+    }
+
     public function test_filter_counts_match_actual_sites(): void
     {
         $user = $this->ownerWithOrg();

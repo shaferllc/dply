@@ -20,7 +20,14 @@ use Livewire\Component;
  */
 class Index extends Component
 {
-    /** Filter: 'all', a backend slug, or 'failed' to show only failed sites. */
+    /**
+     * Filter the table by one of:
+     *   - 'all': everything
+     *   - backend slug ('digitalocean_app_platform' / 'aws_app_runner')
+     *   - status ('failed' / 'provisioning')
+     *   - mode ('source' / 'image')
+     *   - 'previews': only ephemeral preview deploys
+     */
     #[Url]
     public string $filter = 'all';
 
@@ -29,40 +36,51 @@ class Index extends Component
         $org = auth()->user()?->currentOrganization();
         abort_if($org === null, 403);
 
-        $query = Site::query()
+        // Pull the full set first; filter (and totals) are computed
+        // on the collection so the totals can stay consistent across
+        // filter switches without an extra DB round-trip per total.
+        $allSites = Site::query()
             ->where('organization_id', $org->id)
             ->where(function ($q): void {
                 $q->where('type', SiteType::Container)
                     ->orWhereNotNull('container_backend');
             })
             ->with('server:id,name')
-            ->orderByDesc('created_at');
+            ->orderByDesc('created_at')
+            ->get();
 
-        match ($this->filter) {
-            'digitalocean_app_platform', 'aws_app_runner' => $query->where('container_backend', $this->filter),
-            'failed' => $query->where('status', Site::STATUS_CONTAINER_FAILED),
-            'provisioning' => $query->where('status', Site::STATUS_CONTAINER_PROVISIONING),
-            default => null,
+        $isSource = fn (Site $s) => is_array($s->meta['container']['source'] ?? null);
+        $isPreview = fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id'] ?? null);
+
+        $sites = match ($this->filter) {
+            'digitalocean_app_platform', 'aws_app_runner' => $allSites->where('container_backend', $this->filter)->values(),
+            'failed' => $allSites->where('status', Site::STATUS_CONTAINER_FAILED)->values(),
+            'provisioning' => $allSites->where('status', Site::STATUS_CONTAINER_PROVISIONING)->values(),
+            'source' => $allSites->filter($isSource)->values(),
+            'image' => $allSites->reject($isSource)->values(),
+            'previews' => $allSites->filter($isPreview)->values(),
+            default => $allSites,
         };
-
-        $sites = $query->get();
 
         $hasAnyBackendCredential = ProviderCredential::query()
             ->where('organization_id', $org->id)
             ->whereIn('provider', ['digitalocean_app_platform', 'aws_app_runner'])
             ->exists();
 
-        $byBackend = $sites->groupBy('container_backend')->map->count()->all();
+        $byBackend = $allSites->groupBy('container_backend')->map->count()->all();
 
         return view('livewire.edge.index', [
             'org' => $org,
             'sites' => $sites,
             'totals' => [
-                'all' => $sites->count(),
+                'all' => $allSites->count(),
                 'digitalocean_app_platform' => $byBackend['digitalocean_app_platform'] ?? 0,
                 'aws_app_runner' => $byBackend['aws_app_runner'] ?? 0,
-                'failed' => $sites->where('status', Site::STATUS_CONTAINER_FAILED)->count(),
-                'provisioning' => $sites->where('status', Site::STATUS_CONTAINER_PROVISIONING)->count(),
+                'failed' => $allSites->where('status', Site::STATUS_CONTAINER_FAILED)->count(),
+                'provisioning' => $allSites->where('status', Site::STATUS_CONTAINER_PROVISIONING)->count(),
+                'source' => $allSites->filter($isSource)->count(),
+                'image' => $allSites->reject($isSource)->count(),
+                'previews' => $allSites->filter($isPreview)->count(),
             ],
             'hasAnyBackendCredential' => $hasAnyBackendCredential,
         ])->layout('layouts.app');

@@ -25,6 +25,9 @@
         @php
             $tabs = [
                 ['key' => 'all', 'label' => __('All'), 'count' => $totals['all']],
+                ['key' => 'source', 'label' => __('Source'), 'count' => $totals['source'] ?? 0],
+                ['key' => 'image', 'label' => __('Image'), 'count' => $totals['image'] ?? 0],
+                ['key' => 'previews', 'label' => __('Previews'), 'count' => $totals['previews'] ?? 0],
                 ['key' => 'digitalocean_app_platform', 'label' => 'DO App Platform', 'count' => $totals['digitalocean_app_platform']],
                 ['key' => 'aws_app_runner', 'label' => 'AWS App Runner', 'count' => $totals['aws_app_runner']],
                 ['key' => 'provisioning', 'label' => __('Provisioning'), 'count' => $totals['provisioning']],
