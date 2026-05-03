@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Marketplace;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\MarketplaceItem;
 use App\Models\Server;
 use App\Models\User;
@@ -17,6 +18,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use DispatchesToastNotifications;
+
     #[Url(history: true)]
     public string $category = 'all';
 
