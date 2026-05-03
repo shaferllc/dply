@@ -4,6 +4,7 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
@@ -19,6 +20,7 @@ use Livewire\Component;
 class Monitor extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
 
     public Server $server;
 
