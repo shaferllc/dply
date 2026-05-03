@@ -575,7 +575,23 @@ class ProvisionJourney extends Component
             return null;
         }
 
-        // Prefer high-signal lines: scan from the end for a known error shape.
+        // High-priority root-cause patterns: when these appear, they're
+        // almost always the actual cause of the failure even if a
+        // downstream symptom appears later (e.g. a PPA fetch timeout
+        // followed by "couldn't find package php8.4-mysql"). Scan the
+        // FULL meaningful set (not just the tail) so we catch causes
+        // that scrolled past the symptom.
+        $rootCausePatterns = [
+            '/Could not connect to/i',
+            '/Connection (?:timed out|refused)/i',
+            '/Failed to fetch/i',
+            '/Some index files failed to download/i',
+            '/Network is unreachable/i',
+            '/Temporary failure resolving/i',
+        ];
+
+        // Lower-priority symptom patterns — match these only when no
+        // root cause was found. Scanned from the tail backwards.
         $errorPatterns = [
             '/^E:\s/i',                                  // apt
             '/^Err:/i',                                  // apt
@@ -588,8 +604,7 @@ class ProvisionJourney extends Component
             '/command not found/i',
             '/exited with (?:status|code)\s+\d+/i',
             '/Timeout was reached/i',
-            '/Connection (?:timed out|refused)/i',
-            '/Failed to (?:fetch|start|connect|enable)/i',
+            '/Failed to (?:start|connect|enable)/i',
             '/dpkg:\s+error/i',
             '/Sub-process\s+\S+\s+returned/i',
         ];
@@ -598,11 +613,22 @@ class ProvisionJourney extends Component
         $contextStart = max(0, count($meaningful) - 8);
         $tail = array_slice($meaningful, $contextStart);
 
-        foreach (array_reverse($tail, true) as $line) {
-            foreach ($errorPatterns as $pattern) {
+        foreach ($meaningful as $line) {
+            foreach ($rootCausePatterns as $pattern) {
                 if (preg_match($pattern, $line) === 1) {
                     $headline = $line;
                     break 2;
+                }
+            }
+        }
+
+        if ($headline === null) {
+            foreach (array_reverse($tail, true) as $line) {
+                foreach ($errorPatterns as $pattern) {
+                    if (preg_match($pattern, $line) === 1) {
+                        $headline = $line;
+                        break 2;
+                    }
                 }
             }
         }
@@ -898,7 +924,15 @@ class ProvisionJourney extends Component
             $actions[] = 'Review the failed verification checks: '.implode(', ', $failingChecks).'.';
         }
 
-        if (($failureClassification['code'] ?? null) === 'config_validation') {
+        if (($failureClassification['code'] ?? null) === 'package_repo_unreachable') {
+            $actions = [
+                'This usually means a package mirror or PPA was briefly unreachable. Click Re-run setup to try again.',
+                'If it keeps failing, check whether the server can reach archive.ubuntu.com and ppa.launchpadcontent.net (HTTPS, port 443).',
+                'In rare cases the PPA itself is offline — in that case waiting a few minutes is the only fix.',
+            ];
+            $commands[] = 'curl -I https://ppa.launchpadcontent.net';
+            $commands[] = 'sudo apt-get update';
+        } elseif (($failureClassification['code'] ?? null) === 'config_validation') {
             $commands[] = 'sudo nginx -t';
             $commands[] = 'sudo haproxy -c -f /etc/haproxy/haproxy.cfg';
         } elseif (($failureClassification['code'] ?? null) === 'service_startup') {
