@@ -108,4 +108,16 @@ interface EdgeBackend
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array;
 
     public function detachDomain(Site $site, ProviderCredential $credential, string $hostname): void;
+
+    /**
+     * Fetch logs for the latest deployment. Returns either:
+     *   - 'content': inline log text the operator can read directly
+     *   - 'url': a presigned URL the operator can curl / open
+     *   - 'message': a backend-specific note (e.g. "logs are in
+     *     CloudWatch under stream X") when the backend can't return
+     *     logs synchronously over its standard API.
+     *
+     * @return array{content: ?string, url: ?string, message: ?string}
+     */
+    public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array;
 }

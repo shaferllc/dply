@@ -179,6 +179,22 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         return DigitalOceanAppPlatformService::getRegions();
     }
 
+    public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return ['content' => null, 'url' => null, 'message' => 'Site has not been provisioned on the backend yet.'];
+        }
+
+        $service = new DigitalOceanAppPlatformService($credential);
+        $result = $service->getLatestDeploymentLogs($site->container_backend_id);
+
+        if ($result['url'] === null) {
+            return ['content' => null, 'url' => null, 'message' => 'No deployment logs available yet — DO has not produced a log link.'];
+        }
+
+        return ['content' => null, 'url' => $result['url'], 'message' => null];
+    }
+
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

@@ -188,6 +188,25 @@ class AwsAppRunnerBackend implements EdgeBackend
         return AwsAppRunnerService::getRegions();
     }
 
+    public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
+    {
+        // App Runner streams logs to CloudWatch under
+        // /aws/apprunner/{service-name}/{revision}/{application,service}.
+        // We don't fetch them through the App Runner API (no equivalent
+        // of DO's signed-URL endpoint); the operator goes to CloudWatch
+        // directly. Surface the LogGroup hint instead.
+        $serviceName = $this->backendServiceName($site);
+
+        return [
+            'content' => null,
+            'url' => null,
+            'message' => sprintf(
+                'AWS App Runner streams logs to CloudWatch under /aws/apprunner/%s/<revision>/{application,service}. Open the AWS console for live tailing.',
+                $serviceName,
+            ),
+        ];
+    }
+
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

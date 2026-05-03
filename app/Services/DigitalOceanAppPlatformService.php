@@ -164,6 +164,38 @@ class DigitalOceanAppPlatformService
     }
 
     /**
+     * Fetch the latest deployment log link for an app. DO returns a
+     * presigned `historic_urls[0]` URL the operator can curl/open;
+     * for in-progress deployments it returns a `live_url` instead.
+     * We surface whichever is set.
+     *
+     * @return array{deployment_id: ?string, url: ?string}
+     */
+    public function getLatestDeploymentLogs(string $appId, string $type = 'DEPLOY'): array
+    {
+        $deploymentsResponse = $this->request('get', '/apps/'.$appId.'/deployments?per_page=1');
+        $this->assertSuccess($deploymentsResponse, 'list deployments');
+        $deployments = $deploymentsResponse->json('deployments') ?? [];
+        if (! is_array($deployments) || $deployments === []) {
+            return ['deployment_id' => null, 'url' => null];
+        }
+
+        $deploymentId = (string) ($deployments[0]['id'] ?? '');
+        if ($deploymentId === '') {
+            return ['deployment_id' => null, 'url' => null];
+        }
+
+        $logsResponse = $this->request('get', '/apps/'.$appId.'/deployments/'.$deploymentId.'/logs?type='.$type);
+        $this->assertSuccess($logsResponse, 'get deployment logs');
+        $payload = $logsResponse->json() ?? [];
+        $url = is_array($payload['historic_urls'] ?? null) && isset($payload['historic_urls'][0])
+            ? (string) $payload['historic_urls'][0]
+            : (is_string($payload['live_url'] ?? null) ? (string) $payload['live_url'] : null);
+
+        return ['deployment_id' => $deploymentId, 'url' => $url];
+    }
+
+    /**
      * Inspect a single app — used by status polling.
      *
      * @return array<string, mixed>

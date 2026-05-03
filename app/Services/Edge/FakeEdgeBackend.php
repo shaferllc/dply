@@ -106,6 +106,15 @@ class FakeEdgeBackend implements EdgeBackend
         // No-op.
     }
 
+    public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
+    {
+        return [
+            'content' => "fake-edge backend\n[build] resolved framework: laravel\n[build] composer install ok\n[deploy] starting container\n[deploy] healthcheck OK\n",
+            'url' => null,
+            'message' => null,
+        ];
+    }
+
     private function syntheticLiveUrl(Site $site): string
     {
         $slug = $site->slug ?: Str::slug($site->name) ?: 'app';
