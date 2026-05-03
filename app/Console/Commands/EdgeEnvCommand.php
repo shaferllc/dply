@@ -28,6 +28,7 @@ class EdgeEnvCommand extends Command
         {site : Site ID, slug, or name}
         {--file= : Path to a .env-format file whose content replaces the site env}
         {--set=* : KEY=value pairs to merge into the existing env (repeatable)}
+        {--build : Target the build-time env vars instead of runtime (DO BUILD_TIME / App Runner BuildEnvironmentVariables)}
         {--no-redeploy : Persist env vars only, do not queue a redeploy}';
 
     protected $description = 'Push env vars to a deployed edge site (and queue a redeploy).';
@@ -53,7 +54,15 @@ class EdgeEnvCommand extends Command
             return self::FAILURE;
         }
 
-        $site->update(['env_file_content' => $newContent]);
+        if ($this->option('build')) {
+            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta['container'] = array_merge($meta['container'] ?? [], [
+                'build_env_file_content' => $newContent,
+            ]);
+            $site->update(['meta' => $meta]);
+        } else {
+            $site->update(['env_file_content' => $newContent]);
+        }
 
         $backend = EdgeRouter::backendFor($site->fresh());
         $credential = EdgeRouter::credentialFor($site->fresh());
@@ -109,7 +118,14 @@ class EdgeEnvCommand extends Command
         // Merge the given KEY=value pairs onto the existing site env,
         // preserving order: existing keys are updated in-place; new
         // keys append at the end. Quoted values are passed through.
-        $existingLines = preg_split('/\r?\n/', (string) $site->env_file_content) ?: [];
+        // For --build, merge against the build-env content (stored
+        // under meta.container.build_env_file_content) instead.
+        if ($this->option('build')) {
+            $existingContent = (string) ($site->meta['container']['build_env_file_content'] ?? '');
+        } else {
+            $existingContent = (string) $site->env_file_content;
+        }
+        $existingLines = preg_split('/\r?\n/', $existingContent) ?: [];
         $byKey = [];
         $orderedKeys = [];
         foreach ($existingLines as $line) {

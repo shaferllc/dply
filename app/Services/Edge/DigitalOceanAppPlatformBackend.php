@@ -20,12 +20,14 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         $service = new DigitalOceanAppPlatformService($credential);
 
         $env = $this->siteEnvVars($site);
+        $buildEnv = $this->siteBuildEnvVars($site);
         $result = $service->createApp(
             appName: $this->backendAppName($site),
             region: $site->container_region ?: 'nyc',
             image: (string) $site->container_image,
             port: (int) ($site->container_port ?: 8080),
             envVars: $env,
+            buildEnvVars: $buildEnv,
         );
 
         return [
@@ -48,6 +50,7 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
             deployOnPush: $source['deploy_on_push'],
             dockerfilePath: $source['dockerfile_path'],
             envVars: $this->siteEnvVars($site),
+            buildEnvVars: $this->siteBuildEnvVars($site),
         );
 
         return [
@@ -130,6 +133,9 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         foreach ($this->siteEnvVars($site) as $k => $v) {
             $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'RUN_TIME'];
         }
+        foreach ($this->siteBuildEnvVars($site) as $k => $v) {
+            $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
+        }
         $spec['services'][0]['envs'] = $envSpec;
         $service->updateApp($site->container_backend_id, $spec);
     }
@@ -196,7 +202,31 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
      */
     private function siteEnvVars(Site $site): array
     {
-        $envContent = (string) ($site->env_file_content ?? '');
+        return $this->parseEnvLines((string) ($site->env_file_content ?? ''));
+    }
+
+    /**
+     * Build-time env vars are stored separately on the Site's meta
+     * under meta.container.build_env_file_content (same .env format).
+     * They map to DO scope=BUILD_TIME / App Runner BuildEnvironmentVariables —
+     * needed for app secrets (e.g. private package tokens) that the
+     * build step requires but shouldn't leak into runtime.
+     *
+     * @return array<string, string>
+     */
+    private function siteBuildEnvVars(Site $site): array
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $content = $meta['container']['build_env_file_content'] ?? '';
+
+        return $this->parseEnvLines(is_string($content) ? $content : '');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function parseEnvLines(string $envContent): array
+    {
         if ($envContent === '') {
             return [];
         }

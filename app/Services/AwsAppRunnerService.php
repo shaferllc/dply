@@ -121,6 +121,7 @@ class AwsAppRunnerService
         string $connectionArn,
         int $port,
         array $envVars = [],
+        array $buildEnvVars = [],
         ?string $dockerfilePath = null,
         bool $autoDeploy = true,
         string $cpu = '256',
@@ -131,6 +132,9 @@ class AwsAppRunnerService
             'Port' => (string) $port,
             'RuntimeEnvironmentVariables' => $envVars,
         ];
+        if ($buildEnvVars !== []) {
+            $codeConfigurationValues['BuildEnvironmentVariables'] = $buildEnvVars;
+        }
 
         $sourceConfig = [
             'CodeRepository' => [
@@ -241,13 +245,16 @@ class AwsAppRunnerService
      *
      * @param  array<string, string>  $envVars
      */
-    public function updateServiceSourceEnv(string $serviceArn, string $repositoryUrl, string $branch, string $connectionArn, int $port, array $envVars, ?string $dockerfilePath = null): void
+    public function updateServiceSourceEnv(string $serviceArn, string $repositoryUrl, string $branch, string $connectionArn, int $port, array $envVars, array $buildEnvVars = [], ?string $dockerfilePath = null): void
     {
         $codeConfigurationValues = [
             'Runtime' => $dockerfilePath !== null && $dockerfilePath !== '' ? 'DOCKER' : 'NODEJS_18',
             'Port' => (string) $port,
             'RuntimeEnvironmentVariables' => $envVars,
         ];
+        if ($buildEnvVars !== []) {
+            $codeConfigurationValues['BuildEnvironmentVariables'] = $buildEnvVars;
+        }
 
         $this->client->updateService([
             'ServiceArn' => $serviceArn,

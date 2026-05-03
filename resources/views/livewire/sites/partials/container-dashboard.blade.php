@@ -169,8 +169,20 @@
                 <span wire:loading wire:target="saveContainerEnvAndRedeploy">{{ __('Saving…') }}</span>
             </button>
         </div>
-        <textarea id="container_env_file_input" wire:model="container_env_file_input" rows="6" class="mt-3 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="APP_ENV=production&#10;LOG_LEVEL=info"></textarea>
-        <x-input-error :messages="$errors->get('container_env_file_input')" class="mt-2" />
+        <div class="mt-3 grid gap-4 lg:grid-cols-2">
+            <div>
+                <label for="container_env_file_input" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Runtime') }}</label>
+                <p class="mt-0.5 text-[11px] text-slate-500">{{ __('Available at run-time only.') }}</p>
+                <textarea id="container_env_file_input" wire:model="container_env_file_input" rows="6" class="mt-2 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="APP_ENV=production&#10;LOG_LEVEL=info"></textarea>
+                <x-input-error :messages="$errors->get('container_env_file_input')" class="mt-2" />
+            </div>
+            <div>
+                <label for="container_build_env_file_input" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Build-time') }}</label>
+                <p class="mt-0.5 text-[11px] text-slate-500">{{ __('Available during build, hidden at runtime. Use for private package tokens.') }}</p>
+                <textarea id="container_build_env_file_input" wire:model="container_build_env_file_input" rows="6" class="mt-2 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="NPM_TOKEN=ghp_xxx&#10;COMPOSER_AUTH={...}"></textarea>
+                <x-input-error :messages="$errors->get('container_build_env_file_input')" class="mt-2" />
+            </div>
+        </div>
     </div>
 
     @if ($isSourceMode && empty($containerMeta['preview_parent_site_id']))

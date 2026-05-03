@@ -54,10 +54,14 @@ class DigitalOceanAppPlatformService
         string $image,
         int $port,
         array $envVars = [],
+        array $buildEnvVars = [],
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
             $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'RUN_TIME'];
+        }
+        foreach ($buildEnvVars as $k => $v) {
+            $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
         }
 
         [, $repository, $tag] = $this->parseImageRef($image);
@@ -112,10 +116,14 @@ class DigitalOceanAppPlatformService
         bool $deployOnPush = true,
         ?string $dockerfilePath = null,
         array $envVars = [],
+        array $buildEnvVars = [],
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
             $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'RUN_TIME'];
+        }
+        foreach ($buildEnvVars as $k => $v) {
+            $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
         }
 
         $service = [

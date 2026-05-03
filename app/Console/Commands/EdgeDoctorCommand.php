@@ -161,6 +161,10 @@ class EdgeDoctorCommand extends Command
                 'provider' => $credential->provider,
             ],
             'mode' => is_array($container['source'] ?? null) ? 'source' : 'image',
+            'env' => [
+                'runtime_set' => $site->env_file_content !== null && $site->env_file_content !== '',
+                'build_set' => is_string($container['build_env_file_content'] ?? null) && $container['build_env_file_content'] !== '',
+            ],
             'image' => [
                 'current' => $site->container_image,
                 'port' => $site->container_port,

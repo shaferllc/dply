@@ -44,6 +44,7 @@ class AwsAppRunnerBackend implements EdgeBackend
             connectionArn: $connectionArn,
             port: (int) ($site->container_port ?: 8080),
             envVars: $this->siteEnvVars($site),
+            buildEnvVars: $this->siteBuildEnvVars($site),
             dockerfilePath: $source['dockerfile_path'],
             autoDeploy: $source['deploy_on_push'],
         );
@@ -123,7 +124,7 @@ class AwsAppRunnerBackend implements EdgeBackend
 
         if (is_array($site->meta['container']['source'] ?? null)) {
             // Source mode — re-push the CodeRepository spec with the
-            // new runtime env vars while keeping repo / branch / dockerfile.
+            // new runtime + build env vars while keeping repo / branch / dockerfile.
             $source = $this->sourceSpec($site);
             $service->updateServiceSourceEnv(
                 serviceArn: $site->container_backend_id,
@@ -132,6 +133,7 @@ class AwsAppRunnerBackend implements EdgeBackend
                 connectionArn: $this->connectionArn($credential),
                 port: (int) ($site->container_port ?: 8080),
                 envVars: $envVars,
+                buildEnvVars: $this->siteBuildEnvVars($site),
                 dockerfilePath: $source['dockerfile_path'],
             );
 
@@ -214,7 +216,31 @@ class AwsAppRunnerBackend implements EdgeBackend
      */
     private function siteEnvVars(Site $site): array
     {
-        $envContent = (string) ($site->env_file_content ?? '');
+        return $this->parseEnvLines((string) ($site->env_file_content ?? ''));
+    }
+
+    /**
+     * Build-time env vars are stored separately on the Site's meta
+     * under meta.container.build_env_file_content. They map to App
+     * Runner's BuildEnvironmentVariables — needed for app secrets
+     * (e.g. private package tokens) that the build needs but
+     * shouldn't leak into runtime.
+     *
+     * @return array<string, string>
+     */
+    private function siteBuildEnvVars(Site $site): array
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $content = $meta['container']['build_env_file_content'] ?? '';
+
+        return $this->parseEnvLines(is_string($content) ? $content : '');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function parseEnvLines(string $envContent): array
+    {
         if ($envContent === '') {
             return [];
         }

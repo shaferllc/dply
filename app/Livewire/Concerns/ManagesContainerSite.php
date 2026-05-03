@@ -26,6 +26,8 @@ trait ManagesContainerSite
 
     public string $container_env_file_input = '';
 
+    public string $container_build_env_file_input = '';
+
     public function bootManagesContainerSite(): void
     {
         if ($this->container_image_input === '' && isset($this->site)) {
@@ -33,6 +35,10 @@ trait ManagesContainerSite
         }
         if ($this->container_env_file_input === '' && isset($this->site)) {
             $this->container_env_file_input = (string) ($this->site->env_file_content ?? '');
+        }
+        if ($this->container_build_env_file_input === '' && isset($this->site)) {
+            $meta = is_array($this->site->meta) ? $this->site->meta : [];
+            $this->container_build_env_file_input = (string) ($meta['container']['build_env_file_content'] ?? '');
         }
     }
 
@@ -42,9 +48,19 @@ trait ManagesContainerSite
             return;
         }
         $this->authorize('update', $this->site);
-        $this->validate(['container_env_file_input' => 'nullable|string|max:65535']);
+        $this->validate([
+            'container_env_file_input' => 'nullable|string|max:65535',
+            'container_build_env_file_input' => 'nullable|string|max:65535',
+        ]);
 
-        $this->site->update(['env_file_content' => $this->container_env_file_input]);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['container'] = array_merge($meta['container'] ?? [], [
+            'build_env_file_content' => $this->container_build_env_file_input,
+        ]);
+        $this->site->update([
+            'env_file_content' => $this->container_env_file_input,
+            'meta' => $meta,
+        ]);
 
         $backend = EdgeRouter::backendFor($this->site->fresh());
         $credential = EdgeRouter::credentialFor($this->site->fresh());
