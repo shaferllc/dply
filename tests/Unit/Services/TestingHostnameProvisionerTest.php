@@ -26,7 +26,7 @@ class TestingHostnameProvisionerTest extends TestCase
         ]);
         $site->id = '01jtestsite0000000000000000';
 
-        $provisioner = new TestingHostnameProvisioner;
+        $provisioner = app(TestingHostnameProvisioner::class);
         $first = $provisioner->chooseZone($site);
         $second = $provisioner->chooseZone($site);
 
@@ -42,7 +42,7 @@ class TestingHostnameProvisionerTest extends TestCase
         ]);
         $site->id = '01jtestsite0000000000000000';
 
-        $hostname = (new TestingHostnameProvisioner)->buildHostname($site, 'dply.cc');
+        $hostname = app(TestingHostnameProvisioner::class)->buildHostname($site, 'dply.cc');
 
         $this->assertStringEndsWith('.dply.cc', $hostname);
         $this->assertStringContainsString('marketing-api', $hostname);
