@@ -204,13 +204,33 @@
                                         <div class="min-w-0 flex-1">
                                             <p class="text-base font-semibold text-red-900 sm:text-lg">{{ __('Provisioning failed at: :step', ['step' => $failedStep['label']]) }}</p>
                                             @if ($failureReason)
+                                                @php
+                                                    $reasonClipboard = $failureReason['headline'];
+                                                    if ($failureReason['exit_code'] !== null) {
+                                                        $reasonClipboard = '[exit '.$failureReason['exit_code'].'] '.$reasonClipboard;
+                                                    }
+                                                    if (count($failureReason['context']) > 1) {
+                                                        $reasonClipboard .= "\n\n".implode("\n", $failureReason['context']);
+                                                    }
+                                                @endphp
                                                 <div class="mt-2 rounded-xl border border-red-300 bg-white/80 px-4 py-3">
-                                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">
-                                                        {{ __('Reason') }}
-                                                        @if ($failureReason['exit_code'] !== null)
-                                                            <span class="ml-1 font-normal normal-case text-red-600/80">· {{ __('exit code :code', ['code' => $failureReason['exit_code']]) }}</span>
-                                                        @endif
-                                                    </p>
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">
+                                                            {{ __('Reason') }}
+                                                            @if ($failureReason['exit_code'] !== null)
+                                                                <span class="ml-1 font-normal normal-case text-red-600/80">· {{ __('exit code :code', ['code' => $failureReason['exit_code']]) }}</span>
+                                                            @endif
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            x-data="{ copied: false }"
+                                                            x-on:click="navigator.clipboard.writeText(@js($reasonClipboard)); copied = true; setTimeout(() => copied = false, 1500)"
+                                                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                        >
+                                                            <span x-show="!copied">{{ __('Copy') }}</span>
+                                                            <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                                        </button>
+                                                    </div>
                                                     <p class="mt-1 break-words font-mono text-sm leading-6 text-red-900">{{ $failureReason['headline'] }}</p>
                                                     @if (count($failureReason['context']) > 1)
                                                         <details class="mt-2">
@@ -291,15 +311,27 @@
                                     @endif
 
                                     @if ($failedStep['output'])
-                                        <details class="mt-4 rounded-xl border border-red-200 bg-white/80 p-4">
-                                            <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-red-700">
-                                                <div class="flex items-center justify-between gap-3">
+                                        <div x-data="{ open: false, copied: false }" class="mt-4 rounded-xl border border-red-200 bg-white/80 p-4">
+                                            <div class="flex items-center justify-between gap-3">
+                                                <button
+                                                    type="button"
+                                                    x-on:click="open = !open"
+                                                    class="flex flex-1 items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide text-red-700"
+                                                >
                                                     <span>{{ __('Captured step output') }}</span>
-                                                    <x-heroicon-o-chevron-down class="h-4 w-4" />
-                                                </div>
-                                            </summary>
-                                            <pre class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6 text-red-900">{{ $failedStep['output'] }}</pre>
-                                        </details>
+                                                    <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="open ? 'rotate-180' : ''" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    x-on:click.stop="navigator.clipboard.writeText(@js($failedStep['output'])); copied = true; setTimeout(() => copied = false, 1500)"
+                                                    class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                >
+                                                    <span x-show="!copied">{{ __('Copy') }}</span>
+                                                    <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                                </button>
+                                            </div>
+                                            <pre x-show="open" x-cloak class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6 text-red-900">{{ $failedStep['output'] }}</pre>
+                                        </div>
                                     @endif
                                 </div>
                                 <span class="shrink-0 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-red-800">{{ __('Failed') }}</span>
