@@ -109,6 +109,7 @@ class EdgeDeployCommandTest extends TestCase
 
     public function test_fails_when_no_credential_connected(): void
     {
+        config(['server_provision_fake.env_flag' => false]);
         [$user, $org] = $this->scaffold();
 
         $exit = Artisan::call('dply:edge:deploy', [

@@ -21,6 +21,7 @@ class EdgeRouterTest extends TestCase
 
     public function test_backend_for_returns_correct_implementation(): void
     {
+        config(['server_provision_fake.env_flag' => false]);
         [$user, $org, $server] = $this->scaffold();
         $doSite = Site::factory()->create([
             'server_id' => $server->id,
@@ -106,6 +107,7 @@ class EdgeRouterTest extends TestCase
 
     public function test_pick_auto_backend_returns_null_when_no_credential(): void
     {
+        config(['server_provision_fake.env_flag' => false]);
         $org = Organization::factory()->create();
         $this->assertNull(EdgeRouter::pickAutoBackend($org->id));
     }

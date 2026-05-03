@@ -89,6 +89,7 @@ class EdgeDoctorCommandTest extends TestCase
 
     public function test_drift_when_no_credential_connected(): void
     {
+        config(['server_provision_fake.env_flag' => false]);
         [$user, $org] = $this->scaffold();
         $site = $this->makeContainerSite($user, $org, [
             'name' => 'Orphan',

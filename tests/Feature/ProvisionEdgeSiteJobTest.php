@@ -78,6 +78,7 @@ class ProvisionEdgeSiteJobTest extends TestCase
 
     public function test_no_credential_marks_failed_without_throwing(): void
     {
+        config(['server_provision_fake.env_flag' => false]);
         [$user, $org] = $this->scaffold();
         $site = $this->makeContainerSite($user, $org, 'digitalocean_app_platform', 'nyc');
 

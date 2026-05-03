@@ -6,6 +6,7 @@ namespace App\Services\Edge;
 
 use App\Models\ProviderCredential;
 use App\Models\Site;
+use App\Support\Servers\FakeCloudProvision;
 
 /**
  * Maps a Site's container_backend column → concrete EdgeBackend
@@ -36,9 +37,29 @@ class EdgeRouter
             return null;
         }
 
+        // Fake-cloud mode: when no real persisted credential exists for
+        // the site's backend, route everything through FakeEdgeBackend
+        // so dev installs (and tests that don't fake out HTTP) can
+        // reach end-to-end states without a real DO/AWS account.
+        if (FakeCloudProvision::enabled() && ! self::hasPersistedCredential($site)) {
+            return new FakeEdgeBackend($key);
+        }
+
         $class = $map[$key];
 
         return new $class;
+    }
+
+    private static function hasPersistedCredential(Site $site): bool
+    {
+        if (! is_string($site->container_backend) || $site->container_backend === '') {
+            return false;
+        }
+
+        return ProviderCredential::query()
+            ->where('organization_id', $site->organization_id)
+            ->where('provider', $site->container_backend)
+            ->exists();
     }
 
     /**
@@ -62,11 +83,26 @@ class EdgeRouter
             return null;
         }
 
-        return ProviderCredential::query()
+        $resolved = ProviderCredential::query()
             ->where('organization_id', $site->organization_id)
             ->where('provider', $site->container_backend)
             ->orderBy('created_at')
             ->first();
+
+        // In fake-cloud mode there's no real credential to find.
+        // Synthesize an unsaved placeholder so jobs that pass it
+        // through to FakeEdgeBackend (which ignores it) still work.
+        if ($resolved === null && FakeCloudProvision::enabled()) {
+            $placeholder = new ProviderCredential;
+            $placeholder->organization_id = $site->organization_id;
+            $placeholder->provider = (string) $site->container_backend;
+            $placeholder->name = 'fake-cloud (no real credential)';
+            $placeholder->credentials = [];
+
+            return $placeholder;
+        }
+
+        return $resolved;
     }
 
     /**
@@ -92,6 +128,13 @@ class EdgeRouter
             if (in_array($provider, $available, true)) {
                 return $provider;
             }
+        }
+
+        // Fake-cloud mode: pick a default so the create flow keeps
+        // working without a real cloud credential connected. DO is
+        // still preferred so the dev install matches the prod default.
+        if (FakeCloudProvision::enabled()) {
+            return 'digitalocean_app_platform';
         }
 
         return null;

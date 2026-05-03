@@ -84,6 +84,7 @@ class CreateEdgeSiteTest extends TestCase
 
     public function test_throws_when_no_container_credential_connected(): void
     {
+        config(['server_provision_fake.env_flag' => false]);
         [$user, $org] = $this->scaffold();
 
         $this->expectException(\RuntimeException::class);

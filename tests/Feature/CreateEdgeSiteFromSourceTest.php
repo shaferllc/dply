@@ -145,6 +145,7 @@ class CreateEdgeSiteFromSourceTest extends TestCase
 
     public function test_auto_backend_throws_when_none_connected(): void
     {
+        config(['server_provision_fake.env_flag' => false]);
         [$user, $org] = $this->scaffold();
 
         $this->expectException(\RuntimeException::class);
