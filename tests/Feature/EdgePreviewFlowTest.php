@@ -176,6 +176,43 @@ class EdgePreviewFlowTest extends TestCase
         $this->assertContains('feature/signup', $branches);
     }
 
+    public function test_dashboard_teardown_button_dispatches_teardown_job(): void
+    {
+        Queue::fake();
+        [$user, $org] = $this->scaffold();
+        $parent = $this->makeSourceParent($user, $org);
+        $preview = (new CreateEdgePreviewSite)->handle($parent, 'feature/x', prNumber: 7);
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(\App\Livewire\Sites\Settings::class, [
+                'server' => $parent->server,
+                'site' => $parent,
+                'section' => 'general',
+            ])
+            ->call('tearDownContainerPreview', $preview->id)
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(\App\Jobs\TeardownEdgeSiteJob::class, fn ($j) => $j->siteId === $preview->id);
+    }
+
+    public function test_dashboard_teardown_rejects_unrelated_site(): void
+    {
+        Queue::fake();
+        [$user, $org] = $this->scaffold();
+        $parent = $this->makeSourceParent($user, $org);
+        $orphan = $this->makeSourceParent($user, $org); // different parent — not a child of $parent
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(\App\Livewire\Sites\Settings::class, [
+                'server' => $parent->server,
+                'site' => $parent,
+                'section' => 'general',
+            ])
+            ->call('tearDownContainerPreview', $orphan->id);
+
+        Queue::assertNotPushed(\App\Jobs\TeardownEdgeSiteJob::class);
+    }
+
     public function test_dashboard_renders_preview_deployments_panel(): void
     {
         Queue::fake();

@@ -214,9 +214,17 @@
                                     <span class="text-slate-500">{{ __('No live URL yet') }}</span>
                                 @endif
                             </div>
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $previewStatusClass }}">
-                                {{ str_replace('_', ' ', (string) $preview->status) }}
-                            </span>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $previewStatusClass }}">
+                                    {{ str_replace('_', ' ', (string) $preview->status) }}
+                                </span>
+                                <button type="button"
+                                    wire:click="tearDownContainerPreview('{{ $preview->id }}')"
+                                    wire:confirm="{{ __('Tear down preview for branch :branch?', ['branch' => $previewBranch]) }}"
+                                    class="text-[11px] font-medium text-rose-700 hover:text-rose-900">
+                                    {{ __('Tear down') }}
+                                </button>
+                            </div>
                         </li>
                     @endforeach
                 </ul>

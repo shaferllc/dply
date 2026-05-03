@@ -100,6 +100,37 @@ trait ManagesContainerSite
         }
     }
 
+    /**
+     * Tear down a preview deployment that's a child of the current
+     * source-mode parent site. Authorisation goes through the parent
+     * — if you can edit the parent, you can manage its previews.
+     */
+    public function tearDownContainerPreview(string $previewSiteId): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $preview = \App\Models\Site::query()->find($previewSiteId);
+        if ($preview === null
+            || $preview->organization_id !== $this->site->organization_id
+            || ($preview->meta['container']['preview_parent_site_id'] ?? null) !== $this->site->id) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Preview not found or not a child of this site.'));
+            }
+
+            return;
+        }
+
+        TeardownEdgeSiteJob::dispatch($preview->id);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $branch = (string) ($preview->meta['container']['preview_branch'] ?? '');
+            $this->toastSuccess(__('Preview teardown queued for branch :branch.', ['branch' => $branch]));
+        }
+    }
+
     public function attachContainerDomain(): void
     {
         if (! $this->site->usesContainerRuntime()) {
