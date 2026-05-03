@@ -63,7 +63,7 @@ class ServerWorkspaceSshKeysTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceSshKeys::class, ['server' => $server])
-            ->assertSee('New SSH key')
+            ->assertSee('Add SSH key')
             ->assertSee('Keys on this server')
             ->assertSee('Recent audit history')
             ->assertDontSee('Bulk import')
