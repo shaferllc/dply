@@ -1207,6 +1207,8 @@ class ServerTest extends TestCase
             ->assertSee('Unavailable');
     }
 
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
     public function test_servers_create_custom_connection_test_can_report_success(): void
     {
         $sshMock = Mockery::mock('overload:App\Services\SshConnection');
