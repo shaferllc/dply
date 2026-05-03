@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\CheckSupervisorHealthCommand;
+use App\Console\Commands\EdgePollStatusCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
@@ -78,6 +79,11 @@ return Application::configure(basePath: dirname(__DIR__))
             ->when(fn (): bool => (int) config('dply.deploy_digest_hours', 0) > 0);
 
         $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
+
+        // Sweep edge sites for backend status updates. Runs every
+        // minute so an active deploy reaches "active" within ~60s
+        // of the backend reporting ready.
+        $schedule->command(EdgePollStatusCommand::class)->everyMinute();
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
