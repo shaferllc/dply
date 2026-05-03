@@ -159,6 +159,12 @@
                                         </x-slot>
                                         {{ __('Fleet health') }}
                                     </x-dropdown-link>
+                                    <x-dropdown-link :href="route('fleet.domains')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-magnifying-glass class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Fleet domains') }}
+                                    </x-dropdown-link>
                                     <x-dropdown-link :href="route('projects.index')">
                                         <x-slot name="icon">
                                             <x-heroicon-o-rectangle-stack class="{{ $hi }}" />

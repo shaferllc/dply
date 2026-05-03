@@ -121,6 +121,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
     Route::livewire('/fleet/health', \App\Livewire\Fleet\Health::class)->name('fleet.health');
+    Route::livewire('/fleet/domains', \App\Livewire\Fleet\Domains::class)->name('fleet.domains');
     Route::livewire('/admin', AdminDashboard::class)
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.dashboard');
