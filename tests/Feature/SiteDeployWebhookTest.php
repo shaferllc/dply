@@ -9,7 +9,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeploySyncGroup;
 use App\Models\WebhookDeliveryLog;
-use Dply\Core\Security\WebhookSignature;
+use App\Support\WebhookSignature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
