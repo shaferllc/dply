@@ -46,12 +46,55 @@
                             <p class="mt-1">{{ __('App Runner can only build from a GitHub repo when an authorized connection ARN is attached to the credential. Set up the connection in the AWS console, then store the ARN as github_connection_arn on this credential.') }}</p>
                         </div>
                     @endif
-                    <div>
-                        <x-input-label for="repo" :value="__('GitHub repo')" />
-                        <x-text-input id="repo" wire:model="repo" type="text" class="mt-1 block w-full font-mono" required placeholder="acme/api" />
-                        <p class="mt-1 text-xs text-slate-500">{{ __('owner/name or full GitHub URL. The backend pulls and builds it for you.') }}</p>
+                    @if ($linkedSourceControlAccounts !== [])
+                        <div role="radiogroup" aria-label="{{ __('Where to find the repo') }}" class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
+                            <button type="button" role="radio" aria-checked="{{ $repo_source === 'connected' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'connected')"
+                                @class([
+                                    'rounded-md px-2.5 py-1 font-medium transition',
+                                    'bg-white text-slate-900 shadow-sm' => $repo_source === 'connected',
+                                    'text-slate-600 hover:text-slate-900' => $repo_source !== 'connected',
+                                ])>{{ __('Pick from connected account') }}</button>
+                            <button type="button" role="radio" aria-checked="{{ $repo_source === 'manual' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'manual')"
+                                @class([
+                                    'rounded-md px-2.5 py-1 font-medium transition',
+                                    'bg-white text-slate-900 shadow-sm' => $repo_source === 'manual',
+                                    'text-slate-600 hover:text-slate-900' => $repo_source !== 'manual',
+                                ])>{{ __('Enter manually') }}</button>
+                        </div>
+                    @endif
+
+                    @if ($repo_source === 'connected' && $linkedSourceControlAccounts !== [])
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="source_control_account_id" :value="__('Account')" />
+                                <select id="source_control_account_id" wire:model.live="source_control_account_id" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                    @foreach ($linkedSourceControlAccounts as $account)
+                                        <option value="{{ $account['id'] }}">{{ $account['label'] ?? $account['name'] ?? $account['id'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <x-input-label for="repository_selection" :value="__('Repository')" />
+                                <select id="repository_selection" wire:model.live="repository_selection" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required>
+                                    <option value="">{{ __('Select a repository…') }}</option>
+                                    @foreach ($availableRepositories as $r)
+                                        <option value="{{ $r['url'] }}">{{ $r['name'] ?? $r['url'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        @if ($repo !== '')
+                            <p class="text-xs text-slate-500">{{ __('Will deploy :repo on branch :branch.', ['repo' => $repo, 'branch' => $branch]) }}</p>
+                        @endif
                         <x-input-error :messages="$errors->get('repo')" class="mt-2" />
-                    </div>
+                    @else
+                        <div>
+                            <x-input-label for="repo" :value="__('GitHub repo')" />
+                            <x-text-input id="repo" wire:model="repo" type="text" class="mt-1 block w-full font-mono" required placeholder="acme/api" />
+                            <p class="mt-1 text-xs text-slate-500">{{ __('owner/name or full GitHub URL. The backend pulls and builds it for you.') }}</p>
+                            <x-input-error :messages="$errors->get('repo')" class="mt-2" />
+                        </div>
+                    @endif
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                             <x-input-label for="branch" :value="__('Branch')" />

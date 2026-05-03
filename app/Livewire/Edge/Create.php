@@ -10,6 +10,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
 use App\Services\Edge\AwsAppRunnerBackend;
 use App\Services\Edge\DigitalOceanAppPlatformBackend;
+use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -38,6 +39,16 @@ class Create extends Component
 
     public string $image = '';
 
+    /**
+     * 'manual' = type owner/name. 'connected' = pick from a GitHub
+     * account already linked to the user's profile via OAuth.
+     */
+    public string $repo_source = 'manual';
+
+    public string $source_control_account_id = '';
+
+    public string $repository_selection = '';
+
     public string $repo = '';
 
     public string $branch = 'main';
@@ -45,6 +56,16 @@ class Create extends Component
     public string $dockerfile_path = '';
 
     public bool $deploy_on_push = true;
+
+    /**
+     * @var list<array{id: string, label: string}>
+     */
+    public array $linkedSourceControlAccounts = [];
+
+    /**
+     * @var list<array{url: string, name: string, branch: string}>
+     */
+    public array $availableRepositories = [];
 
     public int $port = 8080;
 
@@ -74,7 +95,7 @@ class Create extends Component
         return $rules;
     }
 
-    public function mount(): void
+    public function mount(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         $org = auth()->user()?->currentOrganization();
         if ($org === null) {
@@ -85,6 +106,75 @@ class Create extends Component
 
         // Default region tied to the picked backend.
         $this->updatedBackend($this->backend);
+
+        // Pre-populate linked GitHub / GitLab accounts so the source
+        // tab can offer a repo dropdown without a round trip.
+        $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser(auth()->user());
+        if ($this->linkedSourceControlAccounts !== []) {
+            $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
+            $this->loadRepositoriesForSelectedAccount();
+            // When at least one account is linked, default the source-mode
+            // picker to "connected" so the dropdown is what the user sees
+            // first. They can still toggle to manual entry.
+            $this->repo_source = 'connected';
+        }
+    }
+
+    public function updatedRepoSource(string $value): void
+    {
+        // Switching back to manual entry clears the dropdown selection
+        // so the repo / branch fields don't carry over silently.
+        if ($value === 'manual') {
+            $this->repository_selection = '';
+        }
+    }
+
+    public function updatedSourceControlAccountId(string $value): void
+    {
+        $this->source_control_account_id = $value;
+        $this->repository_selection = '';
+        $this->loadRepositoriesForSelectedAccount();
+    }
+
+    public function updatedRepositorySelection(string $value): void
+    {
+        if ($value === '') {
+            return;
+        }
+
+        $match = collect($this->availableRepositories)->firstWhere('url', $value);
+        if (! is_array($match)) {
+            return;
+        }
+
+        $this->repo = $this->normalizeRepo((string) $match['url']);
+        $this->branch = is_string($match['branch'] ?? null) && $match['branch'] !== ''
+            ? (string) $match['branch']
+            : 'main';
+    }
+
+    private function loadRepositoriesForSelectedAccount(): void
+    {
+        if ($this->source_control_account_id === '') {
+            $this->availableRepositories = [];
+
+            return;
+        }
+
+        $account = auth()->user()?->socialAccounts()->find($this->source_control_account_id);
+        $this->availableRepositories = $account
+            ? app(SourceControlRepositoryBrowser::class)->repositoriesForAccount($account)
+            : [];
+    }
+
+    private function normalizeRepo(string $value): string
+    {
+        $value = trim($value);
+        if (preg_match('#^https?://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$#i', $value, $m) === 1) {
+            return $m[1];
+        }
+
+        return trim($value, '/');
     }
 
     public function updatedBackend(string $value): void

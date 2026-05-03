@@ -174,6 +174,90 @@ class EdgeCreatePageTest extends TestCase
             ->assertDontSee('AWS App Runner needs a GitHub connection');
     }
 
+    public function test_source_tab_shows_only_manual_entry_when_no_accounts_linked(): void
+    {
+        $user = $this->ownerWithOrg();
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->assertSet('linkedSourceControlAccounts', [])
+            ->assertSee('owner/name or full GitHub URL')
+            ->assertDontSee('Pick from connected account');
+    }
+
+    public function test_source_tab_renders_picker_when_accounts_linked(): void
+    {
+        $user = $this->ownerWithOrg();
+
+        $browser = new class extends \App\Services\SourceControl\SourceControlRepositoryBrowser
+        {
+            public function __construct() {}
+
+            public function accountsForUser($user): array
+            {
+                return [['id' => 'acct-1', 'label' => 'github:acme', 'name' => 'acme']];
+            }
+
+            public function repositoriesForAccount($account): array
+            {
+                return [
+                    ['url' => 'https://github.com/acme/api', 'name' => 'acme/api', 'branch' => 'main'],
+                    ['url' => 'https://github.com/acme/web', 'name' => 'acme/web', 'branch' => 'develop'],
+                ];
+            }
+        };
+        app()->instance(\App\Services\SourceControl\SourceControlRepositoryBrowser::class, $browser);
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->assertSee('Pick from connected account')
+            ->assertSee('Enter manually')
+            ->assertSee('github:acme');
+    }
+
+    public function test_picker_selection_populates_repo_and_branch(): void
+    {
+        $user = $this->ownerWithOrg();
+        // Seed a real SocialAccount because the component's
+        // loadRepositoriesForSelectedAccount() asks the User's relation
+        // for it. The browser fake is consulted only after that lookup.
+        $account = \App\Models\SocialAccount::query()->create([
+            'user_id' => $user->id,
+            'provider' => 'github',
+            'provider_id' => '12345',
+            'label' => 'github:acme',
+            'nickname' => 'acme',
+            'access_token' => encrypt('t'),
+        ]);
+
+        $browser = new class($account->id) extends \App\Services\SourceControl\SourceControlRepositoryBrowser
+        {
+            public function __construct(public string $accountId) {}
+
+            public function accountsForUser($user): array
+            {
+                return [['id' => $this->accountId, 'label' => 'github:acme', 'name' => 'acme']];
+            }
+
+            public function repositoriesForAccount($account): array
+            {
+                return [
+                    ['url' => 'https://github.com/acme/api.git', 'name' => 'acme/api', 'branch' => 'develop'],
+                ];
+            }
+        };
+        app()->instance(\App\Services\SourceControl\SourceControlRepositoryBrowser::class, $browser);
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->set('repository_selection', 'https://github.com/acme/api.git')
+            ->assertSet('repo', 'acme/api')
+            ->assertSet('branch', 'develop');
+    }
+
     public function test_source_mode_dispatches_provision_with_source_meta(): void
     {
         Queue::fake();
