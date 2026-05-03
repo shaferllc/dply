@@ -182,6 +182,12 @@
         </div>
     </div>
 
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Deploy webhook') }}</p>
+        <p class="text-xs text-slate-500">{{ __('POST to this URL from your CI to redeploy. Optional JSON body { "image": "ghcr.io/me/api:v2" } bumps the tag.') }}</p>
+        <input type="text" readonly value="{{ $site->edgeRedeployHookUrl() }}" class="block w-full select-all rounded-md border-slate-300 bg-slate-50 font-mono text-xs text-slate-800 shadow-sm" onclick="this.select()" />
+    </div>
+
     <div class="flex justify-end border-t border-slate-200 pt-4">
         <button type="button" wire:click="tearDownContainer" wire:confirm="{{ __('Permanently delete the container deployment? The backend resource will be torn down.') }}" class="text-sm font-medium text-rose-700 hover:text-rose-900">
             {{ __('Tear down container') }}

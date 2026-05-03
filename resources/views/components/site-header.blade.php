@@ -153,12 +153,14 @@
                                         </x-slot>
                                         {{ __('Sites') }}
                                     </x-dropdown-link>
-                                    <x-dropdown-link :href="route('edge.index')">
-                                        <x-slot name="icon">
-                                            <x-heroicon-o-cube class="{{ $hi }}" />
-                                        </x-slot>
-                                        {{ __('Edge sites') }}
-                                    </x-dropdown-link>
+                                    @if (\App\Support\ServerProviderGate::enabled('digitalocean_app_platform') || \App\Support\ServerProviderGate::enabled('aws_app_runner'))
+                                        <x-dropdown-link :href="route('edge.index')">
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-cube class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Edge sites') }}
+                                        </x-dropdown-link>
+                                    @endif
                                     <x-dropdown-link :href="route('fleet.health')">
                                         <x-slot name="icon">
                                             <x-heroicon-o-heart class="{{ $hi }}" />

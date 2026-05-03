@@ -1640,6 +1640,22 @@ class Site extends Model
     }
 
     /**
+     * Signed URL CI can POST to for redeploying an edge container
+     * site. The signature uses Laravel's signed-route mechanism
+     * keyed on APP_KEY — no expiry (CI scripts shouldn't have to
+     * refresh the URL on a schedule). Operators can rotate by
+     * regenerating webhook_secret on the site, which invalidates
+     * the URL via that field's inclusion in the signature.
+     */
+    public function edgeRedeployHookUrl(): string
+    {
+        return \Illuminate\Support\Facades\URL::signedRoute(
+            'hooks.edge.redeploy',
+            ['site' => $this->id, 's' => substr((string) $this->webhook_secret, 0, 8)],
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function repositoryMeta(): array
