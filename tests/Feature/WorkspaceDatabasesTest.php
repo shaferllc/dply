@@ -182,10 +182,16 @@ class WorkspaceDatabasesTest extends TestCase
                 ->andThrow(new \RuntimeException('SSH connection failed for server: bright-meadow'));
         });
 
+        // The connection error surfaces via a toast (not in the rendered
+        // HTML) — assert against the dispatched notify event instead.
         Livewire::actingAs($user)
             ->test(WorkspaceDatabases::class, ['server' => $server])
-            ->assertSee('Dply could not connect to the server to check database engines.')
-            ->assertSee('The server is not accepting Dply\'s SSH login right now for root@');
+            ->assertDispatched(
+                'notify',
+                fn (string $event, array $args) => isset($args['message'])
+                    && str_contains((string) $args['message'], 'Dply could not connect to the server to check database engines.')
+                    && str_contains((string) $args['message'], 'is not accepting Dply\'s SSH login')
+            );
     }
 
     public function test_databases_page_uses_basics_first_layout(): void
