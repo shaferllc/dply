@@ -112,15 +112,17 @@ class CreateEdgePreviewSite
     }
 
     /**
-     * Look up an existing preview for the given parent + branch.
-     * Used both by handle() (idempotency) and by the teardown CLI
-     * to find what to remove.
+     * Look up an existing (live, not-torn-down) preview for the
+     * given parent + branch. Used both by handle() (idempotency)
+     * and by the teardown CLI to find what to remove.
+     *
+     * Torn-down previews are excluded so re-running CI on a closed
+     * + reopened PR spawns a fresh preview rather than returning
+     * the dead row.
      */
     public static function findExisting(Site $parent, string $branch): ?Site
     {
-        return Site::query()
-            ->where('organization_id', $parent->organization_id)
-            ->whereJsonContains('meta->container->preview_parent_site_id', $parent->id)
+        return self::livePreviewQuery($parent)
             ->whereJsonContains('meta->container->preview_branch', $branch)
             ->first();
     }
@@ -130,11 +132,17 @@ class CreateEdgePreviewSite
      */
     public static function listForParent(Site $parent): \Illuminate\Database\Eloquent\Collection
     {
+        return self::livePreviewQuery($parent)
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    private static function livePreviewQuery(Site $parent): \Illuminate\Database\Eloquent\Builder
+    {
         return Site::query()
             ->where('organization_id', $parent->organization_id)
             ->whereJsonContains('meta->container->preview_parent_site_id', $parent->id)
-            ->orderByDesc('created_at')
-            ->get();
+            ->whereNull('meta->container->torn_down_at');
     }
 
     private function previewSlug(string $parentSlug, string $branch, ?int $prNumber): string

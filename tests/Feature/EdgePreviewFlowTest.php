@@ -83,6 +83,32 @@ class EdgePreviewFlowTest extends TestCase
         (new CreateEdgePreviewSite)->handle($parent->fresh(), 'feature/x');
     }
 
+    public function test_torn_down_preview_does_not_block_new_create(): void
+    {
+        Queue::fake();
+        [$user, $org] = $this->scaffold();
+        $parent = $this->makeSourceParent($user, $org);
+
+        $first = (new CreateEdgePreviewSite)->handle($parent, 'feature/x');
+        // Simulate the teardown job marking it dead.
+        $first->update([
+            'meta' => array_merge($first->meta, [
+                'container' => array_merge($first->meta['container'] ?? [], [
+                    'torn_down_at' => now()->toIso8601String(),
+                ]),
+            ]),
+        ]);
+
+        $second = (new CreateEdgePreviewSite)->handle($parent, 'feature/x');
+
+        // The new site is fresh, not the torn-down one.
+        $this->assertNotSame($first->id, $second->id);
+        // findExisting returns the live preview, not the torn-down one.
+        $this->assertSame($second->id, CreateEdgePreviewSite::findExisting($parent, 'feature/x')?->id);
+        // listForParent only counts live previews.
+        $this->assertCount(1, CreateEdgePreviewSite::listForParent($parent));
+    }
+
     public function test_action_uses_branch_slug_when_no_pr_number(): void
     {
         Queue::fake();
