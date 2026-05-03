@@ -110,6 +110,30 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         $service->updateApp($site->container_backend_id, $spec);
     }
 
+    public function updateEnvVars(Site $site, ProviderCredential $credential): void
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return;
+        }
+
+        $service = new DigitalOceanAppPlatformService($credential);
+        $current = $service->getApp($site->container_backend_id);
+        $spec = $current['spec'] ?? [];
+        if (! is_array($spec) || empty($spec['services'][0])) {
+            // Spec shape unexpected — fall back to a plain redeploy.
+            $service->deployApp($site->container_backend_id, force: false);
+
+            return;
+        }
+
+        $envSpec = [];
+        foreach ($this->siteEnvVars($site) as $k => $v) {
+            $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'RUN_TIME'];
+        }
+        $spec['services'][0]['envs'] = $envSpec;
+        $service->updateApp($site->container_backend_id, $spec);
+    }
+
     public function teardown(Site $site, ProviderCredential $credential): void
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

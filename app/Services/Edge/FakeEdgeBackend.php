@@ -58,6 +58,11 @@ class FakeEdgeBackend implements EdgeBackend
         // caller; nothing to push to a backend in fake mode.
     }
 
+    public function updateEnvVars(Site $site, ProviderCredential $credential): void
+    {
+        // No-op — env vars live on the Site model in fake mode.
+    }
+
     public function teardown(Site $site, ProviderCredential $credential): void
     {
         // No-op — idempotent.

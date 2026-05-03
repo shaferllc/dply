@@ -66,6 +66,16 @@ interface EdgeBackend
     public function updateImage(Site $site, ProviderCredential $credential, string $image): void;
 
     /**
+     * Push the Site's current env vars (parsed from env_file_content
+     * via Site::siteEnvVars()) into the backend's deployment spec,
+     * keeping the image / source spec the same. Used when the operator
+     * edits env vars on the dashboard. Idempotent — returns without
+     * error when there's no backend deployment yet (the values land
+     * via the next provision instead).
+     */
+    public function updateEnvVars(Site $site, ProviderCredential $credential): void;
+
+    /**
      * Tear down the backend resource. Should be idempotent —
      * subsequent calls on a missing resource MUST NOT raise.
      */

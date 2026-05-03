@@ -235,6 +235,42 @@ class AwsAppRunnerService
     }
 
     /**
+     * Push new env vars to a CODE_REPOSITORY-mode service without
+     * changing the source repo / branch / Dockerfile path. Used by
+     * the source-mode env editor.
+     *
+     * @param  array<string, string>  $envVars
+     */
+    public function updateServiceSourceEnv(string $serviceArn, string $repositoryUrl, string $branch, string $connectionArn, int $port, array $envVars, ?string $dockerfilePath = null): void
+    {
+        $codeConfigurationValues = [
+            'Runtime' => $dockerfilePath !== null && $dockerfilePath !== '' ? 'DOCKER' : 'NODEJS_18',
+            'Port' => (string) $port,
+            'RuntimeEnvironmentVariables' => $envVars,
+        ];
+
+        $this->client->updateService([
+            'ServiceArn' => $serviceArn,
+            'SourceConfiguration' => [
+                'CodeRepository' => [
+                    'RepositoryUrl' => $repositoryUrl,
+                    'SourceCodeVersion' => [
+                        'Type' => 'BRANCH',
+                        'Value' => $branch,
+                    ],
+                    'CodeConfiguration' => [
+                        'ConfigurationSource' => 'API',
+                        'CodeConfigurationValues' => $codeConfigurationValues,
+                    ],
+                ],
+                'AuthenticationConfiguration' => [
+                    'ConnectionArn' => $connectionArn,
+                ],
+            ],
+        ]);
+    }
+
+    /**
      * Associate a custom domain with an App Runner service. Returns
      * the DNS validation records the operator must add at their
      * registrar so AWS can verify ownership and issue the cert.

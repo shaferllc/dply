@@ -112,6 +112,44 @@ class AwsAppRunnerBackend implements EdgeBackend
         );
     }
 
+    public function updateEnvVars(Site $site, ProviderCredential $credential): void
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return;
+        }
+
+        $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
+        $envVars = $this->siteEnvVars($site);
+
+        if (is_array($site->meta['container']['source'] ?? null)) {
+            // Source mode — re-push the CodeRepository spec with the
+            // new runtime env vars while keeping repo / branch / dockerfile.
+            $source = $this->sourceSpec($site);
+            $service->updateServiceSourceEnv(
+                serviceArn: $site->container_backend_id,
+                repositoryUrl: $source['repository_url'],
+                branch: $source['branch'],
+                connectionArn: $this->connectionArn($credential),
+                port: (int) ($site->container_port ?: 8080),
+                envVars: $envVars,
+                dockerfilePath: $source['dockerfile_path'],
+            );
+
+            return;
+        }
+
+        // Image mode — updateImage already re-pushes env vars alongside
+        // the (unchanged) image.
+        if (is_string($site->container_image) && $site->container_image !== '') {
+            $service->updateImage(
+                $site->container_backend_id,
+                $site->container_image,
+                (int) ($site->container_port ?: 8080),
+                $envVars,
+            );
+        }
+    }
+
     public function teardown(Site $site, ProviderCredential $credential): void
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

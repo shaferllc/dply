@@ -158,6 +158,21 @@
         </div>
     @endif
 
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Environment variables') }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ __('Edit and click Save & redeploy. The backend\'s spec is updated and a fresh roll is queued.') }}</p>
+            </div>
+            <button type="button" wire:click="saveContainerEnvAndRedeploy" wire:loading.attr="disabled" wire:target="saveContainerEnvAndRedeploy" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-900 disabled:opacity-50">
+                <span wire:loading.remove wire:target="saveContainerEnvAndRedeploy">{{ __('Save & redeploy') }}</span>
+                <span wire:loading wire:target="saveContainerEnvAndRedeploy">{{ __('Saving…') }}</span>
+            </button>
+        </div>
+        <textarea id="container_env_file_input" wire:model="container_env_file_input" rows="6" class="mt-3 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="APP_ENV=production&#10;LOG_LEVEL=info"></textarea>
+        <x-input-error :messages="$errors->get('container_env_file_input')" class="mt-2" />
+    </div>
+
     @if ($isSourceMode && empty($containerMeta['preview_parent_site_id']))
         @php
             $previews = \App\Actions\Edge\CreateEdgePreviewSite::listForParent($site);

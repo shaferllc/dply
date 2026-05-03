@@ -8,6 +8,7 @@ use App\Jobs\AttachEdgeDomainJob;
 use App\Jobs\DetachEdgeDomainJob;
 use App\Jobs\RedeployEdgeSiteJob;
 use App\Jobs\TeardownEdgeSiteJob;
+use App\Services\Edge\EdgeRouter;
 
 /**
  * Methods bolted onto Sites\Settings (and any future container
@@ -23,10 +24,46 @@ trait ManagesContainerSite
 
     public string $container_domain_input = '';
 
+    public string $container_env_file_input = '';
+
     public function bootManagesContainerSite(): void
     {
         if ($this->container_image_input === '' && isset($this->site)) {
             $this->container_image_input = (string) ($this->site->container_image ?? '');
+        }
+        if ($this->container_env_file_input === '' && isset($this->site)) {
+            $this->container_env_file_input = (string) ($this->site->env_file_content ?? '');
+        }
+    }
+
+    public function saveContainerEnvAndRedeploy(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+        $this->validate(['container_env_file_input' => 'nullable|string|max:65535']);
+
+        $this->site->update(['env_file_content' => $this->container_env_file_input]);
+
+        $backend = EdgeRouter::backendFor($this->site->fresh());
+        $credential = EdgeRouter::credentialFor($this->site->fresh());
+        if ($backend !== null && $credential !== null) {
+            try {
+                $backend->updateEnvVars($this->site->fresh(), $credential);
+            } catch (\Throwable $e) {
+                if (method_exists($this, 'toastError')) {
+                    $this->toastError(__('Saved env vars locally, but pushing to backend failed: :err', ['err' => $e->getMessage()]));
+                }
+
+                return;
+            }
+        }
+
+        RedeployEdgeSiteJob::dispatch($this->site->id);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Env vars saved and redeploy queued. The backend will pick up the new values on the next roll.'));
         }
     }
 
