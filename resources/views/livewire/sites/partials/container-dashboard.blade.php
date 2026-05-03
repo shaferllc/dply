@@ -194,6 +194,19 @@
     </div>
 
     @if ($isSourceMode && empty($containerMeta['preview_parent_site_id']))
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('GitHub webhook') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Paste this URL + the site\'s webhook secret into your repository\'s GitHub webhook settings. dply will spawn previews on PR open / sync, tear them down on PR close, and redeploy on push to the source branch.') }}</p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-[auto_1fr] sm:items-center">
+                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Payload URL') }}</span>
+                <input type="text" readonly value="{{ $site->edgeGithubHookUrl() }}" class="block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" onclick="this.select()" />
+                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Content type') }}</span>
+                <code class="rounded bg-slate-100 px-2 py-1 text-xs">application/json</code>
+                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Events') }}</span>
+                <span class="text-xs text-slate-700">{{ __('"Pushes" + "Pull requests" (or "Send me everything").') }}</span>
+            </div>
+        </div>
+
         @php
             $previews = \App\Actions\Edge\CreateEdgePreviewSite::listForParent($site);
         @endphp

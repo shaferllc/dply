@@ -1656,6 +1656,17 @@ class Site extends Model
     }
 
     /**
+     * Inbound GitHub webhook URL — paste this into the repository's
+     * webhook settings on GitHub. The site's webhook_secret is the
+     * shared HMAC-SHA256 signing secret operators paste alongside.
+     * No URL signing here: GitHub signs the body, not the URL.
+     */
+    public function edgeGithubHookUrl(): string
+    {
+        return route('hooks.edge.github', ['site' => $this->id]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function repositoryMeta(): array

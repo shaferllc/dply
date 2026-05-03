@@ -239,6 +239,22 @@ class EdgePreviewFlowTest extends TestCase
         Queue::assertNotPushed(\App\Jobs\TeardownEdgeSiteJob::class);
     }
 
+    public function test_dashboard_renders_github_webhook_section_for_source_sites(): void
+    {
+        [$user, $org] = $this->scaffold();
+        $parent = $this->makeSourceParent($user, $org);
+
+        $response = $this->actingAs($user)->get(route('sites.show', [
+            'server' => $parent->server,
+            'site' => $parent,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('GitHub webhook')
+            ->assertSee(route('hooks.edge.github', $parent), false)
+            ->assertSee('Pull requests');
+    }
+
     public function test_dashboard_renders_preview_deployments_panel(): void
     {
         Queue::fake();
