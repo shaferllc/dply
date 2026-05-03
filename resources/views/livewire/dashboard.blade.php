@@ -66,6 +66,35 @@
 
 <div class="py-8 sm:py-10 lg:py-12">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        @if ($fleetAlert !== null)
+            <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm" role="alert">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-start gap-3">
+                        <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-200 text-rose-900">
+                            <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold text-rose-900">{{ __('Fleet needs attention') }}</p>
+                            <p class="mt-1 text-xs text-rose-800">
+                                @if ($fleetAlert['failed_latest'] > 0)
+                                    {{ trans_choice('{1} 1 site with a failed latest deploy.|[2,*] :count sites with a failed latest deploy.', $fleetAlert['failed_latest'], ['count' => $fleetAlert['failed_latest']]) }}
+                                @endif
+                                @if ($fleetAlert['long_running'] > 0)
+                                    {{ trans_choice('{1} 1 deploy running over 15 minutes.|[2,*] :count deploys running over 15 minutes.', $fleetAlert['long_running'], ['count' => $fleetAlert['long_running']]) }}
+                                @endif
+                                @if ($fleetAlert['drift_servers'] > 0)
+                                    {{ trans_choice('{1} 1 server with engine drift.|[2,*] :count servers with engine drift.', $fleetAlert['drift_servers'], ['count' => $fleetAlert['drift_servers']]) }}
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    <a href="{{ route('fleet.health') }}" wire:navigate class="rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-800">
+                        {{ __('View fleet health') }} →
+                    </a>
+                </div>
+            </div>
+        @endif
+
         <section class="relative overflow-hidden rounded-[2rem] border border-brand-ink/10 bg-brand-ink text-brand-cream shadow-xl shadow-brand-ink/15 ring-1 ring-white/10">
             <div class="absolute inset-0 bg-mesh-brand opacity-90"></div>
             <div class="relative px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
