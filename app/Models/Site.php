@@ -47,6 +47,12 @@ class Site extends Model
 
     public const STATUS_FUNCTIONS_ACTIVE = 'functions_active';
 
+    public const STATUS_CONTAINER_PROVISIONING = 'container_provisioning';
+
+    public const STATUS_CONTAINER_ACTIVE = 'container_active';
+
+    public const STATUS_CONTAINER_FAILED = 'container_failed';
+
     public const STATUS_ERROR = 'error';
 
     public const SSL_NONE = 'none';

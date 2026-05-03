@@ -38,6 +38,15 @@ return new class extends Migration
             // Region the container is deployed in (backend-specific).
             $table->string('container_region', 50)->nullable();
         });
+
+        // Container sites don't have an on-disk document_root or
+        // repository_path — relax NOT NULL on both so the same
+        // sites table can model both VM-rooted and container-only
+        // workloads.
+        Schema::table('sites', function (Blueprint $table): void {
+            $table->string('document_root')->nullable()->change();
+            $table->string('repository_path')->nullable()->change();
+        });
     }
 
     public function down(): void

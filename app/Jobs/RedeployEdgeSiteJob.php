@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Jobs;
+
+use App\Models\Site;
+use App\Services\Edge\EdgeRouter;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+
+/**
+ * Triggers a redeploy of the existing container app on its
+ * backend. If a new image tag is supplied, updateImage() is
+ * called first so the next deploy picks it up.
+ */
+class RedeployEdgeSiteJob implements ShouldQueue
+{
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
+
+    public int $tries = 3;
+
+    public function __construct(public string $siteId, public ?string $newImage = null) {}
+
+    public function handle(): void
+    {
+        $site = Site::query()->find($this->siteId);
+        if ($site === null) {
+            return;
+        }
+
+        $backend = EdgeRouter::backendFor($site);
+        $credential = EdgeRouter::credentialFor($site);
+        if ($backend === null || $credential === null) {
+            return;
+        }
+
+        if (is_string($this->newImage) && $this->newImage !== '' && $this->newImage !== $site->container_image) {
+            $site->update(['container_image' => $this->newImage]);
+            $backend->updateImage($site->fresh(), $credential, $this->newImage);
+        }
+
+        $result = $backend->redeploy($site->fresh(), $credential);
+
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['container'] = array_merge($meta['container'] ?? [], [
+            'last_deployment_id' => $result['deployment_id'],
+            'last_deploy_started_at' => now()->toIso8601String(),
+        ]);
+        $site->update(['meta' => $meta, 'last_deploy_at' => now()]);
+    }
+}
