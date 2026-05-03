@@ -149,4 +149,9 @@
     </form>
 
     @include('livewire.servers.create._discard-draft-modal')
+
+    {{-- The preflight panel above includes preflight-check-row, which has
+         "Add SSH key" buttons that dispatch open-modal => personal-ssh-key-modal.
+         The modal listener has to live on the same page, so include it here. --}}
+    <livewire:profile.personal-ssh-key-modal source="servers.create" />
 </div>
