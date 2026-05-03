@@ -157,9 +157,7 @@
                         @if (\App\Jobs\RunSetupScriptJob::shouldDispatch($server) && $server->setup_status !== \App\Models\Server::SETUP_STATUS_RUNNING)
                             <button
                                 type="button"
-                                wire:click="rerunSetup"
-                                wire:confirm="{{ __('Re-run the full setup script? Steps that already completed (e.g. installed packages) will skip in seconds — but the script does run from the top.') }}"
-                                title="{{ __('Re-runs the full bootstrap script from the top. Already-installed packages and applied configs are detected and skipped quickly, so a re-run after a transient failure usually finishes in seconds, not minutes.') }}"
+                                wire:click="openResumeInstallModal"
                                 class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:border-brand-sage hover:text-brand-sage"
                             >
                                 <x-heroicon-o-arrow-path class="h-4 w-4" />
@@ -1029,6 +1027,67 @@
                             <div class="flex justify-end border-t border-zinc-100 bg-zinc-50/80 px-6 py-5 sm:px-8 sm:py-6">
                                 <button type="button" wire:click="closeCancelProvisionModal" class="inline-flex justify-center rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-brand-ink hover:bg-zinc-50 sm:px-6">
                                     {{ __('Close') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if ($showResumeInstallModal)
+                <div
+                    class="fixed inset-0 z-50 overflow-y-auto"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="resume-install-title"
+                >
+                    <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeResumeInstallModal"></div>
+                    <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
+                        <div class="w-full max-w-xl dply-modal-panel" @click.stop>
+                            <div class="border-b border-zinc-100 px-6 py-6 sm:px-8 sm:py-7">
+                                <h2 id="resume-install-title" class="text-lg font-semibold text-brand-ink">{{ __('Resume install') }}</h2>
+                                <p class="mt-3 text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Re-runs the bootstrap script from the top. Already-installed packages and applied configs are detected and skipped quickly, so a re-run after a transient failure (e.g. a PPA timeout) usually finishes in seconds rather than minutes.') }}
+                                </p>
+                            </div>
+                            <div class="space-y-4 px-6 py-7 sm:px-8 sm:py-8">
+                                <div class="rounded-xl border border-zinc-200 bg-zinc-50/80 p-5 text-sm text-brand-moss">
+                                    <p class="font-medium text-brand-ink">{{ __('What re-runs') }}</p>
+                                    <ul class="mt-2 space-y-1 list-disc pl-5">
+                                        <li>{{ __('apt-get update + repository setup') }}</li>
+                                        <li>{{ __('Package installs (skip if already installed)') }}</li>
+                                        <li>{{ __('Webserver / PHP / database configuration writes') }}</li>
+                                        <li>{{ __('Service enable + start') }}</li>
+                                    </ul>
+                                </div>
+                                <div class="rounded-xl border border-zinc-200 bg-zinc-50/80 p-5 text-sm text-brand-moss">
+                                    <p class="font-medium text-brand-ink">{{ __('Server state') }}</p>
+                                    <p class="mt-2">{{ __('Server') }}: <span class="font-medium text-brand-ink">{{ ucfirst($server->status) }}</span></p>
+                                    <p class="mt-1">{{ __('Setup') }}: <span class="font-medium text-brand-ink">{{ ucfirst($server->setup_status) }}</span></p>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap justify-end gap-3 border-t border-zinc-100 bg-zinc-50/80 px-6 py-5 sm:px-8 sm:py-6">
+                                <button
+                                    type="button"
+                                    wire:click="closeResumeInstallModal"
+                                    class="inline-flex justify-center rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-brand-ink hover:bg-zinc-50 sm:px-6"
+                                >
+                                    {{ __('Cancel') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="rerunSetup"
+                                    wire:loading.attr="disabled"
+                                    wire:target="rerunSetup"
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-3 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest sm:px-6 disabled:cursor-wait disabled:opacity-60"
+                                >
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="rerunSetup" />
+                                    <svg wire:loading wire:target="rerunSetup" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    <span wire:loading.remove wire:target="rerunSetup">{{ __('Resume install') }}</span>
+                                    <span wire:loading wire:target="rerunSetup">{{ __('Queueing…') }}</span>
                                 </button>
                             </div>
                         </div>

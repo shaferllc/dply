@@ -34,6 +34,8 @@ class ProvisionJourney extends Component
 
     public bool $showCancelProvisionModal = false;
 
+    public bool $showResumeInstallModal = false;
+
     /** @var string SHA-256 of last logged journey snapshot (avoids log spam on wire:poll). */
     public string $journeyViewLogSignature = '';
 
@@ -266,9 +268,21 @@ class ProvisionJourney extends Component
             && $this->server->setup_status === Server::SETUP_STATUS_DONE;
     }
 
+    public function openResumeInstallModal(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->showResumeInstallModal = true;
+    }
+
+    public function closeResumeInstallModal(): void
+    {
+        $this->showResumeInstallModal = false;
+    }
+
     public function rerunSetup(): void
     {
         $this->authorize('update', $this->server);
+        $this->showResumeInstallModal = false;
 
         $server = $this->server->fresh();
         if (! $server || ! RunSetupScriptJob::shouldDispatch($server)) {
