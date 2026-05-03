@@ -48,11 +48,14 @@ class GuestMetricsPushTest extends TestCase
             'tx_bytes_per_sec' => 2048.25,
         ];
 
+        // Use a recent captured_at — ServerMetricsRecorder::pruneOldSnapshots
+        // deletes anything older than 30 days, so a hardcoded date eventually
+        // gets pruned the moment it's stored.
         $this->postJson('/api/metrics', [
             'server_id' => $server->id,
             'token' => $plain,
             'metrics' => $metrics,
-            'captured_at' => '2026-03-30T12:00:00Z',
+            'captured_at' => now()->subMinutes(5)->toIso8601String(),
         ])->assertAccepted()->assertJson(['ok' => true]);
 
         $this->assertSame(1, ServerMetricSnapshot::query()->where('server_id', $server->id)->count());
