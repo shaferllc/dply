@@ -52,6 +52,15 @@ class DplyAboutCommand extends Command
                 'sites' => Site::query()->count(),
                 'deployments_total' => SiteDeployment::query()->count(),
                 'database_engines_registered' => ServerDatabaseEngine::query()->count(),
+                'edge_sites' => Site::query()->whereNotNull('container_backend')->count(),
+                'edge_source_mode_sites' => Site::query()
+                    ->whereNotNull('container_backend')
+                    ->whereNotNull('meta->container->source->repo')
+                    ->count(),
+                'edge_preview_sites' => Site::query()
+                    ->whereNotNull('container_backend')
+                    ->whereNotNull('meta->container->preview_parent_site_id')
+                    ->count(),
             ],
         ];
 
@@ -118,5 +127,14 @@ class DplyAboutCommand extends Command
         $this->line(sprintf('  %-32s %d', 'sites', $about['fleet']['sites']));
         $this->line(sprintf('  %-32s %d', 'deployments_total', $about['fleet']['deployments_total']));
         $this->line(sprintf('  %-32s %d', 'database_engines_registered', $about['fleet']['database_engines_registered']));
+        if (($about['fleet']['edge_sites'] ?? 0) > 0) {
+            $this->line(sprintf(
+                '  %-32s %d (source-mode: %d, previews: %d)',
+                'edge_sites',
+                $about['fleet']['edge_sites'],
+                $about['fleet']['edge_source_mode_sites'] ?? 0,
+                $about['fleet']['edge_preview_sites'] ?? 0,
+            ));
+        }
     }
 }

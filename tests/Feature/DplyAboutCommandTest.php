@@ -53,6 +53,65 @@ class DplyAboutCommandTest extends TestCase
         $this->assertSame(2, $decoded['fleet']['sites']);
     }
 
+    public function test_fleet_counts_include_edge_breakdown(): void
+    {
+        $server = Server::factory()->create([
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        // 1 image-mode + 1 source-mode + 1 source-mode preview
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => 'nginx:1',
+            'container_port' => 80,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+        ]);
+        $parent = Site::factory()->create([
+            'server_id' => $server->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'meta' => ['container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']]],
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_PROVISIONING,
+            'meta' => [
+                'container' => [
+                    'source' => ['repo' => 'acme/api', 'branch' => 'feature/x'],
+                    'preview_parent_site_id' => $parent->id,
+                    'preview_branch' => 'feature/x',
+                ],
+            ],
+        ]);
+
+        Artisan::call('dply:about', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame(3, $decoded['fleet']['edge_sites']);
+        $this->assertSame(2, $decoded['fleet']['edge_source_mode_sites']);
+        $this->assertSame(1, $decoded['fleet']['edge_preview_sites']);
+    }
+
     public function test_human_output_renders_section_headings(): void
     {
         $exit = Artisan::call('dply:about');
