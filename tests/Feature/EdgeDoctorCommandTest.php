@@ -169,6 +169,40 @@ class EdgeDoctorCommandTest extends TestCase
         $this->assertTrue($drift->contains(fn ($d) => str_contains($d, 'connection reset')));
     }
 
+    public function test_doctor_reports_scale_and_github_webhook_for_source_site(): void
+    {
+        [$user, $org] = $this->scaffold();
+        ProviderCredential::query()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean_app_platform',
+            'name' => 'DO',
+            'credentials' => ['api_token' => 't'],
+        ]);
+        $site = $this->makeContainerSite($user, $org, [
+            'name' => 'Scaled API',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'container_image' => null,
+            'meta' => [
+                'container' => [
+                    'backend_id' => 'do-app-1',
+                    'live_url' => 'https://x.ondigitalocean.app',
+                    'source' => ['repo' => 'acme/api', 'branch' => 'main', 'deploy_on_push' => true],
+                    'instance_count' => 4,
+                    'size_tier' => 'large',
+                ],
+            ],
+        ]);
+
+        Artisan::call('dply:edge:doctor', ['site' => $site->name, '--json' => true]);
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertSame(4, $payload['scale']['instances']);
+        $this->assertSame('large', $payload['scale']['size_tier']);
+        $this->assertNotNull($payload['github_webhook_url']);
+        $this->assertStringContainsString('hooks/edge/'.$site->id.'/github', $payload['github_webhook_url']);
+    }
+
     public function test_source_mode_site_reports_repo_and_branch(): void
     {
         [$user, $org] = $this->scaffold();

@@ -169,6 +169,11 @@ class EdgeDoctorCommand extends Command
                 'current' => $site->container_image,
                 'port' => $site->container_port,
             ],
+            'scale' => [
+                'instances' => is_int($container['instance_count'] ?? null) ? (int) $container['instance_count'] : 1,
+                'size_tier' => is_string($container['size_tier'] ?? null) ? (string) $container['size_tier'] : 'small',
+            ],
+            'github_webhook_url' => is_array($container['source'] ?? null) ? $site->edgeGithubHookUrl() : null,
             'source' => is_array($container['source'] ?? null) ? [
                 'repo' => $container['source']['repo'] ?? null,
                 'branch' => $container['source']['branch'] ?? null,
@@ -227,6 +232,18 @@ class EdgeDoctorCommand extends Command
             $this->line('<fg=cyan>Image</>');
             $this->line(sprintf('  %-14s %s', 'image', $r['image']['current'] ?? '—'));
             $this->line(sprintf('  %-14s %s', 'port', $r['image']['port'] ?? '—'));
+        }
+
+        $this->newLine();
+        $this->line('<fg=cyan>Scale</>');
+        $this->line(sprintf('  %-14s %s', 'instances', (string) ($r['scale']['instances'] ?? 1)));
+        $this->line(sprintf('  %-14s %s', 'size_tier', (string) ($r['scale']['size_tier'] ?? 'small')));
+
+        if (! empty($r['github_webhook_url'])) {
+            $this->newLine();
+            $this->line('<fg=cyan>GitHub webhook</>');
+            $this->line(sprintf('  %s', $r['github_webhook_url']));
+            $this->line('  <fg=gray>Paste this URL + the site\'s webhook secret into the repo\'s GitHub webhook settings.</>');
         }
 
         $this->newLine();

@@ -103,6 +103,8 @@ class EdgeListCommand extends Command
                 'mode' => $source !== null ? 'source' : 'image',
                 'image' => $site->container_image,
                 'source' => $sourceLabel,
+                'instances' => is_int($meta['container']['instance_count'] ?? null) ? (int) $meta['container']['instance_count'] : 1,
+                'size' => is_string($meta['container']['size_tier'] ?? null) ? (string) $meta['container']['size_tier'] : 'small',
                 'status' => $site->status,
                 'live_url' => $site->containerLiveUrl(),
             ];
@@ -128,7 +130,7 @@ class EdgeListCommand extends Command
         $this->newLine();
 
         $this->table(
-            ['site', 'organization', 'backend', 'region', 'mode', 'image / source', 'status', 'live url'],
+            ['site', 'organization', 'backend', 'region', 'mode', 'image / source', 'inst', 'size', 'status', 'live url'],
             array_map(fn (array $r): array => [
                 $r['site'],
                 $r['organization'],
@@ -136,6 +138,8 @@ class EdgeListCommand extends Command
                 $r['region'],
                 $r['mode'],
                 $r['mode'] === 'source' ? ($r['source'] ?? '—') : ($r['image'] ?? '—'),
+                (string) ($r['instances'] ?? 1),
+                (string) ($r['size'] ?? 'small'),
                 $r['status'],
                 $r['live_url'] ?? '—',
             ], $rows),

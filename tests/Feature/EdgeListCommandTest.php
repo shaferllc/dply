@@ -160,6 +160,19 @@ class EdgeListCommandTest extends TestCase
         $this->assertSame('Parent', $payload['sites'][0]['site']);
     }
 
+    public function test_json_includes_instances_and_size(): void
+    {
+        $this->makeContainerSite('Sized Site', 'digitalocean_app_platform', Site::STATUS_CONTAINER_ACTIVE, [
+            'meta' => ['container' => ['instance_count' => 3, 'size_tier' => 'large']],
+        ]);
+
+        Artisan::call('dply:edge:list', ['--json' => true]);
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertSame(3, $payload['sites'][0]['instances']);
+        $this->assertSame('large', $payload['sites'][0]['size']);
+    }
+
     public function test_unknown_mode_returns_failure(): void
     {
         $exit = Artisan::call('dply:edge:list', ['--mode' => 'nope']);
