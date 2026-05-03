@@ -52,6 +52,11 @@ use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
+use App\Livewire\Fleet\Deploys as FleetDeploys;
+use App\Livewire\Fleet\Domains as FleetDomains;
+use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
+use App\Livewire\Fleet\Health as FleetHealth;
+use App\Livewire\Servers\Deploys as ServerDeploys;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePhp;
 use App\Livewire\Servers\WorkspaceRecipes;
@@ -70,6 +75,9 @@ use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Commits as SitesCommits;
 use App\Livewire\Sites\Create as SitesCreate;
+use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
+use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
+use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Settings as SiteSettings;
@@ -120,10 +128,10 @@ Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareContro
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
-    Route::livewire('/fleet/health', \App\Livewire\Fleet\Health::class)->name('fleet.health');
-    Route::livewire('/fleet/domains', \App\Livewire\Fleet\Domains::class)->name('fleet.domains');
-    Route::livewire('/fleet/env-search', \App\Livewire\Fleet\EnvSearch::class)->name('fleet.env-search');
-    Route::livewire('/fleet/deploys', \App\Livewire\Fleet\Deploys::class)->name('fleet.deploys');
+    Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
+    Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
+    Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
+    Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
     Route::livewire('/admin', AdminDashboard::class)
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.dashboard');
@@ -221,9 +229,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
-    Route::livewire('servers/{server}/sites/{site}/env-diff', \App\Livewire\Sites\EnvDiff::class)->name('sites.env-diff');
-    Route::livewire('servers/{server}/sites/{site}/deployments', \App\Livewire\Sites\DeploymentsList::class)->name('sites.deployments.index');
-    Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', \App\Livewire\Sites\DeploymentDetail::class)->name('sites.deployments.show');
+    Route::livewire('servers/{server}/sites/{site}/env-diff', SitesEnvDiff::class)->name('sites.env-diff');
+    Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
+    Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
@@ -254,7 +262,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
     Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
-    Route::livewire('servers/{server}/deploys', \App\Livewire\Servers\Deploys::class)->name('servers.deploys');
+    Route::livewire('servers/{server}/deploys', ServerDeploys::class)->name('servers.deploys');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
     Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
