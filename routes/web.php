@@ -80,6 +80,7 @@ use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Edge\Create as EdgeCreate;
+use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\SiteClone as SitesClone;
@@ -189,6 +190,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('scripts/{script}/edit', ScriptsEdit::class)->name('scripts.edit');
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
+    Route::livewire('edge', EdgeIndex::class)->name('edge.index');
     Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
     Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
     Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
