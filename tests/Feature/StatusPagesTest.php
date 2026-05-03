@@ -40,7 +40,10 @@ class StatusPagesTest extends TestCase
             'is_public' => true,
         ]);
 
-        $response = $this->get(route('status.public', $page));
+        // Guest pages are caught by RedirectGuestsToComingSoon middleware in
+        // non-local envs; bypass for tests asserting actual page render.
+        $response = $this->withoutMiddleware([\App\Http\Middleware\RedirectGuestsToComingSoon::class])
+            ->get(route('status.public', $page));
 
         $response->assertOk();
         $response->assertSee('API');
@@ -57,7 +60,9 @@ class StatusPagesTest extends TestCase
             'is_public' => false,
         ]);
 
-        $this->get(route('status.public', $page))->assertNotFound();
+        $this->withoutMiddleware([\App\Http\Middleware\RedirectGuestsToComingSoon::class])
+            ->get(route('status.public', $page))
+            ->assertNotFound();
     }
 
     public function test_user_can_create_status_page(): void

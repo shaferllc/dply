@@ -2,6 +2,7 @@
 
 namespace App\Livewire\StatusPages;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\StatusPage;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
@@ -10,6 +11,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use DispatchesToastNotifications;
+
     public string $name = '';
 
     public string $description = '';
