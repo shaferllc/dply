@@ -162,6 +162,70 @@ class FleetSummaryCommandTest extends TestCase
         $this->assertSame([], $decoded['edge_fleet']['by_backend']);
     }
 
+    public function test_edge_fleet_section_breaks_down_by_mode_and_counts_previews(): void
+    {
+        $user = \App\Models\User::factory()->create();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        // 1 image-mode parent
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => 'nginx:1',
+            'container_port' => 80,
+            'container_backend' => 'digitalocean_app_platform',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+        ]);
+        // 1 source-mode parent
+        $parent = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'meta' => ['container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']]],
+        ]);
+        // 1 source-mode preview
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'status' => Site::STATUS_CONTAINER_PROVISIONING,
+            'meta' => [
+                'container' => [
+                    'source' => ['repo' => 'acme/api', 'branch' => 'feature/x'],
+                    'preview_parent_site_id' => $parent->id,
+                    'preview_branch' => 'feature/x',
+                ],
+            ],
+        ]);
+
+        Artisan::call('dply:fleet:summary', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame(3, $decoded['edge_fleet']['total']);
+        $this->assertSame(1, $decoded['edge_fleet']['by_mode']['image']);
+        $this->assertSame(2, $decoded['edge_fleet']['by_mode']['source']);
+        $this->assertSame(1, $decoded['edge_fleet']['previews']);
+    }
+
     public function test_edge_fleet_human_output_renders_section(): void
     {
         $user = \App\Models\User::factory()->create();

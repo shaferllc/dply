@@ -52,9 +52,15 @@ class FleetSummaryCommand extends Command
 
         $edgeSites = Site::query()
             ->whereNotNull('container_backend')
-            ->get(['container_backend', 'status']);
+            ->get(['container_backend', 'status', 'meta']);
         $edgeByBackend = $edgeSites->groupBy('container_backend')->map->count()->sortKeys()->all();
         $edgeByStatus = $edgeSites->groupBy('status')->map->count()->sortKeys()->all();
+        $edgeByMode = $edgeSites
+            ->groupBy(fn (Site $s) => is_array($s->meta['container']['source'] ?? null) ? 'source' : 'image')
+            ->map->count()
+            ->sortKeys()
+            ->all();
+        $edgePreviewCount = $edgeSites->filter(fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id']))->count();
         $edgeBackendCredentials = ProviderCredential::query()
             ->whereIn('provider', ['digitalocean_app_platform', 'aws_app_runner'])
             ->get(['provider'])
@@ -78,6 +84,8 @@ class FleetSummaryCommand extends Command
                 'total' => $edgeSites->count(),
                 'by_backend' => $edgeByBackend,
                 'by_status' => $edgeByStatus,
+                'by_mode' => $edgeByMode,
+                'previews' => $edgePreviewCount,
                 'backend_credentials' => $edgeBackendCredentials,
             ],
         ];
@@ -135,7 +143,17 @@ class FleetSummaryCommand extends Command
         if ($edgeSites->isNotEmpty()) {
             $this->newLine();
             $this->line('<fg=cyan>Dply edge</>');
-            $this->line(sprintf('  %d edge container site(s)', $edgeSites->count()));
+            $this->line(sprintf(
+                '  %d edge container site(s)%s',
+                $edgeSites->count(),
+                $edgePreviewCount > 0 ? sprintf(' (%d preview deploy(s))', $edgePreviewCount) : '',
+            ));
+            if ($edgeByMode !== []) {
+                $this->table(['mode', 'count'], array_map(
+                    fn ($mode) => [$mode, (string) $edgeByMode[$mode]],
+                    array_keys($edgeByMode),
+                ));
+            }
             if ($edgeByBackend !== []) {
                 $this->table(['backend', 'count'], array_map(
                     fn ($backend) => [$backend, (string) $edgeByBackend[$backend]],
