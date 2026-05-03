@@ -39,7 +39,13 @@ class Server extends Model
 
     public const HOST_KIND_DIGITALOCEAN_FUNCTIONS = 'digitalocean_functions';
 
+    public const HOST_KIND_DIGITALOCEAN_APP_PLATFORM = 'digitalocean_app_platform';
+
     public const HOST_KIND_AWS_LAMBDA = 'aws_lambda';
+
+    public const HOST_KIND_AWS_APP_RUNNER = 'aws_app_runner';
+
+    public const HOST_KIND_DPLY_EDGE = 'dply_edge';
 
     public const HEALTH_REACHABLE = 'reachable';
 
@@ -294,7 +300,10 @@ class Server extends Model
             self::HOST_KIND_DOCKER,
             self::HOST_KIND_KUBERNETES,
             self::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+            self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
             self::HOST_KIND_AWS_LAMBDA,
+            self::HOST_KIND_AWS_APP_RUNNER,
+            self::HOST_KIND_DPLY_EDGE,
         ], true) ? $hostKind : self::HOST_KIND_VM;
     }
 
@@ -316,6 +325,30 @@ class Server extends Model
     public function isAwsLambdaHost(): bool
     {
         return $this->hostKind() === self::HOST_KIND_AWS_LAMBDA;
+    }
+
+    public function isDigitalOceanAppPlatformHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM;
+    }
+
+    public function isAwsAppRunnerHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_AWS_APP_RUNNER;
+    }
+
+    public function isDplyEdgeHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DPLY_EDGE;
+    }
+
+    public function isContainerHost(): bool
+    {
+        return in_array($this->hostKind(), [
+            self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
+            self::HOST_KIND_AWS_APP_RUNNER,
+            self::HOST_KIND_DPLY_EDGE,
+        ], true);
     }
 
     public function isDockerHost(): bool

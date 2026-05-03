@@ -101,6 +101,12 @@ class Site extends Model
         'deployment_environment',
         'php_fpm_user',
         'env_file_content',
+        'container_image',
+        'container_registry',
+        'container_port',
+        'container_backend',
+        'container_backend_id',
+        'container_region',
         'meta',
     ];
 
@@ -886,6 +892,30 @@ class Site extends Model
     public function usesKubernetesRuntime(): bool
     {
         return $this->runtimeProfile() === 'kubernetes_web';
+    }
+
+    public function usesContainerRuntime(): bool
+    {
+        return $this->type === \App\Enums\SiteType::Container
+            || in_array($this->container_backend, [
+                'digitalocean_app_platform',
+                'aws_app_runner',
+                'dply_edge',
+            ], true);
+    }
+
+    /**
+     * URL the container deployment is reachable at, set by the
+     * provisioner once the backend reports an "ingress" hostname
+     * (DO App Platform default ondigitalocean.app, App Runner's
+     * default *.awsapprunner.com).
+     */
+    public function containerLiveUrl(): ?string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $url = $meta['container']['live_url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
     }
 
     /**

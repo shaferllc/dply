@@ -11,32 +11,28 @@ return [
         'digitalocean_functions' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_FUNCTIONS', true), // https://www.digitalocean.com/products/functions/
         'digitalocean_kubernetes' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_KUBERNETES', true), // https://www.digitalocean.com/products/kubernetes/
         'digitalocean_app_platform' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_APP_PLATFORM', false), // https://www.digitalocean.com/products/app-platform/
-        'digitalocean' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN', true),
-        'digitalocean_functions' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_FUNCTIONS', true),
-        'digitalocean_kubernetes' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_KUBERNETES', true),
-        'digitalocean_app_platform' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_APP_PLATFORM', false),
-        'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', false),
-        'linode' => env('DPLY_SERVER_PROVIDER_LINODE', false),
-        'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', false),
-        'akamai' => env('DPLY_SERVER_PROVIDER_AKAMAI', false),
-        'scaleway' => env('DPLY_SERVER_PROVIDER_SCALEWAY', false),
-        'upcloud' => env('DPLY_SERVER_PROVIDER_UPCLOUD', false),
-        'equinix_metal' => env('DPLY_SERVER_PROVIDER_EQUINIX_METAL', false),
-        'ovh' => env('DPLY_SERVER_PROVIDER_OVH', false),
-        'rackspace' => env('DPLY_SERVER_PROVIDER_RACKSPACE', false),
-        'fly_io' => env('DPLY_SERVER_PROVIDER_FLY_IO', false),
-        'render' => env('DPLY_SERVER_PROVIDER_RENDER', false),
-        'railway' => env('DPLY_SERVER_PROVIDER_RAILWAY', false),
-        'coolify' => env('DPLY_SERVER_PROVIDER_COOLIFY', false),
-        'cap_rover' => env('DPLY_SERVER_PROVIDER_CAP_ROVER', false),
-        'aws' => env('DPLY_SERVER_PROVIDER_AWS', false),
-        'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false),
+        'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', false), // https://www.hetzner.com/cloud
+        'linode' => env('DPLY_SERVER_PROVIDER_LINODE', false), // https://www.linode.com/
+        'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', false), // https://www.vultr.com/
+        'akamai' => env('DPLY_SERVER_PROVIDER_AKAMAI', false), // https://www.akamai.com/solutions/cloud-computing
+        'scaleway' => env('DPLY_SERVER_PROVIDER_SCALEWAY', false), // https://www.scaleway.com/en/iaas/
+        'upcloud' => env('DPLY_SERVER_PROVIDER_UPCLOUD', false), // https://upcloud.com/
+        'equinix_metal' => env('DPLY_SERVER_PROVIDER_EQUINIX_METAL', false), // https://metal.equinix.com/
+        'ovh' => env('DPLY_SERVER_PROVIDER_OVH', false), // https://www.ovhcloud.com/en/public-cloud/
+        'rackspace' => env('DPLY_SERVER_PROVIDER_RACKSPACE', false), // https://www.rackspace.com/cloud
+        'fly_io' => env('DPLY_SERVER_PROVIDER_FLY_IO', false), // https://fly.io/
+        'render' => env('DPLY_SERVER_PROVIDER_RENDER', false), // https://render.com/
+        'railway' => env('DPLY_SERVER_PROVIDER_RAILWAY', false), // https://railway.app/
+        'coolify' => env('DPLY_SERVER_PROVIDER_COOLIFY', false), // https://coolify.io/
+        'aws' => env('DPLY_SERVER_PROVIDER_AWS', false), // https://aws.amazon.com/ec2/
+        'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false), // https://aws.amazon.com/apprunner/
         /** DNS / API token only (not a compute host in v1). */
-        'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true),
-        'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true),
-        'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false),
-        'azure' => env('DPLY_SERVER_PROVIDER_AZURE', false),
-        'oracle' => env('DPLY_SERVER_PROVIDER_ORACLE', false),
-        'custom' => env('DPLY_SERVER_PROVIDER_CUSTOM', true),
+        'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true), // https://www.cloudflare.com/
+        'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/
+        'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false), // https://cloud.google.com/compute
+        'azure' => env('DPLY_SERVER_PROVIDER_AZURE', false), // https://azure.microsoft.com/en-us/products/virtual-machines/
+        'oracle' => env('DPLY_SERVER_PROVIDER_ORACLE', false), // https://www.oracle.com/cloud/compute/
+        'custom' => env('DPLY_SERVER_PROVIDER_CUSTOM', true), // Custom/manual server entry
+
     ],
 ];
