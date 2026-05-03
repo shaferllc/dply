@@ -14,6 +14,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -131,6 +132,22 @@ class StepReview extends Component
     protected function stepNumber(): int
     {
         return 4;
+    }
+
+    /**
+     * Live-refresh the preflight panel when the SSH-key modal
+     * (which is a sibling Livewire component) reports a new key
+     * was saved. Without this, the "Add a personal profile SSH
+     * key" blocker stays red until the operator manually reloads
+     * the page even though the key now exists.
+     */
+    #[On('personal-ssh-key-created')]
+    public function refreshAfterPersonalSshKey(): void
+    {
+        // Touch the form so render() recomputes the preflight
+        // context with the freshly-saved key visible. The actual
+        // recompute happens in render(); no other state needs to
+        // change.
     }
 
     public function render(): View

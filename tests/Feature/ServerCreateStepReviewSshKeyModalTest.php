@@ -35,6 +35,27 @@ class ServerCreateStepReviewSshKeyModalTest extends TestCase
         $response->assertSee('Add a personal SSH key');
     }
 
+    public function test_preflight_refreshes_when_personal_ssh_key_event_dispatches(): void
+    {
+        $user = $this->seedUserWithDraftAtReview();
+        // No keys → blocker should be present on first render.
+        $component = \Livewire\Livewire::actingAs($user)
+            ->test(\App\Livewire\Servers\Create\StepReview::class);
+        $component->assertSee('Add a personal profile SSH key');
+
+        // Now create a key out-of-band (simulating what the
+        // PersonalSshKeyModal does when it persists) and dispatch
+        // the event the modal would dispatch on save.
+        \App\Models\UserSshKey::factory()->create([
+            'user_id' => $user->id,
+            'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('z', 43).' refresh-test',
+            'provision_on_new_servers' => true,
+        ]);
+
+        $component->dispatch('personal-ssh-key-created')
+            ->assertDontSee('Add a personal profile SSH key');
+    }
+
     public function test_preflight_add_ssh_key_button_targets_personal_ssh_key_modal(): void
     {
         $user = $this->seedUserWithDraftAtReview();

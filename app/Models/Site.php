@@ -919,6 +919,48 @@ class Site extends Model
      * (DO App Platform default ondigitalocean.app, App Runner's
      * default *.awsapprunner.com).
      */
+    /**
+     * Rough monthly cost estimate for the container site, in USD.
+     * Based on backend × size_tier × instance_count, using public
+     * list pricing as of 2026-05. Returns 0 for non-container sites.
+     *
+     * Not authoritative — used as a "ballpark" surface in the
+     * dashboard / CLI so operators can compare fleets without
+     * digging into the cloud billing console.
+     */
+    public function estimatedMonthlyCostUsd(): int
+    {
+        if ($this->container_backend === null) {
+            return 0;
+        }
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $tier = (string) ($meta['container']['size_tier'] ?? 'small');
+        $instances = is_int($meta['container']['instance_count'] ?? null)
+            ? (int) $meta['container']['instance_count']
+            : 1;
+
+        // Per-instance pricing rough estimates. DO's instance_size_slug
+        // pricing is monthly + flat; App Runner is per-vCPU-hour for
+        // active time so this is more uncertain (we assume active 24/7).
+        $perInstance = match ($this->container_backend) {
+            'digitalocean_app_platform' => match ($tier) {
+                'medium' => 10,
+                'large' => 25,
+                'xlarge' => 50,
+                default => 5,
+            },
+            'aws_app_runner' => match ($tier) {
+                'medium' => 50,
+                'large' => 100,
+                'xlarge' => 200,
+                default => 25,
+            },
+            default => 0,
+        };
+
+        return $perInstance * max(1, $instances);
+    }
+
     public function containerLiveUrl(): ?string
     {
         $meta = is_array($this->meta) ? $this->meta : [];
