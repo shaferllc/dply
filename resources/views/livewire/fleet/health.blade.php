@@ -164,6 +164,34 @@
                 </div>
             </dl>
 
+            @php
+                $sourceCount = $edgeFleet['by_mode']['source'] ?? 0;
+                $imageCount = $edgeFleet['by_mode']['image'] ?? 0;
+                $previewCount = $edgeFleet['previews'] ?? 0;
+            @endphp
+            @if ($sourceCount > 0 || $previewCount > 0)
+                <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    @if ($sourceCount > 0)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 font-medium text-indigo-800">
+                            <span class="size-1.5 rounded-full bg-indigo-500"></span>
+                            {{ trans_choice('{1} 1 source-mode site|[2,*] :count source-mode sites', $sourceCount, ['count' => $sourceCount]) }}
+                        </span>
+                    @endif
+                    @if ($imageCount > 0)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+                            <span class="size-1.5 rounded-full bg-slate-400"></span>
+                            {{ trans_choice('{1} 1 image-mode site|[2,*] :count image-mode sites', $imageCount, ['count' => $imageCount]) }}
+                        </span>
+                    @endif
+                    @if ($previewCount > 0)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-900">
+                            <span class="size-1.5 rounded-full bg-amber-500"></span>
+                            {{ trans_choice('{1} 1 preview deploy|[2,*] :count preview deploys', $previewCount, ['count' => $previewCount]) }}
+                        </span>
+                    @endif
+                </div>
+            @endif
+
             @if ($edgeFleet['failed_sites'] !== [])
                 <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50/60 p-3 text-xs text-rose-900">
                     <p class="font-semibold">

@@ -70,6 +70,8 @@ class Health extends Component
      *     total: int,
      *     by_backend: array<string, int>,
      *     by_status: array<string, int>,
+     *     by_mode: array<string, int>,
+     *     previews: int,
      *     failed_sites: list<array{name: string, server_id: ?string, container_image: ?string}>
      * }|null
      */
@@ -78,7 +80,7 @@ class Health extends Component
         $sites = Site::query()
             ->where('organization_id', $organizationId)
             ->whereNotNull('container_backend')
-            ->get(['id', 'name', 'server_id', 'container_backend', 'container_image', 'status']);
+            ->get(['id', 'name', 'server_id', 'container_backend', 'container_image', 'status', 'meta']);
 
         if ($sites->isEmpty()) {
             return null;
@@ -86,6 +88,11 @@ class Health extends Component
 
         $byBackend = $sites->groupBy('container_backend')->map->count()->all();
         $byStatus = $sites->groupBy('status')->map->count()->all();
+        $byMode = $sites
+            ->groupBy(fn (Site $s) => is_array($s->meta['container']['source'] ?? null) ? 'source' : 'image')
+            ->map->count()
+            ->all();
+        $previews = $sites->filter(fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id']))->count();
 
         $failedSites = $sites
             ->filter(fn (Site $s) => $s->status === Site::STATUS_CONTAINER_FAILED)
@@ -101,6 +108,8 @@ class Health extends Component
             'total' => $sites->count(),
             'by_backend' => $byBackend,
             'by_status' => $byStatus,
+            'by_mode' => $byMode,
+            'previews' => $previews,
             'failed_sites' => $failedSites,
         ];
     }

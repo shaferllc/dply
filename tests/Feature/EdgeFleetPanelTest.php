@@ -68,6 +68,37 @@ class EdgeFleetPanelTest extends TestCase
             ->assertSee('Broken Container');
     }
 
+    public function test_panel_shows_source_mode_and_preview_breakdown(): void
+    {
+        $user = $this->ownerWithOrg();
+        $org = $user->currentOrganization();
+        // Two source-mode parents + one preview deploy.
+        $this->makeContainerSite($user, $org, 'src-1', 'digitalocean_app_platform', Site::STATUS_CONTAINER_ACTIVE, [
+            'meta' => ['container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']]],
+            'container_image' => null,
+        ]);
+        $parent = $this->makeContainerSite($user, $org, 'src-2', 'digitalocean_app_platform', Site::STATUS_CONTAINER_ACTIVE, [
+            'meta' => ['container' => ['source' => ['repo' => 'acme/web', 'branch' => 'main']]],
+            'container_image' => null,
+        ]);
+        $this->makeContainerSite($user, $org, 'preview-pr-9', 'digitalocean_app_platform', Site::STATUS_CONTAINER_PROVISIONING, [
+            'container_image' => null,
+            'meta' => [
+                'container' => [
+                    'source' => ['repo' => 'acme/web', 'branch' => 'feature/x'],
+                    'preview_parent_site_id' => $parent->id,
+                    'preview_branch' => 'feature/x',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('fleet.health'));
+
+        $response->assertOk()
+            ->assertSee('3 source-mode sites')
+            ->assertSee('1 preview deploy');
+    }
+
     public function test_panel_replaces_old_fly_upsell_when_edge_sites_exist(): void
     {
         $user = $this->ownerWithOrg();
@@ -98,7 +129,10 @@ class EdgeFleetPanelTest extends TestCase
         return $user;
     }
 
-    private function makeContainerSite(User $user, Organization $org, string $name, string $backend, string $status = Site::STATUS_CONTAINER_PROVISIONING): Site
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function makeContainerSite(User $user, Organization $org, string $name, string $backend, string $status = Site::STATUS_CONTAINER_PROVISIONING, array $overrides = []): Site
     {
         $server = Server::factory()->create([
             'user_id' => $user->id,
@@ -106,7 +140,7 @@ class EdgeFleetPanelTest extends TestCase
             'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
         ]);
 
-        return Site::factory()->create([
+        return Site::factory()->create(array_merge([
             'server_id' => $server->id,
             'user_id' => $user->id,
             'organization_id' => $org->id,
@@ -120,6 +154,6 @@ class EdgeFleetPanelTest extends TestCase
             'container_backend' => $backend,
             'container_region' => 'nyc',
             'status' => $status,
-        ]);
+        ], $overrides));
     }
 }
