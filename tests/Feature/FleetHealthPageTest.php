@@ -124,6 +124,63 @@ class FleetHealthPageTest extends TestCase
             ->assertSee('longer than 15m');
     }
 
+    public function test_fly_upsell_shows_for_orgs_with_node_sites_and_no_fly_credential(): void
+    {
+        [$user, $org] = $this->makeUserOrg();
+        $server = Server::factory()->create(['organization_id' => $org->id]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $org->id,
+            'runtime' => 'node',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('fleet.health'));
+
+        $response->assertOk()
+            ->assertSee('Try Fly.io edge')
+            ->assertSee('1 site')
+            ->assertSee('Connect Fly.io');
+    }
+
+    public function test_fly_upsell_hides_when_org_has_only_php_sites(): void
+    {
+        [$user, $org] = $this->makeUserOrg();
+        $server = Server::factory()->create(['organization_id' => $org->id]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $org->id,
+            'runtime' => 'php',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('fleet.health'));
+
+        $response->assertOk()
+            ->assertDontSee('Try Fly.io edge');
+    }
+
+    public function test_fly_upsell_hides_when_org_already_has_fly_credential(): void
+    {
+        [$user, $org] = $this->makeUserOrg();
+        $server = Server::factory()->create(['organization_id' => $org->id]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $org->id,
+            'runtime' => 'node',
+        ]);
+        \App\Models\ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'fly_io',
+            'name' => 'Existing Fly token',
+            'credentials' => ['api_token' => 'fly-token-test'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('fleet.health'));
+
+        $response->assertOk()
+            ->assertDontSee('Try Fly.io edge');
+    }
+
     public function test_fleet_link_renders_in_top_nav(): void
     {
         [$user, $org] = $this->makeUserOrg();
