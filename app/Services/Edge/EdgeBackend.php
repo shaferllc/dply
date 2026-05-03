@@ -35,6 +35,20 @@ interface EdgeBackend
     public function provision(Site $site, ProviderCredential $credential): array;
 
     /**
+     * Vercel-shape source-mode provision: the backend pulls a
+     * GitHub repo + branch and handles build itself (Dockerfile
+     * when present, buildpack otherwise). With deploy_on_push
+     * enabled at the backend, every push to that branch triggers
+     * an auto-redeploy without dply needing to listen for webhooks.
+     *
+     * Source spec is read off the Site's meta.container.source —
+     * { repo, branch, dockerfile_path?, deploy_on_push }.
+     *
+     * @return array{backend_id: string, live_url: ?string}
+     */
+    public function provisionFromSource(Site $site, ProviderCredential $credential): array;
+
+    /**
      * Trigger a redeploy of the existing app — backend pulls
      * the latest image tag and rolls a new revision. No-op when
      * the site has no backend_id yet.

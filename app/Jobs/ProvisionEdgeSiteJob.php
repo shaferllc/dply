@@ -46,8 +46,12 @@ class ProvisionEdgeSiteJob implements ShouldQueue
 
         $site->update(['status' => Site::STATUS_CONTAINER_PROVISIONING]);
 
+        $hasSource = is_array($site->meta['container']['source'] ?? null);
+
         try {
-            $result = $backend->provision($site, $credential);
+            $result = $hasSource
+                ? $backend->provisionFromSource($site, $credential)
+                : $backend->provision($site, $credential);
         } catch (Throwable $e) {
             $this->markFailed($site, $e->getMessage());
 

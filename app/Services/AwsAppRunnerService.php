@@ -102,6 +102,72 @@ class AwsAppRunnerService
     }
 
     /**
+     * Create an App Runner service from a GitHub repo. App Runner
+     * does the build + deploy + auto-redeploy on push — same Vercel-
+     * style source mode DO App Platform offers, just over the
+     * CODE_REPOSITORY source type.
+     *
+     * `connectionArn` is an App Runner GitHub connection ARN — the
+     * operator authorizes a GitHub App once per AWS account; the
+     * connection ARN is what we keep on the ProviderCredential.
+     *
+     * @param  array<string, string>  $envVars
+     * @return array{service_arn: string, service_url: ?string}
+     */
+    public function createServiceFromSource(
+        string $serviceName,
+        string $repositoryUrl,
+        string $branch,
+        string $connectionArn,
+        int $port,
+        array $envVars = [],
+        ?string $dockerfilePath = null,
+        bool $autoDeploy = true,
+        string $cpu = '256',
+        string $memory = '512',
+    ): array {
+        $codeConfigurationValues = [
+            'Runtime' => $dockerfilePath !== null && $dockerfilePath !== '' ? 'DOCKER' : 'NODEJS_18',
+            'Port' => (string) $port,
+            'RuntimeEnvironmentVariables' => $envVars,
+        ];
+
+        $sourceConfig = [
+            'CodeRepository' => [
+                'RepositoryUrl' => $repositoryUrl,
+                'SourceCodeVersion' => [
+                    'Type' => 'BRANCH',
+                    'Value' => $branch,
+                ],
+                'CodeConfiguration' => [
+                    'ConfigurationSource' => 'API',
+                    'CodeConfigurationValues' => $codeConfigurationValues,
+                ],
+            ],
+            'AuthenticationConfiguration' => [
+                'ConnectionArn' => $connectionArn,
+            ],
+            'AutoDeploymentsEnabled' => $autoDeploy,
+        ];
+
+        $result = $this->client->createService([
+            'ServiceName' => $serviceName,
+            'SourceConfiguration' => $sourceConfig,
+            'InstanceConfiguration' => [
+                'Cpu' => $cpu,
+                'Memory' => $memory,
+            ],
+        ]);
+
+        $service = $result['Service'] ?? [];
+
+        return [
+            'service_arn' => (string) ($service['ServiceArn'] ?? ''),
+            'service_url' => isset($service['ServiceUrl']) ? 'https://'.$service['ServiceUrl'] : null,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function describeService(string $serviceArn): array

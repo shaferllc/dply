@@ -92,6 +92,68 @@ class DigitalOceanAppPlatformService
     }
 
     /**
+     * Create a new app from a GitHub repo. DO App Platform owns the
+     * build (Dockerfile-based when one is present, buildpack
+     * auto-detection otherwise) and the auto-redeploy on push when
+     * `deploy_on_push` is true. This is the Vercel-style source mode
+     * — give it a repo, get back a running URL.
+     *
+     * `repo` is `owner/name` exactly as DO expects.
+     *
+     * @param  array<string, string>  $envVars
+     * @return array{id: string, default_ingress: ?string}
+     */
+    public function createAppFromSource(
+        string $appName,
+        string $region,
+        string $repo,
+        string $branch,
+        int $port,
+        bool $deployOnPush = true,
+        ?string $dockerfilePath = null,
+        array $envVars = [],
+    ): array {
+        $envSpec = [];
+        foreach ($envVars as $k => $v) {
+            $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'RUN_TIME'];
+        }
+
+        $service = [
+            'name' => 'web',
+            'github' => [
+                'repo' => $repo,
+                'branch' => $branch,
+                'deploy_on_push' => $deployOnPush,
+            ],
+            'http_port' => $port,
+            'instance_count' => 1,
+            'instance_size_slug' => 'basic-xxs',
+            'envs' => $envSpec,
+        ];
+
+        if (is_string($dockerfilePath) && $dockerfilePath !== '') {
+            $service['dockerfile_path'] = $dockerfilePath;
+        }
+
+        $body = [
+            'spec' => [
+                'name' => $appName,
+                'region' => $region,
+                'services' => [$service],
+            ],
+        ];
+
+        $response = $this->request('post', '/apps', $body);
+        $this->assertSuccess($response, 'create app from source');
+        $data = $response->json('app') ?? [];
+
+        return [
+            'id' => (string) ($data['id'] ?? ''),
+            'default_ingress' => $data['default_ingress'] ?? null,
+        ];
+    }
+
+    /**
      * Inspect a single app — used by status polling.
      *
      * @return array<string, mixed>

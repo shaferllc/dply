@@ -92,6 +92,70 @@ class ProvisionEdgeSiteJobTest extends TestCase
         $this->assertTrue(true); // no exception
     }
 
+    public function test_source_mode_calls_create_app_from_source(): void
+    {
+        Http::fake([
+            'api.digitalocean.com/v2/apps' => Http::response([
+                'app' => [
+                    'id' => 'do-app-src-1',
+                    'default_ingress' => 'https://src.ondigitalocean.app',
+                ],
+            ], 201),
+        ]);
+
+        [$user, $org] = $this->scaffold();
+        ProviderCredential::query()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean_app_platform',
+            'name' => 'DO',
+            'credentials' => ['api_token' => 't'],
+        ]);
+
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'type' => SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_PENDING,
+            'meta' => [
+                'container' => [
+                    'source' => [
+                        'repo' => 'acme/api',
+                        'branch' => 'main',
+                        'deploy_on_push' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        (new ProvisionEdgeSiteJob($site->id))->handle();
+
+        $fresh = $site->fresh();
+        $this->assertSame('do-app-src-1', $fresh->container_backend_id);
+        $this->assertSame(Site::STATUS_CONTAINER_ACTIVE, $fresh->status);
+
+        Http::assertSent(function ($req) {
+            $svc = $req->data()['spec']['services'][0] ?? [];
+
+            return ($svc['github']['repo'] ?? null) === 'acme/api'
+                && ($svc['github']['branch'] ?? null) === 'main'
+                && ($svc['github']['deploy_on_push'] ?? null) === true;
+        });
+    }
+
     /**
      * @return array{0: User, 1: Organization}
      */

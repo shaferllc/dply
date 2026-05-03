@@ -155,6 +155,67 @@ class DigitalOceanAppPlatformServiceTest extends TestCase
         $service->createApp('api-acme', 'nyc', 'nginx:1', 80);
     }
 
+    public function test_create_app_from_source_posts_github_spec(): void
+    {
+        Http::fake([
+            'api.digitalocean.com/v2/apps' => Http::response([
+                'app' => ['id' => 'app-src-1', 'default_ingress' => null],
+            ], 201),
+        ]);
+
+        $service = new DigitalOceanAppPlatformService($this->credential());
+        $result = $service->createAppFromSource(
+            appName: 'api-acme',
+            region: 'nyc',
+            repo: 'acme/api',
+            branch: 'main',
+            port: 8080,
+            deployOnPush: true,
+            dockerfilePath: 'docker/Dockerfile',
+            envVars: ['APP_ENV' => 'production'],
+        );
+
+        $this->assertSame('app-src-1', $result['id']);
+
+        Http::assertSent(function (Request $request) {
+            $body = $request->data();
+            $svc = $body['spec']['services'][0];
+
+            return $request->method() === 'POST'
+                && str_ends_with($request->url(), '/v2/apps')
+                && ($svc['github']['repo'] ?? null) === 'acme/api'
+                && ($svc['github']['branch'] ?? null) === 'main'
+                && ($svc['github']['deploy_on_push'] ?? null) === true
+                && ($svc['dockerfile_path'] ?? null) === 'docker/Dockerfile'
+                && ($svc['http_port'] ?? null) === 8080
+                && ($svc['envs'][0]['key'] ?? null) === 'APP_ENV';
+        });
+    }
+
+    public function test_create_app_from_source_omits_dockerfile_path_when_blank(): void
+    {
+        Http::fake([
+            'api.digitalocean.com/v2/apps' => Http::response([
+                'app' => ['id' => 'app-src-2', 'default_ingress' => null],
+            ], 201),
+        ]);
+
+        $service = new DigitalOceanAppPlatformService($this->credential());
+        $service->createAppFromSource(
+            appName: 'svc',
+            region: 'nyc',
+            repo: 'acme/svc',
+            branch: 'main',
+            port: 3000,
+        );
+
+        Http::assertSent(function (Request $request) {
+            $svc = $request->data()['spec']['services'][0];
+
+            return ! array_key_exists('dockerfile_path', $svc);
+        });
+    }
+
     private function credential(): ProviderCredential
     {
         $user = User::factory()->create();

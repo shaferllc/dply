@@ -109,6 +109,61 @@ class EdgeCreatePageTest extends TestCase
             ->assertHasErrors(['name', 'image']);
     }
 
+    public function test_source_tab_renders_repo_inputs(): void
+    {
+        $user = $this->ownerWithOrg();
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->assertSee('GitHub repo')
+            ->assertSee('Branch')
+            ->assertSee('Auto-deploy on push to this branch')
+            ->assertSee('owner/name or full GitHub URL');
+    }
+
+    public function test_source_mode_validates_repo_and_branch(): void
+    {
+        $user = $this->ownerWithOrg();
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->set('name', 'svc')
+            ->call('deploy')
+            ->assertHasErrors(['repo']);
+    }
+
+    public function test_source_mode_dispatches_provision_with_source_meta(): void
+    {
+        Queue::fake();
+        $user = $this->ownerWithOrg();
+        ProviderCredential::query()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'digitalocean_app_platform',
+            'name' => 'DO',
+            'credentials' => ['api_token' => 't'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->set('name', 'Acme API')
+            ->set('repo', 'acme/api')
+            ->set('branch', 'main')
+            ->set('port', 8080)
+            ->set('region', 'nyc')
+            ->set('backend', 'digitalocean_app_platform')
+            ->call('deploy')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(ProvisionEdgeSiteJob::class);
+        $site = \App\Models\Site::query()->where('name', 'Acme API')->firstOrFail();
+        $this->assertNull($site->container_image);
+        $this->assertSame('acme/api', $site->meta['container']['source']['repo']);
+    }
+
     private function ownerWithOrg(): User
     {
         $user = User::factory()->create();

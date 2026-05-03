@@ -151,6 +151,46 @@ class AwsAppRunnerServiceTest extends TestCase
         $this->assertContains('ap-northeast-1', $slugs);
     }
 
+    public function test_create_service_from_source_uses_code_repository(): void
+    {
+        $client = Mockery::mock(AppRunnerClient::class);
+        $client->shouldReceive('createService')
+            ->once()
+            ->with(Mockery::on(function (array $args): bool {
+                $code = $args['SourceConfiguration']['CodeRepository'] ?? null;
+                $auth = $args['SourceConfiguration']['AuthenticationConfiguration'] ?? null;
+
+                return is_array($code)
+                    && $code['RepositoryUrl'] === 'https://github.com/acme/api'
+                    && $code['SourceCodeVersion']['Type'] === 'BRANCH'
+                    && $code['SourceCodeVersion']['Value'] === 'main'
+                    && $code['CodeConfiguration']['CodeConfigurationValues']['Runtime'] === 'DOCKER'
+                    && $code['CodeConfiguration']['CodeConfigurationValues']['Port'] === '8080'
+                    && ($args['SourceConfiguration']['AutoDeploymentsEnabled'] ?? null) === true
+                    && is_array($auth)
+                    && $auth['ConnectionArn'] === 'arn:aws:apprunner:us-east-1:1234:connection/dply-gh/xyz';
+            }))
+            ->andReturn(new Result([
+                'Service' => [
+                    'ServiceArn' => 'arn:aws:apprunner:us-east-1:1234:service/api-acme/src',
+                    'ServiceUrl' => 'api-acme.awsapprunner.com',
+                ],
+            ]));
+
+        $service = $this->service($client);
+        $result = $service->createServiceFromSource(
+            serviceName: 'api-acme',
+            repositoryUrl: 'https://github.com/acme/api',
+            branch: 'main',
+            connectionArn: 'arn:aws:apprunner:us-east-1:1234:connection/dply-gh/xyz',
+            port: 8080,
+            dockerfilePath: 'Dockerfile',
+        );
+
+        $this->assertStringStartsWith('arn:aws:apprunner:', $result['service_arn']);
+        $this->assertSame('https://api-acme.awsapprunner.com', $result['service_url']);
+    }
+
     private function service(AppRunnerClient $client): AwsAppRunnerService
     {
         return (new AwsAppRunnerService($this->credential()))->withClient($client);

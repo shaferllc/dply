@@ -18,18 +18,58 @@
 
     <form wire:submit="deploy" class="mt-8 space-y-6">
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div role="tablist" aria-label="{{ __('Deployment source') }}" class="mb-5 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-sm">
+                <button type="button" role="tab" aria-selected="{{ $mode === 'image' ? 'true' : 'false' }}" wire:click="$set('mode', 'image')"
+                    @class([
+                        'rounded-lg px-3 py-1.5 font-medium transition',
+                        'bg-white text-slate-900 shadow-sm' => $mode === 'image',
+                        'text-slate-600 hover:text-slate-900' => $mode !== 'image',
+                    ])>{{ __('Container image') }}</button>
+                <button type="button" role="tab" aria-selected="{{ $mode === 'source' ? 'true' : 'false' }}" wire:click="$set('mode', 'source')"
+                    @class([
+                        'rounded-lg px-3 py-1.5 font-medium transition',
+                        'bg-white text-slate-900 shadow-sm' => $mode === 'source',
+                        'text-slate-600 hover:text-slate-900' => $mode !== 'source',
+                    ])>{{ __('Deploy from source') }}</button>
+            </div>
+
             <div class="space-y-4">
                 <div>
                     <x-input-label for="name" :value="__('App name')" />
                     <x-text-input id="name" wire:model="name" type="text" class="mt-1 block w-full" required placeholder="acme-api" />
                     <x-input-error :messages="$errors->get('name')" class="mt-2" />
                 </div>
-                <div>
-                    <x-input-label for="image" :value="__('Container image')" />
-                    <x-text-input id="image" wire:model="image" type="text" class="mt-1 block w-full" required placeholder="ghcr.io/acme/api:v1.2.3" />
-                    <p class="mt-1 text-xs text-slate-500">{{ __('Public registry images work out of the box. For private images, connect a registry credential first.') }}</p>
-                    <x-input-error :messages="$errors->get('image')" class="mt-2" />
-                </div>
+                @if ($mode === 'source')
+                    <div>
+                        <x-input-label for="repo" :value="__('GitHub repo')" />
+                        <x-text-input id="repo" wire:model="repo" type="text" class="mt-1 block w-full font-mono" required placeholder="acme/api" />
+                        <p class="mt-1 text-xs text-slate-500">{{ __('owner/name or full GitHub URL. The backend pulls and builds it for you.') }}</p>
+                        <x-input-error :messages="$errors->get('repo')" class="mt-2" />
+                    </div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <x-input-label for="branch" :value="__('Branch')" />
+                            <x-text-input id="branch" wire:model="branch" type="text" class="mt-1 block w-full font-mono" required placeholder="main" />
+                            <x-input-error :messages="$errors->get('branch')" class="mt-2" />
+                        </div>
+                        <div>
+                            <x-input-label for="dockerfile_path" :value="__('Dockerfile path (optional)')" />
+                            <x-text-input id="dockerfile_path" wire:model="dockerfile_path" type="text" class="mt-1 block w-full font-mono" placeholder="Dockerfile" />
+                            <p class="mt-1 text-xs text-slate-500">{{ __('Leave blank for buildpack auto-detection.') }}</p>
+                        </div>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" wire:model="deploy_on_push" class="rounded border-slate-300">
+                        {{ __('Auto-deploy on push to this branch') }}
+                    </label>
+                @else
+                    <div>
+                        <x-input-label for="image" :value="__('Container image')" />
+                        <x-text-input id="image" wire:model="image" type="text" class="mt-1 block w-full" required placeholder="ghcr.io/acme/api:v1.2.3" />
+                        <p class="mt-1 text-xs text-slate-500">{{ __('Public registry images work out of the box. For private images, connect a registry credential first.') }}</p>
+                        <x-input-error :messages="$errors->get('image')" class="mt-2" />
+                    </div>
+                @endif
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <x-input-label for="port" :value="__('HTTP port')" />

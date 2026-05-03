@@ -31,6 +31,61 @@ class AwsAppRunnerBackend implements EdgeBackend
         ];
     }
 
+    public function provisionFromSource(Site $site, ProviderCredential $credential): array
+    {
+        $source = $this->sourceSpec($site);
+        $connectionArn = $this->connectionArn($credential);
+
+        $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
+        $result = $service->createServiceFromSource(
+            serviceName: $this->backendServiceName($site),
+            repositoryUrl: $source['repository_url'],
+            branch: $source['branch'],
+            connectionArn: $connectionArn,
+            port: (int) ($site->container_port ?: 8080),
+            envVars: $this->siteEnvVars($site),
+            dockerfilePath: $source['dockerfile_path'],
+            autoDeploy: $source['deploy_on_push'],
+        );
+
+        return [
+            'backend_id' => $result['service_arn'],
+            'live_url' => $result['service_url'],
+        ];
+    }
+
+    /**
+     * @return array{repository_url: string, branch: string, dockerfile_path: ?string, deploy_on_push: bool}
+     */
+    private function sourceSpec(Site $site): array
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $source = $meta['container']['source'] ?? [];
+        if (! is_array($source) || ! is_string($source['repo'] ?? null) || $source['repo'] === '') {
+            throw new \RuntimeException('Site has no container source spec recorded — cannot provision from source.');
+        }
+
+        $repo = (string) $source['repo'];
+        $repositoryUrl = str_starts_with($repo, 'http') ? $repo : 'https://github.com/'.$repo;
+
+        return [
+            'repository_url' => $repositoryUrl,
+            'branch' => is_string($source['branch'] ?? null) && $source['branch'] !== '' ? (string) $source['branch'] : 'main',
+            'dockerfile_path' => is_string($source['dockerfile_path'] ?? null) && $source['dockerfile_path'] !== '' ? (string) $source['dockerfile_path'] : null,
+            'deploy_on_push' => (bool) ($source['deploy_on_push'] ?? true),
+        ];
+    }
+
+    private function connectionArn(ProviderCredential $credential): string
+    {
+        $arn = $credential->credentials['github_connection_arn'] ?? null;
+        if (! is_string($arn) || $arn === '') {
+            throw new \RuntimeException('AWS App Runner credential has no github_connection_arn — connect a GitHub App in App Runner first.');
+        }
+
+        return $arn;
+    }
+
     public function redeploy(Site $site, ProviderCredential $credential): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

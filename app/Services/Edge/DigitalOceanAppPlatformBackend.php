@@ -34,6 +34,47 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         ];
     }
 
+    public function provisionFromSource(Site $site, ProviderCredential $credential): array
+    {
+        $service = new DigitalOceanAppPlatformService($credential);
+        $source = $this->sourceSpec($site);
+
+        $result = $service->createAppFromSource(
+            appName: $this->backendAppName($site),
+            region: $site->container_region ?: 'nyc',
+            repo: $source['repo'],
+            branch: $source['branch'],
+            port: (int) ($site->container_port ?: 8080),
+            deployOnPush: $source['deploy_on_push'],
+            dockerfilePath: $source['dockerfile_path'],
+            envVars: $this->siteEnvVars($site),
+        );
+
+        return [
+            'backend_id' => $result['id'],
+            'live_url' => $result['default_ingress'],
+        ];
+    }
+
+    /**
+     * @return array{repo: string, branch: string, dockerfile_path: ?string, deploy_on_push: bool}
+     */
+    private function sourceSpec(Site $site): array
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $source = $meta['container']['source'] ?? [];
+        if (! is_array($source) || ! is_string($source['repo'] ?? null) || $source['repo'] === '') {
+            throw new \RuntimeException('Site has no container source spec recorded — cannot provision from source.');
+        }
+
+        return [
+            'repo' => (string) $source['repo'],
+            'branch' => is_string($source['branch'] ?? null) && $source['branch'] !== '' ? (string) $source['branch'] : 'main',
+            'dockerfile_path' => is_string($source['dockerfile_path'] ?? null) && $source['dockerfile_path'] !== '' ? (string) $source['dockerfile_path'] : null,
+            'deploy_on_push' => (bool) ($source['deploy_on_push'] ?? true),
+        ];
+    }
+
     public function redeploy(Site $site, ProviderCredential $credential): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

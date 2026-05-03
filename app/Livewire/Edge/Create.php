@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Edge;
 
 use App\Actions\Edge\CreateEdgeSite;
+use App\Actions\Edge\CreateEdgeSiteFromSource;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
 use App\Services\Edge\AwsAppRunnerBackend;
@@ -25,9 +26,25 @@ class Create extends Component
     #[Url]
     public string $backend = 'auto';
 
+    /**
+     * 'image' = pre-built image (the existing flow). 'source' = give
+     * us a GitHub repo and the backend handles build + deploy +
+     * auto-redeploy on push (the Vercel-shape flow).
+     */
+    #[Url]
+    public string $mode = 'image';
+
     public string $name = '';
 
     public string $image = '';
+
+    public string $repo = '';
+
+    public string $branch = 'main';
+
+    public string $dockerfile_path = '';
+
+    public bool $deploy_on_push = true;
 
     public int $port = 8080;
 
@@ -37,14 +54,24 @@ class Create extends Component
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => ['required', 'string', 'max:80'],
-            'image' => ['required', 'string', 'max:500'],
             'port' => ['required', 'integer', 'min:1', 'max:65535'],
             'region' => ['required', 'string', 'max:50'],
             'backend' => ['required', 'in:auto,digitalocean_app_platform,aws_app_runner'],
+            'mode' => ['required', 'in:image,source'],
             'env_file_content' => ['nullable', 'string', 'max:20000'],
         ];
+
+        if ($this->mode === 'source') {
+            $rules['repo'] = ['required', 'string', 'max:200'];
+            $rules['branch'] = ['required', 'string', 'max:120'];
+            $rules['dockerfile_path'] = ['nullable', 'string', 'max:200'];
+        } else {
+            $rules['image'] = ['required', 'string', 'max:500'];
+        }
+
+        return $rules;
     }
 
     public function mount(): void
@@ -80,14 +107,26 @@ class Create extends Component
         $this->validate();
 
         try {
-            $site = (new CreateEdgeSite)->handle(auth()->user(), $org, [
-                'name' => $this->name,
-                'image' => $this->image,
-                'port' => $this->port,
-                'region' => $this->region,
-                'backend' => $this->backend,
-                'env_file_content' => $this->env_file_content,
-            ]);
+            $site = $this->mode === 'source'
+                ? (new CreateEdgeSiteFromSource)->handle(auth()->user(), $org, [
+                    'name' => $this->name,
+                    'repo' => $this->repo,
+                    'branch' => $this->branch,
+                    'dockerfile_path' => $this->dockerfile_path,
+                    'deploy_on_push' => $this->deploy_on_push,
+                    'port' => $this->port,
+                    'region' => $this->region,
+                    'backend' => $this->backend,
+                    'env_file_content' => $this->env_file_content,
+                ])
+                : (new CreateEdgeSite)->handle(auth()->user(), $org, [
+                    'name' => $this->name,
+                    'image' => $this->image,
+                    'port' => $this->port,
+                    'region' => $this->region,
+                    'backend' => $this->backend,
+                    'env_file_content' => $this->env_file_content,
+                ]);
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
 
