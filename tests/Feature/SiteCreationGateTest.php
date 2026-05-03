@@ -151,6 +151,7 @@ class SiteCreationGateTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'php_version' => '8.3',
+            'status' => Site::STATUS_NGINX_ACTIVE,
             'meta' => [
                 'php_runtime' => [
                     'memory_limit' => '512M',
@@ -162,7 +163,7 @@ class SiteCreationGateTest extends TestCase
 
         $this->actingInOrg($user, $org);
 
-        $response = $this->get(route('sites.show', [$server, $site]));
+        $response = $this->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']));
 
         $response->assertOk()
             ->assertSee('PHP')

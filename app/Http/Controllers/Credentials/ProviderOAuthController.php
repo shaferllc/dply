@@ -95,7 +95,7 @@ class ProviderOAuthController extends Controller
         $organizationId = $payload['organization_id'] ?? null;
         $issuedAt = $payload['issued_at'] ?? 0;
 
-        if ((! is_int($userId) && ! (is_string($userId) && ctype_digit($userId)))
+        if ((! is_int($userId) && ! (is_string($userId) && $userId !== ''))
             || ! is_string($organizationId) || $organizationId === ''
             || (! is_int($issuedAt) && ! (is_string($issuedAt) && ctype_digit($issuedAt)))) {
             return redirect()
@@ -103,7 +103,6 @@ class ProviderOAuthController extends Controller
                 ->with('error', __('Invalid or expired OAuth state. Please try again.'));
         }
 
-        $userId = (int) $userId;
         $issuedAt = (int) $issuedAt;
 
         if (now()->timestamp - $issuedAt > 900) {
@@ -113,7 +112,7 @@ class ProviderOAuthController extends Controller
         }
 
         $user = $request->user();
-        if (! $user || $user->id !== $userId) {
+        if (! $user || (string) $user->id !== (string) $userId) {
             return redirect()
                 ->route('login')
                 ->with('error', __('Your session changed during sign-in. Please sign in and connect again.'));

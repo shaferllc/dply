@@ -209,6 +209,18 @@
                 </div>
             @endif
 
+            @if (is_array($sitePhpData) && $site->type === \App\Enums\SiteType::Php && ! empty($sitePhpData['mismatch_version']))
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p class="font-medium">{{ __('PHP version mismatch') }}</p>
+                    <p class="mt-1 text-amber-800">{{ __('This site references PHP :version, but that version is not currently installed on this server.', ['version' => $sitePhpData['mismatch_version']]) }}</p>
+                    <p class="mt-2">
+                        <a href="{{ $sitePhpData['server_php_workspace_url'] }}" wire:navigate class="font-medium text-amber-900 underline">
+                            {{ __('Install or switch versions on the server PHP page') }}
+                        </a>
+                    </p>
+                </div>
+            @endif
+
             @if (! $readyForWorkspace)
                 <div class="space-y-6" wire:poll.5s="pollProvisioningStatus">
                     <div class="overflow-hidden rounded-[1.75rem] border {{ $provisioningState === 'failed' ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-white' }} shadow-sm">
