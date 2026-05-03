@@ -5,6 +5,7 @@ use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\EdgeDeployWebhookController;
+use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
@@ -108,6 +109,10 @@ Route::match(['post', 'options'], '/hooks/sites/{site}/deploy', SiteDeployWebhoo
 Route::match(['post', 'options'], '/hooks/edge/{site}/redeploy', EdgeDeployWebhookController::class)
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.edge.redeploy');
+
+Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhookController::class)
+    ->middleware(['throttle:site-webhook'])
+    ->name('hooks.edge.github');
 
 Route::get('/', function () {
     return view('welcome');
