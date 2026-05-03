@@ -36,6 +36,14 @@ trait ManagesContainerSite
      */
     public ?array $container_logs_result = null;
 
+    /**
+     * Populated by fetchContainerDeployments(); list of normalized
+     * deployment rows: { id, phase, started_at, finished_at, cause }.
+     *
+     * @var list<array<string, ?string>>|null
+     */
+    public ?array $container_deployments_result = null;
+
     public function bootManagesContainerSite(): void
     {
         if ($this->container_image_input === '' && isset($this->site)) {
@@ -222,6 +230,31 @@ trait ManagesContainerSite
                 'url' => null,
                 'message' => __('Failed to fetch logs: :err', ['err' => $e->getMessage()]),
             ];
+        }
+    }
+
+    public function fetchContainerDeployments(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('view', $this->site);
+
+        $backend = EdgeRouter::backendFor($this->site);
+        $credential = EdgeRouter::credentialFor($this->site);
+        if ($backend === null || $credential === null) {
+            $this->container_deployments_result = [];
+
+            return;
+        }
+
+        try {
+            $this->container_deployments_result = $backend->recentDeployments($this->site, $credential, 10);
+        } catch (\Throwable $e) {
+            $this->container_deployments_result = [];
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Failed to fetch deployments: :err', ['err' => $e->getMessage()]));
+            }
         }
     }
 

@@ -295,6 +295,50 @@
         @endif
     </div>
 
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Recent deployments') }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ __('Live history pulled from the backend on demand.') }}</p>
+            </div>
+            <button type="button" wire:click="fetchContainerDeployments" wire:loading.attr="disabled" wire:target="fetchContainerDeployments" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+                <span wire:loading.remove wire:target="fetchContainerDeployments">{{ __('Fetch deployments') }}</span>
+                <span wire:loading wire:target="fetchContainerDeployments">{{ __('Fetching…') }}</span>
+            </button>
+        </div>
+        @if (is_array($container_deployments_result))
+            @if ($container_deployments_result === [])
+                <p class="mt-3 text-xs text-slate-500">{{ __('No deployments returned by backend.') }}</p>
+            @else
+                <ul class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 text-xs">
+                    @foreach ($container_deployments_result as $deployment)
+                        @php
+                            $depPhase = (string) ($deployment['phase'] ?? 'UNKNOWN');
+                            $depPhaseClass = match ($depPhase) {
+                                'ACTIVE' => 'bg-emerald-100 text-emerald-800',
+                                'BUILDING', 'DEPLOYING' => 'bg-sky-100 text-sky-800',
+                                'ERROR', 'FAILED' => 'bg-rose-100 text-rose-800',
+                                'SUPERSEDED' => 'bg-slate-100 text-slate-700',
+                                default => 'bg-slate-100 text-slate-700',
+                            };
+                        @endphp
+                        <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+                            <div class="min-w-0 flex-1">
+                                <p class="font-mono text-[11px] text-slate-900">{{ substr((string) ($deployment['id'] ?? '—'), 0, 12) }}</p>
+                                @if ($deployment['started_at'] ?? null)
+                                    <p class="mt-0.5 text-[10px] text-slate-500">{{ __('Started :at', ['at' => $deployment['started_at']]) }}{{ ($deployment['cause'] ?? null) ? ' · '.$deployment['cause'] : '' }}</p>
+                                @endif
+                            </div>
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $depPhaseClass }}">
+                                {{ str_replace('_', ' ', $depPhase) }}
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        @endif
+    </div>
+
     @php
         $activity = \App\Support\Edge\ContainerActivityTimeline::for($site);
     @endphp
