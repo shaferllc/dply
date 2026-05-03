@@ -1177,6 +1177,33 @@ APACHE,
         // hits its `timeout 120s` cap on small/remote/ARM hosts (Docker-on-macOS, Hetzner ARM,
         // etc.), reporting "Error: Timeout was reached" with no real problem to retry against.
         // The curl fetch below is single-URL, has its own retries, and is ~10x faster.
+        //
+        // The apt-get update is wrapped in a retry-with-verify loop because
+        // ppa.launchpadcontent.net regularly times out under network blips.
+        // When that happens, apt prints "Failed to fetch ... InRelease",
+        // returns 0 (since the main Ubuntu mirrors succeeded), and the
+        // downstream php8.4-* install bombs with "Unable to locate package".
+        // We loop apt-get update up to 4× and verify the ondrej list is
+        // actually present in apt-cache policy output before declaring done.
+        $aptUpdateWithRetry = implode("\n", [
+            'success=0',
+            'for attempt in 1 2 3 4; do',
+            '  echo "[dply] apt-get update attempt $attempt/4 (refreshing ondrej/php sources)..."',
+            '  timeout 300s apt-get update -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 || true',
+            '  if apt-cache policy 2>/dev/null | grep -q "ppa.launchpadcontent.net/ondrej/php"; then',
+            '    echo "[dply] ondrej/php apt cache populated."',
+            '    success=1; break',
+            '  fi',
+            '  echo "[dply] ondrej/php sources not visible to apt yet — sleeping 15s before retry."',
+            '  sleep 15',
+            'done',
+            'if [ "$success" -ne 1 ]; then',
+            '  echo "[dply] ERROR: ondrej/php repo unreachable after 4 retries. Likely a transient PPA outage." >&2',
+            '  echo "[dply] Run \'curl -I https://ppa.launchpadcontent.net\' on the host to diagnose." >&2',
+            '  exit 1',
+            'fi',
+        ]);
+
         $setupRepo = implode(' && ', [
             'install -d -m 0755 /etc/apt/keyrings',
             'curl -fsSL --retry 3 --retry-delay 2 --max-time 60 '
@@ -1185,8 +1212,8 @@ APACHE,
             'chmod 0644 /etc/apt/keyrings/ondrej-php.gpg',
             'echo "deb [signed-by=/etc/apt/keyrings/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu $(lsb_release -cs) main" '
                 .'> /etc/apt/sources.list.d/ondrej-php.list',
-            'timeout 300s apt-get update -y',
         ]);
+        $setupRepo .= ' && '.$aptUpdateWithRetry;
 
         if ($this->forceReinstall()) {
             return [$setupRepo];
