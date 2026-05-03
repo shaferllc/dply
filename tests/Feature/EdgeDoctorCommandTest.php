@@ -168,6 +168,47 @@ class EdgeDoctorCommandTest extends TestCase
         $this->assertTrue($drift->contains(fn ($d) => str_contains($d, 'connection reset')));
     }
 
+    public function test_source_mode_site_reports_repo_and_branch(): void
+    {
+        [$user, $org] = $this->scaffold();
+        ProviderCredential::query()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'digitalocean_app_platform',
+            'name' => 'DO',
+            'credentials' => ['api_token' => 't'],
+        ]);
+        $site = $this->makeContainerSite($user, $org, [
+            'name' => 'Built API',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'container_image' => null,
+            'meta' => [
+                'container' => [
+                    'backend_id' => 'do-app-src',
+                    'live_url' => 'https://built.ondigitalocean.app',
+                    'source' => [
+                        'repo' => 'acme/built',
+                        'branch' => 'main',
+                        'dockerfile_path' => 'Dockerfile',
+                        'deploy_on_push' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        Artisan::call('dply:edge:doctor', [
+            'site' => $site->name,
+            '--json' => true,
+        ]);
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertSame('source', $payload['mode']);
+        $this->assertSame('acme/built', $payload['source']['repo']);
+        $this->assertSame('main', $payload['source']['branch']);
+        $this->assertSame('Dockerfile', $payload['source']['dockerfile_path']);
+        $this->assertTrue($payload['source']['deploy_on_push']);
+    }
+
     public function test_timeline_is_newest_first_and_includes_domains(): void
     {
         [$user, $org] = $this->scaffold();

@@ -160,10 +160,17 @@ class EdgeDoctorCommand extends Command
                 'name' => $credential->name,
                 'provider' => $credential->provider,
             ],
+            'mode' => is_array($container['source'] ?? null) ? 'source' : 'image',
             'image' => [
                 'current' => $site->container_image,
                 'port' => $site->container_port,
             ],
+            'source' => is_array($container['source'] ?? null) ? [
+                'repo' => $container['source']['repo'] ?? null,
+                'branch' => $container['source']['branch'] ?? null,
+                'dockerfile_path' => $container['source']['dockerfile_path'] ?? null,
+                'deploy_on_push' => $container['source']['deploy_on_push'] ?? null,
+            ] : null,
             'live' => [
                 'url' => $liveUrl,
                 'last_phase' => is_string($container['last_phase'] ?? null) ? $container['last_phase'] : null,
@@ -205,9 +212,18 @@ class EdgeDoctorCommand extends Command
         }
 
         $this->newLine();
-        $this->line('<fg=cyan>Image</>');
-        $this->line(sprintf('  %-14s %s', 'image', $r['image']['current'] ?? '—'));
-        $this->line(sprintf('  %-14s %s', 'port', $r['image']['port'] ?? '—'));
+        if (($r['mode'] ?? 'image') === 'source' && is_array($r['source'] ?? null)) {
+            $this->line('<fg=cyan>Source (build on backend)</>');
+            $this->line(sprintf('  %-14s %s', 'repo', $r['source']['repo'] ?? '—'));
+            $this->line(sprintf('  %-14s %s', 'branch', $r['source']['branch'] ?? '—'));
+            $this->line(sprintf('  %-14s %s', 'dockerfile', $r['source']['dockerfile_path'] ?? '<fg=gray>auto-detect</>'));
+            $this->line(sprintf('  %-14s %s', 'auto-deploy', ($r['source']['deploy_on_push'] ?? true) ? 'on push' : 'manual only'));
+            $this->line(sprintf('  %-14s %s', 'port', $r['image']['port'] ?? '—'));
+        } else {
+            $this->line('<fg=cyan>Image</>');
+            $this->line(sprintf('  %-14s %s', 'image', $r['image']['current'] ?? '—'));
+            $this->line(sprintf('  %-14s %s', 'port', $r['image']['port'] ?? '—'));
+        }
 
         $this->newLine();
         $this->line('<fg=cyan>Live</>');

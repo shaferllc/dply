@@ -1,5 +1,7 @@
 @php
     $containerMeta = is_array($site->meta['container'] ?? null) ? $site->meta['container'] : [];
+    $sourceSpec = is_array($containerMeta['source'] ?? null) ? $containerMeta['source'] : null;
+    $isSourceMode = $sourceSpec !== null;
     $liveUrl = $site->containerLiveUrl();
     $backendLabel = match ($site->container_backend) {
         'digitalocean_app_platform' => 'DigitalOcean App Platform',
@@ -25,7 +27,13 @@
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Dply edge') }}</p>
             <h2 class="mt-1 text-lg font-semibold text-slate-900">{{ __('Container deployment') }}</h2>
-            <p class="mt-1 text-sm text-slate-600">{{ __('This site runs as a container on a managed backend. Roll out a new image tag or tear it down here.') }}</p>
+            <p class="mt-1 text-sm text-slate-600">
+                @if ($isSourceMode)
+                    {{ __('This site runs from a GitHub repo. The backend builds + deploys on every push to the chosen branch.') }}
+                @else
+                    {{ __('This site runs as a container on a managed backend. Roll out a new image tag or tear it down here.') }}
+                @endif
+            </p>
         </div>
         <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ $statusBadgeClass }}">
             {{ $statusLabel }}
@@ -67,22 +75,63 @@
         </div>
     </dl>
 
-    <div class="rounded-xl border border-slate-200 bg-white p-4">
-        <label for="container_image_input" class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Image reference') }}</label>
-        <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <input id="container_image_input" wire:model="container_image_input" type="text" class="block w-full rounded-md border-slate-300 font-mono text-sm shadow-sm" placeholder="ghcr.io/acme/api:v1.2.3" />
-            <button type="button" wire:click="redeployContainer" wire:loading.attr="disabled" wire:target="redeployContainer" class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-800 disabled:opacity-50">
-                <span wire:loading.remove wire:target="redeployContainer">{{ __('Redeploy') }}</span>
-                <span wire:loading wire:target="redeployContainer">{{ __('Queueing…') }}</span>
-            </button>
+    @if ($isSourceMode)
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Source') }}</p>
+            <dl class="mt-2 grid gap-3 sm:grid-cols-2">
+                <div>
+                    <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Repository') }}</dt>
+                    <dd class="mt-1 break-all font-mono text-xs text-slate-900">
+                        <a href="https://github.com/{{ $sourceSpec['repo'] ?? '' }}" target="_blank" rel="noopener" class="text-sky-700 hover:underline">{{ $sourceSpec['repo'] ?? '—' }}</a>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Branch') }}</dt>
+                    <dd class="mt-1 font-mono text-xs text-slate-900">{{ $sourceSpec['branch'] ?? 'main' }}</dd>
+                </div>
+                @if (! empty($sourceSpec['dockerfile_path']))
+                    <div>
+                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Dockerfile') }}</dt>
+                        <dd class="mt-1 font-mono text-xs text-slate-900">{{ $sourceSpec['dockerfile_path'] }}</dd>
+                    </div>
+                @endif
+                <div>
+                    <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Auto-deploy on push') }}</dt>
+                    <dd class="mt-1 text-xs">
+                        @if (! array_key_exists('deploy_on_push', $sourceSpec) || $sourceSpec['deploy_on_push'])
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ __('Enabled') }}</span>
+                        @else
+                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">{{ __('Disabled') }}</span>
+                        @endif
+                    </dd>
+                </div>
+            </dl>
+            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs text-slate-500">{{ __('Push to the branch above to trigger a build and deploy. Or manually re-roll the latest commit:') }}</p>
+                <button type="button" wire:click="redeployContainer" wire:loading.attr="disabled" wire:target="redeployContainer" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="redeployContainer">{{ __('Redeploy from latest') }}</span>
+                    <span wire:loading wire:target="redeployContainer">{{ __('Queueing…') }}</span>
+                </button>
+            </div>
         </div>
-        <p class="mt-2 text-xs text-slate-500">{{ __('Update the tag and click Redeploy to roll a new revision. Leave the tag the same to just re-pull.') }}</p>
-    </div>
+    @else
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <label for="container_image_input" class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Image reference') }}</label>
+            <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input id="container_image_input" wire:model="container_image_input" type="text" class="block w-full rounded-md border-slate-300 font-mono text-sm shadow-sm" placeholder="ghcr.io/acme/api:v1.2.3" />
+                <button type="button" wire:click="redeployContainer" wire:loading.attr="disabled" wire:target="redeployContainer" class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-800 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="redeployContainer">{{ __('Redeploy') }}</span>
+                    <span wire:loading wire:target="redeployContainer">{{ __('Queueing…') }}</span>
+                </button>
+            </div>
+            <p class="mt-2 text-xs text-slate-500">{{ __('Update the tag and click Redeploy to roll a new revision. Leave the tag the same to just re-pull.') }}</p>
+        </div>
+    @endif
 
     @php
         $imageHistory = is_array($containerMeta['image_history'] ?? null) ? array_reverse($containerMeta['image_history']) : [];
     @endphp
-    @if (count($imageHistory) > 1)
+    @if (! $isSourceMode && count($imageHistory) > 1)
         <div class="rounded-xl border border-slate-200 bg-white p-4">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Image history') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('Click Roll back to redeploy a previous image tag. The current tag is highlighted.') }}</p>

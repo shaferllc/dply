@@ -58,12 +58,20 @@ class EdgeListCommand extends Command
         $sites = $query->get();
 
         $rows = $sites->map(function (Site $site): array {
+            $meta = is_array($site->meta) ? $site->meta : [];
+            $source = is_array($meta['container']['source'] ?? null) ? $meta['container']['source'] : null;
+            $sourceLabel = $source !== null
+                ? sprintf('%s@%s', (string) ($source['repo'] ?? '?'), (string) ($source['branch'] ?? 'main'))
+                : null;
+
             return [
                 'site' => $site->name,
                 'organization' => $site->organization?->name ?? '—',
                 'backend' => $site->container_backend ?? '—',
                 'region' => $site->container_region ?? '—',
-                'image' => $site->container_image ?? '—',
+                'mode' => $source !== null ? 'source' : 'image',
+                'image' => $site->container_image,
+                'source' => $sourceLabel,
                 'status' => $site->status,
                 'live_url' => $site->containerLiveUrl(),
             ];
@@ -89,13 +97,14 @@ class EdgeListCommand extends Command
         $this->newLine();
 
         $this->table(
-            ['site', 'organization', 'backend', 'region', 'image', 'status', 'live url'],
+            ['site', 'organization', 'backend', 'region', 'mode', 'image / source', 'status', 'live url'],
             array_map(fn (array $r): array => [
                 $r['site'],
                 $r['organization'],
                 $r['backend'],
                 $r['region'],
-                $r['image'],
+                $r['mode'],
+                $r['mode'] === 'source' ? ($r['source'] ?? '—') : ($r['image'] ?? '—'),
                 $r['status'],
                 $r['live_url'] ?? '—',
             ], $rows),

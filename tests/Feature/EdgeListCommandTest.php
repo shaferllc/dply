@@ -72,6 +72,43 @@ class EdgeListCommandTest extends TestCase
         $this->assertStringContainsString('Unknown --status', Artisan::output());
     }
 
+    public function test_source_mode_site_shows_source_label_in_json(): void
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Source Site',
+            'type' => SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'meta' => [
+                'container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']],
+            ],
+        ]);
+
+        Artisan::call('dply:edge:list', ['--json' => true]);
+        $payload = json_decode(Artisan::output(), true);
+
+        $this->assertSame('source', $payload['sites'][0]['mode']);
+        $this->assertSame('acme/api@main', $payload['sites'][0]['source']);
+        $this->assertNull($payload['sites'][0]['image']);
+    }
+
     public function test_empty_fleet_message(): void
     {
         $exit = Artisan::call('dply:edge:list');

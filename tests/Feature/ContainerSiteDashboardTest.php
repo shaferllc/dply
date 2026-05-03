@@ -135,6 +135,47 @@ class ContainerSiteDashboardTest extends TestCase
             ->assertDontSee('Container deployment');
     }
 
+    public function test_source_mode_dashboard_shows_repo_branch_not_image_input(): void
+    {
+        [$user, $server, $site] = $this->makeContainerSite();
+        $site->update([
+            'container_image' => null,
+            'meta' => [
+                'container' => [
+                    'source' => [
+                        'repo' => 'acme/api',
+                        'branch' => 'main',
+                        'dockerfile_path' => 'docker/Dockerfile',
+                        'deploy_on_push' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site]));
+
+        $response->assertOk()
+            ->assertSee('Container deployment')
+            ->assertSee('Source')
+            ->assertSee('acme/api')
+            ->assertSee('docker/Dockerfile')
+            ->assertSee('Auto-deploy on push')
+            ->assertSee('Redeploy from latest')
+            ->assertDontSee('Image reference');
+    }
+
+    public function test_image_mode_dashboard_still_shows_image_input(): void
+    {
+        [$user, $server, $site] = $this->makeContainerSite();
+
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site]));
+
+        $response->assertOk()
+            ->assertSee('Image reference')
+            ->assertSee('ghcr.io/acme/api:v1')
+            ->assertDontSee('Auto-deploy on push');
+    }
+
     /**
      * @return array{0: User, 1: Server, 2: Site}
      */
