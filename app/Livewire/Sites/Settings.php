@@ -7,6 +7,7 @@ use App\Jobs\DeleteServerSystemUserJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SiteSystemUserMutationJob;
+use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
@@ -45,6 +46,7 @@ use Illuminate\Validation\Rule;
 
 class Settings extends Show
 {
+    use ManagesContainerSite;
     use StreamsRemoteSshLivewire;
 
     private const ROUTING_TABS = ['domains', 'aliases', 'redirects', 'preview', 'tenants'];

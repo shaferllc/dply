@@ -194,6 +194,10 @@
 
             <main class="min-w-0 space-y-6 lg:col-span-9">
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
+                    @if ($section === 'general' && $site->usesContainerRuntime())
+                        @include('livewire.sites.partials.container-dashboard')
+                    @endif
+
                     @if ($section === 'general')
                         <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <form wire:submit="saveGeneralSettings">

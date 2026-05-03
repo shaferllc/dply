@@ -584,6 +584,9 @@ class Site extends Model
                 self::STATUS_DOCKER_CONFIGURED,
                 self::STATUS_KUBERNETES_CONFIGURED,
                 self::STATUS_FUNCTIONS_CONFIGURED,
+                self::STATUS_CONTAINER_PROVISIONING,
+                self::STATUS_CONTAINER_ACTIVE,
+                self::STATUS_CONTAINER_FAILED,
             ], true);
     }
 
@@ -1463,8 +1466,14 @@ class Site extends Model
     public function effectiveRepositoryPath(): string
     {
         $path = $this->repository_path;
+        if ($path !== null && $path !== '') {
+            return $path;
+        }
 
-        return $path !== null && $path !== '' ? $path : $this->document_root;
+        // Container sites have neither a repo path nor a document
+        // root — return a stable placeholder so callers that derive
+        // sub-paths (basic-auth dir, etc.) can still build strings.
+        return $this->document_root ?? '/var/www/'.($this->slug ?: 'site');
     }
 
     /**
