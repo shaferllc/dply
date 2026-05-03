@@ -1,4 +1,5 @@
 <div class="mx-auto max-w-6xl px-6 py-10">
+    @include('livewire.fleet._tabs')
     <header class="mb-6 border-b border-slate-200 pb-4">
         <h1 class="text-2xl font-semibold text-slate-900">{{ __('Fleet deploys') }}</h1>
         <p class="mt-1 text-sm text-slate-600">{{ __('In-flight, failed, and stagnant deploy activity across the fleet.') }}</p>

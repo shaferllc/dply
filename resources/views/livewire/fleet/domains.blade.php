@@ -1,4 +1,5 @@
 <div class="mx-auto max-w-6xl px-6 py-10">
+    @include('livewire.fleet._tabs')
     <header class="mb-6 border-b border-slate-200 pb-4">
         <h1 class="text-2xl font-semibold text-slate-900">{{ __('Fleet domains') }}</h1>
         <p class="mt-1 text-sm text-slate-600">{{ __('Every hostname attached to a site in this organization. Search to locate where a domain is served.') }}</p>
