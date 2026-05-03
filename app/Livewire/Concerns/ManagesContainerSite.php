@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Jobs\AttachEdgeDomainJob;
+use App\Jobs\DetachEdgeDomainJob;
 use App\Jobs\RedeployEdgeSiteJob;
 use App\Jobs\TeardownEdgeSiteJob;
 
@@ -18,6 +20,8 @@ use App\Jobs\TeardownEdgeSiteJob;
 trait ManagesContainerSite
 {
     public string $container_image_input = '';
+
+    public string $container_domain_input = '';
 
     public function bootManagesContainerSite(): void
     {
@@ -56,6 +60,46 @@ trait ManagesContainerSite
 
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Tear-down queued. The container will be deleted on the backend shortly.'));
+        }
+    }
+
+    public function attachContainerDomain(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $hostname = strtolower(trim($this->container_domain_input));
+        $hostname = preg_replace('#^https?://#', '', (string) $hostname);
+        $hostname = rtrim((string) $hostname, '/');
+        if ($hostname === '' || ! preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i', $hostname)) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Hostname does not look valid.'));
+            }
+
+            return;
+        }
+
+        AttachEdgeDomainJob::dispatch($this->site->id, $hostname);
+        $this->container_domain_input = '';
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Domain attach queued. DNS validation records will appear here shortly.'));
+        }
+    }
+
+    public function detachContainerDomain(string $hostname): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        DetachEdgeDomainJob::dispatch($this->site->id, $hostname);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Domain detach queued.'));
         }
     }
 }

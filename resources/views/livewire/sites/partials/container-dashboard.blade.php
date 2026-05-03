@@ -83,6 +83,47 @@
         <p class="text-xs text-slate-500">{{ __('Last deploy started at :at', ['at' => $containerMeta['last_deploy_started_at']]) }}</p>
     @endif
 
+    @php
+        $attachedDomains = is_array($containerMeta['domains'] ?? null) ? $containerMeta['domains'] : [];
+    @endphp
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Custom domains') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Point your own hostnames at the backend\'s default ingress. Validation records (if any) appear after the attach completes.') }}</p>
+        </div>
+
+        @if ($attachedDomains !== [])
+            <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                @foreach ($attachedDomains as $hostname => $info)
+                    <li class="px-3 py-2 text-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="font-mono text-slate-900 break-all">{{ $hostname }}</span>
+                            <button type="button" wire:click="detachContainerDomain('{{ $hostname }}')" wire:confirm="{{ __('Remove :host from this app?', ['host' => $hostname]) }}" class="text-xs font-medium text-rose-700 hover:text-rose-900">{{ __('Remove') }}</button>
+                        </div>
+                        @if (! empty($info['validation_records']))
+                            <div class="mt-2 space-y-1 rounded-md bg-slate-50 p-2 text-[11px] text-slate-700">
+                                <p class="font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('DNS validation records') }}</p>
+                                @foreach ($info['validation_records'] as $rec)
+                                    <p class="font-mono break-all">{{ $rec['type'] }} <span class="text-slate-500">→</span> {{ $rec['name'] }} <span class="text-slate-500">⇒</span> {{ $rec['value'] }}</p>
+                                @endforeach
+                            </div>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+        @else
+            <p class="text-xs text-slate-500">{{ __('No custom domains attached yet — the app is reachable at its default backend URL.') }}</p>
+        @endif
+
+        <div class="flex flex-col gap-2 sm:flex-row">
+            <input type="text" wire:model="container_domain_input" class="block w-full rounded-md border-slate-300 font-mono text-sm shadow-sm" placeholder="api.example.com" />
+            <button type="button" wire:click="attachContainerDomain" wire:loading.attr="disabled" wire:target="attachContainerDomain" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
+                <span wire:loading.remove wire:target="attachContainerDomain">{{ __('Attach domain') }}</span>
+                <span wire:loading wire:target="attachContainerDomain">{{ __('Queueing…') }}</span>
+            </button>
+        </div>
+    </div>
+
     <div class="flex justify-end border-t border-slate-200 pt-4">
         <button type="button" wire:click="tearDownContainer" wire:confirm="{{ __('Permanently delete the container deployment? The backend resource will be torn down.') }}" class="text-sm font-medium text-rose-700 hover:text-rose-900">
             {{ __('Tear down container') }}

@@ -157,6 +157,53 @@ class DigitalOceanAppPlatformService
     }
 
     /**
+     * Attach a custom domain to an app. DO Apps requires the domain
+     * to be added to the app's spec (not a side-channel domain
+     * resource), so this updates the spec rather than calling a
+     * separate /domains endpoint.
+     *
+     * @param  array<string, mixed>  $existingSpec  Current spec (caller fetches via getApp first)
+     */
+    public function attachDomain(string $appId, array $existingSpec, string $hostname): void
+    {
+        $domains = $existingSpec['domains'] ?? [];
+        if (! is_array($domains)) {
+            $domains = [];
+        }
+        foreach ($domains as $d) {
+            if (is_array($d) && (string) ($d['domain'] ?? '') === $hostname) {
+                return;
+            }
+        }
+        $domains[] = [
+            'domain' => $hostname,
+            'type' => 'PRIMARY',
+        ];
+        $existingSpec['domains'] = $domains;
+
+        $this->updateApp($appId, $existingSpec);
+    }
+
+    /**
+     * @param  array<string, mixed>  $existingSpec
+     */
+    public function detachDomain(string $appId, array $existingSpec, string $hostname): void
+    {
+        $domains = $existingSpec['domains'] ?? [];
+        if (! is_array($domains)) {
+            return;
+        }
+        $filtered = array_values(array_filter($domains, function ($d) use ($hostname): bool {
+            return ! is_array($d) || (string) ($d['domain'] ?? '') !== $hostname;
+        }));
+        if (count($filtered) === count($domains)) {
+            return;
+        }
+        $existingSpec['domains'] = $filtered;
+        $this->updateApp($appId, $existingSpec);
+    }
+
+    /**
      * Reads the API to confirm the token is valid (cheap call —
      * lists apps with a per-page=1 limit). Throws on auth failure
      * so the caller can surface a credential-rejected error.

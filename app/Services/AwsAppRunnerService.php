@@ -169,6 +169,45 @@ class AwsAppRunnerService
     }
 
     /**
+     * Associate a custom domain with an App Runner service. Returns
+     * the DNS validation records the operator must add at their
+     * registrar so AWS can verify ownership and issue the cert.
+     *
+     * @return list<array{name: string, type: string, value: string, status: string}>
+     */
+    public function associateCustomDomain(string $serviceArn, string $hostname): array
+    {
+        $result = $this->client->associateCustomDomain([
+            'ServiceArn' => $serviceArn,
+            'DomainName' => $hostname,
+            'EnableWWWSubdomain' => false,
+        ]);
+
+        $records = [];
+        foreach (($result['CustomDomain']['CertificateValidationRecords'] ?? []) as $r) {
+            if (! is_array($r)) {
+                continue;
+            }
+            $records[] = [
+                'name' => (string) ($r['Name'] ?? ''),
+                'type' => (string) ($r['Type'] ?? ''),
+                'value' => (string) ($r['Value'] ?? ''),
+                'status' => (string) ($r['Status'] ?? ''),
+            ];
+        }
+
+        return $records;
+    }
+
+    public function disassociateCustomDomain(string $serviceArn, string $hostname): void
+    {
+        $this->client->disassociateCustomDomain([
+            'ServiceArn' => $serviceArn,
+            'DomainName' => $hostname,
+        ]);
+    }
+
+    /**
      * Cheap auth probe — listServices is read-only and returns
      * fast even on empty accounts. Throws on auth failure.
      */

@@ -71,4 +71,17 @@ interface EdgeBackend
      * @return list<array{slug: string, label: string}>
      */
     public function regions(): array;
+
+    /**
+     * Attach a custom hostname to the deployed app. Returns any
+     * DNS validation records the operator must publish at their
+     * registrar (App Runner returns CNAME validation records;
+     * DO returns an empty array — DO uses ALIAS / A pointing at
+     * the default ingress and verifies live).
+     *
+     * @return list<array{name: string, type: string, value: string, status: string}>
+     */
+    public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array;
+
+    public function detachDomain(Site $site, ProviderCredential $credential, string $hostname): void;
 }

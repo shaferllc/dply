@@ -102,6 +102,30 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         return DigitalOceanAppPlatformService::getRegions();
     }
 
+    public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return [];
+        }
+        $service = new DigitalOceanAppPlatformService($credential);
+        $current = $service->getApp($site->container_backend_id);
+        $spec = is_array($current['spec'] ?? null) ? $current['spec'] : [];
+        $service->attachDomain($site->container_backend_id, $spec, $hostname);
+
+        return [];
+    }
+
+    public function detachDomain(Site $site, ProviderCredential $credential, string $hostname): void
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return;
+        }
+        $service = new DigitalOceanAppPlatformService($credential);
+        $current = $service->getApp($site->container_backend_id);
+        $spec = is_array($current['spec'] ?? null) ? $current['spec'] : [];
+        $service->detachDomain($site->container_backend_id, $spec, $hostname);
+    }
+
     /**
      * @return array<string, string>
      */

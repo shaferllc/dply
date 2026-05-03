@@ -93,6 +93,29 @@ class AwsAppRunnerBackend implements EdgeBackend
         return AwsAppRunnerService::getRegions();
     }
 
+    public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return [];
+        }
+
+        return (new AwsAppRunnerService($credential, $site->container_region ?: null))
+            ->associateCustomDomain($site->container_backend_id, $hostname);
+    }
+
+    public function detachDomain(Site $site, ProviderCredential $credential, string $hostname): void
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return;
+        }
+        try {
+            (new AwsAppRunnerService($credential, $site->container_region ?: null))
+                ->disassociateCustomDomain($site->container_backend_id, $hostname);
+        } catch (\Throwable) {
+            // Idempotent — already gone is fine.
+        }
+    }
+
     /**
      * @return array<string, string>
      */
