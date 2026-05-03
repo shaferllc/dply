@@ -202,6 +202,8 @@
                 <input type="text" readonly value="{{ $site->edgeGithubHookUrl() }}" class="block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" onclick="this.select()" />
                 <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Content type') }}</span>
                 <code class="rounded bg-slate-100 px-2 py-1 text-xs">application/json</code>
+                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Secret') }}</span>
+                <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site, 'section' => 'notifications']) }}" wire:navigate class="text-xs text-sky-700 hover:underline">{{ __('Open Settings → Webhooks to reveal & rotate the secret') }} →</a>
                 <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Events') }}</span>
                 <span class="text-xs text-slate-700">{{ __('"Pushes" + "Pull requests" (or "Send me everything").') }}</span>
             </div>
