@@ -19,7 +19,7 @@ class SiteDashboardLatestDeployBadgeTest extends TestCase
     public function test_dashboard_shows_last_deploy_badge_when_deployment_exists(): void
     {
         [$user, $server, $site] = $this->makeUserSite();
-        SiteDeployment::query()->create([
+        $deployment = SiteDeployment::query()->create([
             'site_id' => $site->id,
             'project_id' => $site->project_id,
             'idempotency_key' => 'dep-1',
@@ -33,7 +33,19 @@ class SiteDashboardLatestDeployBadgeTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Last deploy')
-            ->assertSee('success');
+            ->assertSee('success')
+            // Badge links to the deployment-detail page now.
+            ->assertSee(route('sites.deployments.show', [
+                'server' => $server,
+                'site' => $site,
+                'deployment' => $deployment,
+            ]), false)
+            // "All deploys" badge links to the deployments index.
+            ->assertSee('All deploys')
+            ->assertSee(route('sites.deployments.index', [
+                'server' => $server,
+                'site' => $site,
+            ]), false);
     }
 
     public function test_dashboard_omits_badge_when_no_deployments(): void

@@ -298,13 +298,16 @@
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($this->latestDeployment !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ $this->latestDeployment->status === 'success' ? 'bg-emerald-100 text-emerald-900' : ($this->latestDeployment->status === 'failed' ? 'bg-rose-100 text-rose-900' : 'bg-slate-100 text-slate-700') }}">
+                                        <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $this->latestDeployment]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] hover:opacity-80 {{ $this->latestDeployment->status === 'success' ? 'bg-emerald-100 text-emerald-900' : ($this->latestDeployment->status === 'failed' ? 'bg-rose-100 text-rose-900' : 'bg-slate-100 text-slate-700') }}" title="{{ __('Open deployment detail') }}">
                                             {{ __('Last deploy') }} · {{ $this->latestDeployment->status }}
                                             @if ($this->latestDeployment->started_at)
                                                 <span class="font-mono text-[10px] opacity-80">{{ $this->latestDeployment->started_at->diffForHumans(null, true) }}</span>
                                             @endif
-                                        </span>
+                                        </a>
                                     @endif
+                                    <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}" wire:navigate class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700 hover:bg-slate-200" title="{{ __('All deployments') }}">
+                                        {{ __('All deploys') }}
+                                    </a>
                                     <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ ($foundationStatus['runtime_drifted'] ?? false) ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800' }}">
                                         {{ ($foundationStatus['runtime_drifted'] ?? false) ? __('Detected') : __('In sync') }}
                                     </span>
