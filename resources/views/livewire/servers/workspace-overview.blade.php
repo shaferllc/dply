@@ -163,6 +163,10 @@
                             <x-heroicon-o-rocket-launch class="h-4 w-4" />
                             {{ __('Open Deploy') }}
                         </a>
+                        <a href="{{ route('servers.deploys', $server) }}" wire:navigate class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:bg-brand-sand/20">
+                            <x-heroicon-o-clock class="h-4 w-4" />
+                            {{ __('Recent deploys') }}
+                        </a>
                         <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:bg-brand-sand/20">
                             <x-heroicon-o-chart-bar class="h-4 w-4" />
                             {{ __('Open Metrics') }}
