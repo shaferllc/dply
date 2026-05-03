@@ -18,17 +18,24 @@ RUN apt-get update \
         systemd systemd-sysv dbus dbus-user-session \
         openssh-server sudo \
         ca-certificates curl gnupg iproute2 lsb-release locales \
- # Match DigitalOcean's ubuntu-24-04-x64 cloud image baseline so a script
- # that runs locally won't bomb on missing utilities the droplet would
- # have shipped with: cron + rsyslog (logging), wget + dnsutils (network
- # debug), unattended-upgrades (DO enables it by default), tzdata + xz-utils
- # + bzip2 (archive helpers commonly used in apt-installable .deb scripts).
- # Without these, dply's bootstrap "just works" on droplets but fails
- # locally with "command not found" on subtle paths.
-        cron rsyslog \
-        wget dnsutils \
-        unattended-upgrades \
-        tzdata xz-utils bzip2 \
+ # ─── DO ubuntu-24-04-x64 cloud-image package set ──────────────────
+ # Mirror the package list a freshly-spun DigitalOcean droplet has on
+ # first boot. Scripts that "just work" on droplets but fail locally
+ # are almost always tripping over one of these missing utilities.
+ # Sourced from a `dpkg --get-selections` dump on a real DO droplet,
+ # trimmed to what the bootstrap script and workspace shells touch.
+        cloud-init cloud-initramfs-growroot cloud-guest-utils \
+        netplan.io netbase ifupdown isc-dhcp-client \
+        cron rsyslog logrotate \
+        wget dnsutils netcat-openbsd telnet \
+        unattended-upgrades update-notifier-common landscape-common \
+        python3 python3-yaml python3-requests python3-apt \
+        software-properties-common \
+        tzdata xz-utils bzip2 unzip zip \
+        less rsync \
+        htop iotop \
+        git vim-tiny nano \
+        man-db manpages \
  # Pre-install common bootstrap deps so they survive `docker compose down && up`.
  # On a real cloud VM the bootstrap installs these and they persist for the life
  # of the box; in our throwaway dev container they get wiped on recreate, which
@@ -39,7 +46,28 @@ RUN apt-get update \
         supervisor \
         fail2ban \
  && rm -rf /var/lib/apt/lists/* \
- && locale-gen en_US.UTF-8
+ && locale-gen en_US.UTF-8 \
+ # DO droplets default the timezone to UTC; do the same so timestamps
+ # in logs (rsyslog, systemd-journal) match what an operator sees on
+ # a real droplet.
+ && ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
+ && echo "Etc/UTC" > /etc/timezone \
+ # DO cloud images ship with /etc/update-motd.d/00-header etc. that
+ # aren't critical, but matching the motd skeleton avoids surprising
+ # operators who SSH in expecting the standard Ubuntu welcome banner.
+ && (printf 'Welcome to Ubuntu 24.04 LTS (dply ssh-dev container)\n\n  This container mirrors DigitalOcean ubuntu-24-04-x64.\n  Local fake-cloud target — not a real droplet.\n\n' > /etc/motd || true)
+
+# DO droplets typically have a non-root sudo user (`ubuntu` on cloud
+# images, sometimes `root`-only). Add a passwordless-sudo `ubuntu`
+# user so scripts that assume `su - ubuntu` or `sudo -u ubuntu`
+# work the same way as on a real droplet. Root SSH still works for
+# the bootstrap path; this is only for parity with cloud images.
+RUN useradd -m -s /bin/bash -G sudo ubuntu \
+ && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-ubuntu \
+ && chmod 0440 /etc/sudoers.d/90-ubuntu \
+ && mkdir -p /home/ubuntu/.ssh \
+ && chmod 700 /home/ubuntu/.ssh \
+ && chown -R ubuntu:ubuntu /home/ubuntu/.ssh
 
 # Pre-install the ondrej/php PPA + PHP 8.4 packages so the bootstrap script's
 # skip-if-already-present checks short-circuit the launchpad fetch path

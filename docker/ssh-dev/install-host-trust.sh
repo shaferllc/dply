@@ -17,6 +17,14 @@ if [ -r /etc/ssh/authorized_keys.pub ]; then
     fi
     install -d -m 700 -o dply -g dply /home/dply/.ssh
     install -m 600 -o dply -g dply /etc/ssh/authorized_keys.pub /home/dply/.ssh/authorized_keys
+
+    # `ubuntu` user is created by the Dockerfile to match DO's cloud
+    # image baseline. Authorize the same key here so operators can
+    # `ssh ubuntu@host` and behave just like a real DO droplet.
+    if id -u ubuntu >/dev/null 2>&1; then
+        install -d -m 700 -o ubuntu -g ubuntu /home/ubuntu/.ssh
+        install -m 600 -o ubuntu -g ubuntu /etc/ssh/authorized_keys.pub /home/ubuntu/.ssh/authorized_keys
+    fi
 fi
 
 if [ -r /usr/local/share/ca-certificates/valet-ca.crt ]; then
