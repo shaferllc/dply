@@ -46,6 +46,7 @@ class Health extends Component
         $successRate = $this->computeSuccessRate($sites->pluck('id'));
         $mostActive = $this->computeMostActive($sites);
         $flyUpsell = $this->computeFlyUpsell($org->id, $sites);
+        $edgeFleet = $this->computeEdgeFleet($org->id);
 
         return view('livewire.fleet.health', [
             'org' => $org,
@@ -56,7 +57,52 @@ class Health extends Component
             'deploys' => $deploys,
             'mostActive' => $mostActive,
             'flyUpsell' => $flyUpsell,
+            'edgeFleet' => $edgeFleet,
         ])->layout('layouts.app');
+    }
+
+    /**
+     * Aggregate stats for edge container sites in the org. Returns
+     * null when the org has no edge sites — the view falls through
+     * to the generic Fly upsell in that case.
+     *
+     * @return array{
+     *     total: int,
+     *     by_backend: array<string, int>,
+     *     by_status: array<string, int>,
+     *     failed_sites: list<array{name: string, server_id: ?string, container_image: ?string}>
+     * }|null
+     */
+    private function computeEdgeFleet(string $organizationId): ?array
+    {
+        $sites = Site::query()
+            ->where('organization_id', $organizationId)
+            ->whereNotNull('container_backend')
+            ->get(['id', 'name', 'server_id', 'container_backend', 'container_image', 'status']);
+
+        if ($sites->isEmpty()) {
+            return null;
+        }
+
+        $byBackend = $sites->groupBy('container_backend')->map->count()->all();
+        $byStatus = $sites->groupBy('status')->map->count()->all();
+
+        $failedSites = $sites
+            ->filter(fn (Site $s) => $s->status === Site::STATUS_CONTAINER_FAILED)
+            ->map(fn (Site $s) => [
+                'name' => $s->name,
+                'server_id' => $s->server_id,
+                'container_image' => $s->container_image,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'total' => $sites->count(),
+            'by_backend' => $byBackend,
+            'by_status' => $byStatus,
+            'failed_sites' => $failedSites,
+        ];
     }
 
     /**

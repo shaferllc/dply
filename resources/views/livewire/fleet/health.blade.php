@@ -125,7 +125,64 @@
         </section>
     @endif
 
-    @if ($flyUpsell)
+    @if ($edgeFleet)
+        <section class="mt-8 rounded-2xl border border-sky-200 bg-sky-50/40 p-5 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">{{ __('Dply edge') }}</p>
+                    <h2 class="mt-1 text-lg font-semibold text-slate-900">
+                        {{ trans_choice('{1} 1 edge container site|[2,*] :count edge container sites', $edgeFleet['total'], ['count' => $edgeFleet['total']]) }}
+                    </h2>
+                </div>
+                <a href="{{ route('edge.index') }}" wire:navigate class="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">
+                    {{ __('Open /edge') }} →
+                </a>
+            </div>
+
+            <dl class="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                @foreach ($edgeFleet['by_backend'] as $backend => $count)
+                    <div class="rounded-xl border border-slate-200 bg-white p-3">
+                        <dt class="font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            {{ $backend === 'digitalocean_app_platform' ? 'DO App Platform' : ($backend === 'aws_app_runner' ? 'AWS App Runner' : $backend) }}
+                        </dt>
+                        <dd class="mt-1 text-lg font-semibold text-slate-900">{{ $count }}</dd>
+                    </div>
+                @endforeach
+                @php
+                    $byStatus = $edgeFleet['by_status'];
+                    $activeCount = $byStatus[\App\Models\Site::STATUS_CONTAINER_ACTIVE] ?? 0;
+                    $provisioningCount = $byStatus[\App\Models\Site::STATUS_CONTAINER_PROVISIONING] ?? 0;
+                    $failedCount = $byStatus[\App\Models\Site::STATUS_CONTAINER_FAILED] ?? 0;
+                @endphp
+                <div class="rounded-xl border border-slate-200 bg-white p-3">
+                    <dt class="font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Active') }}</dt>
+                    <dd class="mt-1 text-lg font-semibold {{ $activeCount > 0 ? 'text-emerald-700' : 'text-slate-400' }}">{{ $activeCount }}</dd>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-3">
+                    <dt class="font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('In flight') }}</dt>
+                    <dd class="mt-1 text-lg font-semibold {{ $provisioningCount > 0 ? 'text-sky-700' : 'text-slate-400' }}">{{ $provisioningCount }}</dd>
+                </div>
+            </dl>
+
+            @if ($edgeFleet['failed_sites'] !== [])
+                <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50/60 p-3 text-xs text-rose-900">
+                    <p class="font-semibold">
+                        {{ trans_choice('{1} 1 edge site failed|[2,*] :count edge sites failed', $failedCount, ['count' => $failedCount]) }}
+                    </p>
+                    <ul class="mt-1 space-y-0.5">
+                        @foreach ($edgeFleet['failed_sites'] as $row)
+                            <li>
+                                <span class="font-medium">{{ $row['name'] }}</span>
+                                @if ($row['container_image'])
+                                    <span class="ml-1 font-mono text-[11px] text-rose-700">{{ $row['container_image'] }}</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </section>
+    @elseif ($flyUpsell)
         <section class="mt-8 rounded-2xl border border-sky-200 bg-sky-50/60 p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
