@@ -15,8 +15,14 @@ class ServerProviderFeatureFlagsTest extends TestCase
 
     public function test_list_server_provider_cards_only_includes_enabled_providers(): void
     {
+        // Disable everything in the catalog, then explicitly enable the
+        // two we want — otherwise env-driven defaults for aws_lambda /
+        // digitalocean_functions / digitalocean_kubernetes leak in.
+        $allProviders = array_keys(config('server_providers.enabled', []));
+        foreach ($allProviders as $id) {
+            config(['server_providers.enabled.'.$id => false]);
+        }
         config(['server_providers.enabled.digitalocean' => true]);
-        config(['server_providers.enabled.hetzner' => false]);
         config(['server_providers.enabled.custom' => true]);
 
         $user = User::factory()->create();

@@ -143,7 +143,7 @@ class BackupConfigurations extends Component
         $this->toastSuccess(__('Backup configuration updated.'));
     }
 
-    public function deleteConfiguration(int $id): void
+    public function deleteConfiguration(string $id): void
     {
         $config = BackupConfiguration::query()->findOrFail($id);
 
