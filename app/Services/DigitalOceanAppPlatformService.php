@@ -166,6 +166,21 @@ class DigitalOceanAppPlatformService
     }
 
     /**
+     * List recent deployments for an app. Returns at most $limit
+     * deployments newest-first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listDeployments(string $appId, int $limit = 10): array
+    {
+        $response = $this->request('get', '/apps/'.$appId.'/deployments?per_page='.max(1, $limit));
+        $this->assertSuccess($response, 'list deployments');
+        $deployments = $response->json('deployments') ?? [];
+
+        return is_array($deployments) ? array_values($deployments) : [];
+    }
+
+    /**
      * Fetch the latest deployment log link for an app. DO returns a
      * presigned `historic_urls[0]` URL the operator can curl/open;
      * for in-progress deployments it returns a `live_url` instead.

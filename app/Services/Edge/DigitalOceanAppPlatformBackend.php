@@ -182,6 +182,28 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         return DigitalOceanAppPlatformService::getRegions();
     }
 
+    public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return [];
+        }
+
+        $service = new DigitalOceanAppPlatformService($credential);
+        $raw = $service->listDeployments($site->container_backend_id, $limit);
+
+        return array_map(static function (array $entry): array {
+            $cause = is_string($entry['cause_details']['type'] ?? null) ? (string) $entry['cause_details']['type'] : null;
+
+            return [
+                'id' => (string) ($entry['id'] ?? ''),
+                'phase' => (string) ($entry['phase'] ?? 'UNKNOWN'),
+                'started_at' => is_string($entry['created_at'] ?? null) ? (string) $entry['created_at'] : null,
+                'finished_at' => is_string($entry['updated_at'] ?? null) ? (string) $entry['updated_at'] : null,
+                'cause' => $cause,
+            ];
+        }, $raw);
+    }
+
     public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

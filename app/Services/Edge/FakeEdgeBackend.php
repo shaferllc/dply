@@ -115,6 +115,23 @@ class FakeEdgeBackend implements EdgeBackend
         ];
     }
 
+    public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
+    {
+        $now = now();
+        $entries = [];
+        for ($i = 0; $i < min(3, $limit); $i++) {
+            $entries[] = [
+                'id' => 'fake-dep-'.($i + 1),
+                'phase' => $i === 0 ? 'ACTIVE' : 'SUPERSEDED',
+                'started_at' => $now->copy()->subHours($i * 2)->toIso8601String(),
+                'finished_at' => $now->copy()->subHours($i * 2)->addMinutes(3)->toIso8601String(),
+                'cause' => $i === 0 ? 'manual' : 'auto',
+            ];
+        }
+
+        return $entries;
+    }
+
     private function syntheticLiveUrl(Site $site): string
     {
         $slug = $site->slug ?: Str::slug($site->name) ?: 'app';

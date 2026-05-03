@@ -120,4 +120,13 @@ interface EdgeBackend
      * @return array{content: ?string, url: ?string, message: ?string}
      */
     public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array;
+
+    /**
+     * Recent deployments for the site, newest-first. Each entry is
+     * a normalized shape so the CLI / dashboard can render across
+     * backends without backend-specific casework.
+     *
+     * @return list<array{id: string, phase: string, started_at: ?string, finished_at: ?string, cause: ?string}>
+     */
+    public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array;
 }

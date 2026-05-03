@@ -194,6 +194,32 @@ class AwsAppRunnerBackend implements EdgeBackend
         return AwsAppRunnerService::getRegions();
     }
 
+    public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
+    {
+        // App Runner exposes ListOperations on a service for full
+        // deploy history; we keep this minimal — the CLI surface is
+        // primarily used against DigitalOcean (where deployments are
+        // first-class). For AWS, return a single synthetic "latest"
+        // entry derived from local meta so the CLI / dashboard show
+        // something instead of an empty list.
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
+        $startedAt = is_string($container['last_deploy_started_at'] ?? null) ? (string) $container['last_deploy_started_at'] : null;
+        $deploymentId = is_string($container['last_deployment_id'] ?? null) ? (string) $container['last_deployment_id'] : null;
+
+        if ($deploymentId === null && $startedAt === null) {
+            return [];
+        }
+
+        return [[
+            'id' => $deploymentId ?? 'unknown',
+            'phase' => 'UNKNOWN',
+            'started_at' => $startedAt,
+            'finished_at' => null,
+            'cause' => 'aws_app_runner',
+        ]];
+    }
+
     public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
     {
         // App Runner streams logs to CloudWatch under
