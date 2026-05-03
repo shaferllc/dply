@@ -80,6 +80,36 @@
     </div>
 
     @php
+        $imageHistory = is_array($containerMeta['image_history'] ?? null) ? array_reverse($containerMeta['image_history']) : [];
+    @endphp
+    @if (count($imageHistory) > 1)
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Image history') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Click Roll back to redeploy a previous image tag. The current tag is highlighted.') }}</p>
+            <ul class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
+                @foreach ($imageHistory as $entry)
+                    @php
+                        $isCurrent = ($entry['image'] ?? null) === $site->container_image;
+                    @endphp
+                    <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs {{ $isCurrent ? 'bg-emerald-50/40' : '' }}">
+                        <div class="min-w-0">
+                            <p class="break-all font-mono text-slate-900">{{ $entry['image'] ?? '—' }}</p>
+                            @if (! empty($entry['deployed_at']))
+                                <p class="mt-0.5 text-[10px] text-slate-500">{{ __('Deployed :at', ['at' => $entry['deployed_at']]) }}</p>
+                            @endif
+                        </div>
+                        @if ($isCurrent)
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ __('Current') }}</span>
+                        @else
+                            <button type="button" wire:click="rollbackContainerImage('{{ $entry['image'] }}')" wire:confirm="{{ __('Roll back to :img? The backend will redeploy with this tag.', ['img' => $entry['image']]) }}" class="text-xs font-medium text-sky-700 hover:text-sky-900">{{ __('Roll back') }}</button>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    @php
         $activity = \App\Support\Edge\ContainerActivityTimeline::for($site);
     @endphp
     @if ($activity !== [])

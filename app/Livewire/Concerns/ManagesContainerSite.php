@@ -102,4 +102,28 @@ trait ManagesContainerSite
             $this->toastSuccess(__('Domain detach queued.'));
         }
     }
+
+    public function rollbackContainerImage(string $image): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $image = trim($image);
+        if ($image === '' || $image === $this->site->container_image) {
+            if (method_exists($this, 'toastWarning')) {
+                $this->toastWarning(__('Already on that image — nothing to roll back to.'));
+            }
+
+            return;
+        }
+
+        RedeployEdgeSiteJob::dispatch($this->site->id, $image);
+        $this->container_image_input = $image;
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Rollback to :image queued.', ['image' => $image]));
+        }
+    }
 }

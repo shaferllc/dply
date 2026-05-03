@@ -41,7 +41,8 @@ class RedeployEdgeSiteJob implements ShouldQueue
             return;
         }
 
-        if (is_string($this->newImage) && $this->newImage !== '' && $this->newImage !== $site->container_image) {
+        $previousImage = $site->container_image;
+        if (is_string($this->newImage) && $this->newImage !== '' && $this->newImage !== $previousImage) {
             $site->update(['container_image' => $this->newImage]);
             $backend->updateImage($site->fresh(), $credential, $this->newImage);
         }
@@ -53,6 +54,21 @@ class RedeployEdgeSiteJob implements ShouldQueue
             'last_deployment_id' => $result['deployment_id'],
             'last_deploy_started_at' => now()->toIso8601String(),
         ]);
+
+        // Append to image history so the operator can roll back to
+        // any previously-deployed tag. Cap at the most recent 10
+        // entries — beyond that the dashboard list gets unwieldy.
+        $history = is_array($meta['container']['image_history'] ?? null) ? $meta['container']['image_history'] : [];
+        $deployedImage = is_string($this->newImage) && $this->newImage !== '' ? $this->newImage : $previousImage;
+        if (is_string($deployedImage) && $deployedImage !== '') {
+            $history[] = [
+                'image' => $deployedImage,
+                'deployed_at' => now()->toIso8601String(),
+                'deployment_id' => $result['deployment_id'],
+            ];
+            $meta['container']['image_history'] = array_slice($history, -10);
+        }
+
         $site->update(['meta' => $meta, 'last_deploy_at' => now()]);
     }
 }
