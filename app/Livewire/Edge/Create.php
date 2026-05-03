@@ -276,6 +276,7 @@ class Create extends Component
             'connectedBackends' => $connected,
             'regions' => $this->backendRegions($this->backend),
             'awsSourceReady' => $awsSourceReady,
+            'fakeCloudActive' => \App\Support\Servers\FakeCloudProvision::enabled(),
         ])->layout('layouts.app');
     }
 }

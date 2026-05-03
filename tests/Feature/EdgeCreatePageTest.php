@@ -20,6 +20,7 @@ class EdgeCreatePageTest extends TestCase
 
     public function test_page_renders_with_no_backends_connected_warning(): void
     {
+        config(['server_provision_fake.env_flag' => false]);
         $user = $this->ownerWithOrg();
 
         $response = $this->actingAs($user)->get(route('edge.create'));
@@ -29,6 +30,18 @@ class EdgeCreatePageTest extends TestCase
             ->assertSee('No container backend connected')
             ->assertSee('Connect DigitalOcean')
             ->assertSee('Connect AWS App Runner');
+    }
+
+    public function test_page_shows_fake_cloud_notice_instead_of_warning_when_no_creds_and_fake_on(): void
+    {
+        config(['server_provision_fake.env_flag' => true]);
+        $user = $this->ownerWithOrg();
+
+        $response = $this->actingAs($user)->get(route('edge.create'));
+
+        $response->assertOk()
+            ->assertSee('Fake-cloud mode is on')
+            ->assertDontSee('No container backend connected');
     }
 
     public function test_page_hides_warning_when_backend_connected(): void

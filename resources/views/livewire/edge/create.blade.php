@@ -4,7 +4,7 @@
         <p class="mt-2 text-sm text-slate-600">{{ __('Push a Docker image to the dply edge platform. We provision it on a managed container backend (DigitalOcean App Platform or AWS App Runner) under the hood — you get global HTTPS, auto-scaling, and zero-config TLS.') }}</p>
     </header>
 
-    @if ($connectedBackends->isEmpty())
+    @if ($connectedBackends->isEmpty() && ! $fakeCloudActive)
         <div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-sm text-amber-900">
             <p class="font-semibold">{{ __('No container backend connected') }}</p>
             <p class="mt-1">{{ __('Connect a DigitalOcean App Platform or AWS App Runner credential first — that\'s the cloud account dply uses to run your container under the hood.') }}</p>
@@ -13,6 +13,11 @@
                 <span class="mx-2 text-amber-400">·</span>
                 <a href="{{ route('credentials.index', ['provider' => 'aws_app_runner']) }}" wire:navigate class="font-medium text-amber-900 underline">{{ __('Connect AWS App Runner') }}</a>
             </p>
+        </div>
+    @elseif ($connectedBackends->isEmpty() && $fakeCloudActive)
+        <div data-testid="fake-cloud-active-notice" class="rounded-2xl border border-sky-200 bg-sky-50/60 p-4 text-sm text-sky-900">
+            <p class="font-semibold">{{ __('Fake-cloud mode is on — no real DO/AWS account needed') }}</p>
+            <p class="mt-1">{{ __('Deployments will land on the in-memory fake backend. Live URLs are synthetic. Connect a real credential to switch over.') }}</p>
         </div>
     @endif
 
