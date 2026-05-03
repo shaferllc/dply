@@ -18,6 +18,15 @@ class TaskRunnerWebhookTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Webhook routes are guest-accessible — RedirectGuestsToComingSoon
+        // catches them in non-local envs and returns 302 instead of letting
+        // the controller's signature check run. Bypass for the whole class.
+        $this->withoutMiddleware([\App\Http\Middleware\RedirectGuestsToComingSoon::class]);
+    }
+
     public function test_unsigned_webhook_update_output_is_rejected(): void
     {
         $task = Task::query()->create([
