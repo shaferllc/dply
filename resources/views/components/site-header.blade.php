@@ -171,6 +171,12 @@
                                         </x-slot>
                                         {{ __('Fleet env search') }}
                                     </x-dropdown-link>
+                                    <x-dropdown-link :href="route('fleet.deploys')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-rocket-launch class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Fleet deploys') }}
+                                    </x-dropdown-link>
                                     <x-dropdown-link :href="route('projects.index')">
                                         <x-slot name="icon">
                                             <x-heroicon-o-rectangle-stack class="{{ $hi }}" />

@@ -123,6 +123,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/fleet/health', \App\Livewire\Fleet\Health::class)->name('fleet.health');
     Route::livewire('/fleet/domains', \App\Livewire\Fleet\Domains::class)->name('fleet.domains');
     Route::livewire('/fleet/env-search', \App\Livewire\Fleet\EnvSearch::class)->name('fleet.env-search');
+    Route::livewire('/fleet/deploys', \App\Livewire\Fleet\Deploys::class)->name('fleet.deploys');
     Route::livewire('/admin', AdminDashboard::class)
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.dashboard');
