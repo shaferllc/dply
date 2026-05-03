@@ -117,6 +117,18 @@ trait ManagesProviderCredentials
 
     public string $oracle_api_token = '';
 
+    public string $do_app_platform_name = '';
+
+    public string $do_app_platform_api_token = '';
+
+    public string $aws_app_runner_name = '';
+
+    public string $aws_app_runner_access_key_id = '';
+
+    public string $aws_app_runner_secret_access_key = '';
+
+    public string $aws_app_runner_region = 'us-east-1';
+
     public function storeDigitalOcean(): void
     {
         if (! $this->ensureProviderEnabled('digitalocean')) {
@@ -409,6 +421,66 @@ trait ManagesProviderCredentials
         $this->notifyProviderCredentialStored('fly_io');
     }
 
+    public function storeDigitalOceanAppPlatform(): void
+    {
+        if (! $this->ensureProviderEnabled('digitalocean_app_platform')) {
+            return;
+        }
+        $this->validate([
+            'do_app_platform_name' => 'nullable|string|max:255',
+            'do_app_platform_api_token' => 'required|string',
+        ], [], ['do_app_platform_api_token' => 'API token']);
+        if ($this->storeProviderCredential(
+            'digitalocean_app_platform',
+            $this->do_app_platform_name,
+            $this->do_app_platform_api_token,
+            'do_app_platform_api_token',
+        )) {
+            $this->reset('do_app_platform_name', 'do_app_platform_api_token');
+        }
+    }
+
+    public function storeAwsAppRunner(): void
+    {
+        if (! $this->ensureProviderEnabled('aws_app_runner')) {
+            return;
+        }
+        $this->validate([
+            'aws_app_runner_name' => 'nullable|string|max:255',
+            'aws_app_runner_access_key_id' => 'required|string|max:255',
+            'aws_app_runner_secret_access_key' => 'required|string|max:255',
+            'aws_app_runner_region' => 'required|string|max:50',
+        ], [], [
+            'aws_app_runner_access_key_id' => 'Access key ID',
+            'aws_app_runner_secret_access_key' => 'Secret access key',
+            'aws_app_runner_region' => 'Region',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
+        }
+        auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'aws_app_runner',
+            'name' => trim($this->aws_app_runner_name) ?: 'AWS App Runner',
+            'credentials' => [
+                'access_key_id' => $this->aws_app_runner_access_key_id,
+                'secret_access_key' => $this->aws_app_runner_secret_access_key,
+                'region' => $this->aws_app_runner_region,
+            ],
+        ]);
+        $this->toastSuccess('Provider connected.');
+        $this->reset(
+            'aws_app_runner_name',
+            'aws_app_runner_access_key_id',
+            'aws_app_runner_secret_access_key',
+        );
+        $this->notifyProviderCredentialStored('aws_app_runner');
+    }
+
     public function storeRender(): void
     {
         if (! $this->ensureProviderEnabled('render')) {
@@ -608,7 +680,7 @@ trait ManagesProviderCredentials
                 $vultr->validateToken();
             } elseif ($provider === 'cloudflare') {
                 (new CloudflareDnsService($credential))->verifyToken();
-            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle'], true)) {
+            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'digitalocean_app_platform'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
                 throw new \InvalidArgumentException("Unknown provider: {$provider}");

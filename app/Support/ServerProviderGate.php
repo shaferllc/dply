@@ -16,6 +16,7 @@ final class ServerProviderGate
         'digitalocean',
         'digitalocean_functions',
         'digitalocean_kubernetes',
+        'digitalocean_app_platform',
         'hetzner',
         'vultr',
         'linode',
@@ -25,6 +26,7 @@ final class ServerProviderGate
         'equinix_metal',
         'fly_io',
         'aws',
+        'aws_app_runner',
         'aws_lambda',
         'custom',
     ];

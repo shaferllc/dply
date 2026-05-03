@@ -7,9 +7,14 @@
  */
 return [
     'enabled' => [
+        'digitalocean' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN', true), // https://www.digitalocean.com/
+        'digitalocean_functions' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_FUNCTIONS', true), // https://www.digitalocean.com/products/functions/
+        'digitalocean_kubernetes' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_KUBERNETES', true), // https://www.digitalocean.com/products/kubernetes/
+        'digitalocean_app_platform' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_APP_PLATFORM', false), // https://www.digitalocean.com/products/app-platform/
         'digitalocean' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN', true),
         'digitalocean_functions' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_FUNCTIONS', true),
         'digitalocean_kubernetes' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_KUBERNETES', true),
+        'digitalocean_app_platform' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_APP_PLATFORM', false),
         'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', false),
         'linode' => env('DPLY_SERVER_PROVIDER_LINODE', false),
         'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', false),
@@ -25,6 +30,7 @@ return [
         'coolify' => env('DPLY_SERVER_PROVIDER_COOLIFY', false),
         'cap_rover' => env('DPLY_SERVER_PROVIDER_CAP_ROVER', false),
         'aws' => env('DPLY_SERVER_PROVIDER_AWS', false),
+        'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false),
         /** DNS / API token only (not a compute host in v1). */
         'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true),
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true),

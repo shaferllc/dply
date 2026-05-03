@@ -437,6 +437,64 @@
         </div>
         @break
 
+    @case('digitalocean_app_platform')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Container backend') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect a DigitalOcean API token (the same one as DigitalOcean droplets — both APIs share scopes). Dply uses this to deploy your container apps to DigitalOcean App Platform.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="do_app_platform_name" :value="__('Label (optional)')" />
+                        <x-text-input id="do_app_platform_name" wire:model="do_app_platform_name" type="text" class="mt-1 block w-full" />
+                    </div>
+                    <div>
+                        <x-input-label for="do_app_platform_api_token" :value="__('API token')" />
+                        <x-text-input id="do_app_platform_api_token" wire:model="do_app_platform_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create at :link with read+write scope.', ['link' => '<a href="https://cloud.digitalocean.com/account/api/tokens" target="_blank" rel="noopener" class="'.$link.'">DigitalOcean → API → Tokens</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('do_app_platform_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeDigitalOceanAppPlatform" wire:loading.attr="disabled" wire:target="storeDigitalOceanAppPlatform">{{ __('Save credential') }}</x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('aws_app_runner')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Container backend') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect an IAM access key with apprunner:* scope. Dply uses this to deploy your container apps to AWS App Runner — managed containers with auto-scaling and built-in HTTPS.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="aws_app_runner_name" :value="__('Label (optional)')" />
+                        <x-text-input id="aws_app_runner_name" wire:model="aws_app_runner_name" type="text" class="mt-1 block w-full" />
+                    </div>
+                    <div>
+                        <x-input-label for="aws_app_runner_access_key_id" :value="__('Access key ID')" />
+                        <x-text-input id="aws_app_runner_access_key_id" wire:model="aws_app_runner_access_key_id" type="text" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('aws_app_runner_access_key_id')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="aws_app_runner_secret_access_key" :value="__('Secret access key')" />
+                        <x-text-input id="aws_app_runner_secret_access_key" wire:model="aws_app_runner_secret_access_key" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('aws_app_runner_secret_access_key')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="aws_app_runner_region" :value="__('Region')" />
+                        <x-text-input id="aws_app_runner_region" wire:model="aws_app_runner_region" type="text" class="mt-1 block w-full" placeholder="us-east-1" required />
+                        <p class="{{ $hint }}">{{ __('App Runner is available in 8 regions; us-east-1, us-west-2, eu-west-1, ap-northeast-1 are the cheapest.') }}</p>
+                        <x-input-error :messages="$errors->get('aws_app_runner_region')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeAwsAppRunner" wire:loading.attr="disabled" wire:target="storeAwsAppRunner">{{ __('Save credential') }}</x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
     @case('render')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
