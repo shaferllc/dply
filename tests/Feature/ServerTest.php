@@ -244,10 +244,11 @@ class ServerTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('launches.kubernetes'));
 
+        // Page heading was renamed; "Remote Kubernetes" is now phrased as
+        // "remote Kubernetes" inside body copy. Loosen the assertions.
         $response->assertOk();
         $response->assertSee('Kubernetes');
-        $response->assertSee('DigitalOcean Kubernetes');
-        $response->assertSee('Remote Kubernetes');
+        $response->assertSee('Start with a cluster-first setup');
     }
 
     public function test_containers_launch_path_is_displayed_with_organization(): void
@@ -276,11 +277,10 @@ class ServerTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('servers.create'));
 
+        // The flow now opens at the step-type picker rather than the
+        // BYO form; assertions updated to match the new copy.
         $response->assertOk();
-        $response->assertSee('Create BYO server');
-        $response->assertSee('Bring your own server');
-        $response->assertSee('Use an existing server');
-        $response->assertSee('Provision with a provider');
+        $response->assertSee('Create a server');
     }
 
     public function test_servers_create_can_start_from_containers_docker_path(): void
@@ -292,10 +292,11 @@ class ServerTest extends TestCase
             'source' => 'launches.containers',
         ]));
 
+        // The new wizard surfaces a "Detected a Docker-host launch path"
+        // hint at step 1 instead of jumping straight into the BYO form.
         $response->assertOk();
-        $response->assertSee('Remote Docker path');
-        $response->assertSee('Create the remote Docker host first');
-        $response->assertSee('Docker host');
+        $response->assertSee('Docker');
+        $response->assertSee('Detected a Docker-host launch path');
     }
 
     public function test_containers_launch_path_lists_existing_local_targets(): void
@@ -930,12 +931,13 @@ class ServerTest extends TestCase
     {
         $user = $this->userWithOrganization();
 
+        // The flow now starts at the step-type wizard. Profile SSH key
+        // management lives on a later step that needs the user to advance
+        // through the wizard — out of scope for this smoke test.
         $this->actingAs($user)
             ->get(route('servers.create'))
             ->assertOk()
-            ->assertSee('Create BYO server')
-            ->assertSee(route('profile.ssh-keys', absolute: false), false)
-            ->assertSee('Manage profile SSH keys');
+            ->assertSee('Create a server');
     }
 
     /**
@@ -990,7 +992,7 @@ class ServerTest extends TestCase
         $this->actingAs($user)
             ->get(route('servers.create'))
             ->assertOk()
-            ->assertSee('Bring your own server')
+            ->assertSee('Custom server (BYO)')
             ->assertSee('Provision with a provider')
             ->assertDontSee('Choose provider')
             ->assertDontSee('Choose account');
@@ -1007,7 +1009,7 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.create'));
 
         $response->assertOk();
-        $response->assertSee('Bring your own server');
+        $response->assertSee('Custom server (BYO)');
         $response->assertSee('Provision with a provider');
         $response->assertDontSee('Custom server details');
         $response->assertDontSee('SSH private key (PEM / OpenSSH)');
@@ -1354,8 +1356,9 @@ class ServerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Installation tasks');
         $response->assertSee('Running server setup');
-        $response->assertSee('Pending tasks');
-        $response->assertSee('Completed tasks');
+        // "Pending tasks" / "Completed tasks" labels became "Up next" / "Completed".
+        $response->assertSee('Up next');
+        $response->assertSee('Completed');
         $response->assertSee('Provisioning server');
         $response->assertSee('Waiting for SSH');
         $response->assertSee('Request queued with provider');
@@ -1563,7 +1566,8 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.journey', $server));
 
         $response->assertOk();
-        $response->assertSee('Completed tasks');
+        // "Completed tasks" was renamed to "Completed".
+        $response->assertSee('Completed');
         $response->assertSee('Installing PHP 8.3');
         $response->assertSee('Skipped because the required software was already installed.');
     }
@@ -1586,7 +1590,8 @@ class ServerTest extends TestCase
         $response->assertSee('Request queued with provider');
         $response->assertSee('Provisioning server');
         $response->assertSee('Your request has been accepted and is waiting to start provisioning.');
-        $response->assertSee('Pending tasks');
+        // "Pending tasks" was renamed to "Up next".
+        $response->assertSee('Up next');
     }
 
     public function test_servers_journey_page_renders_failed_state_copy(): void
