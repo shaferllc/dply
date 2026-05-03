@@ -44,6 +44,10 @@ class CreateEdgeSiteFromSource
         $branch = (string) ($payload['branch'] ?? 'main') ?: 'main';
         $port = (int) ($payload['port'] ?? 8080);
         $instances = max(1, (int) ($payload['instances'] ?? 1));
+        $sizeTier = (string) ($payload['size_tier'] ?? 'small');
+        if (! in_array($sizeTier, ['small', 'medium', 'large', 'xlarge'], true)) {
+            $sizeTier = 'small';
+        }
         $region = (string) ($payload['region'] ?? '');
         $dockerfilePath = (string) ($payload['dockerfile_path'] ?? '');
         $deployOnPush = ! array_key_exists('deploy_on_push', $payload) || (bool) $payload['deploy_on_push'];
@@ -104,6 +108,7 @@ class CreateEdgeSiteFromSource
                 'container' => [
                     'source' => $sourceSpec,
                     'instance_count' => $instances,
+                    'size_tier' => $sizeTier,
                 ],
             ],
         ]);

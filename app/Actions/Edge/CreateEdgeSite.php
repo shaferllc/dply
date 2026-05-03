@@ -33,6 +33,10 @@ class CreateEdgeSite
         $image = (string) ($payload['image'] ?? '');
         $port = (int) ($payload['port'] ?? 8080);
         $instances = max(1, (int) ($payload['instances'] ?? 1));
+        $sizeTier = (string) ($payload['size_tier'] ?? 'small');
+        if (! in_array($sizeTier, ['small', 'medium', 'large', 'xlarge'], true)) {
+            $sizeTier = 'small';
+        }
         $region = (string) ($payload['region'] ?? '');
         $envFile = (string) ($payload['env_file_content'] ?? '');
 
@@ -85,6 +89,7 @@ class CreateEdgeSite
             'meta' => [
                 'container' => [
                     'instance_count' => $instances,
+                    'size_tier' => $sizeTier,
                 ],
             ],
         ]);

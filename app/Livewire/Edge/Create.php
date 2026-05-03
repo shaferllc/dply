@@ -71,6 +71,9 @@ class Create extends Component
 
     public int $instances = 1;
 
+    /** Compute tier — small | medium | large | xlarge. */
+    public string $size_tier = 'small';
+
     public string $region = '';
 
     public string $env_file_content = '';
@@ -81,6 +84,7 @@ class Create extends Component
             'name' => ['required', 'string', 'max:80'],
             'port' => ['required', 'integer', 'min:1', 'max:65535'],
             'instances' => ['required', 'integer', 'min:1', 'max:50'],
+            'size_tier' => ['required', 'in:small,medium,large,xlarge'],
             'region' => ['required', 'string', 'max:50'],
             'backend' => ['required', 'in:auto,digitalocean_app_platform,aws_app_runner'],
             'mode' => ['required', 'in:image,source'],
@@ -209,6 +213,7 @@ class Create extends Component
                     'deploy_on_push' => $this->deploy_on_push,
                     'port' => $this->port,
                     'instances' => $this->instances,
+                    'size_tier' => $this->size_tier,
                     'region' => $this->region,
                     'backend' => $this->backend,
                     'env_file_content' => $this->env_file_content,
@@ -218,6 +223,7 @@ class Create extends Component
                     'image' => $this->image,
                     'port' => $this->port,
                     'instances' => $this->instances,
+                    'size_tier' => $this->size_tier,
                     'region' => $this->region,
                     'backend' => $this->backend,
                     'env_file_content' => $this->env_file_content,

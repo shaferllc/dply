@@ -29,6 +29,7 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
             envVars: $env,
             buildEnvVars: $buildEnv,
             instanceCount: $this->siteInstanceCount($site),
+            instanceSizeSlug: $this->siteSizeSlugForDo($site),
         );
 
         return [
@@ -53,6 +54,7 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
             envVars: $this->siteEnvVars($site),
             buildEnvVars: $this->siteBuildEnvVars($site),
             instanceCount: $this->siteInstanceCount($site),
+            instanceSizeSlug: $this->siteSizeSlugForDo($site),
         );
 
         return [
@@ -139,10 +141,11 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
             $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
         }
         $spec['services'][0]['envs'] = $envSpec;
-        // Re-push instance_count too — operators may have called
-        // dply:edge:scale; pushing only envs would leave the spec
-        // out of sync with what the Site says it should run.
+        // Re-push instance_count and size too — operators may have
+        // called dply:edge:scale or dply:edge:resize; pushing only
+        // envs would leave the spec out of sync with the Site.
         $spec['services'][0]['instance_count'] = $this->siteInstanceCount($site);
+        $spec['services'][0]['instance_size_slug'] = $this->siteSizeSlugForDo($site);
         $service->updateApp($site->container_backend_id, $spec);
     }
 
@@ -254,6 +257,24 @@ class DigitalOceanAppPlatformBackend implements EdgeBackend
         $raw = $meta['container']['instance_count'] ?? null;
 
         return is_int($raw) && $raw > 0 ? $raw : 1;
+    }
+
+    /**
+     * Map the site's portable size_tier (small / medium / large /
+     * xlarge) to DO App Platform's instance_size_slug. Operators
+     * set the tier via dply:edge:resize; default is "small".
+     */
+    private function siteSizeSlugForDo(Site $site): string
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $tier = (string) ($meta['container']['size_tier'] ?? 'small');
+
+        return match ($tier) {
+            'medium' => 'basic-xs',
+            'large' => 'basic-s',
+            'xlarge' => 'basic-m',
+            default => 'basic-xxs',
+        };
     }
 
     /**

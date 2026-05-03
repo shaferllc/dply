@@ -137,6 +137,16 @@
                         <x-input-error :messages="$errors->get('instances')" class="mt-2" />
                     </div>
                     <div>
+                        <x-input-label for="size_tier" :value="__('Size')" />
+                        <select id="size_tier" wire:model="size_tier" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required>
+                            <option value="small">{{ __('Small (DO basic-xxs / AWS 256/512)') }}</option>
+                            <option value="medium">{{ __('Medium (DO basic-xs / AWS 512/1024)') }}</option>
+                            <option value="large">{{ __('Large (DO basic-s / AWS 1024/2048)') }}</option>
+                            <option value="xlarge">{{ __('XLarge (DO basic-m / AWS 2048/4096)') }}</option>
+                        </select>
+                        <x-input-error :messages="$errors->get('size_tier')" class="mt-2" />
+                    </div>
+                    <div>
                         <x-input-label for="backend" :value="__('Backend')" />
                         <select id="backend" wire:model.live="backend" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm">
                             <option value="auto">{{ __('Let dply choose') }}</option>

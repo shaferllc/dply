@@ -56,6 +56,7 @@ class DigitalOceanAppPlatformService
         array $envVars = [],
         array $buildEnvVars = [],
         int $instanceCount = 1,
+        string $instanceSizeSlug = 'basic-xxs',
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -80,7 +81,7 @@ class DigitalOceanAppPlatformService
                     ],
                     'http_port' => $port,
                     'instance_count' => max(1, $instanceCount),
-                    'instance_size_slug' => 'basic-xxs',
+                    'instance_size_slug' => $instanceSizeSlug,
                     'envs' => $envSpec,
                 ]],
             ],
@@ -119,6 +120,7 @@ class DigitalOceanAppPlatformService
         array $envVars = [],
         array $buildEnvVars = [],
         int $instanceCount = 1,
+        string $instanceSizeSlug = 'basic-xxs',
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -137,7 +139,7 @@ class DigitalOceanAppPlatformService
             ],
             'http_port' => $port,
             'instance_count' => max(1, $instanceCount),
-            'instance_size_slug' => 'basic-xxs',
+            'instance_size_slug' => $instanceSizeSlug,
             'envs' => $envSpec,
         ];
 

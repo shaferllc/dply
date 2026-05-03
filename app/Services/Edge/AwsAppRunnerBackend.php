@@ -18,11 +18,14 @@ class AwsAppRunnerBackend implements EdgeBackend
     public function provision(Site $site, ProviderCredential $credential): array
     {
         $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
+        [$cpu, $memory] = $this->cpuMemoryForSite($site);
         $result = $service->createService(
             serviceName: $this->backendServiceName($site),
             image: (string) $site->container_image,
             port: (int) ($site->container_port ?: 8080),
             envVars: $this->siteEnvVars($site),
+            cpu: $cpu,
+            memory: $memory,
         );
 
         return [
@@ -37,6 +40,7 @@ class AwsAppRunnerBackend implements EdgeBackend
         $connectionArn = $this->connectionArn($credential);
 
         $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
+        [$cpu, $memory] = $this->cpuMemoryForSite($site);
         $result = $service->createServiceFromSource(
             serviceName: $this->backendServiceName($site),
             repositoryUrl: $source['repository_url'],
@@ -47,6 +51,8 @@ class AwsAppRunnerBackend implements EdgeBackend
             buildEnvVars: $this->siteBuildEnvVars($site),
             dockerfilePath: $source['dockerfile_path'],
             autoDeploy: $source['deploy_on_push'],
+            cpu: $cpu,
+            memory: $memory,
         );
 
         return [
@@ -268,6 +274,26 @@ class AwsAppRunnerBackend implements EdgeBackend
         $raw = $meta['container']['instance_count'] ?? null;
 
         return is_int($raw) && $raw > 0 ? $raw : 1;
+    }
+
+    /**
+     * Map the site's portable size_tier (small / medium / large /
+     * xlarge) to App Runner's [Cpu, Memory] pair (string slugs).
+     * Defaults to "small" → 256/512 (the smallest App Runner combo).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function cpuMemoryForSite(Site $site): array
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $tier = (string) ($meta['container']['size_tier'] ?? 'small');
+
+        return match ($tier) {
+            'medium' => ['512', '1024'],
+            'large' => ['1024', '2048'],
+            'xlarge' => ['2048', '4096'],
+            default => ['256', '512'],
+        };
     }
 
     /**
