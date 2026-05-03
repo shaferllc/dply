@@ -42,11 +42,13 @@ class Health extends Component
 
         $drift = $this->computeDrift($servers, $sites);
         $deploys = $this->computeDeployHealth($sites);
+        $successRate = $this->computeSuccessRate($sites->pluck('id'));
 
         return view('livewire.fleet.health', [
             'org' => $org,
             'serverCount' => $servers->count(),
             'siteCount' => $sites->count(),
+            'successRate' => $successRate,
             'drift' => $drift,
             'deploys' => $deploys,
         ])->layout('layouts.app');
@@ -159,6 +161,40 @@ class Health extends Component
             'running' => $running,
             'long_running' => $longRunning,
             'failed_latest' => $failedLatest,
+        ];
+    }
+
+    /**
+     * Deploy success rate over the last 7 days. Excludes skipped
+     * deploys (idempotency conflicts) since they're not really
+     * "tries" — a skipped deploy means another one was running.
+     *
+     * @param  \Illuminate\Support\Collection<int, string>  $siteIds
+     * @return array{percent: ?int, total: int, success: int, failed: int, window_days: int}
+     */
+    private function computeSuccessRate($siteIds): array
+    {
+        $windowDays = 7;
+        $since = now()->subDays($windowDays);
+
+        $base = SiteDeployment::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('started_at', '>=', $since)
+            ->whereIn('status', [
+                SiteDeployment::STATUS_SUCCESS,
+                SiteDeployment::STATUS_FAILED,
+            ]);
+
+        $total = (clone $base)->count();
+        $success = (clone $base)->where('status', SiteDeployment::STATUS_SUCCESS)->count();
+        $failed = $total - $success;
+
+        return [
+            'percent' => $total > 0 ? (int) round($success / $total * 100) : null,
+            'total' => $total,
+            'success' => $success,
+            'failed' => $failed,
+            'window_days' => $windowDays,
         ];
     }
 }

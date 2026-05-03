@@ -134,6 +134,48 @@ class FleetHealthPageTest extends TestCase
             ->assertSee(route('fleet.health'), false);
     }
 
+    public function test_renders_7_day_success_rate(): void
+    {
+        [$user, $org] = $this->makeUserOrg();
+        $server = Server::factory()->create(['organization_id' => $org->id]);
+        $site = Site::factory()->create(['server_id' => $server->id, 'organization_id' => $org->id]);
+        for ($i = 0; $i < 4; $i++) {
+            SiteDeployment::query()->create([
+                'site_id' => $site->id,
+                'project_id' => $site->project_id,
+                'trigger' => 'manual',
+                'status' => SiteDeployment::STATUS_SUCCESS,
+                'started_at' => now()->subDays($i),
+                'finished_at' => now()->subDays($i),
+            ]);
+        }
+        SiteDeployment::query()->create([
+            'site_id' => $site->id,
+            'project_id' => $site->project_id,
+            'trigger' => 'manual',
+            'status' => SiteDeployment::STATUS_FAILED,
+            'started_at' => now()->subDays(2),
+            'finished_at' => now()->subDays(2),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('fleet.health'));
+
+        $response->assertOk()
+            ->assertSee('7-day success', false)
+            ->assertSee('80%')
+            ->assertSee('4 / 5');
+    }
+
+    public function test_success_rate_renders_no_deploys_yet_when_empty(): void
+    {
+        [$user] = $this->makeUserOrg();
+
+        $response = $this->actingAs($user)->get(route('fleet.health'));
+
+        $response->assertOk()
+            ->assertSee('No deploys yet');
+    }
+
     public function test_only_shows_servers_in_current_org(): void
     {
         [$user, $org] = $this->makeUserOrg();

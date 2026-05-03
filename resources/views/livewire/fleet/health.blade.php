@@ -5,7 +5,7 @@
         <p class="mt-1 text-sm text-slate-600">{{ __('Drift, in-flight deploys, and failure surfaces across the :org organization.', ['org' => $org->name]) }}</p>
     </header>
 
-    <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Servers') }}</p>
             <p class="mt-2 text-3xl font-semibold text-slate-900">{{ $serverCount }}</p>
@@ -30,6 +30,16 @@
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Failed (latest)') }}</p>
             <p class="mt-2 text-3xl font-semibold {{ count($deploys['failed_latest']) > 0 ? 'text-rose-700' : 'text-emerald-700' }}">{{ count($deploys['failed_latest']) }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('Sites whose last deploy failed') }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __(':days-day success', ['days' => $successRate['window_days']]) }}</p>
+            @if ($successRate['percent'] === null)
+                <p class="mt-2 text-3xl font-semibold text-slate-400">—</p>
+                <p class="mt-1 text-xs text-slate-500">{{ __('No deploys yet') }}</p>
+            @else
+                <p class="mt-2 text-3xl font-semibold {{ $successRate['percent'] >= 95 ? 'text-emerald-700' : ($successRate['percent'] >= 80 ? 'text-amber-700' : 'text-rose-700') }}">{{ $successRate['percent'] }}%</p>
+                <p class="mt-1 text-xs text-slate-500">{{ $successRate['success'] }} / {{ $successRate['total'] }} {{ __('settled') }}</p>
+            @endif
         </div>
     </section>
 
