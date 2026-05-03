@@ -110,4 +110,83 @@ class FleetSummaryCommandTest extends TestCase
 
         $this->assertTrue($decoded['fly_io']['connected']);
     }
+
+    public function test_edge_fleet_section_aggregates_by_backend_and_status(): void
+    {
+        $user = \App\Models\User::factory()->create();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => 'nginx:1',
+            'container_port' => 80,
+            'container_backend' => 'digitalocean_app_platform',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => 'public.ecr.aws/x/y:1',
+            'container_port' => 8080,
+            'container_backend' => 'aws_app_runner',
+            'status' => Site::STATUS_CONTAINER_FAILED,
+        ]);
+
+        Artisan::call('dply:fleet:summary', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame(2, $decoded['edge_fleet']['total']);
+        $this->assertSame(1, $decoded['edge_fleet']['by_backend']['digitalocean_app_platform']);
+        $this->assertSame(1, $decoded['edge_fleet']['by_backend']['aws_app_runner']);
+        $this->assertSame(1, $decoded['edge_fleet']['by_status'][Site::STATUS_CONTAINER_ACTIVE]);
+        $this->assertSame(1, $decoded['edge_fleet']['by_status'][Site::STATUS_CONTAINER_FAILED]);
+    }
+
+    public function test_edge_fleet_section_empty_when_no_container_sites(): void
+    {
+        Artisan::call('dply:fleet:summary', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame(0, $decoded['edge_fleet']['total']);
+        $this->assertSame([], $decoded['edge_fleet']['by_backend']);
+    }
+
+    public function test_edge_fleet_human_output_renders_section(): void
+    {
+        $user = \App\Models\User::factory()->create();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'type' => \App\Enums\SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => 'nginx:1',
+            'container_port' => 80,
+            'container_backend' => 'digitalocean_app_platform',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+        ]);
+
+        Artisan::call('dply:fleet:summary');
+        $output = Artisan::output();
+
+        $this->assertStringContainsString('Dply edge', $output);
+        $this->assertStringContainsString('1 edge container site', $output);
+        $this->assertStringContainsString('digitalocean_app_platform', $output);
+    }
 }

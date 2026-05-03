@@ -50,6 +50,18 @@ class FleetSummaryCommand extends Command
             ->whereIn('runtime', ['node', 'static'])
             ->count();
 
+        $edgeSites = Site::query()
+            ->whereNotNull('container_backend')
+            ->get(['container_backend', 'status']);
+        $edgeByBackend = $edgeSites->groupBy('container_backend')->map->count()->sortKeys()->all();
+        $edgeByStatus = $edgeSites->groupBy('status')->map->count()->sortKeys()->all();
+        $edgeBackendCredentials = ProviderCredential::query()
+            ->whereIn('provider', ['digitalocean_app_platform', 'aws_app_runner'])
+            ->get(['provider'])
+            ->groupBy('provider')
+            ->map->count()
+            ->all();
+
         $payload = [
             'totals' => [
                 'servers' => $totalServers,
@@ -61,6 +73,12 @@ class FleetSummaryCommand extends Command
             'fly_io' => [
                 'connected' => $flyConnected,
                 'edge_eligible_sites' => $edgeEligibleSites,
+            ],
+            'edge_fleet' => [
+                'total' => $edgeSites->count(),
+                'by_backend' => $edgeByBackend,
+                'by_status' => $edgeByStatus,
+                'backend_credentials' => $edgeBackendCredentials,
             ],
         ];
 
@@ -112,6 +130,32 @@ class FleetSummaryCommand extends Command
                 trans_choice('{1} Node/static site|[2,*] Node/static sites', $edgeEligibleSites),
             ));
             $this->line('<fg=gray>  Connect: dply:list-engines | docs: https://fly.io/docs/about/pricing</>');
+        }
+
+        if ($edgeSites->isNotEmpty()) {
+            $this->newLine();
+            $this->line('<fg=cyan>Dply edge</>');
+            $this->line(sprintf('  %d edge container site(s)', $edgeSites->count()));
+            if ($edgeByBackend !== []) {
+                $this->table(['backend', 'count'], array_map(
+                    fn ($backend) => [$backend, (string) $edgeByBackend[$backend]],
+                    array_keys($edgeByBackend),
+                ));
+            }
+            $statusOrder = [
+                Site::STATUS_CONTAINER_ACTIVE,
+                Site::STATUS_CONTAINER_PROVISIONING,
+                Site::STATUS_CONTAINER_FAILED,
+            ];
+            $statusRows = [];
+            foreach ($statusOrder as $status) {
+                if (isset($edgeByStatus[$status])) {
+                    $statusRows[] = [$status, (string) $edgeByStatus[$status]];
+                }
+            }
+            if ($statusRows !== []) {
+                $this->table(['status', 'count'], $statusRows);
+            }
         }
 
         return self::SUCCESS;
