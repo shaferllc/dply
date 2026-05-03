@@ -103,6 +103,21 @@
         </section>
     @endif
 
+    @if ($mostActive !== [])
+        <section class="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-900">{{ __('Most active sites (30 days)') }}</h2>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Top 5 by settled deploy count.') }}</p>
+            <ul class="mt-3 divide-y divide-slate-100">
+                @foreach ($mostActive as $row)
+                    <li class="flex items-center justify-between py-2 text-sm">
+                        <a href="{{ route('sites.show', ['server' => $row['server_id'], 'site' => $row['site']]) }}" wire:navigate class="font-medium text-slate-800 hover:underline">{{ $row['site']->name }}</a>
+                        <span class="font-mono text-xs text-slate-500">{{ $row['count'] }} {{ __('deploys') }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
+
     @if ($drift['servers_with_drift'] === 0 && $deploys['failed_latest'] === [] && $deploys['long_running'] === 0)
         <section class="mt-8 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 text-center shadow-sm">
             <p class="text-lg font-semibold text-emerald-900">{{ __('All clear') }}</p>

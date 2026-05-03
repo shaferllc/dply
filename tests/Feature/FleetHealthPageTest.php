@@ -176,6 +176,41 @@ class FleetHealthPageTest extends TestCase
             ->assertSee('No deploys yet');
     }
 
+    public function test_most_active_sites_panel_renders_top_deployers(): void
+    {
+        [$user, $org] = $this->makeUserOrg();
+        $server = Server::factory()->create(['organization_id' => $org->id]);
+        $busy = Site::factory()->create(['server_id' => $server->id, 'organization_id' => $org->id, 'name' => 'busy-app']);
+        $quiet = Site::factory()->create(['server_id' => $server->id, 'organization_id' => $org->id, 'name' => 'quiet-app']);
+        for ($i = 0; $i < 5; $i++) {
+            SiteDeployment::query()->create([
+                'site_id' => $busy->id,
+                'project_id' => $busy->project_id,
+                'trigger' => 'manual',
+                'status' => SiteDeployment::STATUS_SUCCESS,
+                'started_at' => now()->subDays($i),
+                'finished_at' => now()->subDays($i),
+            ]);
+        }
+        SiteDeployment::query()->create([
+            'site_id' => $quiet->id,
+            'project_id' => $quiet->project_id,
+            'trigger' => 'manual',
+            'status' => SiteDeployment::STATUS_SUCCESS,
+            'started_at' => now()->subDays(2),
+            'finished_at' => now()->subDays(2),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('fleet.health'));
+
+        $response->assertOk()
+            ->assertSee('Most active sites')
+            ->assertSee('busy-app')
+            ->assertSee('5 deploys')
+            ->assertSee('quiet-app')
+            ->assertSee('1 deploys');
+    }
+
     public function test_only_shows_servers_in_current_org(): void
     {
         [$user, $org] = $this->makeUserOrg();

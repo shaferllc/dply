@@ -43,6 +43,7 @@ class Health extends Component
         $drift = $this->computeDrift($servers, $sites);
         $deploys = $this->computeDeployHealth($sites);
         $successRate = $this->computeSuccessRate($sites->pluck('id'));
+        $mostActive = $this->computeMostActive($sites);
 
         return view('livewire.fleet.health', [
             'org' => $org,
@@ -51,6 +52,7 @@ class Health extends Component
             'successRate' => $successRate,
             'drift' => $drift,
             'deploys' => $deploys,
+            'mostActive' => $mostActive,
         ])->layout('layouts.app');
     }
 
@@ -196,5 +198,47 @@ class Health extends Component
             'failed' => $failed,
             'window_days' => $windowDays,
         ];
+    }
+
+    /**
+     * Top 5 most-deployed sites in the last 30 days.
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @return list<array{site: Site, count: int, server_id: ?string}>
+     */
+    private function computeMostActive($sites): array
+    {
+        if ($sites->isEmpty()) {
+            return [];
+        }
+
+        $since = now()->subDays(30);
+        $counts = SiteDeployment::query()
+            ->whereIn('site_id', $sites->pluck('id'))
+            ->where('started_at', '>=', $since)
+            ->whereIn('status', [
+                SiteDeployment::STATUS_SUCCESS,
+                SiteDeployment::STATUS_FAILED,
+            ])
+            ->selectRaw('site_id, COUNT(*) as deploy_count')
+            ->groupBy('site_id')
+            ->orderByDesc('deploy_count')
+            ->limit(5)
+            ->get(['site_id', 'deploy_count']);
+
+        $rows = [];
+        foreach ($counts as $row) {
+            $site = $sites->firstWhere('id', $row->site_id);
+            if ($site === null) {
+                continue;
+            }
+            $rows[] = [
+                'site' => $site,
+                'count' => (int) $row->deploy_count,
+                'server_id' => $site->server_id,
+            ];
+        }
+
+        return $rows;
     }
 }
