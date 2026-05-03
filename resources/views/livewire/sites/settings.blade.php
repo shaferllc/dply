@@ -316,18 +316,12 @@
 
                             @php
                                 $isEdgeEligible = in_array($site->runtime, ['node', 'static'], true);
-                                $orgHasFly = $isEdgeEligible
-                                    ? \App\Models\ProviderCredential::query()
-                                        ->where('organization_id', $site->organization_id)
-                                        ->where('provider', 'fly_io')
-                                        ->exists()
-                                    : true;
                             @endphp
-                            @if ($isEdgeEligible && ! $orgHasFly)
+                            @if ($isEdgeEligible)
                                 <div class="mt-4 rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs text-sky-900">
                                     <span class="font-semibold">{{ __('Edge-eligible') }}</span> —
-                                    {{ __('this :runtime site could deploy globally on Fly.io for ~$3/mo with sub-100ms response times.', ['runtime' => $site->runtime]) }}
-                                    <a href="{{ route('credentials.index', ['provider' => 'fly_io']) }}" wire:navigate class="ml-1 font-medium underline hover:text-sky-950">{{ __('Connect Fly.io') }} →</a>
+                                    {{ __('this :runtime site can deploy globally on dply edge — managed HTTPS, auto-scaling, no VM to babysit.', ['runtime' => $site->runtime]) }}
+                                    <a href="{{ route('edge.create') }}" wire:navigate class="ml-1 font-medium underline hover:text-sky-950">{{ __('Deploy to dply edge') }} →</a>
                                 </div>
                             @endif
 

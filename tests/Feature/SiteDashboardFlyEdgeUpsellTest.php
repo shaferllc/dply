@@ -16,7 +16,7 @@ class SiteDashboardFlyEdgeUpsellTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_node_site_without_fly_credential_shows_upsell(): void
+    public function test_node_site_shows_dply_edge_upsell(): void
     {
         [$user, $server, $site] = $this->makeUserSite('node');
 
@@ -24,10 +24,10 @@ class SiteDashboardFlyEdgeUpsellTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Edge-eligible')
-            ->assertSee('Connect Fly.io');
+            ->assertSee('Deploy to dply edge');
     }
 
-    public function test_static_site_without_fly_credential_shows_upsell(): void
+    public function test_static_site_shows_dply_edge_upsell(): void
     {
         [$user, $server, $site] = $this->makeUserSite('static');
 
@@ -40,23 +40,6 @@ class SiteDashboardFlyEdgeUpsellTest extends TestCase
     public function test_php_site_does_not_show_upsell(): void
     {
         [$user, $server, $site] = $this->makeUserSite('php');
-
-        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site]));
-
-        $response->assertOk()
-            ->assertDontSee('Edge-eligible');
-    }
-
-    public function test_node_site_with_existing_fly_credential_does_not_show_upsell(): void
-    {
-        [$user, $server, $site] = $this->makeUserSite('node');
-        ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $site->organization_id,
-            'provider' => 'fly_io',
-            'name' => 'Already connected',
-            'credentials' => ['api_token' => 't'],
-        ]);
 
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site]));
 

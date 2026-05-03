@@ -129,14 +129,13 @@
         <section class="mt-8 rounded-2xl border border-sky-200 bg-sky-50/60 p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <p class="text-sm font-semibold text-sky-900">{{ __('Try Fly.io edge for your Node + static sites') }}</p>
+                    <p class="text-sm font-semibold text-sky-900">{{ __('Deploy a container app on dply edge') }}</p>
                     <p class="mt-1 text-xs text-sky-800">
-                        {{ trans_choice('{1} 1 site|[2,*] :count sites', $flyUpsell['eligible_count'], ['count' => $flyUpsell['eligible_count']]) }}
-                        {{ __('in this org could deploy close to users in 30+ regions for ~$3/mo each, with sub-100ms response times.') }}
+                        {{ __('Run any container image globally on dply edge — managed HTTPS, auto-scaling, and one-click rollback. Backed by DigitalOcean App Platform or AWS App Runner.') }}
                     </p>
                 </div>
-                <a href="{{ route('credentials.index', ['provider' => 'fly_io']) }}" wire:navigate class="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">
-                    {{ __('Connect Fly.io') }} →
+                <a href="{{ route('edge.create') }}" wire:navigate class="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">
+                    {{ __('Deploy to dply edge') }} →
                 </a>
             </div>
         </section>

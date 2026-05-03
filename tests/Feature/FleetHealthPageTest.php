@@ -137,9 +137,8 @@ class FleetHealthPageTest extends TestCase
         $response = $this->actingAs($user)->get(route('fleet.health'));
 
         $response->assertOk()
-            ->assertSee('Try Fly.io edge')
-            ->assertSee('1 site')
-            ->assertSee('Connect Fly.io');
+            ->assertSee('dply edge')
+            ->assertSee('Deploy to dply edge');
     }
 
     public function test_fly_upsell_hides_when_org_has_only_php_sites(): void
@@ -155,7 +154,7 @@ class FleetHealthPageTest extends TestCase
         $response = $this->actingAs($user)->get(route('fleet.health'));
 
         $response->assertOk()
-            ->assertDontSee('Try Fly.io edge');
+            ->assertDontSee('Deploy a container app on dply edge');
     }
 
     public function test_fly_upsell_hides_when_org_already_has_fly_credential(): void
@@ -178,7 +177,7 @@ class FleetHealthPageTest extends TestCase
         $response = $this->actingAs($user)->get(route('fleet.health'));
 
         $response->assertOk()
-            ->assertDontSee('Try Fly.io edge');
+            ->assertDontSee('Deploy a container app on dply edge');
     }
 
     public function test_fleet_link_renders_in_top_nav(): void
