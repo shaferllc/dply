@@ -79,8 +79,36 @@
         <p class="mt-2 text-xs text-slate-500">{{ __('Update the tag and click Redeploy to roll a new revision. Leave the tag the same to just re-pull.') }}</p>
     </div>
 
-    @if (! empty($containerMeta['last_deploy_started_at']))
-        <p class="text-xs text-slate-500">{{ __('Last deploy started at :at', ['at' => $containerMeta['last_deploy_started_at']]) }}</p>
+    @php
+        $activity = \App\Support\Edge\ContainerActivityTimeline::for($site);
+    @endphp
+    @if ($activity !== [])
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Recent activity') }}</p>
+            <ol class="mt-3 space-y-2">
+                @foreach (array_slice($activity, 0, 8) as $event)
+                    <li class="flex items-start gap-3 text-xs">
+                        <span class="mt-0.5 inline-flex size-2 shrink-0 rounded-full
+                            {{ $event['kind'] === 'error' || $event['kind'] === 'poll_error' ? 'bg-rose-500' : '' }}
+                            {{ $event['kind'] === 'provisioned' ? 'bg-emerald-500' : '' }}
+                            {{ $event['kind'] === 'deploy' ? 'bg-sky-500' : '' }}
+                            {{ $event['kind'] === 'domain_attached' ? 'bg-indigo-500' : '' }}
+                            {{ $event['kind'] === 'teardown' ? 'bg-slate-400' : '' }}
+                            {{ $event['kind'] === 'poll' ? 'bg-slate-300' : '' }}
+                        "></span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-medium text-slate-900">{{ __($event['label']) }}</p>
+                            @if ($event['detail'])
+                                <p class="mt-0.5 break-all text-slate-600">{{ $event['detail'] }}</p>
+                            @endif
+                        </div>
+                        @if ($event['at'])
+                            <span class="shrink-0 font-mono text-[10px] text-slate-500" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans(null, true) }}</span>
+                        @endif
+                    </li>
+                @endforeach
+            </ol>
+        </div>
     @endif
 
     @php
