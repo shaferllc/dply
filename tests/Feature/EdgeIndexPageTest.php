@@ -107,6 +107,78 @@ class EdgeIndexPageTest extends TestCase
         $response->assertDontSee('No container backend connected');
     }
 
+    public function test_lists_source_mode_site_with_repo_branch(): void
+    {
+        $user = $this->ownerWithOrg();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'Source Site',
+            'type' => SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'meta' => ['container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']]],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('edge.index'));
+
+        $response->assertOk()
+            ->assertSee('Source Site')
+            ->assertSee('acme/api@main')
+            ->assertSee('Image / source');
+    }
+
+    public function test_lists_preview_with_pr_badge(): void
+    {
+        $user = $this->ownerWithOrg();
+        $org = $user->currentOrganization();
+        $server = Server::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'PR #42 — API',
+            'type' => SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => null,
+            'container_port' => 8080,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+            'meta' => [
+                'container' => [
+                    'source' => ['repo' => 'acme/api', 'branch' => 'feature/x'],
+                    'preview_branch' => 'feature/x',
+                    'preview_pr_number' => 42,
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('edge.index'));
+
+        $response->assertOk()
+            ->assertSee('PR #42');
+    }
+
     public function test_filter_counts_match_actual_sites(): void
     {
         $user = $this->ownerWithOrg();

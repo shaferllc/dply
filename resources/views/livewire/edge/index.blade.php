@@ -52,7 +52,7 @@
                         <th class="px-4 py-3">{{ __('App') }}</th>
                         <th class="px-4 py-3">{{ __('Backend') }}</th>
                         <th class="px-4 py-3">{{ __('Region') }}</th>
-                        <th class="px-4 py-3">{{ __('Image') }}</th>
+                        <th class="px-4 py-3">{{ __('Image / source') }}</th>
                         <th class="px-4 py-3">{{ __('Status') }}</th>
                         <th class="px-4 py-3">{{ __('Live URL') }}</th>
                     </tr>
@@ -78,14 +78,32 @@
                                 default => $site->container_backend ?? '—',
                             };
                             $liveUrl = $site->containerLiveUrl();
+                            $rowSource = is_array($site->meta['container']['source'] ?? null) ? $site->meta['container']['source'] : null;
+                            $rowPreviewBranch = $site->meta['container']['preview_branch'] ?? null;
+                            $rowPreviewPr = $site->meta['container']['preview_pr_number'] ?? null;
                         @endphp
                         <tr>
                             <td class="px-4 py-3">
                                 <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ $site->name }}</a>
+                                @if ($rowPreviewBranch)
+                                    <span class="ml-1 inline-flex items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-indigo-800">
+                                        @if ($rowPreviewPr)
+                                            PR #{{ $rowPreviewPr }}
+                                        @else
+                                            {{ __('Preview') }}
+                                        @endif
+                                    </span>
+                                @endif
                             </td>
                             <td class="px-4 py-3 text-slate-700">{{ $backendLabel }}</td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ $site->container_region ?: '—' }}</td>
-                            <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ $site->container_image ?: '—' }}</td>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">
+                                @if ($rowSource)
+                                    {{ ($rowSource['repo'] ?? '?').'@'.($rowSource['branch'] ?? 'main') }}
+                                @else
+                                    {{ $site->container_image ?: '—' }}
+                                @endif
+                            </td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $statusBadge }}">{{ $statusLabel }}</span>
                             </td>
