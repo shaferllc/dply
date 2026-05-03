@@ -14,7 +14,10 @@ class RegistrationTest extends TestCase
 
     public function test_registration_screen_can_be_rendered(): void
     {
-        $response = $this->get('/register');
+        // Bypass RedirectGuestsToComingSoon — non-local environments
+        // (incl. testing) bounce guest traffic to /coming-soon by default.
+        $response = $this->withoutMiddleware([\App\Http\Middleware\RedirectGuestsToComingSoon::class])
+            ->get('/register');
 
         $response->assertStatus(200);
     }
