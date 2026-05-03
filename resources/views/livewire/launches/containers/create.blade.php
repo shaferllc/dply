@@ -4,12 +4,12 @@
             <x-page-header
                 :eyebrow="__('Repo-first containers')"
                 :title="__('Launch a container target from a repo')"
-                :description="__('Inspect the repo first, review the inferred runtime, then choose whether to launch on Local Docker or continue into a remote Docker or Kubernetes target.')"
+                :description="__('Inspect the repo first, review the inferred runtime, then choose a remote Docker host or Kubernetes cluster — DigitalOcean or AWS.')"
                 doc-route="docs.index"
                 flush
             >
                 <x-slot name="actions">
-                    <a href="{{ route('launches.containers') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Back to Containers') }}</a>
+                    <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Back to Launch setup') }}</a>
                 </x-slot>
             </x-page-header>
         </div>
@@ -114,7 +114,7 @@
                 <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
                     <div>
                         <h2 class="text-lg font-semibold text-slate-900">{{ __('Choose the container target') }}</h2>
-                        <p class="mt-1 text-sm text-slate-600">{{ __('Keep the same inspected repo and continue into a local or remote container target.') }}</p>
+                        <p class="mt-1 text-sm text-slate-600">{{ __('Pick where the inspected repo should run — Docker host or Kubernetes cluster, on DigitalOcean or AWS.') }}</p>
                     </div>
 
                     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -131,7 +131,20 @@
                         @endforeach
                     </div>
 
-                    @if ($providerCredentials !== [])
+                    @php
+                        $isCloudTarget = str_starts_with($target_family, 'digitalocean_') || str_starts_with($target_family, 'aws_');
+                        $cloudLabel = str_starts_with($target_family, 'aws_') ? __('AWS') : __('DigitalOcean');
+                    @endphp
+
+                    @if ($isCloudTarget && $providerCredentials === [])
+                        <div data-testid="empty-credential-notice" class="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
+                            <p class="font-semibold">{{ __('No :provider credentials connected.', ['provider' => $cloudLabel]) }}</p>
+                            <p class="mt-1 text-amber-800">{{ __('Connect a :provider API token before launching this target.', ['provider' => $cloudLabel]) }}</p>
+                            <a href="{{ $connectCredentialUrl }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-amber-900 underline hover:text-amber-700">
+                                {{ __('Connect :provider', ['provider' => $cloudLabel]) }} →
+                            </a>
+                        </div>
+                    @elseif ($providerCredentials !== [])
                         <div class="grid gap-6 md:grid-cols-3">
                             <div>
                                 <x-input-label for="provider_credential_id" :value="__('Provider credential')" />
@@ -178,7 +191,7 @@
                     @endif
 
                     <div class="flex flex-wrap items-center justify-end gap-3">
-                        <a href="{{ route('launches.containers') }}" wire:navigate class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{{ __('Cancel') }}</a>
+                        <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{{ __('Cancel') }}</a>
                         <button type="button" wire:click="launch" class="inline-flex items-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700">
                             {{ __('Launch target') }}
                         </button>

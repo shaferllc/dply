@@ -26,15 +26,17 @@ class Create extends Component
             [
                 'id' => 'containers',
                 'title' => __('Containers'),
-                'description' => __('Start from a repo-first container lane that covers local Docker, remote Docker, and remote Kubernetes targets.'),
-                'enabled' => false,
+                'description' => __('Inspect a repo and launch it onto remote Docker or remote Kubernetes — DigitalOcean or AWS.'),
+                'enabled' => true,
+                'href' => route('launches.containers.create'),
                 'icon' => 'cube',
             ],
             [
                 'id' => 'edge',
                 'title' => __('Edge'),
-                'description' => __('Route edge-runtime and static-network deploys through a dedicated edge path.'),
-                'enabled' => false,
+                'description' => __('Deploy a container image straight onto the dply edge platform — DO App Platform or AWS App Runner.'),
+                'enabled' => true,
+                'href' => route('edge.create'),
                 'icon' => 'globe-alt',
             ],
             [

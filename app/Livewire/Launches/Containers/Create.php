@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Launches;
+namespace App\Livewire\Launches\Containers;
 
 use App\Actions\Servers\GetProviderCredentialsForServerType;
 use App\Actions\Servers\ResolveServerCreateCatalog;
@@ -22,7 +22,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
-class LocalDocker extends Component
+class Create extends Component
 {
     public string $repo_source = 'manual';
 
@@ -36,7 +36,7 @@ class LocalDocker extends Component
 
     public string $repository_selection = '';
 
-    public string $target_family = '';
+    public string $target_family = 'digitalocean_docker';
 
     public string $provider_credential_id = '';
 
@@ -105,9 +105,11 @@ class LocalDocker extends Component
 
         $this->inspection = $inspection;
         $this->has_inspection = true;
-        $this->target_family = $this->target_family !== ''
-            ? $this->target_family
-            : ($inspection['detection']['target_kind'] === 'kubernetes' ? 'local_orbstack_kubernetes' : 'local_orbstack_docker');
+        if ($this->target_family === '') {
+            $this->target_family = $this->defaultTargetForDetection(
+                (string) ($inspection['detection']['target_kind'] ?? ''),
+            );
+        }
         $this->kubernetes_namespace = (string) ($inspection['detection']['kubernetes_namespace'] ?: 'default');
         $this->syncCloudDefaults();
     }
@@ -164,18 +166,57 @@ class LocalDocker extends Component
 
     public function render(): View
     {
-        return view('livewire.launches.local-docker', [
-            'targetOptions' => [
-                ['id' => 'local_orbstack_docker', 'label' => __('Local Docker')],
-                ['id' => 'local_orbstack_kubernetes', 'label' => __('Local Kubernetes')],
-                ['id' => 'digitalocean_docker', 'label' => __('Remote Docker (DigitalOcean)')],
-                ['id' => 'digitalocean_kubernetes', 'label' => __('Remote Kubernetes (DigitalOcean)')],
-                ['id' => 'aws_docker', 'label' => __('Remote Docker (AWS)')],
-                ['id' => 'aws_kubernetes', 'label' => __('Remote Kubernetes (AWS)')],
-            ],
+        return view('livewire.launches.containers.create', [
+            'targetOptions' => $this->targetOptions(),
             'providerCredentials' => $this->providerCredentials(),
             'cloudCatalog' => $this->cloudCatalog(),
+            'connectCredentialUrl' => route('credentials.index'),
         ]);
+    }
+
+    /**
+     * Production targets are remote-only. Local Docker / local Kubernetes
+     * launchers stay available behind DPLY_ENABLE_LOCAL_DOCKER_LAUNCH for
+     * dogfooding (default on in local env, off everywhere else) — they
+     * point at 127.0.0.1 and would be misleading to a customer.
+     *
+     * @return list<array{id: string, label: string}>
+     */
+    private function targetOptions(): array
+    {
+        $options = [
+            ['id' => 'digitalocean_docker', 'label' => __('Remote Docker (DigitalOcean)')],
+            ['id' => 'digitalocean_kubernetes', 'label' => __('Remote Kubernetes (DigitalOcean)')],
+            ['id' => 'aws_docker', 'label' => __('Remote Docker (AWS)')],
+            ['id' => 'aws_kubernetes', 'label' => __('Remote Kubernetes (AWS)')],
+        ];
+
+        if (self::localTargetsEnabled()) {
+            array_unshift(
+                $options,
+                ['id' => 'local_orbstack_docker', 'label' => __('Local Docker (testing only)')],
+                ['id' => 'local_orbstack_kubernetes', 'label' => __('Local Kubernetes (testing only)')],
+            );
+        }
+
+        return $options;
+    }
+
+    public static function localTargetsEnabled(): bool
+    {
+        return filter_var(
+            config('launches.local_docker_enabled', app()->environment('local')),
+            FILTER_VALIDATE_BOOL,
+        );
+    }
+
+    private function defaultTargetForDetection(string $targetKind): string
+    {
+        if ($targetKind === 'kubernetes') {
+            return self::localTargetsEnabled() ? 'local_orbstack_kubernetes' : 'digitalocean_kubernetes';
+        }
+
+        return self::localTargetsEnabled() ? 'local_orbstack_docker' : 'digitalocean_docker';
     }
 
     private function resolvedRepositoryUrl(): string
@@ -197,8 +238,9 @@ class LocalDocker extends Component
 
     private function launchRules(): array
     {
+        $allowedFamilies = collect($this->targetOptions())->pluck('id')->all();
         $rules = [
-            'target_family' => ['required', 'string', 'in:local_orbstack_docker,local_orbstack_kubernetes,digitalocean_docker,digitalocean_kubernetes,aws_docker,aws_kubernetes'],
+            'target_family' => ['required', 'string', 'in:'.implode(',', $allowedFamilies)],
         ];
 
         if (str_starts_with($this->target_family, 'digitalocean_') || str_starts_with($this->target_family, 'aws_')) {

@@ -11,7 +11,7 @@ use App\Jobs\RunSetupScriptJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\WaitForServerSshReadyJob;
-use App\Livewire\Launches\LocalDocker;
+use App\Livewire\Launches\Containers\Create as LaunchesContainersCreate;
 use App\Livewire\Servers\Create as ServersCreate;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney;
@@ -220,9 +220,9 @@ class ServerTest extends TestCase
         $response->assertSee('Serverless');
         $response->assertSee('Coming soon');
         $response->assertSee(route('servers.create'), false);
-        $response->assertDontSee(route('launches.containers'), false);
+        $response->assertSee(route('launches.containers.create'), false);
+        $response->assertSee(route('edge.create'), false);
         $response->assertDontSee(route('launches.serverless'), false);
-        $response->assertDontSee(route('launches.edge-network'), false);
         $response->assertDontSee(route('launches.cloud-network'), false);
     }
 
@@ -249,22 +249,6 @@ class ServerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Kubernetes');
         $response->assertSee('Start with a cluster-first setup');
-    }
-
-    public function test_containers_launch_path_is_displayed_with_organization(): void
-    {
-        $user = $this->userWithOrganization();
-
-        $response = $this->actingAs($user)->get(route('launches.containers'));
-
-        $response->assertOk();
-        $response->assertSee('Containers');
-        $response->assertSee('Shared runtime model');
-        $response->assertSee('Local Docker');
-        $response->assertSee('Remote Kubernetes');
-        $response->assertSee(route('launches.local-docker', absolute: false), false);
-        $response->assertDontSee('host_target=docker', false);
-        $response->assertDontSee('source=launches.containers', false);
     }
 
     public function test_servers_create_is_displayed_with_organization(): void
@@ -299,45 +283,11 @@ class ServerTest extends TestCase
         $response->assertSee('Detected a Docker-host launch path');
     }
 
-    public function test_containers_launch_path_lists_existing_local_targets(): void
-    {
-        $user = $this->userWithOrganization();
-        $organization = $user->currentOrganization();
-
-        $dockerHost = Server::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $organization->id,
-            'name' => 'orbstack-docker',
-            'provider' => 'custom',
-            'meta' => [
-                'host_kind' => Server::HOST_KIND_DOCKER,
-            ],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('launches.containers'));
-
-        $response->assertOk();
-        $response->assertSee('Continue on an existing local target');
-        $response->assertSee('orbstack-docker');
-        $response->assertSee(route('sites.create', $dockerHost), false);
-    }
-
-    public function test_containers_launch_path_links_to_repo_first_local_docker_flow(): void
-    {
-        $user = $this->userWithOrganization();
-
-        $response = $this->actingAs($user)->get(route('launches.containers'));
-
-        $response->assertOk();
-        $response->assertSee(route('launches.local-docker', absolute: false), false);
-        $response->assertSee('Open local Docker');
-    }
-
     public function test_local_docker_repo_first_page_is_displayed(): void
     {
         $user = $this->userWithOrganization();
 
-        $response = $this->actingAs($user)->get(route('launches.local-docker'));
+        $response = $this->actingAs($user)->get(route('launches.containers.create'));
 
         $response->assertOk();
         $response->assertSee('Repo-first containers');
@@ -350,6 +300,7 @@ class ServerTest extends TestCase
     public function test_local_docker_repo_first_flow_auto_creates_hidden_host_and_site(): void
     {
         Bus::fake();
+        config(['launches.local_docker_enabled' => true]);
 
         $user = $this->userWithOrganization();
         $organization = $user->currentOrganization();
@@ -368,9 +319,10 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(LocalDocker::class)
+            ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('repository_branch', 'main')
+            ->set('target_family', 'local_orbstack_docker')
             ->call('launch')
             ->assertHasNoErrors()
             ->assertRedirect();
@@ -406,6 +358,7 @@ class ServerTest extends TestCase
     public function test_local_docker_repo_first_flow_creates_kubernetes_target_when_repo_detects_cluster_markers(): void
     {
         Bus::fake();
+        config(['launches.local_docker_enabled' => true]);
 
         $user = $this->userWithOrganization();
         $organization = $user->currentOrganization();
@@ -424,9 +377,10 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(LocalDocker::class)
+            ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('repository_branch', 'main')
+            ->set('target_family', 'local_orbstack_kubernetes')
             ->call('launch')
             ->assertHasNoErrors()
             ->assertRedirect();
@@ -456,6 +410,7 @@ class ServerTest extends TestCase
     public function test_local_docker_repo_first_flow_stores_low_confidence_detection_metadata(): void
     {
         Bus::fake();
+        config(['launches.local_docker_enabled' => true]);
 
         $user = $this->userWithOrganization();
 
@@ -473,9 +428,10 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(LocalDocker::class)
+            ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('repository_branch', 'main')
+            ->set('target_family', 'local_orbstack_docker')
             ->call('launch')
             ->assertHasNoErrors()
             ->assertRedirect();
@@ -490,6 +446,7 @@ class ServerTest extends TestCase
     public function test_local_docker_repo_first_flow_persists_repository_subdirectory_for_runtime_checkout(): void
     {
         Bus::fake();
+        config(['launches.local_docker_enabled' => true]);
 
         $user = $this->userWithOrganization();
 
@@ -507,10 +464,11 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(LocalDocker::class)
+            ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/monorepo.git')
             ->set('repository_branch', 'main')
             ->set('repository_subdirectory', 'apps/web')
+            ->set('target_family', 'local_orbstack_docker')
             ->call('launch')
             ->assertHasNoErrors()
             ->assertRedirect();
@@ -525,6 +483,7 @@ class ServerTest extends TestCase
     public function test_local_docker_launch_redirects_to_site_workspace(): void
     {
         Bus::fake();
+        config(['launches.local_docker_enabled' => true]);
 
         $user = $this->userWithOrganization();
 
@@ -542,9 +501,10 @@ class ServerTest extends TestCase
         });
 
         $component = Livewire::actingAs($user)
-            ->test(LocalDocker::class)
+            ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('repository_branch', 'main')
+            ->set('target_family', 'local_orbstack_docker')
             ->call('launch')
             ->assertHasNoErrors()
             ->assertRedirect();
@@ -571,7 +531,7 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(LocalDocker::class)
+            ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->call('inspectRepository')
             ->assertSee('Choose the container target')
@@ -603,7 +563,7 @@ class ServerTest extends TestCase
         });
 
         Livewire::actingAs($user)
-            ->test(LocalDocker::class)
+            ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->set('target_family', 'digitalocean_docker')
             ->set('provider_credential_id', (string) $credential->id)
