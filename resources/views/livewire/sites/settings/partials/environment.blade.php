@@ -76,7 +76,7 @@
             <li>{{ __('Set one') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-set {{ $site->slug }} KEY=value</code></li>
             <li>{{ __('Bulk import from .env') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-import {{ $site->slug }} --file=.env</code></li>
             <li>{{ __('Export current as .env') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-export {{ $site->slug }} --to=.env</code></li>
-            <li>{{ __('Diff prod vs staging') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-diff {{ $site->slug }}</code></li>
+            <li>{{ __('Diff prod vs staging') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-diff {{ $site->slug }}</code> {{ __('or') }} <a class="text-slate-700 underline hover:text-slate-900" href="{{ route('sites.env-diff', ['server' => $server, 'site' => $site]) }}" wire:navigate>{{ __('open env-diff page') }}</a></li>
         </ul>
     </details>
 </section>
