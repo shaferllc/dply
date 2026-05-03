@@ -32,7 +32,10 @@ class RunSiteUptimeMonitorCheckJobTest extends TestCase
             'last_ok' => null,
         ]);
 
-        (new RunSiteUptimeMonitorCheckJob($monitor->id))->handle(app(SiteUptimeCheckUrlResolver::class));
+        (new RunSiteUptimeMonitorCheckJob($monitor->id))->handle(
+            app(SiteUptimeCheckUrlResolver::class),
+            app(\App\Services\Notifications\NotificationPublisher::class),
+        );
 
         $monitor->refresh();
         $this->assertTrue($monitor->last_ok);

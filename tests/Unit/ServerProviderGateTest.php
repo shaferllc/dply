@@ -25,7 +25,12 @@ class ServerProviderGateTest extends TestCase
 
     public function test_default_server_create_type_skips_disabled_digitalocean(): void
     {
+        // Disable the entire DO family — digitalocean_functions and
+        // digitalocean_kubernetes are next in SERVER_CREATE_ORDER and would
+        // otherwise be picked up before hetzner.
         config(['server_providers.enabled.digitalocean' => false]);
+        config(['server_providers.enabled.digitalocean_functions' => false]);
+        config(['server_providers.enabled.digitalocean_kubernetes' => false]);
         config(['server_providers.enabled.hetzner' => true]);
         config(['server_providers.enabled.custom' => true]);
 
