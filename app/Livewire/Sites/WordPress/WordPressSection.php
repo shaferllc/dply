@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Services\RemoteCli\Kind;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
 use App\Services\RemoteCli\WpCli;
+use App\Services\WordPress\Advisories\AdvisoryProvider;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
@@ -40,6 +41,17 @@ class WordPressSection extends Component
 
     /** Most recent run id rendered in the Console output panel. */
     public ?int $latestRunId = null;
+
+    /**
+     * Plugins-tab cache. Populated by loadPlugins() from
+     * `wp plugin list --format=json`. Each entry is enriched with
+     * any open advisories from the AdvisoryProvider.
+     *
+     * @var list<array{name: string, status: string, version: string, update: string, advisories: list<array<string, mixed>>}>
+     */
+    public array $plugins = [];
+
+    public bool $pluginsLoaded = false;
 
     public function mount(Site $site): void
     {
@@ -122,6 +134,81 @@ class WordPressSection extends Component
         $meta['wp_cron'] = ['handler' => 'system_cron', 'switched_at' => now()->toISOString()];
         $this->site->meta = $meta;
         $this->site->save();
+    }
+
+    /**
+     * Plugins sub-tab loader — runs `wp plugin list --format=json`
+     * synchronously (the command is on the INSTANT allowlist) and
+     * decorates each entry with any open advisories from the
+     * AdvisoryProvider.
+     */
+    public function loadPlugins(WpCli $wpcli, AdvisoryProvider $advisories): void
+    {
+        try {
+            $result = $wpcli->run(
+                site: $this->site,
+                command: 'plugin list',
+                args: ['--format=json'],
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('plugins', __('Your role can\'t inspect plugins on this site.'));
+
+            return;
+        }
+
+        $stdout = trim($result->stdout());
+        $rows = $stdout !== '' ? json_decode($stdout, associative: true) : [];
+        if (! is_array($rows)) {
+            $this->addError('plugins', __('wp plugin list returned non-JSON output.'));
+            $this->plugins = [];
+            $this->pluginsLoaded = true;
+
+            return;
+        }
+
+        $this->plugins = array_values(array_map(function (array $row) use ($advisories): array {
+            $name = (string) ($row['name'] ?? '');
+            $version = (string) ($row['version'] ?? '');
+            $advisoryList = $name !== '' && $version !== ''
+                ? $advisories->forPlugin($name, $version)
+                : [];
+
+            return [
+                'name' => $name,
+                'status' => (string) ($row['status'] ?? ''),
+                'version' => $version,
+                'update' => (string) ($row['update'] ?? 'none'),
+                'advisories' => array_map(fn ($a) => [
+                    'id' => $a->id,
+                    'title' => $a->title,
+                    'severity' => $a->severity,
+                    'cve' => $a->cve,
+                    'patched' => $a->patchedVersion,
+                    'url' => $a->url,
+                ], $advisoryList),
+            ];
+        }, array_filter($rows, 'is_array')));
+
+        $this->pluginsLoaded = true;
+    }
+
+    /**
+     * Bulk update everything reporting "available" — single
+     * `wp plugin update --all` async dispatch (Q14 plugins sub-tab).
+     */
+    public function updateAllPlugins(WpCli $wpcli): void
+    {
+        try {
+            $wpcli->run(
+                site: $this->site,
+                command: 'plugin update',
+                args: ['--all'],
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('plugins', __('Updates require admin or owner role.'));
+        }
     }
 
     /**

@@ -101,6 +101,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // WordPress advisory feed (Q20 — Wordfence Intelligence default).
+        // Singleton because it caches per-request lookups in process.
+        $this->app->singleton(\App\Services\WordPress\Advisories\AdvisoryProvider::class, \App\Services\WordPress\Advisories\WordfenceIntelligenceProvider::class);
+
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
         $this->app->singleton(ServerlessProvisionerFactory::class);

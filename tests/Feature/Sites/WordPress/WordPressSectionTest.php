@@ -14,6 +14,8 @@ use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\RemoteCli\Kind;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\WordPress\Advisories\Advisory;
+use App\Services\WordPress\Advisories\AdvisoryProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
@@ -149,6 +151,98 @@ class WordPressSectionTest extends TestCase
             ->set('tab', 'cron')
             ->assertSee('wp-cron via HTTP (default)')
             ->assertSee('Switch to system cron');
+    }
+
+    public function test_load_plugins_runs_wp_plugin_list_and_decorates_with_advisories(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+
+        // wp plugin list is on the INSTANT allowlist — runs sync.
+        // RemoteCli::executeSync collects stdout via the per-chunk
+        // callback, so the mock must invoke it to populate the result.
+        $jsonOutput = json_encode([
+            ['name' => 'akismet', 'status' => 'active', 'version' => '5.3', 'update' => 'available'],
+            ['name' => 'hello',    'status' => 'inactive', 'version' => '1.7', 'update' => 'none'],
+        ]);
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $executor->shouldReceive('runInlineBashWithOutputCallback')
+            ->once()
+            ->withArgs(function ($s, $name, $bash, callable $cb) use ($jsonOutput) {
+                $cb('out', $jsonOutput);
+
+                return true;
+            })
+            ->andReturn(new ProcessOutput($jsonOutput, 0, false));
+        app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+        // Advisory provider returns one CVE for akismet 5.3 only.
+        $advisories = Mockery::mock(AdvisoryProvider::class);
+        $advisories->shouldReceive('forPlugin')
+            ->withArgs(fn (string $slug, string $v) => $slug === 'akismet' && $v === '5.3')
+            ->andReturn([new Advisory('wfi-1', 'XSS in akismet', 'high', 'CVE-2024-X', '5.4', 'https://example.com/cve')]);
+        $advisories->shouldReceive('forPlugin')
+            ->withArgs(fn (string $slug) => $slug === 'hello')
+            ->andReturn([]);
+        app()->instance(AdvisoryProvider::class, $advisories);
+
+        $component = Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'plugins')
+            ->call('loadPlugins')
+            ->assertSet('pluginsLoaded', true);
+
+        $plugins = $component->get('plugins');
+        $this->assertCount(2, $plugins);
+        $this->assertSame('akismet', $plugins[0]['name']);
+        $this->assertSame('available', $plugins[0]['update']);
+        $this->assertCount(1, $plugins[0]['advisories']);
+        $this->assertSame('CVE-2024-X', $plugins[0]['advisories'][0]['cve']);
+        $this->assertCount(0, $plugins[1]['advisories']);
+    }
+
+    public function test_load_plugins_handles_empty_install_gracefully(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $executor->shouldReceive('runInlineBashWithOutputCallback')
+            ->withArgs(function ($s, $name, $bash, callable $cb) {
+                $cb('out', '[]');
+
+                return true;
+            })
+            ->andReturn(new ProcessOutput('[]', 0, false));
+        app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+        $advisories = Mockery::mock(AdvisoryProvider::class);
+        $advisories->shouldNotReceive('forPlugin');
+        app()->instance(AdvisoryProvider::class, $advisories);
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'plugins')
+            ->call('loadPlugins')
+            ->assertSet('plugins', [])
+            ->assertSet('pluginsLoaded', true);
+    }
+
+    public function test_update_all_plugins_dispatches_async_command(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+
+        // 'plugin update' is mutating-recoverable but NOT instant — async dispatch.
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $executor->shouldReceive('runInlineBashWithOutputCallback')
+            ->andReturn(new ProcessOutput('ok', 0, false));
+        app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'plugins')
+            ->call('updateAllPlugins');
+
+        $run = RemoteCliRun::query()->where('command', 'plugin update')->sole();
+        $this->assertSame(['--all'], $run->args);
     }
 
     public function test_switch_to_system_cron_records_handler_on_meta(): void
