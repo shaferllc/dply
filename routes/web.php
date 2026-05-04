@@ -240,6 +240,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('servers.show');
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
+    Route::livewire('servers/{server}/sites/{site}/scaffold-journey', \App\Livewire\Sites\ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::livewire('servers/{server}/sites/{site}/env-diff', SitesEnvDiff::class)->name('sites.env-diff');
     Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');

@@ -285,7 +285,7 @@ class Create extends Component
             session()->flash('info', __('WordPress site queued for scaffolding. The pipeline runs in the background.'));
         }
 
-        return $this->redirect(route('sites.show', [
+        return $this->redirect(route('sites.scaffold-journey', [
             'server' => $this->server,
             'site' => $site,
         ]), navigate: true);
