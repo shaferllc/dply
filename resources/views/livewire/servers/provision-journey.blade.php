@@ -1,6 +1,29 @@
 @php
     $card = 'dply-card overflow-hidden';
     $progressPercent = $totalCount > 0 ? (int) round(($completedCount / $totalCount) * 100) : 0;
+
+    // Two-phase progress so the headline never reads "100%" until BOTH
+    // cloud + setup are done. Without this, the single combined counter
+    // jumps from "6/6" to "4/23" the moment the setup script dispatches
+    // and 18 step labels populate retroactively — looks to the operator
+    // like provisioning restarted from the beginning. Splitting into
+    // separate bars keeps each phase honest.
+    $cloudKeys = ['queued', 'provisioning', 'ip', 'ssh'];
+    $cloudSteps = collect($steps)->whereIn('key', $cloudKeys);
+    $cloudDone = $cloudSteps->where('state', 'completed')->count();
+    $cloudTotal = $cloudSteps->count() ?: count($cloudKeys);
+    $cloudPercent = $cloudTotal > 0 ? (int) round(($cloudDone / $cloudTotal) * 100) : 0;
+
+    // Setup steps are anything between the cloud-side keys and the
+    // final 'ready' step — script_* hashes once the bash body has been
+    // parsed, OR the 'setup' placeholder pre-dispatch.
+    $setupSteps = collect($steps)->whereNotIn('key', array_merge($cloudKeys, ['ready']));
+    $setupDone = $setupSteps->where('state', 'completed')->count();
+    $setupTotal = $setupSteps->count();
+    $setupActive = $setupSteps->where('state', 'active')->isNotEmpty();
+    $setupStarted = $setupActive || $setupDone > 0;
+    $setupPercent = $setupTotal > 0 ? (int) round(($setupDone / $setupTotal) * 100) : 0;
+
     $journeyAlerts = [];
     if (! empty($infrastructureAlerts['digitalocean_gone'] ?? null)) {
         $journeyAlerts['digitalocean_gone'] = $infrastructureAlerts['digitalocean_gone'];
@@ -16,7 +39,17 @@
 
 <div
     @if ($shouldPoll)
-        wire:poll.5s
+        {{-- Polling cadence + visibility gating to keep the journey
+             page from thrashing when the operator has multiple tabs
+             open or has switched away.
+             - 10s base interval (was 5s — 2× headroom against Livewire
+               request stacking with multiple tabs open)
+             - .visible modifier uses IntersectionObserver, which both
+               pauses the poll when the journey panel is scrolled out
+               of view AND when the browser tab is hidden (browsers
+               throttle IO entries on backgrounded tabs, so polling
+               effectively stops within ~250ms of tab-switch). --}}
+        wire:poll.10s.visible
     @endif
     x-data
 >
@@ -158,7 +191,18 @@
                                     </span>
                                 @endif
                             </div>
-                            <h2 class="mt-2 text-xl font-semibold tracking-tight text-brand-ink sm:text-2xl">{{ __('Installation tasks (:done/:total)', ['done' => $completedCount, 'total' => $totalCount]) }}</h2>
+                            {{-- Headline reports per-phase progress so it doesn't jump
+                                 backwards when the setup script dispatches and total
+                                 step count grows. The combined :done/:total is still
+                                 useful for log signatures internally; the operator
+                                 sees phased numbers up here. --}}
+                            <h2 class="mt-2 text-xl font-semibold tracking-tight text-brand-ink sm:text-2xl">
+                                @if ($setupStarted)
+                                    {{ __('Server setup (:done/:total)', ['done' => $setupDone, 'total' => $setupTotal]) }}
+                                @else
+                                    {{ __('Cloud provisioning (:done/:total)', ['done' => $cloudDone, 'total' => $cloudTotal]) }}
+                                @endif
+                            </h2>
                             <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss">
                                 @if ($journeyHasFailed)
                                     {{ __('Provisioning hit an error. Review the failure details below, then click Resume install — it re-runs the full script, but already-completed steps (installed packages, written configs) are detected and skipped quickly.') }}
@@ -206,16 +250,45 @@
                         </div>
                     </div>
 
-                    <div>
-                        <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                            <span class="text-sm font-medium text-brand-ink">{{ __('Progress') }}</span>
-                            <span class="text-sm tabular-nums text-brand-moss">{{ __(':done of :total steps', ['done' => $completedCount, 'total' => $totalCount]) }}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <div class="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/80">
-                                <div class="h-full rounded-full bg-emerald-600 transition-[width] duration-300" style="width: {{ $progressPercent }}%"></div>
+                    <div class="space-y-4">
+                        {{-- Phase 1: cloud-side provisioning (DO API → IP → SSH up) --}}
+                        <div>
+                            <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                                <span class="inline-flex items-center gap-2 text-sm font-medium text-brand-ink">
+                                    <x-heroicon-m-cloud class="h-4 w-4 text-brand-moss" />
+                                    {{ __('Cloud provisioning') }}
+                                </span>
+                                <span class="text-sm tabular-nums text-brand-moss">{{ __(':done of :total', ['done' => $cloudDone, 'total' => $cloudTotal]) }}</span>
                             </div>
-                            <span class="shrink-0 text-sm font-semibold tabular-nums text-brand-forest">{{ $progressPercent }}%</span>
+                            <div class="flex items-center gap-3">
+                                <div class="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/80">
+                                    <div class="h-full rounded-full bg-sky-600 transition-[width] duration-300" style="width: {{ $cloudPercent }}%"></div>
+                                </div>
+                                <span class="shrink-0 text-sm font-semibold tabular-nums text-sky-700">{{ $cloudPercent }}%</span>
+                            </div>
+                        </div>
+
+                        {{-- Phase 2: server setup (the 18-step installer running on the droplet via SSH).
+                             "Pending" until the cloud phase finishes + the setup script dispatches; once
+                             the script is in flight, the bar fills from 0 → 100 of N script steps. --}}
+                        <div>
+                            <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                                <span class="inline-flex items-center gap-2 text-sm font-medium text-brand-ink">
+                                    <x-heroicon-m-wrench-screwdriver class="h-4 w-4 text-brand-moss" />
+                                    {{ __('Server setup') }}
+                                </span>
+                                @if ($setupStarted)
+                                    <span class="text-sm tabular-nums text-brand-moss">{{ __(':done of :total', ['done' => $setupDone, 'total' => $setupTotal]) }}</span>
+                                @else
+                                    <span class="text-sm tabular-nums text-brand-mist">{{ __('Waiting for cloud phase') }}</span>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/80">
+                                    <div class="h-full rounded-full bg-emerald-600 transition-[width] duration-300" style="width: {{ $setupStarted ? $setupPercent : 0 }}%"></div>
+                                </div>
+                                <span class="shrink-0 text-sm font-semibold tabular-nums {{ $setupStarted ? 'text-brand-forest' : 'text-brand-mist' }}">{{ $setupStarted ? $setupPercent.'%' : '—' }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
