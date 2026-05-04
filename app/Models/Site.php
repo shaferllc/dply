@@ -53,6 +53,15 @@ class Site extends Model
 
     public const STATUS_CONTAINER_FAILED = 'container_failed';
 
+    /**
+     * Site row exists, scaffold pipeline (PR 5/6) is in flight.
+     * Distinct from container_provisioning so Container vs Scaffold
+     * journeys don't share states or audit shapes.
+     */
+    public const STATUS_SCAFFOLDING = 'scaffolding';
+
+    public const STATUS_SCAFFOLD_FAILED = 'scaffold_failed';
+
     public const STATUS_ERROR = 'error';
 
     public const SSL_NONE = 'none';

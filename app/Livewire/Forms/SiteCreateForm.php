@@ -14,6 +14,28 @@ class SiteCreateForm extends Form
 
     public string $name = '';
 
+    /**
+     * Source mode for the new site:
+     *  - 'import':   bring an existing repo (current default behaviour)
+     *  - 'scaffold': spin up a fresh app from a starter template (Laravel / WordPress)
+     *
+     * Drives the wizard's "branch at step 1" toggle (Q3). Scaffold mode
+     * collects fewer fields and dispatches a separate pipeline (PR 5/6).
+     */
+    public string $mode = 'import';
+
+    /**
+     * Starter template chosen when mode === 'scaffold'.
+     * Empty for import mode. v1 supports 'laravel' and 'wordpress' (Q4).
+     */
+    public string $scaffold_framework = '';
+
+    /**
+     * Admin email collected on the scaffold-mode form. Used to seed the
+     * first WordPress / Breeze user on a successful scaffold (Q11).
+     */
+    public string $scaffold_admin_email = '';
+
     public string $type = 'php';
 
     public string $document_root = '/var/www/app/public';

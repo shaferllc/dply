@@ -147,4 +147,15 @@ return [
 
     'supervisor_health_notify_org_admins' => filter_var(env('DPLY_SUPERVISOR_HEALTH_NOTIFY_ADMINS', true), FILTER_VALIDATE_BOOL),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Site scaffolding (Laravel + WordPress one-click installs)
+    |--------------------------------------------------------------------------
+    | Gates the new "scaffold a fresh app" branch of the Site Create wizard
+    | plus the WordPress Site Settings section. Default off until the
+    | back-end pipelines (PR 5–6) and journey UI (PR 7) ship; flips on once
+    | the pipeline is reliable end-to-end.
+    */
+    'scaffold_v1_enabled' => filter_var(env('DPLY_SCAFFOLD_V1_ENABLED', false), FILTER_VALIDATE_BOOL),
+
 ];
