@@ -116,22 +116,22 @@ class StepWhat extends Component
             return;
         }
 
-        // Preset → form field mapping. Empty / null preset values stay
-        // empty so the user can fill them manually for the static-host
-        // and database-node tiles (which intentionally clear PHP).
+        // Preset → form field mapping. The preset describes the FULL
+        // stack — anything the preset omits is treated as "not installed"
+        // so clicking Rails clears the stale PHP pin from a prior Laravel
+        // selection, and clicking Static clears DB/cache. Operators can
+        // re-add anything in the override panel below.
         $this->form->server_role = $preset['role'];
-        if ($preset['webserver'] !== null) {
-            $this->form->webserver = $preset['webserver'];
-        }
-        if ($preset['php_version'] !== null) {
-            $this->form->php_version = $preset['php_version'];
-        }
-        if ($preset['database'] !== null) {
-            $this->form->database = $preset['database'];
-        }
-        if ($preset['cache'] !== null) {
-            $this->form->cache_service = $preset['cache'];
-        }
+        $this->form->webserver = $preset['webserver'] ?? 'none';
+        $this->form->php_version = $preset['php_version'] ?? 'none';
+        $this->form->database = $preset['database'] ?? 'none';
+        $this->form->cache_service = $preset['cache'] ?? 'none';
+
+        $runtimes = $preset['runtimes'];
+        $this->form->ruby_version = (string) ($runtimes['ruby'] ?? '');
+        $this->form->node_version = (string) ($runtimes['node'] ?? '');
+        $this->form->python_version = (string) ($runtimes['python'] ?? '');
+        $this->form->go_version = (string) ($runtimes['go'] ?? '');
 
         // Persist the preset choice on the draft so re-entering the step
         // remembers the tile the user clicked. Stored under the existing

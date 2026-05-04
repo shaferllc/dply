@@ -8,7 +8,14 @@
 # (`ubuntu-24-04-x64`). Keep these in lockstep so a script that
 # passes locally will also pass on a real droplet without surprise
 # package-availability or systemd-unit differences.
-FROM ubuntu:24.04
+#
+# The platform is pinned to linux/amd64 because DO droplets are x86_64
+# (note the "-x64" in the image slug), and several apt sources we rely
+# on — most notably packages.sury.org/php — only ship a meaningful
+# package set for amd64 on noble. On Apple Silicon hosts this runs
+# under QEMU emulation; that's an acceptable cost for staying faithful
+# to the cloud target and avoiding arch-specific package gaps.
+FROM --platform=linux/amd64 ubuntu:24.04
 
 ENV container=docker
 ARG DEBIAN_FRONTEND=noninteractive
@@ -62,28 +69,35 @@ RUN apt-get update \
 # user so scripts that assume `su - ubuntu` or `sudo -u ubuntu`
 # work the same way as on a real droplet. Root SSH still works for
 # the bootstrap path; this is only for parity with cloud images.
-RUN useradd -m -s /bin/bash -G sudo ubuntu \
+#
+# Recent ubuntu:24.04 base images already ship with a UID-1000 `ubuntu`
+# user (matching the cloud image), so create-if-missing and then ensure
+# group membership / home / .ssh regardless of which side created it.
+RUN id -u ubuntu >/dev/null 2>&1 || useradd -m -s /bin/bash ubuntu \
+ && usermod -aG sudo ubuntu \
  && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-ubuntu \
  && chmod 0440 /etc/sudoers.d/90-ubuntu \
- && mkdir -p /home/ubuntu/.ssh \
- && chmod 700 /home/ubuntu/.ssh \
- && chown -R ubuntu:ubuntu /home/ubuntu/.ssh
+ && install -d -m 0700 -o ubuntu -g ubuntu /home/ubuntu/.ssh
 
-# Pre-install the ondrej/php PPA + PHP 8.4 packages so the bootstrap script's
+# Pre-install Ondřej Surý's PHP 8.4 packages so the bootstrap script's
 # skip-if-already-present checks short-circuit the launchpad fetch path
-# entirely. Docker on macOS regularly fails to reach
-# ppa.launchpadcontent.net (185.125.190.*) due to its NAT/IPv4 routing,
-# which would otherwise stall fake-cloud provisioning for ~80s before
-# bombing out. Baking the artifacts into the image makes the local UX
-# instant and matches what a "fresh + already-bootstrapped" cloud VM
-# would look like to dply.
+# entirely.
+#
+# We pull from packages.sury.org (Surý's own apt repo) instead of the
+# Launchpad PPA mirror. Both ship the same packages — Surý maintains
+# them — but Docker on macOS routinely cannot reach
+# ppa.launchpadcontent.net (185.125.190.*) due to NAT/IPv4 routing,
+# which would otherwise stall fake-cloud provisioning ~80s before
+# timing out. sury.org rides a Fastly-fronted CDN that's reachable
+# from the same Docker network in <1s, so swapping the source
+# eliminates the flake without changing what gets installed.
 RUN install -d -m 0755 /etc/apt/keyrings \
  && curl -fsSL --retry 5 --retry-delay 3 --max-time 90 \
-        "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14aa40ec0831756756d7f66c4f4ea0aae5267a6c" \
-        | gpg --dearmor --yes -o /etc/apt/keyrings/ondrej-php.gpg \
- && chmod 0644 /etc/apt/keyrings/ondrej-php.gpg \
- && echo "deb [signed-by=/etc/apt/keyrings/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu noble main" \
-        > /etc/apt/sources.list.d/ondrej-php.list \
+        https://packages.sury.org/php/apt.gpg \
+        -o /etc/apt/keyrings/sury-php.gpg \
+ && chmod 0644 /etc/apt/keyrings/sury-php.gpg \
+ && echo "deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ noble main" \
+        > /etc/apt/sources.list.d/sury-php.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
         php8.4-cli php8.4-fpm php8.4-common \

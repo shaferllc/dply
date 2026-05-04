@@ -42,7 +42,41 @@ class ServerCreateStepWhatPresetsTest extends TestCase
             ->assertSet('form.server_role', 'application')
             ->assertSet('form.webserver', 'nginx')
             ->assertSet('form.database', 'postgres17')
-            ->assertSet('form.cache_service', 'redis');
+            ->assertSet('form.cache_service', 'redis')
+            ->assertSet('form.ruby_version', '3.3')
+            // Rails has no PHP — applying the preset clears any prior pin
+            // back to "none" so review screen reflects the actual stack.
+            ->assertSet('form.php_version', 'none')
+            ->assertSet('form.node_version', '')
+            ->assertSet('form.python_version', '')
+            ->assertSet('form.go_version', '');
+    }
+
+    public function test_apply_preset_for_polyglot_fills_every_language_runtime(): void
+    {
+        $user = $this->seedUserWithDraft();
+
+        Livewire::actingAs($user)
+            ->test(StepWhat::class)
+            ->call('applyPreset', 'polyglot')
+            ->assertSet('form.ruby_version', '3.3')
+            ->assertSet('form.node_version', '22')
+            ->assertSet('form.python_version', '3.12')
+            ->assertSet('form.go_version', '1.22')
+            ->assertSet('form.php_version', '8.4');
+    }
+
+    public function test_switching_from_rails_to_laravel_clears_ruby_pin(): void
+    {
+        $user = $this->seedUserWithDraft();
+
+        Livewire::actingAs($user)
+            ->test(StepWhat::class)
+            ->call('applyPreset', 'rails')
+            ->assertSet('form.ruby_version', '3.3')
+            ->call('applyPreset', 'laravel')
+            ->assertSet('form.ruby_version', '')
+            ->assertSet('form.php_version', '8.4');
     }
 
     public function test_apply_preset_for_polyglot_keeps_php_pinned(): void

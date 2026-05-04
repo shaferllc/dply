@@ -42,6 +42,20 @@ class ServerCreateForm extends Form
 
     public string $php_version = '8.3';
 
+    /**
+     * Per-language runtime versions, set when the operator picks a stack
+     * template (Rails → ruby_version, Next.js → node_version, etc.) and
+     * overridable individually on Step 3. Empty string means "not used
+     * by this stack" and the form treats it as not-installed.
+     */
+    public string $ruby_version = '';
+
+    public string $node_version = '';
+
+    public string $python_version = '';
+
+    public string $go_version = '';
+
     public string $database = 'mysql84';
 
     public string $install_profile = 'laravel_app';

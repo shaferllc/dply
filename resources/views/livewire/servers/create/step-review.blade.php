@@ -61,6 +61,24 @@
                         <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Web / PHP / DB / Cache') }}</dt>
                         <dd class="mt-1 font-medium text-brand-ink">{{ $form->webserver }} · {{ $form->php_version }} · {{ $form->database }} · {{ $form->cache_service }}</dd>
                     </div>
+                    @php
+                        $languageRuntimes = array_filter([
+                            'Ruby' => $form->ruby_version,
+                            'Node' => $form->node_version,
+                            'Python' => $form->python_version,
+                            'Go' => $form->go_version,
+                        ], fn ($v) => $v !== '');
+                    @endphp
+                    @if ($languageRuntimes !== [])
+                        <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 sm:col-span-2">
+                            <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Language runtimes') }}</dt>
+                            <dd class="mt-1 font-medium text-brand-ink">
+                                @foreach ($languageRuntimes as $name => $version)
+                                    {{ $name }} {{ $version }}@if (! $loop->last) · @endif
+                                @endforeach
+                            </dd>
+                        </div>
+                    @endif
                 @endif
             </dl>
         </section>

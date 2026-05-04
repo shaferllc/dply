@@ -112,6 +112,12 @@ final class StoreServerFromCreateForm
             $form->webserver,
             $form->php_version,
             $form->database,
+            [
+                'ruby' => $form->ruby_version,
+                'node' => $form->node_version,
+                'python' => $form->python_version,
+                'go' => $form->go_version,
+            ],
         );
     }
 
