@@ -244,6 +244,82 @@ class WordPressSection extends Component
     }
 
     /**
+     * Hardening sub-tab — flip a Q18 opinion on or off.
+     *
+     * Each opinion maps to a wp-cli call + a meta.scaffold.hardening
+     * entry update. The meta is the single source of truth for the
+     * UI; the wp-cli call is the side effect that makes the live site
+     * actually match.
+     */
+    public function toggleHardening(string $opinionKey, WpCli $wpcli): void
+    {
+        $org = $this->site->organization;
+        if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
+            $this->addError('hardening', __('Admin or owner role required to change hardening defaults.'));
+
+            return;
+        }
+
+        $allowed = ['disallow_file_edit', 'force_ssl_admin', 'disable_wp_cron'];
+        if (! in_array($opinionKey, $allowed, true)) {
+            $this->addError('hardening', __('Unknown hardening opinion.'));
+
+            return;
+        }
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $opinions = $meta['scaffold']['hardening'] ?? [];
+        $current = collect($opinions)->firstWhere('key', $opinionKey);
+        $newEnabled = ! ($current['enabled'] ?? false);
+
+        $constant = match ($opinionKey) {
+            'disallow_file_edit' => 'DISALLOW_FILE_EDIT',
+            'force_ssl_admin' => 'FORCE_SSL_ADMIN',
+            'disable_wp_cron' => 'DISABLE_WP_CRON',
+        };
+
+        try {
+            if ($newEnabled) {
+                $wpcli->run(
+                    site: $this->site,
+                    command: 'config set',
+                    args: [$constant, 'true', '--raw', '--type=constant'],
+                    queuedBy: auth()->user(),
+                );
+            } else {
+                $wpcli->run(
+                    site: $this->site,
+                    command: 'config delete',
+                    args: [$constant, '--type=constant'],
+                    queuedBy: auth()->user(),
+                );
+            }
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('hardening', __('Permission denied: :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        // Upsert the opinion row in meta — set enabled flag, leave
+        // unrelated keys untouched so PR 6's full set persists.
+        $found = false;
+        foreach ($opinions as &$row) {
+            if (($row['key'] ?? null) === $opinionKey) {
+                $row['enabled'] = $newEnabled;
+                $found = true;
+                break;
+            }
+        }
+        unset($row);
+        if (! $found) {
+            $opinions[] = ['key' => $opinionKey, 'enabled' => $newEnabled];
+        }
+        $meta['scaffold']['hardening'] = $opinions;
+        $this->site->meta = $meta;
+        $this->site->save();
+    }
+
+    /**
      * @return Collection<int, Snapshot>
      */
     public function snapshots(): Collection

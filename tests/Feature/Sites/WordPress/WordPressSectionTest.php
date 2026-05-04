@@ -285,6 +285,109 @@ class WordPressSectionTest extends TestCase
             ->assertSee('manual');
     }
 
+    public function test_hardening_tab_renders_existing_opinions_as_toggles(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+        $site->meta = ['scaffold' => [
+            'framework' => 'wordpress',
+            'hardening' => [
+                ['key' => 'disallow_file_edit', 'enabled' => true],
+                ['key' => 'force_ssl_admin', 'enabled' => false],
+            ],
+        ]];
+        $site->save();
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'hardening')
+            ->assertSee('Hardening defaults')
+            ->assertSee('DISALLOW_FILE_EDIT')
+            ->assertSee('FORCE_SSL_ADMIN')
+            ->assertSee('DISABLE_WP_CRON');
+    }
+
+    public function test_toggle_hardening_runs_wp_config_set_and_updates_meta(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+        $site->meta = ['scaffold' => [
+            'framework' => 'wordpress',
+            'hardening' => [['key' => 'force_ssl_admin', 'enabled' => false]],
+        ]];
+        $site->save();
+
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $executor->shouldReceive('runInlineBashWithOutputCallback')
+            ->andReturn(new ProcessOutput('Success', 0, false));
+        app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'hardening')
+            ->call('toggleHardening', 'force_ssl_admin');
+
+        $site->refresh();
+        $opinion = collect($site->meta['scaffold']['hardening'])->firstWhere('key', 'force_ssl_admin');
+        $this->assertTrue($opinion['enabled']);
+
+        $run = RemoteCliRun::query()->where('command', 'config set')->sole();
+        $this->assertSame(['FORCE_SSL_ADMIN', 'true', '--raw', '--type=constant'], $run->args);
+    }
+
+    public function test_toggle_hardening_off_runs_wp_config_delete(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+        $site->meta = ['scaffold' => [
+            'framework' => 'wordpress',
+            'hardening' => [['key' => 'disallow_file_edit', 'enabled' => true]],
+        ]];
+        $site->save();
+
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $executor->shouldReceive('runInlineBashWithOutputCallback')
+            ->andReturn(new ProcessOutput('Success', 0, false));
+        app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'hardening')
+            ->call('toggleHardening', 'disallow_file_edit');
+
+        $site->refresh();
+        $opinion = collect($site->meta['scaffold']['hardening'])->firstWhere('key', 'disallow_file_edit');
+        $this->assertFalse($opinion['enabled']);
+
+        $run = RemoteCliRun::query()->where('command', 'config delete')->sole();
+        $this->assertSame(['DISALLOW_FILE_EDIT', '--type=constant'], $run->args);
+    }
+
+    public function test_toggle_hardening_blocks_member_role(): void
+    {
+        [$user, $site] = $this->makeWpSite(userRole: 'member');
+
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $executor->shouldNotReceive('runInlineBashWithOutputCallback');
+        app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'hardening')
+            ->call('toggleHardening', 'disable_wp_cron')
+            ->assertHasErrors('hardening');
+
+        $this->assertSame(0, RemoteCliRun::query()->count());
+    }
+
+    public function test_toggle_hardening_rejects_unknown_opinion(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'hardening')
+            ->call('toggleHardening', 'totally-fake-opinion')
+            ->assertHasErrors('hardening');
+    }
+
     public function test_switch_to_system_cron_records_handler_on_meta(): void
     {
         [$user, $site] = $this->makeWpSite();

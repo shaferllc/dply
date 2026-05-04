@@ -14,7 +14,7 @@
             'plugins' => ['label' => __('Plugins'), 'enabled' => true],
             'database' => ['label' => __('Database'), 'enabled' => true],
             'cron' => ['label' => __('Cron'), 'enabled' => true],
-            'hardening' => ['label' => __('Hardening'), 'enabled' => false],
+            'hardening' => ['label' => __('Hardening'), 'enabled' => true],
         ] as $key => $meta)
             <button
                 type="button"
@@ -278,10 +278,69 @@
         </section>
     @endif
 
-    {{-- Placeholder sub-tabs --}}
+    {{-- HARDENING --}}
     @if ($tab === 'hardening')
-        <section class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-cream/20 p-8 text-center">
-            <p class="text-sm text-brand-mist">{{ __('This sub-tab ships in the next release.') }}</p>
+        @php
+            $hardeningOpinions = collect(data_get($site->meta, 'scaffold.hardening', []))->keyBy('key');
+            $opinions = [
+                'disallow_file_edit' => [
+                    'title' => __('Disallow in-admin file editor'),
+                    'description' => __('Removes the Plugins / Themes file editor from wp-admin. Common attack vector for compromised admin accounts.'),
+                    'wp_constant' => 'DISALLOW_FILE_EDIT',
+                ],
+                'force_ssl_admin' => [
+                    'title' => __('Force SSL on /wp-admin'),
+                    'description' => __('Refuses unencrypted login + admin pages. Required for the placeholder URL since it ships with HTTPS.'),
+                    'wp_constant' => 'FORCE_SSL_ADMIN',
+                ],
+                'disable_wp_cron' => [
+                    'title' => __('Disable wp-cron'),
+                    'description' => __('Prevents WP from running cron on every page load. Pair with the Cron tab\'s "system cron" switch for the recommended setup.'),
+                    'wp_constant' => 'DISABLE_WP_CRON',
+                ],
+            ];
+        @endphp
+        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+            <header>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Hardening defaults') }}</h3>
+                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Each toggle below is an opinion the WordPress scaffold pipeline applied. Flip any of them off if your site has a specific reason — your audit log records every change.') }}</p>
+            </header>
+
+            <x-input-error :messages="$errors->get('hardening')" class="mt-3" />
+
+            <div class="mt-5 space-y-3">
+                @foreach ($opinions as $key => $copy)
+                    @php $enabled = (bool) ($hardeningOpinions[$key]['enabled'] ?? false); @endphp
+                    <div class="flex items-start justify-between gap-4 rounded-xl border border-brand-ink/10 bg-brand-cream/20 p-4">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-semibold text-brand-ink">{{ $copy['title'] }}</p>
+                                <span class="rounded bg-brand-ink/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $copy['wp_constant'] }}</span>
+                            </div>
+                            <p class="mt-1 text-xs text-brand-moss">{{ $copy['description'] }}</p>
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="toggleHardening('{{ $key }}')"
+                            wire:loading.attr="disabled"
+                            wire:target="toggleHardening"
+                            @class([
+                                'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+                                'bg-brand-sage' => $enabled,
+                                'bg-brand-mist/40' => ! $enabled,
+                            ])
+                            aria-pressed="{{ $enabled ? 'true' : 'false' }}"
+                            aria-label="{{ $copy['title'] }}"
+                        >
+                            <span @class([
+                                'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                                'translate-x-5' => $enabled,
+                                'translate-x-1' => ! $enabled,
+                            ])></span>
+                        </button>
+                    </div>
+                @endforeach
+            </div>
         </section>
     @endif
     @endif
