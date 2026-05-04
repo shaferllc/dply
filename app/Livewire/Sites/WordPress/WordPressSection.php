@@ -12,6 +12,7 @@ use App\Services\RemoteCli\WpCli;
 use App\Models\Snapshot;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Snapshots\LocalDiskDestination;
+use App\Services\Snapshots\SnapshotDestinationFactory;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use Illuminate\Contracts\View\View;
@@ -217,12 +218,13 @@ class WordPressSection extends Component
     }
 
     /**
-     * Database sub-tab — take a fresh snapshot to local disk.
-     * Restricted to admin/owner because dumps capture every byte of
-     * production data; PR 10c keeps it admin-gated by class signature
-     * (the org check still runs at the dispatched action's call site).
+     * Database sub-tab — take a fresh snapshot. Routes to the
+     * preferred destination (S3 archive if configured, local-disk
+     * fallback otherwise) so operators who set up an S3 bucket get
+     * durable backups automatically without changing their click
+     * pattern. Admin/owner only.
      */
-    public function takeSnapshot(SnapshotService $snapshots, ExecuteRemoteTaskOnServer $executor): void
+    public function takeSnapshot(SnapshotService $snapshots, SnapshotDestinationFactory $destinations): void
     {
         $org = $this->site->organization;
         if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
@@ -234,7 +236,7 @@ class WordPressSection extends Component
         try {
             $snapshots->take(
                 site: $this->site,
-                destination: new LocalDiskDestination($executor),
+                destination: $destinations->preferred(),
                 reason: Snapshot::REASON_MANUAL,
                 userId: auth()->id(),
             );
