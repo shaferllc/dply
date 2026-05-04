@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 class ServerCreatePresetCatalogTest extends TestCase
 {
-    public function test_catalog_lists_the_eight_v1_presets(): void
+    public function test_catalog_lists_the_v1_presets_in_order(): void
     {
         $ids = array_column((new ServerCreatePresetCatalog)->all(), 'id');
 
@@ -19,10 +19,25 @@ class ServerCreatePresetCatalogTest extends TestCase
             'nextjs',
             'django',
             'polyglot',
+            'wordpress',
             'static',
             'database',
             'custom',
         ], $ids);
+    }
+
+    public function test_wordpress_preset_uses_mariadb_redis_php_84(): void
+    {
+        $wp = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_WORDPRESS);
+
+        $this->assertNotNull($wp);
+        $this->assertSame('application', $wp['role']);
+        $this->assertSame('nginx', $wp['webserver']);
+        $this->assertSame('8.4', $wp['php_version']);
+        $this->assertSame('mariadb114', $wp['database']);
+        $this->assertSame('redis', $wp['cache']);
+        $this->assertSame([], $wp['runtimes']);
+        $this->assertTrue($wp['featured']);
     }
 
     public function test_polyglot_preset_carries_all_four_non_php_runtimes(): void

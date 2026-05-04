@@ -50,6 +50,8 @@ final class ServerCreatePresetCatalog
 
     public const ID_DATABASE = 'database';
 
+    public const ID_WORDPRESS = 'wordpress';
+
     public const ID_CUSTOM = 'custom';
 
     /**
@@ -131,6 +133,18 @@ final class ServerCreatePresetCatalog
                 ],
                 'php_version' => '8.4',
                 'database' => 'postgres17',
+                'cache' => 'redis',
+                'featured' => true,
+            ],
+            [
+                'id' => self::ID_WORDPRESS,
+                'name' => 'WordPress host',
+                'description' => 'PHP 8.4 + Nginx + MariaDB 11.4 + Redis + wp-cli preinstalled. Optimised for one-click WordPress scaffolding.',
+                'role' => 'application',
+                'webserver' => 'nginx',
+                'runtimes' => [],
+                'php_version' => '8.4',
+                'database' => 'mariadb114',
                 'cache' => 'redis',
                 'featured' => true,
             ],

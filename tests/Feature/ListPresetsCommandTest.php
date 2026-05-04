@@ -32,7 +32,7 @@ class ListPresetsCommandTest extends TestCase
         $this->assertSame(0, $exit);
         $decoded = json_decode($output, true);
         $this->assertIsArray($decoded);
-        $this->assertCount(8, $decoded['presets']);
+        $this->assertCount(9, $decoded['presets']);
 
         $byId = collect($decoded['presets'])->keyBy('id');
         $this->assertTrue($byId['polyglot']['featured']);
