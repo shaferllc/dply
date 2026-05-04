@@ -16,7 +16,14 @@
     </div>
 
     <div class="py-10">
-        <div class="dply-page-shell">
+        <div class="dply-page-shell space-y-8">
+            @if (config('dply.scaffold_v1_enabled'))
+                @include('livewire.sites._create-mode-toggle')
+            @endif
+
+            @if ($form->mode === 'scaffold' && config('dply.scaffold_v1_enabled'))
+                @include('livewire.sites._create-scaffold-panel')
+            @else
             <form wire:submit="store" class="space-y-10">
                 <section aria-labelledby="server-context-heading">
                     <h2 id="server-context-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('1. Confirm server context') }}</h2>
@@ -482,6 +489,7 @@
                     </button>
                 </div>
             </form>
+            @endif
         </div>
     </div>
 </div>
