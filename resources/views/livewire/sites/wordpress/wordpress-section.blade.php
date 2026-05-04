@@ -12,7 +12,7 @@
         @foreach ([
             'console' => ['label' => __('Console'), 'enabled' => true],
             'plugins' => ['label' => __('Plugins'), 'enabled' => true],
-            'database' => ['label' => __('Database'), 'enabled' => false],
+            'database' => ['label' => __('Database'), 'enabled' => true],
             'cron' => ['label' => __('Cron'), 'enabled' => true],
             'hardening' => ['label' => __('Hardening'), 'enabled' => false],
         ] as $key => $meta)
@@ -227,8 +227,59 @@
         </section>
     @endif
 
+    {{-- DATABASE --}}
+    @if ($tab === 'database')
+        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+            <header class="flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Database snapshots') }}</h3>
+                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Manual `mysqldump` / `pg_dump` snapshots stored on this server (7-day TTL). BYO S3 destinations land in a follow-up PR.') }}</p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="takeSnapshot"
+                    wire:loading.attr="disabled"
+                    wire:target="takeSnapshot"
+                    class="inline-flex h-9 items-center gap-2 rounded-xl bg-brand-ink px-4 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:opacity-60"
+                >
+                    <x-heroicon-o-camera wire:loading.remove wire:target="takeSnapshot" class="h-4 w-4" />
+                    <x-spinner wire:loading wire:target="takeSnapshot" variant="cream" size="sm" />
+                    <span wire:loading.remove wire:target="takeSnapshot">{{ __('Take snapshot') }}</span>
+                    <span wire:loading wire:target="takeSnapshot">{{ __('Dumping…') }}</span>
+                </button>
+            </header>
+
+            <x-input-error :messages="$errors->get('snapshots')" class="mt-3" />
+
+            @if ($snapshots->isEmpty())
+                <p class="mt-5 text-center text-sm text-brand-mist">{{ __('No snapshots yet. Click "Take snapshot" to capture one.') }}</p>
+            @else
+                <ul class="mt-5 divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
+                    @foreach ($snapshots as $snapshot)
+                        <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-mono text-brand-ink">snap-{{ $snapshot->id }}</p>
+                                <p class="mt-0.5 text-xs text-brand-mist">
+                                    {{ $snapshot->reason }} · {{ number_format(($snapshot->bytes ?? 0) / 1024, 1) }}&nbsp;KB · {{ $snapshot->created_at?->diffForHumans() }}
+                                    @if ($snapshot->expires_at)
+                                        · expires {{ $snapshot->expires_at->diffForHumans() }}
+                                    @endif
+                                </p>
+                            </div>
+                            <span @class([
+                                'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                'bg-brand-sand/40 text-brand-ink' => $snapshot->destination === 'local_disk',
+                                'bg-brand-sage/15 text-brand-forest' => $snapshot->destination === 's3',
+                            ])>{{ $snapshot->destination }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </section>
+    @endif
+
     {{-- Placeholder sub-tabs --}}
-    @if (in_array($tab, ['database', 'hardening'], true))
+    @if ($tab === 'hardening')
         <section class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-cream/20 p-8 text-center">
             <p class="text-sm text-brand-mist">{{ __('This sub-tab ships in the next release.') }}</p>
         </section>

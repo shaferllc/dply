@@ -245,6 +245,46 @@ class WordPressSectionTest extends TestCase
         $this->assertSame(['--all'], $run->args);
     }
 
+    public function test_database_tab_renders_empty_state_when_no_snapshots(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'database')
+            ->assertSee('Database snapshots')
+            ->assertSee('No snapshots yet');
+    }
+
+    public function test_take_snapshot_blocks_member_role_with_inline_error(): void
+    {
+        [$user, $site] = $this->makeWpSite(userRole: 'member');
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'database')
+            ->call('takeSnapshot')
+            ->assertHasErrors('snapshots');
+
+        $this->assertSame(0, \App\Models\Snapshot::query()->count());
+    }
+
+    public function test_database_tab_lists_existing_snapshots(): void
+    {
+        [$user, $site] = $this->makeWpSite();
+        \App\Models\Snapshot::factory()->create([
+            'site_id' => $site->id,
+            'reason' => 'manual',
+            'bytes' => 2048,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WordPressSection::class, ['site' => $site])
+            ->set('tab', 'database')
+            ->assertSee('snap-')
+            ->assertSee('manual');
+    }
+
     public function test_switch_to_system_cron_records_handler_on_meta(): void
     {
         [$user, $site] = $this->makeWpSite();
