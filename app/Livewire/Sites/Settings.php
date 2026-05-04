@@ -159,8 +159,18 @@ class Settings extends Show
 
     public ?string $system_user_list_error = null;
 
-    /** @var 'commands'|'octane'|'reverb'|'logs'|'setup' */
+    /** @var 'commands'|'octane'|'reverb'|'logs'|'setup'|'schedule'|'migrations'|'pail' */
     public string $laravel_tab = 'commands';
+
+    /**
+     * Schedule sub-tab: parsed `php artisan schedule:list --json` rows.
+     * Empty until the operator clicks Load.
+     *
+     * @var list<array{command?: string, description?: string, expression?: string, next_due?: string}>
+     */
+    public array $laravelScheduleEntries = [];
+
+    public bool $laravelScheduleLoaded = false;
 
     public string $laravel_custom_commands_text = '';
 
@@ -268,7 +278,7 @@ class Settings extends Show
         $this->routingTab = $this->resolveRoutingTab(request()->query('tab'));
 
         $laravelTabQuery = request()->query('laravel_tab');
-        if (is_string($laravelTabQuery) && in_array($laravelTabQuery, ['commands', 'octane', 'reverb', 'logs', 'setup'], true)) {
+        if (is_string($laravelTabQuery) && in_array($laravelTabQuery, ['commands', 'octane', 'reverb', 'logs', 'setup', 'schedule', 'migrations', 'pail'], true)) {
             $this->laravel_tab = $laravelTabQuery;
         }
 
@@ -597,6 +607,40 @@ class Settings extends Show
         $this->authorize('view', $this->site);
         $executor = app(LaravelConsoleExecutor::class);
         $this->laravel_artisan_discovery = $executor->listArtisanCommands($this->site->fresh(), $force);
+    }
+
+    /**
+     * Schedule sub-tab loader (PR 11).
+     *
+     * Runs `php artisan schedule:list --json` via the new Artisan
+     * service (PR 1+2) — sync execution because schedule:list is on
+     * the INSTANT allowlist. Parses the JSON output into a flat array
+     * the schedule-tab partial renders. Failures land as inline errors
+     * rather than throwing; broken parsing leaves the entry list empty
+     * with a friendly message.
+     */
+    public function loadLaravelSchedule(\App\Services\RemoteCli\Artisan $artisan): void
+    {
+        $this->authorize('view', $this->site);
+
+        try {
+            $result = $artisan->run(
+                site: $this->site,
+                command: 'schedule:list',
+                args: ['--json'],
+                queuedBy: auth()->user(),
+            );
+        } catch (\App\Services\RemoteCli\RemoteCliPermissionDeniedException $e) {
+            $this->addError('laravel_schedule', __('Your role can\'t inspect the Laravel schedule.'));
+
+            return;
+        }
+
+        $stdout = trim($result->stdout());
+        $rows = $stdout !== '' ? json_decode($stdout, associative: true) : [];
+
+        $this->laravelScheduleEntries = is_array($rows) ? array_values(array_filter($rows, 'is_array')) : [];
+        $this->laravelScheduleLoaded = true;
     }
 
     public function saveLaravelCustomCommands(LaravelConsoleExecutor $executor): void

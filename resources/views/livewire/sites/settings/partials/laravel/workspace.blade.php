@@ -50,6 +50,9 @@
                 'reverb' => __('Reverb'),
                 'logs' => __('Logs'),
                 'setup' => __('Setup'),
+                'schedule' => __('Schedule'),
+                'migrations' => __('Migrations'),
+                'pail' => __('Pail'),
             ] as $tabId => $tabLabel)
                 <button
                     type="button"
@@ -276,6 +279,22 @@
                     <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="mt-3 inline-flex text-sm font-medium text-brand-forest underline">{{ __('Open Deploy') }}</a>
                 </div>
             </div>
+        </div>
+    @endif
+
+    @if ($laravel_tab === 'schedule')
+        @include('livewire.sites.settings.partials.laravel.schedule-tab')
+    @endif
+
+    @if ($laravel_tab === 'migrations')
+        <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-cream/20 p-8 text-center">
+            <p class="text-sm text-brand-mist">{{ __('Migrations browser ships in the next release.') }}</p>
+        </div>
+    @endif
+
+    @if ($laravel_tab === 'pail')
+        <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-cream/20 p-8 text-center">
+            <p class="text-sm text-brand-mist">{{ __('Pail real-time log streamer ships in the next release.') }}</p>
         </div>
     @endif
 </div>
