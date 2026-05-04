@@ -274,10 +274,16 @@ class Create extends Component
             ],
         ]);
 
-        // PR 5/6 will dispatch ScaffoldPipeline\{Laravel,WordPress}Job here.
-        // For now the Site exists in 'scaffolding' status and the user is
-        // sent to its show page with a placeholder banner via session flash.
-        session()->flash('info', __('Site queued for scaffolding. The pipeline ships in the next release.'));
+        // Dispatch the framework-specific pipeline. The Site is already
+        // in STATUS_SCAFFOLDING; the worker walks it through the steps
+        // recorded under meta.scaffold.steps[] for the journey UI (PR 7).
+        if ($this->form->scaffold_framework === 'laravel') {
+            \App\Jobs\RunLaravelScaffoldJob::dispatch($site->id);
+            session()->flash('info', __('Laravel site queued for scaffolding. The pipeline runs in the background.'));
+        } else {
+            // WordPress pipeline lands in PR 6.
+            session()->flash('info', __('WordPress site queued. The scaffold pipeline ships in the next release.'));
+        }
 
         return $this->redirect(route('sites.show', [
             'server' => $this->server,
