@@ -186,14 +186,32 @@ class Settings extends Show
     public ?string $laravelMigrationsFlash = null;
 
     /**
-     * Pail sub-tab buffer — last N lines from storage/logs/laravel.log.
-     * v1 ships a "fetch latest" pattern rather than a true real-time
-     * stream (that would need a WebSocket / SSE channel dply hasn't
-     * built yet); operators click Refresh to re-tail.
+     * Pail sub-tab buffer — recent log entries from storage/logs/laravel.log.
+     *
+     * v1 (PR 11c) shipped operator-driven "Tail logs" button.
+     * v1.1 (this slice) adds wire:poll-driven live tail with byte-offset
+     * tracking: every 2s we fetch only the bytes appended since the
+     * last poll, append to the buffer client-side, and trim to a
+     * cap so memory stays bounded. Real WebSocket/SSE streaming is
+     * still a v2 concern but for typical Laravel sites with
+     * single-line-per-event JSON logs this looks "live enough".
      */
     public string $laravelPailBuffer = '';
 
     public bool $laravelPailLoaded = false;
+
+    /**
+     * Byte offset into the log file we've already streamed up to.
+     * Sent to `tail -c +<offset>` on each poll so we only ship new
+     * bytes. Reset to 0 on Refresh so the user can re-baseline.
+     */
+    public int $laravelPailOffset = 0;
+
+    /** Live-poll on/off — operator toggles on the sub-tab. */
+    public bool $laravelPailLive = false;
+
+    /** Soft cap on buffer size (chars) so a chatty log doesn't OOM Livewire state. */
+    public const PAIL_BUFFER_MAX_CHARS = 64_000;
 
     public string $laravel_custom_commands_text = '';
 
@@ -749,36 +767,47 @@ class Settings extends Show
     }
 
     /**
-     * Pail sub-tab loader (PR 11c).
+     * Pail sub-tab loader.
      *
-     * Tails the Laravel log file directly via SSH instead of running
-     * `php artisan pail` itself — pail is a long-running process and
-     * needs SSE/WebSocket plumbing dply hasn't built yet. v1 surfaces
-     * the same data Pail would show (last N lines of laravel.log) on
-     * an operator-driven refresh; v2 can promote to true streaming
-     * over the existing TaskRunner streaming layer.
+     * Initial load: fetches the last 200 lines + records the file's
+     * current size as the byte offset to stream from. Subsequent calls
+     * (driven by wire:poll when laravelPailLive is true OR by manual
+     * Refresh) emit `tail -c +<offset+1>` so only the bytes appended
+     * since last poll come back; appended to the buffer + trimmed at
+     * PAIL_BUFFER_MAX_CHARS so chatty logs don't blow Livewire state.
+     *
+     * Real WebSocket/SSE streaming is still a v2 concern — wire:poll
+     * is the right tradeoff for a logs panel where 2s latency is fine
+     * and dply already has the polling primitive plumbed everywhere
+     * (no new infra to maintain).
      */
     public function loadLaravelPail(\App\Services\Servers\ExecuteRemoteTaskOnServer $executor, int $lines = 200): void
     {
         $this->authorize('view', $this->site);
 
-        $deployPath = $this->site->document_root ?: $this->site->repository_path ?: '/home/dply/'.$this->site->slug;
-        // strip "/public" suffix if document_root points at the public/ dir
-        $deployBase = preg_replace('#/public/?$#', '', $deployPath);
-
-        $logPath = rtrim((string) $deployBase, '/').'/storage/logs/laravel.log';
+        $logPath = $this->laravelLogPath();
+        $script = $this->laravelPailLoaded
+            // Incremental fetch: send bytes after current offset, plus
+            // the new file size so we can advance the offset locally.
+            ? sprintf(
+                'if [ -r %1$s ]; then SIZE=$(stat -c %%s %1$s 2>/dev/null || stat -f %%z %1$s); echo "DPLY-PAIL-SIZE:$SIZE"; tail -c +%2$d %1$s 2>/dev/null; else echo "DPLY-PAIL-MISSING"; fi',
+                escapeshellarg($logPath),
+                $this->laravelPailOffset + 1,
+            )
+            // First fetch: tail the last N lines AND record the file's
+            // total size as the new offset so the next poll continues
+            // from there.
+            : sprintf(
+                'if [ -r %1$s ]; then SIZE=$(stat -c %%s %1$s 2>/dev/null || stat -f %%z %1$s); echo "DPLY-PAIL-SIZE:$SIZE"; tail -n %2$d %1$s 2>/dev/null; else echo "DPLY-PAIL-MISSING"; fi',
+                escapeshellarg($logPath),
+                max(10, min(1000, $lines)),
+            );
 
         try {
             $out = $executor->runInlineBash(
                 server: $this->site->server,
                 name: 'laravel:pail-tail',
-                inlineBash: sprintf(
-                    'test -r %s && tail -n %d %s 2>/dev/null || echo "(no log file at %s)"',
-                    escapeshellarg($logPath),
-                    max(10, min(1000, $lines)),
-                    escapeshellarg($logPath),
-                    $logPath,
-                ),
+                inlineBash: $script,
                 timeoutSeconds: 15,
             );
         } catch (\Throwable $e) {
@@ -787,8 +816,65 @@ class Settings extends Show
             return;
         }
 
-        $this->laravelPailBuffer = (string) $out->getBuffer();
-        $this->laravelPailLoaded = true;
+        $raw = (string) $out->getBuffer();
+
+        if (str_starts_with(trim($raw), 'DPLY-PAIL-MISSING')) {
+            $this->laravelPailBuffer = '(no log file at '.$logPath.')';
+            $this->laravelPailLoaded = true;
+
+            return;
+        }
+
+        // Strip the size header line and parse the new offset.
+        if (preg_match('/^DPLY-PAIL-SIZE:(\d+)\n?/', $raw, $matches)) {
+            $newOffset = (int) $matches[1];
+            $body = substr($raw, strlen($matches[0]));
+        } else {
+            $newOffset = $this->laravelPailOffset;
+            $body = $raw;
+        }
+
+        if ($this->laravelPailLoaded) {
+            $this->laravelPailBuffer .= $body;
+        } else {
+            $this->laravelPailBuffer = $body;
+            $this->laravelPailLoaded = true;
+        }
+
+        // Cap buffer so a chatty log doesn't blow up Livewire payload.
+        if (strlen($this->laravelPailBuffer) > self::PAIL_BUFFER_MAX_CHARS) {
+            $this->laravelPailBuffer = '… (older lines trimmed) …'."\n".substr($this->laravelPailBuffer, -self::PAIL_BUFFER_MAX_CHARS);
+        }
+
+        $this->laravelPailOffset = $newOffset;
+    }
+
+    /**
+     * Operator-toggled live mode (wire:poll firing every 2s in the view).
+     */
+    public function toggleLaravelPailLive(): void
+    {
+        $this->laravelPailLive = ! $this->laravelPailLive;
+    }
+
+    /**
+     * Manual reset — clears the buffer and re-baselines offset so
+     * Refresh fetches the last 200 lines again instead of incremental.
+     */
+    public function resetLaravelPail(): void
+    {
+        $this->laravelPailBuffer = '';
+        $this->laravelPailOffset = 0;
+        $this->laravelPailLoaded = false;
+    }
+
+    private function laravelLogPath(): string
+    {
+        $deployPath = $this->site->document_root ?: $this->site->repository_path ?: '/home/dply/'.$this->site->slug;
+        // strip "/public" suffix if document_root points at the public/ dir
+        $deployBase = preg_replace('#/public/?$#', '', $deployPath);
+
+        return rtrim((string) $deployBase, '/').'/storage/logs/laravel.log';
     }
 
     public function saveLaravelCustomCommands(LaravelConsoleExecutor $executor): void
