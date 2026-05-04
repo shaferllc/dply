@@ -196,6 +196,26 @@ class Site extends Model
             }
         });
 
+        static::deleting(function (Site $site): void {
+            // Release any placeholder DNS record + ondply.io zone entry
+            // assigned to this site by the scaffold pipeline. release()
+            // is idempotent + safe to call on non-scaffolded sites
+            // (it short-circuits when meta.scaffold.placeholder_dns is
+            // absent), so it runs unconditionally on every site delete.
+            try {
+                app(\App\Services\Scaffold\PlaceholderDnsManager::class)->release($site);
+            } catch (\Throwable $e) {
+                // Best-effort cleanup. We do NOT want a transient DNS
+                // provider failure to block deletion of the site row;
+                // any orphaned record is recoverable via the manager's
+                // audit trail.
+                \Illuminate\Support\Facades\Log::warning('Site::deleting placeholder release failed', [
+                    'site_id' => $site->getKey(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
         static::deleted(function (Site $site): void {
             if ($site->project_id) {
                 Project::query()->whereKey($site->project_id)->delete();

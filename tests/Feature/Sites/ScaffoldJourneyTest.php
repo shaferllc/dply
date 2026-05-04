@@ -11,15 +11,34 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Scaffold\PlaceholderDnsManager;
 use App\Services\Scaffold\ScaffoldStep;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
+use Mockery;
 use Tests\TestCase;
 
 class ScaffoldJourneyTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Bind a stub PlaceholderDnsManager into the container so Livewire's
+     * injection on retry() finds something safe — we don't want any
+     * real DNS-API or nip.io HTTP calls firing from these tests.
+     */
+    private function stubPlaceholderDns(): PlaceholderDnsManager
+    {
+        $mock = Mockery::mock(PlaceholderDnsManager::class);
+        $mock->shouldReceive('release')->andReturnNull();
+        $mock->shouldReceive('assign')->andReturn([
+            'hostname' => 'stub.test', 'zone' => null, 'record_id' => null, 'source' => 'nip.io',
+        ]);
+        app()->instance(PlaceholderDnsManager::class, $mock);
+
+        return $mock;
+    }
 
     private function makeSite(string $status, array $scaffoldMeta = [], string $userRole = 'admin'): array
     {
@@ -94,6 +113,7 @@ class ScaffoldJourneyTest extends TestCase
     public function test_retry_dispatches_pipeline_and_resets_state(): void
     {
         Bus::fake();
+        $this->stubPlaceholderDns();
         [$user, $server, $site] = $this->makeSite(Site::STATUS_SCAFFOLD_FAILED, [
             'attempt_count' => 1,
             'admin_password' => encrypt('old-password'),
@@ -119,6 +139,7 @@ class ScaffoldJourneyTest extends TestCase
     public function test_retry_dispatches_laravel_job_for_laravel_framework(): void
     {
         Bus::fake();
+        $this->stubPlaceholderDns();
         [$user, $server, $site] = $this->makeSite(Site::STATUS_SCAFFOLD_FAILED, [
             'framework' => 'laravel',
             'attempt_count' => 1,
@@ -132,9 +153,42 @@ class ScaffoldJourneyTest extends TestCase
         Bus::assertDispatched(RunLaravelScaffoldJob::class);
     }
 
+    public function test_retry_releases_prior_placeholder_and_drops_site_domain_row(): void
+    {
+        Bus::fake();
+
+        // Asserting mock — release must be called exactly once with this Site
+        // before the new pipeline job is dispatched.
+        $dns = Mockery::mock(PlaceholderDnsManager::class);
+        $dns->shouldReceive('release')->once();
+        $dns->shouldReceive('assign')->andReturn([
+            'hostname' => 'unused.test', 'zone' => null, 'record_id' => null, 'source' => 'nip.io',
+        ]);
+        app()->instance(PlaceholderDnsManager::class, $dns);
+
+        [$user, $server, $site] = $this->makeSite(Site::STATUS_SCAFFOLD_FAILED, [
+            'framework' => 'wordpress',
+            'attempt_count' => 1,
+            'placeholder_dns' => ['hostname' => 'old-blog.198-51-100-1.nip.io', 'source' => 'nip.io'],
+            'steps' => [['key' => 'wp_install', 'state' => ScaffoldStep::STATE_FAILED]],
+        ]);
+        // Pre-existing SiteDomain row from the failed first attempt.
+        $site->domains()->create(['hostname' => 'old-blog.198-51-100-1.nip.io', 'is_primary' => true, 'www_redirect' => false]);
+
+        Livewire::actingAs($user)
+            ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
+            ->call('retry');
+
+        $site->refresh();
+        $this->assertSame(0, $site->domains()->where('hostname', 'old-blog.198-51-100-1.nip.io')->count(),
+            'Stale SiteDomain row from prior attempt must be deleted to free the unique hostname constraint');
+        Bus::assertDispatched(RunWordPressScaffoldJob::class);
+    }
+
     public function test_retry_is_a_no_op_after_attempt_cap(): void
     {
         Bus::fake();
+        $this->stubPlaceholderDns();
         [$user, $server, $site] = $this->makeSite(Site::STATUS_SCAFFOLD_FAILED, [
             'attempt_count' => 3,
             'steps' => [['key' => 'prereqs', 'state' => ScaffoldStep::STATE_FAILED]],

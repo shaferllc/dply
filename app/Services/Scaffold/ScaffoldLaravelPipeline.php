@@ -48,6 +48,7 @@ class ScaffoldLaravelPipeline
         private readonly ServerDatabaseProvisioner $databaseProvisioner,
         private readonly ExecuteRemoteTaskOnServer $executor,
         private readonly SiteAuditWriter $audit,
+        private readonly PlaceholderDnsManager $placeholderDns,
     ) {}
 
     /**
@@ -66,6 +67,7 @@ class ScaffoldLaravelPipeline
 
         $steps = [
             ['prereqs', fn () => $this->stepPrereqs($site)],
+            ['placeholder_dns', fn () => $this->stepAssignPlaceholderDns($site)],
             ['db_create', fn () => $this->stepCreateDatabase($site)],
             ['composer_create', fn () => $this->stepComposerCreate($site)],
             ['breeze_install', fn () => $this->stepBreezeInstall($site)],
@@ -130,6 +132,7 @@ class ScaffoldLaravelPipeline
     {
         $steps = [
             ScaffoldStep::pending('prereqs', 'Verify prerequisites (composer)'),
+            ScaffoldStep::pending('placeholder_dns', 'Assign placeholder hostname'),
             ScaffoldStep::pending('db_create', 'Create database + user'),
             ScaffoldStep::pending('composer_create', 'composer create-project laravel/laravel'),
             ScaffoldStep::pending('breeze_install', 'Install Breeze (Blade)'),
@@ -147,6 +150,34 @@ class ScaffoldLaravelPipeline
         $result = $this->prerequisites->ensureComposer($site->server);
         if (! $result->ok()) {
             throw new \RuntimeException('Composer install failed: '.$result->error);
+        }
+    }
+
+    /**
+     * Assign a placeholder hostname (e.g. <slug>.ondply.io with nip.io
+     * fallback) and persist it as a primary SiteDomain so downstream
+     * pipeline steps + the rest of the codebase find it via
+     * Site::primaryDomain(). Idempotent — safe to call again on retry
+     * because PlaceholderDnsManager::assign() short-circuits when an
+     * assignment already exists, and we only insert a SiteDomain when
+     * one doesn't already exist for this hostname.
+     */
+    private function stepAssignPlaceholderDns(Site $site): void
+    {
+        $assignment = $this->placeholderDns->assign($site);
+
+        $hostname = $assignment['hostname'] ?? null;
+        if (! is_string($hostname) || $hostname === '') {
+            throw new \RuntimeException('Placeholder DNS assignment returned no hostname.');
+        }
+
+        $existing = $site->domains()->where('hostname', $hostname)->first();
+        if ($existing === null) {
+            $site->domains()->create([
+                'hostname' => $hostname,
+                'is_primary' => $site->domains()->where('is_primary', true)->doesntExist(),
+                'www_redirect' => false,
+            ]);
         }
     }
 
@@ -312,18 +343,21 @@ class ScaffoldLaravelPipeline
     }
 
     /**
-     * Best-effort APP_URL: a primary domain if one's been attached,
-     * else a placeholder. PR 8's PlaceholderDnsManager will rewrite
-     * this to the real <slug>.ondply.io once issued.
+     * APP_URL for the freshly-scaffolded Laravel site. The
+     * placeholder_dns pipeline step (run before write_env) guarantees
+     * a primaryDomain() exists; the localhost fallback only fires for
+     * sites where that step somehow short-circuited.
+     *
+     * v1 hard-codes http:// because cert issuance for placeholder
+     * hostnames is a separate subsystem (not built yet); the operator
+     * can flip APP_URL to https:// after attaching a real domain via
+     * the routing tab.
      */
     private function appUrl(Site $site): string
     {
-        $primary = $site->primaryDomain()?->hostname;
-        if (is_string($primary) && $primary !== '') {
-            return 'https://'.$primary;
-        }
+        $hostname = $site->primaryDomain()?->hostname;
 
-        return 'http://localhost';
+        return 'http://'.(is_string($hostname) && $hostname !== '' ? $hostname : 'localhost');
     }
 
     private function setMeta(Site $site, string $dottedPath, mixed $value): void

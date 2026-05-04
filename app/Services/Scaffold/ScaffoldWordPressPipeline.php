@@ -44,6 +44,7 @@ class ScaffoldWordPressPipeline
         private readonly ServerDatabaseProvisioner $databaseProvisioner,
         private readonly ExecuteRemoteTaskOnServer $executor,
         private readonly SiteAuditWriter $audit,
+        private readonly PlaceholderDnsManager $placeholderDns,
     ) {}
 
     /**
@@ -58,6 +59,7 @@ class ScaffoldWordPressPipeline
 
         $steps = [
             ['prereqs', fn () => $this->stepPrereqs($site)],
+            ['placeholder_dns', fn () => $this->stepAssignPlaceholderDns($site)],
             ['db_create', fn () => $this->stepCreateDatabase($site)],
             ['wp_download', fn () => $this->stepWpDownload($site)],
             ['wp_config', fn () => $this->stepWpConfig($site)],
@@ -116,6 +118,7 @@ class ScaffoldWordPressPipeline
     {
         $steps = [
             ScaffoldStep::pending('prereqs', 'Verify prerequisites (wp-cli)'),
+            ScaffoldStep::pending('placeholder_dns', 'Assign placeholder hostname'),
             ScaffoldStep::pending('db_create', 'Create database + user'),
             ScaffoldStep::pending('wp_download', 'wp core download'),
             ScaffoldStep::pending('wp_config', 'wp config create'),
@@ -131,6 +134,33 @@ class ScaffoldWordPressPipeline
         $result = $this->prerequisites->ensureWpCli($site->server);
         if (! $result->ok()) {
             throw new \RuntimeException('wp-cli install failed: '.$result->error);
+        }
+    }
+
+    /**
+     * Assign a placeholder hostname BEFORE wp_install runs (Q12 critical
+     * detail — `wp core install --url=` writes the URL into wp_options
+     * in serialized form, so it must be correct from the very first
+     * call). Persist the hostname as a primary SiteDomain so siteUrl()
+     * + future routing-tab actions find it via Site::primaryDomain().
+     * Idempotent on retry — see ScaffoldLaravelPipeline mirror.
+     */
+    private function stepAssignPlaceholderDns(Site $site): void
+    {
+        $assignment = $this->placeholderDns->assign($site);
+
+        $hostname = $assignment['hostname'] ?? null;
+        if (! is_string($hostname) || $hostname === '') {
+            throw new \RuntimeException('Placeholder DNS assignment returned no hostname.');
+        }
+
+        $existing = $site->domains()->where('hostname', $hostname)->first();
+        if ($existing === null) {
+            $site->domains()->create([
+                'hostname' => $hostname,
+                'is_primary' => $site->domains()->where('is_primary', true)->doesntExist(),
+                'www_redirect' => false,
+            ]);
         }
     }
 
@@ -300,18 +330,18 @@ class ScaffoldWordPressPipeline
         return '/home/dply/'.$site->slug.'/current';
     }
 
+    /**
+     * URL passed to `wp core install --url=`. The placeholder_dns
+     * pipeline step (run before wp_install) guarantees a primaryDomain()
+     * exists, so this is the placeholder hostname (or a real domain if
+     * one was pre-attached). v1 hard-codes http:// — see appUrl() in
+     * the Laravel pipeline for the same scheme rationale.
+     */
     private function siteUrl(Site $site): string
     {
-        $primary = $site->primaryDomain()?->hostname;
-        if (is_string($primary) && $primary !== '') {
-            return 'https://'.$primary;
-        }
+        $hostname = $site->primaryDomain()?->hostname;
 
-        // PR 8 (PlaceholderDnsManager) replaces this with the real
-        // <slug>.ondply.io once the DNS adapter ships. v1 fallback is
-        // a placeholder string that wp-cli accepts — the operator
-        // attaches a real domain via the Routing tab afterwards.
-        return 'https://'.$site->slug.'.placeholder.local';
+        return 'http://'.(is_string($hostname) && $hostname !== '' ? $hostname : 'localhost');
     }
 
     private function setMeta(Site $site, string $dottedPath, mixed $value): void

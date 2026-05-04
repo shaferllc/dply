@@ -80,7 +80,7 @@ class ScaffoldJourney extends Component
      * + re-dispatches; cleanup of files / DB lands alongside the DNS
      * teardown work.
      */
-    public function retry(): void
+    public function retry(\App\Services\Scaffold\PlaceholderDnsManager $placeholderDns): void
     {
         if (! $this->canRetry()) {
             return;
@@ -89,6 +89,19 @@ class ScaffoldJourney extends Component
         $framework = $this->site->meta['scaffold']['framework'] ?? null;
         if (! in_array($framework, ['laravel', 'wordpress'], true)) {
             return;
+        }
+
+        // Release the prior placeholder before clearing meta — the
+        // SiteDomain row gets dropped by hostname so a hash-suffixed
+        // re-assignment doesn't trip the unique constraint, and the
+        // DNS A record (if any) is cleaned up provider-side. release()
+        // is idempotent so this is safe even when no prior assignment
+        // existed (e.g. a scaffold that failed before placeholder_dns).
+        $priorHostname = $this->site->meta['scaffold']['placeholder_dns']['hostname'] ?? null;
+        $placeholderDns->release($this->site);
+        if (is_string($priorHostname) && $priorHostname !== '') {
+            $this->site->domains()->where('hostname', $priorHostname)->delete();
+            $this->site->refresh();
         }
 
         $meta = $this->site->meta;

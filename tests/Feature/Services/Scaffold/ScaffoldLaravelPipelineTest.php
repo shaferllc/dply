@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\Scaffold\PlaceholderDnsManager;
 use App\Services\Scaffold\PrerequisiteResult;
 use App\Services\Scaffold\ScaffoldLaravelPipeline;
 use App\Services\Scaffold\ScaffoldPrerequisites;
@@ -29,6 +30,26 @@ class ScaffoldLaravelPipelineTest extends TestCase
     {
         Mockery::close();
         parent::tearDown();
+    }
+
+    /**
+     * Mock PlaceholderDnsManager that records the call and returns a
+     * stable nip.io-shaped hostname so downstream URL writes are
+     * deterministic + the test never makes a real HTTP request.
+     */
+    private function placeholderDnsAlwaysAssigns(Site $site, string $hostname = 'my-laravel-app.198-51-100-7.nip.io'): PlaceholderDnsManager
+    {
+        $mock = Mockery::mock(PlaceholderDnsManager::class);
+        $mock->shouldReceive('assign')
+            ->andReturn([
+                'hostname' => $hostname,
+                'zone' => null,
+                'record_id' => null,
+                'source' => 'nip.io',
+            ]);
+        $mock->shouldReceive('release')->andReturnNull();
+
+        return $mock;
     }
 
     private function makeScaffoldingSite(): Site
@@ -77,7 +98,7 @@ class ScaffoldLaravelPipelineTest extends TestCase
 
         $audit = app(\App\Services\RemoteCli\SiteAuditWriter::class);
 
-        $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit))->run($site);
+        $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, $this->placeholderDnsAlwaysAssigns($site)))->run($site);
 
         $this->assertTrue($result['ok']);
         $this->assertNull($result['failed_step']);
@@ -86,7 +107,8 @@ class ScaffoldLaravelPipelineTest extends TestCase
         $this->assertSame(Site::STATUS_PENDING, $site->status);
 
         $steps = collect($site->meta['scaffold']['steps']);
-        $this->assertCount(8, $steps);
+        // 9 = original 8 + the new placeholder_dns step (PR-follow-up wiring)
+        $this->assertCount(9, $steps);
         $this->assertTrue($steps->every(fn ($s) => $s['state'] === ScaffoldStep::STATE_COMPLETED),
             'All steps should have settled to completed; got: '.json_encode($steps->pluck('state')));
 
@@ -120,7 +142,7 @@ class ScaffoldLaravelPipelineTest extends TestCase
 
         $audit = app(\App\Services\RemoteCli\SiteAuditWriter::class);
 
-        $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit))->run($site);
+        $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, $this->placeholderDnsAlwaysAssigns($site)))->run($site);
 
         $this->assertFalse($result['ok']);
         $this->assertSame('prereqs', $result['failed_step']);
@@ -159,12 +181,65 @@ class ScaffoldLaravelPipelineTest extends TestCase
 
         $audit = app(\App\Services\RemoteCli\SiteAuditWriter::class);
 
-        $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit))->run($site);
+        $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, $this->placeholderDnsAlwaysAssigns($site)))->run($site);
 
         $this->assertFalse($result['ok']);
         $this->assertSame('composer_create', $result['failed_step']);
 
         $site->refresh();
         $this->assertSame(Site::STATUS_SCAFFOLD_FAILED, $site->status);
+    }
+
+    public function test_placeholder_dns_step_creates_primary_site_domain(): void
+    {
+        $site = $this->makeScaffoldingSite();
+
+        $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+        $prereqs->shouldReceive('ensureComposer')->andReturn(PrerequisiteResult::alreadyPresent('composer'));
+        $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+        $dbProvisioner->shouldReceive('createOnServer')->andReturn('ok');
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $executor->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('ok', 0, false));
+
+        $dns = $this->placeholderDnsAlwaysAssigns($site, hostname: 'my-laravel-app.203-0-113-7.nip.io');
+
+        (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(\App\Services\RemoteCli\SiteAuditWriter::class), $dns))
+            ->run($site);
+
+        $domain = $site->fresh()->primaryDomain();
+        $this->assertNotNull($domain, 'Pipeline must persist a primary SiteDomain row from the placeholder hostname');
+        $this->assertSame('my-laravel-app.203-0-113-7.nip.io', $domain->hostname);
+        $this->assertTrue($domain->is_primary);
+    }
+
+    public function test_write_env_uses_placeholder_hostname_in_app_url(): void
+    {
+        $site = $this->makeScaffoldingSite();
+
+        $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+        $prereqs->shouldReceive('ensureComposer')->andReturn(PrerequisiteResult::alreadyPresent('composer'));
+        $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+        $dbProvisioner->shouldReceive('createOnServer')->andReturn('ok');
+
+        $hostnameSeen = null;
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        // Capture the bash that write_env runs so we can grep for APP_URL.
+        $executor->shouldReceive('runInlineBash')
+            ->withArgs(function ($s, string $name, string $bash) use (&$hostnameSeen) {
+                if ($name === 'scaffold-laravel:write-env') {
+                    $hostnameSeen = $bash;
+                }
+
+                return true;
+            })
+            ->andReturn(new ProcessOutput('ok', 0, false));
+
+        $dns = $this->placeholderDnsAlwaysAssigns($site, hostname: 'my-laravel-app.198-51-100-9.nip.io');
+
+        (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(\App\Services\RemoteCli\SiteAuditWriter::class), $dns))
+            ->run($site);
+
+        $this->assertNotNull($hostnameSeen, 'write_env step should have run');
+        $this->assertStringContainsString('APP_URL=http://my-laravel-app.198-51-100-9.nip.io', $hostnameSeen);
     }
 }
