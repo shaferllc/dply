@@ -185,6 +185,16 @@ class Settings extends Show
     /** UI flash flag set after a successful pre-rollback snapshot+rollback. */
     public ?string $laravelMigrationsFlash = null;
 
+    /**
+     * Pail sub-tab buffer — last N lines from storage/logs/laravel.log.
+     * v1 ships a "fetch latest" pattern rather than a true real-time
+     * stream (that would need a WebSocket / SSE channel dply hasn't
+     * built yet); operators click Refresh to re-tail.
+     */
+    public string $laravelPailBuffer = '';
+
+    public bool $laravelPailLoaded = false;
+
     public string $laravel_custom_commands_text = '';
 
     /**
@@ -736,6 +746,49 @@ class Settings extends Show
 
         $this->laravelMigrationsFlash = __('Rolled back last migration batch. Pre-rollback snapshot saved as snap-:id.', ['id' => $snapshot->id]);
         $this->laravelMigrationsLoaded = false; // Force reload to refresh status table
+    }
+
+    /**
+     * Pail sub-tab loader (PR 11c).
+     *
+     * Tails the Laravel log file directly via SSH instead of running
+     * `php artisan pail` itself — pail is a long-running process and
+     * needs SSE/WebSocket plumbing dply hasn't built yet. v1 surfaces
+     * the same data Pail would show (last N lines of laravel.log) on
+     * an operator-driven refresh; v2 can promote to true streaming
+     * over the existing TaskRunner streaming layer.
+     */
+    public function loadLaravelPail(\App\Services\Servers\ExecuteRemoteTaskOnServer $executor, int $lines = 200): void
+    {
+        $this->authorize('view', $this->site);
+
+        $deployPath = $this->site->document_root ?: $this->site->repository_path ?: '/home/dply/'.$this->site->slug;
+        // strip "/public" suffix if document_root points at the public/ dir
+        $deployBase = preg_replace('#/public/?$#', '', $deployPath);
+
+        $logPath = rtrim((string) $deployBase, '/').'/storage/logs/laravel.log';
+
+        try {
+            $out = $executor->runInlineBash(
+                server: $this->site->server,
+                name: 'laravel:pail-tail',
+                inlineBash: sprintf(
+                    'test -r %s && tail -n %d %s 2>/dev/null || echo "(no log file at %s)"',
+                    escapeshellarg($logPath),
+                    max(10, min(1000, $lines)),
+                    escapeshellarg($logPath),
+                    $logPath,
+                ),
+                timeoutSeconds: 15,
+            );
+        } catch (\Throwable $e) {
+            $this->addError('laravel_pail', __('Pail tail failed: :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        $this->laravelPailBuffer = (string) $out->getBuffer();
+        $this->laravelPailLoaded = true;
     }
 
     public function saveLaravelCustomCommands(LaravelConsoleExecutor $executor): void

@@ -291,8 +291,6 @@
     @endif
 
     @if ($laravel_tab === 'pail')
-        <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-cream/20 p-8 text-center">
-            <p class="text-sm text-brand-mist">{{ __('Pail real-time log streamer ships in the next release.') }}</p>
-        </div>
+        @include('livewire.sites.settings.partials.laravel.pail-tab')
     @endif
 </div>
