@@ -26,16 +26,19 @@ class ServerDeployLayoutBuilder
     public function build(Server $server): array
     {
         return [
-            // Ubuntu's default nginx docroot. We render a dply-branded
-            // landing page here so a freshly provisioned server returns
-            // something honest on port 80 ("dply server ready — create
-            // a site to deploy") rather than nginx's default welcome.
-            'web_root' => '/var/www/html',
+            // Default vhost docroot for the "no site configured yet"
+            // landing page. Lives under /home/dply/ alongside every
+            // per-site directory so all dply-managed paths stay in
+            // one place — easier to grant SSH access, easier to back
+            // up, and makes the "where does dply put things" mental
+            // model uniform. Leading underscore sorts it first and
+            // keeps it out of the way of real site slugs.
+            'web_root' => '/home/dply/_default',
 
             // Server-level log dir for the default supervisor worker
             // and any server-wide cron jobs. Per-site logs live under
             // /home/dply/<site-slug>/storage/logs/.
-            'logs' => '/var/log/dply',
+            'logs' => '/home/dply/_default/logs',
 
             'bin' => '/usr/local/bin',
         ];

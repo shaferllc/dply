@@ -119,6 +119,11 @@ trait HandlesServerRemovalFlow
         $this->closeRemoveServerModal();
         $deleteServer->execute($server, $actor, $auditExtras, $emailContext);
 
-        return $this->redirect(route('servers.index'), navigate: true);
+        // Hard redirect (no navigate: true) — Livewire's SPA-style
+        // soft navigation re-hydrates the current component before
+        // the redirect URL takes over, and that re-hydration tries
+        // to look up the just-deleted Server model → 404 modal. A
+        // plain redirect avoids the round-trip entirely.
+        return redirect()->route('servers.index');
     }
 }

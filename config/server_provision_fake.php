@@ -12,7 +12,8 @@ return [
     | enable in production: see FakeCloudProvision::enabled().
     |
     */
-    'env_flag' => (bool) env('DPLY_FAKE_CLOUD_PROVISION', false),
+    // env() returns strings; (bool) "false" is true in PHP — use FILTER_VALIDATE_BOOLEAN.
+    'env_flag' => filter_var(env('DPLY_FAKE_CLOUD_PROVISION', false), FILTER_VALIDATE_BOOLEAN),
 
     'allowed_environments' => ['local', 'testing'],
 
@@ -63,12 +64,12 @@ return [
     /*
     | When keys are generated, log recovery_public_key in local environment.
     */
-    'log_generated_public_key' => (bool) env('DPLY_FAKE_CLOUD_LOG_PUBLIC_KEY', true),
+    'log_generated_public_key' => filter_var(env('DPLY_FAKE_CLOUD_LOG_PUBLIC_KEY', true), FILTER_VALIDATE_BOOLEAN),
 
     /*
     | Fly.io: no RunSetupScriptJob for Fly hosts; optional stub skips Fly API
     | and marks the server ready for journey/UI smoke only.
     */
-    'fly_io_ui_stub' => (bool) env('DPLY_FAKE_CLOUD_FLY_IO_UI_STUB', false),
+    'fly_io_ui_stub' => filter_var(env('DPLY_FAKE_CLOUD_FLY_IO_UI_STUB', false), FILTER_VALIDATE_BOOLEAN),
 
 ];

@@ -1,142 +1,195 @@
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
     <x-server-create-stepper :current="4" :reached="$reachedStep" :mode="$form->mode" :hostKind="$form->custom_host_kind" />
 
-    <form wire:submit.prevent="store" class="space-y-8">
+    <form wire:submit.prevent="store" class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
+      <div class="space-y-8 min-w-0">
+
         <header class="relative overflow-hidden rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-brand-cream via-white to-brand-sand/20 px-6 py-8 shadow-sm sm:px-10 sm:py-10">
             <div class="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-brand-sage/10 blur-3xl" aria-hidden="true"></div>
             <div class="absolute -bottom-16 -left-12 h-40 w-40 rounded-full bg-brand-gold/10 blur-3xl" aria-hidden="true"></div>
             <div class="relative">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Step :n of :total', ['n' => 4, 'total' => $totalSteps]) }}</p>
                 <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ __('Review and launch') }}</h1>
-                <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">{{ __('Confirm the details below, then create. Anything blocking will surface in the preflight panel.') }}</p>
+                <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">{{ __('Confirm what dply is about to spin up. The preflight panel on the right surfaces anything blocking before you can create.') }}</p>
             </div>
         </header>
 
-        {{-- Summary --}}
-        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7">
-            <div class="flex items-baseline justify-between gap-2">
-                <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Summary') }}</h2>
-                <span class="text-xs text-brand-mist">{{ __('What will be created') }}</span>
+        @php
+            $modeLabel = $form->mode === 'provider'
+                ? __('Provision with :provider', ['provider' => $form->type ?: __('a provider')])
+                : __('Custom / BYO').' — '.($form->custom_host_kind === 'docker' ? __('Docker host') : __('VM'));
+            $languageRuntimes = array_filter([
+                'Ruby' => $form->ruby_version,
+                'Node' => $form->node_version,
+                'Python' => $form->python_version,
+                'Go' => $form->go_version,
+            ], fn ($v) => $v !== '');
+        @endphp
+
+        {{-- 1. SUMMARY — chip-strip pattern matching step-what's "Template filled in" panel --}}
+        <section class="rounded-2xl border-2 border-brand-sage/20 bg-white p-6 shadow-sm space-y-5 sm:p-7">
+            <div class="flex items-start gap-4">
+                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest">
+                    <x-heroicon-o-clipboard-document-check class="h-5 w-5" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('What you are creating') }}</h2>
+                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Final shape of the server. Anything missing here came from a step you can still go back to.') }}</p>
+                </div>
             </div>
-            <dl class="mt-5 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                    <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Type') }}</dt>
-                    <dd class="mt-1 font-medium text-brand-ink">
-                        @if ($form->mode === 'provider')
-                            {{ __('Provision with :provider', ['provider' => $form->type ?: __('a provider')]) }}
-                        @else
-                            {{ __('Custom / BYO') }} — {{ $form->custom_host_kind === 'docker' ? __('Docker host') : __('VM') }}
+
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/40 p-5">
+                <div class="flex flex-wrap gap-1.5 text-xs">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</span>
+                        <span class="font-medium text-brand-ink">{{ $modeLabel }}</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</span>
+                        <span class="font-mono font-medium text-brand-ink">{{ $form->name ?: '—' }}</span>
+                    </span>
+
+                    @if ($form->mode === 'provider')
+                        @if ($form->region !== '')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</span>
+                                <span class="font-medium text-brand-ink">{{ $form->region }}</span>
+                            </span>
                         @endif
-                    </dd>
-                </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                    <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Name') }}</dt>
-                    <dd class="mt-1 font-mono font-medium text-brand-ink">{{ $form->name }}</dd>
-                </div>
-                @if ($form->mode === 'provider')
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Region') }}</dt>
-                        <dd class="mt-1 font-medium text-brand-ink">{{ $form->region ?: '—' }}</dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Plan / size') }}</dt>
-                        <dd class="mt-1 font-medium text-brand-ink">{{ $form->size ?: '—' }}</dd>
-                    </div>
-                @else
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 sm:col-span-2">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Host') }}</dt>
-                        <dd class="mt-1 font-mono font-medium text-brand-ink">{{ $form->ssh_user }}@{{ $form->ip_address }}:{{ $form->ssh_port ?: 22 }}</dd>
-                    </div>
-                @endif
-                @if ($isVmShaped)
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Install profile') }}</dt>
-                        <dd class="mt-1 font-medium text-brand-ink">{{ $form->install_profile ?: '—' }}</dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Server role') }}</dt>
-                        <dd class="mt-1 font-medium text-brand-ink">{{ $form->server_role ?: '—' }}</dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 sm:col-span-2">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Web / PHP / DB / Cache') }}</dt>
-                        <dd class="mt-1 font-medium text-brand-ink">{{ $form->webserver }} · {{ $form->php_version }} · {{ $form->database }} · {{ $form->cache_service }}</dd>
-                    </div>
-                    @php
-                        $languageRuntimes = array_filter([
-                            'Ruby' => $form->ruby_version,
-                            'Node' => $form->node_version,
-                            'Python' => $form->python_version,
-                            'Go' => $form->go_version,
-                        ], fn ($v) => $v !== '');
-                    @endphp
-                    @if ($languageRuntimes !== [])
-                        <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 sm:col-span-2">
-                            <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Language runtimes') }}</dt>
-                            <dd class="mt-1 font-medium text-brand-ink">
-                                @foreach ($languageRuntimes as $name => $version)
-                                    {{ $name }} {{ $version }}@if (! $loop->last) · @endif
-                                @endforeach
-                            </dd>
-                        </div>
+                        @if ($form->size !== '')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</span>
+                                <span class="font-medium text-brand-ink">{{ $form->size }}</span>
+                            </span>
+                        @endif
+                    @else
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</span>
+                            <span class="font-mono font-medium text-brand-ink">{{ $form->ssh_user }}@{{ $form->ip_address }}:{{ $form->ssh_port ?: 22 }}</span>
+                        </span>
                     @endif
+                </div>
+
+                @if ($isVmShaped)
+                    <div class="mt-3 flex flex-wrap gap-1.5 text-xs">
+                        @if ($form->install_profile !== '')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bundle') }}</span>
+                                <span class="font-medium text-brand-ink">{{ $form->install_profile }}</span>
+                            </span>
+                        @endif
+                        @if ($form->server_role !== '')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Job') }}</span>
+                                <span class="font-medium text-brand-ink">{{ $form->server_role }}</span>
+                            </span>
+                        @endif
+                        @if ($form->webserver !== '' && $form->webserver !== 'none')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Web') }}</span>
+                                <span class="font-medium text-brand-ink">{{ $form->webserver }}</span>
+                            </span>
+                        @endif
+                        @if ($form->php_version !== '' && $form->php_version !== 'none')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PHP') }}</span>
+                                <span class="font-medium text-brand-ink">{{ $form->php_version }}</span>
+                            </span>
+                        @endif
+                        @if ($form->database !== '' && $form->database !== 'none')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB') }}</span>
+                                <span class="font-medium text-brand-ink">{{ $form->database }}</span>
+                            </span>
+                        @endif
+                        @if ($form->cache_service !== '' && $form->cache_service !== 'none')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache') }}</span>
+                                <span class="font-medium text-brand-ink">{{ $form->cache_service }}</span>
+                            </span>
+                        @endif
+                        @foreach ($languageRuntimes as $name => $version)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $name }}</span>
+                                <span class="font-medium text-brand-ink">{{ $version }}</span>
+                            </span>
+                        @endforeach
+                    </div>
                 @endif
-            </dl>
+            </div>
         </section>
 
-        {{-- Advanced options collapsed --}}
+        {{-- 2. ADVANCED OPTIONS — collapsed disclosures matching step-what's override pattern --}}
         @if ($form->mode === 'provider' && $form->type === 'digitalocean')
-            <details class="group rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition-transform group-open:rotate-180" />
-                        {{ __('Advanced DigitalOcean options') }}
+            <details class="group rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                <summary class="flex cursor-pointer list-none items-start gap-4 px-6 py-5 sm:px-7">
+                    <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest transition-colors group-hover:bg-brand-sage/15">
+                        <x-heroicon-o-adjustments-horizontal class="h-5 w-5" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="flex items-baseline justify-between gap-3">
+                            <span class="text-base font-semibold text-brand-ink">{{ __('Advanced DigitalOcean options') }}</span>
+                            <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition-transform group-open:rotate-180" />
+                        </span>
+                        <span class="mt-1 block text-sm text-brand-moss">{{ __('IPv6, automated backups, monitoring agent, tags, cloud-init user-data.') }}</span>
                     </span>
                 </summary>
-                <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label class="inline-flex items-center gap-3 text-sm text-brand-moss">
-                        <input type="checkbox" wire:model.live="form.do_ipv6" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
-                        {{ __('IPv6 networking') }}
-                    </label>
-                    <label class="inline-flex items-center gap-3 text-sm text-brand-moss">
-                        <input type="checkbox" wire:model.live="form.do_backups" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
-                        {{ __('Enable automated backups') }}
-                    </label>
-                    <label class="inline-flex items-center gap-3 text-sm text-brand-moss">
-                        <input type="checkbox" wire:model.live="form.do_monitoring" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
-                        {{ __('Enable monitoring agent') }}
-                    </label>
-                    <div class="sm:col-span-2">
-                        <x-input-label for="do_tags" :value="__('Tags (comma-separated)')" />
-                        <x-text-input id="do_tags" wire:model.live="form.do_tags" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div class="sm:col-span-2">
-                        <x-input-label for="do_user_data" :value="__('Cloud-init user-data (optional)')" />
-                        <textarea id="do_user_data" wire:model.live="form.do_user_data" rows="4" class="mt-1 block w-full rounded-xl border-brand-ink/15 bg-brand-cream/30 font-mono text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage"></textarea>
+                <div class="border-t border-brand-ink/10 px-6 py-6 sm:px-7">
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <label class="inline-flex items-center gap-3 text-sm text-brand-moss">
+                            <input type="checkbox" wire:model.live="form.do_ipv6" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
+                            {{ __('IPv6 networking') }}
+                        </label>
+                        <label class="inline-flex items-center gap-3 text-sm text-brand-moss">
+                            <input type="checkbox" wire:model.live="form.do_backups" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
+                            {{ __('Enable automated backups') }}
+                        </label>
+                        <label class="inline-flex items-center gap-3 text-sm text-brand-moss">
+                            <input type="checkbox" wire:model.live="form.do_monitoring" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
+                            {{ __('Enable monitoring agent') }}
+                        </label>
+                        <div class="sm:col-span-2">
+                            <x-input-label for="do_tags" :value="__('Tags (comma-separated)')" />
+                            <x-text-input id="do_tags" wire:model.live="form.do_tags" type="text" class="mt-1 block w-full" />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <x-input-label for="do_user_data" :value="__('Cloud-init user-data (optional)')" />
+                            <textarea id="do_user_data" wire:model.live="form.do_user_data" rows="4" class="mt-1 block w-full rounded-xl border-brand-ink/15 bg-brand-cream/30 font-mono text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage"></textarea>
+                        </div>
                     </div>
                 </div>
             </details>
         @endif
 
         @if ($isVmShaped)
-            <details class="group rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition-transform group-open:rotate-180" />
-                        {{ __('Optional setup-script recipe') }}
+            <details class="group rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                <summary class="flex cursor-pointer list-none items-start gap-4 px-6 py-5 sm:px-7">
+                    <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest transition-colors group-hover:bg-brand-sage/15">
+                        <x-heroicon-o-document-text class="h-5 w-5" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="flex items-baseline justify-between gap-3">
+                            <span class="text-base font-semibold text-brand-ink">{{ __('Optional setup-script recipe') }}</span>
+                            <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition-transform group-open:rotate-180" />
+                        </span>
+                        <span class="mt-1 block text-sm text-brand-moss">{{ __('Run a recipe defined in config/setup_scripts.php after the base provision.') }}</span>
                     </span>
                 </summary>
-                <div class="mt-4">
+                <div class="border-t border-brand-ink/10 px-6 py-6 sm:px-7">
                     <x-input-label for="setup_script_key" :value="__('Recipe key')" />
                     <x-text-input id="setup_script_key" wire:model.live="form.setup_script_key" type="text" class="mt-1 block w-full font-mono" placeholder="none" />
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Leave blank or "none" to skip. Recipe ids are defined in config/setup_scripts.php.') }}</p>
+                    <p class="mt-2 text-xs text-brand-mist">{{ __('Leave blank or "none" to skip.') }}</p>
                 </div>
             </details>
         @endif
 
+        {{-- Preflight + cost preview lives in the main column (not the sidebar)
+             because the panel has its own internal 2-column layout — squeezing
+             it into a narrow sidebar makes the inner grid overflow. --}}
         @include('livewire.servers.create._preflight-panel', ['preflight' => $preflight])
 
         @if ($errors->has('org'))
-            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first('org') }}</div>
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{ $errors->first('org') }}</div>
         @endif
 
         <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-6">
@@ -173,6 +226,35 @@
                 </button>
             </div>
         </footer>
+      </div>
+
+      {{-- Sidebar: cost preview + helper context, sticky on lg.
+           The preflight checks panel stays in the main column where
+           it has room; the cost preview lifts up here so the operator
+           sees pricing at a glance while scanning the summary. --}}
+      <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        @include('livewire.servers.create._cost-preview-panel', ['preflight' => $preflight])
+
+        <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                <x-heroicon-m-information-circle class="h-3.5 w-3.5" />
+                {{ __('After you click create') }}
+            </p>
+            <ol class="mt-3 space-y-2 text-xs leading-5 text-brand-moss">
+                <li class="flex gap-2"><span class="font-semibold text-brand-ink">1.</span> {{ __('Server row appears in your fleet immediately.') }}</li>
+                <li class="flex gap-2"><span class="font-semibold text-brand-ink">2.</span> {{ __('Provisioning journey opens — watch each step land in real time.') }}</li>
+                <li class="flex gap-2"><span class="font-semibold text-brand-ink">3.</span> {{ __('Once "ready", create sites or scaffold a fresh Laravel / WordPress install.') }}</li>
+            </ol>
+        </div>
+
+        <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/30 p-5">
+            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                <x-heroicon-m-arrow-path class="h-3.5 w-3.5" />
+                {{ __('Need to change something?') }}
+            </p>
+            <p class="mt-2 text-xs leading-5 text-brand-moss">{{ __('Use the stepper above or the Back button. Your draft persists across navigation; nothing is created until you click "Create server".') }}</p>
+        </div>
+      </aside>
     </form>
 
     @include('livewire.servers.create._discard-draft-modal')

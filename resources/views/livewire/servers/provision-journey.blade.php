@@ -40,6 +40,36 @@
         @include('livewire.servers.partials.workspace-flashes')
 
         <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,20rem)] lg:gap-8">
+
+            {{-- Orphaned fake-cloud server banner. Server was created
+                 during a fake-cloud session that's now disabled, so its
+                 stored ip_address (127.0.0.1) and ssh_port (2222) point
+                 at a docker container that's likely not running. The
+                 "100% complete" stats below are a stale artifact from
+                 the fake-cloud routing that quick-marked steps done.
+                 Operators can't recover this — the row has no real
+                 provider credentials. Steer them to delete + recreate. --}}
+            @if (! empty($isOrphanedFakeServer))
+                <div class="col-span-full overflow-hidden rounded-2xl border-2 border-amber-300 bg-amber-50 shadow-sm">
+                    <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
+                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold leading-snug text-amber-950">{{ __('This server is an orphan from a prior fake-cloud session') }}</p>
+                            <p class="mt-1 text-sm leading-relaxed text-amber-950/90">
+                                {{ __('It was created while DPLY_FAKE_CLOUD_PROVISION was enabled, so its IP (:ip) and SSH port (:port) point at a local docker container — not a real server. The "completed" tasks below are stale state from the fake-cloud routing.', [
+                                    'ip' => $server->ip_address ?: '127.0.0.1',
+                                    'port' => $server->ssh_port ?: 2222,
+                                ]) }}
+                            </p>
+                            <p class="mt-2 text-sm leading-relaxed text-amber-950/90">
+                                <strong>{{ __('Fix:') }}</strong>
+                                {{ __('Remove this server row, then create a fresh one from /servers/create. The new row will provision against your real provider account.') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if ($hasJourneyAlerts)
                 <div class="col-span-full overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm ring-1 ring-brand-ink/5">
                     @foreach ($journeyAlerts as $key => $row)

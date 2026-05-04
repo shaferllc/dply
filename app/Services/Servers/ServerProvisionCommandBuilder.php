@@ -847,7 +847,14 @@ final class ServerProvisionCommandBuilder
             'cat > '.escapeshellarg($layout['web_root'].'/index.html').' <<\'EOF\'
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>dply server ready</title><style>body{font-family:system-ui,sans-serif;max-width:36rem;margin:6rem auto;padding:0 1.5rem;color:#171a0e}h1{font-size:1.5rem;margin:0 0 .5rem}p{color:#5a6354}code{background:#f6f4ee;padding:.15rem .35rem;border-radius:.25rem}</style></head><body><h1>dply server ready</h1><p>This server is provisioned but has no sites yet. Create one from your dply dashboard or via <code>dply:site:create</code>.</p></body></html>
 EOF',
-            'chown -R www-data:www-data '.escapeshellarg($layout['web_root']).' || true',
+            // Owned by dply:dply since the docroot now lives under
+            // /home/dply/. Nginx (running as www-data) needs read +
+            // execute on the path; the dply user's home dir is
+            // chmod 0755 + dply group is in www-data's reachable
+            // group set, so traversal works. dply owns the bytes,
+            // nginx serves them.
+            'chown -R dply:dply '.escapeshellarg($layout['web_root']).' || true',
+            'chmod 755 '.escapeshellarg($layout['web_root']),
         ]);
     }
 

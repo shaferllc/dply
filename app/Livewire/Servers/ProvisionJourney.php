@@ -122,6 +122,12 @@ class ProvisionJourney extends Component
             'run' => $run,
             'infrastructureAlerts' => app(ServerJourneyInfrastructureAlerts::class)->forServer($this->server),
             'localDevShellHints' => $this->localDevShellHints(),
+            // True when this server row was created during a prior
+            // fake-cloud session but DPLY_FAKE_CLOUD_PROVISION is now
+            // off. The view surfaces a clear "orphan — delete and
+            // recreate" banner instead of misleading the operator with
+            // "100% complete" stats from cached fake-cloud step state.
+            'isOrphanedFakeServer' => FakeCloudProvision::isOrphanedFakeServer($this->server),
             'artifacts' => $artifacts,
             'steps' => $steps,
             'completedCount' => $completedCount,
@@ -232,7 +238,13 @@ class ProvisionJourney extends Component
      */
     protected function localDevShellHints(): ?array
     {
-        if (! app()->environment('local')) {
+        // Two gates per the local-dev pattern: only render when the
+        // operator is actually running fake-cloud locally. Disabling
+        // DPLY_FAKE_CLOUD_PROVISION (or moving to a non-local env)
+        // hides the local-docker shell hints entirely so production
+        // operators don't see "exec into the dply-ssh-dev container"
+        // hints that would mislead them.
+        if (! app()->environment('local') || ! FakeCloudProvision::enabled()) {
             return null;
         }
 
