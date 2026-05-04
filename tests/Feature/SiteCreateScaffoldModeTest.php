@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -120,6 +121,7 @@ class SiteCreateScaffoldModeTest extends TestCase
 
     public function test_storescaffold_creates_site_in_scaffolding_status(): void
     {
+        Bus::fake(); // Prevent the WP pipeline job from running inline
         config(['dply.scaffold_v1_enabled' => true]);
         [$user, $server] = $this->userWithOrgAndServer();
 
@@ -139,10 +141,14 @@ class SiteCreateScaffoldModeTest extends TestCase
         $this->assertSame('admin@example.com', $site->meta['scaffold']['admin_email']);
         $this->assertSame($user->id, $site->meta['scaffold']['requested_by_user_id']);
         $this->assertNull($site->meta['scaffold']['requested_hostname']);
+
+        Bus::assertDispatched(\App\Jobs\RunWordPressScaffoldJob::class,
+            fn ($job) => $job->siteId === $site->id);
     }
 
     public function test_storescaffold_records_optional_hostname(): void
     {
+        Bus::fake();
         config(['dply.scaffold_v1_enabled' => true]);
         [$user, $server] = $this->userWithOrgAndServer();
 
@@ -157,6 +163,9 @@ class SiteCreateScaffoldModeTest extends TestCase
 
         $site = Site::query()->sole();
         $this->assertSame('app.example.com', $site->meta['scaffold']['requested_hostname']);
+
+        Bus::assertDispatched(\App\Jobs\RunLaravelScaffoldJob::class,
+            fn ($job) => $job->siteId === $site->id);
     }
 
     public function test_storescaffold_validates_required_fields(): void

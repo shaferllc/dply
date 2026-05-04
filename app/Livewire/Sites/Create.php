@@ -281,8 +281,8 @@ class Create extends Component
             \App\Jobs\RunLaravelScaffoldJob::dispatch($site->id);
             session()->flash('info', __('Laravel site queued for scaffolding. The pipeline runs in the background.'));
         } else {
-            // WordPress pipeline lands in PR 6.
-            session()->flash('info', __('WordPress site queued. The scaffold pipeline ships in the next release.'));
+            \App\Jobs\RunWordPressScaffoldJob::dispatch($site->id);
+            session()->flash('info', __('WordPress site queued for scaffolding. The pipeline runs in the background.'));
         }
 
         return $this->redirect(route('sites.show', [
