@@ -1342,6 +1342,8 @@
                         @include('livewire.sites.settings.partials.system-user')
                     @elseif ($section === 'laravel-stack')
                         @include('livewire.sites.settings.partials.laravel-stack')
+                    @elseif ($section === 'wordpress')
+                        @livewire('sites.wordpress.wordpress-section', ['site' => $site], key('wordpress-section-'.$site->id))
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'logs')

@@ -17,6 +17,7 @@ return [
         'runtime' => ['label' => 'Runtime'],
         'system-user' => ['label' => 'System user'],
         'laravel-stack' => ['label' => 'Laravel'],
+        'wordpress' => ['label' => 'WordPress'],
         'environment' => ['label' => 'Environment'],
         'logs' => ['label' => 'Logs'],
         'notifications' => ['label' => 'Notifications'],

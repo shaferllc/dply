@@ -29,6 +29,7 @@ final class SiteSettingsSidebar
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent'],
                 ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user'],
                 ['id' => 'laravel-stack', 'label' => __('Laravel'), 'icon' => 'heroicon-o-bolt'],
+                ['id' => 'wordpress', 'label' => __('WordPress'), 'icon' => 'heroicon-o-globe-alt'],
                 ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square'],
                 ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open'],
                 ['id' => 'commits', 'label' => __('Commits'), 'icon' => 'heroicon-o-code-bracket'],
@@ -52,6 +53,7 @@ final class SiteSettingsSidebar
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent'],
                 ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user'],
                 ['id' => 'laravel-stack', 'label' => __('Laravel'), 'icon' => 'heroicon-o-bolt'],
+                ['id' => 'wordpress', 'label' => __('WordPress'), 'icon' => 'heroicon-o-globe-alt'],
                 ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell'],
@@ -82,6 +84,7 @@ final class SiteSettingsSidebar
 
         return collect($withWebserver)
             ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
+            ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
             ->values()
             ->all();
     }

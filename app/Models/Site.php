@@ -875,6 +875,23 @@ class Site extends Model
     }
 
     /**
+     * True when the site's detected runtime app is WordPress (per
+     * {@see \App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector}),
+     * OR when the site was scaffolded with the WordPress framework
+     * pipeline (Q14 — gates the WordPress Settings section).
+     */
+    public function isWordPressDetected(): bool
+    {
+        if (strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'wordpress') {
+            return true;
+        }
+
+        $scaffoldFramework = $this->meta['scaffold']['framework'] ?? null;
+
+        return is_string($scaffoldFramework) && strtolower($scaffoldFramework) === 'wordpress';
+    }
+
+    /**
      * @param  array<string, mixed>  $blob
      */
     private function runtimeAppDetectionIsMeaningful(array $blob): bool
