@@ -1691,7 +1691,7 @@ class ServerTest extends TestCase
                 'cache_service' => 'none',
                 'deploy_user' => 'dply',
                 'expected_services' => ['haproxy', 'ufw'],
-                'paths' => ['current' => '/home/dply/apps/lb/current'],
+                'paths' => ['web_root' => '/var/www/html', 'logs' => '/var/log/dply'],
                 'config_files' => ['/etc/haproxy/haproxy.cfg'],
             ],
             'content' => '{}',

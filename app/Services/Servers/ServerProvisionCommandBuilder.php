@@ -137,8 +137,9 @@ final class ServerProvisionCommandBuilder
                 'deploy_user' => (string) config('server_provision.deploy_ssh_user', 'dply'),
                 'expected_services' => array_keys($this->verificationLabels($role, $web, $php, $database, $cache)),
                 'paths' => [
-                    'current' => $layout['current'],
-                    'shared' => $layout['shared'],
+                    // Server-level paths only — per-site current/shared/releases
+                    // get reported by each Site's own provisioning artifact.
+                    'web_root' => $layout['web_root'],
                     'logs' => $layout['logs'],
                 ],
                 'config_files' => collect($this->renderedConfigs($role, $web, $php, $layout))
@@ -155,8 +156,9 @@ final class ServerProvisionCommandBuilder
                 'deploy_user' => (string) config('server_provision.deploy_ssh_user', 'dply'),
                 'expected_services' => array_keys($this->verificationLabels($role, $web, $php, $database, $cache)),
                 'paths' => [
-                    'current' => $layout['current'],
-                    'shared' => $layout['shared'],
+                    // Server-level paths only — per-site current/shared/releases
+                    // get reported by each Site's own provisioning artifact.
+                    'web_root' => $layout['web_root'],
                     'logs' => $layout['logs'],
                 ],
                 'config_files' => collect($this->renderedConfigs($role, $web, $php, $layout))
@@ -824,58 +826,54 @@ final class ServerProvisionCommandBuilder
     }
 
     /**
-     * @param  array{root:string,app:string,releases:string,current:string,shared:string,logs:string,tmp:string,bin:string}  $layout
+     * @param  array{web_root:string,logs:string,bin:string}  $layout
      * @return list<string>
      */
     private function createDeployLayout(array $layout): array
     {
-        return $this->withStep('Preparing deploy layout', [
+        // Server-level dirs only. Per-site Capistrano layout (current /
+        // shared / releases / tmp) is created at site-create time by
+        // the site scaffolders under /home/dply/<site-slug>/, NOT by
+        // server provisioning. The legacy "apps/<server-slug>" tree +
+        // dply-prepare-layout systemd unit baked single-app-per-server
+        // assumptions into the bare-server pipeline; both come out here.
+        return $this->withStep('Preparing server filesystem', [
             'install -d -m 0755 '.implode(' ', array_map('escapeshellarg', [
-                $layout['root'],
-                $layout['app'],
-                $layout['releases'],
-                $layout['shared'],
+                $layout['web_root'],
                 $layout['logs'],
-                $layout['tmp'],
             ])),
-            'ln -sfn '.escapeshellarg($layout['app']).' '.escapeshellarg($layout['current']),
-            'chown -R dply:dply '.escapeshellarg($layout['root']).' || true',
-            'cat > /usr/local/bin/dply-prepare-layout <<\'EOF\'
-#!/bin/bash
-set -euo pipefail
-install -d -m 0755 '.trim($layout['releases']).' '.trim($layout['shared']).' '.trim($layout['logs']).' '.trim($layout['tmp']).'
-chown -R dply:dply '.trim($layout['root']).'
+            // Render a dply-branded landing page so port 80 returns
+            // something honest until the operator creates a site.
+            'cat > '.escapeshellarg($layout['web_root'].'/index.html').' <<\'EOF\'
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>dply server ready</title><style>body{font-family:system-ui,sans-serif;max-width:36rem;margin:6rem auto;padding:0 1.5rem;color:#171a0e}h1{font-size:1.5rem;margin:0 0 .5rem}p{color:#5a6354}code{background:#f6f4ee;padding:.15rem .35rem;border-radius:.25rem}</style></head><body><h1>dply server ready</h1><p>This server is provisioned but has no sites yet. Create one from your dply dashboard or via <code>dply:site:create</code>.</p></body></html>
 EOF',
-            'chmod 755 /usr/local/bin/dply-prepare-layout',
-            $this->writeFileWithRollback('/etc/systemd/system/dply-prepare-layout.service', (new SystemdUnitFileBuilder)->buildDeployPrepareUnit()),
-            'systemctl daemon-reload',
-            'systemctl enable dply-prepare-layout.service',
-            '/usr/local/bin/dply-prepare-layout',
+            'chown -R www-data:www-data '.escapeshellarg($layout['web_root']).' || true',
         ]);
     }
 
     /**
-     * @param  array{root:string,app:string,releases:string,current:string,shared:string,logs:string,tmp:string,bin:string}  $layout
+     * @param  array{web_root:string,logs:string,bin:string}  $layout
      * @return array<string, array{label:string,path:string,content:string}>
      */
     private function renderedConfigs(string $role, string $web, string $php, array $layout): array
     {
         $configs = [];
         $phpSocket = $php !== 'none' ? '/run/php/'.$this->phpStem($php).'-fpm.sock' : null;
+        $webRoot = $layout['web_root'];
 
         if ($web === 'nginx') {
             $configs['nginx-starter'] = [
-                'label' => 'Nginx starter site',
+                'label' => 'Nginx default site',
                 'path' => '/etc/nginx/sites-available/dply',
                 'content' => <<<NGINX
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
-    root {$layout['current']}/public;
+    root {$webRoot};
     index index.php index.html;
 
     location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
+        try_files \$uri \$uri/ =404;
     }
 
     location ~ \.php$ {
@@ -889,25 +887,24 @@ NGINX,
 
         if ($web === 'caddy') {
             $configs['caddy-starter'] = [
-                'label' => 'Caddy starter site',
+                'label' => 'Caddy default site',
                 'path' => '/etc/caddy/Caddyfile',
-                'content' => (new CaddySiteConfigBuilder)->build($layout['current'].'/public', $phpSocket),
+                'content' => (new CaddySiteConfigBuilder)->build($webRoot, $phpSocket),
             ];
         }
 
         if ($web === 'apache') {
             $configs['apache-starter'] = [
-                'label' => 'Apache starter site',
+                'label' => 'Apache default site',
                 'path' => '/etc/apache2/sites-available/dply.conf',
                 'content' => <<<APACHE
 <VirtualHost *:80>
     ServerName localhost
-    DocumentRoot {$layout['current']}/public
-    <Directory {$layout['current']}/public>
+    DocumentRoot {$webRoot}
+    <Directory {$webRoot}>
         AllowOverride All
         Require all granted
         DirectoryIndex index.php index.html
-        FallbackResource /index.php
     </Directory>
     <FilesMatch \.php$>
         SetHandler "proxy:unix:{$phpSocket}|fcgi://localhost/"
@@ -919,9 +916,9 @@ APACHE,
 
         if ($web === 'openlitespeed') {
             $configs['openlitespeed-starter'] = [
-                'label' => 'OpenLiteSpeed starter site',
+                'label' => 'OpenLiteSpeed default site',
                 'path' => '/usr/local/lsws/conf/vhosts/dply/vhconf.conf',
-                'content' => "docRoot {$layout['current']}/public/\nvhDomain localhost\nindex  {\n  useServer 0\n  indexFiles index.php, index.html\n}\n",
+                'content' => "docRoot {$webRoot}/\nvhDomain localhost\nindex  {\n  useServer 0\n  indexFiles index.php, index.html\n}\n",
             ];
         }
 
@@ -949,19 +946,17 @@ APACHE,
             ];
         }
 
-        if ($role === 'docker') {
-            $configs['systemd-docker-note'] = [
-                'label' => 'Docker host systemd unit',
-                'path' => '/etc/systemd/system/dply-prepare-layout.service',
-                'content' => (new SystemdUnitFileBuilder)->buildDeployPrepareUnit(),
-            ];
-        }
+        // Docker hosts no longer get the per-server dply-prepare-layout
+        // systemd unit — the per-app layout that unit prepared was the
+        // single-app-per-server holdover. Docker container deploys
+        // bring their own filesystem story; nothing to do here at
+        // server-create time.
 
         return $configs;
     }
 
     /**
-     * @param  array{root:string,app:string,releases:string,current:string,shared:string,logs:string,tmp:string,bin:string}  $layout
+     * @param  array{web_root:string,logs:string,bin:string}  $layout
      * @return list<string>
      */
     private function writeRenderedConfigs(string $role, string $web, string $php, array $layout): array
