@@ -287,9 +287,7 @@
     @endif
 
     @if ($laravel_tab === 'migrations')
-        <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-cream/20 p-8 text-center">
-            <p class="text-sm text-brand-mist">{{ __('Migrations browser ships in the next release.') }}</p>
-        </div>
+        @include('livewire.sites.settings.partials.laravel.migrations-tab')
     @endif
 
     @if ($laravel_tab === 'pail')

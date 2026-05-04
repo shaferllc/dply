@@ -172,6 +172,19 @@ class Settings extends Show
 
     public bool $laravelScheduleLoaded = false;
 
+    /**
+     * Migrations sub-tab: parsed `php artisan migrate:status --json`
+     * rows ordered as the framework returns them (oldest → newest).
+     *
+     * @var list<array{migration?: string, batch?: int|string|null, ran?: bool}>
+     */
+    public array $laravelMigrationEntries = [];
+
+    public bool $laravelMigrationsLoaded = false;
+
+    /** UI flash flag set after a successful pre-rollback snapshot+rollback. */
+    public ?string $laravelMigrationsFlash = null;
+
     public string $laravel_custom_commands_text = '';
 
     /**
@@ -641,6 +654,88 @@ class Settings extends Show
 
         $this->laravelScheduleEntries = is_array($rows) ? array_values(array_filter($rows, 'is_array')) : [];
         $this->laravelScheduleLoaded = true;
+    }
+
+    /**
+     * Migrations sub-tab loader (PR 11b).
+     *
+     * Runs `php artisan migrate:status --json` via the Artisan service.
+     * The command is INSTANT-allowlisted so it returns inline. Parsed
+     * rows feed the migrations-tab partial.
+     */
+    public function loadLaravelMigrations(\App\Services\RemoteCli\Artisan $artisan): void
+    {
+        $this->authorize('view', $this->site);
+
+        try {
+            $result = $artisan->run(
+                site: $this->site,
+                command: 'migrate:status',
+                args: ['--json'],
+                queuedBy: auth()->user(),
+            );
+        } catch (\App\Services\RemoteCli\RemoteCliPermissionDeniedException $e) {
+            $this->addError('laravel_migrations', __('Your role can\'t inspect migrations.'));
+
+            return;
+        }
+
+        $stdout = trim($result->stdout());
+        $rows = $stdout !== '' ? json_decode($stdout, associative: true) : [];
+
+        $this->laravelMigrationEntries = is_array($rows) ? array_values(array_filter($rows, 'is_array')) : [];
+        $this->laravelMigrationsLoaded = true;
+    }
+
+    /**
+     * Rollback the most-recent N migration batches, optionally taking
+     * a pre-rollback snapshot via SnapshotService for the safety net
+     * (Q9 + Q19). Admin/owner only because this is destructive — losing
+     * data without a snapshot to restore from is a real possibility.
+     */
+    public function rollbackLastMigrationBatch(
+        \App\Services\RemoteCli\Artisan $artisan,
+        \App\Services\Snapshots\SnapshotService $snapshots,
+        \App\Services\Servers\ExecuteRemoteTaskOnServer $executor,
+    ): void {
+        $this->authorize('update', $this->site);
+
+        $org = $this->site->organization;
+        if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
+            $this->addError('laravel_migrations', __('Admin or owner role required to roll back migrations.'));
+
+            return;
+        }
+
+        // Pre-rollback safety-net snapshot to local disk (Q19 transient).
+        try {
+            $snapshot = $snapshots->take(
+                site: $this->site,
+                destination: new \App\Services\Snapshots\LocalDiskDestination($executor),
+                reason: \App\Models\Snapshot::REASON_PRE_MIGRATION_ROLLBACK,
+                userId: auth()->id(),
+            );
+        } catch (\Throwable $e) {
+            $this->addError('laravel_migrations', __('Pre-rollback snapshot failed; aborting rollback. :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        try {
+            $artisan->run(
+                site: $this->site,
+                command: 'migrate:rollback',
+                args: ['--force', '--step=1'],
+                queuedBy: auth()->user(),
+            );
+        } catch (\App\Services\RemoteCli\RemoteCliPermissionDeniedException $e) {
+            $this->addError('laravel_migrations', __('Permission denied: :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        $this->laravelMigrationsFlash = __('Rolled back last migration batch. Pre-rollback snapshot saved as snap-:id.', ['id' => $snapshot->id]);
+        $this->laravelMigrationsLoaded = false; // Force reload to refresh status table
     }
 
     public function saveLaravelCustomCommands(LaravelConsoleExecutor $executor): void
