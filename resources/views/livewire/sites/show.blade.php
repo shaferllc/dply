@@ -222,264 +222,293 @@
             @endif
 
             @if (! $readyForWorkspace)
+                @php
+                    $siteJourneyHasFailed = $provisioningState === 'failed';
+                    $siteJourneyIsDone = $provisioningState === 'ready';
+                    $siteVisibleSteps = collect($statusSteps)->except('failed');
+                    $siteTotalSteps = $siteVisibleSteps->count();
+                    $siteCompletedSteps = $siteJourneyHasFailed ? max(0, $currentStepIndex) : ($siteJourneyIsDone ? $siteTotalSteps : max(0, $currentStepIndex));
+                    $siteProgressPercent = $siteTotalSteps > 0 ? (int) round(($siteCompletedSteps / $siteTotalSteps) * 100) : 0;
+                    $siteCurrentLabel = $statusSteps[$provisioningState] ?? str_replace('_', ' ', $provisioningState);
+                @endphp
                 <div class="space-y-6" wire:poll.5s="pollProvisioningStatus">
-                    <div class="overflow-hidden rounded-[1.75rem] border {{ $provisioningState === 'failed' ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-white' }} shadow-sm">
-                        <div class="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1.55fr)_20rem]">
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] {{ $provisioningState === 'failed' ? 'text-red-700/90' : 'text-slate-500' }}">
-                                    {{ __('Site status') }}
-                                </p>
-                                <div class="mt-5 rounded-[1.5rem] border {{ $provisioningState === 'failed' ? 'border-red-200 bg-white/90' : 'border-slate-200 bg-slate-50/70' }} px-5 py-5 sm:px-6">
-                                    <div class="flex items-start gap-4 sm:gap-5">
-                                    <div class="mt-0.5 flex size-14 shrink-0 self-start items-center justify-center rounded-2xl {{ $provisioningState === 'failed' ? 'bg-red-100 text-red-700 ring-1 ring-red-200' : 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' }}">
-                                        @if ($provisioningState === 'failed')
-                                            <x-heroicon-o-exclamation-triangle class="h-7 w-7" />
+                    {{-- Header card: matches server provision-journey hero --}}
+                    <section class="dply-card overflow-hidden">
+                        <div class="flex flex-col gap-6 border-b border-brand-ink/10 px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
+                            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Site provisioning') }}</p>
+                                        @if ($siteJourneyHasFailed)
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800 ring-1 ring-red-200">
+                                                <x-heroicon-s-x-mark class="h-3 w-3" />
+                                                {{ __('Failed') }}
+                                            </span>
+                                        @elseif ($siteJourneyIsDone)
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                                <x-heroicon-s-check class="h-3 w-3" />
+                                                {{ __('Ready') }}
+                                            </span>
                                         @else
-                                            <x-heroicon-o-arrow-path class="h-7 w-7" />
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                                <x-heroicon-o-arrow-path class="h-3 w-3 animate-spin" />
+                                                {{ __('Live') }}
+                                            </span>
                                         @endif
                                     </div>
-                                    <div class="min-w-0">
-                                        <h3 class="text-3xl font-semibold tracking-tight text-slate-950 sm:text-[1.9rem]">
-                                            @if ($provisioningState === 'failed')
-                                                {{ __('Provisioning failed') }}
-                                            @else
-                                                {{ __('Installing your site') }}
-                                            @endif
-                                        </h3>
-                                        <p class="mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {{ $provisioningState === 'failed' ? 'bg-red-100 text-red-800 ring-1 ring-red-200' : 'bg-blue-100 text-blue-800 ring-1 ring-blue-200' }}">
-                                            {{ $statusSteps[$provisioningState] ?? str_replace('_', ' ', $provisioningState) }}
-                                        </p>
-                                        <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-600">
-                                            @if ($provisioningError)
-                                                {{ __('Dply hit a server-level setup problem while finishing installation. Fix the underlying access issue, then retry from this page.') }}
-                                            @else
-                                                {{ __('Dply is writing the web server config, attaching your temporary testing URL, and checking which hostname becomes reachable first. As soon as either the testing URL or the real domain responds, the full site workspace will appear here.') }}
-                                            @endif
-                                        </p>
-                                    </div>
-                                </div>
-                                </div>
-
-                                <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                                    @if ($targetUrl)
-                                        <div class="rounded-2xl border border-slate-200 bg-white/85 px-4 py-4 shadow-sm">
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">{{ __('Testing URL') }}</p>
-                                            <p class="mt-3 break-all font-mono text-sm text-slate-900">{{ $targetUrl }}</p>
-                                            <p class="mt-2 text-xs leading-5 text-slate-500">{{ __('Use this first while the customer domain catches up.') }}</p>
-                                        </div>
-                                    @endif
-
-                                    <div class="rounded-2xl border border-slate-200 bg-white/85 px-4 py-4 shadow-sm">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">{{ __('Install summary') }}</p>
-                                        <dl class="mt-3 space-y-3 text-sm">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <dt class="text-slate-500">{{ __('Primary domain') }}</dt>
-                                                <dd class="max-w-[16rem] break-all text-right font-mono text-slate-900">{{ optional($site->primaryDomain())->hostname ?? '—' }}</dd>
-                                            </div>
-                                            <div class="flex items-start justify-between gap-3">
-                                                <dt class="text-slate-500">{{ __('Web server') }}</dt>
-                                                <dd class="font-medium capitalize text-slate-900">{{ $site->webserver() }}</dd>
-                                            </div>
-                                            @if ($site->runtimeKey())
-                                                <div class="flex items-start justify-between gap-3">
-                                                    <dt class="text-slate-500">{{ __('Runtime') }}</dt>
-                                                    <dd class="font-medium text-slate-900">
-                                                        <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
-                                                            <span class="font-mono text-slate-500"> · {{ $site->runtimeVersion() }}</span>
-                                                        @endif
-                                                    </dd>
-                                                </div>
-                                            @endif
-                                            @if ($site->internal_port)
-                                                <div class="flex items-start justify-between gap-3">
-                                                    <dt class="text-slate-500">{{ __('Internal port') }}</dt>
-                                                    <dd class="font-mono text-slate-900">{{ $site->internal_port }}</dd>
-                                                </div>
-                                            @endif
-                                            <div class="flex items-start justify-between gap-3">
-                                                <dt class="text-slate-500">{{ __('Current step') }}</dt>
-                                                <dd class="font-medium text-slate-900">{{ $statusSteps[$provisioningState] ?? str_replace('_', ' ', $provisioningState) }}</dd>
-                                            </div>
-                                        </dl>
-                                    </div>
-                                </div>
-
-                                @if ($provisioningError)
-                                    <div class="mt-6 rounded-2xl border border-red-200 bg-white/90 p-4 shadow-sm">
-                                        <div class="flex items-start justify-between gap-4">
-                                            <div class="min-w-0">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-red-700">{{ __('Latest error') }}</p>
-                                                <p class="mt-3 break-all font-mono text-xs leading-6 text-slate-700">{{ $provisioningError }}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endif
-
-                                @if ($provisioningLog->isNotEmpty())
-                                    <div class="mt-6">
-                                        @include('livewire.partials.deployment-activity-console', [
-                                            'title' => __('Install activity'),
-                                            'meta' => ($statusSteps[$provisioningState] ?? str_replace('_', ' ', $provisioningState)).' · '.__('last :count entries', ['count' => min(8, $provisioningLog->count())]),
-                                            'transcript' => $provisioningTranscript,
-                                        ])
-                                    </div>
-                                @endif
-                            </div>
-
-                            <div class="flex flex-col justify-between gap-4 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5 shadow-sm">
-                                <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">{{ __('Current step') }}</p>
-                                    <p class="mt-3 text-xl font-semibold tracking-tight text-slate-950">{{ $statusSteps[$provisioningState] ?? str_replace('_', ' ', $provisioningState) }}</p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-500">
-                                        @if ($provisioningState === 'failed')
-                                            {{ __('This install is paused until the server access issue is fixed.') }}
+                                    <h2 class="mt-2 text-xl font-semibold tracking-tight text-brand-ink sm:text-2xl">
+                                        {{ __('Site setup (:done/:total)', ['done' => $siteCompletedSteps, 'total' => $siteTotalSteps]) }}
+                                    </h2>
+                                    <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss">
+                                        @if ($siteJourneyHasFailed)
+                                            {{ __('Provisioning hit an error. Review the failure details below, then retry — Dply re-runs only the steps that need it.') }}
                                         @else
-                                            {{ __('This page updates live as the installer moves through each step.') }}
+                                            {{ __('Dply is writing the web server config, attaching the temporary testing URL, and watching for the first hostname that responds.') }}
                                         @endif
                                     </p>
                                 </div>
-
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Completion rule') }}</p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('The site is considered ready as soon as either the testing URL or the real domain responds.') }}</p>
-                                </div>
-
-                                @if ($provisioningState === 'failed')
-                                    <div>
+                                <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                                    @if ($siteJourneyHasFailed)
                                         <button
                                             type="button"
                                             wire:click="retryProvisioning"
                                             wire:loading.attr="disabled"
-                                            class="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+                                            wire:target="retryProvisioning"
+                                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:border-brand-sage hover:text-brand-sage disabled:opacity-60"
                                         >
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" />
                                             <span wire:loading.remove wire:target="retryProvisioning">{{ __('Retry provisioning') }}</span>
-                                            <span wire:loading wire:target="retryProvisioning">{{ __('Retrying...') }}</span>
+                                            <span wire:loading wire:target="retryProvisioning">{{ __('Retrying…') }}</span>
                                         </button>
-                                        <p class="mt-3 text-xs leading-5 text-slate-500">{{ __('Use this after fixing root SSH access or passwordless sudo on the server.') }}</p>
-                                    </div>
-                                @endif
-
-                                <div class="border-t border-slate-200 pt-4">
+                                    @endif
                                     <button
                                         type="button"
                                         wire:click="openConfirmActionModal('cancelProvisioning', [], @js(__('Cancel provisioning')), @js(__('Cancel this site setup, delete the generated testing DNS record, remove any created web server config from the server, and return to add site?')), @js(__('Cancel provisioning')), true)"
-                                        class="inline-flex w-full items-center justify-center rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-50"
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
                                     >
-                                        {{ __('Cancel provisioning') }}
+                                        <x-heroicon-o-x-circle class="h-4 w-4" />
+                                        {{ __('Cancel build') }}
                                     </button>
-                                    <p class="mt-3 text-xs leading-5 text-slate-500">{{ __('This removes the temporary DNS record, cleans up generated server config, deletes the pending site, and returns you to site creation.') }}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                                    <span class="inline-flex items-center gap-2 text-sm font-medium text-brand-ink">
+                                        <x-heroicon-m-wrench-screwdriver class="h-4 w-4 text-brand-moss" />
+                                        {{ __('Site setup') }}
+                                    </span>
+                                    <span class="text-sm tabular-nums text-brand-moss">{{ __(':done of :total', ['done' => $siteCompletedSteps, 'total' => $siteTotalSteps]) }}</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/80">
+                                        <div class="h-full rounded-full {{ $siteJourneyHasFailed ? 'bg-red-500' : 'bg-sky-600' }} transition-[width] duration-300" style="width: {{ $siteProgressPercent }}%"></div>
+                                    </div>
+                                    <span class="shrink-0 text-sm font-semibold tabular-nums {{ $siteJourneyHasFailed ? 'text-red-700' : 'text-sky-700' }}">{{ $siteProgressPercent }}%</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-                    <div class="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                        <div class="flex items-center justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-semibold text-slate-900">{{ __('Provisioning steps') }}</h3>
-                                <p class="mt-1 text-sm text-slate-500">{{ __('A compact install timeline showing what is done, what is running, and what comes next.') }}</p>
-                            </div>
-                            <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                {{ max(1, $currentStepIndex + 1) }} / {{ count($statusSteps) }}
-                            </div>
-                        </div>
-                        <div class="mt-6 space-y-4">
-                            @foreach ($statusSteps as $key => $label)
-                                @php
-                                    $loopIndex = array_search($key, $stepKeys, true);
-                                    $isDone = $loopIndex !== false && $loopIndex < $currentStepIndex;
-                                    $isCurrent = $key === $provisioningState;
-                                @endphp
-                                <div class="flex gap-4 rounded-2xl px-1 py-1">
-                                    <div class="flex flex-col items-center">
-                                        <div class="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold shadow-sm {{ $isCurrent ? 'bg-slate-900 text-white ring-4 ring-slate-100' : ($isDone ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500') }}">
-                                            {{ $isDone ? '✓' : $loop->iteration }}
+                        <div class="flex flex-col gap-6 px-5 py-6 sm:px-8 sm:py-8">
+                            @if ($siteJourneyHasFailed)
+                                <div class="rounded-2xl border-2 border-red-300 bg-red-50/95 px-5 py-5 shadow-sm">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-start gap-3">
+                                                <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-600 text-white">
+                                                    <x-heroicon-s-x-mark class="h-4 w-4" aria-hidden="true" />
+                                                </span>
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="text-base font-semibold text-red-900 sm:text-lg">{{ __('Provisioning failed at: :step', ['step' => $siteCurrentLabel]) }}</p>
+                                                    @if ($provisioningError)
+                                                        <div class="mt-2 rounded-xl border border-red-300 bg-white/80 px-4 py-3">
+                                                            <div class="flex items-start justify-between gap-3">
+                                                                <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">{{ __('Reason') }}</p>
+                                                                <button
+                                                                    type="button"
+                                                                    x-data="{ copied: false }"
+                                                                    x-on:click="navigator.clipboard.writeText(@js($provisioningError)); copied = true; setTimeout(() => copied = false, 1500)"
+                                                                    class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                                >
+                                                                    <span x-show="!copied">{{ __('Copy') }}</span>
+                                                                    <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                                                </button>
+                                                            </div>
+                                                            <p class="mt-1 break-words font-mono text-sm leading-6 text-red-900">{{ $provisioningError }}</p>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </div>
-                                        @if (! $loop->last)
-                                            <div class="mt-2 h-12 w-px {{ $isDone ? 'bg-emerald-200' : ($isCurrent ? 'bg-slate-300' : 'bg-slate-200') }}"></div>
-                                        @endif
+                                        <span class="shrink-0 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-red-800">{{ __('Failed') }}</span>
                                     </div>
-                                    <div class="pb-4 pt-1">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <p class="font-medium text-slate-900">{{ $label }}</p>
-                                            @if ($isCurrent)
-                                                <span class="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">{{ __('Live') }}</span>
-                                            @elseif ($isDone)
-                                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{{ __('Done') }}</span>
+                                </div>
+                            @else
+                                <div class="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/95 to-white px-4 py-4 sm:px-5">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center gap-3">
+                                                <span class="inline-flex h-7 w-7 animate-spin items-center justify-center rounded-full border-[3px] border-sky-200 border-t-sky-600" aria-hidden="true"></span>
+                                                <p class="text-base font-semibold text-brand-ink sm:text-lg">{{ $siteCurrentLabel }}</p>
+                                            </div>
+                                            <p class="mt-3 text-sm leading-6 text-brand-moss">
+                                                {{ __('This page updates live as the installer moves through each step. The site is considered ready as soon as either the testing URL or the real domain responds.') }}
+                                            </p>
+                                            @if ($provisioningLog->isNotEmpty())
+                                                <details class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner group" x-data>
+                                                    <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
+                                                        <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                            <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                                            {{ __('Install activity') }}
+                                                        </span>
+                                                        <span class="text-[11px] text-slate-500">{{ __('last :count entries', ['count' => min(8, $provisioningLog->count())]) }}</span>
+                                                    </summary>
+                                                    <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200">{{ $provisioningTranscript }}</pre>
+                                                </details>
                                             @endif
                                         </div>
-                                        @if ($isCurrent)
-                                            <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('This is the active install step right now.') }}</p>
-                                        @elseif ($isDone)
-                                            <p class="mt-1 text-sm leading-6 text-emerald-700">{{ __('Completed successfully.') }}</p>
-                                        @else
-                                            <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('This will run automatically once the earlier steps finish.') }}</p>
-                                        @endif
                                     </div>
                                 </div>
-                            @endforeach
-                        </div>
-                    </div>
+                            @endif
 
-                    <div class="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-semibold text-slate-900">{{ __('DNS and hostname readiness') }}</h3>
-                                <p class="mt-1 text-sm text-slate-500">{{ __('Dply keeps checking both URLs and moves on as soon as one of them becomes reachable.') }}</p>
-                            </div>
-                            <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                {{ __('Either one can win') }}
-                            </div>
-                        </div>
-
-                        @if ($testingHostname !== '')
-                            <div class="mt-5 rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f0fdf4_0%,#ffffff_100%)] p-4 shadow-sm">
-                                <div class="flex items-center justify-between gap-3">
+                            {{-- Step timeline --}}
+                            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10">
+                                <div class="flex items-center justify-between gap-4 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
                                     <div>
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">{{ __('Temporary testing hostname') }}</p>
-                                        <p class="mt-2 break-all font-mono text-sm text-emerald-950">{{ $testingHostname }}</p>
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Provisioning steps') }}</p>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Compact install timeline — done, running, and what comes next.') }}</p>
                                     </div>
-                                    <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">{{ __('Preferred during install') }}</span>
+                                    <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand-moss ring-1 ring-brand-ink/10">
+                                        {{ max(1, $currentStepIndex + 1) }} / {{ $siteTotalSteps }}
+                                    </span>
                                 </div>
-                            </div>
-                        @elseif (($testingHostnameMeta['status'] ?? null) === 'failed')
-                            <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                                <p class="font-medium">{{ __('Temporary hostname could not be created') }}</p>
-                                <p class="mt-1">{{ $testingHostnameMeta['error'] ?? __('Check the global DigitalOcean token and the configured testing domains.') }}</p>
-                            </div>
-                        @endif
-
-                        <dl class="mt-5 grid gap-4 sm:grid-cols-2">
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Primary domain') }}</dt>
-                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ optional($site->primaryDomain())->hostname ?? '—' }}</dd>
-                            </div>
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Web server') }}</dt>
-                                <dd class="mt-2 text-sm font-medium capitalize text-slate-900">{{ $site->webserver() }}</dd>
-                            </div>
-                        </dl>
-
-                        @if ($hostChecks->isNotEmpty())
-                            <div class="mt-5 space-y-3">
-                                @foreach ($hostChecks as $check)
-                                    <div class="rounded-2xl border {{ ($check['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70' }} p-4">
-                                        <div class="flex flex-wrap items-center justify-between gap-3">
-                                            <div>
-                                                <p class="font-mono text-sm font-medium text-slate-900">{{ $check['hostname'] }}</p>
-                                                <p class="mt-1 text-xs leading-5 {{ ($check['ok'] ?? false) ? 'text-emerald-800' : 'text-amber-900' }}">
-                                                    {{ ($check['ok'] ?? false) ? __('This hostname is reachable and can finish the install.') : ($check['error'] ?? __('This hostname has not passed checks yet.')) }}
+                                <ol class="divide-y divide-brand-ink/5">
+                                    @foreach ($siteVisibleSteps as $key => $label)
+                                        @php
+                                            $loopIndex = array_search($key, $stepKeys, true);
+                                            $isDone = ! $siteJourneyHasFailed && $loopIndex !== false && $loopIndex < $currentStepIndex;
+                                            $isCurrent = $key === $provisioningState;
+                                        @endphp
+                                        <li class="flex items-start gap-4 px-5 py-4 sm:px-6">
+                                            <div class="flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold {{ $isCurrent ? ($siteJourneyHasFailed ? 'bg-red-600 text-white' : 'bg-sky-600 text-white ring-4 ring-sky-100') : ($isDone ? 'bg-emerald-600 text-white' : 'bg-white text-brand-mist ring-1 ring-brand-ink/10') }}">
+                                                @if ($isDone)
+                                                    <x-heroicon-s-check class="h-4 w-4" />
+                                                @elseif ($isCurrent && ! $siteJourneyHasFailed)
+                                                    <span class="inline-flex h-3 w-3 animate-pulse rounded-full bg-white"></span>
+                                                @else
+                                                    {{ $loop->iteration }}
+                                                @endif
+                                            </div>
+                                            <div class="min-w-0 flex-1">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <p class="font-medium text-brand-ink">{{ $label }}</p>
+                                                    @if ($isCurrent && ! $siteJourneyHasFailed)
+                                                        <span class="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800">{{ __('Live') }}</span>
+                                                    @elseif ($isDone)
+                                                        <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">{{ __('Done') }}</span>
+                                                    @endif
+                                                </div>
+                                                <p class="mt-1 text-sm leading-6 {{ $isDone ? 'text-brand-forest' : 'text-brand-moss' }}">
+                                                    @if ($isCurrent && ! $siteJourneyHasFailed)
+                                                        {{ __('This is the active install step right now.') }}
+                                                    @elseif ($isDone)
+                                                        {{ __('Completed successfully.') }}
+                                                    @else
+                                                        {{ __('Runs automatically once the earlier steps finish.') }}
+                                                    @endif
                                                 </p>
                                             </div>
-                                            <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ ($check['ok'] ?? false) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
-                                                {{ ($check['ok'] ?? false) ? __('Ready') : __('Waiting') }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                @endforeach
+                                        </li>
+                                    @endforeach
+                                </ol>
                             </div>
-                        @endif
+                        </div>
+                    </section>
+
+                    {{-- Side panels (testing URL, install summary, DNS readiness) --}}
+                    <div class="grid gap-6 lg:grid-cols-2">
+                        <section class="dply-card overflow-hidden p-6 sm:p-8">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Install summary') }}</p>
+                            <h3 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('What we are setting up') }}</h3>
+                            @if ($targetUrl)
+                                <div class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">{{ __('Testing URL') }}</p>
+                                    <p class="mt-2 break-all font-mono text-sm text-emerald-950">{{ $targetUrl }}</p>
+                                    <p class="mt-2 text-xs leading-5 text-emerald-800/80">{{ __('Use this first while the customer domain catches up.') }}</p>
+                                </div>
+                            @endif
+                            <dl class="mt-5 space-y-3 text-sm">
+                                <div class="flex items-start justify-between gap-3 border-b border-brand-ink/5 pb-3">
+                                    <dt class="text-brand-mist">{{ __('Primary domain') }}</dt>
+                                    <dd class="max-w-[16rem] break-all text-right font-mono text-brand-ink">{{ optional($site->primaryDomain())->hostname ?? '—' }}</dd>
+                                </div>
+                                <div class="flex items-start justify-between gap-3 border-b border-brand-ink/5 pb-3">
+                                    <dt class="text-brand-mist">{{ __('Web server') }}</dt>
+                                    <dd class="font-medium capitalize text-brand-ink">{{ $site->webserver() }}</dd>
+                                </div>
+                                @if ($site->runtimeKey())
+                                    <div class="flex items-start justify-between gap-3 border-b border-brand-ink/5 pb-3">
+                                        <dt class="text-brand-mist">{{ __('Runtime') }}</dt>
+                                        <dd class="font-medium text-brand-ink">
+                                            <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
+                                                <span class="font-mono text-brand-mist"> · {{ $site->runtimeVersion() }}</span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                @endif
+                                @if ($site->internal_port)
+                                    <div class="flex items-start justify-between gap-3 border-b border-brand-ink/5 pb-3">
+                                        <dt class="text-brand-mist">{{ __('Internal port') }}</dt>
+                                        <dd class="font-mono text-brand-ink">{{ $site->internal_port }}</dd>
+                                    </div>
+                                @endif
+                                <div class="flex items-start justify-between gap-3">
+                                    <dt class="text-brand-mist">{{ __('Current step') }}</dt>
+                                    <dd class="font-medium text-brand-ink">{{ $siteCurrentLabel }}</dd>
+                                </div>
+                            </dl>
+                        </section>
+
+                        <section class="dply-card overflow-hidden p-6 sm:p-8">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('DNS and hostname readiness') }}</p>
+                                    <h3 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('Either URL can finish setup') }}</h3>
+                                    <p class="mt-1 text-sm text-brand-moss">{{ __('Dply keeps checking both URLs and moves on as soon as one of them becomes reachable.') }}</p>
+                                </div>
+                            </div>
+
+                            @if (($testingHostnameMeta['status'] ?? null) === 'failed')
+                                <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                    <p class="font-medium">{{ __('Temporary hostname could not be created') }}</p>
+                                    <p class="mt-1">{{ $testingHostnameMeta['error'] ?? __('Check the global DigitalOcean token and the configured testing domains.') }}</p>
+                                </div>
+                            @endif
+
+                            @if ($hostChecks->isNotEmpty())
+                                <div class="mt-5 space-y-3">
+                                    @foreach ($hostChecks as $check)
+                                        <div class="rounded-2xl border {{ ($check['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70' }} p-4">
+                                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                                <div class="min-w-0">
+                                                    <p class="break-all font-mono text-sm font-medium text-brand-ink">{{ $check['hostname'] }}</p>
+                                                    <p class="mt-1 text-xs leading-5 {{ ($check['ok'] ?? false) ? 'text-emerald-800' : 'text-amber-900' }}">
+                                                        {{ ($check['ok'] ?? false) ? __('This hostname is reachable and can finish the install.') : ($check['error'] ?? __('This hostname has not passed checks yet.')) }}
+                                                    </p>
+                                                </div>
+                                                <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ ($check['ok'] ?? false) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                                                    {{ ($check['ok'] ?? false) ? __('Ready') : __('Waiting') }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="mt-5 rounded-2xl border border-dashed border-brand-ink/15 bg-white/60 p-4 text-sm text-brand-moss">
+                                    {{ __('No hostname checks yet — Dply will start polling once the web server config is written.') }}
+                                </p>
+                            @endif
+                        </section>
                     </div>
                 </div>
             @else

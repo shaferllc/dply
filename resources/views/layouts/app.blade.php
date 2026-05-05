@@ -107,6 +107,7 @@
         @include('partials.session-flash-toasts')
         @livewireScripts
         @include('partials.livewire-toast-events')
+        @stack('scripts')
         <script>
             document.addEventListener('livewire:init', () => {
                 Livewire.on('provision-journey-complete', (e) => {

@@ -121,6 +121,29 @@ class SiteCreateForm extends Form
      */
     public string $database_engine = '';
 
+    /**
+     * Framework hint chosen by the user in the workspace "Add site" modal.
+     * Drives the default web directory and the legacy {@see $type}; the
+     * runtime detector confirms/overrides this from the repo on clone.
+     *
+     * Recognised values: '' (None — static HTML or PHP), 'laravel',
+     * 'nodejs', 'statamic', 'craft', 'symfony', 'wordpress', 'october',
+     * 'cakephp3'.
+     */
+    public string $framework = '';
+
+    /**
+     * Webserver template slug. Reserved for future per-template Nginx
+     * recipes (Forge parity); the default rendering is unchanged today.
+     */
+    public string $webserver_template = 'default';
+
+    public bool $create_system_user = false;
+
+    public bool $create_staging_site = false;
+
+    public bool $use_as_redirect_domain = false;
+
     public function applyDefaultsForType(string $type): void
     {
         $this->type = $type;
@@ -149,9 +172,38 @@ class SiteCreateForm extends Form
 
         $basePath = $this->defaultDeployPath();
         $this->repository_path = $basePath;
-        $this->document_root = $this->type === 'php'
-            ? $basePath.'/public'
-            : $basePath;
+        $this->document_root = $basePath.$this->frameworkWebSubdir();
+    }
+
+    /**
+     * Resolve the framework choice to (type, web-subdir) so the modal can
+     * mirror Forge's "Project type" → web-directory defaults. The runtime
+     * detector confirms/overrides the type once the repo is cloned.
+     */
+    public function applyFrameworkDefaults(string $framework): void
+    {
+        $this->framework = $framework;
+
+        $type = match ($framework) {
+            'nodejs' => 'node',
+            default => 'php',
+        };
+
+        $this->applyDefaultsForType($type);
+    }
+
+    private function frameworkWebSubdir(): string
+    {
+        if ($this->type !== 'php') {
+            return '';
+        }
+
+        return match ($this->framework) {
+            'wordpress', 'october' => '',
+            'craft' => '/web',
+            'cakephp3' => '/webroot',
+            default => '/public',
+        };
     }
 
     public function defaultDeployPath(): string

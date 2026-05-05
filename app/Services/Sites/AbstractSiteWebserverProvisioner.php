@@ -77,12 +77,29 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
             return;
         }
 
+        // Make sure the web root exists before we look at it. Without this,
+        // a freshly-created site whose deploy path has never been touched
+        // returns "missing" for the index inspect (no path → no files),
+        // we then write index.html via writeSystemFile (which mkdir -p's
+        // the parent), but if any other process races us nginx may serve
+        // a bare 404 in the gap. mkdir -p here closes that window.
+        $mkdir = $ssh->exec(sprintf(
+            '(%s) 2>&1; printf "\nDPLY_PLACEHOLDER_MKDIR:%%s" "$?"',
+            $this->privilegedCommand(
+                $site->server,
+                sprintf('mkdir -p %s', escapeshellarg($root))
+            )
+        ), 30);
+        if (! preg_match('/DPLY_PLACEHOLDER_MKDIR:0\s*$/', $mkdir)) {
+            throw new \RuntimeException('Unable to create the site web root for the placeholder. Output: '.Str::limit($mkdir, 1000));
+        }
+
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_INDEX_PLACEHOLDER_EXIT:%%s" "$?"',
             $this->privilegedCommand(
                 $site->server,
                 sprintf(
-                    'if [ -f %1$s/index.php ] || [ -f %1$s/index.html ] || [ -f %1$s/index.htm ]; then echo exists; else echo missing; fi',
+                    'if [ -f %1$s/index.php ]; then echo deployed; else echo placeholder; fi',
                     escapeshellarg($root)
                 )
             )
@@ -92,7 +109,12 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
             throw new \RuntimeException('Unable to inspect the site web root before writing a placeholder page. Output: '.Str::limit($out, 1000));
         }
 
-        if (str_contains($out, 'exists')) {
+        // index.php on disk means a deploy has populated this doc root —
+        // don't clobber the user's app entrypoint. Any other state (empty
+        // dir, lingering index.html from a prior placeholder, partial
+        // static deploy without index.php) gets the latest placeholder
+        // written so the site never serves a bare nginx 404.
+        if (str_contains($out, 'deployed')) {
             return;
         }
 

@@ -110,6 +110,11 @@ class WorkspaceSites extends Component
         $this->form->applyDefaultsForType($value);
     }
 
+    public function updatedFormFramework(string $value): void
+    {
+        $this->form->applyFrameworkDefaults($value);
+    }
+
     public function updatedFormDocumentRoot(): void
     {
         $this->form->customize_paths = true;
@@ -136,15 +141,14 @@ class WorkspaceSites extends Component
             );
         }
 
-        $phpVersionIds = array_column($this->phpVersions, 'id');
-
         $rules = [
             'name' => 'required|string|max:120',
             'type' => 'required|in:php,static,node',
             'document_root' => 'required|string|max:500',
             'repository_path' => 'nullable|string|max:500',
-            'php_version' => 'nullable|string|max:10',
             'app_port' => 'nullable|integer|min:1|max:65535',
+            'framework' => 'nullable|string|in:,laravel,nodejs,statamic,craft,symfony,wordpress,october,cakephp3',
+            'webserver_template' => 'nullable|string|max:64',
             'primary_hostname' => [
                 'required',
                 'string',
@@ -158,17 +162,7 @@ class WorkspaceSites extends Component
             ],
         ];
 
-        if ($this->form->type === 'php') {
-            $rules['php_version'] = ['required', 'string', 'max:10'];
-            if ($phpVersionIds !== []) {
-                $rules['php_version'][] = 'in:'.implode(',', $phpVersionIds);
-            }
-        }
-
-        $this->form->validate($rules, [
-            'php_version.required' => __('Choose a PHP version for this site.'),
-            'php_version.in' => __('Choose a PHP version that is currently installed on this server.'),
-        ]);
+        $this->form->validate($rules);
 
         $effectiveRuntime = $this->form->type;
         $internalPort = null;
@@ -186,6 +180,14 @@ class WorkspaceSites extends Component
 
         $org = $this->server->organization;
 
+        // PHP version is intentionally not collected in the modal: the
+        // server's preselected default is used at create time and the
+        // runtime detector overrides it from the repo (composer.json
+        // platform / .tool-versions / etc.) on first clone.
+        $defaultPhpVersion = $this->form->type === 'php' && $this->form->php_version !== ''
+            ? $this->form->php_version
+            : null;
+
         $site = Site::query()->create([
             'server_id' => $this->server->id,
             'user_id' => auth()->id(),
@@ -195,9 +197,7 @@ class WorkspaceSites extends Component
             'slug' => Str::slug($this->form->name) ?: 'site',
             'type' => SiteType::from($this->form->type),
             'runtime' => $this->form->type,
-            'runtime_version' => $this->form->type === 'php' && $this->form->php_version !== ''
-                ? $this->form->php_version
-                : null,
+            'runtime_version' => $defaultPhpVersion,
             'internal_port' => $internalPort,
             'document_root' => $this->form->document_root,
             'repository_path' => $this->form->repository_path ?: null,
@@ -210,7 +210,19 @@ class WorkspaceSites extends Component
             'laravel_scheduler' => false,
             'deployment_environment' => 'production',
             'restart_supervisor_programs_after_deploy' => false,
-            'meta' => [],
+            'meta' => [
+                'framework' => $this->form->framework ?: null,
+                'webserver_template' => $this->form->webserver_template ?: 'default',
+                'create_options' => [
+                    'create_system_user' => $this->form->create_system_user,
+                    'create_staging_site' => $this->form->create_staging_site,
+                    'use_as_redirect_domain' => $this->form->use_as_redirect_domain,
+                ],
+                // Marker for the runtime detector: the Site was created
+                // without an explicit runtime/version pin; once the repo
+                // is cloned, detection should fill these from the source.
+                'runtime_detection_pending' => true,
+            ],
         ]);
 
         $site->ensureUniqueSlug();

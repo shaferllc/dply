@@ -164,38 +164,61 @@
                                     <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
                                 </div>
 
-                                <div>
-                                    <x-input-label for="add-site-type" :value="__('Stack')" />
-                                    <select
-                                        id="add-site-type"
-                                        wire:model.live="form.type"
-                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
-                                    >
-                                        <option value="php">{{ __('PHP (PHP-FPM + Nginx)') }}</option>
-                                        <option value="static">{{ __('Static files') }}</option>
-                                        <option value="node">{{ __('Node (Nginx → reverse proxy)') }}</option>
-                                    </select>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="add-site-doc-root" :value="__('Web directory')" />
+                                        <x-text-input
+                                            id="add-site-doc-root"
+                                            wire:model.blur="form.document_root"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono text-sm"
+                                            required
+                                        />
+                                        <x-input-error :messages="$errors->get('form.document_root')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="add-site-deploy-path" :value="__('Project directory')" />
+                                        <x-text-input
+                                            id="add-site-deploy-path"
+                                            wire:model.blur="form.repository_path"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono text-sm"
+                                        />
+                                        <x-input-error :messages="$errors->get('form.repository_path')" class="mt-1" />
+                                    </div>
                                 </div>
 
-                                @if ($form->type === 'php')
-                                    <div>
-                                        <x-input-label for="add-site-php" :value="__('PHP-FPM version')" />
-                                        <select
-                                            id="add-site-php"
-                                            wire:model="form.php_version"
-                                            class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
-                                        >
-                                            <option value="">{{ __('Select a PHP version') }}</option>
-                                            @foreach ($phpVersions as $version)
-                                                <option value="{{ $version['id'] }}">{{ $version['label'] }}</option>
-                                            @endforeach
-                                        </select>
-                                        @if ($phpVersions === [])
-                                            <p class="mt-1 text-xs text-brand-mist">{{ __('No supported PHP versions installed yet. Install one from the PHP workspace first.') }}</p>
-                                        @endif
-                                        <x-input-error :messages="$errors->get('form.php_version')" class="mt-1" />
-                                    </div>
-                                @endif
+                                <div>
+                                    <x-input-label for="add-site-framework" :value="__('Project type')" />
+                                    <select
+                                        id="add-site-framework"
+                                        wire:model.live="form.framework"
+                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                    >
+                                        <option value="">{{ __('None (Static HTML or PHP)') }}</option>
+                                        <option value="laravel">Laravel</option>
+                                        <option value="nodejs">NodeJS</option>
+                                        <option value="statamic">Statamic</option>
+                                        <option value="craft">Craft CMS</option>
+                                        <option value="symfony">Symfony</option>
+                                        <option value="wordpress">WordPress</option>
+                                        <option value="october">OctoberCMS</option>
+                                        <option value="cakephp3">CakePHP 3</option>
+                                    </select>
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('PHP version and runtime details are detected from the repository when the first deploy clones the project.') }}</p>
+                                    <x-input-error :messages="$errors->get('form.framework')" class="mt-1" />
+                                </div>
+
+                                <div>
+                                    <x-input-label for="add-site-template" :value="__('Webserver template')" />
+                                    <select
+                                        id="add-site-template"
+                                        wire:model="form.webserver_template"
+                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                    >
+                                        <option value="default">{{ __('Default template') }}</option>
+                                    </select>
+                                </div>
 
                                 @if ($form->type === 'node')
                                     <div>
@@ -210,28 +233,40 @@
                                     </div>
                                 @endif
 
-                                <div class="grid gap-5 sm:grid-cols-2">
-                                    <div>
-                                        <x-input-label for="add-site-doc-root" :value="__('Document root')" />
-                                        <x-text-input
-                                            id="add-site-doc-root"
-                                            wire:model.blur="form.document_root"
-                                            type="text"
-                                            class="mt-1 block w-full font-mono text-sm"
-                                            required
+                                <div class="space-y-3 border-t border-brand-ink/10 pt-4">
+                                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                                        <input
+                                            type="checkbox"
+                                            wire:model="form.create_system_user"
+                                            class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
                                         />
-                                        <x-input-error :messages="$errors->get('form.document_root')" class="mt-1" />
-                                    </div>
-                                    <div>
-                                        <x-input-label for="add-site-deploy-path" :value="__('Deploy path')" />
-                                        <x-text-input
-                                            id="add-site-deploy-path"
-                                            wire:model.blur="form.repository_path"
-                                            type="text"
-                                            class="mt-1 block w-full font-mono text-sm"
+                                        <span>
+                                            <span class="font-medium">{{ __('Create system user') }}</span>
+                                            <span class="block text-xs text-brand-mist">{{ __('Creates a system user with a random generated name dedicated to this site.') }}</span>
+                                        </span>
+                                    </label>
+                                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                                        <input
+                                            type="checkbox"
+                                            wire:model="form.create_staging_site"
+                                            class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
                                         />
-                                        <x-input-error :messages="$errors->get('form.repository_path')" class="mt-1" />
-                                    </div>
+                                        <span>
+                                            <span class="font-medium">{{ __('Create staging site') }}</span>
+                                            <span class="block text-xs text-brand-mist">{{ __('Creates an extra site for development. After development is done you can push the code over to the main site.') }}</span>
+                                        </span>
+                                    </label>
+                                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                                        <input
+                                            type="checkbox"
+                                            wire:model="form.use_as_redirect_domain"
+                                            class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
+                                        />
+                                        <span>
+                                            <span class="font-medium">{{ __('Use as redirect domain') }}</span>
+                                            <span class="block text-xs text-brand-mist">{{ __('Redirects this whole domain to another domain.') }}</span>
+                                        </span>
+                                    </label>
                                 </div>
                             </div>
                         </div>

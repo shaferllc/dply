@@ -1082,7 +1082,7 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
         $response->assertOk()
-            ->assertSee('Installing your site')
+            ->assertSee('Site provisioning')
             ->assertSee('Checking reachability')
             ->assertSee('preview-app.dply.cc');
     }
