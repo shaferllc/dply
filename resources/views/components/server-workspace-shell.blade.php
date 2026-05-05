@@ -81,11 +81,11 @@
         <aside class="lg:col-span-3 mb-8 lg:mb-0">
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 p-4 sm:p-5">
-                    <div class="flex items-start gap-3">
+                    <div class="flex items-center gap-3">
                         <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $avatarStyle }}">
                             {{ $avatarInitials }}
                         </span>
-                        <div class="min-w-0 flex-1">
+                        <div class="min-w-0 flex-1 leading-tight">
                             <p class="truncate text-base font-semibold text-brand-ink">{{ $server->name }}</p>
                             @if ($server->workspace)
                                 <p class="mt-0.5 truncate text-xs text-brand-moss">

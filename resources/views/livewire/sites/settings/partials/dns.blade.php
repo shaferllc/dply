@@ -58,4 +58,6 @@
             <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
         </div>
     </form>
+
+    <x-cli-snippet class="mx-6 mb-6 sm:mx-8" tone="stub" />
 </section>

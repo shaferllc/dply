@@ -98,7 +98,7 @@
         @endif
     </x-page-header>
 
-    <div class="space-y-8">
+    <div class="mt-6 space-y-8 sm:mt-8">
         {{ $slot }}
     </div>
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Actions\Servers\RecordProvisionStepDurations;
 use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
@@ -70,6 +71,24 @@ class TaskRunnerTaskObserver
 
         if ($run && ($task->wasChanged('output') || $task->wasChanged('status'))) {
             $this->persistStructuredArtifacts($run, $task);
+        }
+
+        // Record per-step durations whenever new output arrives. The
+        // recorder is idempotent on (task_id, label_hash) so we can
+        // call it on every poll — completed steps land as soon as their
+        // [dply-step-end] line is in the buffer, not just at the end.
+        if ($task->wasChanged('output') || $task->wasChanged('status')) {
+            try {
+                app(RecordProvisionStepDurations::class)->handle($server, $task, $run);
+            } catch (\Throwable $e) {
+                // Best-effort: a duration insert failing should never
+                // halt provision bookkeeping. Log and move on.
+                \Illuminate\Support\Facades\Log::warning('server.provision.step_durations.record_failed', [
+                    'server_id' => $server->id,
+                    'task_id' => $task->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         if (! $task->wasChanged('status')) {

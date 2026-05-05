@@ -1,9 +1,25 @@
 @php
-    $stripe = function (\App\Models\Server $server): string {
+    // A server with status=READY but setup_status!=DONE is still being
+    // provisioned (the bash script is on the droplet, the UI shouldn't
+    // paint it green or claim it's "ready" yet). Treat it as
+    // "provisioning" everywhere on this card so the listing reflects
+    // reality until the journey hands over.
+    $isFullyReady = function (\App\Models\Server $server): bool {
+        return $server->status === \App\Models\Server::STATUS_READY
+            && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE;
+    };
+    $displayStatus = function (\App\Models\Server $server) use ($isFullyReady): string {
+        if ($server->status === \App\Models\Server::STATUS_READY && ! $isFullyReady($server)) {
+            return 'provisioning';
+        }
+
+        return (string) $server->status;
+    };
+    $stripe = function (\App\Models\Server $server) use ($isFullyReady): string {
         if ($server->scheduled_deletion_at) {
             return 'bg-orange-500';
         }
-        if ($server->status === \App\Models\Server::STATUS_READY) {
+        if ($isFullyReady($server)) {
             if ($server->health_status === \App\Models\Server::HEALTH_REACHABLE) {
                 return 'bg-emerald-500';
             }
@@ -16,7 +32,11 @@
         if ($server->status === \App\Models\Server::STATUS_ERROR) {
             return 'bg-red-500';
         }
-        if ($server->status === \App\Models\Server::STATUS_PROVISIONING || $server->status === \App\Models\Server::STATUS_PENDING) {
+        if (
+            $server->status === \App\Models\Server::STATUS_PROVISIONING
+            || $server->status === \App\Models\Server::STATUS_PENDING
+            || $server->status === \App\Models\Server::STATUS_READY  // setup still in flight
+        ) {
             return 'bg-amber-400';
         }
 
@@ -339,7 +359,7 @@
                                                 </div>
                                                 <p class="text-xs text-brand-moss leading-relaxed">
                                                     {{ trans_choice(':count site|:count sites', $server->sites_count, ['count' => $server->sites_count]) }}
-                                                    @if ($server->status === \App\Models\Server::STATUS_READY)
+                                                    @if ($isFullyReady($server))
                                                         <span class="text-brand-mist"> · </span>
                                                         {{ __('Online for :days days', ['days' => max(0, (int) $server->created_at->diffInDays(now()))]) }}
                                                     @endif
@@ -403,19 +423,19 @@
                                                                 {{ $server->workspace->name }}
                                                             </a>
                                                         @endif
-                                                        @if ($server->status === \App\Models\Server::STATUS_READY)
+                                                        @if ($isFullyReady($server))
                                                             <span class="text-brand-mist"> · </span>
                                                             {{ __('Online for :days days', ['days' => max(0, (int) $server->created_at->diffInDays(now()))]) }}
                                                         @endif
                                                         <span class="text-brand-mist"> · </span>
                                                         {{ $server->provider->label() }}
                                                         <span class="text-brand-mist"> · </span>
-                                                        {{ $server->status }}
+                                                        {{ $displayStatus($server) }}
                                                         @if ($server->scheduled_deletion_at)
                                                             <span class="text-brand-mist"> · </span>
                                                             <span class="text-amber-800 font-medium">{{ __('Removal :date', ['date' => $server->scheduled_deletion_at->timezone(config('app.timezone'))->toFormattedDateString()]) }}</span>
                                                         @endif
-                                                        @if ($server->status === 'ready')
+                                                        @if ($isFullyReady($server))
                                                             @if ($server->health_status === 'reachable')
                                                                 <span class="text-emerald-600"> · {{ __('Reachable') }}</span>
                                                             @elseif ($server->health_status === 'unreachable')

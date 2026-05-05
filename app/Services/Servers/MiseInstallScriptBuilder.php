@@ -123,10 +123,34 @@ class MiseInstallScriptBuilder
 
         $miseTool = $this->miseToolKey($runtime);
         $userArg = escapeshellarg($deployUser);
-        $cmd = escapeshellarg("mise use --global {$miseTool}@{$version}");
+
+        // Force mise to fetch prebuilt release binaries instead of
+        // compiling from source. Without this, Python (python-build) and
+        // Ruby (ruby-build) default to from-source builds that take
+        // 90–240s on a small droplet — for no real benefit on a stock
+        // x86_64 server. Node defaults to binary, but setting MISE_NODE_COMPILE=0
+        // is harmless and makes the intent explicit. Toggle off via
+        // DPLY_MISE_PREFER_BINARY=false to fall back to the legacy
+        // compile path.
+        //
+        // try/catch so unit tests that exercise this builder without a
+        // booted framework (no config repository in the container) don't
+        // blow up — the prefer-binary default applies in that case.
+        //
+        // Reference: https://mise.jdx.dev/configuration.html#environment-variables
+        try {
+            $preferBinary = (bool) config('server_provision.mise_prefer_binary', true);
+        } catch (\Throwable) {
+            $preferBinary = true;
+        }
+        $env = $preferBinary
+            ? "MISE_NODE_COMPILE=0 MISE_PYTHON_COMPILE=0 MISE_RUBY_COMPILE=0 PYTHON_BUILD_USE_PREBUILT=1 "
+            : '';
+
+        $cmd = escapeshellarg($env."mise use --global {$miseTool}@{$version}");
 
         return [
-            "echo \"[dply] installing {$miseTool}@{$version} globally for {$deployUser}\"",
+            "echo \"[dply] installing {$miseTool}@{$version} globally for {$deployUser} (prefer-binary={$miseTool})\"",
             "sudo -u {$userArg} -H bash -lc {$cmd}",
         ];
     }

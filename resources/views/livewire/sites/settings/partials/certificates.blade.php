@@ -148,4 +148,6 @@
             @endforeach
         </ul>
     @endif
+
+    <x-cli-snippet tone="stub" />
 </section>

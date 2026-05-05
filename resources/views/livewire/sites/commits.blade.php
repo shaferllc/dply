@@ -158,6 +158,8 @@
                     </ul>
                 @endif
             </section>
+
+            <x-cli-snippet tone="stub" />
         </main>
     </div>
 </div>

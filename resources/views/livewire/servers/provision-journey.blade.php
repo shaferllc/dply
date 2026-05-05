@@ -56,6 +56,59 @@
         : null;
 @endphp
 
+@once
+    <style>
+        /* Animated stripe sheen for an actively-progressing bar (e.g. cloud bar mid-fill).
+           The fill keeps its solid colour; we overlay a translucent diagonal-stripe gradient
+           and march it left→right at a steady tempo. */
+        @keyframes dply-progress-stripes {
+            0%   { background-position: 0 0; }
+            100% { background-position: 1.25rem 0; }
+        }
+        .dply-progress-fill-active {
+            background-image: linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.28) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, 0.28) 50%,
+                rgba(255, 255, 255, 0.28) 75%,
+                transparent 75%,
+                transparent
+            );
+            background-size: 1.25rem 1.25rem;
+            animation: dply-progress-stripes 1s linear infinite;
+        }
+
+        /* Indeterminate marching highlight on an empty track — used while we're waiting on
+           a phase handoff (e.g. cloud done, setup not yet dispatched) so the rail doesn't
+           look stalled. A narrow translucent emerald sweeps left→right across the track. */
+        @keyframes dply-progress-indeterminate {
+            0%   { background-position: -40% 0; }
+            100% { background-position: 140% 0; }
+        }
+        .dply-progress-track-indeterminate {
+            background-image: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(5, 150, 105, 0.45) 50%,
+                transparent 100%
+            );
+            background-repeat: no-repeat;
+            background-size: 35% 100%;
+            animation: dply-progress-indeterminate 1.6s ease-in-out infinite;
+        }
+
+        /* Reduce-motion: disable the marching animations but keep colour cues. */
+        @media (prefers-reduced-motion: reduce) {
+            .dply-progress-fill-active,
+            .dply-progress-track-indeterminate {
+                animation: none;
+            }
+        }
+    </style>
+@endonce
+
 <div
     @if ($shouldPoll)
         {{-- Polling cadence + visibility gating to keep the journey
@@ -301,8 +354,8 @@
                                 <span class="text-sm tabular-nums text-brand-moss">{{ __(':done of :total', ['done' => $cloudDone, 'total' => $cloudTotal]) }}</span>
                             </div>
                             <div class="flex items-center gap-3">
-                                <div class="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/80">
-                                    <div class="h-full rounded-full bg-sky-600 transition-[width] duration-300" style="width: {{ $cloudPercent }}%"></div>
+                                <div class="dply-progress-track h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/80 {{ $cloudPercent > 0 && $cloudPercent < 100 ? 'dply-progress-track-idle' : '' }}">
+                                    <div class="dply-progress-fill h-full rounded-full bg-sky-600 transition-[width] duration-300 {{ $cloudPercent > 0 && $cloudPercent < 100 ? 'dply-progress-fill-active' : '' }}" style="width: {{ $cloudPercent }}%"></div>
                                 </div>
                                 <span class="shrink-0 text-sm font-semibold tabular-nums text-sky-700">{{ $cloudPercent }}%</span>
                             </div>
@@ -323,9 +376,16 @@
                                     <span class="text-sm tabular-nums text-brand-mist">{{ __('Waiting for cloud phase') }}</span>
                                 @endif
                             </div>
+                            @php
+                                // While we're waiting on the cloud→setup handoff (cloud at 100%, setup not yet
+                                // started) the empty tan rail looked stalled. Render an indeterminate marching
+                                // sheen on the *track* so the user sees movement during the dispatch gap.
+                                $setupIndeterminate = ! $setupStarted && $cloudPercent >= 100;
+                                $setupActive = $setupStarted && $setupPercent < 100;
+                            @endphp
                             <div class="flex items-center gap-3">
-                                <div class="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/80">
-                                    <div class="h-full rounded-full bg-emerald-600 transition-[width] duration-300" style="width: {{ $setupStarted ? $setupPercent : 0 }}%"></div>
+                                <div class="dply-progress-track h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/80 {{ $setupIndeterminate ? 'dply-progress-track-indeterminate' : ($setupActive ? 'dply-progress-track-idle' : '') }}">
+                                    <div class="dply-progress-fill h-full rounded-full bg-emerald-600 transition-[width] duration-300 {{ $setupActive ? 'dply-progress-fill-active' : '' }}" style="width: {{ $setupStarted ? $setupPercent : 0 }}%"></div>
                                 </div>
                                 <span class="shrink-0 text-sm font-semibold tabular-nums {{ $setupStarted ? 'text-brand-forest' : 'text-brand-mist' }}">{{ $setupStarted ? $setupPercent.'%' : '—' }}</span>
                             </div>
@@ -511,7 +571,14 @@
                                     @if ($stallState)
                                         <div class="mt-3 rounded-xl border border-brand-ink/10 bg-white/90 p-4">
                                             <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Run timing') }}</p>
-                                            <p class="mt-2 text-sm text-brand-ink">{{ $stallState['eta'] }}</p>
+                                            <p class="mt-2 flex flex-wrap items-baseline gap-2 text-sm text-brand-ink">
+                                                <span>{{ $stallState['eta'] }}</span>
+                                                @if (! empty($stallState['eta_samples']))
+                                                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ __('Computed from your previous server provisions for this org.') }}">
+                                                        {{ trans_choice('from :count previous run|from :count previous runs', $stallState['eta_samples'], ['count' => $stallState['eta_samples']]) }}
+                                                    </span>
+                                                @endif
+                                            </p>
                                             <p class="mt-1 text-sm text-brand-moss">{{ $stallState['running_for'] }}</p>
                                             @if ($stallState['last_output'])
                                                 <p class="mt-1 text-sm text-brand-moss">{{ $stallState['last_output'] }}</p>
@@ -685,10 +752,34 @@
                             @if ($pendingSteps->isNotEmpty())
                                 <ul class="space-y-0 border-t border-brand-ink/10 bg-white/80 px-4 py-2 sm:px-5">
                                     @foreach ($pendingSteps as $step)
+                                        @php
+                                            $stepEta = $step['eta'] ?? null;
+                                            $stepEtaSeconds = is_array($stepEta) ? (int) ($stepEta['seconds'] ?? 0) : 0;
+                                            $stepEtaSamples = is_array($stepEta) ? (int) ($stepEta['samples'] ?? 0) : 0;
+                                            $stepEtaLabel = null;
+                                            if ($stepEtaSeconds > 0) {
+                                                if ($stepEtaSeconds < 60) {
+                                                    $stepEtaLabel = '~'.$stepEtaSeconds.'s';
+                                                } else {
+                                                    $minutes = intdiv($stepEtaSeconds, 60);
+                                                    $remainder = $stepEtaSeconds % 60;
+                                                    $stepEtaLabel = $minutes < 10 && $remainder > 0
+                                                        ? sprintf('~%dm %ds', $minutes, $remainder)
+                                                        : '~'.$minutes.'m';
+                                                }
+                                            }
+                                        @endphp
                                         <li class="flex gap-3 border-b border-brand-ink/5 py-3 last:border-b-0">
                                             <span class="mt-1.5 inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-mist ring-4 ring-brand-sand/40" aria-hidden="true"></span>
                                             <div class="min-w-0 flex-1">
-                                                <p class="text-sm font-medium text-brand-ink">{{ $step['label'] }}</p>
+                                                <div class="flex items-center justify-between gap-3">
+                                                    <p class="text-sm font-medium text-brand-ink">{{ $step['label'] }}</p>
+                                                    @if ($stepEtaLabel)
+                                                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ trans_choice('Avg from :count previous run|Avg from :count previous runs', $stepEtaSamples, ['count' => $stepEtaSamples]) }}">
+                                                            {{ $stepEtaLabel }}
+                                                        </span>
+                                                    @endif
+                                                </div>
                                                 @if ($step['detail'])
                                                     <p class="mt-0.5 text-sm text-brand-moss">{{ $step['detail'] }}</p>
                                                 @endif
@@ -760,81 +851,181 @@
                 'lg:row-start-2' => $artifacts->isEmpty() && $hasJourneyAlerts,
                 'lg:row-start-1' => $artifacts->isEmpty() && ! $hasJourneyAlerts,
             ])>
-                <section class="{{ $card }} p-5 sm:p-6">
+                @php
+                    $isFullyReady = $server->status === \App\Models\Server::STATUS_READY
+                        && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE;
+                    $statusBadge = match (true) {
+                        $server->status === \App\Models\Server::STATUS_ERROR => 'bg-red-100 text-red-900 ring-red-300',
+                        $isFullyReady => 'bg-emerald-100 text-emerald-900 ring-emerald-300',
+                        $server->status === \App\Models\Server::STATUS_READY => 'bg-amber-100 text-amber-900 ring-amber-300', // setup still in flight
+                        $server->status === \App\Models\Server::STATUS_PROVISIONING => 'bg-amber-100 text-amber-900 ring-amber-300',
+                        $server->status === \App\Models\Server::STATUS_PENDING => 'bg-sky-100 text-sky-900 ring-sky-300',
+                        default => 'bg-brand-sand text-brand-ink ring-brand-ink/15',
+                    };
+                    $statusLabel = ($server->status === \App\Models\Server::STATUS_READY && ! $isFullyReady)
+                        ? __('Provisioning')
+                        : ucfirst((string) $server->status);
+                    $setupBadge = match ($server->setup_status) {
+                        \App\Models\Server::SETUP_STATUS_DONE => 'bg-emerald-100 text-emerald-900 ring-emerald-300',
+                        \App\Models\Server::SETUP_STATUS_FAILED => 'bg-red-100 text-red-900 ring-red-300',
+                        \App\Models\Server::SETUP_STATUS_RUNNING => 'bg-amber-100 text-amber-900 ring-amber-300',
+                        \App\Models\Server::SETUP_STATUS_PENDING => 'bg-sky-100 text-sky-900 ring-sky-300',
+                        default => 'bg-brand-sand text-brand-ink ring-brand-ink/15',
+                    };
+                @endphp
+                <section class="{{ $card }} p-5 sm:p-6" x-data="{ copied: false }">
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Server summary') }}</h3>
-                    <dl class="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-2">
+                    <dl class="mt-4 grid grid-cols-1 gap-x-4 gap-y-4 text-sm sm:grid-cols-2">
                         <div class="sm:col-span-2">
                             <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                            <dd class="mt-0.5 font-semibold capitalize text-brand-ink">{{ $server->status }}</dd>
+                            <dd class="mt-1">
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $statusBadge }}">
+                                    {{ $statusLabel }}
+                                </span>
+                            </dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</dt>
-                            <dd class="mt-0.5 font-medium text-brand-ink">{{ $server->provider->label() }}</dd>
+                            <dd class="mt-1">
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/12 bg-brand-sand/30 px-2 py-0.5 text-xs font-semibold text-brand-ink">
+                                    {{ $server->provider->label() }}
+                                </span>
+                            </dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
-                            <dd class="mt-0.5 font-medium text-brand-ink">{{ $server->region ?: '—' }}</dd>
+                            <dd class="mt-1">
+                                <code class="rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ $server->region ?: '—' }}</code>
+                            </dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
-                            <dd class="mt-0.5 font-medium text-brand-ink">{{ $server->size ?: '—' }}</dd>
+                            <dd class="mt-1">
+                                <code class="break-all rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ $server->size ?: '—' }}</code>
+                            </dd>
                         </div>
                         @if ($server->setup_status)
                             <div>
                                 <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Setup') }}</dt>
-                                <dd class="mt-0.5 font-medium capitalize text-brand-ink">{{ $server->setup_status }}</dd>
+                                <dd class="mt-1">
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $setupBadge }}">
+                                        {{ ucfirst(str_replace('_', ' ', (string) $server->setup_status)) }}
+                                    </span>
+                                </dd>
                             </div>
                         @endif
                         <div class="sm:col-span-2">
                             <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('IP address') }}</dt>
-                            <dd class="mt-0.5 break-all font-mono text-xs font-medium text-brand-ink">{{ $server->ip_address ?: '—' }}</dd>
+                            <dd class="mt-1 flex min-w-0 items-center gap-2">
+                                <code class="min-w-0 flex-1 truncate rounded-md bg-brand-sand/40 px-2 py-1 font-mono text-xs text-brand-ink">
+                                    {{ $server->ip_address ?: '—' }}
+                                </code>
+                                @if ($server->ip_address)
+                                    <button type="button"
+                                        title="{{ __('Copy IP') }}"
+                                        @click.prevent="navigator.clipboard.writeText(@js($server->ip_address)); copied = true; setTimeout(() => copied = false, 1500)"
+                                        class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">
+                                        <span x-text="copied ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
+                                    </button>
+                                @endif
+                            </dd>
                         </div>
                     </dl>
                     @can('delete', $server)
-                        <div class="mt-5 border-t border-brand-ink/10 pt-4">
+                        <div class="mt-6 border-t border-brand-ink/10 pt-4">
                             <p class="text-xs leading-relaxed text-brand-moss">
                                 {{ __('If the machine is gone or you want to abandon this install, remove the server record from Dply (and tear down linked cloud resources when applicable).') }}
                             </p>
                             <button
                                 type="button"
                                 wire:click="openRemoveServerModal"
-                                class="mt-3 text-sm font-medium text-red-700 hover:text-red-900"
+                                class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 shadow-sm transition-colors hover:border-red-400 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2 sm:w-auto"
                             >
-                                {{ __('Remove or schedule removal…') }}
+                                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Remove or schedule removal') }}
                             </button>
                         </div>
                     @endcan
                 </section>
 
                 @if (app()->environment('local'))
-                    <section class="{{ $card }} p-6">
-                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Setup diagnostics') }}</h3>
+                    @php
+                        $tid = $server->meta['provision_task_id'] ?? null;
+                        $rid = $server->meta['provision_run_id'] ?? null;
+                        $taskStatusValue = $task?->status->value;
+                        // Colour-coded chip per TaskRunner status so a quick glance tells
+                        // you whether the bash provision is still running, succeeded, or
+                        // failed without parsing the word.
+                        $taskStatusBadge = match ($taskStatusValue) {
+                            'running' => 'bg-amber-100 text-amber-900 ring-amber-300',
+                            'completed', 'succeeded', 'success' => 'bg-emerald-100 text-emerald-900 ring-emerald-300',
+                            'failed', 'errored' => 'bg-red-100 text-red-900 ring-red-300',
+                            'cancelled', 'canceled' => 'bg-slate-100 text-slate-700 ring-slate-300',
+                            'queued', 'pending' => 'bg-sky-100 text-sky-900 ring-sky-300',
+                            default => 'bg-brand-sand text-brand-ink ring-brand-ink/15',
+                        };
+                    @endphp
+                    <section class="{{ $card }} p-6" x-data="{ copied: null }">
+                        <div class="flex items-baseline justify-between gap-2">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Setup diagnostics') }}</h3>
+                            <span class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Local env') }}</span>
+                        </div>
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
                             {{ __('Structured entries are written to the app log with keys like server.provision.* — filter logs by server_id or grep server.provision.') }}
                         </p>
-                        <dl class="mt-4 space-y-3 text-sm">
-                            <div>
-                                <dt class="text-brand-moss">{{ __('Server ID') }}</dt>
-                                <dd class="mt-1 break-all font-mono text-xs text-brand-ink">{{ $server->id }}</dd>
+                        <dl class="mt-4 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10 bg-brand-sand/20 text-sm">
+                            <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Server ID') }}</dt>
+                                <dd class="flex min-w-0 items-center gap-2">
+                                    <code class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink">{{ $server->id }}</code>
+                                    <button type="button"
+                                        title="{{ __('Copy') }}"
+                                        @click.prevent="navigator.clipboard.writeText(@js((string) $server->id)); copied = 'server'; setTimeout(() => copied = null, 1500)"
+                                        class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">
+                                        <span x-text="copied === 'server' ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
+                                    </button>
+                                </dd>
                             </div>
-                            <div>
-                                <dt class="text-brand-moss">{{ __('Poll') }}</dt>
-                                <dd class="mt-1 font-medium text-brand-ink">{{ $shouldPoll ? __('On (5s)') : __('Off') }}</dd>
+                            <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Provision task') }}</dt>
+                                <dd class="flex min-w-0 items-center gap-2">
+                                    @if ($tid)
+                                        <code class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink">{{ $tid }}</code>
+                                        <button type="button"
+                                            title="{{ __('Copy') }}"
+                                            @click.prevent="navigator.clipboard.writeText(@js((string) $tid)); copied = 'task'; setTimeout(() => copied = null, 1500)"
+                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">
+                                            <span x-text="copied === 'task' ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
+                                        </button>
+                                    @else
+                                        <span class="text-brand-mist">—</span>
+                                    @endif
+                                </dd>
                             </div>
-                            @php($tid = $server->meta['provision_task_id'] ?? null)
-                            @php($rid = $server->meta['provision_run_id'] ?? null)
-                            <div>
-                                <dt class="text-brand-moss">{{ __('Provision task') }}</dt>
-                                <dd class="mt-1 break-all font-mono text-xs text-brand-ink">{{ $tid ?: '—' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-brand-moss">{{ __('Provision run') }}</dt>
-                                <dd class="mt-1 break-all font-mono text-xs text-brand-ink">{{ $rid ?: '—' }}</dd>
+                            <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Provision run') }}</dt>
+                                <dd class="flex min-w-0 items-center gap-2">
+                                    @if ($rid)
+                                        <code class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink">{{ $rid }}</code>
+                                        <button type="button"
+                                            title="{{ __('Copy') }}"
+                                            @click.prevent="navigator.clipboard.writeText(@js((string) $rid)); copied = 'run'; setTimeout(() => copied = null, 1500)"
+                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">
+                                            <span x-text="copied === 'run' ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
+                                        </button>
+                                    @else
+                                        <span class="text-brand-mist">—</span>
+                                    @endif
+                                </dd>
                             </div>
                             @if ($task)
-                                <div>
-                                    <dt class="text-brand-moss">{{ __('TaskRunner status') }}</dt>
-                                    <dd class="mt-1 font-medium text-brand-ink">{{ $task->status->value }}</dd>
+                                <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('TaskRunner status') }}</dt>
+                                    <dd>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $taskStatusBadge }}">
+                                            {{ $taskStatusValue }}
+                                        </span>
+                                    </dd>
                                 </div>
                             @endif
                         </dl>
@@ -936,25 +1127,119 @@
                      duplicate light-styled preview just confused the page. --}}
 
                 @if ($run)
+                    @php
+                        // Map run-level statuses to colour-coded ring chips so a glance
+                        // tells you whether the bash provision is still in flight,
+                        // succeeded, or failed.
+                        $runStatusBadge = match ($run->status) {
+                            'running' => 'bg-amber-100 text-amber-900 ring-amber-300',
+                            'completed', 'succeeded' => 'bg-emerald-100 text-emerald-900 ring-emerald-300',
+                            'failed', 'errored' => 'bg-red-100 text-red-900 ring-red-300',
+                            'rolled_back' => 'bg-slate-100 text-slate-700 ring-slate-300',
+                            'cancelled', 'canceled' => 'bg-slate-100 text-slate-700 ring-slate-300',
+                            default => 'bg-brand-sand text-brand-ink ring-brand-ink/15',
+                        };
+                        $rollbackBadge = match ($run->rollback_status) {
+                            'pending' => 'bg-amber-100 text-amber-900 ring-amber-300',
+                            'running' => 'bg-amber-100 text-amber-900 ring-amber-300',
+                            'completed' => 'bg-emerald-100 text-emerald-900 ring-emerald-300',
+                            'failed' => 'bg-red-100 text-red-900 ring-red-300',
+                            default => 'bg-brand-sand text-brand-ink ring-brand-ink/15',
+                        };
+
+                        // Wall-clock duration: start → end if terminal, else start → now.
+                        $runStartedAt = $run->started_at ?? $run->created_at;
+                        $runEndedAt = $run->completed_at;
+                        $runDurationSeconds = $runStartedAt
+                            ? (int) abs($runStartedAt->diffInSeconds($runEndedAt ?? now(), true))
+                            : null;
+                        $runDurationHuman = $runDurationSeconds === null
+                            ? null
+                            : \Illuminate\Support\Carbon::createFromTimestamp(0)
+                                ->addSeconds($runDurationSeconds)
+                                ->diffForHumans(\Illuminate\Support\Carbon::createFromTimestamp(0), [
+                                    'syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE,
+                                    'parts' => 2,
+                                    'short' => true,
+                                ]);
+
+                        $artifactCount = $run->artifacts ? $run->artifacts->count() : 0;
+                        $isTerminal = in_array($run->status, ['completed', 'succeeded', 'failed', 'errored', 'rolled_back', 'cancelled', 'canceled'], true);
+                    @endphp
                     <section class="{{ $card }} p-6">
-                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Provision run') }}</h3>
-                        <div class="mt-4 space-y-3 text-sm">
-                            <p class="text-brand-moss">{{ __('Attempt') }}: <span class="font-medium text-brand-ink">#{{ $run->attempt }}</span></p>
-                            <p class="text-brand-moss">{{ __('Run status') }}: <span class="font-medium text-brand-ink">{{ ucfirst($run->status) }}</span></p>
-                            @if ($failureClassification)
-                                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-red-700">{{ __('Failure classification') }}</p>
-                                    <p class="mt-1 text-sm font-semibold text-red-900">{{ $failureClassification['label'] }}</p>
-                                    <p class="mt-1 text-sm text-red-800">{{ $failureClassification['detail'] }}</p>
+                        <div class="flex flex-wrap items-baseline justify-between gap-2">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Provision run') }}</h3>
+                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $runStatusBadge }}">
+                                {{ ucfirst(str_replace('_', ' ', (string) $run->status)) }}
+                            </span>
+                        </div>
+                        <p class="mt-1 text-xs text-brand-moss">
+                            {{ __('A single execution of the bash provision script. Each retry creates a new attempt.') }}
+                        </p>
+
+                        <dl class="mt-4 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10 bg-brand-sand/15 text-sm">
+                            <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Attempt') }}</dt>
+                                <dd class="font-mono text-sm font-semibold text-brand-ink">#{{ $run->attempt }}</dd>
+                            </div>
+                            @if ($runStartedAt)
+                                <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Started') }}</dt>
+                                    <dd class="text-sm text-brand-ink">
+                                        <time datetime="{{ $runStartedAt->toIso8601String() }}" title="{{ $runStartedAt->timezone(config('app.timezone'))->toDayDateTimeString() }}">
+                                            {{ $runStartedAt->diffForHumans() }}
+                                        </time>
+                                    </dd>
+                                </div>
+                            @endif
+                            @if ($runDurationHuman !== null)
+                                <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ $isTerminal ? __('Total time') : __('Running for') }}</dt>
+                                    <dd class="font-mono text-sm text-brand-ink">{{ $runDurationHuman }}</dd>
+                                </div>
+                            @endif
+                            @if ($runEndedAt)
+                                <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Finished') }}</dt>
+                                    <dd class="text-sm text-brand-ink">
+                                        <time datetime="{{ $runEndedAt->toIso8601String() }}" title="{{ $runEndedAt->timezone(config('app.timezone'))->toDayDateTimeString() }}">
+                                            {{ $runEndedAt->diffForHumans() }}
+                                        </time>
+                                    </dd>
                                 </div>
                             @endif
                             @if ($run->rollback_status)
-                                <p class="text-brand-moss">{{ __('Rollback') }}: <span class="font-medium text-brand-ink">{{ str_replace('_', ' ', ucfirst($run->rollback_status)) }}</span></p>
+                                <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Rollback') }}</dt>
+                                    <dd>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $rollbackBadge }}">
+                                            {{ str_replace('_', ' ', ucfirst($run->rollback_status)) }}
+                                        </span>
+                                    </dd>
+                                </div>
                             @endif
-                            @if ($run->summary)
-                                <p class="rounded-xl bg-brand-sand/20 p-4 text-brand-ink">{{ $run->summary }}</p>
-                            @endif
-                        </div>
+                            <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Artifacts') }}</dt>
+                                <dd class="text-sm text-brand-ink">
+                                    {{ trans_choice(':count artifact|:count artifacts', $artifactCount, ['count' => $artifactCount]) }}
+                                </dd>
+                            </div>
+                        </dl>
+
+                        @if ($failureClassification)
+                            <div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-red-700">{{ __('Failure classification') }}</p>
+                                <p class="mt-1 text-sm font-semibold text-red-900">{{ $failureClassification['label'] }}</p>
+                                <p class="mt-1 text-sm text-red-800">{{ $failureClassification['detail'] }}</p>
+                            </div>
+                        @endif
+
+                        @if ($run->summary)
+                            <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-sand/25 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Summary') }}</p>
+                                <p class="mt-1 text-sm leading-6 text-brand-ink">{{ $run->summary }}</p>
+                            </div>
+                        @endif
                     </section>
                 @endif
 

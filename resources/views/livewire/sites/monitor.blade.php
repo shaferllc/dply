@@ -166,6 +166,8 @@
                 {{ __('Show monitors on a public') }}
                 <a href="{{ route('status-pages.index') }}" class="font-medium text-brand-forest underline">{{ __('status page') }}</a>.
             </p>
+
+            <x-cli-snippet tone="stub" />
         </main>
     </div>
 

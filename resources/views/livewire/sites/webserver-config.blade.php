@@ -369,6 +369,8 @@
             </div>
         </div>
     @endif
+
+    <x-cli-snippet tone="stub" />
         </main>
     </div>
 </div>

@@ -699,6 +699,10 @@
         @include('livewire.servers.partials.workspace-ops-not-ready')
     @endif
 
+    @if ($contextSiteModel)
+        <x-cli-snippet tone="stub" />
+    @endif
+
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')
         @include('livewire.servers.partials.remove-server-modal', [

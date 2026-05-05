@@ -285,6 +285,20 @@ class DigitalOceanService
     }
 
     /**
+     * Delete an account SSH key by its DO numeric id or fingerprint.
+     */
+    public function deleteSshKey(int|string $idOrFingerprint): void
+    {
+        $value = is_string($idOrFingerprint) ? trim($idOrFingerprint) : (string) $idOrFingerprint;
+        if ($value === '') {
+            throw new \InvalidArgumentException('SSH key id or fingerprint is required.');
+        }
+
+        $response = $this->request('delete', '/account/keys/'.rawurlencode($value));
+        $this->assertSuccess($response, 'delete SSH key');
+    }
+
+    /**
      * Whether the domain exists in this DigitalOcean account (Networking → Domains).
      */
     public function domainExistsInAccount(string $domain): bool
@@ -402,6 +416,142 @@ class DigitalOceanService
     {
         $response = $this->request('delete', '/droplets/'.$id);
         $this->assertSuccess($response, 'delete droplet');
+    }
+
+    /**
+     * Issue a power_off action against a droplet. Snapshots require the droplet
+     * to be off — DO will accept "snapshot" against a running droplet but uses a
+     * crash-consistent freeze that is less reliable for application servers.
+     *
+     * @return array<string, mixed> action payload
+     */
+    public function powerOffDroplet(int $id): array
+    {
+        $response = $this->request('post', '/droplets/'.$id.'/actions', ['type' => 'power_off']);
+        $this->assertSuccess($response, 'power off droplet');
+
+        return $this->extractAction($response->json(), 'power off droplet');
+    }
+
+    /**
+     * Trigger a snapshot of the droplet's disk into a custom image.
+     *
+     * @return array<string, mixed> action payload
+     */
+    public function snapshotDroplet(int $id, string $name): array
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw new \InvalidArgumentException('Snapshot name is required.');
+        }
+
+        $response = $this->request('post', '/droplets/'.$id.'/actions', [
+            'type' => 'snapshot',
+            'name' => $name,
+        ]);
+        $this->assertSuccess($response, 'snapshot droplet');
+
+        return $this->extractAction($response->json(), 'snapshot droplet');
+    }
+
+    /**
+     * Fetch a droplet-scoped action so callers can poll for completion.
+     *
+     * @return array<string, mixed>
+     */
+    public function getDropletAction(int $dropletId, int $actionId): array
+    {
+        $response = $this->request('get', '/droplets/'.$dropletId.'/actions/'.$actionId);
+        $this->assertSuccess($response, 'get droplet action');
+
+        return $this->extractAction($response->json(), 'get droplet action');
+    }
+
+    /**
+     * Block until a droplet action completes or errors.
+     *
+     * @param  int  $timeoutSeconds  Hard cap; long snapshots can run several minutes.
+     * @param  int  $pollSeconds     Poll interval; snapshot actions only advance every 10–30s.
+     * @param  callable(array<string, mixed>): void|null  $onTick
+     * @return array<string, mixed> Final action payload (status === 'completed' on success)
+     */
+    public function waitForDropletAction(
+        int $dropletId,
+        int $actionId,
+        int $timeoutSeconds = 1800,
+        int $pollSeconds = 10,
+        ?callable $onTick = null,
+    ): array {
+        $deadline = time() + max(30, $timeoutSeconds);
+        $pollSeconds = max(2, $pollSeconds);
+
+        while (true) {
+            $action = $this->getDropletAction($dropletId, $actionId);
+            if ($onTick !== null) {
+                $onTick($action);
+            }
+
+            $status = strtolower((string) ($action['status'] ?? ''));
+            if ($status === 'completed') {
+                return $action;
+            }
+            if ($status === 'errored') {
+                throw new \RuntimeException('DigitalOcean action errored: '.json_encode($action));
+            }
+            if (time() >= $deadline) {
+                throw new \RuntimeException('Timed out waiting for DigitalOcean action '.$actionId.' (status='.$status.').');
+            }
+
+            sleep($pollSeconds);
+        }
+    }
+
+    /**
+     * List custom snapshots, optionally filtered to droplet snapshots.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getSnapshots(?string $resourceType = 'droplet'): array
+    {
+        $query = $resourceType !== null && $resourceType !== '' ? ['resource_type' => $resourceType] : [];
+        $response = $this->request('get', '/snapshots', $query);
+        $this->assertSuccess($response, 'list snapshots');
+        $data = $response->json();
+        $snapshots = $data['snapshots'] ?? $data['data'] ?? [];
+
+        return is_array($snapshots) ? $snapshots : [];
+    }
+
+    /**
+     * Delete a snapshot by ID. Snapshot IDs are returned as strings by the API.
+     */
+    public function deleteSnapshot(string $snapshotId): void
+    {
+        $snapshotId = trim($snapshotId);
+        if ($snapshotId === '') {
+            throw new \InvalidArgumentException('Snapshot id is required.');
+        }
+
+        $response = $this->request('delete', '/snapshots/'.rawurlencode($snapshotId));
+        $this->assertSuccess($response, 'delete snapshot');
+    }
+
+    /**
+     * @param  mixed  $payload
+     * @return array<string, mixed>
+     */
+    private function extractAction($payload, string $action): array
+    {
+        if (! is_array($payload)) {
+            throw new \RuntimeException("DigitalOcean API did not return an action for {$action}.");
+        }
+
+        $data = $payload['action'] ?? $payload;
+        if (! is_array($data) || $data === []) {
+            throw new \RuntimeException("DigitalOcean API did not return an action for {$action}.");
+        }
+
+        return $data;
     }
 
     protected function request(string $method, string $path, array $bodyOrQuery = []): Response

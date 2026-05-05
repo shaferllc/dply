@@ -15,6 +15,17 @@ final class ServerProvisionCommandBuilder
 {
     private const STEP_PREFIX = '[dply-step] ';
 
+    /**
+     * Sibling marker emitted by {@see withStep()} once a step finishes.
+     * Format: `[dply-step-end] <label>\t<seconds>` for normal completion,
+     * or `[dply-step-end] <label>\t0\tresumed` for the resume-skip path.
+     * Parsed by {@see App\Support\Servers\ProvisionStepDurations} into
+     * server_provision_step_runs rows so the journey UI can render
+     * data-driven ETAs ("Avg 1m 25s from 12 previous runs") in place
+     * of the static "Usually a few minutes" copy.
+     */
+    private const STEP_END_PREFIX = '[dply-step-end] ';
+
     private const VERIFY_PREFIX = '[dply-verify] ';
 
     private const ROLLBACK_PREFIX = '[dply-rollback] ';
@@ -108,6 +119,15 @@ final class ServerProvisionCommandBuilder
     private function metricsAgent(Server $server): array
     {
         if (! (bool) config('server_provision.install_metrics_agent', true)) {
+            return [];
+        }
+
+        // Default: skip inline metrics install. RunSetupScriptJob's
+        // success path dispatches InstallMetricsAgentJob which runs the
+        // same install bash via SSH after the journey reads "ready" —
+        // shaves 30–60s off the journey wall-clock without losing the
+        // capability. Override with DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=true.
+        if (! (bool) config('server_provision.install_metrics_agent_inline', false)) {
             return [];
         }
 
@@ -262,15 +282,31 @@ final class ServerProvisionCommandBuilder
 
         $b64 = base64_encode($pub);
 
+        // Each step inside is paired with a `[dply]` echo so the journey
+        // log actually surfaces what happened. Without these, the step
+        // panel was filled by the *next* step's preamble (bootstrap's
+        // cloud-init pre-empt and force-reinstall echoes), which made
+        // it look like "Creating server user" never ran the user creation.
+        $userArg = escapeshellarg($username);
+
         return $this->withStep('Creating server user', [
             'echo '.escapeshellarg($b64).' | base64 -d > /tmp/dply-ssh-bootstrap.pub',
             'chmod 600 /tmp/dply-ssh-bootstrap.pub',
-            'id -u '.escapeshellarg($username).' &>/dev/null || useradd -m -s /bin/bash -G sudo '.escapeshellarg($username),
-            'install -d -m 700 -o '.escapeshellarg($username).' -g '.escapeshellarg($username).' /home/'.escapeshellarg($username).'/.ssh',
-            'install -m 600 -o '.escapeshellarg($username).' -g '.escapeshellarg($username).' /tmp/dply-ssh-bootstrap.pub /home/'.escapeshellarg($username).'/.ssh/authorized_keys',
+            'if id -u '.$userArg.' &>/dev/null; then',
+            '  echo "[dply] user \"'.$username.'\" already exists; reusing"',
+            'else',
+            '  echo "[dply] creating user \"'.$username.'\" (sudo group, /bin/bash)"',
+            '  useradd -m -s /bin/bash -G sudo '.$userArg,
+            '  echo "[dply] user \"'.$username.'\" created"',
+            'fi',
+            'echo "[dply] installing SSH authorized_keys for \"'.$username.'\""',
+            'install -d -m 700 -o '.$userArg.' -g '.$userArg.' /home/'.$userArg.'/.ssh',
+            'install -m 600 -o '.$userArg.' -g '.$userArg.' /tmp/dply-ssh-bootstrap.pub /home/'.$userArg.'/.ssh/authorized_keys',
             'rm -f /tmp/dply-ssh-bootstrap.pub',
+            'echo "[dply] granting passwordless sudo to \"'.$username.'\" via /etc/sudoers.d/90-dply-user"',
             'printf \'%s\\n\' '.escapeshellarg($username.' ALL=(ALL) NOPASSWD:ALL').' > /etc/sudoers.d/90-dply-user',
             'chmod 440 /etc/sudoers.d/90-dply-user',
+            'echo "[dply] server user \"'.$username.'\" ready (uid=$(id -u '.$userArg.'), groups=$(id -Gn '.$userArg.'))"',
         ]);
     }
 
@@ -280,6 +316,62 @@ final class ServerProvisionCommandBuilder
         $lines = [
             'export DEBIAN_FRONTEND=noninteractive',
         ];
+
+        // Pre-empt cloud-init's apt-daily / unattended-upgrades AND
+        // cloud-init's own modules on freshly-booted droplets. The
+        // problem is two-layered:
+        //   (a) apt-daily.timer / apt-daily-upgrade.timer / unattended-
+        //       upgrades.service hold the dpkg lock for boot-time
+        //       security upgrades.
+        //   (b) cloud-init's own cloud-config.service and
+        //       cloud-final.service run `apt-get update` AND can
+        //       re-spawn apt mid-flight if we kill its child without
+        //       stopping cloud-init itself.
+        // Without (b), our previous attempt evicted unattended-upgrades
+        // but cloud-init's own modules kept the lock — operators saw
+        // "waited 0s — apt is busy" loop forever. Solution: stop
+        // cloud-init.target FIRST (which transitively stops
+        // cloud-config / cloud-final / the boot-time apt run), THEN
+        // disable the auto-upgrade timers, THEN kill any leftover apt
+        // children with SIGKILL so the lock is unconditionally free
+        // before our first apt-get call.
+        //
+        // Drift from the security baseline is closed by Dply's
+        // recurring maintenance scheduler instead. Toggle off via
+        // DPLY_PROVISION_PREEMPT_CLOUD_INIT_UPGRADES=false if you want
+        // cloud-init's auto-upgrade behaviour back.
+        if ((bool) config('server_provision.preempt_cloud_init_upgrades', true)) {
+            $lines = array_merge($lines, [
+                'echo "[dply] preempting cloud-init upgrade activity (deferred to Dply scheduler)..."',
+                // Halt cloud-init itself so its modules stop re-spawning apt.
+                // cloud-init.target is the umbrella; stopping it cascades to
+                // cloud-config / cloud-final / cloud-init-local.
+                'systemctl stop cloud-init.target cloud-config.service cloud-final.service cloud-init.service cloud-init-local.service >/dev/null 2>&1 || true',
+                // Then halt the auto-upgrade jobs. mask makes them
+                // unstartable until explicitly unmasked.
+                'systemctl stop unattended-upgrades.service apt-daily.timer apt-daily.service apt-daily-upgrade.timer apt-daily-upgrade.service >/dev/null 2>&1 || true',
+                'systemctl disable unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true',
+                'systemctl mask apt-daily.service apt-daily-upgrade.service >/dev/null 2>&1 || true',
+                // Kill any apt children left behind by the systemctl stop
+                // above (TERM first, then KILL after a short delay).
+                'pkill -TERM -x unattended-upgr >/dev/null 2>&1 || true',
+                'pkill -TERM -x apt-get >/dev/null 2>&1 || true',
+                'pkill -TERM -x apt >/dev/null 2>&1 || true',
+                'sleep 2',
+                'pkill -KILL -x unattended-upgr >/dev/null 2>&1 || true',
+                'pkill -KILL -x apt-get >/dev/null 2>&1 || true',
+                'pkill -KILL -x apt >/dev/null 2>&1 || true',
+                // dpkg lock files left behind by a SIGKILL stay until we
+                // remove them — apt-get refuses to start otherwise. Safe
+                // because we just killed every apt process above.
+                'rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1 || true',
+                // dpkg state may be half-configured if cloud-init was
+                // mid-install when we killed it. Repair so the next
+                // apt-get install doesn't trip on partially-installed
+                // packages.
+                'dpkg --configure -a >/dev/null 2>&1 || true',
+            ]);
+        }
 
         // Force-reinstall mode: wipe ALL step markers so every step
         // re-executes from scratch. Without this, after toggling
@@ -1615,6 +1707,35 @@ APACHE,
     }
 
     /**
+     * Emit a tab-delimited end marker:
+     *   `[dply-step-end] <label>\t<seconds>` (normal)
+     *   `[dply-step-end] <label>\t0\tresumed` (resume-skip)
+     *
+     * Tab-delimited so {@see App\Support\Servers\ProvisionStepDurations::parse()}
+     * can split fields without ambiguity (labels can include spaces).
+     *
+     * `$secondsExpression` is interpolated raw into the printf arg so the
+     * caller can pass a bash expression like `$((NOW - START))`. For
+     * resumed rows the caller passes the literal `0`.
+     */
+    private function stepEndMarker(string $label, string $secondsExpression, bool $resumed = false): string
+    {
+        $resumedSuffix = $resumed ? '\tresumed' : '';
+        // Both label and seconds are passed as printf args (not embedded
+        // in the format string) so any character a label could contain
+        // — quotes, $, backticks — stays inert. The format string itself
+        // is single-quoted bash so printf sees `\t` / `\n` as escapes.
+        $format = self::STEP_END_PREFIX.'%s\t%s'.$resumedSuffix.'\n';
+
+        return sprintf(
+            "printf '%s' %s %s",
+            $format,
+            escapeshellarg($label),
+            $secondsExpression,
+        );
+    }
+
+    /**
      * Wrap a step's commands in a resume-on-failure guard.
      *
      * On success, the step writes /var/lib/dply/steps/<key>.done.
@@ -1644,6 +1765,18 @@ APACHE,
         $marker = '/var/lib/dply/steps/'.$key.'.done';
         $skipMarker = $this->stepMarker($label.' (resumed: already done)');
 
+        // Each step is wrapped with a wall-clock duration capture that
+        // emits a `[dply-step-end]` marker on exit. ProvisionStepDurations
+        // parses those markers when the task reaches a terminal state and
+        // inserts one row per step into server_provision_step_runs, which
+        // ProvisionStepEtaService averages to power the "Avg X min from N
+        // runs" ETA in the journey UI.
+        //
+        // _DPLY_STEP_STARTED is per-step so nested withStep calls (none
+        // today, but defensively) don't clobber each other.
+        $endMarker = $this->stepEndMarker($label, '"$(( $(date +%s) - _DPLY_STEP_STARTED ))"');
+        $resumedEndMarker = $this->stepEndMarker($label, '0', resumed: true);
+
         return [
             // The whole step is one composite shell command so the
             // marker write only happens if every inner command
@@ -1653,11 +1786,14 @@ APACHE,
             implode("\n", [
                 'if [ ! -f '.escapeshellarg($marker).' ]; then',
                 '  '.$this->stepMarker($label),
+                '  _DPLY_STEP_STARTED=$(date +%s)',
                 $body,
                 '  install -d -m 0755 /var/lib/dply/steps',
                 '  touch '.escapeshellarg($marker),
+                '  '.$endMarker,
                 'else',
                 '  '.$skipMarker,
+                '  '.$resumedEndMarker,
                 'fi',
             ]),
         ];

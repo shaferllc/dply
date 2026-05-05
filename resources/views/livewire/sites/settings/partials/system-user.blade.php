@@ -122,4 +122,6 @@
             </div>
         </form>
     @endif
+
+    <x-cli-snippet tone="stub" />
 </section>

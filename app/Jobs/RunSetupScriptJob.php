@@ -8,6 +8,7 @@ use App\Actions\Servers\CreateServerProvisionRun;
 use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Enums\ServerProvider;
 use App\Jobs\CheckServerHealthJob;
+use App\Jobs\InstallMetricsAgentJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
@@ -108,20 +109,29 @@ class RunSetupScriptJob implements ShouldQueue
                 CheckServerHealthJob::dispatch($server);
             }
 
-            // Wire up the metrics push pipeline. The provision script's
-            // metricsAgent step (gated on
-            // server_provision.install_metrics_agent, default true) drops
-            // the snapshot script under the deploy user's home, and this
-            // call flips the cached "python is installed" meta flag,
-            // mints a push token if needed, and dispatches the env +
-            // crontab deploy. Going through the service keeps the
-            // provision path and the manual "Install monitoring" path
-            // converging on the same post-install bookkeeping.
+            // Wire up the metrics push pipeline. Two paths converge here
+            // depending on whether the inline metrics step ran during
+            // the bash provision:
+            //   - inline=true  → bash already installed Python + the
+            //     snapshot script. syncPushArtifactsAfterInstall just
+            //     writes the env file + crontab block.
+            //   - inline=false (default) → bash skipped the agent.
+            //     Dispatch InstallMetricsAgentJob to SSH the install
+            //     bash on a separate connection AFTER the journey reads
+            //     "ready". That job dispatches the env/cron deploy on
+            //     success, so the post-install state ends up identical
+            //     either way; the user just gets ~30–60s back on the
+            //     wall-clock.
             if ((bool) config('server_provision.install_metrics_agent', true)
                 && ! empty($server->ip_address)
                 && $server->isVmHost()
             ) {
-                app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
+                if ((bool) config('server_provision.install_metrics_agent_inline', false)) {
+                    app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
+                } else {
+                    InstallMetricsAgentJob::dispatch((string) $server->id)
+                        ->delay(now()->addSeconds(15));
+                }
             }
 
             // Mirror the bash provision script's UFW defaults (SSH on
@@ -561,35 +571,58 @@ dply_apt_locks_held() {
 }
 
 dply_wait_for_apt_locks() {
+  # Fast-path: if our pre-empt block at script start already disabled
+  # cloud-init + the auto-upgrade timers AND the locks aren't held by
+  # anything else, we're good — skip the cloud-init status --wait
+  # (which can sit there for 60s on droplets that booted recently).
+  if ! dply_apt_locks_held; then
+    return 0
+  fi
+
+  # cloud-init may still be honouring an in-flight `apt-get` from before
+  # our pre-empt killed it. Try a short status wait so we don't race
+  # cloud-init's last-gasp cleanup, but cap it tight (5s, not 60s).
   if command -v cloud-init >/dev/null 2>&1; then
-    timeout 60 cloud-init status --wait >/dev/null 2>&1 \
-      || echo "[dply] cloud-init still running after 60s — will continue polling apt locks directly."
+    timeout 5 cloud-init status --wait >/dev/null 2>&1 || true
   fi
 
   local waited=0
+  # Polite wait window before forcible eviction. Tighter than the old
+  # 90s because the pre-empt block at script start should have already
+  # cleared everything — if locks are still held this far in, the
+  # blocking process is stuck rather than legitimately upgrading.
+  local polite=15
+
   while dply_apt_locks_held; do
-    if [ "\${waited}" -lt 90 ]; then
-      echo "[dply] apt is busy (waited \${waited}s — likely cloud-init unattended-upgrades); polite wait, retry in 10s..."
-      sleep 10
-      waited=\$((waited + 10))
+    if [ "\${waited}" -lt "\${polite}" ]; then
+      echo "[dply] apt is busy (waited \${waited}s — likely cloud-init unattended-upgrades); polite wait, retry in 5s..."
+      sleep 5
+      waited=\$((waited + 5))
       continue
     fi
 
-    if [ "\${waited}" -eq 90 ]; then
-      echo "[dply] apt still busy after 90s — evicting unattended-upgrades to unblock provisioning."
+    if [ "\${waited}" -eq "\${polite}" ]; then
+      echo "[dply] apt still busy after \${polite}s — evicting unattended-upgrades to unblock provisioning."
+      # Cloud-init too — its modules can re-spawn apt children that
+      # the pre-empt block at script start may have missed.
+      systemctl stop cloud-init.target cloud-config.service cloud-final.service cloud-init.service cloud-init-local.service >/dev/null 2>&1 || true
       systemctl stop unattended-upgrades.service >/dev/null 2>&1 || true
       systemctl disable unattended-upgrades.service >/dev/null 2>&1 || true
       systemctl stop apt-daily.timer apt-daily.service >/dev/null 2>&1 || true
       systemctl stop apt-daily-upgrade.timer apt-daily-upgrade.service >/dev/null 2>&1 || true
       pkill -TERM -x unattended-upgr >/dev/null 2>&1 || true
       pkill -TERM -x apt-get >/dev/null 2>&1 || true
-      sleep 5
+      pkill -TERM -x apt >/dev/null 2>&1 || true
+      sleep 2
       pkill -KILL -x unattended-upgr >/dev/null 2>&1 || true
       pkill -KILL -x apt-get >/dev/null 2>&1 || true
+      pkill -KILL -x apt >/dev/null 2>&1 || true
+      # Drop dpkg lock files left behind by SIGKILL.
+      rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1 || true
       # Half-installed package recovery after a kill -9.
       dpkg --configure -a >/dev/null 2>&1 || true
-      waited=\$((waited + 10))
-      sleep 5
+      waited=\$((waited + 5))
+      sleep 2
       continue
     fi
 

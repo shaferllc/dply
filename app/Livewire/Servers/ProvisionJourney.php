@@ -13,6 +13,7 @@ use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
+use App\Services\Servers\ProvisionStepEtaService;
 use App\Services\Servers\ServerJourneyInfrastructureAlerts;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ClassifyProvisionFailure;
@@ -417,13 +418,36 @@ class ProvisionJourney extends Component
         } elseif ($server->status === Server::STATUS_READY && $server->setup_status === Server::SETUP_STATUS_RUNNING) {
             $activeKey = $lastSeenScriptKey ?? ($scriptStepKeys[0] ?? 'setup');
         } elseif ($server->status === Server::STATUS_READY) {
-            $activeKey = 'ready';
+            // Only flip to the terminal 'ready' step once setup is *actually*
+            // done. Previously this branch matched on status alone, which
+            // caught the brief window after SSH comes up but before the
+            // setup job has stamped setup_status (= null) — and marked
+            // every cloud + setup step "completed", showing both progress
+            // bars at 100% on a server that hadn't started running its
+            // bash provision yet. Treat null/unknown like PENDING so the
+            // journey holds on 'ssh' until the setup job takes over.
+            $activeKey = $server->setup_status === Server::SETUP_STATUS_DONE ? 'ready' : 'ssh';
         }
 
         $stepIndex = array_flip(array_column($steps, 'key'));
         $activeIndex = $stepIndex[$activeKey] ?? 0;
 
-        return array_map(function (array $step, int $index) use ($activeIndex, $failedKey, $task, $server): array {
+        // Bulk-resolve ETAs for every script step in one query. The
+        // step key for script steps IS the label hash (both come from
+        // ProvisionStepSnapshots::keyForLabel), so we can hand the keys
+        // directly to the service. Cloud-side steps (queued, provisioning,
+        // ip, ssh, ready, setup placeholder) have no historical row and
+        // the lookup just returns nothing for them.
+        $etaByKey = app(ProvisionStepEtaService::class)
+            ->averagesForLabels(
+                array_values(array_filter(
+                    array_column($steps, 'key'),
+                    static fn (string $k): bool => str_starts_with($k, 'script_'),
+                )),
+                $server->organization,
+            );
+
+        return array_map(function (array $step, int $index) use ($activeIndex, $failedKey, $task, $server, $etaByKey): array {
             $state = 'pending';
 
             if ($failedKey === $step['key']) {
@@ -445,6 +469,11 @@ class ProvisionJourney extends Component
                 'detail' => $this->stepDetail($step['key'], $task, $server, $state),
                 'output' => $this->stepOutput($step['key'], $task, $server, $state),
                 'duration' => $this->stepDuration($step['key'], $task, $server, $state),
+                // null when no historical average is available (cold start
+                // org, or fewer than step_eta_min_samples runs for this
+                // step). View should fall back to the static "Usually X"
+                // copy when this is missing.
+                'eta' => $etaByKey[$step['key']] ?? null,
             ];
         }, $steps, array_keys($steps));
     }
@@ -1001,8 +1030,8 @@ class ProvisionJourney extends Component
     }
 
     /**
-     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}>  $steps
-     * @return array{eta:string,running_for:string,last_output:?string,stalled:bool,warning:?string}|null
+     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string,eta:?array{seconds:int,samples:int}}>  $steps
+     * @return array{eta:string,eta_samples:?int,running_for:string,last_output:?string,stalled:bool,warning:?string}|null
      */
     protected function stallState(?Task $task, array $steps): ?array
     {
@@ -1020,11 +1049,23 @@ class ProvisionJourney extends Component
         // monotonic regardless of which Carbon version is active.
         $secondsSinceUpdate = (int) abs($now->diffInSeconds($task->updated_at ?? $task->started_at ?? $now, true));
         $secondsRunning = (int) abs($now->diffInSeconds($task->started_at ?? $task->created_at ?? $now, true));
-        $eta = match ($activeStep['key'] ?? null) {
-            'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
-            'setup' => 'Usually 5-10 minutes',
-            default => 'Usually a few minutes',
-        };
+
+        // Prefer the data-driven ETA from past runs over the static
+        // "Usually X minutes" copy. The eta payload only lands on
+        // script_* steps (cloud-side keys never have one) and only
+        // when sample size cleared the configured threshold.
+        $etaSamples = null;
+        $stepEta = $activeStep['eta'] ?? null;
+        if (is_array($stepEta) && ($stepEta['seconds'] ?? 0) > 0) {
+            $eta = sprintf('Avg %s', $this->formatRunDuration((int) $stepEta['seconds']));
+            $etaSamples = (int) ($stepEta['samples'] ?? 0);
+        } else {
+            $eta = match ($activeStep['key'] ?? null) {
+                'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
+                'setup' => 'Usually 5-10 minutes',
+                default => 'Usually a few minutes',
+            };
+        }
 
         // Stall heuristics in minutes (integer thresholds are fine here
         // because we round up to favour the operator: a 2m59s gap should
@@ -1035,6 +1076,7 @@ class ProvisionJourney extends Component
 
         return [
             'eta' => $eta,
+            'eta_samples' => $etaSamples,
             'running_for' => 'Running for '.$this->formatRunDuration($secondsRunning),
             // Only surface this when the gap is meaningful; under 30s
             // is just normal poll cadence and would flicker on/off.
