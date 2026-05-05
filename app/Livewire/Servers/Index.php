@@ -298,6 +298,24 @@ class Index extends Component
             ? $insightsMetrics->perServerRollup($servers->pluck('id'))
             : collect();
 
+        // Live metric pulse per server — latest CPU/Mem/Disk for fleet
+        // glance. One distinct subquery joining the latest captured_at
+        // per server, keyed by id for the blade.
+        $latestSnapshots = collect();
+        if ($servers->isNotEmpty()) {
+            $serverIds = $servers->pluck('id')->all();
+            $latestPerServer = \App\Models\ServerMetricSnapshot::query()
+                ->whereIn('server_id', $serverIds)
+                ->whereIn('id', function ($q) use ($serverIds): void {
+                    $q->from('server_metric_snapshots')
+                        ->selectRaw('MAX(id)')
+                        ->whereIn('server_id', $serverIds)
+                        ->groupBy('server_id');
+                })
+                ->get(['id', 'server_id', 'captured_at', 'payload']);
+            $latestSnapshots = $latestPerServer->keyBy('server_id');
+        }
+
         $summary = [
             'total' => $servers->count(),
             'ready' => $servers->where('status', Server::STATUS_READY)->count(),
@@ -335,6 +353,7 @@ class Index extends Component
             'servers' => $servers,
             'groupedServers' => $groupedServers,
             'insightRollup' => $insightRollup,
+            'latestSnapshots' => $latestSnapshots,
             'summary' => $summary,
             'openInsights' => $openInsights,
             'hasProviderCredentials' => $hasProviderCredentials,

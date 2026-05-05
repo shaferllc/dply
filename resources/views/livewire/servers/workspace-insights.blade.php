@@ -198,6 +198,9 @@
                                     {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') ?? '—' }}
                                 </p>
                             </div>
+                            <button type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="{{ $btnSecondary }} shrink-0">
+                                {{ __('Ignore') }}
+                            </button>
                         </li>
                     @endforeach
                 </ul>

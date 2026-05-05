@@ -319,6 +319,9 @@
                                                         @endif
                                                     </div>
                                                     <p class="mt-1 font-mono text-sm text-brand-moss truncate">{{ $server->ip_address ?? __('Provisioning…') }}</p>
+                                                    <div class="mt-2">
+                                                        <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
+                                                    </div>
                                                     @if ($server->workspace)
                                                         <p class="mt-1 text-xs text-brand-moss">
                                                             {{ __('Project:') }}
@@ -384,6 +387,12 @@
                                                         @if ($insOpenList > 0)
                                                             <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $insightBadgeClass($server->id) }}">{{ trans_choice(':count insight|:count insights', $insOpenList, ['count' => $insOpenList]) }}</a>
                                                         @endif
+                                                        <span class="hidden sm:inline-flex">
+                                                            <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
+                                                        </span>
+                                                    </div>
+                                                    <div class="mt-2 sm:hidden">
+                                                        <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
                                                     </div>
                                                     <p class="mt-1 text-sm text-brand-moss">
                                                         {{ trans_choice(':count site|:count sites', $server->sites_count, ['count' => $server->sites_count]) }}

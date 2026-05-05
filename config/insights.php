@@ -5,8 +5,10 @@ use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\Runners\CpuRamUsageInsightRunner;
 use App\Services\Insights\Runners\DiskCapacityInsightRunner;
 use App\Services\Insights\Runners\HealthCheckUrlMissingInsightRunner;
+use App\Services\Insights\Runners\HorizonRecommendedInsightRunner;
 use App\Services\Insights\Runners\LoadAverageInsightRunner;
 use App\Services\Insights\Runners\MetricsMissingInsightRunner;
+use App\Services\Insights\Runners\OctaneRecommendedInsightRunner;
 use App\Services\Insights\Runners\PhpEolSitesInsightRunner;
 use App\Services\Insights\Runners\PipelineHeartbeatInsightRunner;
 use App\Services\Insights\Runners\SslCertificateInsightRunner;
@@ -284,6 +286,51 @@ return [
             'runner' => null,
             'fix' => null,
             'requires' => ['nginx'],
+        ],
+
+        /*
+         * Suggestion: Laravel sites already running a supervisor queue worker but not on Horizon.
+         * Emits with kind=suggestion. Signal: site has an active SupervisorProgram whose command
+         * contains queue:work / queue:listen.
+         */
+        'horizon_recommended' => [
+            'label' => 'Consider Laravel Horizon',
+            'description' => 'Suggest Horizon on Laravel sites that already run queue workers via supervisor.',
+            'scope' => 'site',
+            'requires_pro' => false,
+            'runner' => HorizonRecommendedInsightRunner::class,
+            'fix' => null,
+            'requires' => ['php', 'supervisor'],
+        ],
+
+        /*
+         * Suggestion: Laravel sites without Octane that show sustained load. Emits with
+         * kind=suggestion (skips notifications, separate UI section). Signal recorded in meta.
+         */
+        'octane_recommended' => [
+            'label' => 'Consider Laravel Octane',
+            'description' => 'Suggest enabling Laravel Octane on busy Laravel sites that aren\'t already using it.',
+            'scope' => 'site',
+            'requires_pro' => false,
+            'runner' => OctaneRecommendedInsightRunner::class,
+            'fix' => null,
+            'requires' => ['php'],
+            'parameters' => [
+                'load_threshold' => [
+                    'type' => 'number',
+                    'label' => 'Load (1m) sustained threshold',
+                    'min' => 0.5,
+                    'max' => 64,
+                    'default' => 4,
+                ],
+                'min_samples' => [
+                    'type' => 'number',
+                    'label' => 'Min samples in window',
+                    'min' => 3,
+                    'max' => 240,
+                    'default' => 12,
+                ],
+            ],
         ],
 
         'composer_vulnerabilities' => [

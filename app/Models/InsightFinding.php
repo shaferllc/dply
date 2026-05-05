@@ -40,6 +40,8 @@ class InsightFinding extends Model
         'resolved_at',
         'acknowledged_at',
         'acknowledged_by_user_id',
+        'ignored_at',
+        'ignored_by_user_id',
     ];
 
     protected function casts(): array
@@ -50,6 +52,7 @@ class InsightFinding extends Model
             'detected_at' => 'datetime',
             'resolved_at' => 'datetime',
             'acknowledged_at' => 'datetime',
+            'ignored_at' => 'datetime',
         ];
     }
 
@@ -76,6 +79,11 @@ class InsightFinding extends Model
     public function isOpen(): bool
     {
         return $this->status === self::STATUS_OPEN;
+    }
+
+    public function isIgnored(): bool
+    {
+        return $this->status === self::STATUS_IGNORED;
     }
 
     public function isAcknowledged(): bool

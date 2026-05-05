@@ -537,6 +537,474 @@ class InsightsFeatureTest extends TestCase
         $this->assertSame(InsightFinding::KIND_PROBLEM, $finding->kind);
     }
 
+    public function test_horizon_recommended_runner_emits_for_laravel_site_with_queue_worker_and_no_horizon(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        \App\Models\SupervisorProgram::query()->create([
+            'server_id' => $server->id,
+            'site_id' => $site->id,
+            'slug' => 'site-queue',
+            'program_type' => 'queue',
+            'command' => 'php /var/www/app/artisan queue:work redis --tries=3',
+            'directory' => '/var/www/app',
+            'user' => 'forge',
+            'numprocs' => 1,
+            'is_active' => true,
+            'env_vars' => null,
+            'stdout_logfile' => '/var/log/supervisor/queue.log',
+            'priority' => 999,
+            'startsecs' => 1,
+            'stopwaitsecs' => 30,
+            'autorestart' => 'true',
+            'redirect_stderr' => true,
+        ]);
+
+        $runner = app(\App\Services\Insights\Runners\HorizonRecommendedInsightRunner::class);
+        $candidates = $runner->run($server, $site, []);
+
+        $this->assertCount(1, $candidates);
+        $c = $candidates[0];
+        $this->assertSame('horizon_recommended', $c->insightKey);
+        $this->assertSame(InsightFinding::KIND_SUGGESTION, $c->kind);
+        $this->assertTrue($c->meta['signal']['has_supervisor_queue_worker']);
+    }
+
+    public function test_horizon_recommended_runner_skips_when_already_on_horizon(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                        'laravel_horizon' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        \App\Models\SupervisorProgram::query()->create([
+            'server_id' => $server->id,
+            'site_id' => $site->id,
+            'slug' => 'site-queue',
+            'program_type' => 'queue',
+            'command' => 'php /var/www/app/artisan queue:work',
+            'directory' => '/var/www/app',
+            'user' => 'forge',
+            'numprocs' => 1,
+            'is_active' => true,
+            'env_vars' => null,
+            'stdout_logfile' => '/var/log/supervisor/queue.log',
+            'priority' => 999,
+            'startsecs' => 1,
+            'stopwaitsecs' => 30,
+            'autorestart' => 'true',
+            'redirect_stderr' => true,
+        ]);
+
+        $runner = app(\App\Services\Insights\Runners\HorizonRecommendedInsightRunner::class);
+        $this->assertSame([], $runner->run($server, $site, []));
+    }
+
+    public function test_horizon_recommended_runner_skips_when_no_queue_worker_present(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        // No SupervisorProgram seeded → no signal → suggestion does not fire.
+        $runner = app(\App\Services\Insights\Runners\HorizonRecommendedInsightRunner::class);
+        $this->assertSame([], $runner->run($server, $site, []));
+    }
+
+    public function test_horizon_recommended_runner_skips_inactive_queue_worker(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        \App\Models\SupervisorProgram::query()->create([
+            'server_id' => $server->id,
+            'site_id' => $site->id,
+            'slug' => 'site-queue',
+            'program_type' => 'queue',
+            'command' => 'php /var/www/app/artisan queue:work',
+            'directory' => '/var/www/app',
+            'user' => 'forge',
+            'numprocs' => 1,
+            'is_active' => false,
+            'env_vars' => null,
+            'stdout_logfile' => '/var/log/supervisor/queue.log',
+            'priority' => 999,
+            'startsecs' => 1,
+            'stopwaitsecs' => 30,
+            'autorestart' => 'true',
+            'redirect_stderr' => true,
+        ]);
+
+        $runner = app(\App\Services\Insights\Runners\HorizonRecommendedInsightRunner::class);
+        $this->assertSame([], $runner->run($server, $site, []));
+    }
+
+    public function test_octane_recommended_runner_emits_suggestion_for_busy_laravel_site_without_octane(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        // 12 samples with sustained load_1m=5 → above threshold 4.
+        for ($i = 0; $i < 12; $i++) {
+            ServerMetricSnapshot::query()->create([
+                'server_id' => $server->id,
+                'captured_at' => now()->subMinutes(12 - $i),
+                'payload' => ['load_1m' => 5.0, 'cpu_pct' => 60, 'mem_pct' => 50, 'disk_pct' => 30],
+            ]);
+        }
+
+        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $candidates = $runner->run($server, $site, []);
+
+        $this->assertCount(1, $candidates);
+        $c = $candidates[0];
+        $this->assertSame('octane_recommended', $c->insightKey);
+        $this->assertSame(InsightFinding::KIND_SUGGESTION, $c->kind);
+        $this->assertSame(InsightFinding::SEVERITY_INFO, $c->severity);
+        $this->assertSame('site:'.$site->id, $c->dedupeHash);
+        $this->assertArrayHasKey('signal', $c->meta);
+        $this->assertSame(5.0, $c->meta['signal']['load_1m_avg']);
+    }
+
+    public function test_octane_recommended_runner_skips_when_site_already_uses_octane(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                        'laravel_octane' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        for ($i = 0; $i < 12; $i++) {
+            ServerMetricSnapshot::query()->create([
+                'server_id' => $server->id,
+                'captured_at' => now()->subMinutes(12 - $i),
+                'payload' => ['load_1m' => 8.0, 'cpu_pct' => 80, 'mem_pct' => 50, 'disk_pct' => 30],
+            ]);
+        }
+
+        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $this->assertSame([], $runner->run($server, $site, []));
+    }
+
+    public function test_octane_recommended_runner_skips_non_laravel_sites(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'wordpress',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        for ($i = 0; $i < 12; $i++) {
+            ServerMetricSnapshot::query()->create([
+                'server_id' => $server->id,
+                'captured_at' => now()->subMinutes(12 - $i),
+                'payload' => ['load_1m' => 8.0, 'cpu_pct' => 80, 'mem_pct' => 50, 'disk_pct' => 30],
+            ]);
+        }
+
+        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $this->assertSame([], $runner->run($server, $site, []));
+    }
+
+    public function test_octane_recommended_runner_skips_when_load_below_threshold(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        // 12 samples but load is well below the 4.0 threshold.
+        for ($i = 0; $i < 12; $i++) {
+            ServerMetricSnapshot::query()->create([
+                'server_id' => $server->id,
+                'captured_at' => now()->subMinutes(12 - $i),
+                'payload' => ['load_1m' => 0.5, 'cpu_pct' => 5, 'mem_pct' => 10, 'disk_pct' => 30],
+            ]);
+        }
+
+        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $this->assertSame([], $runner->run($server, $site, []));
+    }
+
+    public function test_octane_recommended_writes_finding_with_kind_suggestion_via_coordinator(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        for ($i = 0; $i < 12; $i++) {
+            ServerMetricSnapshot::query()->create([
+                'server_id' => $server->id,
+                'captured_at' => now()->subMinutes(12 - $i),
+                'payload' => ['load_1m' => 5.0, 'cpu_pct' => 60, 'mem_pct' => 50, 'disk_pct' => 30],
+            ]);
+        }
+
+        // Stack-summary with php expected so the requires=['php'] gate passes.
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']);
+
+        app(InsightRunCoordinator::class)->runForSite($site->fresh());
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('site_id', $site->id)
+            ->where('insight_key', 'octane_recommended')
+            ->first();
+
+        $this->assertNotNull($finding);
+        $this->assertSame(InsightFinding::KIND_SUGGESTION, $finding->kind);
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
+        $this->assertSame(InsightFinding::SEVERITY_INFO, $finding->severity);
+    }
+
+    public function test_octane_recommended_runner_skips_when_too_few_samples(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $server->organization_id,
+            'meta' => [
+                'vm_runtime' => [
+                    'detected' => [
+                        'framework' => 'laravel',
+                        'language' => 'php',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Only 3 samples — below the default 12-sample minimum.
+        for ($i = 0; $i < 3; $i++) {
+            ServerMetricSnapshot::query()->create([
+                'server_id' => $server->id,
+                'captured_at' => now()->subMinutes(3 - $i),
+                'payload' => ['load_1m' => 8.0, 'cpu_pct' => 80, 'mem_pct' => 50, 'disk_pct' => 30],
+            ]);
+        }
+
+        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $this->assertSame([], $runner->run($server, $site, []));
+    }
+
+    public function test_ignore_finding_marks_suggestion_as_ignored_and_records_user(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'octane_recommended',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 's-1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'Consider Octane',
+            'body' => 'busy app',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->call('ignoreFinding', $finding->id);
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_IGNORED, $finding->status);
+        $this->assertNotNull($finding->ignored_at);
+        $this->assertSame($user->id, $finding->ignored_by_user_id);
+    }
+
+    public function test_ignore_action_is_a_noop_for_problem_findings(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'cpu_ram_usage',
+            'kind' => InsightFinding::KIND_PROBLEM,
+            'dedupe_hash' => 'p-1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'High CPU',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->call('ignoreFinding', $finding->id);
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status, 'Problems must not be silenced via ignore — they need to be fixed or auto-resolved');
+        $this->assertNull($finding->ignored_at);
+    }
+
+    public function test_ignored_suggestion_does_not_reopen_within_cooldown(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->registerStubInsight('stub_suggestion_cooldown', requires: [], kind: InsightFinding::KIND_SUGGESTION);
+        config()->set('insights.insights.stub_suggestion_cooldown.cooldown_days', 30);
+
+        // Initial run creates the suggestion.
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+        $finding = InsightFinding::query()
+            ->where('insight_key', 'stub_suggestion_cooldown')
+            ->first();
+        $this->assertNotNull($finding);
+
+        // User ignores it.
+        $finding->forceFill([
+            'status' => InsightFinding::STATUS_IGNORED,
+            'ignored_at' => now(),
+            'ignored_by_user_id' => $server->user_id,
+        ])->save();
+
+        // Next scheduled run within cooldown — runner still emits but the recorder must
+        // skip the upsert and leave the finding ignored.
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_IGNORED, $finding->status);
+        $this->assertSame(1, InsightFinding::query()->where('insight_key', 'stub_suggestion_cooldown')->count(), 'Cooldown must not create a duplicate row');
+    }
+
+    public function test_ignored_suggestion_reopens_after_cooldown_expires(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->registerStubInsight('stub_suggestion_cooldown_expired', requires: [], kind: InsightFinding::KIND_SUGGESTION);
+        config()->set('insights.insights.stub_suggestion_cooldown_expired.cooldown_days', 7);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+        $finding = InsightFinding::query()
+            ->where('insight_key', 'stub_suggestion_cooldown_expired')
+            ->first();
+        $this->assertNotNull($finding);
+
+        // Ignored 8 days ago — past the 7-day cooldown.
+        $finding->forceFill([
+            'status' => InsightFinding::STATUS_IGNORED,
+            'ignored_at' => now()->subDays(8),
+            'ignored_by_user_id' => $server->user_id,
+        ])->save();
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
+        $this->assertNull($finding->ignored_at, 'Ignore breadcrumbs cleared on reopen so a future ignore restarts the cooldown');
+        $this->assertNull($finding->ignored_by_user_id);
+    }
+
     public function test_workspace_insights_renders_suggestions_in_recommendations_section(): void
     {
         [$user, $server] = $this->userWithServer();

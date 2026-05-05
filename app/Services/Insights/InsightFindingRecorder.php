@@ -99,6 +99,18 @@ class InsightFindingRecorder
             ? InsightFinding::KIND_SUGGESTION
             : InsightFinding::KIND_PROBLEM;
 
+        // Suggestion cooldown: when the user explicitly ignored this finding, don't reopen
+        // it on the next scheduled run. After `cooldown_days` (default 30) it can re-emit.
+        // Problems never get a cooldown — they need to surface again until actually resolved.
+        if (
+            $existing !== null
+            && $kind === InsightFinding::KIND_SUGGESTION
+            && $existing->status === InsightFinding::STATUS_IGNORED
+            && $this->isWithinIgnoreCooldown($existing, $c->insightKey)
+        ) {
+            return;
+        }
+
         if ($existing === null) {
             $correlation = $this->correlation->correlateForNewFinding($server);
             $row = InsightFinding::query()->create([
@@ -150,6 +162,9 @@ class InsightFindingRecorder
             // recurrence resurfaces in the Insights banner.
             'acknowledged_at' => null,
             'acknowledged_by_user_id' => null,
+            // Reopened — clear ignore breadcrumbs so a future ignore restarts the cooldown.
+            'ignored_at' => null,
+            'ignored_by_user_id' => null,
         ])->save();
 
         if ($this->shouldNotifySubscribers($c->insightKey, $kind)) {
@@ -168,5 +183,24 @@ class InsightFindingRecorder
         }
 
         return (bool) config('insights.insights.'.$insightKey.'.notify_subscribers', true);
+    }
+
+    /**
+     * Per-insight `cooldown_days` controls how long an ignored suggestion stays silent.
+     * Falls back to global `insights.suggestion_cooldown_days` (default 30). A non-positive
+     * value means "no cooldown" — the suggestion can reopen immediately on next match.
+     */
+    protected function isWithinIgnoreCooldown(InsightFinding $finding, string $insightKey): bool
+    {
+        if ($finding->ignored_at === null) {
+            return false;
+        }
+        $days = (int) (config('insights.insights.'.$insightKey.'.cooldown_days')
+            ?? config('insights.suggestion_cooldown_days', 30));
+        if ($days <= 0) {
+            return false;
+        }
+
+        return $finding->ignored_at->copy()->addDays($days)->isFuture();
     }
 }

@@ -630,6 +630,155 @@
                             </div>
                         </div>
                     </section>
+
+                    {{-- Disk I/O: same shape as Network — two side-by-side
+                         charts sharing a y-axis so a write spike doesn't
+                         dwarf a smaller read line. Empty until the agent
+                         on the box is the new build that ships io_read_bps. --}}
+                    @php
+                        $ioReadSeries = $rangeMetricSeries['io_read_bps'] ?? [];
+                        $ioWriteSeries = $rangeMetricSeries['io_write_bps'] ?? [];
+                        $ioMaxValue = 0.0;
+                        foreach (array_merge($ioReadSeries, $ioWriteSeries) as $row) {
+                            $ioMaxValue = max($ioMaxValue, (float) ($row['max'] ?? 0));
+                        }
+                        if ($ioMaxValue <= 0) {
+                            $ioMaxValue = 1024.0;
+                        }
+                        $ioReadBps = is_numeric($latestPayload['io_read_bps'] ?? null) ? (float) $latestPayload['io_read_bps'] : null;
+                        $ioWriteBps = is_numeric($latestPayload['io_write_bps'] ?? null) ? (float) $latestPayload['io_write_bps'] : null;
+                        $hasIoData = ($ioReadSeries !== [] || $ioWriteSeries !== []) || $ioReadBps !== null || $ioWriteBps !== null;
+                    @endphp
+                    @if ($hasIoData)
+                        <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                            <header class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-2">
+                                    <x-heroicon-o-arrows-up-down class="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
+                                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Disk I/O') }}</h3>
+                                </div>
+                                <p class="text-[11px] text-brand-mist">
+                                    <span class="text-emerald-700">↻ {{ $ioReadBps !== null ? $fmtRate($ioReadBps) : '—' }}</span>
+                                    <span class="text-brand-moss">·</span>
+                                    <span class="text-amber-700">⇡ {{ $ioWriteBps !== null ? $fmtRate($ioWriteBps) : '—' }}</span>
+                                </p>
+                            </header>
+                            <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div>
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">↻ {{ __('Read') }}</p>
+                                    <x-metrics-line-chart
+                                        :series="$ioReadSeries"
+                                        :y-min="0"
+                                        :y-max="$ioMaxValue"
+                                        color-class="text-emerald-600"
+                                        format="bytes-per-sec"
+                                    />
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-700">⇡ {{ __('Write') }}</p>
+                                    <x-metrics-line-chart
+                                        :series="$ioWriteSeries"
+                                        :y-min="0"
+                                        :y-max="$ioMaxValue"
+                                        color-class="text-amber-600"
+                                        format="bytes-per-sec"
+                                    />
+                                </div>
+                            </div>
+                        </section>
+                    @endif
+
+                    {{-- Per-disk usage: a compact list under the main Disk
+                         panel. Only renders when the agent shipped a
+                         disks[] array; older agents see only the Disk %
+                         panel. --}}
+                    @php
+                        $disks = is_array($latestPayload['disks'] ?? null) ? $latestPayload['disks'] : [];
+                    @endphp
+                    @if (! empty($disks) && count($disks) > 1)
+                        <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                            <header class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-2">
+                                    <x-heroicon-o-server-stack class="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
+                                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Mounted filesystems') }}</h3>
+                                </div>
+                                <p class="text-[11px] text-brand-mist">{{ trans_choice(':count mount|:count mounts', count($disks), ['count' => count($disks)]) }}</p>
+                            </header>
+                            <ul class="mt-3 space-y-1.5">
+                                @foreach ($disks as $disk)
+                                    @php
+                                        $pct = (float) ($disk['pct'] ?? 0);
+                                        $barColor = $pct >= 95 ? 'bg-red-500' : ($pct >= 85 ? 'bg-amber-500' : 'bg-emerald-500');
+                                    @endphp
+                                    <li class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-xs">
+                                        <span class="font-mono font-medium text-brand-ink min-w-0 sm:w-48 truncate" title="{{ $disk['device'] ?? '' }} · {{ $disk['fs_type'] ?? '' }}">{{ $disk['mount'] ?? '—' }}</span>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="h-1.5 w-full rounded-full bg-brand-sand/40">
+                                                <div class="h-1.5 rounded-full {{ $barColor }}" style="width: {{ min(100, max(0, $pct)) }}%"></div>
+                                            </div>
+                                        </div>
+                                        <span class="tabular-nums text-brand-moss whitespace-nowrap">
+                                            {{ number_format($pct, 1) }}%
+                                            <span class="text-brand-mist">·
+                                                {{ $fmtBytes((int) ($disk['used_bytes'] ?? 0)) }} / {{ $fmtBytes((int) ($disk['total_bytes'] ?? 0)) }}
+                                            </span>
+                                        </span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </section>
+                    @endif
+
+                    {{-- Top processes: latest snapshot only (point-in-time);
+                         not bucketed because the row identity changes per
+                         sample and we want the live "what's hot right now"
+                         lens, not a chart. --}}
+                    @php
+                        $topCpu = is_array($latestPayload['top_cpu'] ?? null) ? $latestPayload['top_cpu'] : [];
+                        $topMem = is_array($latestPayload['top_mem'] ?? null) ? $latestPayload['top_mem'] : [];
+                    @endphp
+                    @if (! empty($topCpu) || ! empty($topMem))
+                        <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                            <header class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-2">
+                                    <x-heroicon-o-list-bullet class="h-5 w-5 shrink-0 text-brand-forest" aria-hidden="true" />
+                                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Top processes') }}</h3>
+                                </div>
+                                <p class="text-[11px] text-brand-mist">
+                                    @if ($latest)
+                                        {{ __('Sampled') }} {{ $latest->captured_at->diffForHumans() }}
+                                    @endif
+                                </p>
+                            </header>
+                            <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div>
+                                    <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('By CPU') }}</p>
+                                    <ul class="space-y-1">
+                                        @forelse ($topCpu as $row)
+                                            <li class="flex items-center justify-between gap-3 text-xs">
+                                                <span class="min-w-0 flex-1 truncate font-mono text-brand-ink" title="PID {{ $row['pid'] ?? '?' }} · {{ $row['user'] ?? '?' }}">{{ $row['command'] ?? '—' }}</span>
+                                                <span class="tabular-nums text-brand-moss">{{ number_format((float) ($row['cpu_pct'] ?? 0), 1) }}%</span>
+                                            </li>
+                                        @empty
+                                            <li class="text-xs text-brand-mist">{{ __('No data.') }}</li>
+                                        @endforelse
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('By memory') }}</p>
+                                    <ul class="space-y-1">
+                                        @forelse ($topMem as $row)
+                                            <li class="flex items-center justify-between gap-3 text-xs">
+                                                <span class="min-w-0 flex-1 truncate font-mono text-brand-ink" title="PID {{ $row['pid'] ?? '?' }} · {{ $row['user'] ?? '?' }}">{{ $row['command'] ?? '—' }}</span>
+                                                <span class="tabular-nums text-brand-moss">{{ number_format((float) ($row['mem_pct'] ?? 0), 1) }}%</span>
+                                            </li>
+                                        @empty
+                                            <li class="text-xs text-brand-mist">{{ __('No data.') }}</li>
+                                        @endforelse
+                                    </ul>
+                                </div>
+                            </div>
+                        </section>
+                    @endif
                 </div>
             @endif
 

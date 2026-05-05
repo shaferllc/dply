@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -225,6 +226,185 @@ def _network_rates(now_ts: float) -> tuple[float | None, float | None]:
     return round(rx_rate, 1), round(tx_rate, 1)
 
 
+def _disk_io_totals() -> tuple[int, int]:
+    """Sum read + write bytes across all real block devices.
+
+    Reads /proc/diskstats. Skips loopbacks (loop*), ramdisks (ram*), and
+    individual partitions (we use the parent disk like sda / nvme0n1 to
+    avoid double-counting). The agent translates sectors to bytes assuming
+    the standard 512-byte sector size — accurate to within a few percent
+    for nearly all Linux filesystems and good enough for charting.
+    """
+    read_bytes = 0
+    write_bytes = 0
+    sector_size = 512
+    try:
+        with open("/proc/diskstats") as f:
+            lines = f.readlines()
+    except OSError:
+        return 0, 0
+    for raw in lines:
+        parts = raw.split()
+        if len(parts) < 14:
+            continue
+        name = parts[2]
+        # Skip loop / ram / per-partition (e.g. sda1, nvme0n1p1).
+        if name.startswith(("loop", "ram", "fd", "dm-")):
+            continue
+        if any(ch.isdigit() for ch in name) and name[-1].isdigit() and not name.startswith("nvme"):
+            # Partitions like sda1, vda2 — skip.
+            continue
+        # Crude nvme handling: nvme0n1 (full device, keep), nvme0n1p1 (partition, skip).
+        if "p" in name and name.startswith("nvme"):
+            tail = name.split("p")[-1]
+            if tail.isdigit():
+                continue
+        try:
+            sectors_read = int(parts[5])
+            sectors_written = int(parts[9])
+        except (ValueError, IndexError):
+            continue
+        read_bytes += sectors_read * sector_size
+        write_bytes += sectors_written * sector_size
+    return read_bytes, write_bytes
+
+
+def _disk_io_rates(now_ts: float) -> tuple[float | None, float | None]:
+    """Bytes/sec read + written since the previous sample."""
+    state_path = Path.home() / ".dply" / "metrics-io-state.json"
+    read_total, write_total = _disk_io_totals()
+
+    previous: dict[str, float | int] | None = None
+    try:
+        if state_path.is_file():
+            previous = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        previous = None
+
+    try:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            json.dumps({"captured_at": now_ts, "read_total": read_total, "write_total": write_total}),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+    if not previous:
+        return None, None
+
+    prev_ts = float(previous.get("captured_at", 0))
+    prev_read = int(previous.get("read_total", 0))
+    prev_write = int(previous.get("write_total", 0))
+    elapsed = now_ts - prev_ts
+    if elapsed <= 0:
+        return None, None
+
+    read_rate = max(0.0, (read_total - prev_read) / elapsed)
+    write_rate = max(0.0, (write_total - prev_write) / elapsed)
+    return round(read_rate, 1), round(write_rate, 1)
+
+
+def _per_disk_usage() -> list[dict]:
+    """List of mount points with usage. Filtered to real local filesystems."""
+    real_fs = {"ext2", "ext3", "ext4", "xfs", "btrfs", "zfs", "f2fs", "reiserfs", "jfs"}
+    seen: set[str] = set()
+    out: list[dict] = []
+    try:
+        with open("/proc/mounts") as f:
+            mounts = f.readlines()
+    except OSError:
+        return out
+    for raw in mounts:
+        parts = raw.split()
+        if len(parts) < 3:
+            continue
+        device, mount_point, fs_type = parts[0], parts[1], parts[2]
+        if fs_type not in real_fs:
+            continue
+        if mount_point in seen:
+            continue
+        # Skip snap mounts and docker overlay-style internals.
+        if mount_point.startswith(("/snap", "/var/lib/docker", "/var/lib/containerd")):
+            continue
+        seen.add(mount_point)
+        try:
+            u = shutil.disk_usage(mount_point)
+        except OSError:
+            continue
+        if u.total <= 0:
+            continue
+        out.append({
+            "mount": mount_point,
+            "device": device,
+            "fs_type": fs_type,
+            "total_bytes": u.total,
+            "used_bytes": u.used,
+            "free_bytes": u.free,
+            "pct": round(100.0 * u.used / u.total, 1),
+        })
+    # Stable order by mount path; cap at 12 for payload size.
+    out.sort(key=lambda d: d["mount"])
+    return out[:12]
+
+
+def _top_processes(limit: int = 5) -> dict[str, list[dict]]:
+    """Top N processes by CPU% and by RAM% via `ps`. Falls back to empty lists if ps fails."""
+    by_cpu: list[dict] = []
+    by_mem: list[dict] = []
+    cmd_base = ["ps", "-eo", "pid,user,comm,pcpu,pmem", "--no-headers"]
+    try:
+        # CPU sort
+        cpu_proc = subprocess.run(
+            cmd_base + ["--sort=-pcpu"],
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
+        )
+        if cpu_proc.returncode == 0:
+            for line in cpu_proc.stdout.splitlines()[:limit]:
+                row = _parse_ps_line(line)
+                if row is not None:
+                    by_cpu.append(row)
+        # Memory sort
+        mem_proc = subprocess.run(
+            cmd_base + ["--sort=-pmem"],
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
+        )
+        if mem_proc.returncode == 0:
+            for line in mem_proc.stdout.splitlines()[:limit]:
+                row = _parse_ps_line(line)
+                if row is not None:
+                    by_mem.append(row)
+    except (subprocess.SubprocessError, FileNotFoundError, OSError):
+        pass
+    return {"by_cpu": by_cpu, "by_mem": by_mem}
+
+
+def _parse_ps_line(line: str) -> dict | None:
+    parts = line.split(None, 4)
+    if len(parts) < 5:
+        return None
+    pid_s, user, comm, cpu_s, mem_s = parts
+    try:
+        pid = int(pid_s)
+        cpu = float(cpu_s)
+        mem = float(mem_s)
+    except ValueError:
+        return None
+    return {
+        "pid": pid,
+        "user": user[:32],
+        "command": comm[:64],
+        "cpu_pct": round(cpu, 1),
+        "mem_pct": round(mem, 1),
+    }
+
+
 def main() -> None:
     t1, i1 = _jiffies()
     time.sleep(0.25)
@@ -268,6 +448,9 @@ def main() -> None:
         uptime_seconds = int(float(uf.read().split()[0]))
     now_ts = time.time()
     rx_rate, tx_rate = _network_rates(now_ts)
+    io_read_bps, io_write_bps = _disk_io_rates(now_ts)
+    disks = _per_disk_usage()
+    top_procs = _top_processes()
 
     out = {
         "cpu_pct": cpu,
@@ -289,6 +472,11 @@ def main() -> None:
         "uptime_seconds": uptime_seconds,
         "rx_bytes_per_sec": rx_rate,
         "tx_bytes_per_sec": tx_rate,
+        "io_read_bps": io_read_bps,
+        "io_write_bps": io_write_bps,
+        "disks": disks,
+        "top_cpu": top_procs.get("by_cpu", []),
+        "top_mem": top_procs.get("by_mem", []),
     }
     print(json.dumps(out))
     _post_metrics_callback(out)

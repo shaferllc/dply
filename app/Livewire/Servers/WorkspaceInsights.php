@@ -201,6 +201,35 @@ class WorkspaceInsights extends Component
         $this->toastSuccess(__('Fix has been queued. This may take up to a minute.'));
     }
 
+    public function ignoreFinding(int $findingId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        // Ignore is for suggestions only. Problems should be fixed or auto-resolved, not silenced.
+        $finding = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->where('kind', InsightFinding::KIND_SUGGESTION)
+            ->whereKey($findingId)
+            ->first();
+
+        if ($finding === null) {
+            return;
+        }
+
+        $finding->forceFill([
+            'status' => InsightFinding::STATUS_IGNORED,
+            'ignored_at' => now(),
+            'ignored_by_user_id' => $user->id,
+        ])->save();
+    }
+
     public function acknowledgeFinding(int $findingId): void
     {
         $this->authorize('update', $this->server);

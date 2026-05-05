@@ -50,6 +50,9 @@ final class ServerMetricsRangeQuery
 
     /**
      * Metric keys we render — all live in {@see ServerMetricSnapshot::$payload}.
+     * Phase B added io_read_bps / io_write_bps. Per-disk usage and top-process
+     * lists are point-in-time only — not bucketed (the latest payload is shown
+     * directly in the blade).
      *
      * @var list<string>
      */
@@ -60,6 +63,8 @@ final class ServerMetricsRangeQuery
         'load_1m',
         'rx_bytes_per_sec',
         'tx_bytes_per_sec',
+        'io_read_bps',
+        'io_write_bps',
     ];
 
     public static function defaultRange(): string
