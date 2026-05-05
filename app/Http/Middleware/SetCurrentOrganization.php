@@ -40,7 +40,9 @@ class SetCurrentOrganization
             return $next($request);
         }
 
-        $org = $user->organizations()->find($orgId);
+        // Use the User-level memo so downstream callers (page header, gates,
+        // layout) share this lookup instead of re-querying the join.
+        $org = $user->currentOrganization();
         if (! $org || ! $org->hasMember($user)) {
             session()->forget('current_team_id');
 

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Models\ServerCronJob;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
@@ -90,6 +91,32 @@ class DeployGuestMetricsCallbackEnvJob implements ShouldBeUnique, ShouldQueue
             $meta['monitoring_guest_cron_installed_at'] = now()->toIso8601String();
             $meta['monitoring_guest_push_cron_expression'] = $push->normalizedGuestPushCronExpression();
             $server->forceFill(['meta' => $meta])->saveQuietly();
+
+            // Mirror the crontab line in server_cron_jobs so the
+            // workspace's "Scheduled jobs" list reflects what's
+            // actually on the host. Marked system_managed so the
+            // synchronizer skips it (the metrics block has its own
+            // deploy lifecycle) and the UI hides edit/delete affordances.
+            $deployUser = (string) (config('server_provision.deploy_ssh_user', 'dply') ?: 'root');
+            $cronExpression = $push->normalizedGuestPushCronExpression();
+            $command = '/usr/bin/python3 $HOME/.dply/bin/server-metrics-snapshot.py >/dev/null 2>&1';
+
+            ServerCronJob::query()->updateOrCreate(
+                [
+                    'server_id' => $server->id,
+                    'managed_signature' => 'metrics_guest:'.$deployUser,
+                ],
+                [
+                    'cron_expression' => $cronExpression,
+                    'command' => $command,
+                    'user' => $deployUser,
+                    'enabled' => true,
+                    'description' => 'Dply metrics agent (auto-managed)',
+                    'is_synced' => true,
+                    'system_managed' => true,
+                    'managed_block' => ServerCronJob::MANAGED_BLOCK_METRICS,
+                ],
+            );
         } catch (Throwable $e) {
             Log::warning('server_metrics.callback_env_deploy_exception', [
                 'server_id' => $this->serverId,

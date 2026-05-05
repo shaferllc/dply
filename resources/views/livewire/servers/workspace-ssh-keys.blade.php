@@ -185,7 +185,7 @@
                         </div>
 
                         <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                            <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wide text-brand-mist">
+                            <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <span class="inline-flex items-center gap-1.5">
                                     <x-heroicon-o-chevron-down class="h-3.5 w-3.5" />
                                     {{ __('Advanced — rotation reminder') }}

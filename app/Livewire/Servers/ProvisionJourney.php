@@ -20,6 +20,7 @@ use App\Support\Servers\ClassifyProvisionFailure;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\InstalledStack;
 use App\Support\Servers\ProvisionPipelineLog;
+use App\Support\Servers\ProvisionStepDurations;
 use App\Support\Servers\ProvisionStepSnapshots;
 use App\Support\Servers\ProvisionVerificationSummary;
 use Illuminate\Contracts\View\View;
@@ -519,11 +520,83 @@ class ProvisionJourney extends Component
             return null;
         }
 
-        if (($key === 'setup' || $this->scriptStepLabelForKey($task, $key) !== null) && $task) {
-            return $task->getDurationForHumans();
+        $isScriptStep = $key === 'setup' || $this->scriptStepLabelForKey($task, $key) !== null;
+
+        if (! $isScriptStep) {
+            // Cloud-side steps (queued / provisioning / ip / ssh / ready) —
+            // use the elapsed-since-server-created proxy. We don't track
+            // these steps in the duration table because their timing is
+            // owned by the cloud provider, not the bash script.
+            return $server->created_at?->diffForHumans(now(), true);
         }
 
-        return $server->created_at?->diffForHumans(now(), true);
+        if (! $task) {
+            return null;
+        }
+
+        // Per-step durations come from the `[dply-step-end]` markers
+        // emitted by ServerProvisionCommandBuilder::withStep(). For a
+        // step that's already completed we have the recorded value
+        // directly; for the *active* step there's no end marker yet,
+        // so we approximate "running for" as
+        //   (task elapsed) - (sum of all completed step durations).
+        // That folds out the time spent on prior steps and leaves only
+        // the time accumulated since this step started — which used to
+        // be wrong, the active script step was showing the entire task
+        // wall-clock instead of its own slice.
+        $endDurations = $this->stepEndDurations($task);
+
+        if ($state === 'completed' && $key !== 'setup') {
+            $hash = $key; // script_<md5> already matches label_hash
+            if (isset($endDurations[$hash])) {
+                return $this->formatRunDuration($endDurations[$hash]);
+            }
+        }
+
+        if ($state === 'active') {
+            $started = $task->started_at ?? $task->created_at;
+            if ($started === null) {
+                return null;
+            }
+
+            $taskElapsed = (int) abs(now()->diffInSeconds($started, true));
+            $completedTotal = array_sum($endDurations);
+            $sliceSeconds = max(0, $taskElapsed - $completedTotal);
+
+            return $this->formatRunDuration($sliceSeconds);
+        }
+
+        return $task->getDurationForHumans();
+    }
+
+    /**
+     * Map of label_hash → recorded duration_seconds for every step that
+     * has emitted an end marker so far in this task's output. Cached
+     * per-render via a property to avoid re-parsing on every step row.
+     *
+     * @return array<string, int>
+     */
+    private array $stepEndDurationsCache = [];
+
+    private function stepEndDurations(Task $task): array
+    {
+        $cacheKey = (string) $task->id.'@'.(string) ($task->updated_at?->timestamp ?? 0);
+        if (array_key_exists($cacheKey, $this->stepEndDurationsCache)) {
+            return $this->stepEndDurationsCache[$cacheKey];
+        }
+
+        $output = is_string($task->output) ? $task->output : '';
+        $rows = ProvisionStepDurations::parse($output);
+
+        $map = [];
+        foreach ($rows as $row) {
+            // Resumed-skip rows have duration_seconds = 0; ignoring them
+            // would still be correct here because the active-step math
+            // relies on summing real elapsed seconds, not a count.
+            $map[$row['label_hash']] = ($map[$row['label_hash']] ?? 0) + (int) $row['duration_seconds'];
+        }
+
+        return $this->stepEndDurationsCache[$cacheKey] = $map;
     }
 
     protected function stepOutput(string $key, ?Task $task, Server $server, string $state): ?string
@@ -576,7 +649,6 @@ class ProvisionJourney extends Component
 
         return count(preg_split('/\r\n|\r|\n/', $task->output) ?: []);
     }
-
 
     /**
      * Extract a one-line "why did this fail" headline + a few supporting lines from the

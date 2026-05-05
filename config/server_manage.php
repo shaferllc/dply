@@ -336,7 +336,10 @@ BASH
      */
     'workspace_tabs' => [
         'overview' => ['label' => 'Overview', 'icon' => 'squares-2x2'],
-        'services' => ['label' => 'Services', 'icon' => 'bolt'],
+        // 'services' sub-tab retired: it duplicated the standalone /servers/{id}/services
+        // page (workspace top-nav). Manage stays focused on host-level admin (web,
+        // data, updates, configuration, danger); systemd units + listening ports
+        // live on the Services page and the Firewall page respectively.
         'web' => ['label' => 'Web', 'icon' => 'globe-alt'],
         'data' => ['label' => 'Data', 'icon' => 'circle-stack'],
         'updates' => ['label' => 'Updates', 'icon' => 'arrow-path'],

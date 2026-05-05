@@ -3,18 +3,19 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\ExportServerDatabaseBackupJob;
+use App\Jobs\InstallDatabaseEngineJob;
+use App\Jobs\UninstallDatabaseEngineJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
-use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAdminCredential;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
+use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseExtraUser;
-use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseDriftAnalyzer;
@@ -22,13 +23,14 @@ use App\Services\Servers\ServerDatabaseHostCapabilities;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Support\ServerDatabaseNotificationKeys;
+use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -41,6 +43,7 @@ class WorkspaceDatabases extends Component
     use InteractsWithServerWorkspace;
     use WithFileUploads;
 
+    #[Url(as: 'tab', except: 'databases', history: true)]
     public string $workspace_tab = 'databases';
 
     public string $new_db_name = '';
@@ -71,10 +74,10 @@ class WorkspaceDatabases extends Component
 
     public ?string $credentials_modal_db_id = null;
 
-    /** @var array{name: string, engine: string, username: string, password: string, password_generated: bool, username_generated: bool}|null */
-    public ?array $generated_database_credentials = null;
+    public ?string $connection_url_modal_db_id = null;
 
-    public bool $db_engine_default_applied = false;
+    /** @var array{name: string, engine: string, username: string, password: string, host: string, password_generated: bool, username_generated: bool}|null */
+    public ?array $generated_database_credentials = null;
 
     public string $admin_mysql_root_username = 'root';
 
@@ -106,16 +109,32 @@ class WorkspaceDatabases extends Component
 
     public ?string $share_link_modal_db_name = null;
 
-    /** @var array<string, array{created: bool, removed: bool}> */
-    public array $databaseAlertMatrix = [];
-
-    /** @var list<array{id: string, label: string}> */
-    public array $databaseAlertChannelRows = [];
-
     /** @var array<string, mixed>|null */
     public ?array $drift_snapshot = null;
 
-    protected bool $capabilitiesProbeErrorNotified = false;
+    /** State for the unified Edit modal (engine-aware). */
+    public ?string $editing_db_id = null;
+
+    public string $editing_db_engine = '';
+
+    public string $editing_db_name = '';
+
+    public string $edit_description = '';
+
+    public string $edit_mysql_charset = '';
+
+    public string $edit_mysql_collation = '';
+
+    public string $edit_sqlite_path = '';
+
+    /** State for the SQLite SQL console modal. */
+    public ?string $sqlite_console_db_id = null;
+
+    public string $sqlite_console_sql = '';
+
+    public string $sqlite_console_output = '';
+
+    public ?int $sqlite_console_exit_code = null;
 
     protected bool $driftProbeErrorNotified = false;
 
@@ -137,21 +156,95 @@ class WorkspaceDatabases extends Component
             $this->admin_postgres_superuser = $ac->postgres_superuser;
             $this->admin_postgres_use_sudo = $ac->postgres_use_sudo;
         }
-        $this->loadDatabaseAlertMatrix();
+    }
+
+    public function setWorkspaceTab(string $tab): void
+    {
+        $allowed = ['databases', 'advanced', 'notifications', 'mysql', 'postgres', 'sqlite'];
+        $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'databases';
+    }
+
+    /**
+     * Queue an install for the requested database engine. Mirrors the Caches workspace install
+     * flow: a `ServerDatabaseEngine` row is created in PENDING; the queued job runs preflight,
+     * apt-installs, parses the version, and flips status to RUNNING.
+     *
+     * Workspace tabs are engine families ('mysql', 'postgres'); the engine column on the row
+     * holds the canonical short key the install scripts understand.
+     */
+    public function installDatabaseEngine(string $engine): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! in_array($engine, DatabaseEngineInstallScripts::supportedEngines(), true)) {
+            $this->toastError(__('Unsupported database engine.'));
+
+            return;
+        }
+
+        $existing = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if ($existing && $existing->status === ServerDatabaseEngine::STATUS_RUNNING) {
+            $this->toastError(__(':engine is already installed.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $row = $existing ?? ServerDatabaseEngine::query()->create([
+            'server_id' => $this->server->id,
+            'engine' => $engine,
+            'status' => ServerDatabaseEngine::STATUS_PENDING,
+            'is_default' => ServerDatabaseEngine::query()->where('server_id', $this->server->id)->doesntExist(),
+            'port' => ServerDatabaseEngine::defaultPortFor($engine),
+        ]);
+
+        // Re-run install only when the row is in a state that makes sense to retry from.
+        if (! in_array($row->status, [
+            ServerDatabaseEngine::STATUS_PENDING,
+            ServerDatabaseEngine::STATUS_FAILED,
+            ServerDatabaseEngine::STATUS_STOPPED,
+        ], true)) {
+            $this->toastError(__('Install is already in progress.'));
+
+            return;
+        }
+
+        InstallDatabaseEngineJob::dispatch($row->id);
+        $this->toastSuccess(__('Installing :engine — refresh in a moment to see status.', ['engine' => $engine]));
+        $this->workspace_tab = $engine;
+    }
+
+    /**
+     * Queue an uninstall for the engine identified by tab name. Tracks the underlying row by
+     * engine + server so memcached-style swaps don't accidentally drop the wrong row.
+     */
+    public function uninstallDatabaseEngine(string $engine): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if (! $row) {
+            $this->toastError(__('No :engine engine to uninstall.', ['engine' => $engine]));
+
+            return;
+        }
+
+        UninstallDatabaseEngineJob::dispatch($row->id);
+        $this->toastSuccess(__('Uninstall queued for :engine.', ['engine' => $engine]));
     }
 
     public function refreshDatabaseCapabilities(ServerDatabaseHostCapabilities $capabilities): void
     {
         $this->authorize('update', $this->server);
         $capabilities->forget($this->server);
-        $this->db_engine_default_applied = false;
         $this->toastSuccess(__('Rechecked the server for database engines.'));
-    }
-
-    public function setWorkspaceTab(string $tab): void
-    {
-        $allowed = ['databases', 'advanced'];
-        $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'databases';
     }
 
     public function generateNewDbPassword(): void
@@ -164,6 +257,34 @@ class WorkspaceDatabases extends Component
         if ($value !== 'mysql') {
             $this->new_db_user_mode = 'new';
             $this->new_db_existing_user_reference = '';
+        }
+    }
+
+    /**
+     * Auto-format the database name as the operator types so they never see
+     * a "format is invalid" error for trivial things like spaces, dashes, or
+     * casing. The on-submit regex still gates the final value as a safety net.
+     *
+     * Rules: lowercase; spaces, dashes, dots → underscore; strip everything
+     * else outside [a-z0-9_]; collapse runs of underscores; trim leading and
+     * trailing underscores. Length cap at 64 matches the validation rule.
+     *
+     * Trade-off: the trailing-underscore trim means a user pausing mid-name
+     * at "foo_" sees the underscore disappear (debounced after 250ms) and
+     * has to retype it as "foo_bar". That's strictly better than ending up
+     * with "foo_.db" as the file path on creation.
+     */
+    public function updatedNewDbName(string $value): void
+    {
+        $sanitized = strtolower($value);
+        $sanitized = preg_replace('/[\s.\-]+/', '_', $sanitized) ?? '';
+        $sanitized = preg_replace('/[^a-z0-9_]/', '', $sanitized) ?? '';
+        $sanitized = preg_replace('/_+/', '_', $sanitized) ?? '';
+        $sanitized = trim($sanitized, '_');
+        $sanitized = substr($sanitized, 0, 64);
+
+        if ($sanitized !== $value) {
+            $this->new_db_name = $sanitized;
         }
     }
 
@@ -182,6 +303,222 @@ class WorkspaceDatabases extends Component
         $this->credentials_modal_db_id = null;
     }
 
+    public function openConnectionUrlModal(string $databaseId): void
+    {
+        $this->authorize('update', $this->server);
+        $exists = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($databaseId)
+            ->exists();
+        $this->connection_url_modal_db_id = $exists ? $databaseId : null;
+    }
+
+    public function closeConnectionUrlModal(): void
+    {
+        $this->connection_url_modal_db_id = null;
+    }
+
+    public function openEditDatabaseModal(string $databaseId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $db = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($databaseId)
+            ->first();
+        if (! $db) {
+            return;
+        }
+
+        $this->editing_db_id = $db->id;
+        $this->editing_db_engine = (string) $db->engine;
+        $this->editing_db_name = (string) $db->name;
+        $this->edit_description = (string) ($db->description ?? '');
+        $this->edit_mysql_charset = (string) ($db->mysql_charset ?? '');
+        $this->edit_mysql_collation = (string) ($db->mysql_collation ?? '');
+        $this->edit_sqlite_path = (string) ($db->host ?? '');
+
+        // Per the planner notes: cross-engine edits use the dispatch
+        // open-modal pattern (same wiring as personal-ssh-key-modal),
+        // not the ConfirmsActionWithModal trait which is reserved for
+        // single-confirm destructive actions like drop.
+        $this->dispatch('open-modal', 'edit-database-modal');
+    }
+
+    public function closeEditDatabaseModal(): void
+    {
+        $this->dispatch('close-modal', 'edit-database-modal');
+
+        $this->editing_db_id = null;
+        $this->editing_db_engine = '';
+        $this->editing_db_name = '';
+        $this->edit_description = '';
+        $this->edit_mysql_charset = '';
+        $this->edit_mysql_collation = '';
+        $this->edit_sqlite_path = '';
+    }
+
+    public function saveDatabaseEdit(
+        ServerDatabaseProvisioner $provisioner,
+        ServerDatabaseAuditLogger $auditLogger,
+    ): void {
+        $this->authorize('update', $this->server);
+
+        if (! $this->editing_db_id) {
+            return;
+        }
+
+        $db = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($this->editing_db_id)
+            ->firstOrFail();
+
+        $rules = [
+            'edit_description' => 'nullable|string|max:2000',
+        ];
+        if ($db->engine === 'mysql') {
+            $rules['edit_mysql_charset'] = 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/';
+            $rules['edit_mysql_collation'] = 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/';
+        }
+        if ($db->engine === 'sqlite') {
+            $rules['edit_sqlite_path'] = 'required|string|max:512';
+        }
+        $this->validate($rules);
+
+        $diff = [];
+
+        if ((string) ($db->description ?? '') !== $this->edit_description) {
+            $diff['description'] = ['from' => $db->description, 'to' => $this->edit_description ?: null];
+            $db->description = $this->edit_description ?: null;
+        }
+
+        if ($db->engine === 'mysql') {
+            $newCharset = $this->edit_mysql_charset ?: null;
+            $newCollation = $this->edit_mysql_collation ?: null;
+            if ($db->mysql_charset !== $newCharset) {
+                $diff['mysql_charset'] = ['from' => $db->mysql_charset, 'to' => $newCharset];
+                $db->mysql_charset = $newCharset;
+            }
+            if ($db->mysql_collation !== $newCollation) {
+                $diff['mysql_collation'] = ['from' => $db->mysql_collation, 'to' => $newCollation];
+                $db->mysql_collation = $newCollation;
+            }
+        }
+
+        if ($db->engine === 'sqlite' && trim($this->edit_sqlite_path) !== (string) $db->host) {
+            // Run the host-side mv BEFORE updating the host column so a
+            // failed move leaves the row pointing at a file that still
+            // exists. The provisioner re-validates both paths through
+            // safeSqlitePath() so a tampered field can't escape the jail.
+            try {
+                $provisioner->relocateSqliteFile($db, trim($this->edit_sqlite_path));
+            } catch (\Throwable $e) {
+                $this->toastError(__('Could not move SQLite file: :msg', ['msg' => $e->getMessage()]));
+
+                return;
+            }
+
+            $diff['host'] = ['from' => $db->host, 'to' => trim($this->edit_sqlite_path)];
+            $db->host = trim($this->edit_sqlite_path);
+        }
+
+        if ($diff === []) {
+            $this->toastSuccess(__('Nothing to update.'));
+            $this->closeEditDatabaseModal();
+
+            return;
+        }
+
+        $db->save();
+
+        $auditLogger->record(
+            $this->server,
+            ServerDatabaseAuditEvent::EVENT_DATABASE_UPDATED,
+            ['server_database_id' => $db->id, 'engine' => $db->engine, 'diff' => $diff],
+            auth()->user(),
+        );
+
+        $this->toastSuccess(__('Database updated.'));
+        $this->closeEditDatabaseModal();
+    }
+
+    public function openSqliteConsoleModal(string $databaseId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $db = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($databaseId)
+            ->first();
+        if (! $db || $db->engine !== 'sqlite') {
+            return;
+        }
+
+        $this->sqlite_console_db_id = $db->id;
+        $this->sqlite_console_sql = '';
+        $this->sqlite_console_output = '';
+        $this->sqlite_console_exit_code = null;
+        $this->dispatch('open-modal', 'sqlite-sql-console-modal');
+    }
+
+    public function closeSqliteConsoleModal(): void
+    {
+        $this->dispatch('close-modal', 'sqlite-sql-console-modal');
+        $this->sqlite_console_db_id = null;
+        $this->sqlite_console_sql = '';
+        $this->sqlite_console_output = '';
+        $this->sqlite_console_exit_code = null;
+    }
+
+    public function runSqliteSql(
+        ServerDatabaseProvisioner $provisioner,
+        ServerDatabaseAuditLogger $auditLogger,
+    ): void {
+        $this->authorize('update', $this->server);
+
+        if (! $this->sqlite_console_db_id) {
+            return;
+        }
+
+        $this->validate([
+            'sqlite_console_sql' => 'required|string|min:1|max:'.((int) config('server_database.import_max_bytes', 10485760)),
+        ]);
+
+        $db = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($this->sqlite_console_db_id)
+            ->firstOrFail();
+
+        if ($db->engine !== 'sqlite') {
+            $this->toastError(__('SQL console is only available for SQLite databases.'));
+
+            return;
+        }
+
+        try {
+            $output = $provisioner->executeSqliteSql($db, $this->sqlite_console_sql);
+            $this->sqlite_console_output = $output;
+            // sqlite3 exits 0 on success, non-zero on parse error or
+            // constraint violation; the provisioner returns the trimmed
+            // mixed stdout/stderr stream and we re-inspect via a quick
+            // shell call. Keeping it simple: we only mark exit_code
+            // non-zero when the output looks like a sqlite3 error line.
+            $this->sqlite_console_exit_code = str_contains(strtolower($output), 'error') ? 1 : 0;
+        } catch (\Throwable $e) {
+            $this->sqlite_console_output = $e->getMessage();
+            $this->sqlite_console_exit_code = 1;
+
+            return;
+        }
+
+        $auditLogger->record(
+            $this->server,
+            ServerDatabaseAuditEvent::EVENT_IMPORT_RAN,
+            ['server_database_id' => $db->id, 'engine' => 'sqlite', 'sql_length' => strlen($this->sqlite_console_sql)],
+            auth()->user(),
+        );
+    }
+
     public function dismissGeneratedDatabaseCredentials(): void
     {
         $this->generated_database_credentials = null;
@@ -193,62 +530,8 @@ class WorkspaceDatabases extends Component
         $this->share_link_modal_db_name = null;
     }
 
-    public function saveDatabaseAlertPreferences(): void
+    public function saveAdminCredentials(ServerDatabaseAuditLogger $auditLogger): void
     {
-        $this->authorize('update', $this->server);
-        if ($this->currentUserIsDeployer()) {
-            $this->toastError(__('Deployers cannot change notification routing.'));
-
-            return;
-        }
-
-        $user = auth()->user();
-        if ($user === null) {
-            return;
-        }
-
-        $channels = AssignableNotificationChannels::forUser($user, $user->currentOrganization());
-        $allowedIds = $channels->pluck('id')->map(fn ($id) => (string) $id)->all();
-
-        DB::transaction(function () use ($channels, $allowedIds): void {
-            foreach ($channels as $channel) {
-                $cid = (string) $channel->id;
-                if (! in_array($cid, $allowedIds, true)) {
-                    continue;
-                }
-
-                $row = $this->databaseAlertMatrix[$cid] ?? [];
-                foreach (ServerDatabaseNotificationKeys::KINDS as $kind) {
-                    $wanted = (bool) ($row[$kind] ?? false);
-                    $eventKey = ServerDatabaseNotificationKeys::eventKey($kind);
-                    $q = NotificationSubscription::query()
-                        ->where('notification_channel_id', $channel->id)
-                        ->where('subscribable_type', Server::class)
-                        ->where('subscribable_id', $this->server->id)
-                        ->where('event_key', $eventKey);
-
-                    if ($wanted) {
-                        NotificationSubscription::query()->firstOrCreate([
-                            'notification_channel_id' => $channel->id,
-                            'subscribable_type' => Server::class,
-                            'subscribable_id' => $this->server->id,
-                            'event_key' => $eventKey,
-                        ]);
-                    } else {
-                        $q->delete();
-                    }
-                }
-            }
-        });
-
-        $this->toastSuccess(__('Database notification routing updated.'));
-        $this->loadDatabaseAlertMatrix();
-    }
-
-    public function saveAdminCredentials(
-        ServerDatabaseHostCapabilities $capabilities,
-        ServerDatabaseAuditLogger $auditLogger,
-    ): void {
         $this->authorize('update', $this->server);
         $this->validate([
             'admin_mysql_root_username' => 'required|string|max:64',
@@ -272,28 +555,23 @@ class WorkspaceDatabases extends Component
 
         $this->admin_mysql_root_password = '';
         $this->admin_postgres_password = '';
-        $capabilities->forget($this->server);
-        $this->db_engine_default_applied = false;
 
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_ADMIN_CREDENTIALS_SAVED, [], auth()->user());
         $this->toastSuccess(__('Saved database admin credentials.'));
     }
 
-    public function clearStoredMysqlRootPassword(
-        ServerDatabaseHostCapabilities $capabilities,
-    ): void {
+    public function clearStoredMysqlRootPassword(): void
+    {
         $this->authorize('update', $this->server);
         $cred = ServerDatabaseAdminCredential::query()->where('server_id', $this->server->id)->first();
         if ($cred) {
             $cred->mysql_root_password = null;
             $cred->save();
         }
-        $capabilities->forget($this->server);
-        $this->db_engine_default_applied = false;
         $this->toastSuccess(__('Cleared stored MySQL root password.'));
     }
 
-    public function clearStoredPostgresPassword(ServerDatabaseHostCapabilities $capabilities): void
+    public function clearStoredPostgresPassword(): void
     {
         $this->authorize('update', $this->server);
         $cred = ServerDatabaseAdminCredential::query()->where('server_id', $this->server->id)->first();
@@ -301,8 +579,6 @@ class WorkspaceDatabases extends Component
             $cred->postgres_password = null;
             $cred->save();
         }
-        $capabilities->forget($this->server);
-        $this->db_engine_default_applied = false;
         $this->toastSuccess(__('Cleared stored PostgreSQL password.'));
     }
 
@@ -329,20 +605,31 @@ class WorkspaceDatabases extends Component
         ]);
 
         $db = ServerDatabase::query()->where('server_id', $this->server->id)->whereKey($this->extra_db_id)->firstOrFail();
-        if ($db->engine !== 'mysql') {
-            $this->addError('extra_db_id', __('Extra users in this flow are limited to MySQL databases.'));
 
-            return;
-        }
+        // Postgres roles are global (no @host concept); store
+        // 'localhost' as a placeholder so the column constraint stays
+        // satisfied without misleading the operator. MySQL/MariaDB
+        // honours the host the user typed.
+        $extraHost = $db->engine === 'postgres' ? 'localhost' : $this->extra_host;
 
         $extra = ServerDatabaseExtraUser::query()->create([
             'server_database_id' => $db->id,
             'username' => $this->extra_username,
             'password' => $this->extra_password,
-            'host' => $this->extra_host,
+            'host' => $extraHost,
         ]);
 
-        $provisioner->createExtraMysqlUser($db, $extra);
+        try {
+            $provisioner->createExtraDatabaseUser($db, $extra);
+        } catch (\Throwable $e) {
+            // Roll back the local row if the remote call exploded so
+            // the dashboard doesn't show a user that isn't on the host.
+            $extra->delete();
+            $this->toastError(__('Could not create user on the server: :msg', ['msg' => $e->getMessage()]));
+
+            return;
+        }
+
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_EXTRA_USER_CREATED, [
             'server_database_id' => $db->id,
             'username' => $extra->username,
@@ -356,7 +643,6 @@ class WorkspaceDatabases extends Component
     public function removeExtraUser(
         string $extraId,
         ServerDatabaseProvisioner $provisioner,
-        ServerDatabaseHostCapabilities $capabilities,
         ServerDatabaseAuditLogger $auditLogger,
     ): void {
         $this->authorize('update', $this->server);
@@ -368,30 +654,9 @@ class WorkspaceDatabases extends Component
             ->firstOrFail();
 
         $db = $row->serverDatabase;
-        if ($db->engine !== 'mysql') {
-            $dbId = $row->server_database_id;
-            $user = $row->username;
-            $row->delete();
-            $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_EXTRA_USER_REMOVED, [
-                'server_database_id' => $dbId,
-                'username' => $user,
-                'dropped_remote' => false,
-            ], auth()->user());
-            $this->toastSuccess(__('Removed extra user from Dply.'));
-
-            return;
-        }
-
-        $caps = $capabilities->forServer($this->server);
-
-        if (! $caps['mysql']) {
-            $this->toastError(__('MySQL is not reachable over SSH; cannot drop the remote user safely.'));
-
-            return;
-        }
 
         try {
-            $provisioner->dropExtraMysqlUser($db, $row);
+            $provisioner->dropExtraDatabaseUser($db, $row);
         } catch (\Throwable $e) {
             $this->toastError(__('Could not drop user on the server: :msg', ['msg' => $e->getMessage()]));
 
@@ -467,6 +732,7 @@ class WorkspaceDatabases extends Component
         $backup = ServerDatabaseBackup::query()
             ->whereKey($backupId)
             ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
+            ->with('serverDatabase')
             ->firstOrFail();
 
         if ($backup->status !== ServerDatabaseBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
@@ -475,13 +741,17 @@ class WorkspaceDatabases extends Component
             return null;
         }
 
-        if (! Storage::disk('local')->exists($backup->disk_path)) {
+        $disk = Storage::disk(config('server_database.backup_disk', 'local'));
+        if (! $disk->exists($backup->disk_path)) {
             $this->toastError(__('Backup file is missing from storage.'));
 
             return null;
         }
 
-        return Storage::disk('local')->download($backup->disk_path, 'database-'.$backup->id.'.sql');
+        $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
+        $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
+
+        return $disk->download($backup->disk_path, $filename);
     }
 
     public function importSql(
@@ -528,57 +798,32 @@ class WorkspaceDatabases extends Component
 
     public function synchronizeDatabases(
         ServerDatabaseProvisioner $provisioner,
-        ServerDatabaseHostCapabilities $capabilities,
         ServerDatabaseAuditLogger $auditLogger,
     ): void {
         $this->authorize('update', $this->server);
 
-        $caps = $capabilities->forServer($this->server);
-        if (! $caps['mysql'] && ! $caps['postgres']) {
-            $this->toastError(__('No supported database engine is reachable on this server (MySQL/MariaDB as root, or PostgreSQL via the postgres user).'));
-
-            return;
-        }
-
         try {
-            $this->remote_mysql_databases = $caps['mysql']
-                ? $provisioner->listMysqlDatabaseNames($this->server)
-                : [];
-            try {
-                $this->remote_postgres_databases = $caps['postgres']
-                    ? $provisioner->listPostgresDatabaseNames($this->server)
-                    : [];
-            } catch (\Throwable) {
-                $this->remote_postgres_databases = [];
-            }
-            $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_SYNC_RAN, [
-                'mysql_count' => count($this->remote_mysql_databases),
-                'postgres_count' => count($this->remote_postgres_databases),
-            ], auth()->user());
-            $this->toastSuccess(__('Queried the server for database names. Compare the lists below and add or import anything missing in Dply.'));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+            $this->remote_mysql_databases = $provisioner->listMysqlDatabaseNames($this->server);
+        } catch (\Throwable) {
+            $this->remote_mysql_databases = [];
         }
+        try {
+            $this->remote_postgres_databases = $provisioner->listPostgresDatabaseNames($this->server);
+        } catch (\Throwable) {
+            $this->remote_postgres_databases = [];
+        }
+
+        $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_SYNC_RAN, [
+            'mysql_count' => count($this->remote_mysql_databases),
+            'postgres_count' => count($this->remote_postgres_databases),
+        ], auth()->user());
+        $this->toastSuccess(__('Queried the server for database names. Compare the lists below and add or import anything missing in Dply.'));
     }
 
-    public function prefillDatabaseFromDiscovery(
-        string $name,
-        string $engine,
-        ServerDatabaseHostCapabilities $capabilities,
-    ): void {
+    public function prefillDatabaseFromDiscovery(string $name, string $engine): void
+    {
         $this->authorize('update', $this->server);
-        $caps = $capabilities->forServer($this->server);
         $engine = $engine === 'postgres' ? 'postgres' : 'mysql';
-        if ($engine === 'mysql' && ! $caps['mysql']) {
-            $this->toastError(__('MySQL/MariaDB is not available on this server.'));
-
-            return;
-        }
-        if ($engine === 'postgres' && ! $caps['postgres']) {
-            $this->toastError(__('PostgreSQL is not available on this server.'));
-
-            return;
-        }
         $this->workspace_tab = 'advanced';
         $this->new_db_name = $name;
         $this->new_db_engine = $engine;
@@ -590,51 +835,66 @@ class WorkspaceDatabases extends Component
 
     public function createDatabase(
         ServerDatabaseProvisioner $provisioner,
-        ServerDatabaseHostCapabilities $capabilities,
         ServerDatabaseAuditLogger $auditLogger,
         ServerDatabaseNotificationDispatcher $notificationDispatcher,
+        ServerDatabaseHostCapabilities $capabilitiesService,
     ): void {
         $this->authorize('update', $this->server);
         $this->new_db_username = trim($this->new_db_username);
 
-        $caps = $capabilities->forServer($this->server);
-        if ($this->new_db_engine === 'mysql' && ! $caps['mysql']) {
-            $this->addError('new_db_engine', __('MySQL/MariaDB is not installed or root access from SSH is not available on this server.'));
-
-            return;
-        }
-        if ($this->new_db_engine === 'postgres' && ! $caps['postgres']) {
-            $this->addError('new_db_engine', __('PostgreSQL is not installed or the postgres role is not reachable over SSH.'));
+        $capabilities = $capabilitiesService->forServer($this->server);
+        if (! ($capabilities[$this->new_db_engine] ?? false)) {
+            $engineLabel = match ($this->new_db_engine) {
+                'mysql' => 'MySQL/MariaDB',
+                'postgres' => 'PostgreSQL',
+                'sqlite' => 'SQLite',
+                default => $this->new_db_engine,
+            };
+            $this->addError('new_db_engine', __(':engine is not installed on this server.', ['engine' => $engineLabel]));
 
             return;
         }
 
         $rules = [
             'new_db_name' => 'required|string|max:64|regex:/^[a-zA-Z0-9_]+$/',
-            'new_db_engine' => 'required|in:mysql,postgres',
-            'new_db_host' => 'required|string|max:255',
+            'new_db_engine' => 'required|in:mysql,postgres,sqlite',
+            'new_db_host' => 'required|string|max:512',
             'new_db_description' => 'nullable|string|max:2000',
             'new_mysql_charset' => 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/',
             'new_mysql_collation' => 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/',
             'new_db_user_mode' => 'required|in:new,existing',
             'new_db_existing_user_reference' => 'nullable|string|max:100',
         ];
-        if ($this->new_db_user_mode === 'existing' && $this->new_db_engine === 'mysql') {
+        if ($this->new_db_engine === 'sqlite') {
+            // SQLite has no roles or auth — skip user/password rules
+            // entirely. The "host" field is repurposed to carry the
+            // absolute file path on the server (validated by the
+            // provisioner against server_database.sqlite_root).
+            $rules['new_db_username'] = 'nullable';
+            $rules['new_db_password'] = 'nullable';
+        } elseif ($this->new_db_user_mode === 'existing' && $this->new_db_engine === 'mysql') {
             $rules['new_db_existing_user_reference'] = 'required|string|max:100';
             $rules['new_db_username'] = 'nullable';
+            $rules['new_db_password'] = 'nullable';
         } elseif ($this->new_db_username !== '') {
             $rules['new_db_username'] = 'required|string|max:64|regex:/^[a-zA-Z0-9_]+$/';
+            $rules['new_db_password'] = $this->new_db_password !== null && $this->new_db_password !== ''
+                ? 'required|string|max:200'
+                : 'nullable';
         } else {
             $rules['new_db_username'] = 'nullable';
-        }
-        if ($this->new_db_user_mode === 'existing' && $this->new_db_engine === 'mysql') {
-            $rules['new_db_password'] = 'nullable';
-        } elseif ($this->new_db_password !== null && $this->new_db_password !== '') {
-            $rules['new_db_password'] = 'required|string|max:200';
-        } else {
-            $rules['new_db_password'] = 'nullable';
+            $rules['new_db_password'] = $this->new_db_password !== null && $this->new_db_password !== ''
+                ? 'required|string|max:200'
+                : 'nullable';
         }
         $this->validate($rules);
+
+        // Force 'new' for non-MySQL engines so a stale form value
+        // (operator switched from MySQL → SQLite without re-rendering)
+        // can't trip the existing-user branch below.
+        if ($this->new_db_engine !== 'mysql') {
+            $this->new_db_user_mode = 'new';
+        }
 
         $existingMysqlUser = null;
         if ($this->new_db_user_mode === 'existing') {
@@ -652,9 +912,11 @@ class WorkspaceDatabases extends Component
             }
         }
 
+        $isSqlite = $this->new_db_engine === 'sqlite';
+
         $username = $existingMysqlUser['username'] ?? $this->new_db_username;
         $usernameGenerated = false;
-        if ($username === '') {
+        if (! $isSqlite && $username === '') {
             $base = Str::slug($this->new_db_name, '_');
             if ($base === '') {
                 $base = 'db';
@@ -665,9 +927,19 @@ class WorkspaceDatabases extends Component
 
         $password = $existingMysqlUser['password'] ?? $this->new_db_password;
         $passwordGenerated = false;
-        if ($password === null || $password === '') {
+        if (! $isSqlite && ($password === null || $password === '')) {
             $password = Str::password(24);
             $passwordGenerated = true;
+        }
+
+        // SQLite always lands at the canonical layout — the create form
+        // doesn't collect the path anymore. Existing rows with custom
+        // paths keep theirs; only new creates pass through here.
+        if ($isSqlite) {
+            $root = rtrim((string) config('server_database.sqlite_root', '/var/lib/dply/sqlite'), '/');
+            $this->new_db_host = $root.'/'.$this->server->id.'/'.$this->new_db_name.'.db';
+            $username = $username ?: '';
+            $password = $password ?: '';
         }
 
         try {
@@ -698,6 +970,7 @@ class WorkspaceDatabases extends Component
                 'engine' => $db->engine,
                 'username' => $db->username,
                 'password' => $db->password,
+                'host' => $db->host,
                 'username_generated' => $usernameGenerated,
                 'password_generated' => $passwordGenerated,
             ];
@@ -736,24 +1009,12 @@ class WorkspaceDatabases extends Component
     public function dropDatabaseOnServer(
         string $id,
         ServerDatabaseProvisioner $provisioner,
-        ServerDatabaseHostCapabilities $capabilities,
         ServerDatabaseAuditLogger $auditLogger,
         ServerDatabaseNotificationDispatcher $notificationDispatcher,
     ): void {
         $this->authorize('update', $this->server);
 
         $db = ServerDatabase::query()->where('server_id', $this->server->id)->findOrFail($id);
-        $caps = $capabilities->forServer($this->server);
-        if ($db->engine === 'mysql' && ! $caps['mysql']) {
-            $this->toastError(__('MySQL/MariaDB is not available on this server, so the database cannot be dropped remotely.'));
-
-            return;
-        }
-        if ($db->engine === 'postgres' && ! $caps['postgres']) {
-            $this->toastError(__('PostgreSQL is not available on this server, so the database cannot be dropped remotely.'));
-
-            return;
-        }
 
         try {
             $out = $provisioner->dropFromServer($db);
@@ -773,37 +1034,38 @@ class WorkspaceDatabases extends Component
     }
 
     public function render(
-        ServerDatabaseHostCapabilities $capabilitiesService,
         ServerDatabaseDriftAnalyzer $driftAnalyzer,
+        ServerDatabaseHostCapabilities $capabilitiesService,
     ): View {
-        $this->server->refresh();
         $this->server->load([
             'serverDatabases.extraUsers',
-            'databaseAuditEvents' => fn ($q) => $q->limit(80),
+            'databaseAuditEvents' => fn ($q) => $q->with('user:id,name')->limit(80),
         ]);
 
-        $capabilities = ['mysql' => false, 'postgres' => false, 'redis' => false];
+        $capabilities = ['mysql' => false, 'postgres' => false, 'sqlite' => false];
         try {
             $capabilities = $capabilitiesService->forServer($this->server);
-            $this->capabilitiesProbeErrorNotified = false;
-        } catch (\Throwable $e) {
-            $message = $this->friendlyDatabaseWorkspaceError(
-                $e,
-                __('Dply could not connect to the server to check database engines.')
-            );
-            if (! $this->capabilitiesProbeErrorNotified) {
-                $this->toastError($message);
-                $this->capabilitiesProbeErrorNotified = true;
+        } catch (\Throwable) {
+            // Probe failures (SSH timeout, key issues) leave engine tabs hidden.
+            // The user can still create databases from Basics — provisioner errors surface there.
+        }
+
+        if (! ($capabilities[$this->new_db_engine] ?? false)) {
+            foreach (['mysql', 'postgres', 'sqlite'] as $engine) {
+                if ($capabilities[$engine] ?? false) {
+                    $this->new_db_engine = $engine;
+                    break;
+                }
             }
         }
 
-        if (! $this->db_engine_default_applied) {
-            if (! $capabilities['mysql'] && $capabilities['postgres']) {
-                $this->new_db_engine = 'postgres';
-            } elseif ($capabilities['mysql'] && ! $capabilities['postgres']) {
-                $this->new_db_engine = 'mysql';
-            }
-            $this->db_engine_default_applied = true;
+        // Engine tabs are now ALWAYS reachable — even when an engine isn't installed yet, the
+        // operator needs to land on the tab to click the Install button. The capability probe
+        // still drives what the tab renders (status panel vs install CTA); it just doesn't gate
+        // navigability anymore.
+        $allowedTabs = ['databases', 'advanced', 'notifications', 'mysql', 'postgres', 'sqlite'];
+        if (! in_array($this->workspace_tab, $allowedTabs, true)) {
+            $this->workspace_tab = 'databases';
         }
 
         $credentialsModalDatabase = null;
@@ -811,6 +1073,13 @@ class WorkspaceDatabases extends Component
             $credentialsModalDatabase = ServerDatabase::query()
                 ->where('server_id', $this->server->id)
                 ->find($this->credentials_modal_db_id);
+        }
+
+        $connectionUrlModalDatabase = null;
+        if ($this->connection_url_modal_db_id !== null) {
+            $connectionUrlModalDatabase = ServerDatabase::query()
+                ->where('server_id', $this->server->id)
+                ->find($this->connection_url_modal_db_id);
         }
 
         if ($this->workspace_tab === 'advanced' && $this->drift_snapshot === null) {
@@ -831,9 +1100,13 @@ class WorkspaceDatabases extends Component
 
         $recentBackups = ServerDatabaseBackup::query()
             ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
+            ->with('serverDatabase')
             ->orderByDesc('created_at')
-            ->limit(15)
+            ->limit(60)
             ->get();
+
+        // Group by engine so each engine tab can render only its own backups.
+        $recentBackupsByEngine = $recentBackups->groupBy(fn ($b) => $b->serverDatabase?->engine ?? 'unknown');
 
         $this->server->loadMissing('organization');
         $org = $this->server->organization;
@@ -842,14 +1115,24 @@ class WorkspaceDatabases extends Component
             ? $org->databaseImportMaxBytes()
             : (int) config('server_database.import_max_bytes', 10485760);
 
+        // Engine rows keyed by engine name so the per-engine tabs can render install/status
+        // without repeated queries. Sqlite doesn't have a row in this table — it's a binary
+        // that ships with the others.
+        $engineRows = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->get()
+            ->keyBy('engine');
+
         return view('livewire.servers.workspace-databases', [
             'capabilities' => $capabilities,
             'credentialsModalDatabase' => $credentialsModalDatabase,
+            'connectionUrlModalDatabase' => $connectionUrlModalDatabase,
             'existingMysqlUserOptions' => $this->existingMysqlUserOptions(),
             'recentBackups' => $recentBackups,
+            'recentBackupsByEngine' => $recentBackupsByEngine,
             'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
             'databaseImportMaxBytes' => $databaseImportMaxBytes,
-            'isDeployer' => $this->currentUserIsDeployer(),
+            'engineRows' => $engineRows,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
@@ -957,40 +1240,5 @@ class WorkspaceDatabases extends Component
         }
 
         return $options;
-    }
-
-    protected function loadDatabaseAlertMatrix(): void
-    {
-        $this->databaseAlertMatrix = [];
-        $this->databaseAlertChannelRows = [];
-
-        $user = auth()->user();
-        if ($user === null) {
-            return;
-        }
-
-        $channels = AssignableNotificationChannels::forUser($user, $user->currentOrganization());
-        foreach ($channels as $channel) {
-            $cid = (string) $channel->id;
-            $entry = [
-                'created' => false,
-                'removed' => false,
-            ];
-
-            foreach (ServerDatabaseNotificationKeys::KINDS as $kind) {
-                $entry[$kind] = NotificationSubscription::query()
-                    ->where('notification_channel_id', $channel->id)
-                    ->where('subscribable_type', Server::class)
-                    ->where('subscribable_id', $this->server->id)
-                    ->where('event_key', ServerDatabaseNotificationKeys::eventKey($kind))
-                    ->exists();
-            }
-
-            $this->databaseAlertMatrix[$cid] = $entry;
-            $this->databaseAlertChannelRows[] = [
-                'id' => $cid,
-                'label' => (string) $channel->label,
-            ];
-        }
     }
 }

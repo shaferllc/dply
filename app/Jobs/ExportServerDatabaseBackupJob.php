@@ -2,11 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseDumpOutputValidator;
 use App\Services\Servers\ServerDatabaseRemoteExec;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
@@ -36,25 +38,42 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
         $db = $backup->serverDatabase;
         $server = $db->server;
 
+        $diskName = (string) config('server_database.backup_disk', 'local');
+        $disk = Storage::disk($diskName);
+
         try {
-            if ($db->engine === 'postgres') {
-                $contents = $remoteExec->pgDump($server, $db->name, $db->username, $db->password);
+            $extension = match ($db->engine) {
+                'sqlite' => 'db',
+                default => 'sql',
+            };
+
+            if ($db->engine === 'sqlite') {
+                $maxBytes = (int) config('server_database.sqlite_backup_max_bytes', 256 * 1024 * 1024);
+                $contents = $remoteExec->sqliteBackup($server, (string) $db->host, $maxBytes);
+
+                if ($contents === '') {
+                    throw new \RuntimeException('SQLite backup produced an empty file.');
+                }
             } else {
-                $contents = $remoteExec->mysqldump($server, $db->name, $db->username, $db->password);
+                $contents = $db->engine === 'postgres'
+                    ? $remoteExec->pgDump($server, $db->name, $db->username, $db->password)
+                    : $remoteExec->mysqldump($server, $db->name, $db->username, $db->password);
+
+                if (ServerDatabaseDumpOutputValidator::looksLikeFailedDump($db->engine, $contents)) {
+                    throw new \RuntimeException('Dump command failed: '.substr($contents, 0, 1200));
+                }
             }
 
-            if (ServerDatabaseDumpOutputValidator::looksLikeFailedDump($db->engine, $contents)) {
-                throw new \RuntimeException('Dump command failed: '.substr($contents, 0, 1200));
-            }
-
-            $relative = 'database-backups/'.$server->id.'/'.$backup->id.'.sql';
-            Storage::disk('local')->put($relative, $contents);
+            $relative = 'database-backups/'.$server->id.'/'.$backup->id.'.'.$extension;
+            $disk->put($relative, $contents);
 
             $backup->update([
                 'status' => ServerDatabaseBackup::STATUS_COMPLETED,
                 'disk_path' => $relative,
                 'bytes' => strlen($contents),
             ]);
+
+            $this->pruneOlderBackups($db, $disk);
 
             $user = $backup->user;
             if ($user) {
@@ -69,6 +88,35 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
                 'status' => ServerDatabaseBackup::STATUS_FAILED,
                 'error_message' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Keep only the most-recent N completed backups for this database; delete older files + rows.
+     * Failed/pending backups are not pruned — operators can still see their error trail.
+     */
+    protected function pruneOlderBackups(ServerDatabase $db, Filesystem $disk): void
+    {
+        $keep = max(1, (int) config('server_database.backup_retention_per_database', 10));
+
+        $stale = ServerDatabaseBackup::query()
+            ->where('server_database_id', $db->id)
+            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
+            ->orderByDesc('created_at')
+            ->skip($keep)
+            ->take(1000)
+            ->get();
+
+        foreach ($stale as $old) {
+            if (! empty($old->disk_path)) {
+                try {
+                    $disk->delete($old->disk_path);
+                } catch (\Throwable) {
+                    // Disk-side delete failures shouldn't block pruning the row;
+                    // a future prune will retry the disk delete.
+                }
+            }
+            $old->delete();
         }
     }
 }

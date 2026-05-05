@@ -117,6 +117,27 @@
                             $appTimezone = config('app.timezone') ?: 'UTC';
                             $checkedAtLocal = $checkedAt?->copy()->timezone($appTimezone);
                             $checkedAtUtc = $checkedAt?->copy()->timezone('UTC');
+
+                            // Derive fix-run state from meta so the row can show whether the
+                            // background job is queued/running, succeeded, or failed. Mirrors
+                            // the logic in WorkspaceInsights::selectedFindingDetail so the
+                            // list and modal stay consistent.
+                            $fMeta = is_array($f->meta) ? $f->meta : [];
+                            $fixRunStatus = match (true) {
+                                isset($fMeta['fix_applied_at']) && is_string($fMeta['fix_applied_at']) && $fMeta['fix_applied_at'] !== '' => 'succeeded',
+                                isset($fMeta['fix_failed_at']) && is_string($fMeta['fix_failed_at']) && $fMeta['fix_failed_at'] !== '' => 'failed',
+                                isset($fMeta['fix_refused_at']) && is_string($fMeta['fix_refused_at']) && $fMeta['fix_refused_at'] !== '' => 'refused',
+                                isset($fMeta['fix_run_started_at']) && is_string($fMeta['fix_run_started_at']) && $fMeta['fix_run_started_at'] !== '' => 'queued',
+                                default => 'idle',
+                            };
+                            $fixInFlight = $fixRunStatus === 'queued';
+                            [$fixRunChip, $fixRunLabel, $fixRunIcon] = match ($fixRunStatus) {
+                                'queued' => ['bg-amber-100 text-amber-900 ring-amber-300', __('Fix running…'), 'heroicon-o-arrow-path'],
+                                'succeeded' => ['bg-emerald-100 text-emerald-900 ring-emerald-300', __('Fix succeeded'), 'heroicon-o-check-circle'],
+                                'failed' => ['bg-red-100 text-red-900 ring-red-300', __('Fix failed'), 'heroicon-o-x-circle'],
+                                'refused' => ['bg-amber-100 text-amber-900 ring-amber-300', __('Fix refused'), 'heroicon-o-no-symbol'],
+                                default => [null, null, null],
+                            };
                         @endphp
                         @php
                             [$accent, $iconBg, $iconText, $sevIconComponent, $sevLabel] = match ($f->severity) {
@@ -135,7 +156,15 @@
                                     </span>
                                     <div class="min-w-0">
                                         <p class="text-[10px] font-semibold uppercase tracking-wide {{ $iconText }}">{{ $sevLabel }}</p>
-                                        <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere]">{{ $f->title }}</h4>
+                                        <button
+                                            type="button"
+                                            wire:click="openFindingDetail({{ $f->id }})"
+                                            class="group flex w-full items-start justify-between gap-2 text-left"
+                                            aria-label="{{ __('Open details for :title', ['title' => $f->title]) }}"
+                                        >
+                                            <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere] group-hover:text-brand-forest">{{ $f->title }}</h4>
+                                            <x-heroicon-o-chevron-right class="mt-1 h-4 w-4 shrink-0 text-brand-mist group-hover:text-brand-forest" aria-hidden="true" />
+                                        </button>
                                         @if ($f->body)
                                             <p class="mt-1.5 text-sm leading-6 text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
                                         @endif
@@ -148,7 +177,12 @@
                                             </div>
                                         @endif
                                         <div class="mt-3 flex flex-wrap gap-2">
-                                            @if ($canFix)
+                                            @if ($canFix && $fixInFlight)
+                                                <span class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-amber-900">
+                                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
+                                                    {{ __('Fix running…') }}
+                                                </span>
+                                            @elseif ($canFix)
                                                 <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="{{ $btnSecondary }}">
                                                     <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
@@ -206,7 +240,15 @@
                                     </span>
                                     <div class="min-w-0">
                                         <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Suggestion') }}</p>
-                                        <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere]">{{ $f->title }}</h4>
+                                        <button
+                                            type="button"
+                                            wire:click="openFindingDetail({{ $f->id }})"
+                                            class="group flex w-full items-start justify-between gap-2 text-left"
+                                            aria-label="{{ __('Open details for :title', ['title' => $f->title]) }}"
+                                        >
+                                            <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere] group-hover:text-brand-forest">{{ $f->title }}</h4>
+                                            <x-heroicon-o-chevron-right class="mt-1 h-4 w-4 shrink-0 text-brand-mist group-hover:text-brand-forest" aria-hidden="true" />
+                                        </button>
                                         @if ($f->body)
                                             <p class="mt-1.5 text-sm leading-6 text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
                                         @endif
@@ -337,6 +379,94 @@
     @endif
 
     <x-slot name="modals">
+        @php($detail = $this->selectedFindingDetail)
+        @if ($detailFindingId !== null && $detail)
+            @php($a = $detail['actions'])
+            @php($f = $detail['finding'])
+            <div
+                class="fixed inset-0 z-40 overflow-y-auto"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="insight-detail-title"
+                x-data
+                x-on:keydown.escape.window="$wire.closeFindingDetail()"
+                @if ($a['fixInFlight'])
+                    {{-- Auto-refresh while ApplyInsightFixJob is in
+                         flight so the operator sees the run status flip
+                         from "Queued · running" to "Succeeded" /
+                         "Failed" / "Refused" without a manual reload. --}}
+                    wire:poll.4s="$refresh"
+                @endif
+            >
+                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeFindingDetail"></div>
+                <div class="relative flex min-h-full items-start justify-center px-4 py-10 sm:px-6">
+                    <div class="relative w-full max-w-2xl dply-modal-panel" wire:click.stop>
+                        <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-7">
+                            <h2 id="insight-detail-title" class="text-base font-semibold text-brand-ink">{{ __('Finding details') }}</h2>
+                            <button type="button" wire:click="closeFindingDetail" class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink" aria-label="{{ __('Close') }}">
+                                <x-heroicon-o-x-mark class="h-5 w-5" aria-hidden="true" />
+                            </button>
+                        </div>
+                        <div class="px-6 py-5 sm:px-7">
+                            @include('livewire.servers.partials.insight-finding-detail', ['detail' => $detail])
+                        </div>
+                        <div class="flex flex-col-reverse gap-2 border-t border-brand-ink/10 px-6 py-4 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3 sm:px-7">
+                            <button type="button" wire:click="closeFindingDetail" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50">
+                                {{ __('Close') }}
+                            </button>
+                            @if ($a['canUnignore'])
+                                <button type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50">
+                                    <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Restore') }}
+                                </button>
+                            @endif
+                            @if ($a['canIgnore'])
+                                <button type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50">
+                                    <x-heroicon-o-eye-slash class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Dismiss') }}
+                                </button>
+                            @endif
+                            @if ($a['canUnacknowledge'])
+                                <button type="button" wire:click="unacknowledgeFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unacknowledgeFinding({{ $f->id }})" class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50">
+                                    <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Restore to banner') }}
+                                </button>
+                            @endif
+                            @if ($a['canAcknowledge'])
+                                <button type="button" wire:click="acknowledgeFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="acknowledgeFinding({{ $f->id }})" class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50">
+                                    <x-heroicon-o-check class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Acknowledge') }}
+                                </button>
+                            @endif
+                            @if ($a['canRevertFix'])
+                                <button type="button" wire:click="revertFix({{ $f->id }})" wire:loading.attr="disabled" wire:target="revertFix({{ $f->id }})" wire:confirm="{{ __('Restore the previous configuration from backup and reload the affected service?') }}" class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-semibold text-amber-900 shadow-sm hover:bg-amber-100">
+                                    <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Revert fix') }}
+                                </button>
+                            @endif
+                            @if ($a['canRerun'])
+                                <button type="button" wire:click="rerunSingleCheck('{{ $f->insight_key }}')" wire:loading.attr="disabled" wire:target="rerunSingleCheck('{{ $f->insight_key }}')" class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50">
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="rerunSingleCheck('{{ $f->insight_key }}')" aria-hidden="true" />
+                                    {{ __('Run check now') }}
+                                </button>
+                            @endif
+                            @if ($a['fixInFlight'])
+                                <span class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-semibold text-amber-900">
+                                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
+                                    {{ __('Fix running…') }}
+                                </span>
+                            @elseif ($a['canRunFix'])
+                                <button type="button" wire:click="runFix({{ $f->id }})" wire:loading.attr="disabled" wire:target="runFix({{ $f->id }})" class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60">
+                                    <x-heroicon-o-play class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Run fix now') }}
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         @if ($showApplyFixModal && $selectedFixFinding)
             <div
                 class="fixed inset-0 z-50 overflow-y-auto"

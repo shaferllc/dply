@@ -87,6 +87,18 @@ class ServerMetricsGuestPushService
         $meta['monitoring_ssh_reachable'] = true;
         $meta['monitoring_python_installed'] = true;
         $meta['monitoring_probe_at'] = now()->toIso8601String();
+        // Stamp the bundled SHA so Monitor workspace shows "Agent up
+        // to date" instead of "Agent version unknown" until the next
+        // SSH verify probe runs. We just installed the bundled file
+        // ourselves; the on-disk SHA equals bundledSha256() by
+        // definition.
+        try {
+            $meta['monitoring_guest_script_sha'] = app(ServerMetricsGuestScript::class)->bundledSha256();
+            $meta['monitoring_guest_verify_checked_at'] = now()->toIso8601String();
+        } catch (\Throwable) {
+            // bundle not readable — leave SHA unset, verifier falls
+            // back to "unknown" until Repair monitor is clicked.
+        }
         unset($meta['monitoring_probe_error'], $meta['monitoring_probe_pending'], $meta['monitoring_probe_pending_at']);
         $server->forceFill(['meta' => $meta])->saveQuietly();
 

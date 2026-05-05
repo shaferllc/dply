@@ -27,6 +27,26 @@ class ServerInstalledServices
     public const ALWAYS_PRESENT = ['ufw', 'auth', 'syslog', 'letsencrypt', 'dply'];
 
     /**
+     * Per-request memoization for the stack_summary lookup. Rendering one Livewire
+     * component frequently calls tagsFor()/phpVersionFor() multiple times via the
+     * helpers (sidebar nav filter + middleware + page-level checks). Without this
+     * cache that's two-plus redundant SELECTs against `server_provision_artifacts`
+     * on every single render.
+     *
+     * Keyed by server id; null indicates "we looked and found no artifact" so we
+     * don't re-query.
+     *
+     * @var array<string, array<string, mixed>|null>
+     */
+    private static array $stackSummaryCache = [];
+
+    /** Drop the cache between requests/tests when the same process handles many. */
+    public static function flushCaches(): void
+    {
+        self::$stackSummaryCache = [];
+    }
+
+    /**
      * @return array<string, true> Set of installed service tags (use array_key_exists for fast lookup).
      */
     public static function tagsFor(Server $server): array
@@ -130,6 +150,11 @@ class ServerInstalledServices
      */
     private static function stackSummary(Server $server): ?array
     {
+        $key = (string) $server->id;
+        if (array_key_exists($key, self::$stackSummaryCache)) {
+            return self::$stackSummaryCache[$key];
+        }
+
         $artifact = ServerProvisionArtifact::query()
             ->whereHas('run', fn ($q) => $q->where('server_id', $server->id))
             ->where('type', 'stack_summary')
@@ -137,16 +162,16 @@ class ServerInstalledServices
             ->first();
 
         if (! $artifact instanceof ServerProvisionArtifact) {
-            return null;
+            return self::$stackSummaryCache[$key] = null;
         }
 
         $meta = $artifact->metadata;
         if (is_array($meta) && $meta !== []) {
-            return $meta;
+            return self::$stackSummaryCache[$key] = $meta;
         }
 
         $decoded = json_decode((string) $artifact->content, true);
 
-        return is_array($decoded) ? $decoded : null;
+        return self::$stackSummaryCache[$key] = is_array($decoded) ? $decoded : null;
     }
 }

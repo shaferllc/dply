@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Scaffold\PlaceholderDnsManager;
 use App\Services\Scaffold\PrerequisiteResult;
 use App\Services\Scaffold\ScaffoldLaravelPipeline;
@@ -96,7 +97,7 @@ class ScaffoldLaravelPipelineTest extends TestCase
         $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
         $executor->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('ok', 0, false));
 
-        $audit = app(\App\Services\RemoteCli\SiteAuditWriter::class);
+        $audit = app(SiteAuditWriter::class);
 
         $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, $this->placeholderDnsAlwaysAssigns($site)))->run($site);
 
@@ -140,7 +141,7 @@ class ScaffoldLaravelPipelineTest extends TestCase
 
         $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
 
-        $audit = app(\App\Services\RemoteCli\SiteAuditWriter::class);
+        $audit = app(SiteAuditWriter::class);
 
         $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, $this->placeholderDnsAlwaysAssigns($site)))->run($site);
 
@@ -179,7 +180,7 @@ class ScaffoldLaravelPipelineTest extends TestCase
             ->withArgs(fn ($s, string $name) => $name === 'scaffold-laravel:composer-create')
             ->andReturn(new ProcessOutput('disk full', 2, false));
 
-        $audit = app(\App\Services\RemoteCli\SiteAuditWriter::class);
+        $audit = app(SiteAuditWriter::class);
 
         $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, $this->placeholderDnsAlwaysAssigns($site)))->run($site);
 
@@ -188,6 +189,38 @@ class ScaffoldLaravelPipelineTest extends TestCase
 
         $site->refresh();
         $this->assertSame(Site::STATUS_SCAFFOLD_FAILED, $site->status);
+    }
+
+    public function test_sqlite_install_records_a_server_database_row(): void
+    {
+        $site = $this->makeScaffoldingSite();
+        // Force the server's installed-stack to SQLite so the pipeline
+        // takes the file-based branch instead of provisioning MySQL.
+        $site->server->update(['meta' => ['database' => 'sqlite3']]);
+
+        $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+        $prereqs->shouldReceive('ensureComposer')->andReturn(PrerequisiteResult::alreadyPresent('composer'));
+
+        // Pipeline should NOT call createOnServer for SQLite — Laravel's
+        // migrate handles the file. Only the row is created.
+        $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+        $dbProvisioner->shouldNotReceive('createOnServer');
+
+        $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $executor->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('ok', 0, false));
+
+        $audit = app(SiteAuditWriter::class);
+
+        (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, $this->placeholderDnsAlwaysAssigns($site)))
+            ->run($site);
+
+        $db = ServerDatabase::query()->where('engine', 'sqlite')->sole();
+        $this->assertSame('dply_my_laravel_app', $db->name);
+        $this->assertSame($site->server->id, $db->server_id);
+        $this->assertSame('/home/dply/my-laravel-app/current/database/database.sqlite', $db->host);
+
+        $site->refresh();
+        $this->assertSame($db->id, $site->meta['scaffold']['database']['server_database_id']);
     }
 
     public function test_placeholder_dns_step_creates_primary_site_domain(): void
@@ -203,7 +236,7 @@ class ScaffoldLaravelPipelineTest extends TestCase
 
         $dns = $this->placeholderDnsAlwaysAssigns($site, hostname: 'my-laravel-app.203-0-113-7.nip.io');
 
-        (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(\App\Services\RemoteCli\SiteAuditWriter::class), $dns))
+        (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $dns))
             ->run($site);
 
         $domain = $site->fresh()->primaryDomain();
@@ -236,7 +269,7 @@ class ScaffoldLaravelPipelineTest extends TestCase
 
         $dns = $this->placeholderDnsAlwaysAssigns($site, hostname: 'my-laravel-app.198-51-100-9.nip.io');
 
-        (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(\App\Services\RemoteCli\SiteAuditWriter::class), $dns))
+        (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $dns))
             ->run($site);
 
         $this->assertNotNull($hostnameSeen, 'write_env step should have run');

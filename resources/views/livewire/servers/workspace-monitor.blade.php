@@ -296,7 +296,7 @@
                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Last sample received') }}</dt>
                     <dd class="mt-2 text-sm font-semibold text-brand-ink">
                         @if ($lastGuestSampleAt)
-                            {{ $lastGuestSampleAt->format('Y-m-d H:i:s T') }}
+                            {{ \App\Support\Servers\ServerDateFormatter::format($lastGuestSampleAt, $server) }}
                         @else
                             {{ __('Waiting for first sample') }}
                         @endif
@@ -324,7 +324,7 @@
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Current usage') }}</h2>
                     @if ($latest)
                         <p class="mt-1 text-xs text-brand-mist">
-                            {{ __('Last sample') }}: {{ $latest->captured_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') }}
+                            {{ __('Last sample') }}: {{ \App\Support\Servers\ServerDateFormatter::format($latest->captured_at, $server) }}
                         </p>
                     @endif
                 </div>

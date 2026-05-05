@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestScript;
+use App\Services\Servers\ServerProvisionCommandBuilder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,7 +18,7 @@ use Throwable;
 
 /**
  * Deferred metrics-agent install. Equivalent to
- * {@see \App\Services\Servers\ServerProvisionCommandBuilder::metricsAgent()}
+ * {@see ServerProvisionCommandBuilder::metricsAgent()}
  * but runs over SSH AFTER the bash provision journey is reported "ready",
  * saving 30–60s of journey wall-clock at the cost of monitoring being
  * unavailable for ~1 minute after success.
@@ -118,9 +119,27 @@ BASH;
                 return;
             }
 
+            // Stamp the bundled SHA into meta so the Monitor workspace's
+            // "Agent version unknown" pill flips to "Agent up to date"
+            // immediately — without it, the verifier has nothing to
+            // compare bundledSha256() against until someone clicks
+            // Repair monitor now and we SSH the box to read the SHA.
+            // We just deployed the bundled script over SSH ourselves;
+            // the file on disk is by-definition the bundled version,
+            // so we can write the SHA without another round-trip.
+            try {
+                $bundledSha = $script->bundledSha256();
+            } catch (Throwable) {
+                $bundledSha = null;
+            }
+
             $meta = $server->fresh()?->meta ?? [];
             $meta['metrics_agent_installed_at'] = now()->toIso8601String();
             $meta['monitoring_python_installed'] = true;
+            if ($bundledSha !== null) {
+                $meta['monitoring_guest_script_sha'] = $bundledSha;
+                $meta['monitoring_guest_verify_checked_at'] = now()->toIso8601String();
+            }
             $server->forceFill(['meta' => $meta])->saveQuietly();
 
             // Once the agent script + python are in place, wire the env

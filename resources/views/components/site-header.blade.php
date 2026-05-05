@@ -4,8 +4,7 @@
 ])
 
 @php
-    $notificationTablesReady = \Illuminate\Support\Facades\Schema::hasTable('notification_inbox_items')
-        && \Illuminate\Support\Facades\Schema::hasTable('notification_events');
+    $notificationTablesReady = \App\Support\NotificationTablesReady::all();
     $featuresActive = $active === 'features' || request()->routeIs('features');
     $pricingActive = $active === 'pricing' || request()->routeIs('pricing');
     $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Scaffold;
 
+use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
-use App\Models\Snapshot as SiteSnapshot;
+use App\Notifications\SiteDatabaseCredentialsNotification;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
@@ -202,8 +203,25 @@ class ScaffoldLaravelPipeline
         // the .env writer to find the path.
         if ($engine === 'sqlite3' || str_starts_with($engine, 'sqlite')) {
             $sqlitePath = $this->deployPath($site).'/database/database.sqlite';
+
+            // Track the file in the workspace so it shows up in the
+            // SQLite tab and inherits backup / download / drift / SQL
+            // console support. We don't call createOnServer — Laravel's
+            // `php artisan migrate` creates the file at deploy time —
+            // but recording the row gives operators a way to manage it.
+            $db = new ServerDatabase([
+                'server_id' => $site->server->id,
+                'name' => 'dply_'.Str::slug($site->slug, '_'),
+                'username' => '',
+                'password' => '',
+                'engine' => 'sqlite',
+                'host' => $sqlitePath,
+            ]);
+            $db->save();
+
             $this->setMeta($site, 'scaffold.database', [
                 'engine' => 'sqlite3',
+                'server_database_id' => $db->id,
                 'sqlite_path' => $sqlitePath,
             ]);
 
@@ -231,7 +249,7 @@ class ScaffoldLaravelPipeline
         $username = 'dply_'.Str::slug($site->slug, '_');
         $password = Str::password(24, symbols: false);
 
-        $db = new \App\Models\ServerDatabase([
+        $db = new ServerDatabase([
             'server_id' => $site->server->id,
             'name' => $dbName,
             'username' => $username,
@@ -282,7 +300,7 @@ class ScaffoldLaravelPipeline
             return;
         }
 
-        $creator->notify(new \App\Notifications\SiteDatabaseCredentialsNotification(
+        $creator->notify(new SiteDatabaseCredentialsNotification(
             site: $site,
             engine: $engine,
             password: $password,

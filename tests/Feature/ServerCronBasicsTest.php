@@ -45,7 +45,7 @@ class ServerCronBasicsTest extends TestCase
         $this->actingAs($user)
             ->get(route('servers.cron', $server))
             ->assertOk()
-            ->assertSee('Schedule jobs for this server')
+            ->assertSee('Schedule commands in the Dply-managed crontab block for this server.')
             ->assertSee('Basics')
             ->assertSee('Troubleshooting')
             ->assertSee('Scheduled jobs')

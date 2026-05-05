@@ -6,8 +6,10 @@ namespace Tests\Feature\TaskRunner;
 
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\DeployGuestMetricsCallbackEnvJob;
+use App\Jobs\InstallMetricsAgentJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSetupScriptJob;
+use App\Jobs\SyncServerSystemdServicesJob;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Enums\TaskStatus;
@@ -32,7 +34,9 @@ class ProvisionTaskCompletionTest extends TestCase
         Bus::fake([
             CheckServerHealthJob::class,
             DeployGuestMetricsCallbackEnvJob::class,
+            InstallMetricsAgentJob::class,
             RunServerInsightsJob::class,
+            SyncServerSystemdServicesJob::class,
         ]);
     }
 

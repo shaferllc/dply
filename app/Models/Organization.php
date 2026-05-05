@@ -319,9 +319,21 @@ class Organization extends Model
      * Keyed by user id so the cache works across users (e.g. when an
      * admin views a teammate's permissions on the same org instance).
      *
-     * @var array<string, ?string>  user-id => role (or null when not a member)
+     * @var array<string, ?string> user-id => role (or null when not a member)
      */
     private array $memberRoleMemo = [];
+
+    /**
+     * Class-level cache keyed by `{organization_id}:{user_id}` so two different
+     * Organization instances representing the same row (e.g. one from
+     * $user->currentOrganization(), one from $server->organization) share a
+     * single pivot lookup. The previous instance-level memo only saved
+     * repeated calls on the same instance, which left ~3 duplicate queries
+     * per page render.
+     *
+     * @var array<string, ?string>
+     */
+    private static array $memberRoleStaticMemo = [];
 
     private function memberRole(User $user): ?string
     {
@@ -330,9 +342,23 @@ class Organization extends Model
             return $this->memberRoleMemo[$userId];
         }
 
-        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
+        $staticKey = (string) $this->id.':'.$userId;
+        if (array_key_exists($staticKey, self::$memberRoleStaticMemo)) {
+            return $this->memberRoleMemo[$userId] = self::$memberRoleStaticMemo[$staticKey];
+        }
 
-        return $this->memberRoleMemo[$userId] = $pivot ? (string) $pivot->role : null;
+        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
+        $role = $pivot ? (string) $pivot->role : null;
+
+        self::$memberRoleStaticMemo[$staticKey] = $role;
+
+        return $this->memberRoleMemo[$userId] = $role;
+    }
+
+    /** Drop the cross-instance member-role cache (between requests in long-running processes / tests). */
+    public static function flushMemberRoleCache(): void
+    {
+        self::$memberRoleStaticMemo = [];
     }
 
     public function hasMember(User $user): bool

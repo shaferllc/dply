@@ -48,6 +48,8 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Mockery;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use Tests\TestCase;
 
 class ServerTest extends TestCase
@@ -1168,8 +1170,8 @@ class ServerTest extends TestCase
             ->assertSee('Unavailable');
     }
 
-    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
-    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function test_servers_create_custom_connection_test_can_report_success(): void
     {
         $sshMock = Mockery::mock('overload:App\Services\SshConnection');
@@ -2479,9 +2481,12 @@ class ServerTest extends TestCase
             ->assertSee('Manage')
             ->assertSee('Configuration files');
 
+        // The 'services' section was retired from /manage/ — visiting it now
+        // redirects to the standalone Services page so existing deep links
+        // (digest emails, bookmarks) keep working.
         Livewire::actingAs($user)
             ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'services'])
-            ->assertSee('Services');
+            ->assertRedirect(route('servers.services', ['server' => $server]));
     }
 
     public function test_server_manage_config_preview_dispatches_background_job_when_enabled(): void

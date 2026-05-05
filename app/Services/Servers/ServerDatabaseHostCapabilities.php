@@ -12,16 +12,16 @@ class ServerDatabaseHostCapabilities
     ) {}
 
     /**
-     * @return array{mysql: bool, postgres: bool, redis: bool}
+     * @return array{mysql: bool, postgres: bool, sqlite: bool}
      */
     public function forServer(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
-            return ['mysql' => false, 'postgres' => false, 'redis' => false];
+            return ['mysql' => false, 'postgres' => false, 'sqlite' => false];
         }
 
         $ttl = max(0, (int) config('server_database.capabilities_cache_ttl_seconds', 120));
-        $key = 'server.'.$server->id.'.database_host_capabilities_v2';
+        $key = 'server.'.$server->id.'.database_host_capabilities_v3';
 
         if ($ttl === 0) {
             return $this->probe($server);
@@ -32,23 +32,22 @@ class ServerDatabaseHostCapabilities
 
     public function forget(Server $server): void
     {
-        Cache::forget('server.'.$server->id.'.database_host_capabilities');
-        Cache::forget('server.'.$server->id.'.database_host_capabilities_v2');
+        Cache::forget('server.'.$server->id.'.database_host_capabilities_v3');
     }
 
     /**
-     * @return array{mysql: bool, postgres: bool, redis: bool}
+     * @return array{mysql: bool, postgres: bool, sqlite: bool}
      */
     public function probe(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
-            return ['mysql' => false, 'postgres' => false, 'redis' => false];
+            return ['mysql' => false, 'postgres' => false, 'sqlite' => false];
         }
 
         return [
             'mysql' => $this->remoteExec->probeMysql($server),
             'postgres' => $this->remoteExec->probePostgres($server),
-            'redis' => $this->remoteExec->probeRedis($server),
+            'sqlite' => $this->remoteExec->probeSqlite($server),
         ];
     }
 }

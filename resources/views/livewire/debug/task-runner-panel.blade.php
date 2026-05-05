@@ -72,7 +72,16 @@
                                 @endif
                             </button>
                         @endforeach
-                        <span class="ml-auto text-[10px] text-zinc-500">org · {{ $this->organizationId ?? '—' }}</span>
+                        <button
+                            type="button"
+                            wire:click="toggleMineOnly"
+                            title="{{ $mineOnly ? __('Showing only items you dispatched. Click to show everyone.') : __('Showing the whole org. Click to show only your items.') }}"
+                            class="ml-auto inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide ring-1 ring-inset {{ $mineOnly ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30' : 'bg-zinc-800/60 text-zinc-300 ring-zinc-700' }}"
+                        >
+                            <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $mineOnly ? 'bg-emerald-400' : 'bg-zinc-500' }}"></span>
+                            {{ $mineOnly ? __('Mine') : __('Everyone') }}
+                        </button>
+                        <span class="ml-2 text-[10px] text-zinc-500">org · {{ $this->organizationId ?? '—' }}</span>
                     </div>
 
                     {{-- Body: split list (left) + detail (right) --}}

@@ -54,6 +54,16 @@ class WorkspaceManage extends Component
             return;
         }
 
+        // 'services' was retired from the Manage workspace_tabs because the
+        // standalone /services page is the canonical surface. Redirect deep
+        // links instead of 404-ing — bookmarks and any cached external URLs
+        // (digest emails, etc.) keep working.
+        if ($section === 'services') {
+            $this->redirect(route('servers.services', ['server' => $server]), navigate: true);
+
+            return;
+        }
+
         $allowed = array_keys(config('server_manage.workspace_tabs', []));
         if (! in_array($section, $allowed, true)) {
             abort(404);

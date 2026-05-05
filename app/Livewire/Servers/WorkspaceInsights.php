@@ -9,9 +9,14 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\User;
 use App\Services\Insights\InsightSettingsRepository;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -33,6 +38,12 @@ class WorkspaceInsights extends Component
     public bool $showApplyFixModal = false;
 
     public ?int $applyFixFindingId = null;
+
+    /**
+     * The finding currently being inspected in the detail modal.
+     * Null when the modal is closed.
+     */
+    public ?int $detailFindingId = null;
 
     public function mount(Server $server): void
     {
@@ -149,6 +160,193 @@ class WorkspaceInsights extends Component
 
         RunServerInsightsJob::dispatch($this->server->id, $insightKey);
         $this->toastSuccess(__('Re-running this check. Refresh in a moment for results.'));
+        $this->closeFindingDetail();
+    }
+
+    /**
+     * Open the per-finding detail modal. Scope guard: only findings on
+     * THIS server (server-scoped, not site-scoped) can be inspected here —
+     * site-specific findings have their own page.
+     */
+    public function openFindingDetail(int $findingId): void
+    {
+        $this->authorize('view', $this->server);
+
+        $exists = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->whereKey($findingId)
+            ->exists();
+
+        if (! $exists) {
+            return;
+        }
+
+        $this->detailFindingId = $findingId;
+    }
+
+    public function closeFindingDetail(): void
+    {
+        $this->detailFindingId = null;
+    }
+
+    /**
+     * Decorated finding for the detail modal. Returns null when no finding
+     * is selected or it can no longer be loaded (e.g., resolved away while
+     * the modal was open).
+     *
+     * @return array{
+     *     finding: InsightFinding,
+     *     config: array<string, mixed>|null,
+     *     label: string|null,
+     *     signalRows: array<string, scalar|array<int|string, mixed>|null>,
+     *     fixHistory: array{
+     *         applied_at: Carbon|null,
+     *         applied_by: ?string,
+     *         output: ?string,
+     *         failed_reason: ?string,
+     *         refused_reason: ?string,
+     *         backup_path: ?string,
+     *     },
+     *     correlationFindings: Collection<int, InsightFinding>,
+     *     acknowledgedByName: ?string,
+     *     ignoredByName: ?string,
+     *     actions: array{
+     *         canRerun: bool,
+     *         canApplyFix: bool,
+     *         canRevertFix: bool,
+     *         canAcknowledge: bool,
+     *         canUnacknowledge: bool,
+     *         canIgnore: bool,
+     *         canUnignore: bool,
+     *     }
+     * }|null
+     */
+    #[Computed]
+    public function selectedFindingDetail(): ?array
+    {
+        if ($this->detailFindingId === null) {
+            return null;
+        }
+
+        $finding = InsightFinding::query()
+            ->with('acknowledgedBy:id,name,email')
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->whereKey($this->detailFindingId)
+            ->first();
+
+        if ($finding === null) {
+            return null;
+        }
+
+        $config = config('insights.insights.'.$finding->insight_key);
+        $config = is_array($config) ? $config : null;
+
+        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $signal = is_array($meta['signal'] ?? null) ? $meta['signal'] : [];
+        // Flatten nested signal arrays so the modal can render a single
+        // key/value table without needing recursive markup.
+        $signalRows = $signal === [] ? [] : Arr::dot($signal);
+
+        $parseTs = static fn (mixed $v): ?\Illuminate\Support\Carbon => (is_string($v) && $v !== '') ? Carbon::parse($v) : null;
+
+        $appliedAt = $parseTs($meta['fix_applied_at'] ?? null);
+        $failedAt = $parseTs($meta['fix_failed_at'] ?? null);
+        $refusedAt = $parseTs($meta['fix_refused_at'] ?? null);
+        $runStartedAt = $parseTs($meta['fix_run_started_at'] ?? null);
+
+        $appliedByName = null;
+        $appliedById = $meta['fix_applied_by'] ?? $meta['fix_failed_by'] ?? $meta['fix_refused_by'] ?? null;
+        if (is_int($appliedById) || (is_string($appliedById) && $appliedById !== '')) {
+            $appliedByName = User::query()->whereKey($appliedById)->value('name');
+        }
+
+        // Derive a single run status from the terminal/in-flight meta
+        // keys. The job (ApplyInsightFixJob) writes one of:
+        //   fix_applied_at  → succeeded
+        //   fix_failed_at   → failed
+        //   fix_refused_at  → refused at preflight
+        // runFix() stamps fix_run_started_at and clears the terminal
+        // keys, so the modal can show "queued" until the job lands.
+        $runStatus = match (true) {
+            $appliedAt !== null => 'succeeded',
+            $failedAt !== null => 'failed',
+            $refusedAt !== null => 'refused',
+            $runStartedAt !== null => 'queued',
+            default => 'idle',
+        };
+
+        $ignoredByName = null;
+        if ($finding->ignored_by_user_id !== null) {
+            $ignoredByName = User::query()->whereKey($finding->ignored_by_user_id)->value('name');
+        }
+
+        $correlationIds = [];
+        if (is_array($finding->correlation)) {
+            foreach ($finding->correlation as $entry) {
+                if (is_int($entry)) {
+                    $correlationIds[] = $entry;
+                } elseif (is_array($entry) && isset($entry['finding_id']) && is_int($entry['finding_id'])) {
+                    $correlationIds[] = $entry['finding_id'];
+                }
+            }
+        }
+        $correlationFindings = $correlationIds === []
+            ? collect()
+            : InsightFinding::query()
+                ->where('server_id', $this->server->id)
+                ->whereNull('site_id')
+                ->whereKey($correlationIds)
+                ->where('id', '!=', $finding->id)
+                ->orderByDesc('detected_at')
+                ->limit(10)
+                ->get(['id', 'insight_key', 'severity', 'status', 'title', 'detected_at']);
+
+        $fixConfig = is_array($config['fix'] ?? null) ? $config['fix'] : null;
+        $hasFixHandler = $fixConfig !== null && ($fixConfig['handler'] ?? null);
+        $backupPath = is_string($meta['backup_path'] ?? null) ? $meta['backup_path'] : null;
+
+        $isOpen = $finding->isOpen();
+        $isProblem = $finding->kind !== InsightFinding::KIND_SUGGESTION;
+
+        // canRunFix: handler is wired AND the fix isn't currently
+        // in-flight. The button re-enables once a terminal key lands.
+        $fixInFlight = $runStatus === 'queued';
+        $canRunFix = $isOpen && $hasFixHandler && ! $fixInFlight;
+
+        return [
+            'finding' => $finding,
+            'config' => $config,
+            'label' => is_string($config['label'] ?? null) ? $config['label'] : null,
+            'signalRows' => $signalRows,
+            'fixHistory' => [
+                'run_status' => $runStatus,
+                'run_started_at' => $runStartedAt,
+                'applied_at' => $appliedAt,
+                'failed_at' => $failedAt,
+                'refused_at' => $refusedAt,
+                'applied_by' => $appliedByName,
+                'output' => is_string($meta['fix_output'] ?? null) ? $meta['fix_output'] : null,
+                'failed_reason' => is_string($meta['fix_failure_reason'] ?? null) ? $meta['fix_failure_reason'] : null,
+                'refused_reason' => is_string($meta['fix_refusal_reason'] ?? null) ? $meta['fix_refusal_reason'] : null,
+                'backup_path' => $backupPath,
+            ],
+            'correlationFindings' => $correlationFindings,
+            'acknowledgedByName' => $finding->acknowledgedBy?->name,
+            'ignoredByName' => $ignoredByName,
+            'actions' => [
+                'canRerun' => true,
+                'canRunFix' => $canRunFix,
+                'canApplyFix' => $isOpen && $hasFixHandler,
+                'canRevertFix' => $backupPath !== null && $backupPath !== '',
+                'canAcknowledge' => $isOpen && $isProblem && $finding->acknowledged_at === null,
+                'canUnacknowledge' => $isOpen && $isProblem && $finding->acknowledged_at !== null,
+                'canIgnore' => $isOpen && ! $isProblem,
+                'canUnignore' => $finding->isIgnored(),
+                'fixInFlight' => $fixInFlight,
+            ],
+        ];
     }
 
     public function openApplyFixModal(int $findingId): void
@@ -213,6 +411,95 @@ class WorkspaceInsights extends Component
 
         ApplyInsightFixJob::dispatch($finding->id, $user->id);
         $this->toastSuccess(__('Fix has been queued. This may take up to a minute.'));
+        $this->closeFindingDetailIfMatches($finding->id);
+    }
+
+    /**
+     * Direct "Run fix now" path used by the detail modal — skips the
+     * confirm dialog and immediately stamps a tracking timestamp on the
+     * finding so the modal can render an in-flight pill ("Queued") until
+     * ApplyInsightFixJob writes its terminal meta keys
+     * (fix_applied_at | fix_failed_at | fix_refused_at).
+     *
+     * The modal stays open: while fix_run_started_at is set without a
+     * terminal key, the modal polls and shows live progress.
+     */
+    public function runFix(int $findingId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->whereKey($findingId)
+            ->first();
+
+        if ($finding === null || ! $finding->isOpen()) {
+            return;
+        }
+
+        $fix = config('insights.insights.'.$finding->insight_key.'.fix');
+        $handlerClass = is_array($fix) ? ($fix['handler'] ?? null) : null;
+        if (! is_string($handlerClass) || $handlerClass === '') {
+            return;
+        }
+
+        // Pre-flight the handler class HERE in the request cycle so the
+        // operator sees a useful toast immediately instead of the queue
+        // worker writing fix_handler_missing minutes later. This also
+        // catches stale-worker scenarios — if the user added a new fix
+        // handler but the long-running queue worker hasn't been restarted
+        // yet, the request process knows about the class but the worker
+        // doesn't. Better to refuse here than fail mid-run.
+        if (! class_exists($handlerClass)) {
+            $this->toastError(__('Fix handler class :class is not loadable. Check your queue worker has been restarted after deploying the handler.', [
+                'class' => $handlerClass,
+            ]));
+
+            return;
+        }
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        // Stamp the run-start markers and clear any prior terminal keys
+        // from a previous attempt so the modal pill flips back to "Queued"
+        // for THIS run instead of staying on the old "Failed".
+        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta['fix_run_started_at'] = now()->toIso8601String();
+        $meta['fix_run_started_by'] = $user->id;
+        $meta['fix_run_queue'] = config('queue.default');
+        unset(
+            $meta['fix_applied_at'],
+            $meta['fix_applied_by'],
+            $meta['fix_failed_at'],
+            $meta['fix_failed_by'],
+            $meta['fix_failure_reason'],
+            $meta['fix_refused_at'],
+            $meta['fix_refused_by'],
+            $meta['fix_refusal_reason'],
+            $meta['fix_output'],
+        );
+        $finding->forceFill(['meta' => $meta])->save();
+
+        // ApplyInsightFixJob implements ShouldQueue + Queueable, so this
+        // dispatches to the configured queue connection (sync only when
+        // QUEUE_CONNECTION=sync — in production it lands in the worker).
+        ApplyInsightFixJob::dispatch($finding->id, $user->id);
+
+        $org = $this->server->organization;
+        if ($org instanceof Organization) {
+            audit_log($org, $user, 'insight.fix_run_dispatched', $this->server, null, [
+                'finding_id' => $finding->id,
+                'insight_key' => $finding->insight_key,
+                'queue' => config('queue.default'),
+            ]);
+        }
+
+        $this->toastSuccess(__('Fix queued — tracking progress here.'));
     }
 
     public function revertFix(int $findingId): void
@@ -240,6 +527,7 @@ class WorkspaceInsights extends Component
 
         RevertInsightFixJob::dispatch($finding->id, $user->id);
         $this->toastSuccess(__('Revert has been queued. This may take up to a minute.'));
+        $this->closeFindingDetailIfMatches($finding->id);
     }
 
     public function unignoreFinding(int $findingId): void
@@ -276,6 +564,8 @@ class WorkspaceInsights extends Component
                 'insight_key' => $finding->insight_key,
             ]);
         }
+
+        $this->closeFindingDetailIfMatches($finding->id);
     }
 
     public function ignoreFinding(int $findingId): void
@@ -313,6 +603,8 @@ class WorkspaceInsights extends Component
                 'insight_key' => $finding->insight_key,
             ]);
         }
+
+        $this->closeFindingDetailIfMatches($finding->id);
     }
 
     public function unacknowledgeFinding(int $findingId): void
@@ -351,6 +643,8 @@ class WorkspaceInsights extends Component
                 'severity' => $finding->severity,
             ]);
         }
+
+        $this->closeFindingDetailIfMatches($finding->id);
     }
 
     public function acknowledgeFinding(int $findingId): void
@@ -386,6 +680,22 @@ class WorkspaceInsights extends Component
                 'insight_key' => $finding->insight_key,
                 'severity' => $finding->severity,
             ]);
+        }
+
+        $this->closeFindingDetailIfMatches($finding->id);
+    }
+
+    /**
+     * Close the detail modal only when the action targeted the *currently
+     * displayed* finding. Without this guard, a row-level action button
+     * (e.g., the existing inline "Acknowledge" on the banner) would
+     * unexpectedly close an open detail modal pointing at a *different*
+     * finding.
+     */
+    protected function closeFindingDetailIfMatches(int $findingId): void
+    {
+        if ($this->detailFindingId === $findingId) {
+            $this->closeFindingDetail();
         }
     }
 

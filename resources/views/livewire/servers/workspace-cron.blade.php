@@ -52,20 +52,19 @@
             data-subscribe="{{ $cronRunEchoSubscribable ? '1' : '0' }}"
         ></div>
 
-        <div class="space-y-8">
-        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
-            <p class="font-semibold">{{ __('Schedule jobs for this server') }}</p>
-            <p class="mt-1 leading-relaxed text-brand-moss">
-                {{ __('Dply writes a marked block into this server’s managed crontab. Keep the basics here: add a job, review the list, and sync when you want the server updated.') }}
-            </p>
-        </div>
-
+        <div class="space-y-6">
         <x-server-workspace-tablist :aria-label="__('Cron sections')">
             <x-server-workspace-tab id="cron-tab-basics" :active="$cron_workspace_tab === 'jobs'" wire:click="$set('cron_workspace_tab', 'jobs')">
-                {{ __('Basics') }}
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-calendar-days class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Basics') }}
+                </span>
             </x-server-workspace-tab>
             <x-server-workspace-tab id="cron-tab-troubleshooting" :active="$cron_workspace_tab === 'troubleshooting'" wire:click="$set('cron_workspace_tab', 'troubleshooting')">
-                {{ __('Troubleshooting') }}
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Troubleshooting') }}
+                </span>
             </x-server-workspace-tab>
         </x-server-workspace-tablist>
 
@@ -76,19 +75,31 @@
             panel-class="space-y-8"
         >
         <div class="{{ $card }}">
+            <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest ring-1 ring-brand-forest/20">
+                        @if ($editing_job_id)
+                            <x-heroicon-o-pencil-square class="h-5 w-5" />
+                        @else
+                            <x-heroicon-o-calendar-days class="h-5 w-5" />
+                        @endif
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold text-brand-ink">
+                            @if ($editing_job_id)
+                                {{ __('Edit cron job') }}
+                            @else
+                                {{ __('New cron job') }}
+                            @endif
+                        </h2>
+                        <p class="mt-0.5 text-sm text-brand-moss">
+                            {{ __('What should run, which user runs it, and how often. Advanced toggles tuck below when you need them.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
             <div class="p-6 sm:p-8">
-                <h2 class="text-lg font-semibold text-brand-ink">
-                    @if ($editing_job_id)
-                        {{ __('Edit cron job') }}
-                    @else
-                        {{ __('New cron job') }}
-                    @endif
-                </h2>
-                <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                    {{ __('Use this form for the essentials: what should run, which user should run it, and how often. More advanced cron behavior is tucked below when you need it.') }}
-                </p>
-
-                <form id="cron-job-form" wire:submit="saveCronJob" class="mt-6 space-y-6">
+                <form id="cron-job-form" wire:submit="saveCronJob" class="space-y-6">
                     <div>
                         <x-input-label for="new_cron_command" value="{{ __('Command') }}" />
                         <x-text-input
@@ -317,12 +328,19 @@
         </div>
 
         <div class="{{ $card }}">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Scheduled jobs') }}</h2>
-                <p class="mt-1 text-xs text-brand-moss">
-                    {{ __('Review what is scheduled on this server, then sync after changes so the Dply-managed crontab block is updated.') }}
-                </p>
-                <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30">
+                        <x-heroicon-o-list-bullet class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Scheduled jobs') }}</h2>
+                        <p class="mt-0.5 text-sm text-brand-moss">
+                            {{ __('Sync after changes so the Dply-managed crontab block is updated on the server.') }}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                     <div class="min-w-0 flex-1">
                         <x-input-label for="cron_job_search" value="{{ __('Search jobs') }}" class="sr-only" />
                         <input
@@ -378,9 +396,17 @@
                                 aria-hidden="true"
                             ></span>
                             <div class="min-w-0 flex-1 py-4 pl-5 pr-4 sm:py-5 sm:pl-6 sm:pr-6">
-                                @if (filled($cj->description))
-                                    <p class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ $cj->description }}</p>
-                                @endif
+                                <div class="flex flex-wrap items-center gap-2">
+                                    @if (filled($cj->description))
+                                        <p class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ $cj->description }}</p>
+                                    @endif
+                                    @if ($cj->system_managed)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/30" title="{{ __('Auto-installed by Dply (read-only).') }}">
+                                            <x-heroicon-m-shield-check class="h-3 w-3" />
+                                            {{ __('Managed by Dply') }}
+                                        </span>
+                                    @endif
+                                </div>
                                 <p class="mt-1 break-all font-mono text-sm font-semibold text-brand-ink">{{ $cj->command }}</p>
                                 <p class="mt-2 text-xs text-brand-moss">
                                     <span class="font-mono text-brand-ink/90">{{ $cj->cron_expression }}</span>
@@ -407,6 +433,7 @@
                                     $rowSpinner = 'inline-block size-5 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink';
                                 @endphp
 
+                                @if (! $cj->system_managed)
                                 {{-- Edit (open form) --}}
                                 <button
                                     type="button"
@@ -440,6 +467,7 @@
                                     </span>
                                     <span wire:loading wire:target="toggleCronJob('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
                                 </button>
+                                @endif
 
                                 {{-- Run now --}}
                                 <button
@@ -472,7 +500,10 @@
                                     <span wire:loading wire:target="openLogsModal('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
                                 </button>
 
-                                {{-- Delete (opens confirm modal) --}}
+                                @if (! $cj->system_managed)
+                                {{-- Delete (opens confirm modal). Hidden for system-managed
+                                     rows — those represent dply-installed lines (e.g. metrics
+                                     agent) that have their own deploy lifecycle. --}}
                                 <button
                                     type="button"
                                     wire:click="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)"
@@ -486,6 +517,7 @@
                                     </span>
                                     <span wire:loading wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)" class="inline-block size-5 animate-spin rounded-full border-2 border-red-300 border-t-red-700" aria-hidden="true"></span>
                                 </button>
+                                @endif
                             </div>
                         </li>
                     @endforeach
@@ -504,11 +536,16 @@
             panel-class="space-y-8"
         >
                 <div class="{{ $card }}">
-                    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Run a job manually') }}</h2>
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('Queues a one-off run over SSH (same wrapping as in crontab).') }}
-                        </p>
+                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest ring-1 ring-brand-forest/20">
+                                <x-heroicon-o-bolt class="h-5 w-5" />
+                            </span>
+                            <div class="min-w-0">
+                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Run a job manually') }}</h2>
+                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Queues a one-off run over SSH (same wrapping as in crontab).') }}</p>
+                            </div>
+                        </div>
                     </div>
                     @if ($server->cronJobs->isEmpty())
                         <p class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">
@@ -565,11 +602,16 @@
                 </div>
 
                 <div class="{{ $card }}">
-                    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Live output') }}</h2>
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('Output appears here as the run progresses. This panel always shows status, so you are never left with a blank box.') }}
-                        </p>
+                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 ring-1 ring-sky-200">
+                                <x-heroicon-o-signal class="h-5 w-5" />
+                            </span>
+                            <div class="min-w-0">
+                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Live output') }}</h2>
+                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Output appears here as the run progresses — you are never left with a blank box.') }}</p>
+                            </div>
+                        </div>
                     </div>
                     <div
                         class="p-6 sm:p-8"
@@ -609,9 +651,16 @@
                 </div>
 
             <div class="{{ $card }}">
-                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recent run history') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Recent manual and queued runs (retention :days days).', ['days' => config('cron_workspace.run_retention_days', 90)]) }}</p>
+                <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/60 text-brand-ink ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-clock class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent run history') }}</h2>
+                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Recent manual and queued runs — retention :days days.', ['days' => config('cron_workspace.run_retention_days', 90)]) }}</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     @if ($recentCronRuns->isEmpty())
@@ -644,11 +693,18 @@
             </div>
 
             <div class="{{ $card }}">
-                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Inspect crontab') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">
-                        {{ __('Read-only: shows the real crontab file for that Linux user. Dply uses the SSH login user for “crontab -l”; other users need “sudo crontab -u … -l” (passwordless sudo).') }}
-                    </p>
+                <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-ink/5 text-brand-ink ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-command-line class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Inspect crontab') }}</h2>
+                            <p class="mt-0.5 text-sm text-brand-moss leading-relaxed">
+                                {{ __('Read-only: shows the real crontab file for that Linux user. Dply uses the SSH login user for “crontab -l”; other users need “sudo crontab -u … -l” (passwordless sudo).') }}
+                            </p>
+                        </div>
+                    </div>
                 </div>
                 <div class="space-y-4 p-6 sm:p-8">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-end">

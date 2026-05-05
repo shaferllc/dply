@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Insights\FixActions\ApplyPackageSecurityUpdatesFixAction;
 use App\Services\Insights\FixActions\BumpFpmWorkersFixAction;
 use App\Services\Insights\FixActions\EnableNtpFixAction;
 use App\Services\Insights\FixActions\SupervisorStartFixAction;
@@ -14,10 +15,10 @@ use App\Services\Insights\Runners\OctaneRecommendedInsightRunner;
 use App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner;
 use App\Services\Insights\Runners\PhpEolSitesInsightRunner;
 use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
-use App\Services\Insights\Runners\SystemClockSyncInsightRunner;
 use App\Services\Insights\Runners\PipelineHeartbeatInsightRunner;
 use App\Services\Insights\Runners\SslCertificateInsightRunner;
 use App\Services\Insights\Runners\SupervisorRunningInsightRunner;
+use App\Services\Insights\Runners\SystemClockSyncInsightRunner;
 
 /**
  * Registered insight checks: `runner` null means not implemented yet (skipped by jobs).
@@ -203,7 +204,9 @@ return [
             'scope' => 'server',
             'requires_pro' => false,
             'runner' => PackageSecurityUpdatesInsightRunner::class,
-            'fix' => null,
+            'fix' => [
+                'handler' => ApplyPackageSecurityUpdatesFixAction::class,
+            ],
             'parameters' => [
                 'min_security_updates' => [
                     'type' => 'number',

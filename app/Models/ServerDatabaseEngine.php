@@ -22,6 +22,18 @@ class ServerDatabaseEngine extends Model
 {
     use HasUlids;
 
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_INSTALLING = 'installing';
+
+    public const STATUS_RUNNING = 'running';
+
+    public const STATUS_STOPPED = 'stopped';
+
+    public const STATUS_FAILED = 'failed';
+
+    public const STATUS_UNINSTALLING = 'uninstalling';
+
     protected $table = 'server_database_engines';
 
     protected $fillable = [
@@ -29,17 +41,34 @@ class ServerDatabaseEngine extends Model
         'engine',
         'version',
         'is_default',
+        'status',
+        'port',
+        'error_message',
     ];
 
     protected function casts(): array
     {
         return [
             'is_default' => 'boolean',
+            'port' => 'integer',
         ];
     }
 
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * Default port for the named engine. Mirrors what the install scripts will configure.
+     * postgres family runs on 5432; mysql/mariadb on 3306; sqlite is file-based (port irrelevant).
+     */
+    public static function defaultPortFor(string $engine): int
+    {
+        return match (true) {
+            str_starts_with($engine, 'postgres') => 5432,
+            str_starts_with($engine, 'sqlite') => 0,
+            default => 3306,
+        };
     }
 }

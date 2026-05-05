@@ -7,8 +7,7 @@ use App\Models\Server;
 class ServerDatabaseDriftAnalyzer
 {
     public function __construct(
-        protected ServerDatabaseProvisioner $provisioner,
-        protected ServerDatabaseHostCapabilities $capabilities
+        protected ServerDatabaseProvisioner $provisioner
     ) {}
 
     /**
@@ -19,25 +18,20 @@ class ServerDatabaseDriftAnalyzer
      */
     public function analyze(Server $server): array
     {
-        $caps = $this->capabilities->forServer($server);
         $localMysql = $server->serverDatabases->where('engine', 'mysql')->pluck('name')->sort()->values()->all();
         $localPg = $server->serverDatabases->where('engine', 'postgres')->pluck('name')->sort()->values()->all();
 
         $remoteMysql = [];
         $remotePg = [];
-        if ($caps['mysql']) {
-            try {
-                $remoteMysql = $this->provisioner->listMysqlDatabaseNames($server);
-            } catch (\Throwable) {
-                $remoteMysql = [];
-            }
+        try {
+            $remoteMysql = $this->provisioner->listMysqlDatabaseNames($server);
+        } catch (\Throwable) {
+            $remoteMysql = [];
         }
-        if ($caps['postgres']) {
-            try {
-                $remotePg = $this->provisioner->listPostgresDatabaseNames($server);
-            } catch (\Throwable) {
-                $remotePg = [];
-            }
+        try {
+            $remotePg = $this->provisioner->listPostgresDatabaseNames($server);
+        } catch (\Throwable) {
+            $remotePg = [];
         }
 
         return [

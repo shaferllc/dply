@@ -16,7 +16,12 @@ class ServerCronSynchronizer
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $jobs = $onlyJobs ?? $server->cronJobs;
+        // System-managed rows mirror crontab lines that live in their
+        // own dply-owned block (currently the metrics push agent's
+        // `BEGIN DPLY METRICS GUEST` block). They surface in the
+        // workspace list for visibility but must NOT enter the standard
+        // managed block — that block has its own deploy lifecycle.
+        $jobs = ($onlyJobs ?? $server->cronJobs)->reject(fn (ServerCronJob $job): bool => (bool) $job->system_managed)->values();
         if ($jobs->isEmpty()) {
             return 'No cron jobs to sync.';
         }

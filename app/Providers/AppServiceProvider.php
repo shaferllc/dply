@@ -7,7 +7,9 @@ use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ProcessReferralInvoicePayment;
+use App\Listeners\RecordLivewireDispatchedJob;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
+use App\Listeners\UpdateDispatchedJobLifecycle;
 use App\Models\BackupConfiguration;
 use App\Models\Incident;
 use App\Models\NotificationChannel;
@@ -16,12 +18,15 @@ use App\Models\ProviderCredential;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteProcess;
+use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
 use App\Models\SupervisorProgram;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSshKey;
 use App\Models\Workspace;
+use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
 use App\Observers\ServerObserver;
 use App\Observers\SupervisorProgramObserver;
@@ -85,8 +90,15 @@ use App\Services\Sites\WebserverConfig\OpenLiteSpeedWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\TraefikWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
+use App\Services\WordPress\Advisories\AdvisoryProvider;
+use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
+use App\Support\Debug\TaskRunnerBroadcastBridge;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -103,7 +115,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // WordPress advisory feed (Q20 — Wordfence Intelligence default).
         // Singleton because it caches per-request lookups in process.
-        $this->app->singleton(\App\Services\WordPress\Advisories\AdvisoryProvider::class, \App\Services\WordPress\Advisories\WordfenceIntelligenceProvider::class);
+        $this->app->singleton(AdvisoryProvider::class, WordfenceIntelligenceProvider::class);
 
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
@@ -203,6 +215,13 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(WebhookReceived::class, ProcessReferralInvoicePayment::class);
         Event::listen(ServerAuthorizedKeysSynced::class, DispatchServerAuthorizedKeysSyncedWebhook::class);
 
+        // Mirror Livewire-dispatched queue jobs into task_runner_tasks so the
+        // bottom debug panel surfaces "what's running for me right now".
+        Event::listen(JobQueued::class, [RecordLivewireDispatchedJob::class, 'handle']);
+        Event::listen(JobProcessing::class, [UpdateDispatchedJobLifecycle::class, 'handleProcessing']);
+        Event::listen(JobProcessed::class, [UpdateDispatchedJobLifecycle::class, 'handleProcessed']);
+        Event::listen(JobFailed::class, [UpdateDispatchedJobLifecycle::class, 'handleFailed']);
+
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(Server::class, ServerPolicy::class);
         Gate::policy(Site::class, SitePolicy::class);
@@ -271,8 +290,8 @@ class AppServiceProvider extends ServiceProvider
          * its singleton before we attach.
          */
         $this->app->booted(function (): void {
-            \App\Support\Debug\TaskRunnerBroadcastBridge::register(
-                $this->app->make(\App\Modules\TaskRunner\Contracts\StreamingLoggerInterface::class)
+            TaskRunnerBroadcastBridge::register(
+                $this->app->make(StreamingLoggerInterface::class)
             );
         });
 
@@ -294,7 +313,7 @@ class AppServiceProvider extends ServiceProvider
                         return;
                     }
 
-                    \App\Models\SiteUptimeMonitor::query()->firstOrCreate(
+                    SiteUptimeMonitor::query()->firstOrCreate(
                         ['site_id' => $site->id, 'sort_order' => 0],
                         [
                             'label' => __('Homepage check'),
@@ -391,7 +410,7 @@ class AppServiceProvider extends ServiceProvider
                     $systemdUnitNames[] = $unitBuilder->webUnitName($site);
                     $site->loadMissing('processes');
                     foreach ($site->processes as $process) {
-                        if ($process->type === \App\Models\SiteProcess::TYPE_WEB) {
+                        if ($process->type === SiteProcess::TYPE_WEB) {
                             continue;
                         }
                         $systemdUnitNames[] = $unitBuilder->processUnitName($site, $process);

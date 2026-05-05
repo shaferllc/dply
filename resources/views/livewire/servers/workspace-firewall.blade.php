@@ -508,6 +508,14 @@
                     </div>
                     @endteleport
                 @endif
+
+                {{-- Listening ports — what's actually bound on the host right
+                     now, sourced from the inventory probe. Useful context
+                     when adding or tightening rules: "is this port even
+                     open?" "what process is bound there?" Renders nothing
+                     when meta.manage_listening_ports is empty (e.g. the
+                     server hasn't been probed yet). --}}
+                @include('livewire.servers.partials.server-listening-ports', ['server' => $server])
             </x-server-workspace-tab-panel>
 
             <x-server-workspace-tab-panel

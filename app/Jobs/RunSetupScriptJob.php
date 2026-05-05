@@ -7,9 +7,6 @@ namespace App\Jobs;
 use App\Actions\Servers\CreateServerProvisionRun;
 use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Enums\ServerProvider;
-use App\Jobs\CheckServerHealthJob;
-use App\Jobs\InstallMetricsAgentJob;
-use App\Jobs\RunServerInsightsJob;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\AnonymousTask;
@@ -18,6 +15,7 @@ use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTaskModel;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
+use App\Notifications\ServerProvisionedCredentialsNotification;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
@@ -86,7 +84,7 @@ class RunSetupScriptJob implements ShouldQueue
                 && $creator
                 && filled($creator->email)
             ) {
-                $creator->notify(new \App\Notifications\ServerProvisionedCredentialsNotification($server->fresh() ?? $server));
+                $creator->notify(new ServerProvisionedCredentialsNotification($server->fresh() ?? $server));
             }
 
             // Kick off insights immediately so the workspace lands with a
@@ -149,6 +147,16 @@ class RunSetupScriptJob implements ShouldQueue
                 ProvisionPipelineLog::warning('server.provision.firewall_seed_failed', $server, [
                     'error' => $e->getMessage(),
                 ]);
+            }
+
+            // Populate the System services list on first connect.
+            // Without this, operators land on Settings → Services to
+            // a completely empty card and have to click Sync now to
+            // see anything. Delay 30s so it doesn't compete with the
+            // metrics install + insights run for SSH bandwidth.
+            if (! empty($server->ip_address) && $server->isVmHost()) {
+                SyncServerSystemdServicesJob::dispatch((string) $server->id)
+                    ->delay(now()->addSeconds(30));
             }
 
             return;

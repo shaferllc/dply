@@ -31,22 +31,22 @@ final class TaskRunnerActivityFeed
     /**
      * @return Collection<int, ActivityRow>
      */
-    public function recent(int $limit = 50, ?string $organizationId = null): Collection
+    public function recent(int $limit = 50, ?string $organizationId = null, ?string $actorUserId = null): Collection
     {
         return $this->merge(
-            $this->queryTaskRunnerTasks($organizationId)
+            $this->queryTaskRunnerTasks($organizationId, $actorUserId)
                 ->orderByDesc('started_at')
                 ->orderByDesc('created_at')
                 ->limit($limit)
                 ->get()
                 ->map(fn (TaskRunnerTask $r) => $this->fromTaskRunnerTask($r)),
-            $this->queryManageActions($organizationId)
+            $this->queryManageActions($organizationId, $actorUserId)
                 ->orderByDesc('started_at')
                 ->orderByDesc('created_at')
                 ->limit($limit)
                 ->get()
                 ->map(fn (ServerManageAction $r) => $this->fromManageAction($r)),
-            $this->queryRemoteCliRuns($organizationId)
+            $this->queryRemoteCliRuns($organizationId, $actorUserId)
                 ->orderByDesc('started_at')
                 ->orderByDesc('created_at')
                 ->limit($limit)
@@ -61,18 +61,18 @@ final class TaskRunnerActivityFeed
     /**
      * @return Collection<int, ActivityRow>
      */
-    public function running(?string $organizationId = null): Collection
+    public function running(?string $organizationId = null, ?string $actorUserId = null): Collection
     {
         return $this->merge(
-            $this->queryTaskRunnerTasks($organizationId)
+            $this->queryTaskRunnerTasks($organizationId, $actorUserId)
                 ->whereIn('status', self::RUNNING_STATUSES_TASK_RUNNER)
                 ->get()
                 ->map(fn (TaskRunnerTask $r) => $this->fromTaskRunnerTask($r)),
-            $this->queryManageActions($organizationId)
+            $this->queryManageActions($organizationId, $actorUserId)
                 ->whereIn('status', self::RUNNING_STATUSES_MANAGE)
                 ->get()
                 ->map(fn (ServerManageAction $r) => $this->fromManageAction($r)),
-            $this->queryRemoteCliRuns($organizationId)
+            $this->queryRemoteCliRuns($organizationId, $actorUserId)
                 ->whereIn('status', self::RUNNING_STATUSES_REMOTE_CLI)
                 ->get()
                 ->map(fn (RemoteCliRun $r) => $this->fromRemoteCliRun($r)),
@@ -128,7 +128,7 @@ final class TaskRunnerActivityFeed
         return implode("\n\n", $parts);
     }
 
-    private function queryTaskRunnerTasks(?string $organizationId)
+    private function queryTaskRunnerTasks(?string $organizationId, ?string $actorUserId = null)
     {
         $q = TaskRunnerTask::query()->select([
             'id', 'name', 'action', 'status', 'exit_code', 'server_id',
@@ -136,18 +136,37 @@ final class TaskRunnerActivityFeed
         ]);
 
         if ($organizationId !== null) {
-            $q->whereExists(function ($sub) use ($organizationId): void {
-                $sub->select(\DB::raw(1))
-                    ->from('servers')
-                    ->whereColumn('servers.id', 'task_runner_tasks.server_id')
-                    ->where('servers.organization_id', $organizationId);
+            // Tasks dispatched from a Livewire request may not have a
+            // server_id (e.g. org-level jobs). Allow either: row joins to
+            // a server in this org, OR row has no server but is owned by
+            // a user in this org. Without the OR branch the panel would
+            // hide every dispatched_job that isn't server-scoped.
+            $q->where(function ($outer) use ($organizationId): void {
+                $outer->whereExists(function ($sub) use ($organizationId): void {
+                    $sub->select(\DB::raw(1))
+                        ->from('servers')
+                        ->whereColumn('servers.id', 'task_runner_tasks.server_id')
+                        ->where('servers.organization_id', $organizationId);
+                })->orWhere(function ($noServer) use ($organizationId): void {
+                    $noServer->whereNull('task_runner_tasks.server_id')
+                        ->whereExists(function ($sub) use ($organizationId): void {
+                            $sub->select(\DB::raw(1))
+                                ->from('organization_user')
+                                ->whereColumn('organization_user.user_id', 'task_runner_tasks.created_by')
+                                ->where('organization_user.organization_id', $organizationId);
+                        });
+                });
             });
+        }
+
+        if ($actorUserId !== null) {
+            $q->where('task_runner_tasks.created_by', $actorUserId);
         }
 
         return $q;
     }
 
-    private function queryManageActions(?string $organizationId)
+    private function queryManageActions(?string $organizationId, ?string $actorUserId = null)
     {
         $q = ServerManageAction::query()->select([
             'id', 'server_id', 'user_id', 'task_name', 'label', 'status',
@@ -163,10 +182,14 @@ final class TaskRunnerActivityFeed
             });
         }
 
+        if ($actorUserId !== null) {
+            $q->where('server_manage_actions.user_id', $actorUserId);
+        }
+
         return $q;
     }
 
-    private function queryRemoteCliRuns(?string $organizationId)
+    private function queryRemoteCliRuns(?string $organizationId, ?string $actorUserId = null)
     {
         $q = RemoteCliRun::query()->select([
             'id', 'site_id', 'kind', 'command', 'risk', 'mode', 'status',
@@ -183,11 +206,16 @@ final class TaskRunnerActivityFeed
             });
         }
 
+        if ($actorUserId !== null) {
+            $q->where('remote_cli_runs.queued_by_user_id', $actorUserId);
+        }
+
         return $q;
     }
 
     /**
      * @template T
+     *
      * @param  Collection<int, T>  ...$collections
      * @return Collection<int, T>
      */

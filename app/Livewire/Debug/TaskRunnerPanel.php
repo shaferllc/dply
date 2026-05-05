@@ -7,6 +7,7 @@ namespace App\Livewire\Debug;
 use App\Support\Debug\ActivityRow;
 use App\Support\Debug\TaskRunnerActivityFeed;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -31,6 +32,13 @@ class TaskRunnerPanel extends Component
     /** 'live' | 'recent' | 'all' */
     public string $tab = 'live';
 
+    /**
+     * When true, recent() / running() are filtered to the current user.
+     * Default-on so the panel shows "what *I* dispatched" first; the
+     * platform-admin operator can untoggle to see the whole org.
+     */
+    public bool $mineOnly = true;
+
     public ?string $detailSource = null;
 
     public ?string $detailId = null;
@@ -49,29 +57,58 @@ class TaskRunnerPanel extends Component
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, ActivityRow>
+     * @return Collection<int, ActivityRow>
      */
     #[Computed]
-    public function recent(): \Illuminate\Support\Collection
+    public function recent(): Collection
     {
         if (! $this->authorized) {
             return collect();
         }
 
-        return app(TaskRunnerActivityFeed::class)->recent(50, $this->organizationId);
+        return app(TaskRunnerActivityFeed::class)->recent(
+            limit: 50,
+            organizationId: $this->organizationId,
+            actorUserId: $this->actorFilter(),
+        );
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, ActivityRow>
+     * @return Collection<int, ActivityRow>
      */
     #[Computed]
-    public function running(): \Illuminate\Support\Collection
+    public function running(): Collection
     {
         if (! $this->authorized) {
             return collect();
         }
 
-        return app(TaskRunnerActivityFeed::class)->running($this->organizationId);
+        return app(TaskRunnerActivityFeed::class)->running(
+            organizationId: $this->organizationId,
+            actorUserId: $this->actorFilter(),
+        );
+    }
+
+    /**
+     * Resolve the actor scope for the feed: when mineOnly is on, return the
+     * current user's id (string) so the feed filters created_by /
+     * server_manage_actions.user_id / remote_cli_runs.queued_by_user_id.
+     * Returns null when off so the panel sees the whole org.
+     */
+    public function toggleMineOnly(): void
+    {
+        $this->mineOnly = ! $this->mineOnly;
+    }
+
+    private function actorFilter(): ?string
+    {
+        if (! $this->mineOnly) {
+            return null;
+        }
+
+        $id = auth()->id();
+
+        return is_string($id) || is_int($id) ? (string) $id : null;
     }
 
     public function toggle(): void

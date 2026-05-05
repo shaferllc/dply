@@ -54,9 +54,10 @@
             @case ('overview')
                 @include('livewire.servers.partials.manage.group-overview', $manageShare)
                 @break
-            @case ('services')
-                @include('livewire.servers.partials.manage.group-services', $manageShare)
-                @break
+            {{-- 'services' section removed — see config/server_manage.php
+                 :: workspace_tabs. WorkspaceManage::mount() now redirects
+                 stale ?section=services URLs to the standalone Services
+                 page so deep links don't 404. --}}
             @case ('web')
                 @include('livewire.servers.partials.manage.group-web', $manageShare)
                 @break

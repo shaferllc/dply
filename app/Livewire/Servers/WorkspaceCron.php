@@ -269,6 +269,11 @@ class WorkspaceCron extends Component
     {
         $this->authorize('update', $this->server);
         $job = ServerCronJob::query()->where('server_id', $this->server->id)->findOrFail($jobId);
+        if ($job->system_managed) {
+            $this->toastError(__('This cron line is managed automatically by Dply and can\'t be edited from here.'));
+
+            return;
+        }
         $this->editing_job_id = $job->id;
         $this->new_cron_expression = $job->cron_expression;
         $this->new_cron_command = $job->command;
@@ -377,6 +382,11 @@ class WorkspaceCron extends Component
     {
         $this->authorize('update', $this->server);
         $job = ServerCronJob::query()->where('server_id', $this->server->id)->findOrFail($jobId);
+        if ($job->system_managed) {
+            $this->toastError(__('This cron line is managed automatically by Dply and can\'t be paused from here.'));
+
+            return;
+        }
         $job->update(['enabled' => ! $job->enabled, 'is_synced' => false]);
         $this->toastSuccess($job->fresh()->enabled
             ? __('Job enabled. Sync crontab to apply.')
@@ -386,7 +396,13 @@ class WorkspaceCron extends Component
     public function deleteCronJob(string $jobId): void
     {
         $this->authorize('update', $this->server);
-        ServerCronJob::query()->where('server_id', $this->server->id)->whereKey($jobId)->firstOrFail()->delete();
+        $job = ServerCronJob::query()->where('server_id', $this->server->id)->whereKey($jobId)->firstOrFail();
+        if ($job->system_managed) {
+            $this->toastError(__('This cron line is managed automatically by Dply and can\'t be deleted from here.'));
+
+            return;
+        }
+        $job->delete();
         if ($this->editing_job_id === $jobId) {
             $this->cancelEdit();
         }

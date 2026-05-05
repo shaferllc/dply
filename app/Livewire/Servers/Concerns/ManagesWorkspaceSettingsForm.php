@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers\Concerns;
 
 use App\Services\Servers\ServerSshAccessRepairer;
+use App\Support\Servers\ServerDateFormatter;
 use Illuminate\Validation\Rule;
 
 trait ManagesWorkspaceSettingsForm
@@ -26,6 +27,8 @@ trait ManagesWorkspaceSettingsForm
     public ?string $settingsWorkspaceId = null;
 
     public string $settingsTimezone = 'UTC';
+
+    public string $settingsDateFormat = 'absolute_utc';
 
     public string $settingsNotes = '';
 
@@ -144,6 +147,28 @@ trait ManagesWorkspaceSettingsForm
         $this->toastSuccess(__('Timezone preference saved (for your notes; Dply does not change the OS clock).'));
     }
 
+    public function saveServerDateFormat(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->deployerCannotEditServerSettings()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        $allowed = array_keys((array) config('server_settings.date_formats', []));
+        $this->validate([
+            'settingsDateFormat' => ['required', 'string', 'in:'.implode(',', $allowed)],
+        ]);
+
+        $meta = $this->server->meta ?? [];
+        $meta['date_format'] = $this->settingsDateFormat;
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
+        $this->syncSettingsFormFromServer();
+        $this->toastSuccess(__('Date format preference saved.'));
+    }
+
     public function applyDetectedOsFromInventory(): void
     {
         $this->authorize('update', $this->server);
@@ -207,6 +232,7 @@ trait ManagesWorkspaceSettingsForm
         $this->settingsOsVersion = (string) ($meta['os_version'] ?? '');
         $this->settingsWorkspaceId = $s->workspace_id;
         $this->settingsTimezone = (string) ($meta['timezone'] ?? 'UTC');
+        $this->settingsDateFormat = ServerDateFormatter::resolveKey($s);
         $this->settingsNotes = (string) ($meta['notes'] ?? '');
     }
 }
