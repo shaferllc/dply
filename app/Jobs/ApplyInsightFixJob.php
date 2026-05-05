@@ -51,6 +51,21 @@ class ApplyInsightFixJob implements ShouldQueue
             return;
         }
 
+        // Org safety gate for config-mutating fixes. Restart-only fixes (no on-disk
+        // changes) don't carry mutates_config and bypass this check.
+        if ((bool) ($fix['mutates_config'] ?? false)) {
+            $org = $server->organization;
+            $prefs = is_array($org?->insights_preferences ?? null) ? $org->insights_preferences : [];
+            $allow = array_key_exists('allow_config_mutation', $prefs)
+                ? (bool) $prefs['allow_config_mutation']
+                : true;
+            if (! $allow) {
+                $this->recordRefusal($finding, $user, 'config_mutation_disabled_by_org');
+
+                return;
+            }
+        }
+
         $params = is_array($fix['params'] ?? null) ? $fix['params'] : [];
         $site = $finding->site;
 

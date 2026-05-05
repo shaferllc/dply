@@ -100,9 +100,62 @@
                                     </p>
                                 </div>
                                 <div class="flex flex-wrap gap-2 text-xs font-medium">
-                                    <button type="button" wire:click="runRecipe('{{ $rec->id }}')" class="rounded-lg border border-brand-sage/40 bg-brand-sage/10 px-2.5 py-1 text-brand-sage hover:bg-brand-sage/20">{{ __('Run') }}</button>
-                                    <button type="button" wire:click="editRecipe('{{ $rec->id }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Edit') }}</button>
-                                    <button type="button" wire:click="openConfirmActionModal('deleteRecipe', ['{{ $rec->id }}'], @js(__('Delete saved command')), @js(__('Delete saved command?')), @js(__('Delete')), true)" class="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-red-600 hover:bg-red-50">{{ __('Delete') }}</button>
+                                    {{-- Per-row spinners scoped via exact wire:target call signature so
+                                         clicking Run on recipe A doesn't dim Run on recipes B + C. --}}
+                                    @php
+                                        $deleteCall = "openConfirmActionModal('deleteRecipe', ['".$rec->id."'], '".addslashes(__('Delete saved command'))."', '".addslashes(__('Delete saved command?'))."', '".addslashes(__('Delete'))."', true)";
+                                    @endphp
+
+                                    <button
+                                        type="button"
+                                        wire:click="runRecipe('{{ $rec->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="runRecipe('{{ $rec->id }}')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-sage/40 bg-brand-sage/10 px-2.5 py-1 text-brand-sage hover:bg-brand-sage/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <span wire:loading.remove wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
+                                            <x-heroicon-o-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Run') }}
+                                        </span>
+                                        <span wire:loading wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
+                                            <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-brand-sage/40 border-t-brand-sage" aria-hidden="true"></span>
+                                            {{ __('Running…') }}
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        wire:click="editRecipe('{{ $rec->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="editRecipe('{{ $rec->id }}')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <span wire:loading.remove wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
+                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Edit') }}
+                                        </span>
+                                        <span wire:loading wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
+                                            <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
+                                            {{ __('Loading…') }}
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        wire:click="{{ $deleteCall }}"
+                                        wire:loading.attr="disabled"
+                                        wire:target="{{ $deleteCall }}"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <span wire:loading.remove wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1">
+                                            <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Delete') }}
+                                        </span>
+                                        <span wire:loading wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1.5">
+                                            <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-red-300 border-t-red-700" aria-hidden="true"></span>
+                                            {{ __('Deleting…') }}
+                                        </span>
+                                    </button>
                                 </div>
                             </li>
                         @endforeach

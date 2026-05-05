@@ -400,50 +400,91 @@
                                 @endif
                             </div>
                             <div class="flex shrink-0 items-center gap-1 border-l border-brand-ink/5 bg-brand-sand/10 px-2 py-3 sm:flex-col sm:justify-center sm:px-3">
+                                @php
+                                    // Each row's action buttons share a tiny inline spinner
+                                    // CSS so the icon → spinner swap stays visually centered
+                                    // inside the same 5×5 box.
+                                    $rowSpinner = 'inline-block size-5 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink';
+                                @endphp
+
+                                {{-- Edit (open form) --}}
                                 <button
                                     type="button"
                                     wire:click="startEdit('{{ $cj->id }}')"
-                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60"
+                                    wire:loading.attr="disabled"
+                                    wire:target="startEdit('{{ $cj->id }}')"
+                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-50"
                                     title="{{ __('Edit') }}"
                                 >
-                                    <x-heroicon-o-pencil-square class="h-5 w-5" />
+                                    <span wire:loading.remove wire:target="startEdit('{{ $cj->id }}')">
+                                        <x-heroicon-o-pencil-square class="h-5 w-5" />
+                                    </span>
+                                    <span wire:loading wire:target="startEdit('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
                                 </button>
+
+                                {{-- Pause / Resume --}}
                                 <button
                                     type="button"
                                     wire:click="toggleCronJob('{{ $cj->id }}')"
-                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60"
+                                    wire:loading.attr="disabled"
+                                    wire:target="toggleCronJob('{{ $cj->id }}')"
+                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-50"
                                     title="{{ $cj->enabled ? __('Pause') : __('Resume') }}"
                                 >
-                                    @if ($cj->enabled)
-                                        <x-heroicon-o-pause class="h-5 w-5" />
-                                    @else
-                                        <x-heroicon-o-play class="h-5 w-5" />
-                                    @endif
+                                    <span wire:loading.remove wire:target="toggleCronJob('{{ $cj->id }}')">
+                                        @if ($cj->enabled)
+                                            <x-heroicon-o-pause class="h-5 w-5" />
+                                        @else
+                                            <x-heroicon-o-play class="h-5 w-5" />
+                                        @endif
+                                    </span>
+                                    <span wire:loading wire:target="toggleCronJob('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
                                 </button>
+
+                                {{-- Run now --}}
                                 <button
                                     type="button"
                                     wire:click="runCronJobNow('{{ $cj->id }}')"
-                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:opacity-40"
+                                    wire:loading.attr="disabled"
+                                    wire:target="runCronJobNow('{{ $cj->id }}')"
+                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-50"
                                     title="{{ __('Run now') }}"
                                     @disabled(! $cj->enabled)
                                 >
-                                    <x-heroicon-o-bolt class="h-5 w-5" />
+                                    <span wire:loading.remove wire:target="runCronJobNow('{{ $cj->id }}')">
+                                        <x-heroicon-o-bolt class="h-5 w-5" />
+                                    </span>
+                                    <span wire:loading wire:target="runCronJobNow('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
                                 </button>
+
+                                {{-- Last run output (modal) --}}
                                 <button
                                     type="button"
                                     wire:click="openLogsModal('{{ $cj->id }}')"
-                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60"
+                                    wire:loading.attr="disabled"
+                                    wire:target="openLogsModal('{{ $cj->id }}')"
+                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-50"
                                     title="{{ __('Last run output') }}"
                                 >
-                                    <x-heroicon-o-document-text class="h-5 w-5" />
+                                    <span wire:loading.remove wire:target="openLogsModal('{{ $cj->id }}')">
+                                        <x-heroicon-o-document-text class="h-5 w-5" />
+                                    </span>
+                                    <span wire:loading wire:target="openLogsModal('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
                                 </button>
+
+                                {{-- Delete (opens confirm modal) --}}
                                 <button
                                     type="button"
                                     wire:click="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)"
-                                    class="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                                    wire:loading.attr="disabled"
+                                    wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)"
+                                    class="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                                     title="{{ __('Delete') }}"
                                 >
-                                    <x-heroicon-o-trash class="h-5 w-5" />
+                                    <span wire:loading.remove wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)">
+                                        <x-heroicon-o-trash class="h-5 w-5" />
+                                    </span>
+                                    <span wire:loading wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)" class="inline-block size-5 animate-spin rounded-full border-2 border-red-300 border-t-red-700" aria-hidden="true"></span>
                                 </button>
                             </div>
                         </li>
@@ -503,15 +544,15 @@
                                             type="button"
                                             wire:click="runCronJobNow('{{ $cj->id }}')"
                                             wire:loading.attr="disabled"
-                                            wire:target="runCronJobNow"
-                                            class="inline-flex min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-40"
+                                            wire:target="runCronJobNow('{{ $cj->id }}')"
+                                            class="inline-flex min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-40 disabled:cursor-not-allowed"
                                             @disabled(! $cj->enabled)
                                         >
-                                            <span wire:loading.remove wire:target="runCronJobNow" class="inline-flex items-center gap-1.5">
+                                            <span wire:loading.remove wire:target="runCronJobNow('{{ $cj->id }}')" class="inline-flex items-center gap-1.5">
                                                 <x-heroicon-o-bolt class="h-4 w-4" />
                                                 {{ __('Run now') }}
                                             </span>
-                                            <span wire:loading wire:target="runCronJobNow" class="inline-flex items-center gap-1.5">
+                                            <span wire:loading wire:target="runCronJobNow('{{ $cj->id }}')" class="inline-flex items-center gap-1.5">
                                                 <x-spinner variant="white" size="sm" />
                                                 {{ __('Running…') }}
                                             </span>

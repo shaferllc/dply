@@ -76,8 +76,14 @@ class OrganizationInsightsMetricsService
             return collect();
         }
 
+        // Server-scoped only (whereNull site_id) so the count on the
+        // /servers index badge matches what the operator actually sees
+        // when they click through to /servers/{id}/insights — that page
+        // hides per-site findings (those live on each site's Insights
+        // page). Without this filter the badge over-promises.
         $rows = InsightFinding::query()
             ->whereIn('server_id', $serverIds)
+            ->whereNull('site_id')
             ->where('status', InsightFinding::STATUS_OPEN)
             ->get(['server_id', 'severity']);
 

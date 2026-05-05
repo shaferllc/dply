@@ -93,6 +93,24 @@ class ServerInstalledServices
     }
 
     /**
+     * Active PHP version on the server (e.g. "8.3"), or null when no PHP is installed
+     * or the stack summary is unavailable. Sourced from the latest stack_summary artifact.
+     */
+    public static function phpVersionFor(Server $server): ?string
+    {
+        $stack = self::stackSummary($server);
+        if (! is_array($stack)) {
+            return null;
+        }
+        $php = trim((string) ($stack['php_version'] ?? ''));
+        if ($php === '' || $php === 'none') {
+            return null;
+        }
+
+        return preg_match('/(\d+\.\d+)/', $php, $matches) === 1 ? $matches[1] : null;
+    }
+
+    /**
      * @param  list<string>  $tags
      */
     public static function hasAny(Server $server, array $tags): bool

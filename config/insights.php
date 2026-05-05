@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Insights\FixActions\BumpFpmWorkersFixAction;
 use App\Services\Insights\FixActions\SupervisorStartFixAction;
 use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\Runners\CpuRamUsageInsightRunner;
@@ -10,6 +11,7 @@ use App\Services\Insights\Runners\LoadAverageInsightRunner;
 use App\Services\Insights\Runners\MetricsMissingInsightRunner;
 use App\Services\Insights\Runners\OctaneRecommendedInsightRunner;
 use App\Services\Insights\Runners\PhpEolSitesInsightRunner;
+use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
 use App\Services\Insights\Runners\PipelineHeartbeatInsightRunner;
 use App\Services\Insights\Runners\SslCertificateInsightRunner;
 use App\Services\Insights\Runners\SupervisorRunningInsightRunner;
@@ -225,6 +227,38 @@ return [
             'runner' => null,
             'fix' => null,
             'requires' => ['php'],
+        ],
+
+        /*
+         * Suggestion + config-mutating fix: probe FPM saturation, bump pm.max_children
+         * if active/max ≥ 0.85. Fix takes a timestamped backup, validates new content
+         * with `php-fpm -tt`, then writes + reloads. backup_path is recorded in finding meta.
+         */
+        'php_fpm_workers_undersized' => [
+            'label' => 'PHP-FPM workers undersized',
+            'description' => 'Suggest bumping pm.max_children when FPM is running near its worker ceiling.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => PhpFpmWorkersUndersizedInsightRunner::class,
+            'fix' => [
+                'handler' => BumpFpmWorkersFixAction::class,
+                'mutates_config' => true,
+                'params' => [
+                    'ram_share_pct' => 60,
+                    'per_worker_mb' => 30,
+                    'max_children_cap' => 256,
+                ],
+            ],
+            'requires' => ['php'],
+            'parameters' => [
+                'saturation_ratio' => [
+                    'type' => 'number',
+                    'label' => 'Active/max ratio that triggers the suggestion',
+                    'min' => 0.5,
+                    'max' => 0.99,
+                    'default' => 0.85,
+                ],
+            ],
         ],
 
         'opcache_full' => [

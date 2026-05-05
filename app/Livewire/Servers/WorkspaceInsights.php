@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\ApplyInsightFixJob;
+use App\Jobs\RevertInsightFixJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\InsightFinding;
@@ -201,6 +202,33 @@ class WorkspaceInsights extends Component
         $this->toastSuccess(__('Fix has been queued. This may take up to a minute.'));
     }
 
+    public function revertFix(int $findingId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->whereKey($findingId)
+            ->first();
+        if ($finding === null) {
+            return;
+        }
+
+        $backupPath = $finding->meta['backup_path'] ?? null;
+        if (! is_string($backupPath) || $backupPath === '') {
+            return;
+        }
+
+        RevertInsightFixJob::dispatch($finding->id, $user->id);
+        $this->toastSuccess(__('Revert has been queued. This may take up to a minute.'));
+    }
+
     public function ignoreFinding(int $findingId): void
     {
         $this->authorize('update', $this->server);
@@ -313,9 +341,25 @@ class WorkspaceInsights extends Component
             ->limit(100)
             ->get();
 
+        // Recently applied config-mutating fixes that still have an on-disk backup we can revert from.
+        // Pulled from resolved findings with meta.backup_path set, last 30 days, server-scoped.
+        $recentlyAppliedFindings = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_RESOLVED)
+            ->where('resolved_at', '>=', now()->subDays(30))
+            ->whereRaw("(meta->>'backup_path') is not null and (meta->>'backup_path') <> ''")
+            ->orderByDesc('resolved_at')
+            ->limit(20)
+            ->get();
+
         // Split by kind: problems can page + populate the critical banner; suggestions are
         // tuning recommendations rendered in their own section, never in the banner.
-        $problemFindings = $findings->where('kind', InsightFinding::KIND_PROBLEM)->values();
+        // Treat NULL kind as PROBLEM — earlier records pre-date the kind column and
+        // would otherwise vanish from the page even though the badge counts them.
+        $problemFindings = $findings
+            ->filter(fn (InsightFinding $f): bool => $f->kind !== InsightFinding::KIND_SUGGESTION)
+            ->values();
         $suggestionFindings = $findings->where('kind', InsightFinding::KIND_SUGGESTION)->values();
 
         // Banner: top 3 unacknowledged critical *problems*. Acknowledged
@@ -333,6 +377,7 @@ class WorkspaceInsights extends Component
             'findings' => $problemFindings,
             'suggestionFindings' => $suggestionFindings,
             'bannerFindings' => $bannerFindings,
+            'recentlyAppliedFindings' => $recentlyAppliedFindings,
             'insightsCatalog' => $catalog,
             'enabledChecks' => $enabledChecks,
             'implementedChecks' => $implementedChecks,

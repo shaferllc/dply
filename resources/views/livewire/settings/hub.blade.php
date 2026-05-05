@@ -339,6 +339,13 @@
                                         @error('organizationInsights.quiet_hours_end') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
                                     </div>
                                 </div>
+                                <label class="flex gap-3 cursor-pointer group">
+                                    <input type="checkbox" wire:model.boolean="organizationInsights.allow_config_mutation" class="mt-1 rounded border-brand-mist text-brand-ink focus:ring-brand-sage" />
+                                    <span>
+                                        <span class="block text-sm font-medium text-brand-ink">{{ __('Allow Insights to mutate server configs') }}</span>
+                                        <span class="block text-sm text-brand-moss mt-0.5">{{ __('When enabled, Apply-fix actions that edit on-disk service configs (e.g. bumping pm.max_children) can run. Restart-only fixes are unaffected. Backups are always taken; revert is one click.') }}</span>
+                                    </span>
+                                </label>
                             </div>
                         @endif
                     </div>

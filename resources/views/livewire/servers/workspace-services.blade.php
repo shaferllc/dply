@@ -810,7 +810,7 @@
                             <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('This can take a few seconds over SSH.') }}</p>
                         @endif
                         @if ($systemdStatusModalError)
-                            <div class="mb-3 rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs text-red-900">{{ $systemdStatusModalError }}</div>
+                            <div class="mb-3 rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs text-red-900 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $systemdStatusModalError }}</div>
                         @endif
                         @if ($systemdStatusModalOutput !== '')
                             @php

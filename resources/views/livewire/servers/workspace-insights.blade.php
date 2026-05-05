@@ -67,9 +67,9 @@
                 @foreach ($bannerFindings as $b)
                     <li class="flex flex-wrap items-start justify-between gap-4 px-5 py-3">
                         <div class="min-w-0">
-                            <p class="font-medium text-red-950">{{ $b->title }}</p>
+                            <p class="font-medium text-red-950 break-words [overflow-wrap:anywhere]">{{ $b->title }}</p>
                             @if ($b->body)
-                                <p class="mt-1 text-sm leading-snug text-red-900/85 whitespace-pre-wrap">{{ $b->body }}</p>
+                                <p class="mt-1 text-sm leading-snug text-red-900/85 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $b->body }}</p>
                             @endif
                         </div>
                         <button type="button" wire:click="acknowledgeFinding({{ $b->id }})" wire:loading.attr="disabled" wire:target="acknowledgeFinding({{ $b->id }})" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
@@ -118,51 +118,51 @@
                             $checkedAtLocal = $checkedAt?->copy()->timezone($appTimezone);
                             $checkedAtUtc = $checkedAt?->copy()->timezone('UTC');
                         @endphp
-                        <li class="px-5 py-4 flex flex-wrap items-start justify-between gap-4">
-                            <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide rounded-md px-2 py-0.5
-                                        @class([
-                                            'bg-amber-50 text-amber-950' => $f->severity === 'warning',
-                                            'bg-red-50 text-red-900' => $f->severity === 'critical',
-                                            'bg-brand-sand/80 text-brand-ink' => $f->severity === 'info',
-                                        ])">
-                                        @switch($f->severity)
-                                            @case('critical')
-                                                <x-heroicon-s-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                                @break
-                                            @case('warning')
-                                                <x-heroicon-s-exclamation-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                                @break
-                                            @default
-                                                <x-heroicon-s-information-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                        @endswitch
-                                        {{ $f->severity }}
+                        @php
+                            [$accent, $iconBg, $iconText, $sevIconComponent, $sevLabel] = match ($f->severity) {
+                                'critical' => ['bg-red-500', 'bg-red-50', 'text-red-700', 'heroicon-s-exclamation-triangle', __('Critical')],
+                                'warning' => ['bg-amber-500', 'bg-amber-50', 'text-amber-700', 'heroicon-s-exclamation-circle', __('Warning')],
+                                'info' => ['bg-sky-400', 'bg-sky-50', 'text-sky-700', 'heroicon-s-information-circle', __('Info')],
+                                default => ['bg-brand-mist', 'bg-brand-sand/60', 'text-brand-moss', 'heroicon-s-bell', __('Notice')],
+                            };
+                        @endphp
+                        <li class="relative overflow-hidden">
+                            <span class="absolute inset-y-3 left-0 w-1 rounded-full {{ $accent }}" aria-hidden="true"></span>
+                            <div class="pl-5 pr-5 py-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                                <div class="min-w-0 flex items-start gap-3">
+                                    <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $iconBg }}">
+                                        <x-dynamic-component :component="$sevIconComponent" class="h-4 w-4 {{ $iconText }}" aria-hidden="true" />
                                     </span>
-                                    <span class="font-medium text-brand-ink">{{ $f->title }}</span>
-                                </div>
-                                @if ($f->body)
-                                    <p class="mt-2 text-sm text-brand-moss whitespace-pre-wrap">{{ $f->body }}</p>
-                                @endif
-                                @include('livewire.partials.insight-correlation', ['finding' => $f])
-                                @if ($f->insight_key === 'insights_pipeline_heartbeat' && $checkedAtLocal && $checkedAtUtc)
-                                    <div class="mt-2 space-y-1 text-xs text-brand-mist">
-                                        <p>{{ __('App time') }}: {{ $checkedAtLocal->format('Y-m-d H:i:s T') }}</p>
-                                        <p>{{ __('UTC') }}: {{ $checkedAtUtc->format('Y-m-d H:i:s T') }}</p>
-                                        <p>{{ __('Recorded') }}: {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') }}</p>
+                                    <div class="min-w-0">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide {{ $iconText }}">{{ $sevLabel }}</p>
+                                        <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere]">{{ $f->title }}</h4>
+                                        @if ($f->body)
+                                            <p class="mt-1.5 text-sm leading-6 text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
+                                        @endif
+                                        @include('livewire.partials.insight-correlation', ['finding' => $f])
+                                        @if ($f->insight_key === 'insights_pipeline_heartbeat' && $checkedAtLocal && $checkedAtUtc)
+                                            <div class="mt-2 grid grid-cols-1 gap-x-4 gap-y-0.5 text-[11px] text-brand-mist sm:grid-cols-3">
+                                                <p><span class="font-medium text-brand-moss">{{ __('App time') }}:</span> {{ $checkedAtLocal->format('Y-m-d H:i:s T') }}</p>
+                                                <p><span class="font-medium text-brand-moss">{{ __('UTC') }}:</span> {{ $checkedAtUtc->format('Y-m-d H:i:s T') }}</p>
+                                                <p><span class="font-medium text-brand-moss">{{ __('Recorded') }}:</span> {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') }}</p>
+                                            </div>
+                                        @endif
+                                        @if ($canFix)
+                                            <div class="mt-3">
+                                                <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="{{ $btnSecondary }}">
+                                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                    {{ __('Apply fix') }}
+                                                </button>
+                                            </div>
+                                        @endif
                                     </div>
-                                @else
-                                    <p class="mt-2 text-xs text-brand-mist">
-                                        {{ __('Detected') }}:
-                                        {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') ?? '—' }}
-                                    </p>
-                                @endif
+                                </div>
+                                <div class="flex shrink-0 flex-col items-end gap-1 text-right">
+                                    <span class="text-xs text-brand-mist whitespace-nowrap" title="{{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                                        {{ $f->detected_at?->diffForHumans() ?? '—' }}
+                                    </span>
+                                </div>
                             </div>
-                            @if ($canFix)
-                                <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="{{ $btnSecondary }} shrink-0">
-                                    {{ __('Apply fix') }}
-                                </button>
-                            @endif
                         </li>
                     @endforeach
                 </ul>
@@ -179,27 +179,89 @@
                     @foreach ($suggestionFindings as $f)
                         @php
                             $appTimezone = config('app.timezone') ?: 'UTC';
+                            $sFix = config('insights.insights.'.$f->insight_key.'.fix');
+                            $sCanFix = is_array($sFix) && ($sFix['handler'] ?? null);
+                        @endphp
+                        <li class="relative overflow-hidden">
+                            <span class="absolute inset-y-3 left-0 w-1 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                            <div class="pl-5 pr-5 py-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                                <div class="min-w-0 flex items-start gap-3">
+                                    <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-sand/60">
+                                        <x-heroicon-s-light-bulb class="h-4 w-4 text-brand-forest" aria-hidden="true" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Suggestion') }}</p>
+                                        <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere]">{{ $f->title }}</h4>
+                                        @if ($f->body)
+                                            <p class="mt-1.5 text-sm leading-6 text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
+                                        @endif
+                                        @include('livewire.partials.insight-correlation', ['finding' => $f])
+                                        <div class="mt-3 flex flex-wrap gap-2">
+                                            @if ($sCanFix)
+                                                <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="{{ $btnSecondary }}">
+                                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                    {{ __('Apply fix') }}
+                                                </button>
+                                            @endif
+                                            <button type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="{{ $btnSecondary }}">
+                                                <x-heroicon-o-eye-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                {{ __('Ignore') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex shrink-0 flex-col items-end gap-1 text-right">
+                                    <span class="text-xs text-brand-mist whitespace-nowrap" title="{{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                                        {{ $f->detected_at?->diffForHumans() ?? '—' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if ($recentlyAppliedFindings->isNotEmpty())
+            <div class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 px-5 py-4">
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recently applied fixes') }}</h2>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Fixes Dply applied where an on-disk backup is still recorded. Revert reads the backup, validates the prior config, and reloads the affected service.') }}</p>
+                </div>
+                <ul class="divide-y divide-brand-ink/10">
+                    @foreach ($recentlyAppliedFindings as $f)
+                        @php
+                            $appTimezone = config('app.timezone') ?: 'UTC';
+                            $change = is_array($f->meta['fix_change'] ?? null) ? $f->meta['fix_change'] : null;
                         @endphp
                         <li class="px-5 py-4 flex flex-wrap items-start justify-between gap-4">
                             <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-ink">
-                                        <x-heroicon-s-light-bulb class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                        {{ __('Suggestion') }}
-                                    </span>
-                                    <span class="font-medium text-brand-ink">{{ $f->title }}</span>
-                                </div>
-                                @if ($f->body)
-                                    <p class="mt-2 text-sm text-brand-moss whitespace-pre-wrap">{{ $f->body }}</p>
+                                <p class="font-medium text-brand-ink">{{ $f->title }}</p>
+                                @if ($change)
+                                    <ul class="mt-1 text-xs text-brand-moss space-y-0.5">
+                                        @foreach ($change as $k => $v)
+                                            <li><span class="font-mono">{{ $k }}</span>: {{ is_scalar($v) ? $v : json_encode($v) }}</li>
+                                        @endforeach
+                                    </ul>
                                 @endif
-                                @include('livewire.partials.insight-correlation', ['finding' => $f])
-                                <p class="mt-2 text-xs text-brand-mist">
-                                    {{ __('Detected') }}:
-                                    {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') ?? '—' }}
+                                <p class="mt-1 text-xs text-brand-mist">
+                                    {{ __('Applied') }}:
+                                    {{ $f->resolved_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') ?? '—' }}
+                                </p>
+                                <p class="text-xs text-brand-mist">
+                                    {{ __('Backup') }}: <span class="font-mono">{{ $f->meta['backup_path'] }}</span>
                                 </p>
                             </div>
-                            <button type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="{{ $btnSecondary }} shrink-0">
-                                {{ __('Ignore') }}
+                            <button
+                                type="button"
+                                wire:click="revertFix({{ $f->id }})"
+                                wire:loading.attr="disabled"
+                                wire:target="revertFix({{ $f->id }})"
+                                wire:confirm="{{ __('Restore the previous configuration from backup and reload the affected service?') }}"
+                                class="{{ $btnSecondary }} shrink-0"
+                            >
+                                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Revert') }}
                             </button>
                         </li>
                     @endforeach

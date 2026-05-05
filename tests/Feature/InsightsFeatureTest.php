@@ -537,6 +537,633 @@ class InsightsFeatureTest extends TestCase
         $this->assertSame(InsightFinding::KIND_PROBLEM, $finding->kind);
     }
 
+    public function test_php_fpm_workers_undersized_runner_emits_when_active_over_threshold(): void
+    {
+        [, $server] = $this->userWithServer();
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']);
+
+        $this->stubFpmProbe(['max_children' => 30, 'active_workers' => 28, 'php_version' => '8.3']);
+
+        $runner = app(\App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner::class);
+        $candidates = $runner->run($server->fresh(), null, []);
+
+        $this->assertCount(1, $candidates);
+        $c = $candidates[0];
+        $this->assertSame('php_fpm_workers_undersized', $c->insightKey);
+        $this->assertSame(InsightFinding::KIND_SUGGESTION, $c->kind);
+        $this->assertSame(28, $c->meta['signal']['active_workers']);
+        $this->assertSame(30, $c->meta['signal']['max_children']);
+        $this->assertSame('8.3', $c->meta['signal']['php_version']);
+    }
+
+    public function test_php_fpm_workers_undersized_runner_skips_below_threshold(): void
+    {
+        [, $server] = $this->userWithServer();
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']);
+
+        $this->stubFpmProbe(['max_children' => 30, 'active_workers' => 5, 'php_version' => '8.3']);
+
+        $runner = app(\App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner::class);
+        $this->assertSame([], $runner->run($server->fresh(), null, []));
+    }
+
+    public function test_php_fpm_workers_undersized_runner_skips_when_probe_fails(): void
+    {
+        [, $server] = $this->userWithServer();
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']);
+
+        $this->stubFpmProbe(null);
+
+        $runner = app(\App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner::class);
+        $this->assertSame([], $runner->run($server->fresh(), null, []));
+    }
+
+    public function test_bump_fpm_workers_fix_action_backs_up_substitutes_and_writes_via_editor(): void
+    {
+        [, $server] = $this->userWithServer();
+        $server->forceFill(['ssh_private_key' => 'fake-key'])->save();
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']);
+
+        // Snapshot with mem_total_kb so resolveTotalRamMb() succeeds.
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now(),
+            'payload' => ['mem_total_kb' => 4 * 1024 * 1024], // 4 GB
+        ]);
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'php_fpm_workers_undersized',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'pool:www',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'PHP-FPM nearing worker ceiling',
+            'body' => '',
+            'meta' => [
+                'signal' => [
+                    'php_version' => '8.3',
+                    'max_children' => 30,
+                    'active_workers' => 28,
+                    'ratio' => 0.93,
+                    'threshold' => 0.85,
+                ],
+            ],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        // Stub remote: capture the backup script invocation; return ProcessOutput with success.
+        $remoteCalls = [];
+        $stubRemote = new class($remoteCalls) extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        {
+            /** @var array<int, array{name: string, script: string}> */
+            public array $calls = [];
+
+            public function __construct(array &$calls)
+            {
+                $this->calls = &$calls;
+            }
+
+            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            {
+                $this->calls[] = ['name' => $name, 'script' => $inlineBash];
+
+                return new \App\Modules\TaskRunner\ProcessOutput('backed-up', 0, false);
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stubRemote);
+
+        // Stub editor: capture saveTarget() args + return content from openTarget().
+        $editorState = ['saved_content' => null, 'saved_target' => null, 'saved_version' => null];
+        $stubEditor = new class($editorState) extends \App\Services\Servers\ServerPhpConfigEditor
+        {
+            /** @var array<string, mixed> */
+            public array $state;
+
+            public function __construct(array &$state)
+            {
+                $this->state = &$state;
+            }
+
+            public function openTarget(\App\Models\Server $server, string $version, string $target): array
+            {
+                return [
+                    'version' => $version,
+                    'target' => $target,
+                    'label' => 'Pool config',
+                    'path' => "/etc/php/{$version}/fpm/pool.d/www.conf",
+                    'content' => "[www]\npm = dynamic\npm.max_children = 30\npm.start_servers = 5\n",
+                    'reload_guidance' => '',
+                ];
+            }
+
+            public function saveTarget(\App\Models\Server $server, string $version, string $target, string $content): array
+            {
+                $this->state['saved_content'] = $content;
+                $this->state['saved_target'] = $target;
+                $this->state['saved_version'] = $version;
+
+                return ['message' => 'saved', 'reload_guidance' => '', 'verification_output' => null, 'output' => 'php-fpm test ok'];
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ServerPhpConfigEditor::class, $stubEditor);
+
+        // 4GB * 0.6 / 30 = ~81 → proposed should be 81 (or capped). Current 30 → 81 increase passes preflight.
+        $action = app(\App\Services\Insights\FixActions\BumpFpmWorkersFixAction::class);
+        $params = (array) (config('insights.insights.php_fpm_workers_undersized.fix.params') ?? []);
+        $this->assertNull($action->preflight($server->fresh(), null, $finding, $params));
+        $result = $action->apply($server->fresh(), null, $finding, $params);
+
+        $this->assertTrue($result->ok, 'Apply should succeed: '.$result->errorMessage);
+
+        // Backup script ran first.
+        $this->assertNotEmpty($stubRemote->calls);
+        $this->assertSame('insight-fix-fpm-backup', $stubRemote->calls[0]['name']);
+        $this->assertStringContainsString('/etc/php/8.3/fpm/pool.d/www.conf', $stubRemote->calls[0]['script']);
+
+        // Editor save happened with substituted content.
+        $this->assertSame('pool_config', $editorState['saved_target']);
+        $this->assertSame('8.3', $editorState['saved_version']);
+        $this->assertStringContainsString('pm.max_children = 81', (string) $editorState['saved_content']);
+        $this->assertStringNotContainsString('pm.max_children = 30', (string) $editorState['saved_content']);
+
+        // Backup path stamped on finding.
+        $finding->refresh();
+        $this->assertNotEmpty($finding->meta['backup_path'] ?? null);
+        $this->assertStringContainsString('.dply-backup-', $finding->meta['backup_path']);
+        $this->assertSame(30, $finding->meta['fix_change']['pm_max_children_before']);
+        $this->assertSame(81, $finding->meta['fix_change']['pm_max_children_after']);
+    }
+
+    public function test_bump_fpm_workers_fix_action_preflight_refuses_without_total_ram(): void
+    {
+        [, $server] = $this->userWithServer();
+        $server->forceFill(['ssh_private_key' => 'fake-key'])->save();
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']);
+        // No metric snapshot → no mem_total_kb → resolveTotalRamMb returns null.
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'php_fpm_workers_undersized',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'pool:www',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'x',
+            'body' => '',
+            'meta' => ['signal' => ['php_version' => '8.3', 'max_children' => 30, 'active_workers' => 28]],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        $action = app(\App\Services\Insights\FixActions\BumpFpmWorkersFixAction::class);
+        $reason = $action->preflight($server->fresh(), null, $finding, []);
+        $this->assertNotNull($reason);
+        $this->assertStringContainsString('RAM', $reason);
+    }
+
+    public function test_bump_fpm_workers_revert_restores_backup_via_editor_and_clears_backup_path(): void
+    {
+        [, $server] = $this->userWithServer();
+        $server->forceFill(['ssh_private_key' => 'fake-key'])->save();
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']);
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'php_fpm_workers_undersized',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'pool:www',
+            'status' => InsightFinding::STATUS_RESOLVED,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'PHP-FPM nearing worker ceiling',
+            'body' => '',
+            'meta' => [
+                'signal' => ['php_version' => '8.3', 'max_children' => 30, 'active_workers' => 28],
+                'backup_path' => '/etc/php/8.3/fpm/pool.d/www.conf.dply-backup-20260504000000',
+                'fix_change' => ['pm_max_children_before' => 30, 'pm_max_children_after' => 81],
+            ],
+            'correlation' => null,
+            'detected_at' => now()->subHour(),
+            'resolved_at' => now(),
+        ]);
+
+        $stubRemote = new class extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        {
+            public function __construct() {}
+
+            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            {
+                // Pretend we read the backup successfully — return prior config content.
+                return new \App\Modules\TaskRunner\ProcessOutput("[www]\npm = dynamic\npm.max_children = 30\n", 0, false);
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stubRemote);
+
+        $editorState = ['saved_content' => null];
+        $stubEditor = new class($editorState) extends \App\Services\Servers\ServerPhpConfigEditor
+        {
+            public array $state;
+
+            public function __construct(array &$state)
+            {
+                $this->state = &$state;
+            }
+
+            public function saveTarget(\App\Models\Server $server, string $version, string $target, string $content): array
+            {
+                $this->state['saved_content'] = $content;
+
+                return ['message' => 'reverted', 'reload_guidance' => '', 'verification_output' => null, 'output' => 'php-fpm test ok'];
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ServerPhpConfigEditor::class, $stubEditor);
+
+        $action = app(\App\Services\Insights\FixActions\BumpFpmWorkersFixAction::class);
+        $result = $action->revert($server->fresh(), null, $finding, []);
+
+        $this->assertTrue($result->ok, 'Revert should succeed: '.$result->errorMessage);
+        $this->assertStringContainsString('pm.max_children = 30', (string) $editorState['saved_content']);
+
+        $finding->refresh();
+        $this->assertArrayNotHasKey('backup_path', $finding->meta ?? [], 'backup_path should be cleared on revert');
+        $this->assertNotNull($finding->meta['revert_applied_at'] ?? null);
+    }
+
+    public function test_revert_insight_fix_job_refuses_when_handler_is_not_revertable(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        // Synthetic insight whose handler implements only the apply interface (no Revertable).
+        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        {
+            public function preflight($server, $site, $finding, array $params): ?string
+            {
+                return null;
+            }
+
+            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            {
+                return \App\Services\Insights\FixResult::success();
+            }
+        };
+        $handlerClass = get_class($handler);
+        $this->app->instance($handlerClass, $handler);
+
+        config()->set('insights.insights.stub_apply_only_fix', [
+            'label' => 'Stub apply-only',
+            'description' => '',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => null,
+            'fix' => ['handler' => $handlerClass],
+            'requires' => [],
+            'default_enabled' => true,
+        ]);
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'stub_apply_only_fix',
+            'kind' => InsightFinding::KIND_PROBLEM,
+            'dedupe_hash' => 'r-1',
+            'status' => InsightFinding::STATUS_RESOLVED,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'x',
+            'body' => '',
+            'meta' => ['backup_path' => '/etc/somewhere.conf.bak'],
+            'correlation' => null,
+            'detected_at' => now()->subHour(),
+            'resolved_at' => now(),
+        ]);
+
+        \App\Jobs\RevertInsightFixJob::dispatch($finding->id, $user->id);
+
+        $finding->refresh();
+        $this->assertSame('handler_not_revertable', $finding->meta['revert_failure_reason'] ?? null);
+    }
+
+    public function test_revert_fix_action_in_workspace_dispatches_job_and_panel_renders_recently_applied(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'php_fpm_workers_undersized',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'pool:www',
+            'status' => InsightFinding::STATUS_RESOLVED,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'PHP-FPM nearing worker ceiling',
+            'body' => '',
+            'meta' => [
+                'signal' => ['php_version' => '8.3', 'max_children' => 30, 'active_workers' => 28],
+                'backup_path' => '/etc/php/8.3/fpm/pool.d/www.conf.dply-backup-X',
+                'fix_change' => ['pm_max_children_before' => 30, 'pm_max_children_after' => 81],
+            ],
+            'correlation' => null,
+            'detected_at' => now()->subHour(),
+            'resolved_at' => now(),
+        ]);
+
+        Bus::fake();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->assertViewHas('recentlyAppliedFindings', fn ($c) => $c->count() === 1)
+            ->assertSee('Recently applied fixes')
+            ->assertSee('Revert')
+            ->call('revertFix', $finding->id);
+
+        Bus::assertDispatched(\App\Jobs\RevertInsightFixJob::class, function ($job) use ($finding) {
+            return $job->insightFindingId === $finding->id;
+        });
+    }
+
+    public function test_recently_applied_panel_excludes_findings_without_backup_path(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        // Resolved without backup_path → not in the panel.
+        InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'cpu_ram_usage',
+            'kind' => InsightFinding::KIND_PROBLEM,
+            'dedupe_hash' => 'r',
+            'status' => InsightFinding::STATUS_RESOLVED,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'High CPU',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now()->subHour(),
+            'resolved_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->assertViewHas('recentlyAppliedFindings', fn ($c) => $c->isEmpty());
+    }
+
+    public function test_apply_fix_job_refuses_config_mutating_fix_when_org_disables_it(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        // Disable config mutation at the org level.
+        $org = $server->organization;
+        $org->forceFill([
+            'insights_preferences' => array_merge(
+                is_array($org->insights_preferences) ? $org->insights_preferences : [],
+                ['allow_config_mutation' => false]
+            ),
+        ])->save();
+
+        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        {
+            public bool $applyCalled = false;
+
+            public function preflight($server, $site, $finding, array $params): ?string
+            {
+                return null;
+            }
+
+            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            {
+                $this->applyCalled = true;
+
+                return \App\Services\Insights\FixResult::success();
+            }
+        };
+        $handlerClass = get_class($handler);
+        $this->app->instance($handlerClass, $handler);
+
+        config()->set('insights.insights.stub_mutating_fix', [
+            'label' => 'Stub mutating',
+            'description' => '',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => null,
+            'fix' => ['handler' => $handlerClass, 'mutates_config' => true],
+            'requires' => [],
+            'default_enabled' => true,
+        ]);
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'stub_mutating_fix',
+            'kind' => InsightFinding::KIND_PROBLEM,
+            'dedupe_hash' => 'm-1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'x',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+
+        $this->assertFalse($handler->applyCalled, 'Handler must not run when org disables config mutation');
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
+        $this->assertSame('config_mutation_disabled_by_org', $finding->meta['fix_refusal_reason'] ?? null);
+    }
+
+    public function test_org_can_toggle_allow_config_mutation_through_settings_hub(): void
+    {
+        $owner = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($owner->id, ['role' => 'owner']);
+        $owner->update(['current_organization_id' => $org->id]);
+        session(['current_organization_id' => $org->id]);
+
+        Livewire::actingAs($owner)
+            ->test(\App\Livewire\Settings\Hub::class)
+            ->set('organizationInsights.allow_config_mutation', false)
+            ->call('saveOrganizationInsights');
+
+        $org->refresh();
+        $this->assertSame(false, $org->insights_preferences['allow_config_mutation'] ?? null);
+    }
+
+    public function test_apply_fix_job_runs_config_mutating_fix_when_org_allows_it(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        // Default behavior: no `allow_config_mutation` key set → gate is open.
+
+        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        {
+            public bool $applyCalled = false;
+
+            public function preflight($server, $site, $finding, array $params): ?string
+            {
+                return null;
+            }
+
+            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            {
+                $this->applyCalled = true;
+
+                return \App\Services\Insights\FixResult::success();
+            }
+        };
+        $handlerClass = get_class($handler);
+        $this->app->instance($handlerClass, $handler);
+
+        config()->set('insights.insights.stub_mutating_fix_default', [
+            'label' => 'Stub mutating default',
+            'description' => '',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => null,
+            'fix' => ['handler' => $handlerClass, 'mutates_config' => true],
+            'requires' => [],
+            'default_enabled' => true,
+        ]);
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'stub_mutating_fix_default',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'm-2',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'x',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+
+        $this->assertTrue($handler->applyCalled);
+    }
+
+    public function test_bump_fpm_workers_fix_action_aborts_when_pattern_not_found(): void
+    {
+        [, $server] = $this->userWithServer();
+        $server->forceFill(['ssh_private_key' => 'fake-key'])->save();
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']);
+
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now(),
+            'payload' => ['mem_total_kb' => 4 * 1024 * 1024],
+        ]);
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'php_fpm_workers_undersized',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'pool:www',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'x',
+            'body' => '',
+            'meta' => ['signal' => ['php_version' => '8.3', 'max_children' => 30, 'active_workers' => 28]],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        $stubRemote = new class extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        {
+            public function __construct() {}
+
+            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            {
+                return new \App\Modules\TaskRunner\ProcessOutput('backed-up', 0, false);
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stubRemote);
+
+        // Editor returns content with no pm.max_children line — substitution is a no-op.
+        $stubEditor = new class extends \App\Services\Servers\ServerPhpConfigEditor
+        {
+            public function __construct() {}
+
+            public function openTarget(\App\Models\Server $server, string $version, string $target): array
+            {
+                return [
+                    'version' => $version,
+                    'target' => $target,
+                    'label' => 'Pool config',
+                    'path' => "/etc/php/{$version}/fpm/pool.d/www.conf",
+                    'content' => "[www]\npm = dynamic\n; no max_children line at all\n",
+                    'reload_guidance' => '',
+                ];
+            }
+
+            public function saveTarget(\App\Models\Server $server, string $version, string $target, string $content): array
+            {
+                throw new \RuntimeException('saveTarget should not be called when substitution is a no-op');
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ServerPhpConfigEditor::class, $stubEditor);
+
+        $action = app(\App\Services\Insights\FixActions\BumpFpmWorkersFixAction::class);
+        $result = $action->apply($server->fresh(), null, $finding, []);
+
+        $this->assertFalse($result->ok);
+        $this->assertNotNull($result->errorMessage);
+        $this->assertStringContainsString('pm.max_children', $result->errorMessage);
+    }
+
+    public function test_php_fpm_workers_undersized_runner_skips_when_no_php_version(): void
+    {
+        [, $server] = $this->userWithServer();
+        // No stack-summary seeded → phpVersionFor() returns null → runner returns [].
+
+        $runner = app(\App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner::class);
+        $this->assertSame([], $runner->run($server->fresh(), null, []));
+    }
+
+    /**
+     * Bind a stub ServerPhpFpmProbe that returns the given snapshot.
+     *
+     * @param  array{max_children: int, active_workers: int, php_version: string}|null  $snapshot
+     */
+    private function stubFpmProbe(?array $snapshot): void
+    {
+        $stub = new class($snapshot) extends \App\Services\Servers\ServerPhpFpmProbe
+        {
+            public function __construct(private ?array $snapshot)
+            {
+                // Skip parent constructor — we don't need the SSH executor in tests.
+            }
+
+            public function probe(\App\Models\Server $server, string $phpVersion): ?array
+            {
+                return $this->snapshot;
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ServerPhpFpmProbe::class, $stub);
+    }
+
     public function test_horizon_recommended_runner_emits_for_laravel_site_with_queue_worker_and_no_horizon(): void
     {
         [, $server] = $this->userWithServer();
@@ -1392,6 +2019,8 @@ class InsightsFeatureTest extends TestCase
             'completed_at' => now(),
         ]);
 
+        $hasPhp = in_array('php-fpm', $expectedServices, true) || in_array('php', $expectedServices, true);
+
         $run->artifacts()->create([
             'type' => 'stack_summary',
             'key' => 'stack-summary',
@@ -1400,6 +2029,7 @@ class InsightsFeatureTest extends TestCase
                 'webserver' => in_array('nginx', $expectedServices, true) ? 'nginx' : 'none',
                 'database' => in_array('mysql', $expectedServices, true) ? 'mysql' : (in_array('postgresql', $expectedServices, true) ? 'postgresql' : 'none'),
                 'cache_service' => 'none',
+                'php_version' => $hasPhp ? '8.3' : 'none',
                 'expected_services' => $expectedServices,
             ],
             'content' => '{}',

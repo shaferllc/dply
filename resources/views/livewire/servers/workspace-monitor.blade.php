@@ -120,7 +120,7 @@
                     <p class="text-sm font-semibold text-amber-950">{{ __('SSH check failed — install is blocked until Dply can reach the server') }}</p>
                     <p class="mt-2 text-sm text-amber-900/90">{{ __('Fix SSH credentials and firewall, then Recheck. The same install is available under Services when SSH works.') }}</p>
                     @if (! empty($m['monitoring_probe_error']))
-                        <pre class="mt-3 max-h-36 overflow-auto rounded-lg bg-white/80 p-3 text-xs text-brand-ink whitespace-pre-wrap">{{ $m['monitoring_probe_error'] }}</pre>
+                        <pre class="mt-3 max-h-36 overflow-auto rounded-lg bg-white/80 p-3 text-xs text-brand-ink whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $m['monitoring_probe_error'] }}</pre>
                     @endif
                     <div class="mt-4 flex flex-wrap gap-3">
                         <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}" wire:navigate class="{{ $btnSecondary }}">{{ __('Server connection settings') }}</a>
