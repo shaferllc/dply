@@ -69,16 +69,19 @@
         </div>
     </form>
 
-    <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-        <summary class="cursor-pointer font-semibold text-slate-700">{{ __('Bulk-edit from the terminal') }}</summary>
-        <p class="mt-2">{{ __('When you have many keys to manage at once, the dply CLI is faster than this form:') }}</p>
-        <ul class="mt-2 space-y-1 font-mono text-[11px]">
-            <li>{{ __('Set one') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-set {{ $site->slug }} KEY=value</code></li>
-            <li>{{ __('Bulk import from .env') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-import {{ $site->slug }} --file=.env</code></li>
-            <li>{{ __('Export current as .env') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-export {{ $site->slug }} --to=.env</code></li>
-            <li>{{ __('Diff prod vs staging') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:env-diff {{ $site->slug }}</code> {{ __('or') }} <a class="text-slate-700 underline hover:text-slate-900" href="{{ route('sites.env-diff', ['server' => $server, 'site' => $site]) }}" wire:navigate>{{ __('open env-diff page') }}</a></li>
-        </ul>
-    </details>
+    <x-cli-snippet
+        :intro="__('When you have many keys to manage at once, the dply CLI is faster than this form:')"
+        :commands="[
+            ['label' => __('Set one'), 'command' => 'dply:site:env-set '.$site->slug.' KEY=value'],
+            ['label' => __('Bulk import from .env'), 'command' => 'dply:site:env-import '.$site->slug.' --file=.env'],
+            ['label' => __('Export current as .env'), 'command' => 'dply:site:env-export '.$site->slug.' --to=.env'],
+            ['label' => __('Diff prod vs staging'), 'command' => 'dply:site:env-diff '.$site->slug],
+        ]"
+    />
+    <p class="text-xs text-slate-500">
+        {{ __('Or open the') }}
+        <a class="text-slate-700 underline hover:text-slate-900" href="{{ route('sites.env-diff', ['server' => $server, 'site' => $site]) }}" wire:navigate>{{ __('env-diff page') }}</a>.
+    </p>
 </section>
 
 <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-4">

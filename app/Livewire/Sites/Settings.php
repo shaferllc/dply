@@ -276,14 +276,26 @@ class Settings extends Show
             abort(404);
         }
 
-        $requestedSection = request()->query('section');
-
-        if (is_string($requestedSection) && $requestedSection !== '') {
-            $section = $requestedSection;
+        // Section is a path segment (servers/{server}/sites/{site}/{section}).
+        // Default to 'general' so /sites/{site} (no trailing segment) still
+        // resolves.
+        if ($section === null || $section === '') {
+            $section = 'general';
         }
 
-        if ($section === null) {
-            $this->redirect(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']), navigate: true);
+        // Backward-compat for old ?section=X bookmarks. Translate the
+        // query param into the path segment and redirect, preserving
+        // every other query param (?tab=, ?laravel_tab=, etc.).
+        $querySection = request()->query('section');
+        if (is_string($querySection) && $querySection !== '') {
+            $rest = collect(request()->query())->except('section')->all();
+
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => $querySection,
+                ...$rest,
+            ]), navigate: true);
 
             return;
         }

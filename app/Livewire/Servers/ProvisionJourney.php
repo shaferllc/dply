@@ -1012,13 +1012,14 @@ class ProvisionJourney extends Component
 
         $activeStep = collect($steps)->firstWhere('state', 'active');
         $now = now();
-        // diffInMinutes() returns a float in modern Carbon and the int
-        // cast truncates anything <60s to 0 — that's why operators saw
-        // "Running for 0 minutes" sit there forever during the first
-        // minute of a run. Use seconds and format with humanizeDuration
-        // so the timer is always live.
-        $secondsSinceUpdate = (int) max(0, $now->diffInSeconds($task->updated_at ?? $task->started_at ?? $now));
-        $secondsRunning = (int) max(0, $now->diffInSeconds($task->started_at ?? $task->created_at ?? $now));
+        // Carbon 3's diffInSeconds() returns a SIGNED float — when the
+        // argument is in the past it comes back negative, and max(0, …)
+        // then clamps the timer to zero. Operators saw "Running for 0s"
+        // sit there forever even after several minutes for that reason.
+        // Pass `true` for absolute, then int-cast — keeps the timer
+        // monotonic regardless of which Carbon version is active.
+        $secondsSinceUpdate = (int) abs($now->diffInSeconds($task->updated_at ?? $task->started_at ?? $now, true));
+        $secondsRunning = (int) abs($now->diffInSeconds($task->started_at ?? $task->created_at ?? $now, true));
         $eta = match ($activeStep['key'] ?? null) {
             'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
             'setup' => 'Usually 5-10 minutes',

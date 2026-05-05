@@ -49,14 +49,14 @@
     <div class="lg:grid lg:grid-cols-12 lg:gap-10 items-start">
         <aside class="hidden lg:block lg:col-span-4 xl:col-span-3">
             <div class="sticky top-24 dply-card overflow-hidden max-h-[calc(100vh-8rem)] flex flex-col">
-                <div class="px-4 py-3 border-b border-brand-ink/10 bg-brand-sand/30">
+                <div class="px-3 py-2.5 border-b border-brand-ink/10 bg-brand-sand/30">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Providers') }}</p>
                 </div>
-                <nav class="overflow-y-auto p-2 space-y-4 text-sm" aria-label="{{ __('Cloud providers') }}">
+                <nav class="overflow-y-auto px-2 py-2 space-y-1 text-sm" aria-label="{{ __('Cloud providers') }}">
                     @foreach ($providerNav as $group)
-                        <div>
-                            <p class="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-brand-mist">{{ $group['label'] }}</p>
-                            <ul class="space-y-0.5 mt-1">
+                        <div class="{{ ! $loop->first ? 'pt-3' : '' }}">
+                            <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-mist">{{ $group['label'] }}</p>
+                            <ul class="space-y-0.5">
                                 @foreach ($group['items'] as $item)
                                     @php $count = $this->credentialCountFor($item['id']); @endphp
                                     <li>
@@ -64,7 +64,7 @@
                                             type="button"
                                             wire:click="$set('active_provider', '{{ $item['id'] }}')"
                                             @class([
-                                                'w-full text-left rounded-lg px-3 py-2 transition-colors flex items-center justify-between gap-2',
+                                                'w-full text-left rounded-lg px-3 py-1.5 transition-colors flex items-center justify-between gap-2',
                                                 'bg-brand-sand/60 text-brand-ink font-medium' => $active_provider === $item['id'],
                                                 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active_provider !== $item['id'],
                                             ])

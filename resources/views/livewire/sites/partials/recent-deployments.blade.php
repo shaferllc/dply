@@ -49,10 +49,7 @@
                             @endif
                         @endforeach
                     </div>
-                    <p class="mt-3 text-[10px] text-slate-500">
-                        {{ __('Drill in from the terminal:') }}
-                        <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">dply:site:show-deploy {{ $deployment->id }} --output</code>
-                    </p>
+                    <x-cli-snippet class="mt-3 text-[10px]" :command="'dply:site:show-deploy '.$deployment->id.' --output'" />
                 </details>
             </li>
         @endforeach

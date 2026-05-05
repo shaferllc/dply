@@ -309,23 +309,45 @@ class Organization extends Model
         return $this->morphMany(NotificationChannel::class, 'owner');
     }
 
+    /**
+     * Per-request memo for the current user's pivot role on this org.
+     * Without this, hasMember / hasAdminAccess / userIsDeployer each
+     * fire their own join against organization_user on every gate call —
+     * the debug bar showed the same row queried back-to-back from
+     * Organization.php#314, #319, #326 on a single page render.
+     *
+     * Keyed by user id so the cache works across users (e.g. when an
+     * admin views a teammate's permissions on the same org instance).
+     *
+     * @var array<string, ?string>  user-id => role (or null when not a member)
+     */
+    private array $memberRoleMemo = [];
+
+    private function memberRole(User $user): ?string
+    {
+        $userId = (string) $user->id;
+        if (array_key_exists($userId, $this->memberRoleMemo)) {
+            return $this->memberRoleMemo[$userId];
+        }
+
+        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
+
+        return $this->memberRoleMemo[$userId] = $pivot ? (string) $pivot->role : null;
+    }
+
     public function hasMember(User $user): bool
     {
-        return $this->users()->where('user_id', $user->id)->exists();
+        return $this->memberRole($user) !== null;
     }
 
     public function hasAdminAccess(User $user): bool
     {
-        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
-
-        return $pivot && in_array($pivot->role, ['owner', 'admin'], true);
+        return in_array($this->memberRole($user), ['owner', 'admin'], true);
     }
 
     public function userIsDeployer(User $user): bool
     {
-        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
-
-        return $pivot && $pivot->role === 'deployer';
+        return $this->memberRole($user) === 'deployer';
     }
 
     /**

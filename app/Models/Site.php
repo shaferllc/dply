@@ -1548,7 +1548,30 @@ class Site extends Model
             ...$this->customerDomainHostnames(),
             ...$this->aliasHostnames(),
             ...$this->tenantHostnames(),
+            ...$this->previewHostnames(),
         ])->unique()->values()->all();
+    }
+
+    /**
+     * Hostnames issued by {@see TestingHostnameProvisioner}. Stored on
+     * SitePreviewDomain (not SiteDomain) — without this in the webserver
+     * server_name list, freshly-provisioned testing URLs fall through to
+     * the default nginx server and serve a bare 404.
+     *
+     * @return list<string>
+     */
+    public function previewHostnames(): array
+    {
+        $previewDomains = $this->relationLoaded('previewDomains')
+            ? $this->previewDomains
+            : $this->previewDomains()->get();
+
+        return $previewDomains->pluck('hostname')
+            ->filter(fn (mixed $hostname): bool => is_string($hostname) && trim($hostname) !== '')
+            ->map(fn (string $hostname): string => strtolower(trim($hostname)))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function effectiveRepositoryPath(): string

@@ -287,6 +287,25 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Site::created(function (Site $site): void {
+            rescue(
+                function () use ($site): void {
+                    $regions = array_keys((array) config('site_uptime.probe_regions', []));
+                    if ($regions === []) {
+                        return;
+                    }
+
+                    \App\Models\SiteUptimeMonitor::query()->firstOrCreate(
+                        ['site_id' => $site->id, 'sort_order' => 0],
+                        [
+                            'label' => __('Homepage check'),
+                            'path' => null,
+                            'probe_region' => $regions[0],
+                        ],
+                    );
+                },
+                report: false,
+            );
+
             $server = $site->server;
             if ($server === null) {
                 return;

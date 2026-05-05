@@ -69,8 +69,5 @@
         </div>
     @endif
 
-    <footer class="mt-6 text-xs text-slate-500">
-        {{ __('Same data is available from the terminal:') }}
-        <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">dply:site:show-deploy {{ $deployment->id }} --output</code>
-    </footer>
+    <x-cli-snippet class="mt-6" :command="'dply:site:show-deploy '.$deployment->id.' --output'" />
 </div>

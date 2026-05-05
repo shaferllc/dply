@@ -303,11 +303,13 @@ class SiteProvisioner
                 'error' => null,
             ]);
 
-            if ($site->primaryPreviewDomain()?->hostname === $result['hostname']) {
+            $previewHostname = $site->primaryPreviewDomain()?->hostname;
+            if ($previewHostname !== null && $previewHostname !== '') {
                 $certificate = $this->certificateRequestService->queuePrimaryPreviewAutoSsl($site->fresh(['previewDomains']));
                 if ($certificate) {
                     $this->appendLog($site, 'info', 'ready', 'Queued automatic preview SSL after reachability succeeded.', [
-                        'hostname' => $result['hostname'],
+                        'hostname' => $previewHostname,
+                        'matched_hostname' => $result['hostname'],
                         'certificate_id' => $certificate->id,
                     ]);
                     ExecuteSiteCertificateJob::dispatch($certificate->id);

@@ -2545,10 +2545,9 @@ class SiteTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Logs')
-            ->assertSee('Site logs')
-            ->assertSee('Platform activity')
             ->assertSee('Deploy completed successfully.')
             ->assertSee('Accepted deploy webhook.')
+            ->assertSee('Open server logs')
             ->assertSee(route('servers.logs', $server, false), escape: false);
     }
 

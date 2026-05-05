@@ -185,4 +185,10 @@
             {{ __('Remove repository from server') }}
         </button>
     </section>
+
+    <x-cli-snippet :commands="[
+        ['label' => __('Update remote / branch'), 'command' => 'dply:site:set-repo '.$site->slug.' --url=git@github.com:org/repo.git --branch=main'],
+        ['label' => __('Switch monorepo path'), 'command' => 'dply:site:set-repo '.$site->slug.' --path=apps/web'],
+        ['label' => __('Trigger redeploy after change'), 'command' => 'dply:site:deploy '.$site->slug],
+    ]" />
 </div>

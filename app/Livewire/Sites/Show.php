@@ -520,6 +520,20 @@ class Show extends Component
         $this->toastSuccess(__('Site provisioning has been queued again.'));
     }
 
+    public function openCancelProvisioningModal(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->openConfirmActionModal(
+            'cancelProvisioning',
+            [],
+            __('Halt provisioning?'),
+            __('This stops the install, removes the generated testing DNS record, cleans up any web server config that was written, and deletes the pending site. If you cancel this dialog, provisioning keeps running.'),
+            __('Halt and remove site'),
+            true,
+        );
+    }
+
     public function cancelProvisioning(SiteProvisioningCanceller $canceller): mixed
     {
         $this->authorize('update', $this->site);

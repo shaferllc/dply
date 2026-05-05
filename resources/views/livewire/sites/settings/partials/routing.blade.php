@@ -101,15 +101,12 @@
         <x-primary-button type="submit">{{ __('Add domain') }}</x-primary-button>
     </form>
 
-    <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-        <summary class="cursor-pointer font-semibold text-slate-700">{{ __('Manage from the terminal') }}</summary>
-        <ul class="mt-2 space-y-1 font-mono text-[11px]">
-            <li>{{ __('Add') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:domain-add {{ $site->slug }} new.example.com --primary</code></li>
-            <li>{{ __('Remove') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:domain-remove {{ $site->slug }} old.example.com</code></li>
-            <li>{{ __('Print primary URL') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:site:url {{ $site->slug }}</code></li>
-            <li>{{ __('Find by hostname') }} — <code class="select-all rounded bg-white px-1 py-0.5">dply:fleet:domain-find example.com</code></li>
-        </ul>
-    </details>
+    <x-cli-snippet :commands="[
+        ['label' => __('Add'), 'command' => 'dply:site:domain-add '.$site->slug.' new.example.com --primary'],
+        ['label' => __('Remove'), 'command' => 'dply:site:domain-remove '.$site->slug.' old.example.com'],
+        ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
+        ['label' => __('Find by hostname'), 'command' => 'dply:fleet:domain-find example.com'],
+    ]" />
 </section>
 @elseif ($routingTab === 'aliases')
 <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
@@ -176,6 +173,8 @@
         </div>
         <x-primary-button type="submit">{{ __('Add alias') }}</x-primary-button>
     </form>
+
+    <x-cli-snippet tone="stub" />
 </section>
 @elseif ($routingTab === 'redirects')
 <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
@@ -271,6 +270,8 @@
             </div>
         </div>
     @endif
+
+    <x-cli-snippet tone="stub" />
 </section>
 @elseif ($routingTab === 'preview')
 <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
@@ -334,6 +335,8 @@
             <x-primary-button type="submit">{{ __('Save preview settings') }}</x-primary-button>
         </div>
     </form>
+
+    <x-cli-snippet class="mx-6 mb-6 sm:mx-8" tone="stub" />
 </section>
 @elseif ($routingTab === 'tenants')
 <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
@@ -391,5 +394,7 @@
             <x-primary-button type="submit">{{ __('Add tenant domain') }}</x-primary-button>
         </div>
     </form>
+
+    <x-cli-snippet tone="stub" />
 </section>
 @endif

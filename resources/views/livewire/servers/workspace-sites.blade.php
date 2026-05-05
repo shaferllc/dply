@@ -13,18 +13,24 @@
 
     <div class="{{ $card }}">
         <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-            <div>
+            <div class="min-w-0">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('New site') }}</h2>
                 <p class="mt-1 text-sm text-brand-moss leading-relaxed">
                     {{ __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.') }}
                 </p>
+                @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
+                    <p class="mt-3 inline-flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
+                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{{ $this->addSiteBlockedReason }}</span>
+                    </p>
+                @endif
             </div>
             @if ($this->canAddSite)
                 <x-primary-button type="button" wire:click="openAddSiteModal" class="justify-center">{{ __('Add site') }}</x-primary-button>
             @else
                 <span
                     class="inline-flex cursor-not-allowed items-center justify-center rounded-lg bg-brand-mist/40 px-4 py-2.5 text-sm font-semibold text-brand-moss"
-                    title="{{ __('Requires owner/admin and room under your plan’s site limit—or upgrade.') }}"
+                    title="{{ $this->addSiteBlockedReason }}"
                 >
                     {{ __('Add site') }}
                 </span>

@@ -144,59 +144,77 @@
             aria-hidden="true"
         ></div>
     @endif
-    <header class="border-b border-slate-200 bg-white">
-        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center flex-wrap gap-2">
-            <div>
-                <h2 class="font-semibold text-xl text-slate-800 leading-tight">{{ $site->name }}</h2>
-                <p class="text-sm text-slate-500">
-                    {{ $server->name }} · {{ $site->type->label() }}
-                    · {{ $server->providerDisplayLabel() }}
-                    @if ($site->workspace)
-                        · {{ __('Project:') }}
-                        <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-slate-700 hover:text-slate-900">
-                            {{ $site->workspace->name }}
-                        </a>
+    @php
+        $siteHeaderBreadcrumbs = [
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
+        ];
+        if ($server->workspace) {
+            $siteHeaderBreadcrumbs[] = [
+                'label' => $server->workspace->name,
+                'href' => route('projects.resources', $server->workspace),
+                'icon' => 'rectangle-group',
+            ];
+        }
+        $siteHeaderBreadcrumbs[] = [
+            'label' => $server->name,
+            'href' => route('servers.overview', $server),
+            'icon' => 'server-stack',
+        ];
+        $siteHeaderBreadcrumbs[] = [
+            'label' => $site->name,
+            'icon' => 'globe-alt',
+        ];
+    @endphp
+    <div class="dply-page-shell pt-6">
+        <x-breadcrumb-trail :items="$siteHeaderBreadcrumbs" />
+    </div>
+    <div class="dply-page-shell pt-4">
+        <x-page-header
+            :title="$readyForWorkspace ? __('Site workspace') : __('Site setup')"
+            :description="$readyForWorkspace
+                ? __('Manage this site from one workspace with General as the default landing section.')
+                : __('Track provisioning steps and setup until this site is ready to receive traffic.')"
+            doc-route="docs.index"
+            toolbar
+            compact
+            flush
+        >
+            <x-slot name="leading">
+                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                    @if ($readyForWorkspace)
+                        <x-heroicon-o-globe-alt class="h-7 w-7 text-brand-ink" aria-hidden="true" />
+                    @else
+                        <x-heroicon-o-rocket-launch class="h-7 w-7 text-brand-ink" aria-hidden="true" />
                     @endif
-                </p>
-            </div>
-            <div class="flex items-center gap-4">
+                </span>
+            </x-slot>
+            <x-slot name="actions">
                 @if ($readyForWorkspace && $site->workspace)
-                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
-                        {{ __('Project') }}
-                    </a>
-                    <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
-                        {{ __('Project delivery') }}
+                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                        {{ __('Open project') }}
                     </a>
                 @endif
                 @if ($showWebserverConfigEditor)
-                    <a href="{{ route('sites.webserver-config', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                    <a href="{{ route('sites.webserver-config', [$server, $site]) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                         {{ __('Web server config') }}
                     </a>
                 @endif
                 @if ($readyForWorkspace)
-                    <a href="{{ route('sites.insights', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                    <a href="{{ route('sites.insights', [$server, $site]) }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                         {{ __('Insights') }}
                         @if ($openSiteInsightsCount > 0)
                             <span class="inline-flex min-w-[1.25rem] justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" title="{{ trans_choice(':count open finding|:count open findings', $openSiteInsightsCount, ['count' => $openSiteInsightsCount]) }}">{{ $openSiteInsightsCount }}</span>
                         @endif
                     </a>
-                    <a href="{{ route('sites.monitor', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                    <a href="{{ route('sites.monitor', [$server, $site]) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                         {{ __('Monitor') }}
                     </a>
                 @endif
-                @if ($readyForWorkspace && $showVmCronDaemonsLinks)
-                    <a href="{{ route('sites.cron', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
-                        {{ __('Cron jobs') }}
-                    </a>
-                    <a href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
-                        {{ __('Queue workers') }}
-                    </a>
-                @endif
-                <a href="{{ route('servers.show', $server) }}" class="text-slate-500 hover:text-slate-700 text-sm">← Server</a>
-            </div>
-        </div>
-    </header>
-    <div class="py-12">
+            </x-slot>
+        </x-page-header>
+    </div>
+    <div class="pb-12 pt-2">
         <div class="dply-page-shell space-y-6">
             @if ($this->deployLockInfo)
                 <div class="p-4 rounded-md bg-amber-50 text-amber-900 text-sm border border-amber-200" wire:poll.5s>
@@ -231,9 +249,9 @@
                     $siteProgressPercent = $siteTotalSteps > 0 ? (int) round(($siteCompletedSteps / $siteTotalSteps) * 100) : 0;
                     $siteCurrentLabel = $statusSteps[$provisioningState] ?? str_replace('_', ' ', $provisioningState);
                 @endphp
-                <div class="space-y-6" wire:poll.5s="pollProvisioningStatus">
+                <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,20rem)] lg:gap-8" wire:poll.5s="pollProvisioningStatus">
                     {{-- Header card: matches server provision-journey hero --}}
-                    <section class="dply-card overflow-hidden">
+                    <section class="dply-card overflow-hidden min-w-0 lg:col-start-1 lg:row-start-1">
                         <div class="flex flex-col gap-6 border-b border-brand-ink/10 px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
                             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div class="min-w-0">
@@ -283,8 +301,10 @@
                                     @endif
                                     <button
                                         type="button"
-                                        wire:click="openConfirmActionModal('cancelProvisioning', [], @js(__('Cancel provisioning')), @js(__('Cancel this site setup, delete the generated testing DNS record, remove any created web server config from the server, and return to add site?')), @js(__('Cancel provisioning')), true)"
-                                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
+                                        wire:click="openCancelProvisioningModal"
+                                        wire:loading.attr="disabled"
+                                        wire:target="openCancelProvisioningModal"
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100 disabled:opacity-60"
                                     >
                                         <x-heroicon-o-x-circle class="h-4 w-4" />
                                         {{ __('Cancel build') }}
@@ -425,31 +445,30 @@
                         </div>
                     </section>
 
-                    {{-- Side panels (testing URL, install summary, DNS readiness) --}}
-                    <div class="grid gap-6 lg:grid-cols-2">
-                        <section class="dply-card overflow-hidden p-6 sm:p-8">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Install summary') }}</p>
-                            <h3 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('What we are setting up') }}</h3>
-                            @if ($targetUrl)
-                                <div class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">{{ __('Testing URL') }}</p>
-                                    <p class="mt-2 break-all font-mono text-sm text-emerald-950">{{ $targetUrl }}</p>
-                                    <p class="mt-2 text-xs leading-5 text-emerald-800/80">{{ __('Use this first while the customer domain catches up.') }}</p>
+                    {{-- Right sidebar — mirrors server provision-journey's
+                         <aside>: site summary + testing URL + DNS readiness.
+                         Sticky on lg so it stays in view while the journey
+                         scrolls. --}}
+                    <aside class="w-full space-y-6 self-start lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:max-w-none">
+                        <section class="dply-card overflow-hidden p-5 sm:p-6">
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Site summary') }}</h3>
+                            <dl class="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-2">
+                                <div class="sm:col-span-2">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                                    <dd class="mt-0.5 font-semibold capitalize text-brand-ink">{{ $site->statusLabel() }}</dd>
                                 </div>
-                            @endif
-                            <dl class="mt-5 space-y-3 text-sm">
-                                <div class="flex items-start justify-between gap-3 border-b border-brand-ink/5 pb-3">
-                                    <dt class="text-brand-mist">{{ __('Primary domain') }}</dt>
-                                    <dd class="max-w-[16rem] break-all text-right font-mono text-brand-ink">{{ optional($site->primaryDomain())->hostname ?? '—' }}</dd>
+                                <div>
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Type') }}</dt>
+                                    <dd class="mt-0.5 font-medium capitalize text-brand-ink">{{ $site->type->label() }}</dd>
                                 </div>
-                                <div class="flex items-start justify-between gap-3 border-b border-brand-ink/5 pb-3">
-                                    <dt class="text-brand-mist">{{ __('Web server') }}</dt>
-                                    <dd class="font-medium capitalize text-brand-ink">{{ $site->webserver() }}</dd>
+                                <div>
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Web server') }}</dt>
+                                    <dd class="mt-0.5 font-medium capitalize text-brand-ink">{{ $site->webserver() }}</dd>
                                 </div>
                                 @if ($site->runtimeKey())
-                                    <div class="flex items-start justify-between gap-3 border-b border-brand-ink/5 pb-3">
-                                        <dt class="text-brand-mist">{{ __('Runtime') }}</dt>
-                                        <dd class="font-medium text-brand-ink">
+                                    <div>
+                                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Runtime') }}</dt>
+                                        <dd class="mt-0.5 font-medium text-brand-ink">
                                             <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
                                                 <span class="font-mono text-brand-mist"> · {{ $site->runtimeVersion() }}</span>
                                             @endif
@@ -457,59 +476,74 @@
                                     </div>
                                 @endif
                                 @if ($site->internal_port)
-                                    <div class="flex items-start justify-between gap-3 border-b border-brand-ink/5 pb-3">
-                                        <dt class="text-brand-mist">{{ __('Internal port') }}</dt>
-                                        <dd class="font-mono text-brand-ink">{{ $site->internal_port }}</dd>
+                                    <div>
+                                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Internal port') }}</dt>
+                                        <dd class="mt-0.5 font-mono text-brand-ink">{{ $site->internal_port }}</dd>
                                     </div>
                                 @endif
-                                <div class="flex items-start justify-between gap-3">
-                                    <dt class="text-brand-mist">{{ __('Current step') }}</dt>
-                                    <dd class="font-medium text-brand-ink">{{ $siteCurrentLabel }}</dd>
+                                <div class="sm:col-span-2">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Primary domain') }}</dt>
+                                    <dd class="mt-0.5 break-all font-mono text-xs font-medium text-brand-ink">{{ optional($site->primaryDomain())->hostname ?? '—' }}</dd>
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Current step') }}</dt>
+                                    <dd class="mt-0.5 font-medium text-brand-ink">{{ $siteCurrentLabel }}</dd>
                                 </div>
                             </dl>
+                            @if ($targetUrl)
+                                <div class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">{{ __('Testing URL') }}</p>
+                                    <p class="mt-2 break-all font-mono text-xs text-emerald-950">{{ $targetUrl }}</p>
+                                    <p class="mt-2 text-xs leading-5 text-emerald-800/80">{{ __('Use this first while the customer domain catches up.') }}</p>
+                                </div>
+                            @endif
                         </section>
 
-                        <section class="dply-card overflow-hidden p-6 sm:p-8">
-                            <div class="flex items-start justify-between gap-4">
-                                <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('DNS and hostname readiness') }}</p>
-                                    <h3 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('Either URL can finish setup') }}</h3>
-                                    <p class="mt-1 text-sm text-brand-moss">{{ __('Dply keeps checking both URLs and moves on as soon as one of them becomes reachable.') }}</p>
-                                </div>
-                            </div>
+                        <section class="dply-card overflow-hidden p-5 sm:p-6">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('DNS readiness') }}</p>
+                            <h3 class="mt-2 text-base font-semibold text-brand-ink">{{ __('Either URL can finish setup') }}</h3>
+                            <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Dply checks both URLs and moves on as soon as one responds.') }}</p>
 
                             @if (($testingHostnameMeta['status'] ?? null) === 'failed')
-                                <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                                     <p class="font-medium">{{ __('Temporary hostname could not be created') }}</p>
                                     <p class="mt-1">{{ $testingHostnameMeta['error'] ?? __('Check the global DigitalOcean token and the configured testing domains.') }}</p>
                                 </div>
                             @endif
 
                             @if ($hostChecks->isNotEmpty())
-                                <div class="mt-5 space-y-3">
+                                <ul class="mt-4 space-y-2">
                                     @foreach ($hostChecks as $check)
-                                        <div class="rounded-2xl border {{ ($check['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70' }} p-4">
-                                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <li class="rounded-xl border {{ ($check['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70' }} p-3">
+                                            <div class="flex items-start justify-between gap-2">
                                                 <div class="min-w-0">
-                                                    <p class="break-all font-mono text-sm font-medium text-brand-ink">{{ $check['hostname'] }}</p>
-                                                    <p class="mt-1 text-xs leading-5 {{ ($check['ok'] ?? false) ? 'text-emerald-800' : 'text-amber-900' }}">
-                                                        {{ ($check['ok'] ?? false) ? __('This hostname is reachable and can finish the install.') : ($check['error'] ?? __('This hostname has not passed checks yet.')) }}
+                                                    <p class="break-all font-mono text-xs font-medium text-brand-ink">{{ $check['hostname'] }}</p>
+                                                    <p class="mt-1 text-[11px] leading-snug {{ ($check['ok'] ?? false) ? 'text-emerald-800' : 'text-amber-900' }}">
+                                                        {{ ($check['ok'] ?? false) ? __('Reachable — can finish the install.') : ($check['error'] ?? __('Not reachable yet.')) }}
                                                     </p>
                                                 </div>
-                                                <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ ($check['ok'] ?? false) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ ($check['ok'] ?? false) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
                                                     {{ ($check['ok'] ?? false) ? __('Ready') : __('Waiting') }}
                                                 </span>
                                             </div>
-                                        </div>
+                                        </li>
                                     @endforeach
-                                </div>
+                                </ul>
                             @else
-                                <p class="mt-5 rounded-2xl border border-dashed border-brand-ink/15 bg-white/60 p-4 text-sm text-brand-moss">
+                                <p class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-white/60 p-3 text-xs text-brand-moss">
                                     {{ __('No hostname checks yet — Dply will start polling once the web server config is written.') }}
                                 </p>
                             @endif
                         </section>
-                    </div>
+
+                        @can('delete', $site)
+                            <section class="dply-card overflow-hidden p-5 sm:p-6">
+                                <p class="text-xs leading-relaxed text-brand-moss">
+                                    {{ __('If the install is stuck or you want to abandon it, cancel provisioning to remove the temporary DNS record and clean up the generated server config.') }}
+                                </p>
+                            </section>
+                        @endcan
+                    </aside>
                 </div>
             @else
             <div class="space-y-6 lg:flex lg:items-start lg:gap-8 lg:space-y-0">

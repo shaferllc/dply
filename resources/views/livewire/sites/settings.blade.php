@@ -139,34 +139,51 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <nav class="mb-6 text-sm text-slate-500" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Dashboard') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Servers') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $server->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $site->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li class="font-medium text-slate-900">{{ $workspaceTitle }}</li>
-        </ol>
-    </nav>
+    @php
+        $settingsBreadcrumbs = [
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
+        ];
+        if ($server->workspace) {
+            $settingsBreadcrumbs[] = [
+                'label' => $server->workspace->name,
+                'href' => route('projects.resources', $server->workspace),
+                'icon' => 'rectangle-group',
+            ];
+        }
+        $settingsBreadcrumbs[] = [
+            'label' => $server->name,
+            'href' => route('servers.overview', $server),
+            'icon' => 'server-stack',
+        ];
+        $settingsBreadcrumbs[] = [
+            'label' => $site->name,
+            'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
+            'icon' => 'globe-alt',
+        ];
+        if ($section !== 'general') {
+            $settingsBreadcrumbs[] = ['label' => $workspaceTitle, 'icon' => 'cog-6-tooth'];
+        }
+    @endphp
+    <div class="lg:grid lg:grid-cols-12 lg:gap-10">
+        @include('livewire.sites.settings.partials.sidebar')
 
-    <div class="space-y-6">
-        <x-page-header
-            :title="$workspaceTitle"
-            :description="$workspaceDescription"
-            doc-route="docs.index"
-            flush
-        >
-            <x-slot name="actions">
-                <div class="flex flex-wrap items-center gap-3">
+        <div class="min-w-0 lg:col-span-9">
+            <x-breadcrumb-trail :items="$settingsBreadcrumbs" />
+
+            <x-page-header
+                :title="$workspaceTitle"
+                :description="$workspaceDescription"
+                doc-route="docs.index"
+                toolbar
+                flush
+            >
+                <x-slot name="actions">
                     @if ($showWebserverConfigEditor)
                         <a
                             href="{{ route('sites.webserver-config', [$server, $site]) }}"
                             wire:navigate
-                            class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
+                            class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                         >
                             {{ __('Web server config') }}
                         </a>
@@ -174,25 +191,21 @@
                     <a
                         href="{{ route('sites.insights', [$server, $site]) }}"
                         wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
+                        class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                     >
                         {{ __('Insights') }}
                     </a>
                     <a
                         href="{{ route('sites.monitor', [$server, $site]) }}"
                         wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
+                        class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                     >
                         {{ __('Monitor') }}
                     </a>
-                </div>
-            </x-slot>
-        </x-page-header>
+                </x-slot>
+            </x-page-header>
 
-        <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
-            @include('livewire.sites.settings.partials.sidebar')
-
-            <main class="min-w-0 space-y-6 lg:col-span-9">
+            <main class="min-w-0 space-y-6 mt-8">
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
                     @if ($section === 'general' && $site->usesContainerRuntime())
                         @include('livewire.sites.partials.container-dashboard')
@@ -769,6 +782,15 @@
                                 </div>
                             </form>
                         </section>
+
+                        <x-cli-snippet :commands="[
+                            ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
+                            ['label' => __('Diagnose site'), 'command' => 'dply:site:doctor '.$site->slug],
+                            ['label' => __('Rename site'), 'command' => 'dply:site:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
+                            ['label' => __('Export full config'), 'command' => 'dply:site:export-config '.$site->slug.' --to=site.json'],
+                            ['label' => __('Export deploy manifest'), 'command' => 'dply:site:export-manifest '.$site->slug.' --to=manifest.json'],
+                            ['label' => __('List all sites'), 'command' => 'dply:site:list'],
+                        ]" />
                     @elseif ($section === 'routing')
                         @include('livewire.sites.settings.partials.routing')
                     @elseif ($section === 'dns')
@@ -1334,6 +1356,14 @@
                                 </dl>
                             </section>
                         </section>
+
+                        <x-cli-snippet :commands="[
+                            ['label' => __('Trigger deploy'), 'command' => 'dply:site:deploy '.$site->slug],
+                            ['label' => __('Abort running deploy'), 'command' => 'dply:site:abort-deploy '.$site->slug],
+                            ['label' => __('Run a single phase'), 'command' => 'dply:site:run-phase '.$site->slug.' build'],
+                            ['label' => __('Recent deploy history'), 'command' => 'dply:site:deploy-history '.$site->slug],
+                            ['label' => __('Inspect a deploy'), 'command' => 'dply:site:show-deploy DEPLOYMENT_ID --output'],
+                        ]" />
                     @elseif ($section === 'repository')
                         @include('livewire.sites.settings.partials.repository')
                     @elseif ($section === 'runtime')

@@ -35,6 +35,25 @@
     }
     $allStepsDone = $totalCount > 0 && $completedCount >= $totalCount;
     $hasJourneyAlerts = $journeyAlerts !== [];
+
+    // Wall-clock elapsed for the journey hero. Anchors on the server row's
+    // created_at so the timer reflects the operator's full wait, not just
+    // the most recent task run. Frozen at setup completion; otherwise
+    // refreshes on every wire:poll.
+    $journeyAnchor = $server->created_at;
+    $journeyEndpoint = ($server->setup_status === \App\Models\Server::SETUP_STATUS_DONE && $server->setup_completed_at)
+        ? $server->setup_completed_at
+        : now();
+    $journeyElapsedSeconds = $journeyAnchor ? max(0, (int) $journeyAnchor->diffInSeconds($journeyEndpoint)) : 0;
+    $journeyElapsedHuman = $journeyAnchor
+        ? \Illuminate\Support\Carbon::createFromTimestamp(0)
+            ->addSeconds($journeyElapsedSeconds)
+            ->diffForHumans(\Illuminate\Support\Carbon::createFromTimestamp(0), [
+                'syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE,
+                'parts' => 2,
+                'short' => true,
+            ])
+        : null;
 @endphp
 
 <div
@@ -188,6 +207,18 @@
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                         <x-heroicon-s-check class="h-3 w-3" />
                                         {{ __('Ready') }}
+                                    </span>
+                                @endif
+                                @if ($totalCount > 0)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ __('Total steps completed across cloud + setup phases') }}">
+                                        <x-heroicon-m-list-bullet class="h-3 w-3" />
+                                        {{ __(':done / :total steps', ['done' => $completedCount, 'total' => $totalCount]) }}
+                                    </span>
+                                @endif
+                                @if ($journeyElapsedHuman)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ $journeyIsDone ? __('Total provision time') : __('Time elapsed since this server row was created') }}">
+                                        <x-heroicon-m-clock class="h-3 w-3" />
+                                        {{ $journeyIsDone ? __('Took :elapsed', ['elapsed' => $journeyElapsedHuman]) : __('Elapsed :elapsed', ['elapsed' => $journeyElapsedHuman]) }}
                                     </span>
                                 @endif
                             </div>
@@ -538,10 +569,13 @@
                                              behind a toggle for users who want the full firehose. --}}
                                         <details
                                             x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
-                                            class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
+                                            class="group mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
-                                                <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Show full task tail') }}</span>
+                                                <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                    <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                                    {{ __('Show full task tail') }}
+                                                </span>
                                                 <span class="flex items-center gap-2 text-[11px] text-slate-500">
                                                     <span>
                                                         {{ __(':count lines', ['count' => $liveTaskOutputLineCount]) }}

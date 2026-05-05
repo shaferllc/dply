@@ -19,6 +19,7 @@ use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
+use App\Services\Servers\FirewallRuleTemplateApplicator;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Support\Servers\ProvisionPipelineLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -121,6 +122,23 @@ class RunSetupScriptJob implements ShouldQueue
                 && $server->isVmHost()
             ) {
                 app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
+            }
+
+            // Mirror the bash provision script's UFW defaults (SSH on
+            // the server's ssh_port + HTTP/HTTPS for VM hosts) into
+            // server_firewall_rules so the dashboard reflects what's
+            // actually on the host. Idempotent — the applicator dedupes
+            // by (port, protocol, source, action) so reruns are no-ops.
+            try {
+                app(FirewallRuleTemplateApplicator::class)
+                    ->seedDefaultsForServer($server->fresh() ?? $server, $server->user);
+            } catch (\Throwable $e) {
+                // Seeding is best-effort: a failure here shouldn't fail
+                // the whole provision job. Log and move on; the
+                // workspace's "Apply" button can recreate rules later.
+                ProvisionPipelineLog::warning('server.provision.firewall_seed_failed', $server, [
+                    'error' => $e->getMessage(),
+                ]);
             }
 
             return;

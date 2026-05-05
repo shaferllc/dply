@@ -56,8 +56,5 @@
         <p class="mt-3 text-xs text-slate-500">{{ trans_choice('{1} 1 match|[2,*] :count matches', count($rows), ['count' => count($rows)]) }}</p>
     @endif
 
-    <footer class="mt-8 text-xs text-slate-500">
-        {{ __('Same data is available from the terminal:') }}
-        <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">dply:fleet:env-find {{ $query !== '' ? $query : 'KEY' }}{{ $mode === 'prefix' ? ' --prefix' : '' }}</code>
-    </footer>
+    <x-cli-snippet class="mt-8" :command="'dply:fleet:env-find '.($query !== '' ? $query : 'KEY').($mode === 'prefix' ? ' --prefix' : '')" />
 </div>

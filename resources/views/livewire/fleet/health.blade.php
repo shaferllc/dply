@@ -226,8 +226,5 @@
         </section>
     @endif
 
-    <footer class="mt-8 text-xs text-slate-500">
-        {{ __('Same data is available from the terminal:') }}
-        <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">dply:fleet:doctor</code>
-    </footer>
+    <x-cli-snippet class="mt-8" command="dply:fleet:doctor" />
 </div>

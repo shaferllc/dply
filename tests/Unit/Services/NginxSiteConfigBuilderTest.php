@@ -84,7 +84,7 @@ class NginxSiteConfigBuilderTest extends TestCase
         $this->assertStringContainsString('error_log /var/log/nginx/'.$basename.'-error.log;', $nginx);
     }
 
-    public function test_webserver_hostnames_include_aliases_and_tenants_but_not_preview_domains(): void
+    public function test_webserver_hostnames_include_aliases_tenants_and_preview_domains(): void
     {
         $site = Site::factory()->create([
             'slug' => 'my-app',
@@ -116,8 +116,11 @@ class NginxSiteConfigBuilderTest extends TestCase
         $site->refresh()->load('domains', 'domainAliases', 'tenantDomains', 'previewDomains', 'redirects');
         $nginx = app(NginxSiteConfigBuilder::class)->build($site);
 
-        $this->assertStringContainsString('server_name example.test www.example.test tenant.example.test;', $nginx);
-        $this->assertStringNotContainsString('preview.dply.cc', $nginx);
+        // Preview hostnames must land in server_name so the temporary
+        // testing URL (issued by TestingHostnameProvisioner) actually
+        // routes to this site's nginx block instead of falling through
+        // to the default server and serving a bare 404.
+        $this->assertStringContainsString('server_name example.test www.example.test tenant.example.test preview.dply.cc;', $nginx);
     }
 
     public function test_basic_auth_adds_acme_bypass_and_htpasswd_for_static_site(): void

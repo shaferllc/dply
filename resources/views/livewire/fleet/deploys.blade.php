@@ -82,14 +82,12 @@
         </div>
     @endif
 
-    <footer class="mt-8 text-xs text-slate-500">
-        {{ __('Same data is available from the terminal:') }}
-        @if ($tab === 'running')
-            <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">dply:fleet:running-deploys</code>
-        @elseif ($tab === 'failed-latest')
-            <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">dply:fleet:failed-deploys</code>
-        @else
-            <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">dply:fleet:stale-deploys --days={{ $staleDays }}</code>
-        @endif
-    </footer>
+    @php
+        $fleetDeploysCommand = match ($tab) {
+            'running' => 'dply:fleet:running-deploys',
+            'failed-latest' => 'dply:fleet:failed-deploys',
+            default => 'dply:fleet:stale-deploys --days='.$staleDays,
+        };
+    @endphp
+    <x-cli-snippet class="mt-8" :command="$fleetDeploysCommand" />
 </div>

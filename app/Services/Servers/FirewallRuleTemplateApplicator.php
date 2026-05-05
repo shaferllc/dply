@@ -17,6 +17,62 @@ class FirewallRuleTemplateApplicator
     ) {}
 
     /**
+     * Seed the server_firewall_rules table with the default rule set the
+     * provisioning bash script opens on the host (SSH on the server's
+     * actual ssh_port + HTTP/HTTPS for VM hosts that take inbound web
+     * traffic). Idempotent: createRulesFromDefinitions() dedupes by
+     * (port, protocol, source, action, site_id) so re-running this on
+     * an already-seeded server is a no-op.
+     *
+     * @return int Number of rules created
+     */
+    public function seedDefaultsForServer(Server $server, ?User $user = null, ?ApiToken $apiToken = null): int
+    {
+        $sshPort = (int) ($server->ssh_port ?: 22);
+
+        $definitions = [
+            [
+                'name' => 'SSH',
+                'port' => $sshPort,
+                'protocol' => 'tcp',
+                'source' => 'any',
+                'action' => 'allow',
+                'enabled' => true,
+                'profile' => 'ssh',
+            ],
+        ];
+
+        // Web ports only make sense on VM hosts that actually serve HTTP
+        // traffic. Functions/container hosts route through their cloud
+        // provider's edge, not nginx on the box.
+        if ($server->isVmHost()) {
+            $definitions[] = [
+                'name' => 'HTTP',
+                'port' => 80,
+                'protocol' => 'tcp',
+                'source' => 'any',
+                'action' => 'allow',
+                'enabled' => true,
+                'profile' => 'http',
+            ];
+            $definitions[] = [
+                'name' => 'HTTPS',
+                'port' => 443,
+                'protocol' => 'tcp',
+                'source' => 'any',
+                'action' => 'allow',
+                'enabled' => true,
+                'profile' => 'https',
+            ];
+        }
+
+        return $this->createRulesFromDefinitions($server, $definitions, $user, [
+            'template' => 'auto:provision-defaults',
+            'label' => 'Provision defaults',
+        ], $apiToken);
+    }
+
+    /**
      * Apply a config key from server_firewall.bundled_templates.
      *
      * @return int Number of rules created

@@ -151,17 +151,45 @@ class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthentic
         return $this->hasMany(ReferralReward::class, 'referrer_user_id');
     }
 
+    /**
+     * Per-request memo for {@see currentOrganization()}. Keyed by the
+     * resolved organization id (or the literal '__default__' marker for
+     * the no-session-fallback path) so a session switch mid-request is
+     * still respected. Without this, every callsite (page header, gates,
+     * preflight, debug bar, layouts) re-runs the same join query — the
+     * debug bar showed 14+ duplicate hits for a single page load.
+     *
+     * @var array<string, ?Organization>
+     */
+    private array $currentOrganizationMemo = [];
+
     public function currentOrganization(): ?Organization
     {
         $id = session('current_organization_id');
+        $key = $id ? (string) $id : '__default__';
+
+        if (array_key_exists($key, $this->currentOrganizationMemo)) {
+            return $this->currentOrganizationMemo[$key];
+        }
+
         if (! $id) {
-            return $this->organizations()
+            return $this->currentOrganizationMemo[$key] = $this->organizations()
                 ->orderByPivot('created_at')
                 ->orderBy('organizations.id')
                 ->first();
         }
 
-        return $this->organizations()->find($id);
+        return $this->currentOrganizationMemo[$key] = $this->organizations()->find($id);
+    }
+
+    /**
+     * Drop the memoized {@see currentOrganization()} result. Call after
+     * any code path that mutates session('current_organization_id') so
+     * the next read reflects the new session value.
+     */
+    public function flushCurrentOrganizationCache(): void
+    {
+        $this->currentOrganizationMemo = [];
     }
 
     /**

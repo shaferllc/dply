@@ -163,27 +163,9 @@
                                     @endif
                                     <x-dropdown-link :href="route('fleet.health')">
                                         <x-slot name="icon">
-                                            <x-heroicon-o-heart class="{{ $hi }}" />
+                                            <x-heroicon-o-rectangle-group class="{{ $hi }}" />
                                         </x-slot>
-                                        {{ __('Fleet health') }}
-                                    </x-dropdown-link>
-                                    <x-dropdown-link :href="route('fleet.domains')">
-                                        <x-slot name="icon">
-                                            <x-heroicon-o-magnifying-glass class="{{ $hi }}" />
-                                        </x-slot>
-                                        {{ __('Fleet domains') }}
-                                    </x-dropdown-link>
-                                    <x-dropdown-link :href="route('fleet.env-search')">
-                                        <x-slot name="icon">
-                                            <x-heroicon-o-key class="{{ $hi }}" />
-                                        </x-slot>
-                                        {{ __('Fleet env search') }}
-                                    </x-dropdown-link>
-                                    <x-dropdown-link :href="route('fleet.deploys')">
-                                        <x-slot name="icon">
-                                            <x-heroicon-o-rocket-launch class="{{ $hi }}" />
-                                        </x-slot>
-                                        {{ __('Fleet deploys') }}
+                                        {{ __('Fleet') }}
                                     </x-dropdown-link>
                                     <x-dropdown-link :href="route('projects.index')">
                                         <x-slot name="icon">
@@ -421,9 +403,9 @@
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('fleet.health')" :active="request()->routeIs('fleet.*')">
                     <x-slot name="icon">
-                        <x-heroicon-o-heart class="{{ $hi }}" />
+                        <x-heroicon-o-rectangle-group class="{{ $hi }}" />
                     </x-slot>
-                    {{ __('Fleet health') }}
+                    {{ __('Fleet') }}
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
                     <x-slot name="icon">

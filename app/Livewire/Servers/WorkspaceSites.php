@@ -49,6 +49,39 @@ class WorkspaceSites extends Component
         return Gate::forUser(auth()->user())->allows('create', Site::class);
     }
 
+    /**
+     * Human-readable reason the Add site button is disabled, or '' when
+     * it's enabled. Surfaces the real blocker (server not ready, deployer
+     * role, or plan site cap) inline so operators don't have to guess.
+     */
+    #[Computed]
+    public function addSiteBlockedReason(): string
+    {
+        if (! $this->server->isReady()) {
+            return __('This server is still provisioning — site creation unlocks once it reaches the ready state.');
+        }
+
+        $user = auth()->user();
+        $org = $user?->currentOrganization();
+
+        if ($org === null) {
+            return __('No active organization is selected for your account.');
+        }
+
+        if ($org->userIsDeployer($user)) {
+            return __('Your role on this organization (deployer) cannot create new sites. Ask an owner or admin.');
+        }
+
+        if (! $org->canCreateSite()) {
+            return __('You\'ve hit your plan\'s site limit (:used / :max). Delete an existing site or upgrade to add more.', [
+                'used' => $org->sites()->count(),
+                'max' => $org->maxSitesDisplay(),
+            ]);
+        }
+
+        return '';
+    }
+
     #[Computed]
     public function supportsQuickAdd(): bool
     {
@@ -188,13 +221,26 @@ class WorkspaceSites extends Component
             ? $this->form->php_version
             : null;
 
+        // Resolve uniqueness BEFORE the insert. The Site model's
+        // ensureUniqueSlug() bumps a duplicate slug, but it has to run
+        // pre-save — calling it after Site::create() insert (which is
+        // what we used to do) trips the (server_id, slug) unique
+        // constraint and aborts the request when two sites share a name.
+        $baseSlug = Str::slug($this->form->name) ?: 'site';
+        $slug = $baseSlug;
+        $i = 1;
+        while (Site::query()->where('server_id', $this->server->id)->where('slug', $slug)->exists()) {
+            $slug = $baseSlug.'-'.$i;
+            $i++;
+        }
+
         $site = Site::query()->create([
             'server_id' => $this->server->id,
             'user_id' => auth()->id(),
             'organization_id' => $this->server->organization_id,
             'deploy_script_id' => $org?->default_site_script_id,
             'name' => $this->form->name,
-            'slug' => Str::slug($this->form->name) ?: 'site',
+            'slug' => $slug,
             'type' => SiteType::from($this->form->type),
             'runtime' => $this->form->type,
             'runtime_version' => $defaultPhpVersion,
@@ -224,9 +270,6 @@ class WorkspaceSites extends Component
                 'runtime_detection_pending' => true,
             ],
         ]);
-
-        $site->ensureUniqueSlug();
-        $site->save();
 
         $defaults = app(RuntimeAwareDeployStepDefaults::class)->defaultsFor($site->runtime, null);
         foreach ($defaults as $step) {

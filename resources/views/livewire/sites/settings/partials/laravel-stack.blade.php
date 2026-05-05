@@ -6,3 +6,10 @@
 @else
     @include('livewire.sites.settings.partials.laravel.workspace')
 @endif
+
+<x-cli-snippet :commands="[
+    ['label' => __('Migration status'), 'command' => 'dply:artisan '.$site->slug.' -- migrate:status'],
+    ['label' => __('Run migrations'), 'command' => 'dply:artisan '.$site->slug.' -- migrate --force'],
+    ['label' => __('Roll back one batch'), 'command' => 'dply:laravel:migrate:rollback '.$site->slug.' --step=1 --snapshot-first'],
+    ['label' => __('Run any artisan command'), 'command' => 'dply:artisan '.$site->slug.' -- about'],
+]" />

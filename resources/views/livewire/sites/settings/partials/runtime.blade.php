@@ -466,3 +466,11 @@
         @endif
     @endif
 </section>
+
+<x-cli-snippet :commands="[
+    ['label' => __('Update runtime'), 'command' => 'dply:site:set-runtime '.$site->slug.' --runtime=node --runtime-version=22'],
+    ['label' => __('Set start command'), 'command' => 'dply:site:set-runtime '.$site->slug.' --start=\'node server.js\' --port=3000'],
+    ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
+    ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
+    ['label' => __('Install on server'), 'command' => 'dply:install-runtime '.($server->name ?? 'SERVER').' node 22'],
+]" />
