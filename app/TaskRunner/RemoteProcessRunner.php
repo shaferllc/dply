@@ -68,8 +68,16 @@ class RemoteProcessRunner
     public function sshOptions(): array
     {
         $options = [
-            // INFO: ERROR hides typical auth/connection stderr (exit 255 with empty streams); strip known-host noise in cleanupOutput instead.
-            '-o LogLevel=INFO',
+            // ERROR silences the "Warning: Permanently added <host> ... to
+            // the list of known hosts" message that ssh emits at WARNING
+            // every first-time connect. With UserKnownHostsFile=/dev/null
+            // it fired on every single SSH call, polluting the streaming
+            // task output the operator sees in real time. Auth / connect
+            // failures still surface — they're emitted at ERROR level —
+            // and cleanupOutput still strips any residue from buffers
+            // produced by older sshd / openssh combinations that ignore
+            // LogLevel.
+            '-o LogLevel=ERROR',
             '-o IdentitiesOnly=yes', // Only use the configured public key
             '-o UserKnownHostsFile=/dev/null', // Don't use known hosts
             '-o StrictHostKeyChecking=no', // Disable host key checking

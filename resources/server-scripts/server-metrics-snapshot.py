@@ -51,12 +51,102 @@ def _load_metrics_callback_env() -> dict[str, str]:
     return out
 
 
+def _stable_skip_threshold() -> float:
+    """Per-metric absolute %-point delta below which we consider the sample 'unchanged'."""
+    raw = os.environ.get("DPLY_METRICS_STABLE_THRESHOLD_PCT", "2.0")
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 2.0
+
+
+def _stable_max_skip() -> int:
+    """Max consecutive 1-minute ticks to skip when stable. 4 = push at least once per 5 min."""
+    raw = os.environ.get("DPLY_METRICS_STABLE_MAX_SKIP", "4")
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 4
+
+
+def _should_push_throttled(payload: dict) -> bool:
+    """
+    Adaptive cadence: cron fires every minute, but skip the POST when nothing
+    interesting has changed. Push when:
+      - first run (no state)
+      - any of cpu_pct / mem_pct / disk_pct moved more than the threshold
+      - we've already skipped DPLY_METRICS_STABLE_MAX_SKIP times in a row
+        (heartbeat so charts stay continuous on quiet boxes)
+    State lives in ~/.dply/metrics-throttle.json next to the netstate file.
+    """
+    state_path = Path.home() / ".dply" / "metrics-throttle.json"
+    threshold = _stable_skip_threshold()
+    max_skip = _stable_max_skip()
+
+    previous: dict[str, float | int] | None = None
+    try:
+        if state_path.is_file():
+            previous = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        previous = None
+
+    skip_count = 0
+    must_push = True
+    if isinstance(previous, dict):
+        try:
+            skip_count = int(previous.get("skip_count", 0))
+        except (TypeError, ValueError):
+            skip_count = 0
+        try:
+            prev_cpu = float(previous.get("cpu_pct", -1))
+            prev_mem = float(previous.get("mem_pct", -1))
+            prev_disk = float(previous.get("disk_pct", -1))
+        except (TypeError, ValueError):
+            prev_cpu = prev_mem = prev_disk = -1.0
+        if prev_cpu >= 0 and prev_mem >= 0 and prev_disk >= 0:
+            cur_cpu = float(payload.get("cpu_pct", 0) or 0)
+            cur_mem = float(payload.get("mem_pct", 0) or 0)
+            cur_disk = float(payload.get("disk_pct", 0) or 0)
+            stable = (
+                abs(cur_cpu - prev_cpu) <= threshold
+                and abs(cur_mem - prev_mem) <= threshold
+                and abs(cur_disk - prev_disk) <= threshold
+            )
+            must_push = (not stable) or (skip_count >= max_skip)
+
+    if must_push:
+        new_state = {
+            "cpu_pct": float(payload.get("cpu_pct", 0) or 0),
+            "mem_pct": float(payload.get("mem_pct", 0) or 0),
+            "disk_pct": float(payload.get("disk_pct", 0) or 0),
+            "skip_count": 0,
+        }
+    else:
+        # Preserve last-pushed values; just bump the skip counter.
+        new_state = {
+            "cpu_pct": float(previous.get("cpu_pct", 0)) if isinstance(previous, dict) else 0.0,
+            "mem_pct": float(previous.get("mem_pct", 0)) if isinstance(previous, dict) else 0.0,
+            "disk_pct": float(previous.get("disk_pct", 0)) if isinstance(previous, dict) else 0.0,
+            "skip_count": skip_count + 1,
+        }
+
+    try:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps(new_state), encoding="utf-8")
+    except OSError:
+        pass
+
+    return must_push
+
+
 def _post_metrics_callback(payload: dict) -> None:
     env = _load_metrics_callback_env()
     url = env.get("DPLY_METRICS_CALLBACK_URL") or os.environ.get("DPLY_METRICS_CALLBACK_URL")
     token = env.get("DPLY_METRICS_CALLBACK_TOKEN") or os.environ.get("DPLY_METRICS_CALLBACK_TOKEN")
     sid = env.get("DPLY_METRICS_SERVER_ID") or os.environ.get("DPLY_METRICS_SERVER_ID")
     if not url or not token or not sid:
+        return
+    if not _should_push_throttled(payload):
         return
     captured = datetime.now(timezone.utc).replace(microsecond=0)
     iso = captured.isoformat().replace("+00:00", "Z")

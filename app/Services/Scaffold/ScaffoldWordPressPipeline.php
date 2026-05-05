@@ -10,6 +10,7 @@ use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Support\Servers\InstalledStack;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -166,12 +167,30 @@ class ScaffoldWordPressPipeline
 
     private function stepCreateDatabase(Site $site): void
     {
+        // Read the installed (not requested) engine. On low-memory
+        // droplets the script substitutes SQLite for MySQL/Postgres —
+        // and WordPress doesn't natively support SQLite, so we halt
+        // with a clear, actionable error rather than silently producing
+        // a broken site. Operator's options: re-provision the server
+        // on a 2GB+ droplet, or pick Laravel (which works on SQLite)
+        // for this site instead.
+        $installed = InstalledStack::fromMeta($site->server);
+        $engine = $installed->database ?? 'mysql84';
+
+        if ($engine === 'sqlite3' || str_starts_with($engine, 'sqlite')) {
+            throw new \RuntimeException(
+                'WordPress requires MySQL or MariaDB; this server has SQLite installed '
+                .'(low-memory mode detected at provisioning time, which substitutes SQLite '
+                .'for heavier databases). Re-provision the server on a 2GB+ droplet to '
+                .'install MySQL, or pick Laravel for this site instead.'
+            );
+        }
+
         // WordPress requires MySQL or MariaDB — Q5. Pick whichever the
         // server has installed; default to mysql84 if the server's
         // declared engine is something else (the v1 wizard tile is
         // disabled on Postgres-only hosts so we shouldn't reach here
         // with an incompatible engine).
-        $engine = $site->server->meta['database'] ?? 'mysql84';
         if (! in_array($engine, ['mysql84', 'mysql80', 'mariadb114', 'mariadb11', 'mariadb1011'], true)) {
             $engine = 'mysql84';
         }
@@ -198,6 +217,25 @@ class ScaffoldWordPressPipeline
             'password' => encrypt($password),
             'engine' => $engine,
         ]);
+
+        // Org-gated email of the credentials. Same shape as the Laravel
+        // pipeline — see ScaffoldLaravelPipeline::maybeEmailDatabaseCredentials
+        // for rationale on plain-text password delivery.
+        $organization = $site->organization;
+        $creator = $site->user;
+        if ($organization
+            && $organization->email_database_credentials_enabled
+            && $creator
+            && filled($creator->email)
+        ) {
+            $creator->notify(new \App\Notifications\SiteDatabaseCredentialsNotification(
+                site: $site,
+                engine: $engine,
+                password: $password,
+                databaseName: $dbName,
+                username: $username,
+            ));
+        }
     }
 
     private function stepWpDownload(Site $site): void

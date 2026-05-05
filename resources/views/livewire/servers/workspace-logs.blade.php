@@ -15,8 +15,6 @@
         data-subscribe="{{ $logBroadcastEchoSubscribable ? '1' : '0' }}"
     ></div>
 
-    @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => $logDisplayLines])
-
     @include('livewire.servers.partials.log-viewer-panel', ['logSources' => $logSources])
 
     <x-slot name="modals">

@@ -45,6 +45,14 @@ return [
     'deploy_ssh_user' => env('DPLY_SERVER_DEPLOY_SSH_USER', 'dply'),
 
     /*
+    | Install python3-minimal + deploy the metrics snapshot script
+    | during provision so freshly-built servers start collecting
+    | CPU/RAM/disk data automatically. Disable to keep the install
+    | behind the manual "Install Python for monitoring" service action.
+    */
+    'install_metrics_agent' => (bool) env('DPLY_SERVER_INSTALL_METRICS_AGENT', true),
+
+    /*
     |--------------------------------------------------------------------------
     | Optional extras for application / docker roles
     |--------------------------------------------------------------------------

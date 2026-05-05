@@ -4,17 +4,37 @@ declare(strict_types=1);
 
 namespace Tests\Feature\TaskRunner;
 
+use App\Jobs\CheckServerHealthJob;
+use App\Jobs\DeployGuestMetricsCallbackEnvJob;
+use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class ProvisionTaskCompletionTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // applyProvisionOutcomeToServer dispatches three follow-up jobs
+        // on success (insights, health probe, metrics push pipeline)
+        // that all attempt real SSH work. Fake them so the
+        // observer-success path under test doesn't bomb on the
+        // unreachable test fixture.
+        Bus::fake([
+            CheckServerHealthJob::class,
+            DeployGuestMetricsCallbackEnvJob::class,
+            RunServerInsightsJob::class,
+        ]);
+    }
 
     public function test_observer_marks_server_done_when_provision_task_finishes(): void
     {

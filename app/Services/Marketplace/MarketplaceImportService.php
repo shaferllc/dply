@@ -39,7 +39,7 @@ class MarketplaceImportService
         ]);
     }
 
-    public function importDeployCommand(User $user, MarketplaceItem $item, Server $server): void
+    public function importDeployCommand(User $user, MarketplaceItem $item, Server $server): ServerRecipe
     {
         if ($item->recipe_type !== MarketplaceItem::RECIPE_DEPLOY_COMMAND) {
             throw new \InvalidArgumentException('Invalid recipe type.');
@@ -49,18 +49,38 @@ class MarketplaceImportService
 
         $payload = $item->payload;
         $command = trim((string) ($payload['command'] ?? ''));
-        $mode = (string) ($payload['mode'] ?? 'replace');
 
         if ($command === '') {
             throw new \InvalidArgumentException('Recipe has no command.');
         }
 
-        if ($mode === 'append') {
-            $existing = trim((string) $server->deploy_command);
-            $command = $existing === '' ? $command : $existing."\n".$command;
+        // The legacy `deploy_command` column was dropped — marketplace
+        // RECIPE_DEPLOY_COMMAND items now land as ServerRecipe rows so
+        // the merged /run page can list and execute them like any other
+        // saved command. The 'append' payload mode (used to concatenate
+        // onto an existing single-field command) becomes meaningless
+        // when each import is its own recipe row, so it's ignored.
+        // Idempotency: if a recipe with the same name already exists
+        // for this server, update its script instead of duplicating.
+        $name = (string) ($payload['name'] ?? $item->name);
+
+        $existing = ServerRecipe::query()
+            ->where('server_id', $server->id)
+            ->where('name', $name)
+            ->first();
+
+        if ($existing) {
+            $existing->update(['script' => $command]);
+
+            return $existing;
         }
 
-        $server->update(['deploy_command' => $command]);
+        return ServerRecipe::query()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'name' => $name,
+            'script' => $command,
+        ]);
     }
 
     public function importServerRecipe(User $user, MarketplaceItem $item, Server $server): ServerRecipe

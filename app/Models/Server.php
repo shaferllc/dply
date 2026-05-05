@@ -85,7 +85,6 @@ class Server extends Model
         'setup_status',
         'meta',
         'supervisor_package_status',
-        'deploy_command',
         'last_health_check_at',
         'health_status',
         'scheduled_deletion_at',

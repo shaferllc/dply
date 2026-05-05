@@ -11,6 +11,8 @@ use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Support\Scaffold\DatabaseConnectionEnv;
+use App\Support\Servers\InstalledStack;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -183,6 +185,48 @@ class ScaffoldLaravelPipeline
 
     private function stepCreateDatabase(Site $site): void
     {
+        // Read what was *physically installed* on the server, not what
+        // the wizard requested. On low-memory droplets the script falls
+        // back from MySQL/Postgres to SQLite — using wizard meta here
+        // would generate a ServerDatabase row pointing at a daemon that
+        // doesn't exist, and the provisioner call below would fail.
+        $installed = InstalledStack::fromMeta($site->server);
+        $engine = $installed->database ?? 'mysql84';
+
+        // SQLite has no users / host / port / credentials concept, and
+        // ServerDatabaseProvisioner has no SQLite branch (it would
+        // attempt mysql commands against a daemon that isn't installed).
+        // Skip the row + provisioner entirely — Laravel's `php artisan
+        // migrate` auto-creates the file from the DB_DATABASE env value
+        // we'll write later. The scaffold meta still records enough for
+        // the .env writer to find the path.
+        if ($engine === 'sqlite3' || str_starts_with($engine, 'sqlite')) {
+            $sqlitePath = $this->deployPath($site).'/database/database.sqlite';
+            $this->setMeta($site, 'scaffold.database', [
+                'engine' => 'sqlite3',
+                'sqlite_path' => $sqlitePath,
+            ]);
+
+            // Surface the substitution prominently so anyone watching
+            // the scaffolding output understands their MySQL/Postgres
+            // request was overridden at provisioning time. Tagged-line
+            // pattern matches the existing notice infrastructure.
+            if ($installed->divergesFromRequest($site->server)) {
+                $requested = $site->server->meta['database'] ?? 'unknown';
+                Log::info('site.scaffold.notice', [
+                    'site_id' => $site->id,
+                    'reason' => 'database-engine-substituted',
+                    'requested' => $requested,
+                    'installed' => $engine,
+                    'low_mem_mode' => $installed->lowMemoryMode,
+                ]);
+            }
+
+            $this->maybeEmailDatabaseCredentials($site, 'sqlite3', null, null, null, $sqlitePath);
+
+            return;
+        }
+
         $dbName = 'dply_'.Str::slug($site->slug, '_');
         $username = 'dply_'.Str::slug($site->slug, '_');
         $password = Str::password(24, symbols: false);
@@ -192,18 +236,60 @@ class ScaffoldLaravelPipeline
             'name' => $dbName,
             'username' => $username,
             'password' => $password,
-            'engine' => $site->server->meta['database'] ?? 'mysql84',
+            'engine' => $engine,
             'host' => 'localhost',
         ]);
         $db->save();
         $this->databaseProvisioner->createOnServer($db);
 
         $this->setMeta($site, 'scaffold.database', [
+            'engine' => $engine,
             'server_database_id' => $db->id,
             'name' => $dbName,
             'username' => $username,
             'password' => encrypt($password),
         ]);
+
+        $this->maybeEmailDatabaseCredentials($site, $engine, $password, $dbName, $username, null);
+    }
+
+    /**
+     * Email the database credentials to the site's creator IF the org
+     * has the toggle on. Plain-text password is included in the email
+     * body for SQL engines (the operator opted in for the convenience —
+     * password-by-email is industry-standard for managed-DB workflows).
+     * SQLite emails carry the file path instead.
+     *
+     * No-op when the org toggle is off, when the site has no creator,
+     * or when the creator has no email — fail-closed defaults.
+     */
+    private function maybeEmailDatabaseCredentials(
+        Site $site,
+        string $engine,
+        ?string $password,
+        ?string $databaseName,
+        ?string $username,
+        ?string $sqlitePath,
+    ): void {
+        $organization = $site->organization;
+        $creator = $site->user;
+
+        if (! $organization || ! $organization->email_database_credentials_enabled) {
+            return;
+        }
+
+        if (! $creator || ! filled($creator->email)) {
+            return;
+        }
+
+        $creator->notify(new \App\Notifications\SiteDatabaseCredentialsNotification(
+            site: $site,
+            engine: $engine,
+            password: $password,
+            databaseName: $databaseName,
+            username: $username,
+            sqlitePath: $sqlitePath,
+        ));
     }
 
     private function stepComposerCreate(Site $site): void
@@ -248,7 +334,24 @@ class ScaffoldLaravelPipeline
         $deployPath = $this->deployPath($site);
         $db = $site->fresh()->meta['scaffold']['database'];
         $appName = addslashes($site->name);
-        $dbPassword = decrypt($db['password']);
+
+        // Build the DB block from a single helper so adding engines
+        // doesn't touch this file. Engine-specific branching used to
+        // be a hardcoded `DB_CONNECTION=mysql` here, which silently
+        // produced broken Laravel apps the moment the wizard or the
+        // provisioning script picked anything other than mysql.
+        $engine = (string) ($db['engine'] ?? 'mysql84');
+        if ($engine === 'sqlite3' || str_starts_with($engine, 'sqlite')) {
+            $dbBlock = trim(DatabaseConnectionEnv::forEngine('sqlite3', [
+                'sqlite_path' => (string) ($db['sqlite_path'] ?? $deployPath.'/database/database.sqlite'),
+            ]));
+        } else {
+            $dbBlock = trim(DatabaseConnectionEnv::forEngine($engine, [
+                'name' => (string) $db['name'],
+                'username' => (string) $db['username'],
+                'password' => decrypt($db['password']),
+            ]));
+        }
 
         $envBody = <<<ENV
         APP_NAME="{$appName}"
@@ -260,12 +363,7 @@ class ScaffoldLaravelPipeline
         LOG_CHANNEL=daily
         LOG_LEVEL=info
 
-        DB_CONNECTION=mysql
-        DB_HOST=127.0.0.1
-        DB_PORT=3306
-        DB_DATABASE={$db['name']}
-        DB_USERNAME={$db['username']}
-        DB_PASSWORD={$dbPassword}
+        {$dbBlock}
         ENV;
 
         $cmd = sprintf(

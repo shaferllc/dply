@@ -17,6 +17,7 @@ use App\Services\Servers\ServerJourneyInfrastructureAlerts;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ClassifyProvisionFailure;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\InstalledStack;
 use App\Support\Servers\ProvisionPipelineLog;
 use App\Support\Servers\ProvisionStepSnapshots;
 use App\Support\Servers\ProvisionVerificationSummary;
@@ -139,6 +140,12 @@ class ProvisionJourney extends Component
             'verificationChecks' => $verificationChecks,
             'failureClassification' => $failureClassification,
             'repairGuidance' => $repairGuidance,
+            // Reconciled snapshot of what physically landed (vs the
+            // wizard's request). View uses this to render the
+            // "Requested vs Installed" divergence banner when applicable.
+            'installedStack' => InstalledStack::fromMeta($this->server),
+            'installedStackDiverges' => InstalledStack::fromMeta($this->server)->divergesFromRequest($this->server),
+            'requestedDatabase' => $this->server->meta['database'] ?? null,
             'stackSummary' => $stackSummary,
             'stackTiles' => $stackSummary ? [
                 ['label' => __('Role'),        'value' => $stackSummary['role'],         'icon' => 'heroicon-o-rectangle-stack'],
@@ -153,8 +160,6 @@ class ProvisionJourney extends Component
             'canCancelProvision' => $this->canCancelProvision($task),
             'liveTaskOutput' => $this->liveTaskOutput($task),
             'liveTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
-            'fullTaskOutput' => $this->fullTaskOutput($task),
-            'fullTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
             'taskUpdatedAt' => $task?->updated_at,
             'rollbackSummary' => $this->rollbackSummary($task),
             'failureReason' => $this->failureReason($task, collect($steps)->firstWhere('state', 'failed')),
@@ -543,23 +548,6 @@ class ProvisionJourney extends Component
         return count(preg_split('/\r\n|\r|\n/', $task->output) ?: []);
     }
 
-    /**
-     * Full untrimmed task output for the "View full" modal — capped to keep page size sane.
-     */
-    protected function fullTaskOutput(?Task $task): string
-    {
-        if (! $task || ! is_string($task->output)) {
-            return '';
-        }
-
-        $output = trim($task->output);
-        // Hard cap to ~1MB so a runaway log doesn't bloat the rendered HTML.
-        if (strlen($output) > 1_000_000) {
-            $output = '… [truncated to last 1 MB] …'."\n".substr($output, -1_000_000);
-        }
-
-        return $output;
-    }
 
     /**
      * Extract a one-line "why did this fail" headline + a few supporting lines from the
@@ -1014,7 +1002,7 @@ class ProvisionJourney extends Component
 
     /**
      * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}>  $steps
-     * @return array{eta:string,last_output:string,stalled:bool,warning:?string}|null
+     * @return array{eta:string,running_for:string,last_output:?string,stalled:bool,warning:?string}|null
      */
     protected function stallState(?Task $task, array $steps): ?array
     {
@@ -1023,23 +1011,53 @@ class ProvisionJourney extends Component
         }
 
         $activeStep = collect($steps)->firstWhere('state', 'active');
-        $minutesSinceUpdate = (int) max(0, now()->diffInMinutes($task->updated_at ?? $task->started_at ?? now()));
-        $minutesRunning = (int) max(0, now()->diffInMinutes($task->started_at ?? $task->created_at ?? now()));
+        $now = now();
+        // diffInMinutes() returns a float in modern Carbon and the int
+        // cast truncates anything <60s to 0 — that's why operators saw
+        // "Running for 0 minutes" sit there forever during the first
+        // minute of a run. Use seconds and format with humanizeDuration
+        // so the timer is always live.
+        $secondsSinceUpdate = (int) max(0, $now->diffInSeconds($task->updated_at ?? $task->started_at ?? $now));
+        $secondsRunning = (int) max(0, $now->diffInSeconds($task->started_at ?? $task->created_at ?? $now));
         $eta = match ($activeStep['key'] ?? null) {
             'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
             'setup' => 'Usually 5-10 minutes',
             default => 'Usually a few minutes',
         };
 
+        // Stall heuristics in minutes (integer thresholds are fine here
+        // because we round up to favour the operator: a 2m59s gap should
+        // still tip into "looks stalled" sooner rather than later).
+        $minutesSinceUpdate = (int) ceil($secondsSinceUpdate / 60);
+        $minutesRunning = (int) ceil($secondsRunning / 60);
         $stalled = $minutesSinceUpdate >= 3 || $minutesRunning >= 8;
 
         return [
             'eta' => $eta,
-            'last_output' => $minutesSinceUpdate === 0
-                ? "Running for {$minutesRunning} minute".($minutesRunning === 1 ? '' : 's')
-                : "No new output for {$minutesSinceUpdate} minute".($minutesSinceUpdate === 1 ? '' : 's'),
+            'running_for' => 'Running for '.$this->formatRunDuration($secondsRunning),
+            // Only surface this when the gap is meaningful; under 30s
+            // is just normal poll cadence and would flicker on/off.
+            'last_output' => $secondsSinceUpdate >= 30
+                ? 'No new output for '.$this->formatRunDuration($secondsSinceUpdate)
+                : null,
             'stalled' => $stalled,
             'warning' => $stalled ? 'This run may be stalled. Review the latest output or cancel and retry if it does not recover soon.' : null,
         ];
+    }
+
+    private function formatRunDuration(int $seconds): string
+    {
+        if ($seconds < 60) {
+            return $seconds.'s';
+        }
+
+        $minutes = intdiv($seconds, 60);
+        $remainder = $seconds % 60;
+
+        if ($minutes < 10 && $remainder > 0) {
+            return "{$minutes}m {$remainder}s";
+        }
+
+        return $minutes.'m';
     }
 }

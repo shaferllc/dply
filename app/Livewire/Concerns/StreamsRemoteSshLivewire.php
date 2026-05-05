@@ -2,54 +2,41 @@
 
 namespace App\Livewire\Concerns;
 
-use Livewire\Livewire;
-
 /**
- * Livewire stream targets must exist in the view: wire:stream.replace="remoteSshMeta", wire:stream="remoteSshOut".
+ * No-op trait kept for back-compat with ~28 callers across server / sites
+ * Livewire components.
  *
- * Streaming must only run on Livewire update requests (X-Livewire header). Calling stream() during a
- * full-page render (e.g. mount) corrupts the HTML response with raw JSON.
+ * Originally drove a per-page "Streamed output / LIVE" drawer (`wire:stream`
+ * targets `remoteSshMeta` / `remoteSshOut` in
+ * resources/views/livewire/servers/partials/remote-ssh-stream-panel.blade.php).
+ * That partial has been removed and all live SSH/Process activity now flows
+ * through the global TaskRunner debug panel
+ * ({@see \App\Livewire\Debug\TaskRunnerPanel}, fed by
+ * {@see \App\Support\Debug\TaskRunnerBroadcastBridge} on the org Reverb
+ * channel) — visible to platform admins only.
+ *
+ * The methods below are deliberate no-ops so call sites compile and run
+ * unchanged. A follow-up PR can excise the trait and the `use` lines.
  */
 trait StreamsRemoteSshLivewire
 {
     protected function resetRemoteSshStreamTargets(): void
     {
-        if ($this->shouldSkipLiveRemoteStreams()) {
-            return;
-        }
-
-        $this->stream('', true)->to('remoteSshMeta');
-        $this->stream('', true)->to('remoteSshOut');
+        // no-op: replaced by TaskRunner debug panel
     }
 
     protected function remoteSshStreamSetMeta(string $contextLabel, string $commandShown): void
     {
-        if ($this->shouldSkipLiveRemoteStreams()) {
-            return;
-        }
-
-        $html = '<p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">'.e($contextLabel).'</p>'
-            .'<pre class="mt-2 whitespace-pre-wrap break-all font-mono text-[11px] leading-snug text-brand-ink">'
-            .e($commandShown).'</pre>';
-
-        $this->stream($html, true)->to('remoteSshMeta');
+        // no-op: replaced by TaskRunner debug panel
     }
 
     protected function remoteSshStreamAppendStdout(string $chunk): void
     {
-        if ($chunk === '' || $this->shouldSkipLiveRemoteStreams()) {
-            return;
-        }
-
-        $this->stream(e($chunk))->to('remoteSshOut');
+        // no-op: replaced by TaskRunner debug panel
     }
 
     protected function shouldSkipLiveRemoteStreams(): bool
     {
-        if (app()->runningUnitTests()) {
-            return true;
-        }
-
-        return ! Livewire::isLivewireRequest();
+        return true;
     }
 }

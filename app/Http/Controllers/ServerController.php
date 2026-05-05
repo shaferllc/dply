@@ -203,37 +203,10 @@ class ServerController extends Controller
         }
     }
 
-    public function deploy(Request $request, Server $server): RedirectResponse
-    {
-        $this->authorize('view', $server);
-
-        $command = $server->deploy_command;
-        if (empty(trim((string) $command))) {
-            return back()->with('error', 'Set a deploy command first. Use "Edit deploy command" below.');
-        }
-
-        try {
-            $ssh = new SshConnection($server);
-            $output = $ssh->exec($command);
-
-            return back()->with('command_output', $output);
-        } catch (\Throwable $e) {
-            return back()->with('command_error', $e->getMessage());
-        }
-    }
-
-    public function update(Request $request, Server $server): RedirectResponse
-    {
-        $this->authorize('update', $server);
-
-        $validated = $request->validate([
-            'deploy_command' => 'nullable|string|max:2000',
-        ]);
-
-        $server->update(['deploy_command' => $validated['deploy_command'] ?? null]);
-
-        return back()->with('success', 'Deploy command updated.');
-    }
+    // The `deploy()` action and the `update()` `deploy_command` write
+    // path were removed when the legacy column was dropped. Server-
+    // level commands now live as ServerRecipe rows runnable from
+    // /servers/{id}/run.
 
     public function checkHealth(Request $request, Server $server): RedirectResponse
     {

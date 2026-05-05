@@ -59,11 +59,11 @@
             </p>
         </div>
 
-        <x-resource-notification-summary
-            :resource="$server"
-            :heading="__('Database and server notifications')"
-            :manage-url="route('servers.databases', $server)"
-        />
+        @livewire(\App\Livewire\Notifications\ResourceSummary::class, [
+            'resource' => $server,
+            'heading' => __('Database and server notifications'),
+            'manageUrl' => route('profile.notification-channels.bulk-assign', ['server' => $server->id]),
+        ], key('resource-summary-databases-'.$server->id))
 
         <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
             <x-server-workspace-tablist :aria-label="__('Database workspace sections')" class="sm:min-w-0 sm:flex-1">

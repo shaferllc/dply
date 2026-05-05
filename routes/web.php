@@ -48,7 +48,6 @@ use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDatabases;
-use App\Livewire\Servers\WorkspaceDeploy;
 use App\Livewire\Servers\WorkspaceFirewall;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceLogs;
@@ -61,7 +60,7 @@ use App\Livewire\Fleet\Health as FleetHealth;
 use App\Livewire\Servers\Deploys as ServerDeploys;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePhp;
-use App\Livewire\Servers\WorkspaceRecipes;
+use App\Livewire\Servers\WorkspaceRun;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
@@ -284,8 +283,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
-    Route::livewire('servers/{server}/recipes', WorkspaceRecipes::class)->name('servers.recipes');
-    Route::livewire('servers/{server}/deploy', WorkspaceDeploy::class)->name('servers.deploy');
+    // /run replaces both /recipes and /deploy. The merged page hosts
+    // the saved-command list (CRUD + inline run), an ad-hoc command
+    // runner, and the marketplace import path. Old URLs 404 by
+    // design — clean break, no redirect shim.
+    Route::livewire('servers/{server}/run', WorkspaceRun::class)->name('servers.run');
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');

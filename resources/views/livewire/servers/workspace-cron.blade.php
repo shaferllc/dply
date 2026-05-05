@@ -466,7 +466,7 @@
                     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                         <h2 class="text-sm font-semibold text-brand-ink">{{ __('Run a job manually') }}</h2>
                         <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('Queues a one-off run over SSH (same wrapping as in crontab). Ensure queue workers are running.') }}
+                            {{ __('Queues a one-off run over SSH (same wrapping as in crontab).') }}
                         </p>
                     </div>
                     @if ($server->cronJobs->isEmpty())

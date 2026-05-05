@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use App\Support\Servers\InstalledStack;
 use App\Support\Servers\ProvisionLogSections;
 use App\Support\Servers\ProvisionStepSnapshots;
 
@@ -45,6 +46,23 @@ class TaskRunnerTaskObserver
             if (($meta['provision_step_snapshots'] ?? null) !== $snapshots) {
                 $meta['provision_step_snapshots'] = $snapshots;
                 $server->update(['meta' => $meta]);
+            }
+
+            // Reconcile the installed-stack snapshot. The bash script
+            // emits a single `[dply-installed-stack] {json}` line at the
+            // very end of a successful run; until that lands,
+            // parseFromOutput returns null and we leave existing meta
+            // untouched. Once it appears, we hydrate the value object,
+            // diff against current meta, and write only on actual change
+            // (cheap idempotency — observer fires every output update,
+            // but DB write happens at most once per run).
+            $installedStack = InstalledStack::parseFromOutput(is_string($task->output) ? $task->output : '');
+            if ($installedStack !== null) {
+                $serialized = $installedStack->toArray();
+                if (($meta[InstalledStack::META_KEY] ?? null) !== $serialized) {
+                    $meta[InstalledStack::META_KEY] = $serialized;
+                    $server->update(['meta' => $meta]);
+                }
             }
         }
 

@@ -263,6 +263,19 @@ class AppServiceProvider extends ServiceProvider
             });
         });
 
+        /*
+         * Bridge TaskRunner StreamingLogger events to the org-scoped Reverb
+         * channel so the global TaskRunner debug panel (platform admins) can
+         * tail every SSH/SCP/Process invocation in real time. Deferred to
+         * booted() so the package's TaskServiceProvider has finished wiring
+         * its singleton before we attach.
+         */
+        $this->app->booted(function (): void {
+            \App\Support\Debug\TaskRunnerBroadcastBridge::register(
+                $this->app->make(\App\Modules\TaskRunner\Contracts\StreamingLoggerInterface::class)
+            );
+        });
+
         Server::observe(ServerObserver::class);
         SupervisorProgram::observe(SupervisorProgramObserver::class);
         TaskRunnerTask::observe(TaskRunnerTaskObserver::class);

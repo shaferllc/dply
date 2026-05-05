@@ -5,17 +5,40 @@
 
 <x-server-workspace-layout
     :server="$server"
-    active="recipes"
-    :title="__('Saved commands')"
-    :description="__('Server-local runbooks, diagnostics, and one-off operational scripts. Browse the library to import a starter, or write your own — everything lands here on this server.')"
+    active="run"
+    :title="__('Run')"
+    :description="__('Run server-level commands. Saved commands, ad-hoc shell, and library presets all in one place. Site deploys live on each site’s page.')"
 >
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    {{-- Top-of-page banner clarifying scope. The page used to be
+         called "Deploy" and operators kept landing here looking for
+         site deploys. The banner explicitly redirects them to the
+         right surfaces. --}}
+    <div class="rounded-2xl border border-sky-200/70 bg-sky-50/60 p-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0 max-w-3xl">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Server-level commands') }}</p>
+                <p class="mt-1 text-sm leading-6 text-brand-moss">
+                    {{ __('This page runs commands against the whole server. To deploy a site, open the site’s own page. For coordinated multi-site delivery, use the project delivery page.') }}
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30">
+                    {{ __('Open Sites') }}
+                </a>
+                @if ($server->workspace)
+                    <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30">
+                        {{ __('Open Project delivery') }}
+                    </a>
+                @endif
+            </div>
+        </div>
+    </div>
+
     @if ($opsReady)
         <div class="space-y-6">
-            @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 18])
-
             <div class="{{ $card }} p-6 sm:p-8">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
@@ -24,28 +47,33 @@
                             {{ __(':count saved · pulled from marketplace presets, organization scripts, or written here.', ['count' => $server->recipes->count()]) }}
                         </p>
                     </div>
-                    <div class="flex flex-wrap gap-2 sm:justify-end">
+                    {{-- flex-nowrap + shrink-0 keeps Browse + Write your own
+                         on a single row even when the heading column is wide.
+                         The previous flex-wrap let them stack vertically when
+                         the right column was narrower than the two buttons'
+                         combined width. --}}
+                    <div class="flex flex-row flex-nowrap items-center gap-2 shrink-0 sm:justify-end">
                         <button
                             type="button"
                             wire:click="openLibrary"
-                            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
                         >
-                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <rect x="3" y="3" width="14" height="14" rx="2"/>
                                 <path d="M3 8h14"/>
                                 <path d="M8 3v14"/>
                             </svg>
                             {{ __('Browse library') }}
-                            <span class="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium">
+                            <span class="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-medium">
                                 {{ $libraryTotals['marketplace'] + $libraryTotals['organization'] }}
                             </span>
                         </button>
                         <button
                             type="button"
                             wire:click="startNewRecipe"
-                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                         >
-                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M10 4v12"/>
                                 <path d="M4 10h12"/>
                             </svg>
@@ -74,7 +102,6 @@
                                 <div class="flex flex-wrap gap-2 text-xs font-medium">
                                     <button type="button" wire:click="runRecipe('{{ $rec->id }}')" class="rounded-lg border border-brand-sage/40 bg-brand-sage/10 px-2.5 py-1 text-brand-sage hover:bg-brand-sage/20">{{ __('Run') }}</button>
                                     <button type="button" wire:click="editRecipe('{{ $rec->id }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Edit') }}</button>
-                                    <button type="button" wire:click="useRecipeAsDeployCommand('{{ $rec->id }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Use as deploy') }}</button>
                                     <button type="button" wire:click="openConfirmActionModal('deleteRecipe', ['{{ $rec->id }}'], @js(__('Delete saved command')), @js(__('Delete saved command?')), @js(__('Delete')), true)" class="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-red-600 hover:bg-red-50">{{ __('Delete') }}</button>
                                 </div>
                             </li>
@@ -91,13 +118,37 @@
                                 {{ $editing_recipe_id ? __('Edit saved command') : __('New saved command') }}
                             </h2>
                             <p class="mt-1 text-sm text-brand-moss">
-                                {{ __('Store the command exactly as it should run on this server. Promote into Deploy explicitly when it becomes part of the release flow.') }}
+                                {{ __('Store the command exactly as it should run on this server. Recipes are listed above and can be run, edited, or deleted any time.') }}
                             </p>
                         </div>
                         <button type="button" wire:click="cancelEditingRecipe" class="text-sm font-medium text-brand-moss hover:text-brand-ink">
                             {{ __('Close') }}
                         </button>
                     </div>
+
+                    @if (! $editing_recipe_id && ! empty($starterTemplates))
+                        {{-- Starter templates: pre-fill the form from the
+                             small set of presets that the deleted /deploy
+                             page used to surface as quick-fill buttons.
+                             Only shown when CREATING a new recipe — editing
+                             an existing one shouldn't offer a "wipe and
+                             repopulate from template" footgun. --}}
+                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Start from a template') }}</p>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                @foreach ($starterTemplates as $template)
+                                    <button
+                                        type="button"
+                                        wire:click="applyStarterTemplate('{{ $template['key'] }}')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        title="{{ $template['description'] }}"
+                                    >
+                                        {{ $template['label'] }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
                     <form wire:submit="addRecipe" class="mt-6 space-y-4">
                         <x-text-input wire:model="new_recipe_name" placeholder="{{ __('Saved command name') }}" />
@@ -114,13 +165,38 @@
                 </div>
             @endif
 
+            {{-- Ad-hoc one-off command runner. Absorbed from the deleted
+                 /deploy page so /run owns all command execution. Output
+                 streams to the live SSH panel via the StreamsRemoteSshLivewire
+                 trait — same plumbing the recipe runner uses. --}}
+            <div class="{{ $card }} p-6 sm:p-8">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">
+                            {{ __('Type a shell command and run it now. Output streams below; nothing is saved. Save it as a recipe above when you want to keep it around.') }}
+                        </p>
+                    </div>
+                </div>
+                <form wire:submit="runAdhocCommand" class="mt-5 space-y-3">
+                    <textarea wire:model="adhoc_command" rows="4" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="uname -a"></textarea>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <x-primary-button type="submit" class="!py-2">
+                            {{ __('Run command') }}
+                        </x-primary-button>
+                        @if ($command_error)
+                            <p class="text-xs text-red-700">{{ $command_error }}</p>
+                        @endif
+                    </div>
+                </form>
+            </div>
+
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 px-5 py-4 text-sm text-brand-moss">
                 <p class="font-medium text-brand-ink">{{ __('Where else commands live') }}</p>
                 <p class="mt-1 leading-relaxed">
-                    {{ __('Saved commands stay on this server only. Use Deploy for release commands and Scripts for organization-wide reusable automation.') }}
+                    {{ __('Saved commands stay on this server only. Use Scripts for organization-wide reusable automation.') }}
                 </p>
                 <div class="mt-3 flex flex-wrap gap-3 text-sm font-medium">
-                    <a href="{{ route('servers.deploy', $server) }}" wire:navigate class="text-brand-ink hover:text-brand-sage">{{ __('Open deploy') }}</a>
                     <a href="{{ route('scripts.index') }}" wire:navigate class="text-brand-ink hover:text-brand-sage">{{ __('Open scripts') }}</a>
                 </div>
             </div>
@@ -144,7 +220,7 @@
             $activeItems = $libraryTab === 'organization' ? $orgScriptItems : $marketplaceItems;
             $tabBtnBase = 'rounded-lg px-3 py-1.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-brand-sage/30';
         @endphp
-        <x-modal name="browse-library-modal" maxWidth="2xl" :show="$browseLibraryOpen">
+        <x-modal name="browse-library-modal" maxWidth="5xl" :show="$browseLibraryOpen">
             <div class="flex flex-col" style="max-height: min(85vh, 720px);">
                 <header class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4">
                     <div class="min-w-0">

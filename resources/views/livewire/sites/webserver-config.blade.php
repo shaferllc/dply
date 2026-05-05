@@ -341,7 +341,7 @@
                 <p class="font-semibold text-brand-ink text-sm">{{ __('Runbook') }}</p>
                 <a href="{{ route('scripts.marketplace') }}" wire:navigate class="text-brand-ink font-medium underline">{{ __('Script marketplace') }}</a>
                 <span class="text-brand-mist">·</span>
-                <a href="{{ route('servers.recipes', $server) }}" wire:navigate class="text-brand-ink font-medium underline">{{ __('Server recipes') }}</a>
+                <a href="{{ route('servers.run', $server) }}" wire:navigate class="text-brand-ink font-medium underline">{{ __('Server commands') }}</a>
             </div>
         </aside>
     </div>

@@ -24,7 +24,9 @@ use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSiteInsightsJob;
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Jobs\SyncServerSystemdServicesJob;
+use App\Jobs\UpgradeGuestMetricsScriptJob;
 use App\Models\Server;
+use App\Services\Servers\ServerMetricsGuestScript;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use Illuminate\Console\Scheduling\Schedule;
@@ -137,6 +139,35 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(FlushServerSystemdNotificationDigestCommand::class)
             ->hourlyAt(12)
             ->when(fn (): bool => (bool) config('server_services.systemd_digest_flush_enabled', true));
+
+        // Sweep ready servers and push the bundled metrics script when
+        // its SHA differs from what's recorded as deployed. Job is
+        // ShouldBeUnique on serverId, so a slow droplet won't pile up
+        // duplicate upgrade attempts. The job itself re-checks the
+        // bundled SHA at runtime so a queue backlog can't push a stale
+        // script. Hourly cadence is the cheapest "new release reaches
+        // every droplet within an hour" without making this the
+        // queue's primary tenant.
+        $schedule->call(function (): void {
+            if (! (bool) config('server_metrics.guest_script.scheduled_upgrades_enabled', true)) {
+                return;
+            }
+            $bundledSha = app(ServerMetricsGuestScript::class)->bundledSha256();
+            if ($bundledSha === '') {
+                return;
+            }
+            Server::query()
+                ->where('status', Server::STATUS_READY)
+                ->whereNotNull('ip_address')
+                ->whereNotNull('ssh_private_key')
+                ->each(function (Server $server) use ($bundledSha): void {
+                    $deployedSha = (string) ($server->meta['monitoring_guest_script_sha'] ?? $server->meta['monitoring_guest_script_sha256'] ?? '');
+                    if ($deployedSha === $bundledSha) {
+                        return;
+                    }
+                    UpgradeGuestMetricsScriptJob::dispatch($server->id, $bundledSha);
+                });
+        })->hourly();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = trim((string) env('TRUSTED_PROXIES', ''));

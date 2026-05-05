@@ -86,6 +86,9 @@ trait ManagesServerSystemdServices
 
     public ?string $systemdStatusModalError = null;
 
+    /** Which body the status modal is showing: 'status' (systemctl) or 'logs' (journalctl). */
+    public string $systemdStatusModalView = 'status';
+
     /**
      * Channel id => which inventory-driven events notify that channel for the open unit.
      *
@@ -114,6 +117,18 @@ trait ManagesServerSystemdServices
     public string $systemdFilterCustom = 'all';
 
     public string $systemdFilterNotify = 'all';
+
+    /**
+     * When false, the services table hides background units the operator can't manage
+     * (getty@tty1, ModemManager, multipathd, dbus, …). Failed units always render.
+     * Toggled by the table footer "Show all services" button.
+     */
+    public bool $systemdShowSystem = false;
+
+    public function toggleSystemdShowSystem(): void
+    {
+        $this->systemdShowSystem = ! $this->systemdShowSystem;
+    }
 
     public bool $showSystemdBulkNotifyModal = false;
 
@@ -179,6 +194,7 @@ trait ManagesServerSystemdServices
         $this->systemdStatusModalChannelRows = [];
         $this->systemdStatusModalLoading = false;
         $this->systemdStatusModalError = null;
+        $this->systemdStatusModalView = 'status';
         $this->systemdEntrySnippet = null;
     }
 
@@ -232,6 +248,27 @@ trait ManagesServerSystemdServices
     }
 
     /**
+     * Open the same modal in "Logs" mode (journalctl).
+     */
+    public function openSystemdLogsModalForService(string $unit): void
+    {
+        $this->systemdStatusModalView = 'logs';
+        $this->openSystemdStatusModalForService($unit);
+    }
+
+    /**
+     * Toggle between Status and Logs without closing the modal.
+     */
+    public function setSystemdStatusModalView(string $view): void
+    {
+        if (! in_array($view, ['status', 'logs'], true)) {
+            return;
+        }
+        $this->systemdStatusModalView = $view;
+        $this->fetchSystemdModalStatus();
+    }
+
+    /**
      * Re-fetch systemctl status for the open modal (Refresh button).
      */
     public function fetchSystemdModalStatus(): void
@@ -281,7 +318,8 @@ trait ManagesServerSystemdServices
      */
     protected function fillSystemdModalStatusFromRemoteSsh(string $normalized): void
     {
-        $script = $this->systemdActionBash($normalized, 'status');
+        $view = $this->systemdStatusModalView === 'logs' ? 'logs' : 'status';
+        $script = $this->systemdActionBash($normalized, $view);
 
         set_time_limit((int) config('server_services.systemd_action_timeout', 180) + 30);
         $timeout = (int) config('server_services.systemd_action_timeout', 180);
@@ -290,7 +328,7 @@ trait ManagesServerSystemdServices
             $server = $this->server->fresh();
             $out = $this->runManageInlineBash(
                 $server,
-                'services-systemd:'.$normalized.':status',
+                'services-systemd:'.$normalized.':'.$view,
                 $script,
                 static function (string $type, string $buffer): void {},
                 $timeout,
@@ -476,6 +514,15 @@ trait ManagesServerSystemdServices
             $statusOnly = $catalog->isUnitStatusOnlyForServer($this->server, $s->unit);
             $isFailed = $s->active_state === 'failed' || $s->sub_state === 'failed';
 
+            // Pending action expires after ~3 min so a stuck row clears
+            // even if the inventory sync never lands. Anything fresher
+            // is surfaced to the blade so it can render "Starting…"
+            // / "Stopping…" / etc. instead of stale active_state.
+            $pendingAction = (string) ($s->pending_action ?? '');
+            $pendingFresh = $pendingAction !== ''
+                && $s->pending_action_at !== null
+                && $s->pending_action_at->isAfter(now()->subMinutes(3));
+
             return [
                 'unit' => $s->unit,
                 'label' => $s->label,
@@ -490,6 +537,7 @@ trait ManagesServerSystemdServices
                 'is_failed' => $isFailed,
                 'boot_state' => (string) ($s->unit_file_state ?? ''),
                 'main_pid' => (string) ($s->main_pid ?? ''),
+                'pending_action' => $pendingFresh ? $pendingAction : null,
                 'boot_likely_enabled' => $catalog->bootStateLikelyEnabled($s->unit_file_state),
                 'boot_likely_disabled' => $catalog->bootStateLikelyDisabled($s->unit_file_state),
                 'boot_menu_show_enable' => $catalog->bootMenuShowEnableAtBoot($s->unit_file_state),
@@ -564,7 +612,7 @@ trait ManagesServerSystemdServices
 
         SyncServerSystemdServicesJob::dispatch($this->server->id);
         if (! $silent) {
-            $this->toastSuccess(__('Service sync queued. This page refreshes from the database every few seconds while you stay here—ensure a queue worker is running.'));
+            $this->toastSuccess(__('Service sync queued. This page refreshes automatically while you stay here.'));
         }
     }
 
@@ -653,6 +701,19 @@ trait ManagesServerSystemdServices
         $this->systemdPendingKind = 'action';
         $this->systemdRowBusyUnit = $normalized;
         $this->systemdPendingActionUnit = $normalized;
+
+        // Record the operator's intent on the state row so the table can
+        // immediately render "Starting…" / "Stopping…" / etc. The next
+        // inventory sync will clear this when it confirms the actual
+        // active_state. A safety expiry inside the renderer auto-clears
+        // stale rows (~3 min) if SSH fails to re-sync for any reason.
+        ServerSystemdServiceState::query()
+            ->where('server_id', $this->server->id)
+            ->where('unit', $normalized)
+            ->update([
+                'pending_action' => $action,
+                'pending_action_at' => now(),
+            ]);
 
         set_time_limit((int) config('server_services.systemd_action_timeout', 180) + 30);
         $timeout = (int) config('server_services.systemd_action_timeout', 180);
@@ -925,7 +986,7 @@ trait ManagesServerSystemdServices
 
         $statusHint = match ($status) {
             'queued' => $stalledQueued
-                ? __('Task still queued. Ensure a queue worker is running (e.g. php artisan queue:work) and that CACHE_DRIVER is shared with the worker (not "array").')
+                ? __('Still preparing this task. If it stays stuck, contact your administrator.')
                 : __('Task queued…'),
             'running' => __('Running on server…'),
             default => '',
@@ -995,6 +1056,22 @@ trait ManagesServerSystemdServices
     }
 
     /**
+     * Count of system rows hidden by the "Show all services" toggle. Used by the
+     * services table footer to label the "Show N system services" disclosure.
+     */
+    public function systemdHiddenSystemCount(): int
+    {
+        if ($this->systemdShowSystem) {
+            return 0;
+        }
+
+        return count(array_filter(
+            $this->systemdInventory,
+            fn (array $r): bool => empty($r['can_manage']) && empty($r['is_failed']),
+        ));
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function systemdFilteredInventoryRows(): array
@@ -1031,6 +1108,13 @@ trait ManagesServerSystemdServices
             $rows = array_values(array_filter($rows, fn (array $r): bool => ((int) ($r['alert_subscription_count'] ?? 0)) > 0));
         } elseif ($n === 'none') {
             $rows = array_values(array_filter($rows, fn (array $r): bool => ((int) ($r['alert_subscription_count'] ?? 0)) === 0));
+        }
+
+        if (! $this->systemdShowSystem) {
+            $rows = array_values(array_filter(
+                $rows,
+                fn (array $r): bool => ! empty($r['can_manage']) || ! empty($r['is_failed']),
+            ));
         }
 
         usort($rows, function (array $a, array $b): int {
@@ -1190,6 +1274,7 @@ trait ManagesServerSystemdServices
 
         return match ($action) {
             'status' => '(systemctl status '.$u.' --no-pager -l 2>&1); exit 0',
+            'logs' => '(journalctl --no-pager --output=short-iso -u '.$u.' -n 200 2>&1); exit 0',
             'start', 'stop', 'restart', 'reload', 'disable', 'enable' => '(sudo -n systemctl '.$action.' '.$u.' || systemctl '.$action.' '.$u.') 2>&1',
             default => throw new \InvalidArgumentException,
         };

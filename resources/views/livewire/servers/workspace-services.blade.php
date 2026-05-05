@@ -1,5 +1,8 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    // No overflow-hidden on the table card — the row-action kebab
+    // dropdown is positioned absolute and gets clipped at the card
+    // edge otherwise. dply-card already handles rounded corners.
+    $card = 'dply-card';
     $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
     $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
     $btnDanger = 'inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
@@ -50,13 +53,13 @@
         </div>
     @endif
 
-    <x-resource-notification-summary
-        :resource="$server"
-        :heading="__('Service notifications')"
-        :manage-url="route('servers.services', $server)"
-    />
+    @livewire(\App\Livewire\Notifications\ResourceSummary::class, [
+        'resource' => $server,
+        'heading' => __('Service notifications'),
+        'manageUrl' => route('profile.notification-channels.bulk-assign', ['server' => $server->id]),
+    ], key('resource-summary-services-'.$server->id))
 
-    <div class="{{ $card }} overflow-hidden">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div>
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('System services') }}</h2>
@@ -248,8 +251,17 @@
             </div>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-brand-ink/10 text-left text-sm">
+        @php
+            $systemHiddenCount = $this->systemdHiddenSystemCount();
+        @endphp
+        <div class="-mx-4 sm:mx-0">
+            {{-- Round the bottom edge of the last row so the table doesn't
+                 poke past the card's rounded-2xl corners. We removed
+                 overflow-hidden from the card to let the row-action kebab
+                 dropdown escape; this restores the visual seal. --}}
+            <table class="w-full divide-y divide-brand-ink/10 text-left text-sm
+                [&>tbody>tr:last-child>td:first-child]:rounded-bl-2xl
+                [&>tbody>tr:last-child>td:last-child]:rounded-br-2xl">
                 <thead class="bg-brand-sand/40 text-xs font-semibold uppercase tracking-wide text-brand-moss">
                     <tr>
                         <th scope="col" class="w-10 p-4">
@@ -293,8 +305,43 @@
                             $rowBusy = ($systemdRowBusyUnit ?? '') !== '' && ($systemdRowBusyUnit ?? '') === $rowUnit;
                             $otherBusy = (($systemdRowBusyUnit ?? '') !== '' && ! $rowBusy) || ($systemdBulkBusy ?? false);
                             $bootUnk = trim((string) ($row['boot_state'] ?? '')) === '';
+                            // Optimistic pending action surface. When set, render
+                            // "Starting…" / "Stopping…" / "Restarting…" / "Reloading…"
+                            // immediately after the user clicks, before the SSH
+                            // round-trip + inventory sync confirms the new state.
+                            $pendingAction = $row['pending_action'] ?? null;
+                            $pendingLabel = match ($pendingAction) {
+                                'start' => __('Starting…'),
+                                'stop' => __('Stopping…'),
+                                'restart' => __('Restarting…'),
+                                'reload' => __('Reloading…'),
+                                'enable' => __('Enabling at boot…'),
+                                'disable' => __('Disabling at boot…'),
+                                default => null,
+                            };
+                            // While an action is in flight on this unit, lock
+                            // out every other action button on the same row so
+                            // the operator can't queue a Stop on top of a Start
+                            // (or open the kebab to do it via a different path).
+                            $rowPending = $pendingLabel !== null;
                         @endphp
-                        <tr wire:key="systemd-svc-{{ $rowUnit }}" @class(['bg-red-50/40' => $isFailed])>
+                        <tr
+                            wire:key="systemd-svc-{{ $rowUnit }}"
+                            x-data="{
+                                rowLoading: false,
+                                fireRowLoading() {
+                                    this.rowLoading = true;
+                                    clearTimeout(this._rl);
+                                    // 8 s covers most SSH-driven action / status round-trips.
+                                    // The persistent server-side $rowBusy or modal-visible
+                                    // state takes over for genuinely long actions; this is
+                                    // just the click→first-feedback bridge.
+                                    this._rl = setTimeout(() => { this.rowLoading = false; }, 8000);
+                                },
+                            }"
+                            :class="rowLoading ? 'opacity-60 pointer-events-none' : ''"
+                            @class(['bg-red-50/40' => $isFailed, 'transition-opacity duration-150'])
+                        >
                             <td class="p-4 align-top">
                             <input
                                 type="checkbox"
@@ -304,13 +351,18 @@
                                 @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || ! $mayMutate)
                             />
                             </td>
-                            <td class="p-0 align-top">
-                                <span class="inline-block min-h-[3rem] w-1 rounded-full {{ $isFailed ? 'bg-red-500' : ($isActive ? 'bg-emerald-500' : 'bg-brand-mist/60') }}" title="{{ $row['active'] ?? '' }} / {{ $row['sub'] ?? '' }}"></span>
+                            <td class="relative p-0">
+                                <span class="absolute inset-y-3 left-0 w-1 rounded-full {{ $pendingLabel ? 'bg-amber-500 animate-pulse' : ($isFailed ? 'bg-red-500' : ($isActive ? 'bg-emerald-500' : 'bg-brand-mist/60')) }}" title="{{ $row['active'] ?? '' }} / {{ $row['sub'] ?? '' }}"></span>
                             </td>
                             <td class="p-4 align-top">
                                 <p class="font-medium text-brand-ink">{{ $nameLine }}</p>
                                 <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                                    @if ($isFailed)
+                                    @if ($pendingLabel)
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200">
+                                            <span class="inline-block size-2.5 shrink-0 animate-spin rounded-full border-2 border-amber-300 border-t-amber-700" aria-hidden="true"></span>
+                                            {{ $pendingLabel }}
+                                        </span>
+                                    @elseif ($isFailed)
                                         <span class="inline-flex rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-900 ring-1 ring-red-200">{{ __('Failed') }}</span>
                                     @endif
                                     @if (! empty($row['main_pid']) && ($row['main_pid'] ?? '') !== '0')
@@ -329,11 +381,23 @@
                                 @endif
                             </td>
                             <td class="p-4 align-top text-brand-moss">
-                                @if ($tsLabel !== '')
-                                    <span class="font-mono text-xs text-brand-ink">{{ $tsLabel }}</span>
-                                    @if ($rel)
-                                        <span class="mt-1 block text-xs">{{ $rel }}</span>
-                                    @endif
+                                @php
+                                    $tsCompact = null;
+                                    if ($tsLabel !== '' && $tsLabel !== 'n/a') {
+                                        try {
+                                            $tsCompact = \Carbon\Carbon::parse($tsLabel)->format('M j, H:i');
+                                        } catch (\Throwable) {
+                                            $tsCompact = null;
+                                        }
+                                    }
+                                @endphp
+                                @if ($tsCompact)
+                                    <span class="text-xs whitespace-nowrap" title="{{ $tsLabel }}">
+                                        <span class="font-medium text-brand-ink">{{ $tsCompact }}</span>
+                                        @if ($rel)
+                                            <span class="text-brand-moss">· {{ $rel }}</span>
+                                        @endif
+                                    </span>
                                 @else
                                     <span class="text-brand-mist">—</span>
                                 @endif
@@ -348,82 +412,141 @@
                                     $hasMoreMenu = $rowManageExtras || $rowAlerts || (! empty($row['custom']));
                                 @endphp
                                 <div class="flex flex-nowrap items-center justify-end gap-2">
+                                    {{-- Persistent SSH-running pill, driven server-side once
+                                         the actual remote task is firing for THIS unit. The
+                                         row's Alpine rowLoading flag handles the briefer
+                                         click → modal-open window by dimming the whole tr. --}}
                                     @if ($rowBusy || ($systemdBulkBusy ?? false))
                                         <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand-moss">
                                             <span class="inline-block size-3.5 animate-spin rounded-full border-2 border-brand-ink/20 border-t-brand-ink" aria-hidden="true"></span>
                                             {{ __('Working…') }}
                                         </span>
                                     @endif
-                                    <button
-                                        type="button"
-                                        wire:click="openSystemdStatusModalForService(@js($rowUnit))"
-                                        wire:loading.attr="disabled"
-                                        wire:target="openSystemdStatusModalForService"
-                                        @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $otherBusy)
-                                        class="{{ $btnSecondary }} !inline-flex !h-9 !min-w-[7.25rem] !shrink-0 !items-center !justify-center !gap-1.5 !px-2 !py-0 !text-[11px]"
-                                    >
-                                        <span
-                                            wire:loading
-                                            wire:target="openSystemdStatusModalForService"
-                                            class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink"
-                                            aria-hidden="true"
-                                        ></span>
-                                        <span wire:loading.remove wire:target="openSystemdStatusModalForService" class="uppercase tracking-wide">{{ __('Status') }}</span>
-                                        <span wire:loading wire:target="openSystemdStatusModalForService" class="uppercase tracking-wide">{{ __('Loading') }}</span>
-                                    </button>
-                                    @if (! $isActive)
+                                    {{-- One primary action stays visible: Start when inactive,
+                                         Restart when active and manageable, Status for view-only.
+                                         Everything else (Stop, Status, Reload, Boot toggles,
+                                         Notify, Notification channels, Remove custom) lives in
+                                         the per-row More menu below. --}}
+                                    @if ($mayMutate && ! $isActive)
                                         <button
                                             type="button"
+                                            @click="fireRowLoading()"
                                             wire:click="runSystemdServiceAction(@js($rowUnit), 'start')"
-                                            @disabled(! $opsReady || ! $mayMutate || $otherBusy || $rowBusy)
+                                            @disabled(! $opsReady || $otherBusy || $rowBusy || $rowPending)
                                             class="{{ $btnSecondary }} !shrink-0 !py-2 !text-[11px]"
                                         >
                                             {{ __('Start') }}
                                         </button>
+                                    @elseif ($mayMutate)
+                                        <button
+                                            type="button"
+                                            @click="fireRowLoading()"
+                                            wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'restart'], @js(__('Restart service')), @js(__('Restart this service?')), @js(__('Restart')), false)"
+                                            @disabled(! $opsReady || $otherBusy || $rowBusy || $rowPending)
+                                            class="{{ $btnSecondary }} !shrink-0 !py-2 !text-[11px]"
+                                        >
+                                            {{ __('Restart') }}
+                                        </button>
+                                    @else
+                                        <button
+                                            type="button"
+                                            @click="fireRowLoading()"
+                                            wire:click="openSystemdStatusModalForService(@js($rowUnit))"
+                                            wire:loading.attr="disabled"
+                                            wire:target="openSystemdStatusModalForService"
+                                            @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $otherBusy)
+                                            class="{{ $btnSecondary }} !shrink-0 !py-2 !text-[11px]"
+                                        >
+                                            <span wire:loading.remove wire:target="openSystemdStatusModalForService">{{ __('Status') }}</span>
+                                            <span wire:loading wire:target="openSystemdStatusModalForService">{{ __('Loading') }}</span>
+                                        </button>
                                     @endif
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'restart'], @js(__('Restart service')), @js(__('Restart this service?')), @js(__('Restart')), false)"
-                                        @disabled(! $opsReady || ! $mayMutate || $otherBusy || $rowBusy)
-                                        class="{{ $btnSecondary }} !shrink-0 !py-2 !text-[11px]"
-                                    >
-                                        {{ __('Restart') }}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'stop'], @js(__('Stop service')), @js(__('Stop this service?')), @js(__('Stop')), true)"
-                                        @disabled(! $opsReady || ! $mayMutate || $otherBusy || $rowBusy)
-                                        class="{{ $btnDanger }} !shrink-0 !py-2 !text-[11px]"
-                                    >
-                                        {{ __('Stop') }}
-                                    </button>
-                                    @if ($hasMoreMenu)
-                                        <div class="shrink-0">
-                                            <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
-                                                <x-slot name="trigger">
+                                    <div class="shrink-0">
+                                        <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
+                                            <x-slot name="trigger">
+                                                <button
+                                                    type="button"
+                                                    class="{{ $btnSecondary }} !inline-flex !shrink-0 !items-center !gap-1 !px-2 !py-2 !text-[11px]"
+                                                    aria-label="{{ __('More actions') }}"
+                                                    aria-haspopup="true"
+                                                    @disabled($otherBusy || $rowBusy || $rowPending)
+                                                >
+                                                    <x-heroicon-o-ellipsis-horizontal class="h-4 w-4 shrink-0 text-brand-ink/80" />
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                @php
+                                                    // Each menu item: icon on the left, label,
+                                                    // and a tiny spinner that swaps in for the
+                                                    // icon while the wire:click round-trip is in
+                                                    // flight. The row-level "Working…" pill at
+                                                    // the top of the actions cell handles the
+                                                    // long-running SSH portion that fires after
+                                                    // a confirm modal closes.
+                                                    $menuItem = 'flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50';
+                                                    $menuItemDanger = 'flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50';
+                                                    $iconClasses = 'h-4 w-4 shrink-0 text-brand-ink/70';
+                                                    $iconClassesDanger = 'h-4 w-4 shrink-0 text-red-600';
+                                                    $spinnerClasses = 'inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink';
+                                                @endphp
+                                                @if ($mayMutate && $isActive)
+                                                    {{-- Status came off the row when manageable + active.
+                                                         Surfaced here so it's still one click away. --}}
                                                     <button
                                                         type="button"
-                                                        class="{{ $btnSecondary }} !inline-flex !shrink-0 !items-center !gap-1 !py-2 !pl-2 !pr-2 !text-[11px]"
-                                                        aria-label="{{ __('More actions') }}"
-                                                        aria-haspopup="true"
-                                                        @disabled(
-                                                            (! $opsReady && ! $rowAlerts)
-                                                            || (($deployerSystemdLocked ?? true) && ! $rowManageExtras && ! $rowAlerts)
-                                                            || $otherBusy
-                                                            || $rowBusy
-                                                        )
+                                                        @click="fireRowLoading()"
+                                                        wire:click="openSystemdStatusModalForService(@js($rowUnit))"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="openSystemdStatusModalForService(@js($rowUnit))"
+                                                        class="{{ $menuItem }}"
                                                     >
-                                                        <span class="uppercase tracking-wide">{{ __('More') }}</span>
-                                                        <x-heroicon-o-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-ink/70" />
+                                                        <span wire:loading.remove wire:target="openSystemdStatusModalForService(@js($rowUnit))">
+                                                            <x-heroicon-o-eye class="{{ $iconClasses }}" aria-hidden="true" />
+                                                        </span>
+                                                        <span wire:loading wire:target="openSystemdStatusModalForService(@js($rowUnit))" class="{{ $spinnerClasses }}" aria-hidden="true"></span>
+                                                        {{ __('Status') }}
                                                     </button>
-                                                </x-slot>
-                                                <x-slot name="content">
+                                                @endif
+                                                @if ($canManage)
+                                                    {{-- Journal logs (`journalctl -u <unit>`). Available
+                                                         to anyone who can see the unit, including
+                                                         view-only and status-only roles, since logs
+                                                         are read-only. --}}
+                                                    <button
+                                                        type="button"
+                                                        @click="fireRowLoading()"
+                                                        wire:click="openSystemdLogsModalForService(@js($rowUnit))"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="openSystemdLogsModalForService(@js($rowUnit))"
+                                                        class="{{ $menuItem }}"
+                                                    >
+                                                        <span wire:loading.remove wire:target="openSystemdLogsModalForService(@js($rowUnit))">
+                                                            <x-heroicon-o-document-text class="{{ $iconClasses }}" aria-hidden="true" />
+                                                        </span>
+                                                        <span wire:loading wire:target="openSystemdLogsModalForService(@js($rowUnit))" class="{{ $spinnerClasses }}" aria-hidden="true"></span>
+                                                        {{ __('Logs') }}
+                                                    </button>
+                                                @endif
+                                                @if ($mayMutate)
+                                                    <button
+                                                        type="button"
+                                                        @click="fireRowLoading()"
+                                                        wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'stop'], @js(__('Stop service')), @js(__('Stop this service?')), @js(__('Stop')), true)"
+                                                        @disabled(! $opsReady || $otherBusy || $rowBusy || $rowPending)
+                                                        class="{{ $menuItemDanger }}"
+                                                    >
+                                                        <x-heroicon-o-stop-circle class="{{ $iconClassesDanger }}" aria-hidden="true" />
+                                                        {{ __('Stop') }}
+                                                    </button>
+                                                @endif
                                                     @if ($rowManageExtras)
                                                         <button
                                                             type="button"
+                                                            @click="fireRowLoading()"
                                                             wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'reload'], @js(__('Reload service')), @js(__('Reload this service? Configuration is reapplied without a full restart when the unit supports reload.')), @js(__('Reload')), false)"
-                                                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                            class="{{ $menuItem }}"
                                                         >
+                                                            <x-heroicon-o-arrow-path class="{{ $iconClasses }}" aria-hidden="true" />
                                                             {{ __('Reload') }}
                                                         </button>
                                                     @endif
@@ -431,18 +554,22 @@
                                                         @if ($showBootEnable)
                                                             <button
                                                                 type="button"
+                                                                @click="fireRowLoading()"
                                                                 wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'enable'], @js(__('Enable at boot')), @js(__('Enable this unit to start at boot?')), @js(__('Enable at boot')), false)"
-                                                                class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                                class="{{ $menuItem }}"
                                                             >
+                                                                <x-heroicon-o-bolt class="{{ $iconClasses }}" aria-hidden="true" />
                                                                 {{ __('Enable at boot') }}
                                                             </button>
                                                         @endif
                                                         @if ($showBootDisable)
                                                             <button
                                                                 type="button"
+                                                                @click="fireRowLoading()"
                                                                 wire:click="openConfirmActionModal('runSystemdServiceAction', ['{{ $rowUnit }}', 'disable'], @js(__('Disable at boot')), @js(__('Disable this unit at boot? It will not start automatically after reboot; it may keep running until stopped.')), @js(__('Disable at boot')), true)"
-                                                                class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                                class="{{ $menuItem }}"
                                                             >
+                                                                <x-heroicon-o-no-symbol class="{{ $iconClasses }}" aria-hidden="true" />
                                                                 {{ __('Disable at boot') }}
                                                             </button>
                                                         @endif
@@ -453,18 +580,20 @@
                                                         @endif
                                                         <button
                                                             type="button"
+                                                            @click="fireRowLoading()"
                                                             wire:click="openSystemdAlertsModalForService(@js($rowUnit))"
                                                             wire:loading.attr="disabled"
-                                                            wire:target="openSystemdAlertsModalForService"
-                                                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                            wire:target="openSystemdAlertsModalForService(@js($rowUnit))"
+                                                            class="{{ $menuItem }}"
                                                         >
-                                                            <span class="inline-flex items-center gap-2">
-                                                                <x-heroicon-o-bell class="h-4 w-4 shrink-0 text-brand-ink/80" />
-                                                                {{ __('Notify') }}
-                                                                @if (($row['alert_subscription_count'] ?? 0) > 0)
-                                                                    <span class="rounded-full bg-brand-sand px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-ink">{{ (int) ($row['alert_subscription_count'] ?? 0) }}</span>
-                                                                @endif
+                                                            <span wire:loading.remove wire:target="openSystemdAlertsModalForService(@js($rowUnit))">
+                                                                <x-heroicon-o-bell class="{{ $iconClasses }}" aria-hidden="true" />
                                                             </span>
+                                                            <span wire:loading wire:target="openSystemdAlertsModalForService(@js($rowUnit))" class="{{ $spinnerClasses }}" aria-hidden="true"></span>
+                                                            {{ __('Notify') }}
+                                                            @if (($row['alert_subscription_count'] ?? 0) > 0)
+                                                                <span class="ml-auto rounded-full bg-brand-sand px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-ink">{{ (int) ($row['alert_subscription_count'] ?? 0) }}</span>
+                                                            @endif
                                                         </button>
                                                     @endif
                                                     @if ($server->organization_id && ($rowManageExtras || $hasBootMenu || $rowAlerts))
@@ -472,8 +601,9 @@
                                                         <a
                                                             href="{{ route('organizations.notification-channels', $server->organization_id) }}"
                                                             wire:navigate
-                                                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                            class="{{ $menuItem }}"
                                                         >
+                                                            <x-heroicon-o-inbox class="{{ $iconClasses }}" aria-hidden="true" />
                                                             {{ __('Notification channels') }}
                                                         </a>
                                                     @endif
@@ -481,17 +611,18 @@
                                                         <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
                                                         <button
                                                             type="button"
+                                                            @click="fireRowLoading()"
                                                             wire:click="openConfirmActionModal('removeCustomSystemdUnit', ['{{ $rowUnit }}'], @js(__('Remove custom unit')), @js(__('Remove this unit from custom services?')), @js(__('Remove unit')), true)"
                                                             @disabled($isDeployer)
-                                                            class="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            class="{{ $menuItemDanger }}"
                                                         >
+                                                            <x-heroicon-o-trash class="{{ $iconClassesDanger }}" aria-hidden="true" />
                                                             {{ __('Remove custom unit') }}
                                                         </button>
                                                     @endif
                                                 </x-slot>
                                             </x-dropdown>
                                         </div>
-                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -506,10 +637,31 @@
                             </td>
                         </tr>
                     @endforelse
+                    @if ($systemHiddenCount > 0 || $systemdShowSystem)
+                        <tr>
+                            <td colspan="5" class="p-3 text-center text-xs text-brand-moss">
+                                <button
+                                    type="button"
+                                    wire:click="toggleSystemdShowSystem"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                >
+                                    @if ($systemdShowSystem)
+                                        <x-heroicon-o-chevron-up class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Hide system services') }}
+                                    @else
+                                        <x-heroicon-o-chevron-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ trans_choice('Show :count system service|Show :count system services', $systemHiddenCount, ['count' => $systemHiddenCount]) }}
+                                    @endif
+                                </button>
+                            </td>
+                        </tr>
+                    @endif
                 </tbody>
             </table>
         </div>
     </div>
+
+    @livewire(\App\Livewire\Servers\RecentActionsLog::class, ['server' => $server], key('recent-actions-log-'.$server->id))
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')
@@ -606,44 +758,187 @@
                 <div class="fixed inset-0 bg-brand-ink/40 backdrop-blur-[1px]" wire:click="closeSystemdStatusModal"></div>
                 {{-- Single overflow-y-auto on the panel (not flex-1) so touch/trackpad scroll reaches notification events; sticky header stays visible. --}}
                 <div class="relative z-10 max-h-[min(92vh,52rem)] w-full max-w-[min(96vw,72rem)] overflow-y-auto overscroll-contain dply-modal-panel [-webkit-overflow-scrolling:touch]">
-                    <div class="sticky top-0 z-[1] flex items-start justify-between gap-3 border-b border-brand-ink/10 bg-white px-4 py-4 sm:px-6 sm:py-5">
-                        <div class="min-w-0">
-                            <h2 id="systemd-status-modal-heading" class="text-base font-semibold text-brand-ink">{{ __('Service') }}</h2>
-                            <p class="mt-0.5 font-mono text-xs text-brand-moss break-all">{{ $systemdStatusModalUnit }}</p>
-                            @if ($systemdEntrySnippet)
-                                <p class="mt-2 rounded-lg border border-brand-sage/30 bg-brand-sand/50 px-3 py-2 text-xs text-brand-ink leading-snug">{{ $systemdEntrySnippet }}</p>
-                            @endif
+                    <div class="sticky top-0 z-[1] flex flex-col gap-3 border-b border-brand-ink/10 bg-white px-4 py-4 sm:px-6 sm:py-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <h2 id="systemd-status-modal-heading" class="text-base font-semibold text-brand-ink">{{ __('Service') }}</h2>
+                                <p class="mt-0.5 font-mono text-xs text-brand-moss break-all">{{ $systemdStatusModalUnit }}</p>
+                                @if ($systemdEntrySnippet)
+                                    <p class="mt-2 rounded-lg border border-brand-sage/30 bg-brand-sand/50 px-3 py-2 text-xs text-brand-ink leading-snug">{{ $systemdEntrySnippet }}</p>
+                                @endif
+                            </div>
+                            <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    wire:click="fetchSystemdModalStatus"
+                                    wire:loading.attr="disabled"
+                                    wire:target="fetchSystemdModalStatus"
+                                    @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $systemdStatusModalLoading)
+                                    class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !py-2 !text-[11px]"
+                                >
+                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="fetchSystemdModalStatus" />
+                                    <span wire:loading.remove wire:target="fetchSystemdModalStatus">{{ __('Refresh') }}</span>
+                                    <span wire:loading wire:target="fetchSystemdModalStatus">{{ __('Fetching…') }}</span>
+                                </button>
+                                <button type="button" wire:click="closeSystemdStatusModal" class="{{ $btnSecondary }} !py-2 !text-[11px]">
+                                    {{ __('Close') }}
+                                </button>
+                            </div>
                         </div>
-                        <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                            <button
-                                type="button"
-                                wire:click="fetchSystemdModalStatus"
-                                wire:loading.attr="disabled"
-                                wire:target="fetchSystemdModalStatus"
-                                @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $systemdStatusModalLoading)
-                                class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !py-2 !text-[11px]"
-                            >
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="fetchSystemdModalStatus" />
-                                <span wire:loading.remove wire:target="fetchSystemdModalStatus">{{ __('Refresh status') }}</span>
-                                <span wire:loading wire:target="fetchSystemdModalStatus">{{ __('Fetching…') }}</span>
+                        {{-- Tabs: Status (systemctl) / Logs (journalctl). Either
+                             reuses the same SSH plumbing — only the bash command
+                             changes (see ServerSystemdServicesCatalog::systemdActionBash). --}}
+                        @php
+                            $tabBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors';
+                            $tabActive = $tabBase.' bg-brand-ink text-brand-cream shadow-sm';
+                            $tabIdle = $tabBase.' bg-white text-brand-ink ring-1 ring-brand-ink/10 hover:bg-brand-sand/40';
+                        @endphp
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" wire:click="setSystemdStatusModalView('status')" class="{{ $systemdStatusModalView === 'status' ? $tabActive : $tabIdle }}">
+                                <x-heroicon-o-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Status') }}
                             </button>
-                            <button type="button" wire:click="closeSystemdStatusModal" class="{{ $btnSecondary }} !py-2 !text-[11px]">
-                                {{ __('Close') }}
+                            <button type="button" wire:click="setSystemdStatusModalView('logs')" class="{{ $systemdStatusModalView === 'logs' ? $tabActive : $tabIdle }}">
+                                <x-heroicon-o-document-text class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Logs') }}
                             </button>
                         </div>
                     </div>
                     <div class="px-4 py-4 sm:px-6 sm:py-5">
                         @if ($systemdStatusModalLoading)
-                            <p class="text-xs font-medium text-brand-ink">{{ __('Fetching systemctl status…') }}</p>
+                            <p class="text-xs font-medium text-brand-ink">{{ $systemdStatusModalView === 'logs' ? __('Fetching journalctl logs…') : __('Fetching systemctl status…') }}</p>
                             <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('This can take a few seconds over SSH.') }}</p>
                         @endif
                         @if ($systemdStatusModalError)
                             <div class="mb-3 rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs text-red-900">{{ $systemdStatusModalError }}</div>
                         @endif
                         @if ($systemdStatusModalOutput !== '')
-                            <div class="rounded-xl border border-brand-ink/15 bg-zinc-50 p-3 shadow-inner">
-                                <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-brand-ink">{{ __('systemctl status') }}</p>
-                                <pre class="font-mono text-[11px] leading-snug whitespace-pre-wrap break-words text-zinc-900 [overflow-wrap:anywhere]">{{ $systemdStatusModalOutput }}</pre>
+                            @php
+                                // Lightweight syntax-highlighter for the
+                                // `systemctl status` text dump. Escape
+                                // the buffer first, then layer span
+                                // classes on top so the whole thing
+                                // remains safe to render with {!! !!}.
+                                $statusOut = e($systemdStatusModalOutput);
+
+                                // The leading state bullet ("● unit"
+                                // active, "×" failed) — color the dot
+                                // before the unit name.
+                                $statusOut = preg_replace_callback(
+                                    '/^(\s*)([●×])(\s+\S+)/m',
+                                    function (array $m): string {
+                                        $color = $m[2] === '×' ? 'text-red-500' : 'text-emerald-500';
+
+                                        return $m[1].'<span class="'.$color.' font-semibold">'.$m[2].'</span>'.$m[3];
+                                    },
+                                    $statusOut
+                                ) ?? $statusOut;
+
+                                // State words inside parens — "(running)"
+                                // green, "(dead)"/"(failed)" red, others
+                                // amber for transitions.
+                                $statusOut = preg_replace_callback(
+                                    '/\b(active)\s+\((running|listening|exited|waiting)\)/i',
+                                    fn (array $m): string => '<span class="text-emerald-700 font-semibold">'.$m[0].'</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+                                $statusOut = preg_replace_callback(
+                                    '/\b(inactive|failed)\s+\(([^)]+)\)/i',
+                                    fn (array $m): string => '<span class="text-red-700 font-semibold">'.$m[0].'</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+                                $statusOut = preg_replace_callback(
+                                    '/\b(activating|deactivating|reloading)\s+\(([^)]+)\)/i',
+                                    fn (array $m): string => '<span class="text-amber-700 font-semibold">'.$m[0].'</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+
+                                // "enabled" / "disabled" / "static" /
+                                // "masked" descriptors after Loaded:
+                                $statusOut = preg_replace_callback(
+                                    '/(;\s*)(enabled|enabled-runtime|alias|generated|indirect)\b/',
+                                    fn (array $m): string => $m[1].'<span class="text-emerald-700">'.$m[2].'</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+                                $statusOut = preg_replace_callback(
+                                    '/(;\s*)(disabled|masked|bad)\b/',
+                                    fn (array $m): string => $m[1].'<span class="text-red-700">'.$m[2].'</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+                                $statusOut = preg_replace_callback(
+                                    '/(;\s*)(static|preset:\s*\S+)/',
+                                    fn (array $m): string => $m[1].'<span class="text-zinc-500">'.$m[2].'</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+
+                                // Field labels at the start of a line:
+                                // Loaded, Active, Main PID, Tasks, Memory,
+                                // CPU, CGroup, Docs, Status, etc.
+                                $statusOut = preg_replace_callback(
+                                    '/^(\s*)(Loaded|Active|Main PID|Tasks|Memory|CPU|CGroup|Docs|Status|Process|TriggeredBy|IP|IO|Drop-In):/m',
+                                    fn (array $m): string => $m[1].'<span class="text-zinc-500">'.$m[2].':</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+
+                                // WARNING / ERROR severity tags in journal
+                                // tail lines.
+                                $statusOut = preg_replace_callback(
+                                    '/\b(WARNING|ERROR|CRITICAL|FATAL)\b/',
+                                    fn (array $m): string => '<span class="font-semibold '.match (strtoupper($m[1])) {
+                                        'WARNING' => 'text-amber-700',
+                                        default => 'text-red-700',
+                                    }.'">'.$m[1].'</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+
+                                // Mute timestamps prefixing journal lines:
+                                // "May 04 19:28:09 silver-stag …".
+                                $statusOut = preg_replace_callback(
+                                    '/^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})(\s+\S+)/m',
+                                    fn (array $m): string => '<span class="text-zinc-400">'.$m[1].'</span><span class="text-zinc-500">'.$m[2].'</span>',
+                                    $statusOut
+                                ) ?? $statusOut;
+                            @endphp
+                            <div
+                                x-data="{
+                                    copied: false,
+                                    async copy() {
+                                        try {
+                                            await navigator.clipboard.writeText(this.$refs.statusRaw.textContent);
+                                            this.copied = true;
+                                            setTimeout(() => { this.copied = false; }, 1500);
+                                        } catch (e) { /* clipboard blocked — silent */ }
+                                    },
+                                }"
+                                class="rounded-xl border border-brand-ink/15 bg-zinc-50 p-3 shadow-inner"
+                            >
+                                <div class="mb-2 flex items-center justify-between gap-3">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-ink">{{ $systemdStatusModalView === 'logs' ? __('journalctl -u') : __('systemctl status') }}</p>
+                                    <button
+                                        type="button"
+                                        @click="copy()"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    >
+                                        <template x-if="copied">
+                                            <span class="inline-flex items-center gap-1 text-emerald-700">
+                                                <x-heroicon-o-check class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Copied') }}
+                                            </span>
+                                        </template>
+                                        <template x-if="! copied">
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-clipboard class="h-3 w-3 shrink-0 text-brand-ink/70" aria-hidden="true" />
+                                                {{ __('Copy') }}
+                                            </span>
+                                        </template>
+                                    </button>
+                                </div>
+                                {{-- Hidden raw copy target keeps the copied
+                                     payload free of the colorization spans
+                                     while the visible <pre> renders the
+                                     highlighted version. --}}
+                                <pre x-ref="statusRaw" class="hidden">{{ $systemdStatusModalOutput }}</pre>
+                                <pre class="font-mono text-[11px] leading-snug whitespace-pre-wrap break-words text-zinc-900 [overflow-wrap:anywhere]">{!! $statusOut !!}</pre>
                             </div>
                         @elseif (! $systemdStatusModalLoading && $systemdStatusModalError === null)
                             <p class="text-xs text-brand-moss">{{ __('No output yet. Choose Refresh status.') }}</p>

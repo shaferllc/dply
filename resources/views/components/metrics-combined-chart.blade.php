@@ -279,7 +279,13 @@
                 x-show="activePoint !== null"
                 x-transition.opacity.duration.100ms
                 class="pointer-events-none absolute top-4 z-10 w-72 rounded-xl border border-brand-ink/10 bg-white/95 p-4 shadow-lg backdrop-blur"
-                :style="activePoint ? `left: ${activePoint.guideline_left}%; transform: translateX(-50%);` : ''"
+                :style="activePoint
+                    ? (activePoint.guideline_left < 25
+                        ? `left: ${activePoint.guideline_left}%; transform: translateX(0);`
+                        : (activePoint.guideline_left > 75
+                            ? `left: ${activePoint.guideline_left}%; transform: translateX(-100%);`
+                            : `left: ${activePoint.guideline_left}%; transform: translateX(-50%);`))
+                    : ''"
             >
                 <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Sample') }}</p>
                 <p class="mt-1 text-sm font-semibold text-brand-ink" x-text="activePoint ? activePoint.label : ''"></p>

@@ -16,8 +16,22 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * Run page — the merged surface for executing things on a server.
+ *
+ * Combines:
+ *   - Saved commands (ServerRecipe rows): list, edit, run inline
+ *   - Ad-hoc command runner: type a one-off shell command, see streamed output
+ *   - Marketplace + organization library imports
+ *   - Starter templates from config('deploy_templates.templates')
+ *     pre-fill the new-recipe form
+ *
+ * Replaces the previous /servers/{id}/recipes (renamed to /run) and
+ * /servers/{id}/deploy (deleted). Commands are server-level — site
+ * deploys live on each site's own page.
+ */
 #[Layout('layouts.app')]
-class WorkspaceRecipes extends Component
+class WorkspaceRun extends Component
 {
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
@@ -32,6 +46,12 @@ class WorkspaceRecipes extends Component
     public ?string $editing_recipe_id = null;
 
     public bool $showEditor = false;
+
+    /**
+     * Ad-hoc one-off command runner state. Absorbed from the deleted
+     * WorkspaceDeploy component so /run owns all command execution.
+     */
+    public string $adhoc_command = '';
 
     /** Library-browse modal state. */
     public bool $browseLibraryOpen = false;
@@ -137,20 +157,65 @@ class WorkspaceRecipes extends Component
         $this->toastSuccess('Saved command removed.');
     }
 
-    public function useRecipeAsDeployCommand(string $id): void
+    /**
+     * Pre-fill the new-recipe form from a starter template defined in
+     * config('deploy_templates.templates'). Reads the user-friendly
+     * Laravel/Node/PM2/static-git presets that the deleted
+     * /deploy page used to surface as quick-fill buttons; pasting
+     * into the form lets the operator tweak before saving.
+     */
+    public function applyStarterTemplate(string $key): void
     {
         $this->authorize('update', $this->server);
 
-        $recipe = ServerRecipe::query()
-            ->where('server_id', $this->server->id)
-            ->whereKey($id)
-            ->firstOrFail();
+        $templates = config('deploy_templates.templates', []);
+        $template = $templates[$key] ?? null;
+        if (! is_array($template) || empty($template['command'])) {
+            $this->toastError(__('That starter template is no longer available.'));
 
-        $this->server->update([
-            'deploy_command' => trim($recipe->script) ?: null,
-        ]);
+            return;
+        }
 
-        $this->toastSuccess('Saved command copied to deploy.');
+        $this->editing_recipe_id = null;
+        $this->new_recipe_name = (string) ($template['label'] ?? ucfirst($key));
+        $this->new_recipe_script = (string) $template['command'];
+        $this->showEditor = true;
+    }
+
+    /**
+     * Run a one-off shell command against the server. The command isn't
+     * persisted — output streams to the live SSH panel and is
+     * discarded after the request. Operators iterating on a script
+     * before saving it as a recipe live here.
+     */
+    public function runAdhocCommand(): void
+    {
+        $this->authorize('view', $this->server);
+        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+            $this->command_error = 'Deployers cannot run arbitrary shell commands on servers.';
+
+            return;
+        }
+        $this->validate(['adhoc_command' => 'required|string|max:4000']);
+        $this->command_output = null;
+        $this->command_error = null;
+
+        try {
+            $this->resetRemoteSshStreamTargets();
+            $this->remoteSshStreamSetMeta(
+                __('Ad-hoc command'),
+                $this->server->ssh_user.'@'.$this->server->ip_address.'  '.$this->adhoc_command
+            );
+            $ssh = new SshConnection($this->server);
+            $this->command_output = $ssh->execWithCallback(
+                $this->adhoc_command,
+                fn (string $chunk) => $this->remoteSshStreamAppendStdout($chunk),
+                300
+            );
+            $this->adhoc_command = '';
+        } catch (\Throwable $e) {
+            $this->command_error = $e->getMessage();
+        }
     }
 
     public function runRecipe(string $id): void
@@ -394,7 +459,29 @@ class WorkspaceRecipes extends Component
             }
         }
 
-        return view('livewire.servers.workspace-recipes', [
+        // Starter templates are the small set of preset bash snippets
+        // (Laravel deploy, Node npm, PM2, static-git) that the deleted
+        // /deploy page used to expose as quick-fill buttons. Now they
+        // surface as a "starter from template" affordance on the
+        // new-recipe form so the same operator workflow is preserved
+        // without a separate page.
+        $starterTemplates = collect((array) config('deploy_templates.templates', []))
+            ->map(function (mixed $template, string $key): ?array {
+                if (! is_array($template) || empty($template['command'])) {
+                    return null;
+                }
+
+                return [
+                    'key' => $key,
+                    'label' => (string) ($template['label'] ?? ucfirst($key)),
+                    'description' => (string) ($template['description'] ?? ''),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return view('livewire.servers.workspace-run', [
             'marketplaceItems' => $marketplaceFiltered,
             'orgScriptItems' => $orgFiltered,
             'libraryTotals' => [
@@ -403,6 +490,7 @@ class WorkspaceRecipes extends Component
             ],
             'libraryAvailableTags' => $availableTags,
             'libraryPreview' => $previewItem,
+            'starterTemplates' => $starterTemplates,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

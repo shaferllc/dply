@@ -315,7 +315,15 @@ final class ServerSystemdServicesCatalog
     {
         $s = strtolower(trim((string) $unitFileState));
 
-        if ($s === '' || $s === 'not-found') {
+        // "not-found" means systemd has no unit file for this name — neither
+        // systemctl enable nor disable will succeed. Hide both menu items.
+        // Empty (unknown) state stays permissive: probe failures shouldn't
+        // pull the menu out from under the operator on real units.
+        if ($s === 'not-found') {
+            return false;
+        }
+
+        if ($s === '') {
             return true;
         }
 
@@ -341,7 +349,11 @@ final class ServerSystemdServicesCatalog
     {
         $s = strtolower(trim((string) $unitFileState));
 
-        if ($s === '' || $s === 'not-found') {
+        if ($s === 'not-found') {
+            return false;
+        }
+
+        if ($s === '') {
             return true;
         }
 
@@ -366,7 +378,6 @@ final class ServerSystemdServicesCatalog
      */
     public function buildInventoryScript(Server $server): string
     {
-        unset($server);
         $max = max(1, min(2000, (int) config('server_services.systemd_inventory_max_units', 500)));
         $caseArms = $this->bashDpkgPackageCaseArms();
         $caseBlock = '';
@@ -380,19 +391,49 @@ final class ServerSystemdServicesCatalog
             }
         }
 
+        // dply-allowlisted units that should always appear in the inventory,
+        // even when stopped, so a manual stop / restart doesn't make the
+        // row vanish from the Services table. The bash script merges these
+        // with the live "running" list before querying details.
+        $allowedUnits = $this->allowedUnitsForServer($server);
+        $allowedBlock = '';
+        foreach ($allowedUnits as $u) {
+            $allowedBlock .= '  always_units+=('.escapeshellarg($u).")\n";
+        }
+
         return str_replace(
-            ['__MAX__', '__CASE_BLOCK__'],
-            [(string) $max, $caseBlock],
+            ['__MAX__', '__CASE_BLOCK__', '__ALWAYS_UNITS__'],
+            [(string) $max, $caseBlock, $allowedBlock !== '' ? $allowedBlock : "  :\n"],
             <<<'BASH'
 export LANG=C
 set +e
 MAX=__MAX__
 mapfile -t lines < <(systemctl list-units --type=service --state=running --no-legend --no-pager 2>/dev/null)
 units=()
+declare -A seen=()
 for line in "${lines[@]}"; do
   u=$(echo "$line" | awk '{print $1}')
   case "$u" in
-    *.service) units+=("$u") ;;
+    *.service)
+      if [ -z "${seen[$u]:-}" ]; then
+        seen[$u]=1
+        units+=("$u")
+      fi
+      ;;
+  esac
+done
+# Always-include allowlisted units so stopped/inactive services
+# managed by dply don't disappear from the table after a "Stop".
+always_units=()
+__ALWAYS_UNITS__
+for u in "${always_units[@]}"; do
+  case "$u" in
+    *.service)
+      if [ -z "${seen[$u]:-}" ]; then
+        seen[$u]=1
+        units+=("$u")
+      fi
+      ;;
   esac
 done
 i=0
@@ -404,11 +445,27 @@ for u in "${units[@]}"; do
 __CASE_BLOCK__    *) ;;
   esac
   ver=$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true)
+  load=$(systemctl show -p LoadState --value "$u" 2>/dev/null | head -1)
   act=$(systemctl show -p ActiveState --value "$u" 2>/dev/null | head -1)
   sub=$(systemctl show -p SubState --value "$u" 2>/dev/null | head -1)
   ts=$(systemctl show -p ActiveEnterTimestamp --value "$u" 2>/dev/null | head -1)
   en=$(systemctl is-enabled "$u" 2>/dev/null | head -1)
   pid=$(systemctl show -p MainPID --value "$u" 2>/dev/null | head -1)
+  # Skip units that aren't installed:
+  #   - empty ActiveState        → systemctl couldn't return anything
+  #   - LoadState=not-found      → no unit file on disk (e.g. allowlisted
+  #                                memcached on a server that never apt-
+  #                                installed memcached). Without this skip
+  #                                the row would show "Start" but the
+  #                                action always fails with "Unit ...
+  #                                not found" because there's nothing
+  #                                to start.
+  if [ -z "${act:-}" ]; then
+    continue
+  fi
+  if [ "${load:-}" = "not-found" ]; then
+    continue
+  fi
   echo "DPLY_SVC_ROW:${u}|${act:-unknown}|${sub:-unknown}|${ts}|${ver}|${en:-}|${pid:-}"
 done
 if [ "$i" -eq 0 ]; then

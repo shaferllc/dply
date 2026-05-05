@@ -9,6 +9,31 @@ namespace App\Services\Servers;
 final class ServerSystemdServiceSnapshotDiff
 {
     /**
+     * Patterns for systemd unit names that produce noisy "restart" events
+     * because their ActiveEnterTimestamp legitimately ticks even when nothing
+     * the operator cares about has changed (user managers re-arming on
+     * login/cron, getty re-spawning on TTY activity, session-* / run-* /
+     * scope units that are inherently transient). Started/stopped/state-
+     * change events still fire — only the timestamp-flutter "restarted"
+     * heuristic is suppressed for these.
+     *
+     * @var list<string>
+     */
+    private const RESTART_NOISE_PATTERNS = [
+        '/^user@\d+\.service$/',
+        '/^user-\d+\.slice$/',
+        '/^user-runtime-dir@\d+\.service$/',
+        '/^getty@.*\.service$/',
+        '/^serial-getty@.*\.service$/',
+        '/^session-\d+\.scope$/',
+        '/^run-r[0-9a-f]+\.service$/',
+        '/^run-r[0-9a-f]+\.scope$/',
+        '/^systemd-tmpfiles-clean\.service$/',
+        '/^systemd-tmpfiles-clean\.timer$/',
+        '/^systemd-resolved\.service$/',
+    ];
+
+    /**
      * @param  list<array<string, mixed>>|null  $oldUnits
      * @param  list<array<string, mixed>>  $newUnits
      * @return list<array{at: string, kind: string, unit: string, label: string, detail: ?string}>
@@ -60,7 +85,9 @@ final class ServerSystemdServiceSnapshotDiff
             $newTs = trim((string) ($new['ts'] ?? ''));
 
             if ($oldActive === 'active' && $newActive === 'active' && $oldTs !== '' && $newTs !== '' && $oldTs !== $newTs) {
-                $events[] = $this->makeEvent($now, 'restarted', $new, __('ActiveEnterTimestamp changed (likely restart).'));
+                if (! $this->isRestartNoise($u)) {
+                    $events[] = $this->makeEvent($now, 'restarted', $new, __('ActiveEnterTimestamp changed (likely restart).'));
+                }
 
                 continue;
             }
@@ -77,6 +104,17 @@ final class ServerSystemdServiceSnapshotDiff
         }
 
         return $events;
+    }
+
+    private function isRestartNoise(string $unit): bool
+    {
+        foreach (self::RESTART_NOISE_PATTERNS as $pattern) {
+            if (preg_match($pattern, $unit) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

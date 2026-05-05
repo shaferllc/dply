@@ -23,6 +23,8 @@ class Organization extends Model
         'slug',
         'email',
         'deploy_email_notifications_enabled',
+        'email_server_credentials_enabled',
+        'email_database_credentials_enabled',
         'server_site_preferences',
         'default_site_script_id',
         'cron_maintenance_until',
@@ -38,6 +40,8 @@ class Organization extends Model
         return [
             'trial_ends_at' => 'datetime',
             'deploy_email_notifications_enabled' => 'boolean',
+            'email_server_credentials_enabled' => 'boolean',
+            'email_database_credentials_enabled' => 'boolean',
             'server_site_preferences' => 'array',
             'cron_maintenance_until' => 'datetime',
             'firewall_settings' => 'array',

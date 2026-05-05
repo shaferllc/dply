@@ -75,6 +75,12 @@
 
         <x-marketing-footer />
 
+        @auth
+            @can('viewPlatformAdmin')
+                <livewire:debug.task-runner-panel />
+            @endcan
+        @endauth
+
         {{ $modals ?? '' }}
 
         {{-- Toasts (from Livewire dispatch('notify')) --}}

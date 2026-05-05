@@ -139,6 +139,10 @@ class InsightFindingRecorder
             'meta' => $c->meta,
             'detected_at' => $now,
             'resolved_at' => null,
+            // Reopened — clear any prior org-level banner ack so the
+            // recurrence resurfaces in the Insights banner.
+            'acknowledged_at' => null,
+            'acknowledged_by_user_id' => null,
         ])->save();
 
         if ($this->shouldNotifySubscribers($c->insightKey)) {

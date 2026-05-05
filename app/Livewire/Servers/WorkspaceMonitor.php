@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Jobs\RunServerMonitoringProbeJob;
 use App\Jobs\UpgradeGuestMetricsScriptJob;
 use App\Livewire\Servers\Concerns\ConfirmsServerMonitoringInstall;
@@ -593,6 +594,52 @@ BASH);
             );
         }
 
+        // Self-heal stale callback env files. Earlier deploys could
+        // bake the literal "${DPLY_PUBLIC_APP_URL}/api/metrics" string
+        // into ~/.dply/metrics-callback.env when the .env file
+        // referenced an undefined-yet-during-load variable, leaving the
+        // guest cron emitting "ValueError: unknown url type" forever.
+        // If the URL stored when we last deployed differs from what
+        // guestPushUrl() resolves to today (or contains an unresolved
+        // "${...}" placeholder), redeploy the env file. Idempotent —
+        // the job is ShouldBeUnique on serverId.
+        if (
+            $guestPush->isEnabled()
+            && $sshReachable
+            && $pythonInstalled
+            && ! empty($this->server->ip_address)
+        ) {
+            $expectedPushUrl = $guestPush->guestPushUrl();
+            $deployedPushUrl = (string) ($meta['monitoring_guest_push_callback_url'] ?? '');
+            // Only redeploy when we have a record of a previous deploy
+            // AND it disagrees with what guestPushUrl() resolves to now
+            // (or carries an unresolved "${...}" placeholder). The
+            // never-deployed case belongs to Install / Repair flows —
+            // dispatching a heal job there would SSH on every render,
+            // which also disturbs feature tests.
+            $needsRedeploy = $deployedPushUrl !== ''
+                && $expectedPushUrl !== ''
+                && (str_contains($deployedPushUrl, '${') || $deployedPushUrl !== $expectedPushUrl);
+            if ($needsRedeploy) {
+                DeployGuestMetricsCallbackEnvJob::dispatch($this->server->id);
+            }
+        }
+
+        // Pick up the latest monitoring-install action so the install
+        // card can show "Installing… started Xm ago" even after the
+        // operator reloads. The cache-only $servicesRemoteTaskId only
+        // survives within the current Livewire instance.
+        $monitoringInstallAction = \App\Models\ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->where('task_name', 'services-install:install_monitoring_prerequisites')
+            ->latest('id')
+            ->first();
+        $monitoringInstallInProgress = $monitoringInstallAction !== null
+            && in_array($monitoringInstallAction->status, [
+                \App\Models\ServerManageAction::STATUS_QUEUED,
+                \App\Models\ServerManageAction::STATUS_RUNNING,
+            ], true);
+
         $latestPayloadSummary = $latest !== null
             ? $this->summarizeLatestPayload($latest->payload ?? [])
             : [];
@@ -638,6 +685,8 @@ BASH);
             'sampleAgeMinutes' => $sampleAgeMinutes,
             'sampleTimestampInFuture' => $sampleTimestampInFuture,
             'routingSummary' => $routingSummary,
+            'monitoringInstallAction' => $monitoringInstallAction,
+            'monitoringInstallInProgress' => $monitoringInstallInProgress,
         ]);
     }
 }

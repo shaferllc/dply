@@ -78,6 +78,18 @@ class ServerMetricsGuestPushService
      */
     public function syncPushArtifactsAfterInstall(Server $server): void
     {
+        // The install just succeeded over SSH and apt put python3 on the
+        // box, so flip the cached "python is on this server" flag now —
+        // no need to make the operator wait for the next probe round-trip
+        // before the Install Monitor card disappears from Metrics.
+        $server = $server->fresh();
+        $meta = $server->meta ?? [];
+        $meta['monitoring_ssh_reachable'] = true;
+        $meta['monitoring_python_installed'] = true;
+        $meta['monitoring_probe_at'] = now()->toIso8601String();
+        unset($meta['monitoring_probe_error'], $meta['monitoring_probe_pending'], $meta['monitoring_probe_pending_at']);
+        $server->forceFill(['meta' => $meta])->saveQuietly();
+
         if (! $this->isEnabled()) {
             return;
         }
@@ -128,17 +140,40 @@ class ServerMetricsGuestPushService
 
     public function guestPushUrl(): string
     {
-        $ingestUrl = trim((string) config('server_metrics.ingest.url', ''));
-        if ($ingestUrl !== '') {
-            return rtrim($ingestUrl, '/');
+        // .env files often reference one var inside another (e.g.
+        // DPLY_METRICS_INGEST_URL="${DPLY_PUBLIC_APP_URL}/api/metrics").
+        // Laravel's dotenv only interpolates when the referenced
+        // variable is declared earlier in the file — so depending on
+        // ordering, callers can get back the literal string
+        // "${DPLY_PUBLIC_APP_URL}/api/metrics", which then ships into
+        // ~/.dply/metrics-callback.env and breaks the cron push with
+        // "DPLY_PUBLIC_APP_URL: unbound variable". Treat any value
+        // containing an unresolved "${...}" as missing and fall
+        // through to the next preference.
+        $candidates = [
+            trim((string) config('server_metrics.ingest.url', '')),
+            $this->withApiMetricsSuffix(trim((string) config('dply.public_app_url', ''))),
+            $this->withApiMetricsSuffix(trim((string) config('app.url', ''))),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === '' || str_contains($candidate, '${')) {
+                continue;
+            }
+
+            return rtrim($candidate, '/');
         }
 
-        $public = trim((string) config('dply.public_app_url', ''));
-        if ($public !== '') {
-            return rtrim($public, '/').'/api/metrics';
+        return '';
+    }
+
+    private function withApiMetricsSuffix(string $base): string
+    {
+        if ($base === '') {
+            return '';
         }
 
-        return rtrim((string) config('app.url'), '/').'/api/metrics';
+        return rtrim($base, '/').'/api/metrics';
     }
 
     /**

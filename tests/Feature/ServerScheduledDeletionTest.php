@@ -132,8 +132,25 @@ class ServerScheduledDeletionTest extends TestCase
         $this->assertNull($server->fresh()->scheduled_deletion_at);
     }
 
-    public function test_server_overview_exposes_notification_management_actions(): void
+    // Three notification-quick-assign tests removed when the inline
+    // quick-assign UI was deleted from /servers/{id}/overview as part
+    // of the dashboard refactor. The functionality moved to
+    // /profile/notification-channels/bulk-assign?server={id}, which
+    // has its own coverage. Overview only retains a thin "Manage →"
+    // link to that page.
+    //
+    // Originally:
+    //   - test_server_overview_exposes_notification_management_actions
+    //   - test_server_overview_can_quick_assign_server_notifications
+    //   - test_server_overview_can_quick_add_notification_channel
+
+    public function test_server_overview_quick_assign_removed_placeholder(): void
     {
+        // Sentinel: the inline quick-assign + quick-add UI on the
+        // overview was removed; assert the page no longer mentions
+        // them by their previous labels. If a future change reintroduces
+        // similar inline UI, this test will need to be updated to
+        // reflect the new shape.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -147,82 +164,8 @@ class ServerScheduledDeletionTest extends TestCase
         $this->actingAs($user)
             ->get(route('servers.overview', $server))
             ->assertOk()
-            ->assertSee('Server notifications')
-            ->assertSee('My channels')
-            ->assertSee('Organization channels')
-            ->assertSee('Assign server events');
-    }
-
-    public function test_server_overview_can_quick_assign_server_notifications(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'name' => 'notify-server',
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'setup_status' => Server::SETUP_STATUS_DONE,
-        ]);
-
-        $channel = NotificationChannel::factory()->forUser($user)->create([
-            'type' => NotificationChannel::TYPE_SLACK,
-            'label' => 'Ops',
-            'config' => [
-                'webhook_url' => 'https://hooks.slack.com/services/T/B/X',
-            ],
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceOverview::class, ['server' => $server])
-            ->set('quick_notification_channel_ids', [(string) $channel->id])
-            ->set('quick_notification_event_keys', ['server.monitoring', 'server.ssh_login'])
-            ->call('saveQuickNotificationAssignments')
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseHas('notification_subscriptions', [
-            'notification_channel_id' => $channel->id,
-            'subscribable_type' => Server::class,
-            'subscribable_id' => $server->id,
-            'event_key' => 'server.monitoring',
-        ]);
-
-        $this->assertDatabaseHas('notification_subscriptions', [
-            'notification_channel_id' => $channel->id,
-            'subscribable_type' => Server::class,
-            'subscribable_id' => $server->id,
-            'event_key' => 'server.ssh_login',
-        ]);
-    }
-
-    public function test_server_overview_can_quick_add_notification_channel(): void
-    {
-        $user = $this->userWithOrganization();
-        $org = $user->currentOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'name' => 'notify-server',
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'setup_status' => Server::SETUP_STATUS_DONE,
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceOverview::class, ['server' => $server])
-            ->set('quick_new_owner_scope', 'personal')
-            ->set('quick_new_type', NotificationChannel::TYPE_SLACK)
-            ->set('quick_new_label', 'Ops alerts')
-            ->set('quick_new_slack_webhook_url', 'https://hooks.slack.com/services/T/B/X')
-            ->call('createQuickNotificationChannel')
-            ->assertHasNoErrors()
-            ->assertSet('quick_new_label', '');
-
-        $this->assertDatabaseHas('notification_channels', [
-            'owner_type' => User::class,
-            'owner_id' => $user->id,
-            'type' => NotificationChannel::TYPE_SLACK,
-            'label' => 'Ops alerts',
-        ]);
+            ->assertDontSee('Quick assign')
+            ->assertDontSee('Assign server events');
     }
 
     public function test_rerun_setup_queues_fresh_setup_attempt_for_existing_server(): void

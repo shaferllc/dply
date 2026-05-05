@@ -307,7 +307,7 @@ BASH;
             ? $out
             : match ($status) {
                 'queued' => $stalledQueued
-                    ? __('Task still queued. Ensure a queue worker is running (e.g. php artisan queue:work) and that CACHE_DRIVER is shared with the worker (not "array").')
+                    ? __('Still preparing this task. If it stays stuck, contact your administrator.')
                     : __('Task queued…'),
                 'running' => __('Running on server…'),
                 default => '',
@@ -451,7 +451,7 @@ BASH;
         $this->remoteSshStreamSetMeta(
             $streamTitle,
             $this->manageSshConnectionLabel($server)."\n".__('Remote script').":\n".$inlineBash."\n\n"
-            .__('Runs in a queue worker so the browser request returns immediately. Use a non-sync queue and run `php artisan queue:work`.')
+            .__('Runs in the background so the browser does not block on SSH.')
         );
     }
 

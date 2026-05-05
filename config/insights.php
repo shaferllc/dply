@@ -27,6 +27,12 @@ return [
     */
     'queue_after_deploy' => (bool) env('INSIGHTS_QUEUE_AFTER_DEPLOY', true),
 
+    /*
+    | Queue a server insights run as soon as a fresh server provision succeeds, so the workspace
+    | lands with a populated baseline instead of an empty Insights overview.
+    */
+    'queue_after_install' => (bool) env('INSIGHTS_QUEUE_AFTER_INSTALL', true),
+
     'thresholds' => [
         'cpu_warn_pct' => (float) env('INSIGHTS_CPU_WARN_PCT', 85),
         'mem_warn_pct' => (float) env('INSIGHTS_MEM_WARN_PCT', 85),

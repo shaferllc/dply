@@ -7,6 +7,8 @@ namespace App\Jobs;
 use App\Actions\Servers\CreateServerProvisionRun;
 use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Enums\ServerProvider;
+use App\Jobs\CheckServerHealthJob;
+use App\Jobs\RunServerInsightsJob;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\AnonymousTask;
@@ -17,6 +19,7 @@ use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
+use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Support\Servers\ProvisionPipelineLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -68,6 +71,58 @@ class RunSetupScriptJob implements ShouldQueue
             $updates['meta'] = $meta;
             $server->update($updates);
 
+            // Email server credentials to the creator IF the org has the
+            // toggle on. Opt-in only: most operators don't want
+            // connection blocks landing in mailboxes by default. The
+            // email itself only carries host/port/user — the SSH key
+            // download stays gated behind an authenticated dashboard
+            // session (see ServerProvisionedCredentialsNotification).
+            $organization = $server->organization;
+            $creator = $server->user;
+            if ($organization
+                && $organization->email_server_credentials_enabled
+                && $creator
+                && filled($creator->email)
+            ) {
+                $creator->notify(new \App\Notifications\ServerProvisionedCredentialsNotification($server->fresh() ?? $server));
+            }
+
+            // Kick off insights immediately so the workspace lands with a
+            // populated heartbeat / metrics-missing baseline instead of an
+            // empty state that requires the operator to hit "Refresh"
+            // before anything appears. Job no-ops if the server isn't
+            // ready yet, so the dispatch is safe even on edge timing.
+            if (config('insights.queue_after_install', true) && $server->isVmHost()) {
+                RunServerInsightsJob::dispatch($server->id);
+            }
+
+            // Fire an immediate health check so the workspace Overview's
+            // Health tile flips from "Not checked yet" to a real result
+            // within seconds of provisioning finishing, instead of
+            // waiting up to 5 minutes for the recurring scheduler at
+            // bootstrap/app.php to catch up. The job is idempotent —
+            // worst case the scheduler re-checks 5 minutes later
+            // anyway and overwrites with fresh data.
+            if (! empty($server->ip_address) && $server->isVmHost()) {
+                CheckServerHealthJob::dispatch($server);
+            }
+
+            // Wire up the metrics push pipeline. The provision script's
+            // metricsAgent step (gated on
+            // server_provision.install_metrics_agent, default true) drops
+            // the snapshot script under the deploy user's home, and this
+            // call flips the cached "python is installed" meta flag,
+            // mints a push token if needed, and dispatches the env +
+            // crontab deploy. Going through the service keeps the
+            // provision path and the manual "Install monitoring" path
+            // converging on the same post-install bookkeeping.
+            if ((bool) config('server_provision.install_metrics_agent', true)
+                && ! empty($server->ip_address)
+                && $server->isVmHost()
+            ) {
+                app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
+            }
+
             return;
         }
 
@@ -87,9 +142,18 @@ class RunSetupScriptJob implements ShouldQueue
      * If the most recent run failed for a transient reason (apt fetch timeout, network blip,
      * connection reset) and we're under the attempt cap, queue a delayed retry rather than
      * leaving the user staring at a failure card.
+     *
+     * Disabled by default — set DPLY_AUTO_RETRY_ENABLED=true to opt in. Operators iterating
+     * on the bash script generally want a failed run to stay visible so they can inspect
+     * the output and choose when to re-run, instead of dply silently kicking off attempt
+     * #2 after 30s and overwriting the in-flight diagnostic state.
      */
     protected static function tryScheduleAutoRetry(Server $server): bool
     {
+        if (! (bool) config('dply.auto_retry_enabled', false)) {
+            return false;
+        }
+
         $latestRun = ServerProvisionRun::query()
             ->where('server_id', $server->getKey())
             ->latest('created_at')
@@ -120,6 +184,14 @@ class RunSetupScriptJob implements ShouldQueue
         $meta['auto_retry_max'] = self::MAX_AUTO_RETRY_ATTEMPTS;
         // Clear stale provision_task_id so the journey UI doesn't keep polling the dead task.
         unset($meta['provision_task_id']);
+        // Clear step snapshots from the previous failed run. Without
+        // this, the journey page treats every prior-run script_* key
+        // as "completed" via stepHasPersistedSnapshot during the new
+        // run's cloud phase — so the moment cloud hits 100%, setup
+        // shows 100% too, before the new setup script has even
+        // dispatched. Manual rerun already clears these (see
+        // ProvisionJourney::resumeInstall).
+        unset($meta['provision_step_snapshots']);
 
         $server->update([
             'setup_status' => Server::SETUP_STATUS_PENDING,
@@ -442,7 +514,229 @@ dply_write_file() {
   echo "[dply-rollback] \${rel} :: checkpoint :: Backup recorded"
 }
 
-trap 'status=\$?; echo "[dply-rollback] automatic :: started :: Provision failed, attempting safe rollback"; dply_restore_backups || true; exit \$status' ERR
+trap 'status=\$?; echo "[dply-rollback] automatic :: started :: Provision failed, attempting safe rollback"; dply_dump_dpkg_diagnostics 2>&1 || true; dply_restore_backups || true; exit \$status' ERR
+
+# Two-phase apt-lock waiter. Cloud-init's first-boot
+# unattended-upgrades commonly holds the apt lock for 5-10+ minutes
+# on fresh DigitalOcean droplets, which is unacceptable wait latency
+# during interactive provisioning. Strategy:
+#
+#   Phase 1 (0-90s): passive wait. Politely block on cloud-init and
+#                    apt locks. Most well-behaved droplets clear in
+#                    this window.
+#   Phase 2 (>90s):  active eviction. Stop the unattended-upgrades
+#                    service/timer, kill any apt-get / unattended-upgr
+#                    processes still running, run dpkg --configure -a
+#                    to recover any half-installed packages, then
+#                    proceed. Faster than waiting 5-10 minutes for
+#                    the OS to finish a background task we never
+#                    asked for.
+#
+# Hard fail at 180s — at that point something is genuinely wedged and
+# silent waiting just hides the problem.
+dply_apt_locks_held() {
+  fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+    || fuser /var/lib/dpkg/lock >/dev/null 2>&1 \
+    || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 \
+    || pgrep -x apt-get >/dev/null 2>&1 \
+    || pgrep -x unattended-upgr >/dev/null 2>&1
+}
+
+dply_wait_for_apt_locks() {
+  if command -v cloud-init >/dev/null 2>&1; then
+    timeout 60 cloud-init status --wait >/dev/null 2>&1 \
+      || echo "[dply] cloud-init still running after 60s — will continue polling apt locks directly."
+  fi
+
+  local waited=0
+  while dply_apt_locks_held; do
+    if [ "\${waited}" -lt 90 ]; then
+      echo "[dply] apt is busy (waited \${waited}s — likely cloud-init unattended-upgrades); polite wait, retry in 10s..."
+      sleep 10
+      waited=\$((waited + 10))
+      continue
+    fi
+
+    if [ "\${waited}" -eq 90 ]; then
+      echo "[dply] apt still busy after 90s — evicting unattended-upgrades to unblock provisioning."
+      systemctl stop unattended-upgrades.service >/dev/null 2>&1 || true
+      systemctl disable unattended-upgrades.service >/dev/null 2>&1 || true
+      systemctl stop apt-daily.timer apt-daily.service >/dev/null 2>&1 || true
+      systemctl stop apt-daily-upgrade.timer apt-daily-upgrade.service >/dev/null 2>&1 || true
+      pkill -TERM -x unattended-upgr >/dev/null 2>&1 || true
+      pkill -TERM -x apt-get >/dev/null 2>&1 || true
+      sleep 5
+      pkill -KILL -x unattended-upgr >/dev/null 2>&1 || true
+      pkill -KILL -x apt-get >/dev/null 2>&1 || true
+      # Half-installed package recovery after a kill -9.
+      dpkg --configure -a >/dev/null 2>&1 || true
+      waited=\$((waited + 10))
+      sleep 5
+      continue
+    fi
+
+    if [ "\${waited}" -ge 180 ]; then
+      echo "[dply] ERROR: apt lock still held 90s after eviction — something is wedged." >&2
+      echo "[dply] Diagnose on the host:" >&2
+      echo "[dply]   ps auxf | grep -E 'apt|unattended|dpkg'" >&2
+      echo "[dply]   lsof /var/lib/dpkg/lock-frontend" >&2
+      return 1
+    fi
+
+    echo "[dply] post-eviction wait (\${waited}s); retry in 5s..."
+    sleep 5
+    waited=\$((waited + 5))
+  done
+}
+
+# Heal any half-configured dpkg state left behind by a prior failed
+# install, an OOM kill, an apt eviction, or cloud-init's unattended-
+# upgrades being interrupted mid-flight. Symptom that drives this:
+#
+#   E: Sub-process /usr/bin/dpkg returned an error code (1)
+#   N not fully installed or removed
+#
+# Three-level recovery, escalating only when the gentler step fails:
+#   1. dpkg --configure -a
+#      Re-runs postinst for every half-configured package. Fixes the
+#      common case where postinst was killed (OOM, our eviction).
+#   2. apt-get install -f
+#      Repairs unmet dependencies that were left behind. Catches the
+#      case where the package is fine but a missing dep blocks
+#      reconfiguration.
+#   3. dpkg --purge --force-all <broken pkg>
+#      The escape hatch. If postinst itself is the bug (mysql-server
+#      8.4 + missing locale + missing /var/run/mysqld), levels 1-2
+#      will keep failing forever in a loop. Purge the broken package
+#      so the normal install flow downstream gets a clean slate.
+#      The package's own install step will reinstall it from a known-
+#      working state.
+dply_dump_dpkg_diagnostics() {
+  echo "[dply-diag] ===== dpkg failure diagnostics =====" >&2
+  echo "[dply-diag] non-ok packages (status != ii/rc/un):" >&2
+  local broken_list
+  broken_list=\$(dpkg -l 2>/dev/null \\
+    | awk '/^[a-zA-Z]{2}[ \\t]/ && \$1 !~ /^(ii|rc|un)\$/ { print "  "\$1, \$2, \$3 }')
+  if [ -n "\${broken_list}" ]; then
+    echo "\${broken_list}" >&2
+  else
+    echo "  (none flagged — failure may be a postinst that exited 1 without leaving status state)" >&2
+  fi
+
+  echo "[dply-diag] last 50 lines of /var/log/apt/term.log:" >&2
+  tail -n 50 /var/log/apt/term.log 2>/dev/null | sed 's/^/  /' >&2 \\
+    || echo "  (term.log unavailable)" >&2
+
+  echo "[dply-diag] last 30 lines of /var/log/dpkg.log:" >&2
+  tail -n 30 /var/log/dpkg.log 2>/dev/null | sed 's/^/  /' >&2 \\
+    || echo "  (dpkg.log unavailable)" >&2
+
+  # MySQL-specific deep diagnostics. The postinst calls
+  # systemctl start mysql, and the daemon's actual startup error
+  # only lands in the systemd journal — neither apt's term.log
+  # nor dpkg.log capture mysqld's stderr. Without these blocks
+  # we keep seeing "configure → half-configured in <1s" without
+  # any root-cause signal. Only emit when mysql-server is in the
+  # broken list (or installed at all) so non-mysql failures aren't
+  # noisy.
+  if echo "\${broken_list}" | grep -qE 'mysql-server|mariadb-server' \\
+     || dpkg -l mysql-server-* mariadb-server-* 2>/dev/null | grep -qE '^[a-zA-Z]{2}[ \\t]'; then
+    echo "[dply-diag] mysql/mariadb appears in package state — pulling daemon diagnostics:" >&2
+
+    echo "[dply-diag]   journalctl -u mysql (last 80 lines):" >&2
+    journalctl -u mysql --no-pager -n 80 2>/dev/null | sed 's/^/    /' >&2 \\
+      || echo "    (journalctl -u mysql unavailable)" >&2
+
+    echo "[dply-diag]   journalctl -u mariadb (last 40 lines):" >&2
+    journalctl -u mariadb --no-pager -n 40 2>/dev/null | sed 's/^/    /' >&2 \\
+      || echo "    (no mariadb journal)" >&2
+
+    echo "[dply-diag]   /var/log/mysql/error.log tail (last 50 lines):" >&2
+    tail -n 50 /var/log/mysql/error.log 2>/dev/null | sed 's/^/    /' >&2 \\
+      || echo "    (no /var/log/mysql/error.log yet)" >&2
+
+    echo "[dply-diag]   filesystem state:" >&2
+    ls -lad /var/lib/mysql /var/log/mysql /var/run/mysqld /etc/mysql 2>&1 | sed 's/^/    /' >&2
+
+    echo "[dply-diag]   mysqld --validate-config:" >&2
+    if command -v mysqld >/dev/null 2>&1; then
+      sudo -u mysql mysqld --validate-config 2>&1 | head -n 30 | sed 's/^/    /' >&2 \\
+        || mysqld --validate-config 2>&1 | head -n 30 | sed 's/^/    /' >&2 \\
+        || true
+    else
+      echo "    (mysqld binary not present — package failed before unpack completed)" >&2
+    fi
+
+    echo "[dply-diag]   AppArmor status for mysqld:" >&2
+    aa-status 2>/dev/null | grep -i mysql | sed 's/^/    /' >&2 \\
+      || echo "    (apparmor not active or no mysql profile)" >&2
+
+    echo "[dply-diag]   memory snapshot (mysql 8.0 needs ~512MB to initialise):" >&2
+    free -h 2>/dev/null | sed 's/^/    /' >&2
+
+    echo "[dply-diag]   processes still holding mysql files:" >&2
+    fuser -v /var/lib/mysql 2>&1 | sed 's/^/    /' >&2 || true
+  fi
+
+  echo "[dply-diag] ===== end diagnostics =====" >&2
+}
+
+dply_repair_dpkg_state() {
+  dply_wait_for_apt_locks || return 1
+
+  # /^[a-zA-Z]{2}[ \\t]/  — exactly two status chars + whitespace.
+  # Without the {2} bound, the dpkg -l header line "Desired=Unknown..."
+  # also matched and fed garbage into the broken-list. Tightening to
+  # exactly two characters skips the header cleanly.
+  local broken
+  broken=\$(dpkg -l 2>/dev/null | awk '/^[a-zA-Z]{2}[ \\t]/ && \$1 !~ /^(ii|rc|un)\$/ { print \$2 }')
+
+  if [ -z "\${broken}" ]; then
+    return 0
+  fi
+
+  echo "[dply] detected half-configured packages, running dpkg --configure -a to heal:"
+  echo "\${broken}" | sed 's/^/[dply]   /'
+
+  if dpkg --configure -a; then
+    DEBIAN_FRONTEND=noninteractive apt-get install -f -y \\
+      || echo "[dply] WARNING: apt-get install -f could not auto-fix dependencies."
+  else
+    echo "[dply] dpkg --configure -a failed; trying apt-get install -f..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -f -y || true
+  fi
+
+  # Re-check; if any package is STILL half-configured after both
+  # repair attempts, the postinst itself is broken. Purge with
+  # --force-all so the normal install flow reinstalls it cleanly.
+  local still_broken
+  still_broken=\$(dpkg -l 2>/dev/null | awk '/^[a-zA-Z]{2}[ \\t]/ && \$1 !~ /^(ii|rc|un)\$/ { print \$2 }')
+
+  if [ -n "\${still_broken}" ]; then
+    echo "[dply] gentle repair failed; purging stuck packages (will be reinstalled by their own install step):"
+    echo "\${still_broken}" | sed 's/^/[dply]   /'
+
+    # mysql-server's postinst calls mysql_install_db, which refuses to
+    # initialise into a non-empty /var/lib/mysql. A previous failed
+    # install left files there, so even after dpkg --purge clears the
+    # package the data directory survives — and the very next reinstall
+    # bombs identically: "data directory not empty". Symptom in
+    # /var/log/dpkg.log: configure → half-configured in <1 second,
+    # repeating every retry. Same logic applies to mariadb. Stop the
+    # service and nuke the data + log directories so the next install
+    # gets a clean slate.
+    if echo "\${still_broken}" | grep -qE '^(mysql-server|mariadb-server)'; then
+      echo "[dply] mysql/mariadb among broken packages — wiping stale data dirs so reinstall can initialise cleanly."
+      systemctl stop mysql mariadb >/dev/null 2>&1 || true
+      rm -rf /var/lib/mysql /var/log/mysql /etc/mysql
+    fi
+
+    # shellcheck disable=SC2086
+    DEBIAN_FRONTEND=noninteractive dpkg --purge --force-all \${still_broken} \\
+      || { echo "[dply] ERROR: even --force-all purge failed; manual intervention required." >&2; return 1; }
+    echo "[dply] purge complete; downstream install steps will reinstall."
+  fi
+}
 
 BASH;
     }

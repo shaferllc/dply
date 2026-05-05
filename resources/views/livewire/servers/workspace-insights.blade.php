@@ -8,7 +8,16 @@
     active="insights"
     :title="__('Insights')"
     :description="__('Monitoring, recommendations, and optional fixes for this server.')"
+    :pageHeaderToolbar="true"
 >
+    <x-slot name="headerActions">
+        <button type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
+            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="runChecksNow" aria-hidden="true" />
+            <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
+            <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
+        </button>
+    </x-slot>
+
     @include('livewire.servers.partials.workspace-flashes')
 
     @if ($server->workspace)
@@ -24,17 +33,54 @@
         </div>
     @endif
 
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <x-server-workspace-tablist ariaLabel="{{ __('Insights sections') }}">
-            <x-server-workspace-tab wire:click="setTab('overview')" :active="$tab === 'overview'">{{ __('Overview') }}</x-server-workspace-tab>
-            <x-server-workspace-tab wire:click="setTab('notifications')" :active="$tab === 'notifications'">{{ __('Notifications') }}</x-server-workspace-tab>
-            <x-server-workspace-tab wire:click="setTab('settings')" :active="$tab === 'settings'">{{ __('Settings') }}</x-server-workspace-tab>
-        </x-server-workspace-tablist>
-        <button type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
-            <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
-            <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-        </button>
-    </div>
+    <x-server-workspace-tablist ariaLabel="{{ __('Insights sections') }}">
+        <x-server-workspace-tab wire:click="setTab('overview')" :active="$tab === 'overview'">
+            <span class="inline-flex items-center gap-2">
+                <x-heroicon-o-list-bullet class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Overview') }}
+            </span>
+        </x-server-workspace-tab>
+        <x-server-workspace-tab wire:click="setTab('notifications')" :active="$tab === 'notifications'">
+            <span class="inline-flex items-center gap-2">
+                <x-heroicon-o-bell-alert class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Notifications') }}
+            </span>
+        </x-server-workspace-tab>
+        <x-server-workspace-tab wire:click="setTab('settings')" :active="$tab === 'settings'">
+            <span class="inline-flex items-center gap-2">
+                <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Settings') }}
+            </span>
+        </x-server-workspace-tab>
+    </x-server-workspace-tablist>
+
+    @if ($tab === 'overview' && $bannerFindings->isNotEmpty())
+        <div role="alert" aria-live="polite" class="rounded-2xl border border-red-200 bg-red-50/70 shadow-sm">
+            <div class="flex items-start gap-3 px-5 py-4 border-b border-red-200/80">
+                <x-heroicon-s-exclamation-triangle class="h-5 w-5 shrink-0 text-red-700 mt-0.5" aria-hidden="true" />
+                <div class="min-w-0">
+                    <h2 class="text-sm font-semibold text-red-900">{{ __('Critical attention required') }}</h2>
+                    <p class="mt-0.5 text-xs text-red-900/80">{{ __('Acknowledge to clear from this banner. Recurring issues will resurface automatically.') }}</p>
+                </div>
+            </div>
+            <ul class="divide-y divide-red-200/70">
+                @foreach ($bannerFindings as $b)
+                    <li class="flex flex-wrap items-start justify-between gap-4 px-5 py-3">
+                        <div class="min-w-0">
+                            <p class="font-medium text-red-950">{{ $b->title }}</p>
+                            @if ($b->body)
+                                <p class="mt-1 text-sm leading-snug text-red-900/85 whitespace-pre-wrap">{{ $b->body }}</p>
+                            @endif
+                        </div>
+                        <button type="button" wire:click="acknowledgeFinding({{ $b->id }})" wire:loading.attr="disabled" wire:target="acknowledgeFinding({{ $b->id }})" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
+                            <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Dismiss') }}
+                        </button>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     @if ($tab === 'overview')
         <div class="dply-card overflow-hidden">
@@ -75,12 +121,24 @@
                         <li class="px-5 py-4 flex flex-wrap items-start justify-between gap-4">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <span class="text-xs font-semibold uppercase tracking-wide rounded-md px-2 py-0.5
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide rounded-md px-2 py-0.5
                                         @class([
                                             'bg-amber-50 text-amber-950' => $f->severity === 'warning',
                                             'bg-red-50 text-red-900' => $f->severity === 'critical',
                                             'bg-brand-sand/80 text-brand-ink' => $f->severity === 'info',
-                                        ])">{{ $f->severity }}</span>
+                                        ])">
+                                        @switch($f->severity)
+                                            @case('critical')
+                                                <x-heroicon-s-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                @break
+                                            @case('warning')
+                                                <x-heroicon-s-exclamation-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                @break
+                                            @default
+                                                <x-heroicon-s-information-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        @endswitch
+                                        {{ $f->severity }}
+                                    </span>
                                     <span class="font-medium text-brand-ink">{{ $f->title }}</span>
                                 </div>
                                 @if ($f->body)
@@ -113,7 +171,7 @@
     @endif
 
     @if ($tab === 'notifications')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm p-6 space-y-3 text-sm text-brand-moss max-w-2xl">
+        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm p-6 space-y-3 text-sm text-brand-moss">
             <p>{{ __('Subscribe to “Insights alerts” on this server from your notification channels. When new findings open (or a resolved issue recurs), subscribed channels receive a short message with a link back here.') }}</p>
             <p>
                 <a href="{{ route('profile.notification-channels') }}" wire:navigate class="font-medium text-brand-forest underline">{{ __('Manage notification channels') }}</a>

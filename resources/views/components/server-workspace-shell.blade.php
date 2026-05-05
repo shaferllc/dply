@@ -207,6 +207,9 @@
                                 @case('command-line')
                                     <x-heroicon-o-command-line class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('play-circle')
+                                    <x-heroicon-o-play-circle class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                             @endswitch
                             {{ $label }}
                         </a>

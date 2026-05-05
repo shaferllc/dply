@@ -7,8 +7,6 @@
         data-subscribe="{{ $logBroadcastEchoSubscribable ? '1' : '0' }}"
     ></div>
 
-    @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => $logDisplayLines])
-
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site logs') }}</h2>

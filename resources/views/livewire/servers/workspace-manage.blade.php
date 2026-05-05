@@ -29,8 +29,6 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 18])
-
     <div class="space-y-6">
         <x-server-tab-strip
             :tabs="config('server_manage.workspace_tabs', [])"

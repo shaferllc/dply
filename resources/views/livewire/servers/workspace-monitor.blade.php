@@ -70,8 +70,6 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 14])
-
     @if ($server->workspace)
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
             <p class="font-semibold">{{ __('Project health shortcut') }}</p>
@@ -87,23 +85,38 @@
 
     @if ($opsReady && $probePending)
         <div class="rounded-xl border border-sky-200/80 bg-sky-50/90 px-4 py-3 text-sm text-sky-950">
-            {{ __('Checking SSH and Python on the server in the background. This page will update when the check finishes (requires a queue worker).') }}
+            {{ __('Checking SSH and Python on the server in the background. This page will update when the check finishes.') }}
         </div>
     @endif
-    {{-- Always-visible install path when Python is missing (matches server_workspace / overview copy) --}}
     @if ($opsReady && ! $pyOk)
-        <div class="rounded-2xl border-2 border-brand-sage/35 bg-brand-sand/35 p-6 sm:p-8 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Monitor setup') }}</p>
-            <h2 class="mt-2 text-xl font-bold tracking-tight text-brand-ink">{{ __('Install monitor on this server') }}</h2>
-            <p class="mt-3 max-w-3xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Dply installs Python if needed, deploys the monitor script, and starts collecting usage data. Once it is installed, this page will keep updating every minute.') }}
+        <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
+            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Install monitor on this server') }}</h2>
+            <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                {{ __('Dply provisions the metrics agent over SSH so this page can stream usage data.') }}
             </p>
 
+            <ul class="mt-5 space-y-2.5 text-sm text-brand-ink">
+                <li class="flex items-start gap-2.5">
+                    <x-heroicon-o-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <span>{{ __('Installs Python and the metrics agent over SSH') }}</span>
+                </li>
+                <li class="flex items-start gap-2.5">
+                    <x-heroicon-o-arrow-path class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <span>{{ __('Updates charts on this page every minute') }}</span>
+                </li>
+                <li class="flex items-start gap-2.5">
+                    <x-heroicon-o-bell-alert class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <span>{{ __('Feeds Insights for threshold alerts and digest emails') }}</span>
+                </li>
+            </ul>
+
             @if ($probePending)
-                <p class="mt-5 text-sm font-medium text-brand-ink">{{ __('SSH check queued — running in the background.') }}</p>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Ensure a queue worker is running. You can leave this page; open Metrics again to see the result.') }}</p>
+                <div class="mt-6 rounded-xl border border-sky-200/80 bg-sky-50/70 p-4">
+                    <p class="text-sm font-medium text-sky-950">{{ __('SSH check queued — running in the background.') }}</p>
+                    <p class="mt-1 text-xs text-sky-900/80">{{ __('You can leave this page; open Metrics again to see the result.') }}</p>
+                </div>
             @elseif ($sshUnreachable)
-                <div class="mt-5 rounded-xl border border-amber-200/90 bg-amber-50/90 p-4">
+                <div class="mt-6 rounded-xl border border-amber-200/90 bg-amber-50/80 p-4">
                     <p class="text-sm font-semibold text-amber-950">{{ __('SSH check failed — install is blocked until Dply can reach the server') }}</p>
                     <p class="mt-2 text-sm text-amber-900/90">{{ __('Fix SSH credentials and firewall, then Recheck. The same install is available under Services when SSH works.') }}</p>
                     @if (! empty($m['monitoring_probe_error']))
@@ -118,27 +131,66 @@
                     </div>
                 </div>
             @elseif ($isDeployer)
-                <div class="mt-5 rounded-xl border border-amber-200/80 bg-amber-50/90 p-4 text-sm text-amber-950">
+                <div class="mt-6 rounded-xl border border-amber-200/80 bg-amber-50/80 p-4 text-sm text-amber-950">
                     {{ __('Your role cannot run installs. Ask an admin to open this Metrics page or Services and use “Install Python for monitoring”, then Recheck.') }}
                     <div class="mt-3">
                         <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" class="{{ $btnSecondary }} !py-2">{{ __('Recheck status') }}</button>
                     </div>
                 </div>
+            @elseif ($servicesRemoteTaskId || $monitoringInstallInProgress)
+                {{-- Install task is in flight (SSH apt + script deploy).
+                     Driven by either the in-memory $servicesRemoteTaskId
+                     or the persistent ServerManageAction row picked up
+                     in render(). The latter survives page reloads. --}}
+                @php
+                    $installStatus = (string) ($monitoringInstallAction?->status ?? 'queued');
+                    $installStartedAt = $monitoringInstallAction?->started_at ?? $monitoringInstallAction?->created_at;
+                    $installAgeMinutes = $installStartedAt?->diffInMinutes(now());
+                    $installLabel = match ($installStatus) {
+                        'queued' => __('Queued — waiting to start.'),
+                        'running' => __('Running apt + deploying the metrics agent over SSH.'),
+                        'failed' => __('Install failed. Check the queue worker output and try again.'),
+                        default => __('Install in progress.'),
+                    };
+                @endphp
+                <div wire:poll.5s class="mt-6 rounded-xl border border-sky-200/80 bg-sky-50/70 p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="mt-0.5 inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" aria-hidden="true"></span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-sky-950">
+                                {{ __('Installing monitor on this server…') }}
+                                <span class="ml-1 text-[10px] font-medium uppercase tracking-wide text-sky-700/80">{{ strtoupper($installStatus) }}</span>
+                            </p>
+                            <p class="mt-1 text-xs text-sky-900/85 leading-relaxed">{{ $installLabel }}</p>
+                            @if ($installStartedAt)
+                                <p class="mt-1 text-[11px] text-sky-900/70">
+                                    {{ __('Started') }}: {{ $installStartedAt->diffForHumans() }}
+                                    @if ($installAgeMinutes !== null && $installAgeMinutes >= 1)
+                                        · {{ trans_choice(':count minute elapsed|:count minutes elapsed', (int) $installAgeMinutes, ['count' => (int) $installAgeMinutes]) }}
+                                    @endif
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
             @else
-                <div class="mt-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+                <div class="mt-6 flex flex-wrap items-center gap-3">
                     <button
                         type="button"
                         wire:click="openInstallMonitoringModal('step1')"
-                        class="{{ $btnPrimary }} !px-6 !py-3 !text-sm"
+                        wire:loading.attr="disabled"
+                        wire:target="openInstallMonitoringModal,runInstallAction"
+                        class="{{ $btnPrimary }}"
                     >
-                        <x-heroicon-o-arrow-down-tray class="h-5 w-5 shrink-0 opacity-90" />
-                        {{ __('Install monitor') }}
+                        <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" wire:loading.remove wire:target="openInstallMonitoringModal,runInstallAction" aria-hidden="true" />
+                        <span class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-brand-cream/40 border-t-brand-cream" wire:loading wire:target="openInstallMonitoringModal,runInstallAction" aria-hidden="true"></span>
+                        <span wire:loading.remove wire:target="openInstallMonitoringModal,runInstallAction">{{ __('Install monitor') }}</span>
+                        <span wire:loading wire:target="openInstallMonitoringModal,runInstallAction">{{ __('Installing…') }}</span>
                     </button>
                     <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" class="{{ $btnSecondary }}">
                         <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck status') }}</span>
                         <span wire:loading wire:target="queueMonitoringProbe">{{ __('Queueing…') }}</span>
                     </button>
-                    <a href="{{ route('servers.services', $server) }}" wire:navigate class="text-sm font-semibold text-brand-sage hover:text-brand-forest">{{ __('Same install on Services') }} →</a>
                 </div>
                 @if ($probeAt)
                     <p class="mt-4 text-xs text-brand-mist">{{ __('Last check') }}: {{ $probeAt->format('Y-m-d H:i:s T') }}</p>
@@ -160,6 +212,23 @@
     @endif
 
     @if ($opsReady && $pyOk)
+        @php
+            // "Healthy" = agent SHA matches AND a recent fresh sample
+            // exists. When healthy we hide the recovery toolbar entirely
+            // — Repair / diagnostics only need to surface when something
+            // is actually off (stale agent, missing sample, clock skew,
+            // or push verifier reports drift).
+            $monitorScriptCurrent = (bool) ($guestPushVerification['script_current'] ?? false);
+            $monitorEnvDeployed = (bool) ($guestPushVerification['callback_env_deployed'] ?? false);
+            $monitorCronCurrent = (bool) ($guestPushVerification['cron_current'] ?? false);
+            $monitorSampleFresh = $sampleAgeMinutes !== null
+                && $sampleAgeMinutes <= 10
+                && ! $sampleTimestampInFuture;
+            $monitorHealthy = $monitorScriptCurrent
+                && $monitorEnvDeployed
+                && $monitorCronCurrent
+                && $monitorSampleFresh;
+        @endphp
         <div class="{{ $card }} p-6 sm:p-8">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-2xl">
@@ -168,41 +237,58 @@
                         {{ __('Monitoring is installed. The server pushes fresh metrics back to Dply every minute.') }}
                     </p>
                 </div>
-                @unless ($isDeployer)
-                    <div class="flex flex-wrap items-center gap-3 lg:justify-end">
-                        <button type="button" wire:click="verifyGuestPush" wire:loading.attr="disabled" class="{{ $btnSecondary }}">
-                            <span wire:loading.remove wire:target="verifyGuestPush">{{ __('Recheck monitor') }}</span>
-                            <span wire:loading wire:target="verifyGuestPush">{{ __('Checking…') }}</span>
-                        </button>
+                @if (! $isDeployer && ! $monitorHealthy)
+                    <div class="flex flex-wrap items-center gap-3 lg:justify-end" x-data="{ advancedOpen: false }">
                         <button type="button" wire:click="repairMonitorNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
                             <span wire:loading.remove wire:target="repairMonitorNow">{{ __('Repair monitor now') }}</span>
                             <span wire:loading wire:target="repairMonitorNow">{{ __('Repairing…') }}</span>
                         </button>
-                        <button type="button" wire:click="runMonitorCallbackDiagnostics" wire:loading.attr="disabled" class="{{ $btnSecondary }}">
-                            <span wire:loading.remove wire:target="runMonitorCallbackDiagnostics">{{ __('Run callback diagnostics') }}</span>
-                            <span wire:loading wire:target="runMonitorCallbackDiagnostics">{{ __('Running…') }}</span>
-                        </button>
-                        <button type="button" wire:click="inspectMetricsCallbackEnv" wire:loading.attr="disabled" class="{{ $btnSecondary }}">
-                            <span wire:loading.remove wire:target="inspectMetricsCallbackEnv">{{ __('Inspect callback env') }}</span>
-                            <span wire:loading wire:target="inspectMetricsCallbackEnv">{{ __('Inspecting…') }}</span>
-                        </button>
+                        <div class="relative">
+                            <button type="button" @click="advancedOpen = ! advancedOpen" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-2.5 py-2.5 text-brand-ink shadow-sm hover:bg-brand-sand/40" :aria-expanded="advancedOpen" aria-label="{{ __('Troubleshoot monitor') }}">
+                                <x-heroicon-o-ellipsis-horizontal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            </button>
+                            <div x-show="advancedOpen" x-cloak @click.outside="advancedOpen = false" x-transition.opacity.duration.100ms class="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-lg">
+                                <button type="button" @click="advancedOpen = false" wire:click="runMonitorCallbackDiagnostics" wire:loading.attr="disabled" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/40">
+                                    <span wire:loading.remove wire:target="runMonitorCallbackDiagnostics">{{ __('Run callback diagnostics') }}</span>
+                                    <span wire:loading wire:target="runMonitorCallbackDiagnostics">{{ __('Running…') }}</span>
+                                </button>
+                                <button type="button" @click="advancedOpen = false" wire:click="inspectMetricsCallbackEnv" wire:loading.attr="disabled" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/40">
+                                    <span wire:loading.remove wire:target="inspectMetricsCallbackEnv">{{ __('Inspect callback env') }}</span>
+                                    <span wire:loading wire:target="inspectMetricsCallbackEnv">{{ __('Inspecting…') }}</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                @endunless
+                @endif
             </div>
 
-            <dl class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <dl class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Status') }}</dt>
                     <dd class="mt-2 text-sm font-semibold text-brand-ink">
                         {{ __('Installed and running') }}
                     </dd>
-                </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Collection cadence') }}</dt>
-                    <dd class="mt-2 text-sm font-semibold text-brand-ink">
-                        {{ __('Every minute') }}
-                    </dd>
-                    <dd class="mt-1 text-xs text-brand-mist font-mono">{{ $guestPushCronExpression ?? '* * * * *' }}</dd>
+                    @if ($guestPushVerification !== null)
+                        @php($scriptCurrent = (bool) ($guestPushVerification['script_current'] ?? false))
+                        @php($remoteSha = $guestPushVerification['remote_sha'] ?? null)
+                        <dd class="mt-3 flex items-center gap-1.5 text-xs">
+                            @if ($scriptCurrent)
+                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-900">
+                                    <x-heroicon-s-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Agent up to date') }}
+                                </span>
+                            @elseif ($remoteSha === null)
+                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-semibold text-brand-moss">
+                                    {{ __('Agent version unknown') }}
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-900" title="{{ __('Dply will redeploy the latest snapshot script the next time this server is healthy.') }}">
+                                    <x-heroicon-s-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Agent update queued') }}
+                                </span>
+                            @endif
+                        </dd>
+                    @endif
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Last sample received') }}</dt>
@@ -231,106 +317,37 @@
 
     @if ($showMetricsPanels)
         <div class="{{ $card }} p-6 sm:p-8">
-            <div class="grid gap-4 lg:grid-cols-3">
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Observe') }}</p>
-                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Watch for capacity and drift') }}</p>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('CPU, memory, disk, and load tell you whether the host is healthy before a deploy or incident response step.') }}</p>
-                </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Correlate') }}</p>
-                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Relate spikes to releases') }}</p>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Deployment context on this page helps answer whether a resource spike came from new code, a scheduled job, or a server-level change.') }}</p>
-                </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Escalate') }}</p>
-                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Route findings to the team') }}</p>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use organization and project notification routing so health changes reach the right people instead of living only on this screen.') }}</p>
-                </div>
-            </div>
-
-            <div class="mt-6 grid gap-4 lg:grid-cols-3">
-                <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Sample freshness') }}</p>
-                    <p class="mt-2 text-sm font-semibold text-brand-ink">
-                        @if ($sampleAgeMinutes === null)
-                            {{ __('Waiting for first callback') }}
-                        @elseif ($sampleTimestampInFuture)
-                            {{ __('Clock skew detected') }}
-                        @elseif ($sampleAgeMinutes <= 2)
-                            {{ __('Fresh') }}
-                        @elseif ($sampleAgeMinutes <= 10)
-                            {{ __('Aging') }}
-                        @else
-                            {{ __('Stale') }}
-                        @endif
-                    </p>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        @if ($sampleAgeMinutes === null)
-                            {{ __('No server sample has been stored yet.') }}
-                        @elseif ($sampleTimestampInFuture)
-                            {{ __('The latest sample timestamp is ahead of Dply. Check the server timezone or clock sync, then let a new sample arrive.') }}
-                        @else
-                            {{ trans_choice('Latest metric sample is :minutes minute old.|Latest metric sample is :minutes minutes old.', $sampleAgeMinutes, ['minutes' => $sampleAgeMinutes]) }}
-                        @endif
-                    </p>
-                </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Server notification routes') }}</p>
-                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ trans_choice(':count saved|:count saved', $routingSummary['server_routes'], ['count' => $routingSummary['server_routes']]) }}</p>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use server-scoped routes for host-specific incidents and service alerts.') }}</p>
-                </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                    <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Project escalation routes') }}</p>
-                    <p class="mt-2 text-sm font-semibold text-brand-ink">
-                        @if ($routingSummary['has_project'])
-                            {{ trans_choice(':count saved|:count saved', $routingSummary['project_routes'], ['count' => $routingSummary['project_routes']]) }}
-                        @else
-                            {{ __('No project attached') }}
-                        @endif
-                    </p>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        @if ($routingSummary['has_project'])
-                            {{ __('Project routes are where grouped health and deploy signals should land.') }}
-                        @else
-                            {{ __('Attach this server to a project if you want grouped health and deploy routing.') }}
-                        @endif
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="{{ $card }} p-6 sm:p-8">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Current usage') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">
-                        {{ __('These cards update from the server callback stream. New samples should arrive every minute.') }}
-                    </p>
+                    @if ($latest)
+                        <p class="mt-1 text-xs text-brand-mist">
+                            {{ __('Last sample') }}: {{ $latest->captured_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') }}
+                        </p>
+                    @endif
                 </div>
             </div>
-
-            @if ($latest)
-                <p class="mt-4 text-xs text-brand-mist">
-                    {{ __('Last sample') }}: {{ $latest->captured_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') }}
-                </p>
-            @endif
 
             <dl class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('CPU') }}</dt>
                     <dd class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">{{ isset($p['cpu_pct']) ? number_format((float) $p['cpu_pct'], 1).'%' : '—' }}</dd>
+                    <dd class="mt-1 text-xs text-brand-mist">
+                        {{ trans_choice(':count core|:count cores', (int) ($latestPayloadSummary['cpu_count'] ?? 0), ['count' => (int) ($latestPayloadSummary['cpu_count'] ?? 0)]) }}
+                    </dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Memory') }}</dt>
                     <dd class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">{{ isset($p['mem_pct']) ? number_format((float) $p['mem_pct'], 1).'%' : '—' }}</dd>
-                    <dd class="mt-1 text-xs text-brand-mist">{{ $fmtBytes(isset($p['mem_total_kb']) ? (int) $p['mem_total_kb'] * 1024 : null) }} {{ __('total') }}</dd>
+                    <dd class="mt-1 text-xs text-brand-mist">
+                        {{ $fmtBytes($latestPayloadSummary['memory_available_bytes'] ?? null) }} {{ __('free of') }} {{ $fmtBytes(isset($p['mem_total_kb']) ? (int) $p['mem_total_kb'] * 1024 : null) }}
+                    </dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Disk') }} ({{ __('root') }})</dt>
                     <dd class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">{{ isset($p['disk_pct']) ? number_format((float) $p['disk_pct'], 1).'%' : '—' }}</dd>
                     <dd class="mt-1 text-xs text-brand-mist">
-                        {{ $fmtBytes($p['disk_used_bytes'] ?? null) }} / {{ $fmtBytes($p['disk_total_bytes'] ?? null) }}
+                        {{ $fmtBytes($latestPayloadSummary['disk_free_bytes'] ?? null) }} {{ __('free of') }} {{ $fmtBytes($p['disk_total_bytes'] ?? null) }}
                     </dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
@@ -338,7 +355,7 @@
                     <dd class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">{{ isset($p['load_1m']) ? number_format((float) $p['load_1m'], 2) : '—' }}</dd>
                     <dd class="mt-1 text-xs text-brand-mist">
                         @if (isset($p['load_5m'], $p['load_15m']))
-                            {{ number_format((float) $p['load_5m'], 2) }} / {{ number_format((float) $p['load_15m'], 2) }}
+                            {{ number_format((float) $p['load_5m'], 2) }} / {{ number_format((float) $p['load_15m'], 2) }} (5m / 15m)
                         @else
                             —
                         @endif
@@ -346,66 +363,11 @@
                 </div>
             </dl>
 
-            <div class="mt-6 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:p-5">
-                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Headroom and pressure') }}</h3>
-                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
-                            {{ __('These extra signals help explain whether slowdowns are capacity, disk, swap, uptime, or network related.') }}
-                        </p>
-                    </div>
-                </div>
-
-                <dl class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 p-4">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Memory headroom') }}</dt>
-                        <dd class="mt-2 text-base font-semibold text-brand-ink">{{ $fmtBytes($latestPayloadSummary['memory_available_bytes'] ?? null) }}</dd>
-                        <dd class="mt-1 text-xs text-brand-mist">
-                            {{ __('Available out of :total', ['total' => $fmtBytes($latestPayloadSummary['memory_total_bytes'] ?? null)]) }}
-                        </dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 p-4">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Swap pressure') }}</dt>
-                        <dd class="mt-2 text-base font-semibold text-brand-ink">
-                            @if (isset($latestPayloadSummary['swap_pct']) && $latestPayloadSummary['swap_pct'] !== null)
-                                {{ number_format((float) $latestPayloadSummary['swap_pct'], 1) }}%
-                            @else
-                                —
-                            @endif
-                        </dd>
-                        <dd class="mt-1 text-xs text-brand-mist">
-                            {{ $fmtBytes($latestPayloadSummary['swap_used_bytes'] ?? null) }} / {{ $fmtBytes($latestPayloadSummary['swap_total_bytes'] ?? null) }}
-                        </dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 p-4">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Disk headroom') }}</dt>
-                        <dd class="mt-2 text-base font-semibold text-brand-ink">{{ $fmtBytes($latestPayloadSummary['disk_free_bytes'] ?? null) }}</dd>
-                        <dd class="mt-1 text-xs text-brand-mist">
-                            {{ __('Inodes used: :pct', ['pct' => isset($latestPayloadSummary['inode_pct_root']) && $latestPayloadSummary['inode_pct_root'] !== null ? number_format((float) $latestPayloadSummary['inode_pct_root'], 1).'%' : '—']) }}
-                        </dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 p-4">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Capacity fit') }}</dt>
-                        <dd class="mt-2 text-base font-semibold text-brand-ink">
-                            @if (isset($latestPayloadSummary['load_per_cpu_1m']) && $latestPayloadSummary['load_per_cpu_1m'] !== null)
-                                {{ number_format((float) $latestPayloadSummary['load_per_cpu_1m'], 2) }} {{ __('load/core') }}
-                            @else
-                                —
-                            @endif
-                        </dd>
-                        <dd class="mt-1 text-xs text-brand-mist">
-                            {{ trans_choice(':count CPU core|:count CPU cores', (int) ($latestPayloadSummary['cpu_count'] ?? 0), ['count' => (int) ($latestPayloadSummary['cpu_count'] ?? 0)]) }}
-                        </dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 p-4">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Uptime and traffic') }}</dt>
-                        <dd class="mt-2 text-base font-semibold text-brand-ink">{{ $fmtDuration($latestPayloadSummary['uptime_seconds'] ?? null) }}</dd>
-                        <dd class="mt-1 text-xs text-brand-mist">
-                            {{ __('In :rx · Out :tx', ['rx' => $fmtRate($latestPayloadSummary['rx_bytes_per_sec'] ?? null), 'tx' => $fmtRate($latestPayloadSummary['tx_bytes_per_sec'] ?? null)]) }}
-                        </dd>
-                    </div>
-                </dl>
-            </div>
+            <p class="mt-4 text-xs text-brand-mist">
+                {{ __('Uptime') }}: {{ $fmtDuration($latestPayloadSummary['uptime_seconds'] ?? null) }}
+                <span class="text-brand-moss">·</span>
+                {{ __('In :rx · Out :tx', ['rx' => $fmtRate($latestPayloadSummary['rx_bytes_per_sec'] ?? null), 'tx' => $fmtRate($latestPayloadSummary['tx_bytes_per_sec'] ?? null)]) }}
+            </p>
         </div>
 
         <div class="{{ $card }} p-6 sm:p-8" wire:key="metrics-chart-{{ $latest?->id ?? 'none' }}">
@@ -431,93 +393,6 @@
                 @endif
             </div>
 
-            <div class="mt-6 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:p-5">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Site and deployment context') }}</h3>
-                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
-                            {{ __('Server metrics stay host-level, but this panel helps relate spikes to sites and recent deployments running on the box.') }}
-                        </p>
-                    </div>
-                    <p class="text-xs text-brand-mist">
-                        {{ trans_choice(':count site on this server|:count sites on this server', (int) ($deploymentContext['site_count'] ?? 0), ['count' => (int) ($deploymentContext['site_count'] ?? 0)]) }}
-                        <span class="text-brand-moss">·</span>
-                        {{ trans_choice(':count active|:count active', (int) ($deploymentContext['active_site_count'] ?? 0), ['count' => (int) ($deploymentContext['active_site_count'] ?? 0)]) }}
-                    </p>
-                </div>
-
-                <dl class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 p-4">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Latest deployment') }}</dt>
-                        <dd class="mt-2 text-sm font-semibold text-brand-ink">
-                            @if (($deploymentContext['latest_deployment'] ?? null) !== null)
-                                {{ strtoupper((string) ($deploymentContext['latest_deployment']->status ?? '')) }}
-                            @else
-                                {{ __('No deployments yet') }}
-                            @endif
-                        </dd>
-                        <dd class="mt-1 text-xs text-brand-mist">
-                            @if (($deploymentContext['latest_deployment'] ?? null) !== null)
-                                {{ optional($deploymentContext['latest_deployment']->site)->name ?? __('Unknown site') }}
-                                ·
-                                {{ $deploymentContext['latest_deployment']->finished_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') ?? __('In progress') }}
-                            @else
-                                {{ __('No attached site deployments have finished on this server yet.') }}
-                            @endif
-                        </dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 p-4">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Latest failed deploy') }}</dt>
-                        <dd class="mt-2 text-sm font-semibold text-brand-ink">
-                            @if (($deploymentContext['latest_failed_deployment'] ?? null) !== null)
-                                {{ optional($deploymentContext['latest_failed_deployment']->site)->name ?? __('Unknown site') }}
-                            @else
-                                {{ __('No recent failures') }}
-                            @endif
-                        </dd>
-                        <dd class="mt-1 text-xs text-brand-mist">
-                            @if (($deploymentContext['latest_failed_deployment'] ?? null) !== null)
-                                {{ $deploymentContext['latest_failed_deployment']->finished_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') ?? __('Failed before finish time was recorded') }}
-                            @else
-                                {{ __('Nothing on this server is currently flagged with a failed deployment record.') }}
-                            @endif
-                        </dd>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 p-4">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Most recent correlated event') }}</dt>
-                        <dd class="mt-2 text-sm font-semibold text-brand-ink">
-                            @if (($deploymentContext['latest_correlation'] ?? null) !== null)
-                                {{ str($deploymentContext['latest_correlation']['type'] ?? 'event')->replace('_', ' ')->title() }}
-                            @else
-                                {{ __('No recent correlated activity') }}
-                            @endif
-                        </dd>
-                        <dd class="mt-1 text-xs text-brand-mist">
-                            @if (($deploymentContext['latest_correlation']['finished_at'] ?? null))
-                                {{ \Illuminate\Support\Carbon::parse($deploymentContext['latest_correlation']['finished_at'])->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') }}
-                            @elseif (($deploymentContext['latest_correlation']['completed_at'] ?? null))
-                                {{ \Illuminate\Support\Carbon::parse($deploymentContext['latest_correlation']['completed_at'])->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') }}
-                            @elseif (($deploymentContext['latest_correlation']['at'] ?? null))
-                                {{ \Illuminate\Support\Carbon::parse($deploymentContext['latest_correlation']['at'])->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') }}
-                            @else
-                                {{ __('Useful when a spike follows a deploy, firewall change, cron run, or remote task.') }}
-                            @endif
-                        </dd>
-                    </div>
-                </dl>
-
-                @if (! empty($deploymentContext['site_summaries'] ?? []))
-                    <div class="mt-4 flex flex-wrap gap-3">
-                        @foreach (($deploymentContext['site_summaries'] ?? []) as $siteSummary)
-                            <div class="rounded-full border border-brand-ink/10 bg-white/80 px-3 py-1.5 text-xs text-brand-ink">
-                                <span class="font-semibold">{{ $siteSummary['name'] }}</span>
-                                <span class="text-brand-mist">· {{ strtoupper((string) ($siteSummary['last_deploy_status'] ?? $siteSummary['status'])) }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
-
             @if ($chartSnapshots->isEmpty())
                 <p class="mt-6 text-sm text-brand-mist">{{ __('No history yet. Once the remote monitor callback starts posting samples, the graph will populate automatically.') }}</p>
             @else
@@ -525,6 +400,10 @@
                     <x-metrics-combined-chart :snapshots="$chartSnapshots" />
                 </div>
             @endif
+
+            <p class="mt-4 text-xs text-brand-moss">
+                <a href="{{ route('servers.insights', $server) }}" wire:navigate class="font-medium hover:text-brand-ink">{{ __('View deploy correlations on Insights') }} →</a>
+            </p>
         </div>
     @endif
 

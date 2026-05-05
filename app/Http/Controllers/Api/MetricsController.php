@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\ServerMetricIngestEvent;
 use App\Services\Servers\ServerMetricsCollector;
@@ -96,6 +97,21 @@ class MetricsController extends Controller
         $meta = $server->meta ?? [];
         $meta['monitoring_guest_push_last_sample_at'] = $capturedAt->toIso8601String();
         $server->forceFill(['meta' => $meta])->saveQuietly();
+
+        // A live sample arriving is the strongest possible signal that
+        // metrics_missing_or_stale findings are stale. Resolve them here
+        // so operators don't have to wait for the next hourly insights
+        // run after fixing a misconfigured callback URL or freshly
+        // installing monitoring.
+        InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->whereNull('site_id')
+            ->where('insight_key', 'metrics_missing_or_stale')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->update([
+                'status' => InsightFinding::STATUS_RESOLVED,
+                'resolved_at' => now(),
+            ]);
 
         return response()->json(['ok' => true], 202);
     }

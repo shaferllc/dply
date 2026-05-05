@@ -179,8 +179,6 @@
             </form>
         </div>
 
-        @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 18])
-
         <div class="mt-8 border-t border-brand-ink/10 pt-8">
             <h4 class="text-sm font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider & lifecycle') }}</h4>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2 text-sm">

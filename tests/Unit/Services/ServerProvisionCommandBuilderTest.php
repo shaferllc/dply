@@ -198,10 +198,18 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('[dply] nginx already installed; skipping package install.', $joined);
         $this->assertStringContainsString('[dply] mysql-server already installed; skipping package install.', $joined);
         $this->assertStringContainsString('[dply] redis-server already installed; skipping package install.', $joined);
+        // The "already installed" guard now greps both upstreams
+        // (sury.org primary, Launchpad fallback) and verifies an
+        // InRelease file actually fetched — not just that the source
+        // is configured.
         $this->assertStringContainsString('grep -RqsE', $joined);
-        $this->assertStringContainsString('ondrej-ubuntu-php|ppa\\.launchpadcontent\\.net/ondrej/php', $joined);
-        $this->assertStringContainsString('[dply] ondrej/php repository already installed; skipping repository setup.', $joined);
+        $this->assertStringContainsString('packages\\.sury\\.org/php|ppa\\.launchpadcontent\\.net/ondrej/php', $joined);
+        $this->assertStringContainsString('[dply] ondrej/php repository already installed and indexed; skipping repository setup.', $joined);
+        // Both keyring paths are emitted (case branch picks one at runtime).
+        $this->assertStringContainsString('/etc/apt/keyrings/sury-php.gpg', $joined);
         $this->assertStringContainsString('/etc/apt/keyrings/ondrej-php.gpg', $joined);
+        // Both upstream URLs appear in the source-list emit lines.
+        $this->assertStringContainsString('https://packages.sury.org/php/', $joined);
         $this->assertStringContainsString('https://ppa.launchpadcontent.net/ondrej/php/ubuntu', $joined);
         $this->assertStringContainsString('timeout 300s apt-get update -y', $joined);
         $this->assertStringNotContainsString('rg -l "ondrej-ubuntu-php|ppa.launchpadcontent.net/ondrej/php"', $joined);

@@ -201,6 +201,33 @@ class WorkspaceInsights extends Component
         $this->toastSuccess(__('Fix has been queued. This may take up to a minute.'));
     }
 
+    public function acknowledgeFinding(int $findingId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->whereNull('acknowledged_at')
+            ->whereKey($findingId)
+            ->first();
+
+        if ($finding === null) {
+            return;
+        }
+
+        $finding->forceFill([
+            'acknowledged_at' => now(),
+            'acknowledged_by_user_id' => $user->id,
+        ])->save();
+    }
+
     public function render(): View
     {
         $org = $this->server->organization;
@@ -247,17 +274,29 @@ class WorkspaceInsights extends Component
             }
         }
 
+        $severityOrder = "CASE severity WHEN 'critical' THEN 30 WHEN 'warning' THEN 20 WHEN 'info' THEN 10 ELSE 0 END";
         $findings = InsightFinding::query()
             ->where('server_id', $this->server->id)
             ->whereNull('site_id')
             ->where('status', InsightFinding::STATUS_OPEN)
+            ->orderByRaw($severityOrder.' DESC')
             ->orderByDesc('detected_at')
             ->limit(100)
             ->get();
 
+        // Banner: top 3 unacknowledged criticals only. Acknowledged
+        // ones still appear in the list below — ack silences the
+        // banner, not the whole row.
+        $bannerFindings = $findings
+            ->where('severity', InsightFinding::SEVERITY_CRITICAL)
+            ->whereNull('acknowledged_at')
+            ->take(3)
+            ->values();
+
         return view('livewire.servers.workspace-insights', [
             'orgHasPro' => $orgHasPro,
             'findings' => $findings,
+            'bannerFindings' => $bannerFindings,
             'insightsCatalog' => $catalog,
             'enabledChecks' => $enabledChecks,
             'implementedChecks' => $implementedChecks,

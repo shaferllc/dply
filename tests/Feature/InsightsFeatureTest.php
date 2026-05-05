@@ -125,7 +125,9 @@ class InsightsFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('Insights')
             ->assertSee('1 open finding')
-            ->assertSee('Server metrics are not arriving')
+            // Individual finding titles are no longer rendered on the
+            // overview's insights summary card — that detail moved to
+            // /servers/{id}/insights as part of the dashboard refactor.
             ->assertSee('Open Insights');
     }
 
@@ -197,6 +199,14 @@ class InsightsFeatureTest extends TestCase
     {
         [$user, $server] = $this->userWithServer();
 
+        // Pretend the monitoring guest script has been installed (push
+        // token hash recorded). Without this signal the runner treats
+        // missing snapshots as "user hasn't opted into monitoring yet"
+        // and stays quiet — see MetricsMissingInsightRunner.
+        $meta = is_array($server->meta ?? null) ? $server->meta : [];
+        $meta['monitoring_guest_push_token_hash'] = hash('sha256', 'install-marker');
+        $server->forceFill(['meta' => $meta])->save();
+
         Bus::dispatchSync(new RunServerInsightsJob($server->id));
 
         $this->assertDatabaseHas('insight_findings', [
@@ -204,6 +214,19 @@ class InsightsFeatureTest extends TestCase
             'insight_key' => 'metrics_missing_or_stale',
             'status' => InsightFinding::STATUS_OPEN,
             'severity' => InsightFinding::SEVERITY_WARNING,
+        ]);
+    }
+
+    public function test_run_server_insights_job_skips_missing_metrics_finding_when_monitoring_not_installed(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        Bus::dispatchSync(new RunServerInsightsJob($server->id));
+
+        $this->assertDatabaseMissing('insight_findings', [
+            'server_id' => $server->id,
+            'insight_key' => 'metrics_missing_or_stale',
+            'status' => InsightFinding::STATUS_OPEN,
         ]);
     }
 
@@ -255,6 +278,127 @@ class InsightsFeatureTest extends TestCase
         $this->actingAs($user)
             ->get(route('sites.insights', [$server, $site]))
             ->assertOk();
+    }
+
+    public function test_acknowledge_finding_clears_banner_but_keeps_finding_in_list(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $crit = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'cpu_ram_usage',
+            'dedupe_hash' => 'crit',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_CRITICAL,
+            'title' => 'Critical CPU saturation',
+            'body' => null,
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server]);
+
+        $component
+            ->assertViewHas('bannerFindings', fn ($c) => $c->count() === 1 && $c->first()->id === $crit->id)
+            ->assertViewHas('findings', fn ($c) => $c->where('id', $crit->id)->count() === 1);
+
+        $component->call('acknowledgeFinding', $crit->id);
+
+        $crit->refresh();
+        $this->assertNotNull($crit->acknowledged_at);
+        $this->assertSame($user->id, $crit->acknowledged_by_user_id);
+
+        $component->assertViewHas('bannerFindings', fn ($c) => $c->isEmpty())
+            ->assertViewHas('findings', fn ($c) => $c->where('id', $crit->id)->count() === 1);
+    }
+
+    public function test_findings_are_ordered_by_severity_then_recency(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $info = InsightFinding::query()->create([
+            'server_id' => $server->id, 'site_id' => null, 'team_id' => null,
+            'insight_key' => 'k1', 'dedupe_hash' => 'k1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'Info row', 'body' => null, 'meta' => [], 'correlation' => null,
+            'detected_at' => now(), 'resolved_at' => null,
+        ]);
+        $warn = InsightFinding::query()->create([
+            'server_id' => $server->id, 'site_id' => null, 'team_id' => null,
+            'insight_key' => 'k2', 'dedupe_hash' => 'k2',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'Warn row', 'body' => null, 'meta' => [], 'correlation' => null,
+            'detected_at' => now()->subMinutes(10), 'resolved_at' => null,
+        ]);
+        $crit = InsightFinding::query()->create([
+            'server_id' => $server->id, 'site_id' => null, 'team_id' => null,
+            'insight_key' => 'k3', 'dedupe_hash' => 'k3',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_CRITICAL,
+            'title' => 'Crit row', 'body' => null, 'meta' => [], 'correlation' => null,
+            'detected_at' => now()->subHour(), 'resolved_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->assertViewHas('findings', function ($c) use ($crit, $warn, $info) {
+                $ids = $c->pluck('id')->all();
+
+                return $ids === [$crit->id, $warn->id, $info->id];
+            });
+    }
+
+    public function test_reopened_finding_clears_prior_acknowledgement(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now(),
+            'payload' => ['cpu_pct' => 95, 'mem_pct' => 10, 'disk_pct' => 10, 'load_1m' => 0.5],
+        ]);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'cpu_ram_usage')
+            ->first();
+        $this->assertNotNull($finding);
+
+        $finding->forceFill([
+            'acknowledged_at' => now(),
+            'acknowledged_by_user_id' => $user->id,
+        ])->save();
+
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now()->addMinute(),
+            'payload' => ['cpu_pct' => 10, 'mem_pct' => 10, 'disk_pct' => 10, 'load_1m' => 0.5],
+        ]);
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_RESOLVED, $finding->status);
+
+        ServerMetricSnapshot::query()->create([
+            'server_id' => $server->id,
+            'captured_at' => now()->addMinutes(2),
+            'payload' => ['cpu_pct' => 95, 'mem_pct' => 10, 'disk_pct' => 10, 'load_1m' => 0.5],
+        ]);
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
+        $this->assertNull($finding->acknowledged_at);
+        $this->assertNull($finding->acknowledged_by_user_id);
     }
 
     public function test_insight_run_coordinator_resolves_when_condition_clears(): void

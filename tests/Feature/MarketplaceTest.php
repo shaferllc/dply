@@ -75,8 +75,13 @@ class MarketplaceTest extends TestCase
         $this->assertEquals(0, WebserverTemplate::query()->where('organization_id', $org->id)->count());
     }
 
-    public function test_user_can_import_deploy_recipe_to_server(): void
+    public function test_user_can_import_deploy_marketplace_item_as_recipe(): void
     {
+        // Marketplace items typed RECIPE_DEPLOY_COMMAND used to write
+        // their script into the server's `deploy_command` column. After
+        // the /deploy + /recipes merge into /run, that column is gone
+        // — the import lands as a ServerRecipe row instead, alongside
+        // any other saved commands on this server.
         $user = User::factory()->create();
         $org = Organization::factory()->create();
         $org->users()->attach($user->id, ['role' => 'admin']);
@@ -85,7 +90,6 @@ class MarketplaceTest extends TestCase
         $server = Server::factory()->create([
             'organization_id' => $org->id,
             'user_id' => $user->id,
-            'deploy_command' => null,
         ]);
 
         $item = MarketplaceItem::query()->where('slug', 'deploy-static-git')->firstOrFail();
@@ -96,8 +100,13 @@ class MarketplaceTest extends TestCase
             ->set('deployServerId', $server->id)
             ->call('confirmDeployImport');
 
-        $server->refresh();
-        $this->assertStringContainsString('git pull', (string) $server->deploy_command);
+        $recipe = \App\Models\ServerRecipe::query()
+            ->where('server_id', $server->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($recipe, 'A ServerRecipe row should have been created from the marketplace import.');
+        $this->assertStringContainsString('git pull', (string) $recipe->script);
     }
 
     public function test_user_can_import_server_recipe_to_server_saved_commands(): void

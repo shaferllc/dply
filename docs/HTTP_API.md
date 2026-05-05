@@ -29,7 +29,6 @@ Creating new tokens may require a **Pro** subscription when your instance enable
 | Method | Path | Typical ability |
 | --- | --- | --- |
 | `GET` | `/api/v1/servers` | `servers.read` |
-| `POST` | `/api/v1/servers/{server}/deploy` | `servers.deploy` |
 | `POST` | `/api/v1/servers/{server}/run-command` | `commands.run` |
 | `GET` | `/api/v1/sites` | `sites.read` |
 | `POST` | `/api/v1/sites/{site}/deploy` | `sites.deploy` |

@@ -118,7 +118,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                     'error' => __('This request was replaced by a newer one.'),
                     'flash_success' => null,
                 ]);
-                $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
+                $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'), output: $trimmed);
 
                 return;
             }
@@ -131,7 +131,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                     'error' => $error,
                     'flash_success' => null,
                 ]);
-                $this->updateLog(ServerManageAction::STATUS_FAILED, error: $error);
+                $this->updateLog(ServerManageAction::STATUS_FAILED, error: $error, output: $trimmed);
 
                 return;
             }
@@ -142,7 +142,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => null,
                 'flash_success' => $this->flashSuccessMessage,
             ]);
-            $this->updateLog(ServerManageAction::STATUS_FINISHED);
+            $this->updateLog(ServerManageAction::STATUS_FINISHED, output: $trimmed);
 
             if ($this->taskName === 'services-install:install_monitoring_prerequisites') {
                 $server = Server::query()->find($this->serverId);
@@ -162,15 +162,16 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => __('This request was replaced by a newer one.'),
                 'flash_success' => null,
             ]);
-            $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
+            $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'), output: $trimmed);
         } catch (Throwable $e) {
+            $trimmed = trim(ServerManageSshExecutor::stripSshClientNoise($fullOutput));
             $this->mergePayload([
                 'status' => 'failed',
-                'output' => trim(ServerManageSshExecutor::stripSshClientNoise($fullOutput)),
+                'output' => $trimmed,
                 'error' => $e->getMessage(),
                 'flash_success' => null,
             ]);
-            $this->updateLog(ServerManageAction::STATUS_FAILED, error: $e->getMessage());
+            $this->updateLog(ServerManageAction::STATUS_FAILED, error: $e->getMessage(), output: $trimmed);
         }
     }
 
@@ -187,7 +188,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
         return is_array($entry) && (bool) ($entry['rerun_probe_after_finish'] ?? false);
     }
 
-    protected function updateLog(string $status, bool $started = false, ?string $error = null): void
+    protected function updateLog(string $status, bool $started = false, ?string $error = null, ?string $output = null): void
     {
         if ($this->logId === null || $this->logId === '') {
             return;
@@ -207,6 +208,17 @@ class ServerManageRemoteSshJob implements ShouldQueue
         }
         if ($error !== null && $error !== '') {
             $update['error_message'] = $error;
+        }
+        if ($output !== null) {
+            // Cap output so a runaway script can't bloat the row. The
+            // last 64KB is what an operator usually wants — final apt
+            // resolver output, error trace, etc. Earlier chunks live
+            // in the in-memory cache during the run.
+            $maxOutputBytes = 65_536;
+            if (strlen($output) > $maxOutputBytes) {
+                $output = "[…output truncated…]\n".substr($output, -$maxOutputBytes);
+            }
+            $update['output'] = $output;
         }
         $row->update($update);
     }

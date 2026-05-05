@@ -32,7 +32,9 @@ Route::prefix('v1')->group(function (): void {
 
     Route::middleware(['auth.api', 'throttle:api'])->group(function () use ($apiAbilities): void {
         Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:'.$apiAbilities['servers.index']);
-        Route::post('/servers/{server}/deploy', [ServerController::class, 'deploy'])->middleware('ability:'.$apiAbilities['servers.deploy']);
+        // POST /servers/{id}/deploy was removed when the deploy_command
+        // column was dropped — there's no field for it to write to or
+        // execute against. /run-command stays for ad-hoc remote execution.
         Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:'.$apiAbilities['servers.run_command']);
 
         Route::get('/servers/{server}/firewall', [ServerFirewallController::class, 'show'])->middleware('ability:'.$apiAbilities['firewall.show']);

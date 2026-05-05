@@ -33,6 +33,8 @@ class InsightFinding extends Model
         'correlation',
         'detected_at',
         'resolved_at',
+        'acknowledged_at',
+        'acknowledged_by_user_id',
     ];
 
     protected function casts(): array
@@ -42,6 +44,7 @@ class InsightFinding extends Model
             'correlation' => 'array',
             'detected_at' => 'datetime',
             'resolved_at' => 'datetime',
+            'acknowledged_at' => 'datetime',
         ];
     }
 
@@ -60,8 +63,32 @@ class InsightFinding extends Model
         return $this->belongsTo(Team::class);
     }
 
+    public function acknowledgedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'acknowledged_by_user_id');
+    }
+
     public function isOpen(): bool
     {
         return $this->status === self::STATUS_OPEN;
+    }
+
+    public function isAcknowledged(): bool
+    {
+        return $this->acknowledged_at !== null;
+    }
+
+    /**
+     * Higher number = more important. Used by the Insights banner and
+     * findings list to push critical entries to the top.
+     */
+    public function severityRank(): int
+    {
+        return match ($this->severity) {
+            self::SEVERITY_CRITICAL => 30,
+            self::SEVERITY_WARNING => 20,
+            self::SEVERITY_INFO => 10,
+            default => 0,
+        };
     }
 }

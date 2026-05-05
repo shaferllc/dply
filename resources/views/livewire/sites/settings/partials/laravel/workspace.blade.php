@@ -71,8 +71,6 @@
 
     @if ($laravel_tab === 'commands')
         <div class="space-y-6">
-            @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 14])
-
             @if ($laravel_console_error)
                 <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
             @endif
@@ -215,7 +213,6 @@
 
     @if ($laravel_tab === 'logs')
         <div class="space-y-6">
-            @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 14])
             @if ($laravel_console_error)
                 <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
             @endif

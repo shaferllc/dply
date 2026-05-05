@@ -425,7 +425,7 @@ class WorkspaceCron extends Component
         // Set active run id for Echo (may already be set from the first broadcast if the worker was fast).
         $this->js('window.__dplyCronRunActiveId='.$rid.';');
 
-        $this->toastSuccess(__('Run queued. A queue worker runs it over SSH; output appears here via Reverb or polling.'));
+        $this->toastSuccess(__('Run queued. Output appears here in a moment.'));
     }
 
     /**

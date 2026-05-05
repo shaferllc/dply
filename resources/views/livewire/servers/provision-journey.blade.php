@@ -228,7 +228,16 @@
                                 {{ __('Cancel build') }}
                             </button>
                         @endif
-                        @if (\App\Jobs\RunSetupScriptJob::shouldDispatch($server) && $server->setup_status !== \App\Models\Server::SETUP_STATUS_RUNNING)
+                        {{-- Resume install only makes sense when setup
+                             actually failed and is waiting for the operator
+                             to retry. shouldDispatch was previously used
+                             alone — but it returns true on DONE servers
+                             too (its job is "can we kick off a setup?",
+                             not "is one needed?"), causing the button to
+                             render alongside Open server workspace on a
+                             healthy completed server. Gating on FAILED
+                             specifically is the actual intent. --}}
+                        @if ($server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED && \App\Jobs\RunSetupScriptJob::shouldDispatch($server))
                             <button
                                 type="button"
                                 wire:click="openResumeInstallModal"
@@ -412,12 +421,12 @@
                                     @endif
 
                                     @if ($failedStep['output'])
-                                        <div x-data="{ open: false, copied: false }" class="mt-4 rounded-xl border border-red-200 bg-white/80 p-4">
-                                            <div class="flex items-center justify-between gap-3">
+                                        <div x-data="{ open: false, copied: false }" class="mt-4 overflow-hidden rounded-xl border border-red-200/70 bg-slate-950 shadow-inner">
+                                            <div class="flex items-center justify-between gap-3 border-b border-white/5 bg-red-950/50 px-4 py-2.5">
                                                 <button
                                                     type="button"
                                                     x-on:click="open = !open"
-                                                    class="flex flex-1 items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide text-red-700"
+                                                    class="flex flex-1 items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-wider text-red-300"
                                                 >
                                                     <span>{{ __('Captured step output') }}</span>
                                                     <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="open ? 'rotate-180' : ''" />
@@ -425,13 +434,13 @@
                                                 <button
                                                     type="button"
                                                     x-on:click.stop="navigator.clipboard.writeText(@js($failedStep['output'])); copied = true; setTimeout(() => copied = false, 1500)"
-                                                    class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                    class="shrink-0 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:bg-slate-700/80"
                                                 >
                                                     <span x-show="!copied">{{ __('Copy') }}</span>
-                                                    <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                                    <span x-show="copied" x-cloak class="text-emerald-300">{{ __('Copied') }}</span>
                                                 </button>
                                             </div>
-                                            <pre x-show="open" x-cloak class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6 text-red-900">{{ $failedStep['output'] }}</pre>
+                                            <pre x-show="open" x-cloak class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-red-200 selection:bg-emerald-500/30">{{ $failedStep['output'] }}</pre>
                                         </div>
                                     @endif
                                 </div>
@@ -452,62 +461,97 @@
                                         @endif
                                     </div>
                                     @if ($activeStep['detail'])
-                                        <p class="mt-3 text-sm leading-6 text-brand-moss whitespace-pre-line">{{ $activeStep['detail'] }}</p>
+                                        @php
+                                            // Script steps (key prefixed `script_`) and the
+                                            // 'setup' placeholder render the bash tail as
+                                            // their detail — that's terminal output and
+                                            // belongs in a code block. Non-script steps
+                                            // (queued / provisioning / ip / ssh / ready)
+                                            // carry descriptive prose like "IP assigned:
+                                            // 138.x.y.z" and stay as a regular paragraph.
+                                            $isStreamingDetail = str_starts_with($activeStep['key'] ?? '', 'script_') || ($activeStep['key'] ?? '') === 'setup';
+                                        @endphp
+                                        @if ($isStreamingDetail)
+                                            <pre class="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-brand-ink/10 bg-slate-950 px-3 py-2 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30">{{ $activeStep['detail'] }}</pre>
+                                        @else
+                                            <p class="mt-3 text-sm leading-6 text-brand-moss whitespace-pre-line">{{ $activeStep['detail'] }}</p>
+                                        @endif
                                     @endif
                                     @if ($stallState)
                                         <div class="mt-3 rounded-xl border border-brand-ink/10 bg-white/90 p-4">
                                             <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Run timing') }}</p>
                                             <p class="mt-2 text-sm text-brand-ink">{{ $stallState['eta'] }}</p>
-                                            <p class="mt-1 text-sm text-brand-moss">{{ $stallState['last_output'] }}</p>
+                                            <p class="mt-1 text-sm text-brand-moss">{{ $stallState['running_for'] }}</p>
+                                            @if ($stallState['last_output'])
+                                                <p class="mt-1 text-sm text-brand-moss">{{ $stallState['last_output'] }}</p>
+                                            @endif
                                             @if ($stallState['warning'])
                                                 <p class="mt-2 text-sm font-medium text-amber-700">{{ $stallState['warning'] }}</p>
                                             @endif
                                         </div>
                                     @endif
                                     @if ($activeStep['output'])
-                                        <div
-                                            x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
-                                            class="mt-4 rounded-xl border border-brand-ink/10 bg-white/90 p-4"
+                                        {{-- Collapsed by default. The streaming output
+                                             can be visually noisy (apt fetch chatter,
+                                             dpkg progress) and most operators only
+                                             want to peek at it when something looks
+                                             off. Use <details>; the auto-scroll wiring
+                                             on the pre still works because Alpine's
+                                             x-effect re-fires every poll as long as
+                                             the details is open.
+                                             wire:key keeps Livewire from re-creating
+                                             the element across polls; @toggle pins
+                                             open-state in Alpine so morphdom doesn't
+                                             reset it. --}}
+                                        <details
+                                            wire:key="active-step-output"
+                                            wire:ignore.self
+                                            x-data="{ open: false, copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            x-bind:open="open"
+                                            @toggle.stop="open = $event.target.open; open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
+                                            class="group mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
-                                            <div class="flex items-center justify-between gap-3">
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Live step output') }}</p>
+                                            <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
+                                                <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                    <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                                    {{ __('Live step output') }}
+                                                </span>
                                                 <div class="flex items-center gap-2">
                                                     @if ($taskUpdatedAt)
-                                                        <p class="text-[11px] text-brand-mist">{{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
+                                                        <p class="text-[11px] text-slate-500">{{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
                                                     @endif
-                                                    <button type="button" x-on:click="copy()" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                                    <button type="button" x-on:click.stop.prevent="copy()" class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
                                                         <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
-                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-700"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
                                                     </button>
                                                 </div>
-                                            </div>
+                                            </summary>
                                             <pre
                                                 x-ref="pre"
-                                                x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
-                                                x-effect="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
-                                                class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6 text-brand-ink"
+                                                x-effect="open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
+                                                class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $activeStep['output'] }}</pre>
-                                        </div>
+                                        </details>
                                     @endif
                                     @if ($task && $liveTaskOutput && $activeStep['output'])
                                         {{-- Step-specific output is the primary view; offer the raw task tail
                                              behind a toggle for users who want the full firehose. --}}
                                         <details
                                             x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
-                                            class="mt-4 rounded-xl border border-brand-ink/10 bg-white/70"
+                                            class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
-                                            <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3">
-                                                <span class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Show full task tail') }}</span>
-                                                <span class="flex items-center gap-2 text-[11px] text-brand-mist">
+                                            <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
+                                                <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{{ __('Show full task tail') }}</span>
+                                                <span class="flex items-center gap-2 text-[11px] text-slate-500">
                                                     <span>
                                                         {{ __(':count lines', ['count' => $liveTaskOutputLineCount]) }}
                                                         @if ($taskUpdatedAt)
                                                             · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
                                                         @endif
                                                     </span>
-                                                    <button type="button" x-on:click.stop.prevent="copy()" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                                    <button type="button" x-on:click.stop.prevent="copy()" class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
                                                         <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
-                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-700"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
                                                     </button>
                                                 </span>
                                             </summary>
@@ -515,37 +559,46 @@
                                                 x-ref="pre"
                                                 x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
                                                 x-effect="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
-                                                class="max-h-96 overflow-auto whitespace-pre-wrap break-all border-t border-brand-ink/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                                class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $liveTaskOutput }}</pre>
                                         </details>
                                     @elseif ($task && $liveTaskOutput)
-                                        {{-- No step-specific output yet — show the task tail expanded as the only signal. --}}
-                                        <div
-                                            x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
-                                            class="mt-4 rounded-xl border border-brand-ink/10 bg-white/90 p-4"
+                                        {{-- No step-specific output yet — collapsed
+                                             tail is still the operator's escape hatch
+                                             when the bootstrap script hasn't emitted
+                                             [dply-step] markers yet. --}}
+                                        <details
+                                            wire:key="live-task-tail"
+                                            wire:ignore.self
+                                            x-data="{ open: false, copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            x-bind:open="open"
+                                            @toggle.stop="open = $event.target.open; open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
+                                            class="group mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
-                                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Live task output (tail)') }}</p>
+                                            <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
+                                                <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                    <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                                    {{ __('Live task output (tail)') }}
+                                                </span>
                                                 <div class="flex items-center gap-2">
-                                                    <p class="text-[11px] text-brand-mist">
+                                                    <p class="text-[11px] text-slate-500">
                                                         {{ __(':count lines', ['count' => $liveTaskOutputLineCount]) }}
                                                         @if ($taskUpdatedAt)
                                                             · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
                                                         @endif
                                                     </p>
-                                                    <button type="button" x-on:click="copy()" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                                    <button type="button" x-on:click.stop.prevent="copy()" class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
                                                         <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
-                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-700"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
                                                     </button>
                                                 </div>
-                                            </div>
+                                            </summary>
                                             <pre
                                                 x-ref="pre"
-                                                x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
-                                                x-effect="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
-                                                class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-brand-ink"
+                                                x-effect="open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
+                                                class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $liveTaskOutput }}</pre>
-                                        </div>
+                                        </details>
                                     @elseif ($task && ! $activeStep['output'])
                                         <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-white/70 p-4">
                                             <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Live task output') }}</p>
@@ -561,7 +614,34 @@
                     @endif
 
                     <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-sand/10">
-                        <details class="group border-b border-brand-ink/10 last:border-b-0" @if($pendingSteps->isNotEmpty()) open @endif>
+                        {{--
+                            Disclosure state is owned by Alpine, NOT the
+                            server. The earlier `@if(...) open @endif`
+                            attribute was re-emitted every Livewire poll
+                            and the morph applied it on top of whatever
+                            the user had toggled — so any manual collapse
+                            bounced back open (or vice-versa) every 10s.
+
+                            Two pieces fix this:
+                              1. wire:ignore.self — Livewire's morpher
+                                 skips THIS element's attributes during
+                                 the patch, but still walks its children
+                                 (so the step list updates normally).
+                              2. Alpine `:open` + @toggle — the open
+                                 boolean lives in Alpine state initialised
+                                 from the server only on first render,
+                                 then mutated locally as the user clicks.
+                            wire:key gives Livewire a stable identity so
+                            the element is never replaced wholesale.
+                        --}}
+                        <details
+                            wire:key="provision-pending-disclosure"
+                            wire:ignore.self
+                            x-data="{ open: @js($pendingSteps->isNotEmpty()) }"
+                            x-bind:open="open"
+                            @toggle.stop="open = $event.target.open"
+                            class="group border-b border-brand-ink/10 last:border-b-0"
+                        >
                             <summary class="cursor-pointer list-none px-4 py-3.5 sm:px-5">
                                 <div class="flex items-center justify-between gap-3">
                                     <span class="text-sm font-semibold text-brand-ink">{{ __('Up next (:count)', ['count' => $pendingSteps->count()]) }}</span>
@@ -587,7 +667,14 @@
                             @endif
                         </details>
 
-                        <details class="group" @if($completedSteps->isNotEmpty() && ($pendingSteps->isEmpty() || $allStepsDone)) open @endif>
+                        <details
+                            wire:key="provision-completed-disclosure"
+                            wire:ignore.self
+                            x-data="{ open: @js($completedSteps->isNotEmpty() && ($pendingSteps->isEmpty() || $allStepsDone)) }"
+                            x-bind:open="open"
+                            @toggle.stop="open = $event.target.open"
+                            class="group"
+                        >
                             <summary class="cursor-pointer list-none px-4 py-3.5 sm:px-5">
                                 <div class="flex items-center justify-between gap-3">
                                     <span class="text-sm font-semibold text-brand-ink">{{ __('Completed (:count)', ['count' => $completedSteps->count()]) }}</span>
@@ -612,9 +699,14 @@
                                                     <p class="mt-0.5 text-sm text-brand-moss whitespace-pre-line">{{ $step['detail'] }}</p>
                                                 @endif
                                                 @if ($step['output'])
-                                                    <details class="mt-2 rounded-lg border border-emerald-100/80 bg-emerald-50/50 p-3">
-                                                        <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Output') }}</summary>
-                                                        <pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-brand-ink">{{ $step['output'] }}</pre>
+                                                    <details class="group mt-2 overflow-hidden rounded-lg border border-brand-ink/10 bg-slate-950 shadow-inner">
+                                                        <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-3 py-2">
+                                                            <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                                <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                                                {{ __('Output') }}
+                                                            </span>
+                                                        </summary>
+                                                        <pre class="max-h-40 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30">{{ $step['output'] }}</pre>
                                                     </details>
                                                 @endif
                                             </div>
@@ -803,87 +895,11 @@
                     </section>
                 @endif
 
-                @if ($task)
-                    <section class="{{ $card }} p-6" x-data="{ outputModalOpen: false }">
-                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Setup task') }}</h3>
-                        <div class="mt-4 space-y-3 text-sm">
-                            <p class="text-brand-moss">{{ __('Status') }}: <span class="font-medium text-brand-ink">{{ ucfirst($task->status->value) }}</span></p>
-                            @if ($task->started_at)
-                                <p class="text-brand-moss">{{ __('Started') }}: <span class="font-medium text-brand-ink">{{ $task->started_at->diffForHumans() }}</span></p>
-                            @endif
-                            <div class="min-w-0 rounded-xl bg-brand-sand/20 p-4">
-                                <div class="flex items-center justify-between gap-2">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Recent output') }}</p>
-                                    @if ($fullTaskOutput !== '')
-                                        <button
-                                            type="button"
-                                            x-on:click="outputModalOpen = true; $nextTick(() => { const el = $refs.modalPre; if (el) el.scrollTop = el.scrollHeight })"
-                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                                        >
-                                            <x-heroicon-m-arrows-pointing-out class="h-3.5 w-3.5" />
-                                            {{ __('View full') }}
-                                        </button>
-                                    @endif
-                                </div>
-                                <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-brand-ink">{{ $task->tailOutput(6) ?: __('No task output yet.') }}</pre>
-                            </div>
-                        </div>
-
-                        {{-- Full task output modal --}}
-                        @if ($fullTaskOutput !== '')
-                            <template x-teleport="body">
-                                <div
-                                    x-show="outputModalOpen"
-                                    x-cloak
-                                    x-transition.opacity
-                                    class="fixed inset-0 z-[100] overflow-y-auto"
-                                    role="dialog"
-                                    aria-modal="true"
-                                    x-on:keydown.escape.window="outputModalOpen = false"
-                                >
-                                    <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="outputModalOpen = false"></div>
-                                    <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-8 sm:px-6">
-                                        <div class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl" @click.stop>
-                                            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-6 py-5">
-                                                <div>
-                                                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Full setup task output') }}</h2>
-                                                    <p class="mt-1 text-xs text-brand-moss">
-                                                        {{ __(':count lines · status :status', ['count' => $fullTaskOutputLineCount, 'status' => ucfirst($task->status->value)]) }}
-                                                        @if ($taskUpdatedAt)
-                                                            · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
-                                                        @endif
-                                                    </p>
-                                                </div>
-                                                <div class="flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        x-on:click="navigator.clipboard?.writeText($refs.modalPre.textContent)"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-zinc-50"
-                                                    >
-                                                        <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
-                                                        {{ __('Copy') }}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        x-on:click="outputModalOpen = false"
-                                                        class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-slate-500 transition hover:bg-zinc-50 hover:text-slate-700"
-                                                        aria-label="{{ __('Close') }}"
-                                                    >
-                                                        <x-heroicon-m-x-mark class="h-5 w-5" aria-hidden="true" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <pre
-                                                x-ref="modalPre"
-                                                class="flex-1 min-h-0 overflow-auto whitespace-pre-wrap break-all bg-brand-cream/30 px-6 py-5 font-mono text-xs leading-relaxed text-brand-ink"
-                                            >{{ $fullTaskOutput }}</pre>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        @endif
-                    </section>
-                @endif
+                {{-- The "Setup task" sidebar panel (status / started / Recent
+                     output preview + fullscreen modal) was removed: the journey
+                     section above already shows live status, elapsed time, and
+                     the dark-terminal Live step output / task tail — keeping a
+                     duplicate light-styled preview just confused the page. --}}
 
                 @if ($run)
                     <section class="{{ $card }} p-6">
@@ -946,6 +962,42 @@
                                 <pre class="mt-2 whitespace-pre-wrap font-mono text-xs leading-6 text-brand-ink">{{ implode("\n", $repairGuidance['commands']) }}</pre>
                             </div>
                         @endif
+                    </section>
+                @endif
+
+                {{-- Divergence banner: fires when the reconciled snapshot
+                     reports a different database engine than the wizard
+                     requested (e.g., low-memory mode swapped MySQL → SQLite).
+                     The wizard request lives in $requestedDatabase; the
+                     installed reality lives in $installedStack. We use the
+                     `installedStackDiverges` precomputed bool from the
+                     component to keep view logic minimal. --}}
+                @if ($installedStackDiverges)
+                    <section class="{{ $card }} overflow-hidden border-amber-200 p-0">
+                        <div class="border-b border-amber-200 bg-amber-50/70 px-5 py-4 sm:px-6">
+                            <div class="flex items-start gap-3">
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-amber-900">{{ __('Server stack differs from your request') }}</p>
+                                    <p class="mt-1 text-sm text-amber-800">
+                                        {{ __('You picked :requested, but the droplet was too small to run it safely. The provisioning script substituted :installed to keep the server functional.', [
+                                            'requested' => $requestedDatabase ?? '—',
+                                            'installed' => $installedStack->database ?? '—',
+                                        ]) }}
+                                    </p>
+                                    @if ($installedStack->lowMemoryMode && $installedStack->totalMemoryMb)
+                                        <p class="mt-1 text-xs text-amber-700">
+                                            {{ __('Detected :memMb MB total RAM (low-memory mode threshold: 1024 MB). Re-provision on a 2 GB+ droplet to install :requested.', [
+                                                'memMb' => $installedStack->totalMemoryMb,
+                                                'requested' => $requestedDatabase ?? '—',
+                                            ]) }}
+                                        </p>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </section>
                 @endif
 
@@ -1031,19 +1083,35 @@
                 ])>
                     <h3 class="text-lg font-semibold text-brand-ink">{{ __('Provision artifacts') }}</h3>
                     <p class="mt-1 max-w-prose text-sm text-brand-moss">{{ __('Rendered configs and metadata from this provision run. Scroll horizontally on wide files.') }}</p>
-                    <div class="mt-6 space-y-6">
+                    <div class="mt-6 space-y-3">
                         @foreach ($artifacts as $artifact)
-                            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-4 sm:p-5">
-                                <div class="flex flex-wrap items-center justify-between gap-3">
-                                    <p class="text-sm font-semibold text-brand-ink">{{ $artifact->label }}</p>
+                            {{-- Each artifact is a collapsed disclosure by default;
+                                 the content (rendered configs, JSON metadata) is dense
+                                 and operators usually scan the list of labels first
+                                 before drilling into specifics. wire:ignore.self +
+                                 Alpine open state keeps each one's expand/collapse
+                                 stable across Livewire polls. --}}
+                            <details
+                                wire:key="artifact-{{ $artifact->id ?? $loop->index }}"
+                                wire:ignore.self
+                                x-data="{ open: false }"
+                                x-bind:open="open"
+                                @toggle.stop="open = $event.target.open"
+                                class="group overflow-hidden rounded-xl border border-brand-ink/10 bg-brand-sand/10"
+                            >
+                                <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                                    <span class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
+                                        <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-90" />
+                                        {{ $artifact->label }}
+                                    </span>
                                     <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ str_replace('_', ' ', $artifact->type) }}</span>
-                                </div>
+                                </summary>
                                 @if ($artifact->content)
-                                    <div class="mt-3 max-h-[min(28rem,70vh)] min-w-0 overflow-auto rounded-lg bg-white/90 ring-1 ring-brand-ink/10">
-                                        <pre class="block w-max min-w-full p-4 font-mono text-xs leading-relaxed text-brand-ink whitespace-pre">{{ $artifact->content }}</pre>
+                                    <div class="max-h-[min(28rem,70vh)] min-w-0 overflow-auto border-t border-brand-ink/10 bg-slate-950">
+                                        <pre class="block w-max min-w-full px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 whitespace-pre selection:bg-emerald-500/30">{{ $artifact->content }}</pre>
                                     </div>
                                 @endif
-                            </div>
+                            </details>
                         @endforeach
                     </div>
                 </section>

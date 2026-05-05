@@ -51,6 +51,31 @@
                 <div class="dply-card overflow-hidden">
                     <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                         <div class="lg:col-span-4">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Credential emails') }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Optionally email connection details when servers and site databases are created. Both are off by default — credentials in mailboxes are an attack surface and the dashboard already shows everything to authenticated users.') }}</p>
+                        </div>
+                        <div class="lg:col-span-8 space-y-4">
+                            <label class="flex cursor-pointer items-start gap-3">
+                                <input type="checkbox" wire:model.live="email_server_credentials_enabled" class="mt-1 rounded border-brand-mist text-brand-forest focus:ring-brand-forest" />
+                                <span class="text-sm text-brand-ink">
+                                    {{ __('Email SSH connection details when a server finishes provisioning') }}
+                                    <span class="mt-1 block text-xs text-brand-moss">{{ __('Sent to the user who created the server. Includes host, port, and username; the SSH private key stays gated behind the dashboard.') }}</span>
+                                </span>
+                            </label>
+                            <label class="flex cursor-pointer items-start gap-3">
+                                <input type="checkbox" wire:model.live="email_database_credentials_enabled" class="mt-1 rounded border-brand-mist text-brand-forest focus:ring-brand-forest" />
+                                <span class="text-sm text-brand-ink">
+                                    {{ __('Email database credentials when a site is scaffolded') }}
+                                    <span class="mt-1 block text-xs text-brand-moss">{{ __('Sent to the site creator. Includes the plain-text database password — only enable if your team is comfortable with credentials in email.') }}</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dply-card overflow-hidden">
+                    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
+                        <div class="lg:col-span-4">
                             <h3 class="text-lg font-semibold text-brand-ink">{{ __('API tokens') }}</h3>
                             <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Create scoped organization tokens for CI/CD and automation. The secret is shown once in a dialog after you create it.') }}</p>
                         </div>

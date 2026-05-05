@@ -22,9 +22,18 @@ return [
     | is unavailable so freshly-imported servers still surface everything.
     */
     'nav' => [
-        ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites'],
-        ['key' => 'deploy', 'route' => 'servers.deploy', 'icon' => 'rocket-launch', 'label' => 'Deploy'],
+        // Overview leads — operators arriving at the workspace want
+        // the at-a-glance dashboard first, then drill into Sites
+        // from there. The "Deploy" entry was removed because it
+        // /run is the merged surface for executing things on this
+        // server: saved commands (recipes), ad-hoc shell, marketplace
+        // imports. Replaces both /deploy (deleted, was misleadingly
+        // named for what was server-level admin) and /recipes
+        // (renamed). It sits high in the nav because operators who
+        // know their server is healthy come here next to do something.
         ['key' => 'overview', 'route' => 'servers.overview', 'icon' => 'cpu-chip', 'label' => 'Overview'],
+        ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites'],
+        ['key' => 'run', 'route' => 'servers.run', 'icon' => 'play-circle', 'label' => 'Run'],
         ['key' => 'insights', 'route' => 'servers.insights', 'icon' => 'light-bulb', 'label' => 'Insights'],
         ['key' => 'monitor', 'route' => 'servers.monitor', 'icon' => 'chart-bar', 'label' => 'Metrics'],
         ['key' => 'services', 'route' => 'servers.services', 'icon' => 'rectangle-stack', 'label' => 'Services'],
@@ -34,7 +43,6 @@ return [
         ['key' => 'daemons', 'route' => 'servers.daemons', 'icon' => 'server-stack', 'label' => 'Daemons', 'requires_any_tags' => ['supervisor']],
         ['key' => 'firewall', 'route' => 'servers.firewall', 'icon' => 'shield-check', 'label' => 'Firewall'],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys'],
-        ['key' => 'recipes', 'route' => 'servers.recipes', 'icon' => 'document-text', 'label' => 'Saved commands'],
         ['key' => 'logs', 'route' => 'servers.logs', 'icon' => 'clipboard-document-list', 'label' => 'Logs'],
         ['key' => 'manage', 'route' => 'servers.manage', 'icon' => 'wrench-screwdriver', 'label' => 'Manage'],
         ['key' => 'settings', 'route' => 'servers.settings', 'icon' => 'cog-8-tooth', 'label' => 'Settings'],
