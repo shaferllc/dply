@@ -9,8 +9,13 @@ use App\Models\InsightSetting;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
+use App\Models\ServerProvisionRun;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\TaskRunner\Enums\TaskStatus;
+use App\Modules\TaskRunner\Models\Task;
+use App\Services\Insights\Contracts\InsightRunnerInterface;
+use App\Services\Insights\InsightCandidate;
 use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\InsightSettingsRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -451,5 +456,485 @@ class InsightsFeatureTest extends TestCase
             ->where('status', InsightFinding::STATUS_RESOLVED)
             ->first();
         $this->assertNotNull($resolved);
+    }
+
+    public function test_coordinator_skips_runner_when_required_stack_tag_is_absent(): void
+    {
+        [, $server] = $this->userWithServer();
+        $this->seedStackSummary($server, ['nginx', 'php-fpm']); // no mysql
+
+        $this->registerStubInsight('stub_requires_mysql', requires: ['mysql']);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $this->assertSame(0, InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'stub_requires_mysql')
+            ->count(), 'Runner with requires=[mysql] must not execute on a Postgres-only stack');
+    }
+
+    public function test_coordinator_runs_runner_when_required_stack_tag_is_present(): void
+    {
+        [, $server] = $this->userWithServer();
+        $this->seedStackSummary($server, ['nginx', 'mysql']);
+
+        $this->registerStubInsight('stub_requires_mysql', requires: ['mysql']);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $this->assertSame(1, InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'stub_requires_mysql')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->count());
+    }
+
+    public function test_coordinator_fails_open_when_stack_summary_is_unknown(): void
+    {
+        [, $server] = $this->userWithServer();
+        // No stack-summary artifact seeded → tagsFor() returns 'unknown'.
+
+        $this->registerStubInsight('stub_requires_mysql', requires: ['mysql']);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $this->assertSame(1, InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'stub_requires_mysql')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->count(), 'Fresh server with no provision artifact must fail open and run gated runners');
+    }
+
+    public function test_recorder_persists_kind_from_candidate(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->registerStubInsight('stub_suggestion', requires: [], kind: InsightFinding::KIND_SUGGESTION);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'stub_suggestion')
+            ->first();
+        $this->assertNotNull($finding);
+        $this->assertSame(InsightFinding::KIND_SUGGESTION, $finding->kind);
+    }
+
+    public function test_recorder_defaults_kind_to_problem_when_unspecified(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->registerStubInsight('stub_problem_default', requires: []); // kind default
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'stub_problem_default')
+            ->first();
+        $this->assertNotNull($finding);
+        $this->assertSame(InsightFinding::KIND_PROBLEM, $finding->kind);
+    }
+
+    public function test_workspace_insights_renders_suggestions_in_recommendations_section(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'octane_recommended',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 's-1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'Consider enabling Octane',
+            'body' => 'Sustained load with idle CPU.',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->assertViewHas('suggestionFindings', fn ($c) => $c->count() === 1)
+            ->assertViewHas('findings', fn ($c) => $c->count() === 0)
+            ->assertSee('Recommendations')
+            ->assertSee('Consider enabling Octane');
+    }
+
+    public function test_workspace_banner_excludes_suggestions_even_when_critical(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        // Defensive: a misconfigured suggestion runner with severity=critical must
+        // not hijack the banner reserved for actual problems.
+        InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'misconfigured_suggestion',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 's-1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_CRITICAL,
+            'title' => 'Rogue suggestion',
+            'body' => 'Should not page',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->assertViewHas('bannerFindings', fn ($c) => $c->isEmpty());
+    }
+
+    public function test_apply_fix_job_dispatches_through_handler_and_resolves_problem_when_recheck_passes(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        // Stub handler that captures invocations.
+        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        {
+            public bool $preflightCalled = false;
+
+            public bool $applyCalled = false;
+
+            public function preflight($server, $site, $finding, array $params): ?string
+            {
+                $this->preflightCalled = true;
+
+                return null;
+            }
+
+            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            {
+                $this->applyCalled = true;
+
+                return \App\Services\Insights\FixResult::success('did the thing');
+            }
+        };
+        $handlerClass = get_class($handler);
+        $this->app->instance($handlerClass, $handler);
+
+        $this->registerStubInsightWithHandler('stub_problem_with_fix', $handlerClass);
+
+        // Recorder will run the registered runner and find no candidate → resolves the finding.
+        // For this test, the runner emits one finding first, then on recheck the runner returns nothing.
+        // Easiest path: the recorder writes a finding; the recheck runs the same stub which returns
+        // an empty list when a one-shot flag is flipped. We set up the runner to read a flag.
+        config()->set('insights.test.stub_problem_with_fix_should_emit', true);
+        $this->setStubRunnerEmits('stub_problem_with_fix', true);
+
+        // Initial run: emit candidate → finding open.
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+        $finding = InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'stub_problem_with_fix')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->first();
+        $this->assertNotNull($finding);
+
+        // After fix: runner returns no candidate so recheck closes the finding.
+        $this->setStubRunnerEmits('stub_problem_with_fix', false);
+
+        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+
+        $this->assertTrue($handler->preflightCalled);
+        $this->assertTrue($handler->applyCalled);
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_RESOLVED, $finding->status);
+        $this->assertNotNull($finding->meta['fix_applied_at'] ?? null);
+        $this->assertSame($user->id, $finding->meta['fix_applied_by'] ?? null);
+    }
+
+    public function test_apply_fix_job_records_failure_when_recheck_still_fails(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        {
+            public function preflight($server, $site, $finding, array $params): ?string
+            {
+                return null;
+            }
+
+            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            {
+                return \App\Services\Insights\FixResult::success('shell ran but condition persists');
+            }
+        };
+        $handlerClass = get_class($handler);
+        $this->app->instance($handlerClass, $handler);
+
+        $this->registerStubInsightWithHandler('stub_problem_recheck_fails', $handlerClass);
+        $this->setStubRunnerEmits('stub_problem_recheck_fails', true);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+        $finding = InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'stub_problem_recheck_fails')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->first();
+        $this->assertNotNull($finding);
+
+        // Runner still emits → recheck won't clear the finding.
+        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
+        $this->assertSame('recheck_still_failing', $finding->meta['fix_failure_reason'] ?? null);
+    }
+
+    public function test_apply_fix_job_records_refusal_from_preflight_without_running_apply(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        {
+            public bool $applyCalled = false;
+
+            public function preflight($server, $site, $finding, array $params): ?string
+            {
+                return 'not enough RAM headroom';
+            }
+
+            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            {
+                $this->applyCalled = true;
+
+                return \App\Services\Insights\FixResult::success();
+            }
+        };
+        $handlerClass = get_class($handler);
+        $this->app->instance($handlerClass, $handler);
+
+        $this->registerStubInsightWithHandler('stub_problem_refusal', $handlerClass);
+        $this->setStubRunnerEmits('stub_problem_refusal', true);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+        $finding = InsightFinding::query()
+            ->where('insight_key', 'stub_problem_refusal')
+            ->first();
+        $this->assertNotNull($finding);
+
+        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+
+        $this->assertFalse($handler->applyCalled);
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
+        $this->assertSame('not enough RAM headroom', $finding->meta['fix_refusal_reason'] ?? null);
+    }
+
+    public function test_apply_fix_job_resolves_suggestion_without_recheck(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        {
+            public function preflight($server, $site, $finding, array $params): ?string
+            {
+                return null;
+            }
+
+            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            {
+                return \App\Services\Insights\FixResult::success();
+            }
+        };
+        $handlerClass = get_class($handler);
+        $this->app->instance($handlerClass, $handler);
+
+        $this->registerStubInsightWithHandler('stub_suggestion_with_fix', $handlerClass, kind: InsightFinding::KIND_SUGGESTION);
+        $this->setStubRunnerEmits('stub_suggestion_with_fix', true);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+        $finding = InsightFinding::query()
+            ->where('insight_key', 'stub_suggestion_with_fix')
+            ->first();
+        $this->assertNotNull($finding);
+
+        // Even though the runner still emits, the suggestion lifecycle resolves on apply success
+        // without rechecking — windowed signals don't clear instantly.
+        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_RESOLVED, $finding->status);
+    }
+
+    /**
+     * Register a synthetic insight with a stub runner whose emit/no-emit state is
+     * controlled by setStubRunnerEmits(). Wires the named handler class into config.
+     */
+    private function registerStubInsightWithHandler(string $key, string $handlerClass, string $kind = InsightFinding::KIND_PROBLEM): void
+    {
+        $runner = new class($key, $kind, $this) implements InsightRunnerInterface
+        {
+            public function __construct(
+                private string $key,
+                private string $kind,
+                private \PHPUnit\Framework\TestCase $test,
+            ) {}
+
+            public function run(Server $server, ?Site $site, array $parameters): array
+            {
+                if (! config('insights.test.stub_runner_emits.'.$this->key, true)) {
+                    return [];
+                }
+
+                return [new InsightCandidate(
+                    insightKey: $this->key,
+                    dedupeHash: 'stub',
+                    severity: 'info',
+                    title: 'stub fired',
+                    kind: $this->kind,
+                )];
+            }
+        };
+
+        $runnerClass = get_class($runner);
+        $this->app->instance($runnerClass, $runner);
+
+        config()->set('insights.insights.'.$key, [
+            'label' => 'Stub: '.$key,
+            'description' => 'Test stub.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => $runnerClass,
+            'fix' => ['handler' => $handlerClass],
+            'requires' => [],
+            'default_enabled' => true,
+            'notify_subscribers' => false,
+        ]);
+    }
+
+    private function setStubRunnerEmits(string $key, bool $emits): void
+    {
+        config()->set('insights.test.stub_runner_emits.'.$key, $emits);
+    }
+
+    public function test_suggestions_do_not_dispatch_notification_events(): void
+    {
+        [$owner, $server] = $this->userWithServer();
+
+        $channel = \App\Models\NotificationChannel::factory()->forUser($owner)->create([
+            'type' => \App\Models\NotificationChannel::TYPE_SLACK,
+            'config' => ['webhook_url' => 'https://hooks.slack.com/services/T/B/X'],
+        ]);
+        \App\Models\NotificationSubscription::query()->create([
+            'notification_channel_id' => $channel->id,
+            'subscribable_type' => Server::class,
+            'subscribable_id' => $server->id,
+            'event_key' => \App\Services\Insights\InsightsNotificationDispatcher::EVENT_KEY,
+        ]);
+
+        \Illuminate\Support\Facades\Http::fake();
+
+        $this->registerStubInsight('stub_suggestion_no_notify', requires: [], kind: InsightFinding::KIND_SUGGESTION);
+
+        app(InsightRunCoordinator::class)->runForServer($server->fresh());
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $server->id)
+            ->where('insight_key', 'stub_suggestion_no_notify')
+            ->first();
+        $this->assertNotNull($finding);
+
+        $this->assertDatabaseMissing('notification_events', [
+            'event_key' => \App\Services\Insights\InsightsNotificationDispatcher::EVENT_KEY,
+            'subject_type' => InsightFinding::class,
+            'subject_id' => $finding->id,
+        ]);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    /**
+     * Register a synthetic insight with an inline stub runner that always emits one candidate.
+     * Default-enabled so InsightSettingsRepository::isInsightEnabled() returns true without
+     * needing a stored InsightSetting row.
+     *
+     * @param  list<string>  $requires
+     */
+    private function registerStubInsight(string $key, array $requires, string $kind = InsightFinding::KIND_PROBLEM): void
+    {
+        $runner = new class($key, $kind) implements InsightRunnerInterface
+        {
+            public function __construct(private string $key, private string $kind) {}
+
+            public function run(Server $server, ?Site $site, array $parameters): array
+            {
+                return [new InsightCandidate(
+                    insightKey: $this->key,
+                    dedupeHash: 'stub',
+                    severity: 'info',
+                    title: 'stub fired',
+                    kind: $this->kind,
+                )];
+            }
+        };
+
+        $runnerClass = get_class($runner);
+        $this->app->instance($runnerClass, $runner);
+
+        config()->set('insights.insights.'.$key, [
+            'label' => 'Stub: '.$key,
+            'description' => 'Test stub.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => $runnerClass,
+            'fix' => null,
+            'requires' => $requires,
+            'default_enabled' => true,
+            'notify_subscribers' => false,
+        ]);
+    }
+
+    /**
+     * @param  list<string>  $expectedServices
+     */
+    private function seedStackSummary(Server $server, array $expectedServices): void
+    {
+        $task = Task::query()->create([
+            'name' => 'Server stack provision',
+            'action' => 'provision_stack',
+            'script' => 'dply-provision-stack.sh',
+            'timeout' => 600,
+            'user' => 'root',
+            'status' => TaskStatus::Finished,
+            'output' => '',
+            'server_id' => $server->id,
+            'created_by' => $server->user_id,
+            'started_at' => now()->subMinutes(2),
+            'completed_at' => now(),
+        ]);
+
+        $run = ServerProvisionRun::query()->create([
+            'server_id' => $server->id,
+            'task_id' => $task->id,
+            'attempt' => 1,
+            'status' => 'completed',
+            'summary' => 'Provisioning completed.',
+            'started_at' => now()->subMinutes(3),
+            'completed_at' => now(),
+        ]);
+
+        $run->artifacts()->create([
+            'type' => 'stack_summary',
+            'key' => 'stack-summary',
+            'label' => 'Installed stack',
+            'metadata' => [
+                'webserver' => in_array('nginx', $expectedServices, true) ? 'nginx' : 'none',
+                'database' => in_array('mysql', $expectedServices, true) ? 'mysql' : (in_array('postgresql', $expectedServices, true) ? 'postgresql' : 'none'),
+                'cache_service' => 'none',
+                'expected_services' => $expectedServices,
+            ],
+            'content' => '{}',
+        ]);
     }
 }

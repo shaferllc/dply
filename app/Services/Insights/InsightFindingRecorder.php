@@ -95,6 +95,10 @@ class InsightFindingRecorder
             $severity = InsightFinding::SEVERITY_WARNING;
         }
 
+        $kind = $c->kind === InsightFinding::KIND_SUGGESTION
+            ? InsightFinding::KIND_SUGGESTION
+            : InsightFinding::KIND_PROBLEM;
+
         if ($existing === null) {
             $correlation = $this->correlation->correlateForNewFinding($server);
             $row = InsightFinding::query()->create([
@@ -102,6 +106,7 @@ class InsightFindingRecorder
                 'site_id' => $site?->id,
                 'team_id' => $server->team_id,
                 'insight_key' => $c->insightKey,
+                'kind' => $kind,
                 'dedupe_hash' => $c->dedupeHash,
                 'status' => InsightFinding::STATUS_OPEN,
                 'severity' => $severity,
@@ -112,7 +117,7 @@ class InsightFindingRecorder
                 'detected_at' => $now,
                 'resolved_at' => null,
             ]);
-            if ($this->shouldNotifySubscribers($c->insightKey)) {
+            if ($this->shouldNotifySubscribers($c->insightKey, $kind)) {
                 $this->notifications->notifyIfSubscribed($server, $row, wasReopened: false);
             }
 
@@ -121,6 +126,7 @@ class InsightFindingRecorder
 
         if ($existing->status === InsightFinding::STATUS_OPEN) {
             $existing->forceFill([
+                'kind' => $kind,
                 'severity' => $severity,
                 'title' => $c->title,
                 'body' => $c->body,
@@ -132,6 +138,7 @@ class InsightFindingRecorder
         }
 
         $existing->forceFill([
+            'kind' => $kind,
             'status' => InsightFinding::STATUS_OPEN,
             'severity' => $severity,
             'title' => $c->title,
@@ -145,13 +152,21 @@ class InsightFindingRecorder
             'acknowledged_by_user_id' => null,
         ])->save();
 
-        if ($this->shouldNotifySubscribers($c->insightKey)) {
+        if ($this->shouldNotifySubscribers($c->insightKey, $kind)) {
             $this->notifications->notifyIfSubscribed($server, $existing->fresh(), wasReopened: true);
         }
     }
 
-    protected function shouldNotifySubscribers(string $insightKey): bool
+    /**
+     * Suggestions never page subscribers — they're tuning recommendations, not problems.
+     * Per-insight `notify_subscribers => false` (e.g. heartbeat) wins regardless of kind.
+     */
+    protected function shouldNotifySubscribers(string $insightKey, string $kind): bool
     {
+        if ($kind === InsightFinding::KIND_SUGGESTION) {
+            return false;
+        }
+
         return (bool) config('insights.insights.'.$insightKey.'.notify_subscribers', true);
     }
 }

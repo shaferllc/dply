@@ -19,11 +19,16 @@ class InsightFinding extends Model
 
     public const SEVERITY_CRITICAL = 'critical';
 
+    public const KIND_PROBLEM = 'problem';
+
+    public const KIND_SUGGESTION = 'suggestion';
+
     protected $fillable = [
         'server_id',
         'site_id',
         'team_id',
         'insight_key',
+        'kind',
         'dedupe_hash',
         'status',
         'severity',

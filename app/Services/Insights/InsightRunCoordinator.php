@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Insights\Contracts\InsightRunnerInterface;
+use App\Support\Servers\ServerInstalledServices;
 
 class InsightRunCoordinator
 {
@@ -14,7 +15,10 @@ class InsightRunCoordinator
         protected InsightFindingRecorder $recorder,
     ) {}
 
-    public function runForServer(Server $server): void
+    /**
+     * @param  string|null  $onlyKey  When set, run only this single insight (used by post-fix recheck).
+     */
+    public function runForServer(Server $server, ?string $onlyKey = null): void
     {
         if (! $server->isReady()) {
             return;
@@ -26,8 +30,12 @@ class InsightRunCoordinator
         }
 
         $settings = $this->settingsRepository->forServer($server, $org);
+        $installedTags = ServerInstalledServices::tagsFor($server);
 
         foreach (config('insights.insights', []) as $key => $def) {
+            if ($onlyKey !== null && $key !== $onlyKey) {
+                continue;
+            }
             $scope = $def['scope'] ?? 'server';
             if (! in_array($scope, ['server', 'both'], true)) {
                 continue;
@@ -38,6 +46,10 @@ class InsightRunCoordinator
             }
 
             if (($def['requires_pro'] ?? false) && ! $org->onProSubscription()) {
+                continue;
+            }
+
+            if (! $this->stackRequirementsMet($def, $installedTags)) {
                 continue;
             }
 
@@ -54,7 +66,10 @@ class InsightRunCoordinator
         }
     }
 
-    public function runForSite(Site $site): void
+    /**
+     * @param  string|null  $onlyKey  When set, run only this single insight (used by post-fix recheck).
+     */
+    public function runForSite(Site $site, ?string $onlyKey = null): void
     {
         $server = $site->server;
         if (! $server->isReady()) {
@@ -67,8 +82,12 @@ class InsightRunCoordinator
         }
 
         $settings = $this->settingsRepository->forSite($site, $org);
+        $installedTags = ServerInstalledServices::tagsFor($server);
 
         foreach (config('insights.insights', []) as $key => $def) {
+            if ($onlyKey !== null && $key !== $onlyKey) {
+                continue;
+            }
             $scope = $def['scope'] ?? 'server';
             if (! in_array($scope, ['site', 'both'], true)) {
                 continue;
@@ -79,6 +98,10 @@ class InsightRunCoordinator
             }
 
             if (($def['requires_pro'] ?? false) && ! $org->onProSubscription()) {
+                continue;
+            }
+
+            if (! $this->stackRequirementsMet($def, $installedTags)) {
                 continue;
             }
 
@@ -93,5 +116,31 @@ class InsightRunCoordinator
             $candidates = $runner->run($server, $site, is_array($params) ? $params : []);
             $this->recorder->syncCandidates($server, $site, $key, $candidates);
         }
+    }
+
+    /**
+     * Mirror the UI catalog gating in WorkspaceInsights: skip runners whose backing
+     * service isn't installed. Fail open when the stack summary is unavailable
+     * (`unknown` tag) so freshly-imported servers still surface everything.
+     *
+     * @param  array<string, mixed>  $def
+     * @param  array<string, true>  $installedTags
+     */
+    private function stackRequirementsMet(array $def, array $installedTags): bool
+    {
+        $requires = is_array($def['requires'] ?? null) ? $def['requires'] : [];
+        if ($requires === []) {
+            return true;
+        }
+        if (array_key_exists('unknown', $installedTags)) {
+            return true;
+        }
+        foreach ($requires as $tag) {
+            if (is_string($tag) && array_key_exists($tag, $installedTags)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

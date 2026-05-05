@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Insights\FixActions\SupervisorStartFixAction;
 use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\Runners\CpuRamUsageInsightRunner;
 use App\Services\Insights\Runners\DiskCapacityInsightRunner;
@@ -241,7 +242,7 @@ return [
             'requires_pro' => false,
             'runner' => SupervisorRunningInsightRunner::class,
             'fix' => [
-                'action' => 'supervisor_start',
+                'handler' => SupervisorStartFixAction::class,
             ],
             'requires' => ['supervisor'],
         ],

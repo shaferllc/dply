@@ -1,5 +1,10 @@
 <div class="py-12">
     <div class="dply-page-shell space-y-6">
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Notifications'), 'icon' => 'bell-alert'],
+        ]" />
+
         <x-page-header
             :title="__('Notifications')"
             :description="$notificationsReady ? __('Unread: :count', ['count' => $unreadCount]) : __('Run the latest database migrations to enable the shared inbox.')"

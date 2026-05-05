@@ -18,6 +18,7 @@ use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;
 use App\Services\Servers\ServerMetricsGuestScript;
+use App\Services\Servers\ServerMetricsRangeQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
@@ -36,6 +37,22 @@ class WorkspaceMonitor extends Component
 
     /** Tracks poll transitions so we flash once when a background probe finishes. */
     public bool $wasProbePending = false;
+
+    /** Metrics page time range: '1h' | '6h' | '24h' | '7d' | '30d'. Persisted client-side via localStorage on the segmented control. */
+    public string $metricsRange = '1h';
+
+    public function setMetricsRange(string $range): void
+    {
+        if (! ServerMetricsRangeQuery::isValidRange($range)) {
+            return;
+        }
+        $this->metricsRange = $range;
+    }
+
+    private function floatOrNull(mixed $value): ?float
+    {
+        return $value === null || ! is_numeric($value) ? null : (float) $value;
+    }
 
     public function mount(Server $server): void
     {
@@ -554,17 +571,45 @@ BASH);
 
         $chartLimit = (int) config('server_metrics.chart.max_points', 96);
 
-        $chartSnapshots = ServerMetricSnapshot::query()
-            ->where('server_id', $this->server->id)
-            ->orderByDesc('captured_at')
-            ->limit($chartLimit)
-            ->get()
-            ->sortBy('captured_at')
-            ->values();
-
-        $chartFrom = $chartSnapshots->first()?->captured_at;
-        $chartTo = $chartSnapshots->last()?->captured_at;
+        // Bucketed series per metric across the operator-chosen range.
+        // ServerMetricsRangeQuery handles min/avg/max bucketing in PHP so the
+        // 30d view stays around ~180 points instead of ~43k raw rows.
+        $rangeData = app(ServerMetricsRangeQuery::class)->fetch($this->server, $this->metricsRange);
+        $chartFrom = $rangeData['from'];
+        $chartTo = $rangeData['to'];
+        $rangeMetricSeries = $rangeData['metrics'];
         $tz = config('app.timezone');
+
+        // Threshold tints for per-panel header icon + KPI. Pulled from the
+        // same insights config the alert runners use, so the visual matches
+        // what fires a finding.
+        $thresholdCpu = (float) config('insights.thresholds.cpu_warn_pct', 85);
+        $thresholdMem = (float) config('insights.thresholds.mem_warn_pct', 85);
+        $thresholdLoad = (float) config('insights.thresholds.load_warn', 4.0);
+        $thresholdDiskWarn = 85.0; // Disk has no insights threshold yet — match cpu/mem default.
+
+        $statusFor = function (?float $value, float $warn, float $critical): string {
+            if ($value === null) {
+                return 'unknown';
+            }
+            if ($value >= $critical) {
+                return 'critical';
+            }
+            if ($value >= $warn) {
+                return 'warning';
+            }
+
+            return 'healthy';
+        };
+
+        $latestPayload = is_array($rangeData['latest_payload']) ? $rangeData['latest_payload'] : [];
+        $metricStatuses = [
+            'cpu' => $statusFor($this->floatOrNull($latestPayload['cpu_pct'] ?? null), $thresholdCpu, 95.0),
+            'mem' => $statusFor($this->floatOrNull($latestPayload['mem_pct'] ?? null), $thresholdMem, 95.0),
+            'disk' => $statusFor($this->floatOrNull($latestPayload['disk_pct'] ?? null), $thresholdDiskWarn, 95.0),
+            'load' => $statusFor($this->floatOrNull($latestPayload['load_1m'] ?? null), $thresholdLoad, $thresholdLoad * 1.5),
+            'network' => 'healthy',
+        ];
 
         $meta = $this->server->meta ?? [];
         $sshReachable = (bool) ($meta['monitoring_ssh_reachable'] ?? false);
@@ -664,11 +709,21 @@ BASH);
 
         return view('livewire.servers.workspace-monitor', [
             'latest' => $latest,
-            'chartSnapshots' => $chartSnapshots,
             'chartPointLimit' => $chartLimit,
             'chartFrom' => $chartFrom,
             'chartTo' => $chartTo,
             'chartTimezone' => $tz,
+            'rangeMetricSeries' => $rangeMetricSeries,
+            'rangeBucketSeconds' => $rangeData['bucket_seconds'],
+            'rangeSampleCount' => $rangeData['sample_count'],
+            'metricStatuses' => $metricStatuses,
+            'thresholds' => [
+                'cpu' => $thresholdCpu,
+                'mem' => $thresholdMem,
+                'disk' => $thresholdDiskWarn,
+                'load' => $thresholdLoad,
+            ],
+            'metricsRangeOptions' => array_keys(\App\Services\Servers\ServerMetricsRangeQuery::RANGES),
             'storedSnapshotCount' => $storedSnapshotCount,
             'showMetricsPanels' => $pythonInstalled || $storedSnapshotCount > 0,
             'opsReady' => $this->serverOpsReady(),

@@ -109,7 +109,7 @@
                     @foreach ($findings as $f)
                         @php
                             $fix = config('insights.insights.'.$f->insight_key.'.fix');
-                            $canFix = is_array($fix) && ($fix['action'] ?? null);
+                            $canFix = is_array($fix) && ($fix['handler'] ?? null);
                             $checkedAtRaw = is_array($f->meta ?? null) ? ($f->meta['checked_at'] ?? null) : null;
                             $checkedAt = is_string($checkedAtRaw) && $checkedAtRaw !== ''
                                 ? \Carbon\Carbon::parse($checkedAtRaw)
@@ -168,6 +168,41 @@
                 </ul>
             @endif
         </div>
+
+        @if ($suggestionFindings->isNotEmpty())
+            <div class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 px-5 py-4">
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recommendations') }}</h2>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Tuning suggestions based on observed signals. Nothing is broken — these are opportunities to improve.') }}</p>
+                </div>
+                <ul class="divide-y divide-brand-ink/10">
+                    @foreach ($suggestionFindings as $f)
+                        @php
+                            $appTimezone = config('app.timezone') ?: 'UTC';
+                        @endphp
+                        <li class="px-5 py-4 flex flex-wrap items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-ink">
+                                        <x-heroicon-s-light-bulb class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Suggestion') }}
+                                    </span>
+                                    <span class="font-medium text-brand-ink">{{ $f->title }}</span>
+                                </div>
+                                @if ($f->body)
+                                    <p class="mt-2 text-sm text-brand-moss whitespace-pre-wrap">{{ $f->body }}</p>
+                                @endif
+                                @include('livewire.partials.insight-correlation', ['finding' => $f])
+                                <p class="mt-2 text-xs text-brand-mist">
+                                    {{ __('Detected') }}:
+                                    {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') ?? '—' }}
+                                </p>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
     @endif
 
     @if ($tab === 'notifications')

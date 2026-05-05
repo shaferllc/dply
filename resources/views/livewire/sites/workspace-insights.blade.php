@@ -59,7 +59,7 @@
                     @foreach ($findings as $f)
                         @php
                             $fix = config('insights.insights.'.$f->insight_key.'.fix');
-                            $canFix = is_array($fix) && ($fix['action'] ?? null);
+                            $canFix = is_array($fix) && ($fix['handler'] ?? null);
                         @endphp
                         <li class="px-5 py-4 flex flex-wrap items-start justify-between gap-4">
                             <div class="min-w-0">

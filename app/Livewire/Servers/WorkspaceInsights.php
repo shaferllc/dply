@@ -153,7 +153,7 @@ class WorkspaceInsights extends Component
         }
 
         $fix = config('insights.insights.'.$finding->insight_key.'.fix');
-        $canFix = is_array($fix) && ($fix['action'] ?? null);
+        $canFix = is_array($fix) && ($fix['handler'] ?? null);
         if (! $canFix) {
             return;
         }
@@ -284,10 +284,16 @@ class WorkspaceInsights extends Component
             ->limit(100)
             ->get();
 
-        // Banner: top 3 unacknowledged criticals only. Acknowledged
+        // Split by kind: problems can page + populate the critical banner; suggestions are
+        // tuning recommendations rendered in their own section, never in the banner.
+        $problemFindings = $findings->where('kind', InsightFinding::KIND_PROBLEM)->values();
+        $suggestionFindings = $findings->where('kind', InsightFinding::KIND_SUGGESTION)->values();
+
+        // Banner: top 3 unacknowledged critical *problems*. Acknowledged
         // ones still appear in the list below — ack silences the
-        // banner, not the whole row.
-        $bannerFindings = $findings
+        // banner, not the whole row. Suggestions are excluded defensively
+        // so a misconfigured suggestion runner can't hijack the banner.
+        $bannerFindings = $problemFindings
             ->where('severity', InsightFinding::SEVERITY_CRITICAL)
             ->whereNull('acknowledged_at')
             ->take(3)
@@ -295,7 +301,8 @@ class WorkspaceInsights extends Component
 
         return view('livewire.servers.workspace-insights', [
             'orgHasPro' => $orgHasPro,
-            'findings' => $findings,
+            'findings' => $problemFindings,
+            'suggestionFindings' => $suggestionFindings,
             'bannerFindings' => $bannerFindings,
             'insightsCatalog' => $catalog,
             'enabledChecks' => $enabledChecks,
