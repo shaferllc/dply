@@ -15,7 +15,8 @@ class RunServerInsightsJob implements ShouldQueue
     public int $timeout = 120;
 
     public function __construct(
-        public string $serverId
+        public string $serverId,
+        public ?string $onlyKey = null,
     ) {}
 
     public function handle(InsightRunCoordinator $coordinator, InsightHealthScoreService $healthScore): void
@@ -25,7 +26,11 @@ class RunServerInsightsJob implements ShouldQueue
             return;
         }
 
-        $coordinator->runForServer($server);
-        $healthScore->computeAndStore($server);
+        $coordinator->runForServer($server, $this->onlyKey);
+
+        // Health score reflects all enabled checks; only recompute on a full sweep.
+        if ($this->onlyKey === null) {
+            $healthScore->computeAndStore($server);
+        }
     }
 }

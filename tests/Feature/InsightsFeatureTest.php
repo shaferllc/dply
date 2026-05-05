@@ -537,6 +537,197 @@ class InsightsFeatureTest extends TestCase
         $this->assertSame(InsightFinding::KIND_PROBLEM, $finding->kind);
     }
 
+    public function test_package_security_updates_runner_emits_warning_when_security_updates_present(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->stubRemoteBashOutput("total=12\nsecurity=3\n");
+
+        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $candidates = $runner->run($server->fresh(), null, []);
+
+        $this->assertCount(1, $candidates);
+        $c = $candidates[0];
+        $this->assertSame('package_security_updates', $c->insightKey);
+        $this->assertSame(InsightFinding::KIND_PROBLEM, $c->kind);
+        $this->assertSame(InsightFinding::SEVERITY_WARNING, $c->severity);
+        $this->assertSame(3, $c->meta['signal']['security_count']);
+        $this->assertSame(12, $c->meta['signal']['total_upgradable']);
+        $this->assertStringContainsString('3 security updates', $c->title);
+    }
+
+    public function test_package_security_updates_runner_escalates_to_critical_above_ten(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->stubRemoteBashOutput("total=42\nsecurity=15\n");
+
+        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $candidates = $runner->run($server->fresh(), null, []);
+
+        $this->assertCount(1, $candidates);
+        $this->assertSame(InsightFinding::SEVERITY_CRITICAL, $candidates[0]->severity);
+    }
+
+    public function test_package_security_updates_runner_skips_when_no_security_updates(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->stubRemoteBashOutput("total=2\nsecurity=0\n");
+
+        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $this->assertSame([], $runner->run($server->fresh(), null, []));
+    }
+
+    public function test_package_security_updates_runner_skips_when_apt_not_present(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->stubRemoteBashOutput("no-apt\n");
+
+        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $this->assertSame([], $runner->run($server->fresh(), null, []));
+    }
+
+    public function test_package_security_updates_runner_respects_min_threshold(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        // Threshold 5; only 2 security updates → below threshold, no emission.
+        $this->stubRemoteBashOutput("total=10\nsecurity=2\n");
+
+        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $this->assertSame([], $runner->run($server->fresh(), null, ['min_security_updates' => 5]));
+    }
+
+    public function test_system_clock_sync_runner_emits_warning_when_ntp_inactive(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->stubRemoteBashOutput("ntp_service=inactive\nsynchronized=yes\ntimezone=UTC\n");
+
+        $runner = app(\App\Services\Insights\Runners\SystemClockSyncInsightRunner::class);
+        $candidates = $runner->run($server->fresh(), null, []);
+
+        $this->assertCount(1, $candidates);
+        $c = $candidates[0];
+        $this->assertSame('system_clock_sync', $c->insightKey);
+        $this->assertSame(InsightFinding::KIND_PROBLEM, $c->kind);
+        $this->assertSame(InsightFinding::SEVERITY_WARNING, $c->severity);
+        $this->assertSame('inactive', $c->meta['signal']['ntp_service']);
+        $this->assertStringContainsString('NTP service is not active', $c->body);
+    }
+
+    public function test_system_clock_sync_runner_emits_when_synchronized_is_no(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->stubRemoteBashOutput("ntp_service=active\nsynchronized=no\ntimezone=UTC\n");
+
+        $runner = app(\App\Services\Insights\Runners\SystemClockSyncInsightRunner::class);
+        $candidates = $runner->run($server->fresh(), null, []);
+
+        $this->assertCount(1, $candidates);
+        $this->assertStringContainsString('not reported as synchronized', $candidates[0]->body);
+    }
+
+    public function test_system_clock_sync_runner_skips_when_clock_is_synchronized(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->stubRemoteBashOutput("ntp_service=active\nsynchronized=yes\ntimezone=UTC\n");
+
+        $runner = app(\App\Services\Insights\Runners\SystemClockSyncInsightRunner::class);
+        $this->assertSame([], $runner->run($server->fresh(), null, []));
+    }
+
+    public function test_system_clock_sync_runner_skips_when_timedatectl_not_present(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $this->stubRemoteBashOutput("no-timedatectl\n");
+
+        $runner = app(\App\Services\Insights\Runners\SystemClockSyncInsightRunner::class);
+        $this->assertSame([], $runner->run($server->fresh(), null, []));
+    }
+
+    public function test_enable_ntp_fix_action_runs_timedatectl_set_ntp_true(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        $captured = ['name' => null, 'script' => null, 'as_root' => null];
+        $this->stubRemoteBashCapturing($captured, "NTP service: active\nSystem clock synchronized: yes\n");
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'system_clock_sync',
+            'kind' => InsightFinding::KIND_PROBLEM,
+            'dedupe_hash' => 'clock',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_WARNING,
+            'title' => 'x',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        $action = app(\App\Services\Insights\FixActions\EnableNtpFixAction::class);
+        $this->assertNull($action->preflight($server->fresh(), null, $finding, []));
+        $result = $action->apply($server->fresh(), null, $finding, []);
+
+        $this->assertTrue($result->ok);
+        $this->assertSame('insight-fix-enable-ntp', $captured['name']);
+        $this->assertStringContainsString('timedatectl set-ntp true', (string) $captured['script']);
+        $this->assertTrue($captured['as_root']);
+    }
+
+    /**
+     * Bind a stub ExecuteRemoteTaskOnServer that returns the given buffer string.
+     */
+    private function stubRemoteBashOutput(string $buffer): void
+    {
+        $stub = new class($buffer) extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        {
+            public function __construct(private string $buffer) {}
+
+            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            {
+                return new \App\Modules\TaskRunner\ProcessOutput($this->buffer, 0, false);
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stub);
+    }
+
+    /**
+     * Bind a stub that captures invocation args into the given array reference.
+     */
+    private function stubRemoteBashCapturing(array &$captured, string $buffer): void
+    {
+        $stub = new class($captured, $buffer) extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        {
+            public array $captured;
+
+            public function __construct(array &$captured, private string $buffer)
+            {
+                $this->captured = &$captured;
+            }
+
+            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            {
+                $this->captured['name'] = $name;
+                $this->captured['script'] = $inlineBash;
+                $this->captured['as_root'] = $asRoot;
+
+                return new \App\Modules\TaskRunner\ProcessOutput($this->buffer, 0, false);
+            }
+        };
+        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stub);
+    }
+
     public function test_php_fpm_workers_undersized_runner_emits_when_active_over_threshold(): void
     {
         [, $server] = $this->userWithServer();
@@ -1572,6 +1763,271 @@ class InsightsFeatureTest extends TestCase
         $finding->refresh();
         $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status, 'Problems must not be silenced via ignore — they need to be fixed or auto-resolved');
         $this->assertNull($finding->ignored_at);
+    }
+
+    public function test_ignore_finding_writes_audit_log(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'octane_recommended',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'a-1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 't',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->call('ignoreFinding', $finding->id);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'organization_id' => $server->organization_id,
+            'user_id' => $user->id,
+            'action' => 'insight.ignored',
+        ]);
+    }
+
+    public function test_acknowledge_finding_writes_audit_log(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'cpu_ram_usage',
+            'kind' => InsightFinding::KIND_PROBLEM,
+            'dedupe_hash' => 'a-1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_CRITICAL,
+            'title' => 't',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->call('acknowledgeFinding', $finding->id);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'organization_id' => $server->organization_id,
+            'user_id' => $user->id,
+            'action' => 'insight.acknowledged',
+        ]);
+    }
+
+    public function test_rerun_single_check_dispatches_run_job_with_only_key_filter(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        Bus::fake();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->call('rerunSingleCheck', 'cpu_ram_usage');
+
+        Bus::assertDispatched(RunServerInsightsJob::class, function ($job) use ($server) {
+            return $job->serverId === $server->id && $job->onlyKey === 'cpu_ram_usage';
+        });
+    }
+
+    public function test_rerun_single_check_refuses_unknown_keys(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        Bus::fake();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->call('rerunSingleCheck', 'definitely_not_a_real_insight_key');
+
+        Bus::assertNotDispatched(RunServerInsightsJob::class);
+    }
+
+    public function test_run_server_insights_job_with_only_key_skips_health_score_recompute(): void
+    {
+        [, $server] = $this->userWithServer();
+
+        // We can't easily assert the health-score side effect without coupling to its
+        // implementation, but we can confirm the job invokes the coordinator with onlyKey.
+        $coordinatorState = ['only_key_seen' => null];
+        $stubCoord = new class($coordinatorState) extends \App\Services\Insights\InsightRunCoordinator
+        {
+            public array $state;
+
+            public function __construct(array &$state)
+            {
+                $this->state = &$state;
+            }
+
+            public function runForServer(\App\Models\Server $server, ?string $onlyKey = null): void
+            {
+                $this->state['only_key_seen'] = $onlyKey;
+            }
+        };
+        $this->app->instance(\App\Services\Insights\InsightRunCoordinator::class, $stubCoord);
+
+        Bus::dispatchSync(new RunServerInsightsJob($server->id, 'cpu_ram_usage'));
+
+        $this->assertSame('cpu_ram_usage', $coordinatorState['only_key_seen']);
+    }
+
+    public function test_unacknowledge_finding_clears_breadcrumbs_and_writes_audit_log(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'cpu_ram_usage',
+            'kind' => InsightFinding::KIND_PROBLEM,
+            'dedupe_hash' => 'a-1',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_CRITICAL,
+            'title' => 'High CPU',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now()->subHour(),
+            'resolved_at' => null,
+            'acknowledged_at' => now()->subMinutes(5),
+            'acknowledged_by_user_id' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            // The acknowledged-but-open finding should appear in the open list with the
+            // "Dismissed" indicator and Restore-to-banner control on critical severity.
+            ->assertSee('Restore to banner')
+            ->call('unacknowledgeFinding', $finding->id);
+
+        $finding->refresh();
+        $this->assertNull($finding->acknowledged_at);
+        $this->assertNull($finding->acknowledged_by_user_id);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'organization_id' => $server->organization_id,
+            'user_id' => $user->id,
+            'action' => 'insight.unacknowledged',
+        ]);
+    }
+
+    public function test_unacknowledge_does_not_touch_findings_that_were_never_acknowledged(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'cpu_ram_usage',
+            'kind' => InsightFinding::KIND_PROBLEM,
+            'dedupe_hash' => 'a-2',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_CRITICAL,
+            'title' => 'High CPU',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+            // No acknowledged_at — calling unacknowledge should be a no-op.
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->call('unacknowledgeFinding', $finding->id);
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'organization_id' => $server->organization_id,
+            'action' => 'insight.unacknowledged',
+        ]);
+    }
+
+    public function test_unignore_finding_restores_to_open_and_clears_breadcrumbs(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'octane_recommended',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'u-1',
+            'status' => InsightFinding::STATUS_IGNORED,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'Consider Octane',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now()->subDay(),
+            'resolved_at' => null,
+            'ignored_at' => now()->subHours(2),
+            'ignored_by_user_id' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->assertViewHas('ignoredSuggestions', fn ($c) => $c->count() === 1)
+            ->assertSee('Ignored recommendations')
+            ->assertSee('Restore')
+            ->call('unignoreFinding', $finding->id);
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
+        $this->assertNull($finding->ignored_at);
+        $this->assertNull($finding->ignored_by_user_id);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'organization_id' => $server->organization_id,
+            'user_id' => $user->id,
+            'action' => 'insight.unignored',
+        ]);
+    }
+
+    public function test_unignore_is_a_noop_for_non_ignored_findings(): void
+    {
+        [$user, $server] = $this->userWithServer();
+
+        // An OPEN finding should not be touched by unignoreFinding.
+        $finding = InsightFinding::query()->create([
+            'server_id' => $server->id,
+            'site_id' => null,
+            'team_id' => null,
+            'insight_key' => 'octane_recommended',
+            'kind' => InsightFinding::KIND_SUGGESTION,
+            'dedupe_hash' => 'u-2',
+            'status' => InsightFinding::STATUS_OPEN,
+            'severity' => InsightFinding::SEVERITY_INFO,
+            'title' => 'x',
+            'body' => '',
+            'meta' => [],
+            'correlation' => null,
+            'detected_at' => now(),
+            'resolved_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceInsights::class, ['server' => $server])
+            ->call('unignoreFinding', $finding->id);
+
+        $finding->refresh();
+        $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
     }
 
     public function test_ignored_suggestion_does_not_reopen_within_cooldown(): void

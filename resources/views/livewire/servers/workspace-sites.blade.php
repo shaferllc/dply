@@ -12,35 +12,15 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <div class="{{ $card }}">
-        <div class="p-6 sm:p-8">
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('New site') }}</h2>
-            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                {{ __('Enter a primary domain to get started. Stack, paths, and PHP options are available in advanced settings.') }}
-            </p>
-            <form id="quick-site-form" wire:submit="startQuickSite" class="mt-6">
-                <x-input-label for="quick_site_hostname" value="{{ __('Domain') }}" />
-                <input
-                    id="quick_site_hostname"
-                    type="text"
-                    wire:model="quick_site_hostname"
-                    placeholder="{{ __('e.g. app.example.com') }}"
-                    autocomplete="off"
-                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                    @disabled(! $this->canAddSite)
-                />
-                <x-input-error :messages="$errors->get('quick_site_hostname')" class="mt-2" />
-            </form>
-        </div>
-        <div class="flex flex-col-reverse items-stretch justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
-            <a
-                href="{{ route('sites.create', $server) }}"
-                wire:navigate
-                class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-            >
-                {{ __('Advanced settings') }}
-            </a>
+        <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+            <div>
+                <h2 class="text-lg font-semibold text-brand-ink">{{ __('New site') }}</h2>
+                <p class="mt-1 text-sm text-brand-moss leading-relaxed">
+                    {{ __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.') }}
+                </p>
+            </div>
             @if ($this->canAddSite)
-                <x-primary-button type="submit" form="quick-site-form" class="justify-center">{{ __('Add site') }}</x-primary-button>
+                <x-primary-button type="button" wire:click="openAddSiteModal" class="justify-center">{{ __('Add site') }}</x-primary-button>
             @else
                 <span
                     class="inline-flex cursor-not-allowed items-center justify-center rounded-lg bg-brand-mist/40 px-4 py-2.5 text-sm font-semibold text-brand-moss"
@@ -126,5 +106,151 @@
             'serverId' => $server->id,
             'deletionSummary' => $deletionSummary,
         ])
+
+        @if ($this->supportsQuickAdd)
+            <x-modal
+                name="add-site-modal"
+                :show="$showAddSiteModal"
+                maxWidth="lg"
+                overlayClass="bg-brand-ink/40"
+                focusable
+            >
+                <form wire:submit="addSite" x-data="{ showAdvanced: false }">
+                    <div class="border-b border-brand-ink/10 px-6 py-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
+                        <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
+                        <p class="mt-2 text-sm leading-6 text-brand-moss">
+                            {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
+                        </p>
+                    </div>
+
+                    <div class="space-y-5 px-6 py-6">
+                        <div>
+                            <x-input-label for="add-site-hostname" :value="__('Primary domain')" />
+                            <x-text-input
+                                id="add-site-hostname"
+                                wire:model.live.debounce.300ms="form.primary_hostname"
+                                type="text"
+                                class="mt-1 block w-full font-mono text-sm"
+                                placeholder="app.example.com"
+                                required
+                                autocomplete="off"
+                            />
+                            <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-1" />
+                        </div>
+
+                        <div class="border-t border-brand-ink/10 pt-4">
+                            <button
+                                type="button"
+                                x-on:click="showAdvanced = !showAdvanced"
+                                class="flex w-full items-center justify-between text-sm font-semibold text-brand-ink hover:text-brand-sage"
+                                x-bind:aria-expanded="showAdvanced"
+                            >
+                                <span>{{ __('Advanced settings') }}</span>
+                                <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="showAdvanced ? 'rotate-180' : ''" />
+                            </button>
+
+                            <div x-show="showAdvanced" x-collapse class="mt-5 space-y-5">
+                                <div>
+                                    <x-input-label for="add-site-name" :value="__('Site name')" />
+                                    <x-text-input
+                                        id="add-site-name"
+                                        wire:model="form.name"
+                                        type="text"
+                                        class="mt-1 block w-full"
+                                        autocomplete="off"
+                                    />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Used for the slug and deploy path. Auto-derived from the domain.') }}</p>
+                                    <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
+                                </div>
+
+                                <div>
+                                    <x-input-label for="add-site-type" :value="__('Stack')" />
+                                    <select
+                                        id="add-site-type"
+                                        wire:model.live="form.type"
+                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                    >
+                                        <option value="php">{{ __('PHP (PHP-FPM + Nginx)') }}</option>
+                                        <option value="static">{{ __('Static files') }}</option>
+                                        <option value="node">{{ __('Node (Nginx → reverse proxy)') }}</option>
+                                    </select>
+                                </div>
+
+                                @if ($form->type === 'php')
+                                    <div>
+                                        <x-input-label for="add-site-php" :value="__('PHP-FPM version')" />
+                                        <select
+                                            id="add-site-php"
+                                            wire:model="form.php_version"
+                                            class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                        >
+                                            <option value="">{{ __('Select a PHP version') }}</option>
+                                            @foreach ($phpVersions as $version)
+                                                <option value="{{ $version['id'] }}">{{ $version['label'] }}</option>
+                                            @endforeach
+                                        </select>
+                                        @if ($phpVersions === [])
+                                            <p class="mt-1 text-xs text-brand-mist">{{ __('No supported PHP versions installed yet. Install one from the PHP workspace first.') }}</p>
+                                        @endif
+                                        <x-input-error :messages="$errors->get('form.php_version')" class="mt-1" />
+                                    </div>
+                                @endif
+
+                                @if ($form->type === 'node')
+                                    <div>
+                                        <x-input-label for="add-site-port" :value="__('App listens on (localhost)')" />
+                                        <x-text-input
+                                            id="add-site-port"
+                                            type="number"
+                                            wire:model="form.app_port"
+                                            class="mt-1 block w-32"
+                                        />
+                                        <p class="mt-1 text-xs text-brand-mist">{{ __('Nginx will proxy requests to this port.') }}</p>
+                                    </div>
+                                @endif
+
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="add-site-doc-root" :value="__('Document root')" />
+                                        <x-text-input
+                                            id="add-site-doc-root"
+                                            wire:model.blur="form.document_root"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono text-sm"
+                                            required
+                                        />
+                                        <x-input-error :messages="$errors->get('form.document_root')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="add-site-deploy-path" :value="__('Deploy path')" />
+                                        <x-text-input
+                                            id="add-site-deploy-path"
+                                            wire:model.blur="form.repository_path"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono text-sm"
+                                        />
+                                        <x-input-error :messages="$errors->get('form.repository_path')" class="mt-1" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                        <x-secondary-button type="button" wire:click="closeAddSiteModal">
+                            {{ __('Cancel') }}
+                        </x-secondary-button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="addSite">
+                            <span wire:loading.remove wire:target="addSite">{{ __('Add site') }}</span>
+                            <span wire:loading wire:target="addSite" class="inline-flex items-center gap-2">
+                                <x-spinner variant="cream" />
+                                {{ __('Adding…') }}
+                            </span>
+                        </x-primary-button>
+                    </div>
+                </form>
+            </x-modal>
+        @endif
     </x-slot>
 </x-server-workspace-layout>

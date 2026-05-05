@@ -138,6 +138,19 @@ class WorkspaceInsights extends Component
         $this->toastSuccess(__('Insights check queued. Refresh in a moment for results.'));
     }
 
+    public function rerunSingleCheck(string $insightKey): void
+    {
+        $this->authorize('view', $this->server);
+
+        // Refuse unknown keys — the coordinator would no-op silently which is hard to debug.
+        if (! is_array(config('insights.insights.'.$insightKey))) {
+            return;
+        }
+
+        RunServerInsightsJob::dispatch($this->server->id, $insightKey);
+        $this->toastSuccess(__('Re-running this check. Refresh in a moment for results.'));
+    }
+
     public function openApplyFixModal(int $findingId): void
     {
         $this->authorize('update', $this->server);
@@ -229,6 +242,42 @@ class WorkspaceInsights extends Component
         $this->toastSuccess(__('Revert has been queued. This may take up to a minute.'));
     }
 
+    public function unignoreFinding(int $findingId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        $finding = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_IGNORED)
+            ->whereKey($findingId)
+            ->first();
+
+        if ($finding === null) {
+            return;
+        }
+
+        // Reopen and clear ignore breadcrumbs so a future ignore restarts the cooldown clock.
+        $finding->forceFill([
+            'status' => InsightFinding::STATUS_OPEN,
+            'ignored_at' => null,
+            'ignored_by_user_id' => null,
+        ])->save();
+
+        $org = $this->server->organization;
+        if ($org instanceof Organization) {
+            audit_log($org, $user, 'insight.unignored', $this->server, null, [
+                'finding_id' => $finding->id,
+                'insight_key' => $finding->insight_key,
+            ]);
+        }
+    }
+
     public function ignoreFinding(int $findingId): void
     {
         $this->authorize('update', $this->server);
@@ -256,6 +305,52 @@ class WorkspaceInsights extends Component
             'ignored_at' => now(),
             'ignored_by_user_id' => $user->id,
         ])->save();
+
+        $org = $this->server->organization;
+        if ($org instanceof Organization) {
+            audit_log($org, $user, 'insight.ignored', $this->server, null, [
+                'finding_id' => $finding->id,
+                'insight_key' => $finding->insight_key,
+            ]);
+        }
+    }
+
+    public function unacknowledgeFinding(int $findingId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        // Only acknowledged-and-still-open findings can be un-acknowledged. We don't reach back
+        // into resolved/ignored to prevent surprising state transitions.
+        $finding = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->whereNotNull('acknowledged_at')
+            ->whereKey($findingId)
+            ->first();
+
+        if ($finding === null) {
+            return;
+        }
+
+        $finding->forceFill([
+            'acknowledged_at' => null,
+            'acknowledged_by_user_id' => null,
+        ])->save();
+
+        $org = $this->server->organization;
+        if ($org instanceof Organization) {
+            audit_log($org, $user, 'insight.unacknowledged', $this->server, null, [
+                'finding_id' => $finding->id,
+                'insight_key' => $finding->insight_key,
+                'severity' => $finding->severity,
+            ]);
+        }
     }
 
     public function acknowledgeFinding(int $findingId): void
@@ -283,6 +378,15 @@ class WorkspaceInsights extends Component
             'acknowledged_at' => now(),
             'acknowledged_by_user_id' => $user->id,
         ])->save();
+
+        $org = $this->server->organization;
+        if ($org instanceof Organization) {
+            audit_log($org, $user, 'insight.acknowledged', $this->server, null, [
+                'finding_id' => $finding->id,
+                'insight_key' => $finding->insight_key,
+                'severity' => $finding->severity,
+            ]);
+        }
     }
 
     public function render(): View
@@ -341,6 +445,17 @@ class WorkspaceInsights extends Component
             ->limit(100)
             ->get();
 
+        // Ignored suggestions still within their cooldown window — surfaced separately so
+        // the user has a way to restore one if they change their mind. Server-scoped only.
+        $ignoredSuggestions = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_IGNORED)
+            ->where('kind', InsightFinding::KIND_SUGGESTION)
+            ->orderByDesc('ignored_at')
+            ->limit(20)
+            ->get();
+
         // Recently applied config-mutating fixes that still have an on-disk backup we can revert from.
         // Pulled from resolved findings with meta.backup_path set, last 30 days, server-scoped.
         $recentlyAppliedFindings = InsightFinding::query()
@@ -376,6 +491,7 @@ class WorkspaceInsights extends Component
             'orgHasPro' => $orgHasPro,
             'findings' => $problemFindings,
             'suggestionFindings' => $suggestionFindings,
+            'ignoredSuggestions' => $ignoredSuggestions,
             'bannerFindings' => $bannerFindings,
             'recentlyAppliedFindings' => $recentlyAppliedFindings,
             'insightsCatalog' => $catalog,

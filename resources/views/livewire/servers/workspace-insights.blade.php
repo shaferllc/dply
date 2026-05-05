@@ -147,20 +147,35 @@
                                                 <p><span class="font-medium text-brand-moss">{{ __('Recorded') }}:</span> {{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') }}</p>
                                             </div>
                                         @endif
-                                        @if ($canFix)
-                                            <div class="mt-3">
+                                        <div class="mt-3 flex flex-wrap gap-2">
+                                            @if ($canFix)
                                                 <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="{{ $btnSecondary }}">
                                                     <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
                                                 </button>
-                                            </div>
-                                        @endif
+                                            @endif
+                                            <button type="button" wire:click="rerunSingleCheck('{{ $f->insight_key }}')" wire:loading.attr="disabled" wire:target="rerunSingleCheck('{{ $f->insight_key }}')" class="{{ $btnSecondary }}" title="{{ __('Re-run this single check now (does not recompute health score)') }}">
+                                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.class="animate-spin" wire:target="rerunSingleCheck('{{ $f->insight_key }}')" aria-hidden="true" />
+                                                {{ __('Re-run') }}
+                                            </button>
+                                            @if ($f->severity === 'critical' && $f->acknowledged_at !== null)
+                                                <button type="button" wire:click="unacknowledgeFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unacknowledgeFinding({{ $f->id }})" class="{{ $btnSecondary }}">
+                                                    <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                    {{ __('Restore to banner') }}
+                                                </button>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="flex shrink-0 flex-col items-end gap-1 text-right">
                                     <span class="text-xs text-brand-mist whitespace-nowrap" title="{{ $f->detected_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
                                         {{ $f->detected_at?->diffForHumans() ?? '—' }}
                                     </span>
+                                    @if ($f->acknowledged_at !== null)
+                                        <span class="text-[10px] uppercase tracking-wide text-brand-mist whitespace-nowrap" title="{{ $f->acknowledged_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                                            {{ __('Dismissed') }}
+                                        </span>
+                                    @endif
                                 </div>
                             </div>
                         </li>
@@ -216,6 +231,34 @@
                                     </span>
                                 </div>
                             </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if ($ignoredSuggestions->isNotEmpty())
+            <div class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 px-5 py-4">
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Suggestions you dismissed. Restore one to bring it back into Recommendations on the next scheduled run.') }}</p>
+                </div>
+                <ul class="divide-y divide-brand-ink/10">
+                    @foreach ($ignoredSuggestions as $f)
+                        @php
+                            $appTimezone = config('app.timezone') ?: 'UTC';
+                        @endphp
+                        <li class="px-5 py-3 flex flex-wrap items-center justify-between gap-4">
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-brand-ink/80">{{ $f->title }}</p>
+                                <p class="mt-0.5 text-xs text-brand-mist">
+                                    {{ __('Ignored') }}:
+                                    {{ $f->ignored_at?->timezone($appTimezone)->format('Y-m-d H:i:s T') ?? '—' }}
+                                </p>
+                            </div>
+                            <button type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="{{ $btnSecondary }} shrink-0">
+                                {{ __('Restore') }}
+                            </button>
                         </li>
                     @endforeach
                 </ul>

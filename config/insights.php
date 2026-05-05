@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\Insights\FixActions\BumpFpmWorkersFixAction;
+use App\Services\Insights\FixActions\EnableNtpFixAction;
 use App\Services\Insights\FixActions\SupervisorStartFixAction;
 use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\Runners\CpuRamUsageInsightRunner;
@@ -10,8 +11,10 @@ use App\Services\Insights\Runners\HorizonRecommendedInsightRunner;
 use App\Services\Insights\Runners\LoadAverageInsightRunner;
 use App\Services\Insights\Runners\MetricsMissingInsightRunner;
 use App\Services\Insights\Runners\OctaneRecommendedInsightRunner;
+use App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner;
 use App\Services\Insights\Runners\PhpEolSitesInsightRunner;
 use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
+use App\Services\Insights\Runners\SystemClockSyncInsightRunner;
 use App\Services\Insights\Runners\PipelineHeartbeatInsightRunner;
 use App\Services\Insights\Runners\SslCertificateInsightRunner;
 use App\Services\Insights\Runners\SupervisorRunningInsightRunner;
@@ -175,11 +178,13 @@ return [
 
         'system_clock_sync' => [
             'label' => 'System clock sync',
-            'description' => 'Verify system clock is synchronized.',
+            'description' => 'Verify system clock is synchronized via NTP.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
-            'fix' => null,
+            'runner' => SystemClockSyncInsightRunner::class,
+            'fix' => [
+                'handler' => EnableNtpFixAction::class,
+            ],
         ],
 
         'innodb_buffer_pool' => [
@@ -194,11 +199,20 @@ return [
 
         'package_security_updates' => [
             'label' => 'Package & security updates',
-            'description' => 'Check for available system updates.',
+            'description' => 'Detect outstanding security-suite package updates via apt.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => PackageSecurityUpdatesInsightRunner::class,
             'fix' => null,
+            'parameters' => [
+                'min_security_updates' => [
+                    'type' => 'number',
+                    'label' => 'Min security updates to surface',
+                    'min' => 1,
+                    'max' => 100,
+                    'default' => 1,
+                ],
+            ],
         ],
 
         'ssl_certificate_checks' => [
