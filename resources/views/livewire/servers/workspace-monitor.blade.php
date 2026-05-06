@@ -70,6 +70,11 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4">
+        <p>{{ __('Live + historical resource metrics (CPU, memory, disk, load, network) for this server. Samples are pushed from a small Python guest agent installed during provisioning; the workspace plots time-series and the latest snapshot.') }}</p>
+        <p>{{ __('"Probe" is dply\'s SSH-based reachability check — different from the guest agent, which pushes samples on its own cadence. Both being green means metrics will keep flowing; either being red explains a stale dashboard.') }}</p>
+    </x-explainer>
+
     @if ($server->workspace)
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
             <p class="font-semibold">{{ __('Project health shortcut') }}</p>
