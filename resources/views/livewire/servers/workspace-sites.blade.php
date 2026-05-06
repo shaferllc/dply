@@ -11,6 +11,11 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4">
+        <p>{{ __('Sites hosted on this server. Each row is a vhost (nginx/caddy/apache) with its own document root, runtime version (PHP/Node/Python), database bindings, deploy hooks, and SSL certs. Click a row to drop into the site\'s own page where deploys, env vars, and per-site settings live.') }}</p>
+        <p>{{ __('Adding a site here scaffolds the vhost config + filesystem layout on the server and (optionally) creates a database for it. Removing a site offers cascading cleanup: vhost, files, database, deploy keys.') }}</p>
+    </x-explainer>
+
     <div class="{{ $card }}">
         <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div class="min-w-0">
