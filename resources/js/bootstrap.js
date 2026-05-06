@@ -170,6 +170,69 @@ function bindDplyServerCronRunChannel() {
     });
 }
 
+/**
+ * Cache workspace MONITOR tail: queued SSH + Reverb chunks on private server channel.
+ * Mirrors the cron-run binder above. Subscribes when the workspace renders the
+ * #dply-server-cache-monitor-context element with subscribe="1" (i.e. there is an
+ * active run); leaves on navigation away.
+ */
+function bindDplyServerCacheMonitorChannel() {
+    if (!window.Echo || typeof window.Livewire === 'undefined') {
+        return;
+    }
+
+    const el = document.getElementById('dply-server-cache-monitor-context');
+    const serverId = el?.dataset?.serverId?.trim() ?? '';
+    const subscribe = el?.dataset?.subscribe === '1';
+
+    if (!subscribe || !serverId) {
+        if (window.__dplyCacheMonitorEchoSub) {
+            window.Echo.leave('server.' + window.__dplyCacheMonitorEchoSub);
+            window.__dplyCacheMonitorEchoSub = null;
+        }
+
+        return;
+    }
+
+    if (window.__dplyCacheMonitorEchoSub === serverId) {
+        return;
+    }
+
+    if (window.__dplyCacheMonitorEchoSub) {
+        window.Echo.leave('server.' + window.__dplyCacheMonitorEchoSub);
+    }
+
+    window.__dplyCacheMonitorEchoSub = serverId;
+
+    const ch = window.Echo.private('server.' + serverId);
+
+    ch.listen('.server.cache.monitor.chunk', (payload) => {
+        if (!payload?.run_id || !payload?.chunk) {
+            return;
+        }
+        window.Livewire.dispatch('cache-monitor-chunk', {
+            runId: payload.run_id,
+            chunk: payload.chunk,
+        });
+    });
+
+    /**
+     * Completion clears the active run-id Livewire-side. wire:poll.1s still
+     * syncs the cache buffer fallback when Reverb is off or events are missed.
+     */
+    ch.listen('.server.cache.monitor.completed', (payload) => {
+        if (!payload?.run_id) {
+            return;
+        }
+        window.Livewire.dispatch('cache-monitor-completed', {
+            runId: payload.run_id,
+            success: !!payload.success,
+            lineCount: payload.line_count ?? 0,
+            error: payload.error ?? null,
+        });
+    });
+}
+
 function bindDplySiteProvisioningChannel() {
     if (!window.Echo || typeof window.Livewire === 'undefined') {
         return;
@@ -215,6 +278,7 @@ document.addEventListener('livewire:init', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplyServerCacheMonitorChannel();
     bindDplySiteProvisioningChannel();
 });
 
@@ -222,6 +286,7 @@ document.addEventListener('livewire:navigated', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplyServerCacheMonitorChannel();
     bindDplySiteProvisioningChannel();
 });
 
@@ -230,5 +295,6 @@ document.addEventListener('dply:echo-ready', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplyServerCacheMonitorChannel();
     bindDplySiteProvisioningChannel();
 });

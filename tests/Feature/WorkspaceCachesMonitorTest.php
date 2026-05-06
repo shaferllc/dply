@@ -224,6 +224,61 @@ class WorkspaceCachesMonitorTest extends TestCase
             ->assertSet('monitorPayload', null);
     }
 
+    public function test_on_chunk_appends_lines_to_payload(): void
+    {
+        [$user, $server] = $this->actingOwnerWithRedis();
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->call('setWorkspaceTab', 'redis')
+            ->set('replUnlocked', true)
+            ->call('startMonitor', 10);
+
+        $runId = $component->get('monitorRunId');
+
+        $component->call('onMonitorChunk', $runId, "1700000000.111 [0 client] \"GET\" \"a\"\n1700000000.112 [0 client] \"GET\" \"b\"\n");
+
+        $payload = $component->get('monitorPayload');
+        $this->assertSame('running', $payload['status']);
+        $this->assertSame(
+            ['1700000000.111 [0 client] "GET" "a"', '1700000000.112 [0 client] "GET" "b"'],
+            $payload['lines'],
+        );
+    }
+
+    public function test_on_chunk_drops_events_for_other_run_ids(): void
+    {
+        [$user, $server] = $this->actingOwnerWithRedis();
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->call('setWorkspaceTab', 'redis')
+            ->set('replUnlocked', true)
+            ->call('startMonitor', 10);
+
+        // Wrong run id — chunk should be ignored.
+        $component->call('onMonitorChunk', 'some-other-run', "junk line\n");
+
+        $this->assertSame([], $component->get('monitorPayload')['lines']);
+    }
+
+    public function test_on_completed_clears_run_id(): void
+    {
+        [$user, $server] = $this->actingOwnerWithRedis();
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->call('setWorkspaceTab', 'redis')
+            ->set('replUnlocked', true)
+            ->call('startMonitor', 10);
+
+        $runId = $component->get('monitorRunId');
+
+        $component->call('onMonitorCompleted', $runId, true, 42, null)
+            ->assertSet('monitorRunId', '')
+            ->assertSet('monitorPayload.status', 'completed');
+    }
+
     public function test_monitor_rejects_memcached(): void
     {
         $user = User::factory()->create();

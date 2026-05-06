@@ -30,6 +30,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -1525,6 +1526,57 @@ class WorkspaceCaches extends Component
     {
         $this->monitorRunId = '';
         $this->monitorPayload = null;
+    }
+
+    /**
+     * Reverb chunk dispatched from `bootstrap.js` when a MONITOR broadcast
+     * arrives on the `server.{serverId}` private channel. The JS layer is the
+     * Reverb client; this method just appends the chunk to our in-memory
+     * buffer for the active run.
+     *
+     * Drops events for runs the operator isn't watching (e.g. another
+     * operator's run on the same server) by checking against `monitorRunId`.
+     */
+    #[On('cache-monitor-chunk')]
+    public function onMonitorChunk(string $runId, string $chunk): void
+    {
+        if ($runId !== $this->monitorRunId || $this->monitorRunId === '') {
+            return;
+        }
+
+        $payload = $this->monitorPayload ?? ['status' => 'running', 'lines' => [], 'error' => null];
+        $payload['status'] = 'running';
+
+        // Split the broadcast chunk on newlines and append each non-empty
+        // line. Bound at 500 lines (oldest dropped) to mirror the job's
+        // server-side buffer behavior.
+        $lines = $payload['lines'];
+        foreach (explode("\n", $chunk) as $line) {
+            if ($line === '') {
+                continue;
+            }
+            $lines[] = $line;
+        }
+        if (count($lines) > 500) {
+            $lines = array_slice($lines, -500);
+        }
+
+        $payload['lines'] = $lines;
+        $this->monitorPayload = $payload;
+    }
+
+    #[On('cache-monitor-completed')]
+    public function onMonitorCompleted(string $runId, bool $success, int $lineCount, ?string $error = null): void
+    {
+        if ($runId !== $this->monitorRunId || $this->monitorRunId === '') {
+            return;
+        }
+
+        $payload = $this->monitorPayload ?? ['status' => 'running', 'lines' => [], 'error' => null];
+        $payload['status'] = $success ? 'completed' : 'failed';
+        $payload['error'] = $error;
+        $this->monitorPayload = $payload;
+        $this->monitorRunId = '';
     }
 
     /**

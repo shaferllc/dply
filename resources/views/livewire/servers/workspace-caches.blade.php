@@ -13,6 +13,18 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    {{-- Reverb subscribe context for the live MONITOR tail. JS in bootstrap.js
+         picks up the data-attrs and (un)subscribes accordingly. The 1s wire:poll
+         fallback inside the monitor card keeps things working when Reverb is off
+         or events are missed. --}}
+    <div
+        id="dply-server-cache-monitor-context"
+        data-server-id="{{ $server->id }}"
+        data-subscribe="{{ $monitorRunId !== '' ? '1' : '0' }}"
+        class="hidden"
+        aria-hidden="true"
+    ></div>
+
     <x-explainer class="mb-4">
         <p>{{ __('This workspace manages cache engines installed on this server via apt + systemd — Redis, Valkey, Memcached, KeyDB, and Dragonfly. Multiple engines can run side-by-side (e.g. Redis for queues, Memcached for app cache).') }}</p>
         <p>{{ __('It is independent of how apps deployed here are configured to use cache: this page installs and operates the server, not your app\'s client code. The engine badges are read live from the server; install state lives in the dply database.') }}</p>
