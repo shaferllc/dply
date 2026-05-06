@@ -12,6 +12,12 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4" tone="warn">
+        <p>{{ __('This workspace manages UFW (the Ubuntu firewall) on the server. Dply tracks rules in its own database; "Apply" reconciles them onto the host with ufw allow/deny commands. Anything UFW already had that\'s NOT in the dply rule list will be removed when you apply.') }}</p>
+        <p>{{ __('Presets are quick-to-apply rule bundles for common app shapes (HTTP only, HTTP+SSH from-anywhere, etc.). Templates are reusable rule sets you save and apply across servers.') }}</p>
+        <p>{{ __('Locking yourself out is a real risk. Always keep an SSH allow rule in place; the workspace warns if you\'re about to apply a rule set that doesn\'t include one.') }}</p>
+    </x-explainer>
+
     @if ($opsReady)
         <div class="space-y-6">
             <x-server-workspace-tablist :aria-label="__('Firewall workspace sections')">
