@@ -247,7 +247,13 @@
                     @endphp
                     <div class="{{ $card }} p-6 sm:p-8">
                         <div class="flex flex-wrap items-center gap-3">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ $engineLabel }}</h2>
+                            <h2 class="text-lg font-semibold text-brand-ink">
+                                {{ $engineLabel }}
+                                @if (! $row->isDefaultInstance())
+                                    <span class="text-brand-mist">/</span>
+                                    <span class="font-mono text-sm text-brand-moss">{{ $row->name }}</span>
+                                @endif
+                            </h2>
                             @switch($row->status)
                                 @case(\App\Models\ServerCacheService::STATUS_RUNNING)
                                     <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Running') }}</span>
@@ -278,7 +284,7 @@
                             @endswitch
                             <a
                                 href="#"
-                                wire:click.prevent="setWorkspaceTab('{{ $row->engine }}')"
+                                wire:click.prevent="setWorkspaceTab('{{ $row->engine }}'); setActiveInstance('{{ $row->name }}')"
                                 class="ml-auto text-xs font-medium text-brand-forest hover:underline"
                             >{{ __('Open :engine workspace →', ['engine' => $engineLabel]) }}</a>
                         </div>
@@ -304,7 +310,7 @@
                             </p>
                         @endif
 
-                        @php $stats = $cacheStatsByEngine[$row->engine] ?? []; @endphp
+                        @php $stats = $cacheStatsByInstance[$row->engine][$row->name] ?? []; @endphp
                         @if (! empty($stats))
                             <dl class="mt-4 grid gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4 sm:grid-cols-2 lg:grid-cols-4">
                                 @foreach ($stats as $label => $value)
@@ -338,7 +344,14 @@
              ============================================================================ --}}
         @foreach ($engines as $engine)
             @php
-                $row = $cacheServicesByEngine[$engine] ?? null;
+                $engineInstances = $cacheInstancesByEngine->get($engine, collect());
+                // Multi-instance lookup: use the active-instance name first;
+                // fall back to default (legacy single-instance) if the active
+                // instance doesn't exist for this engine; fall back to any
+                // installed instance after that.
+                $row = $engineInstances->get($active_instance)
+                    ?? $engineInstances->get(\App\Models\ServerCacheService::DEFAULT_INSTANCE_NAME)
+                    ?? $engineInstances->first();
                 $info = \App\Support\Servers\CacheEngineInfo::for($engine);
                 $rowInFlight = $row && in_array($row->status, [
                     \App\Models\ServerCacheService::STATUS_PENDING,
@@ -456,6 +469,115 @@
                             : ['overview', 'configure'];
                         $activeSubtab = in_array($engine_subtab, $availableSubtabs, true) ? $engine_subtab : 'overview';
                     @endphp
+
+                    {{-- Instance chip row — visible when the engine supports multi-instance.
+                         Memcached is single-instance for v1 of multi-port, so the chip row
+                         is hidden for it. The default instance (legacy single-instance) is
+                         pinned to the front of the chip row; named instances follow. --}}
+                    @if ($isRedisFamily)
+                        <div class="mb-4 flex flex-wrap items-center gap-2">
+                            @foreach ($engineInstances as $inst)
+                                @php
+                                    $isActive = $inst->name === $active_instance;
+                                    $instInFlight = in_array($inst->status, [
+                                        \App\Models\ServerCacheService::STATUS_PENDING,
+                                        \App\Models\ServerCacheService::STATUS_INSTALLING,
+                                        \App\Models\ServerCacheService::STATUS_UNINSTALLING,
+                                    ], true);
+                                @endphp
+                                <button
+                                    type="button"
+                                    wire:click="setActiveInstance('{{ $inst->name }}')"
+                                    @class([
+                                        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                                        'border-brand-forest bg-brand-forest text-white shadow-sm' => $isActive,
+                                        'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $isActive,
+                                    ])
+                                    title="{{ __('Switch to instance :name on port :port', ['name' => $inst->name, 'port' => $inst->port]) }}"
+                                >
+                                    <span class="font-mono">{{ $inst->name }}</span>
+                                    <span @class([
+                                        'font-mono text-[10px]',
+                                        'text-white/80' => $isActive,
+                                        'text-brand-mist' => ! $isActive,
+                                    ])>:{{ $inst->port }}</span>
+                                    @if ($instInFlight)
+                                        <x-spinner variant="forest" />
+                                    @elseif ($inst->status === \App\Models\ServerCacheService::STATUS_RUNNING)
+                                        <span @class([
+                                            'h-1.5 w-1.5 rounded-full',
+                                            'bg-emerald-300' => $isActive,
+                                            'bg-emerald-500' => ! $isActive,
+                                        ])></span>
+                                    @elseif ($inst->status === \App\Models\ServerCacheService::STATUS_FAILED)
+                                        <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                    @else
+                                        <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                                    @endif
+                                </button>
+                            @endforeach
+
+                            @if (! $cacheBusy)
+                                <button
+                                    type="button"
+                                    wire:click="openAddInstanceForm"
+                                    class="inline-flex items-center gap-1.5 rounded-full border border-dashed border-brand-ink/25 px-3 py-1.5 text-xs font-medium text-brand-moss hover:border-brand-forest hover:bg-brand-sand/40 hover:text-brand-ink"
+                                    title="{{ __('Install another instance of :engine on a different port', ['engine' => $engineLabels[$engine]]) }}"
+                                >
+                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    {{ __('Add instance') }}
+                                </button>
+                            @endif
+                        </div>
+
+                        @if ($showAddInstanceForm)
+                            <div class="{{ $card }} mb-4 p-5">
+                                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Add another :engine instance', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                <x-explainer class="mt-2">
+                                    <p>{{ __('Installs a second :engine instance on a different port, leaving the existing instance untouched. The new instance gets its own systemd unit (templated), config file, and data directory. Apt is not re-run if the package is already installed.', ['engine' => $engineLabels[$engine]]) }}</p>
+                                    <p>{{ __('Pick a short name (lowercase letters, digits, hyphens; e.g. sessions, queue, cache) and a free port. Auth, memory limits, and config can all be tuned per-instance after the install completes.') }}</p>
+                                </x-explainer>
+
+                                <form wire:submit.prevent="submitAddInstanceForm" class="mt-4 grid gap-4 sm:grid-cols-3 sm:items-end">
+                                    <div>
+                                        <x-input-label for="newInstanceName" :value="__('Instance name')" />
+                                        <x-text-input
+                                            id="newInstanceName"
+                                            wire:model="newInstanceName"
+                                            type="text"
+                                            autocomplete="off"
+                                            spellcheck="false"
+                                            class="mt-1 block w-full font-mono text-sm"
+                                            placeholder="sessions"
+                                            wire:loading.attr="disabled"
+                                            wire:target="submitAddInstanceForm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="newInstancePort" :value="__('Port')" />
+                                        <x-text-input
+                                            id="newInstancePort"
+                                            wire:model="newInstancePort"
+                                            type="number"
+                                            min="1"
+                                            max="65535"
+                                            class="mt-1 block w-full font-mono text-sm"
+                                            placeholder="6380"
+                                            wire:loading.attr="disabled"
+                                            wire:target="submitAddInstanceForm"
+                                        />
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="submitAddInstanceForm">
+                                            <span wire:loading.remove wire:target="submitAddInstanceForm">{{ __('Install instance') }}</span>
+                                            <span wire:loading wire:target="submitAddInstanceForm">{{ __('Queueing…') }}</span>
+                                        </x-primary-button>
+                                        <x-secondary-button type="button" wire:click="closeAddInstanceForm">{{ __('Cancel') }}</x-secondary-button>
+                                    </div>
+                                </form>
+                            </div>
+                        @endif
+                    @endif
 
                     {{-- Sub-tab strip — group the per-engine cards so the page isn't a 9-card scroll. --}}
                     <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])">
@@ -937,7 +1059,9 @@
                             @endif
                             @if (filled($ev->meta) && is_array($ev->meta) && isset($ev->meta['engine']))
                                 <span class="text-brand-mist"> · </span>
-                                <span class="font-mono text-xs text-brand-moss">{{ $ev->meta['engine'] }}</span>
+                                <span class="font-mono text-xs text-brand-moss">
+                                    {{ $ev->meta['engine'] }}@if (! empty($ev->meta['name']) && $ev->meta['name'] !== \App\Models\ServerCacheService::DEFAULT_INSTANCE_NAME)<span class="text-brand-mist">/</span>{{ $ev->meta['name'] }}@endif
+                                </span>
                             @endif
                         </li>
                     @empty

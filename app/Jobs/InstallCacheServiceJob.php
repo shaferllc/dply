@@ -90,7 +90,11 @@ class InstallCacheServiceJob implements ShouldQueue
         }
 
         try {
-            $script = CacheServiceInstallScripts::installScript($row->engine).
+            // Use the row-aware composer so non-default-named instances get the
+            // template unit + per-instance config scaffolding before the
+            // systemctl enable. For the legacy `default` instance this is
+            // identical to the old installScript path.
+            $script = CacheServiceInstallScripts::installScriptForRow($row).
                 "\n".CacheServiceInstallScripts::versionProbeScript($row->engine);
 
             // Stream stdout/stderr chunks back to the row so the workspace's 4s poll can show

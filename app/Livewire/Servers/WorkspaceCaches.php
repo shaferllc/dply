@@ -55,6 +55,22 @@ class WorkspaceCaches extends Component
     public const ENGINE_SUBTABS = ['overview', 'console', 'stats', 'configure'];
 
     /**
+     * Active instance name within the current per-engine tab. URL-bound so
+     * deep links work. Defaults to `default` so existing single-instance
+     * servers (and any first-time install) continue to operate on the
+     * legacy single-instance row without code changes elsewhere.
+     */
+    #[Url(as: 'instance', except: ServerCacheService::DEFAULT_INSTANCE_NAME, history: true)]
+    public string $active_instance = ServerCacheService::DEFAULT_INSTANCE_NAME;
+
+    /** Show/hide the "Add another instance" inline form. */
+    public bool $showAddInstanceForm = false;
+
+    public string $newInstanceName = '';
+
+    public ?int $newInstancePort = null;
+
+    /**
      * Lazy-loaded snapshot of the engine's main config file. Set by `loadCacheConfig()`,
      * cleared by `hideCacheConfig()` or by switching tabs. Scoped to the engine of the
      * currently-active tab, so no per-engine indexing is needed on the property itself.
@@ -136,9 +152,100 @@ class WorkspaceCaches extends Component
         // carrying redis config to the keydb tab would be confusing at best.
         if ($next !== $this->workspace_tab) {
             $this->resetPerEngineUiState();
+            // Switching engines means the previously-selected instance name
+            // probably doesn't exist on the new engine. Reset to `default` so
+            // the per-engine actions land on the legacy single-instance row.
+            $this->active_instance = ServerCacheService::DEFAULT_INSTANCE_NAME;
+            $this->showAddInstanceForm = false;
         }
 
         $this->workspace_tab = $next;
+    }
+
+    /**
+     * Switch the active instance within the current engine tab. Resets the
+     * lazy-loaded per-instance UI buffers (config viewer / clients list / REPL
+     * history / keyspace samples) so they don't carry state from the previous
+     * instance into the next one.
+     *
+     * Validates against the actual instances on the server — passing a name
+     * that doesn't exist on this server falls back to `default` to keep the
+     * URL well-formed.
+     */
+    public function setActiveInstance(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            return;
+        }
+
+        $exists = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->where('name', $name)
+            ->exists();
+
+        $this->active_instance = $exists ? $name : ServerCacheService::DEFAULT_INSTANCE_NAME;
+
+        $this->resetPerEngineUiState();
+    }
+
+    public function openAddInstanceForm(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null || ! ServerCacheService::engineSupportsAuth($engine)) {
+            return;
+        }
+
+        // Suggest the next free port: walk up from the engine's default until
+        // we find one not in use on this server. This lets the operator just
+        // hit "Add" without thinking about port assignment.
+        $usedPorts = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->pluck('port')
+            ->all();
+        $candidate = ServerCacheService::defaultPortFor($engine);
+        while (in_array($candidate, $usedPorts, true)) {
+            $candidate++;
+        }
+
+        $this->newInstanceName = '';
+        $this->newInstancePort = $candidate;
+        $this->showAddInstanceForm = true;
+    }
+
+    public function closeAddInstanceForm(): void
+    {
+        $this->showAddInstanceForm = false;
+        $this->newInstanceName = '';
+        $this->newInstancePort = null;
+    }
+
+    public function submitAddInstanceForm(): void
+    {
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            return;
+        }
+
+        $this->addInstance($engine, trim($this->newInstanceName), (int) ($this->newInstancePort ?? 0));
+
+        // Only collapse the form if the call actually succeeded — toasts on
+        // failure leave the form open so the operator can fix and retry.
+        $exists = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->where('name', trim($this->newInstanceName))
+            ->exists();
+
+        if ($exists) {
+            $this->active_instance = trim($this->newInstanceName);
+            $this->closeAddInstanceForm();
+        }
     }
 
     public function setEngineSubtab(string $subtab): void
@@ -248,6 +355,107 @@ class WorkspaceCaches extends Component
         InstallCacheServiceJob::dispatch($row->id);
         $this->forgetStats($row);
         $this->toastSuccess(__('Installing :engine — refresh in a moment to see status.', ['engine' => $engine]));
+        $this->workspace_tab = $engine;
+    }
+
+    /**
+     * Queue an install for an additional instance of the given engine. The
+     * default instance (legacy single-instance) is created via
+     * `installCacheService`; this method is for second/third/Nth instances on
+     * different ports. Memcached is rejected because its multi-instance
+     * setup is out of scope for v1.
+     *
+     * @param  string  $engine  Engine slug
+     * @param  string  $name  Operator-supplied instance name
+     *                        ([a-z0-9][a-z0-9-]{0,31}); 'default' is reserved
+     * @param  int  $port  TCP port for the new instance
+     */
+    public function addInstance(string $engine, string $name, int $port): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($engine)) {
+            $this->toastError(__('Memcached multi-instance is not supported. Use the default instance only.'));
+
+            return;
+        }
+
+        if ($name === ServerCacheService::DEFAULT_INSTANCE_NAME) {
+            $this->toastError(__("'default' is reserved — pick a different name (e.g. sessions, queue, cache)."));
+
+            return;
+        }
+
+        if (! ServerCacheService::isValidInstanceName($name)) {
+            $this->toastError(__('Instance name must be lowercase letters/digits/hyphens, starting with a letter or digit, max 32 chars.'));
+
+            return;
+        }
+
+        if ($port < 1 || $port > 65535) {
+            $this->toastError(__('Port must be between 1 and 65535.'));
+
+            return;
+        }
+
+        // Reject reserved port ranges that the OS or other dply features need —
+        // operators almost never want to bind a cache to e.g. 22 (SSH), 80
+        // (HTTP), or the well-known DB ports.
+        if (in_array($port, [22, 25, 80, 443, 3306, 5432, 6443, 8080, 11211], true)) {
+            $this->toastError(__('Port :port is reserved for another service. Pick a different port (e.g. :suggested).', [
+                'port' => $port,
+                'suggested' => $port === 11211 ? 11212 : ServerCacheService::defaultPortFor($engine) + 1,
+            ]));
+
+            return;
+        }
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        // Per-server uniqueness on (server_id, port) and (server_id, engine, name)
+        // is enforced at the DB layer, but a friendly toast beats a 500 page
+        // when the operator picks a name or port that already exists.
+        $portTaken = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('port', $port)
+            ->exists();
+        if ($portTaken) {
+            $this->toastError(__('Port :port is already used by another cache service on this server.', ['port' => $port]));
+
+            return;
+        }
+
+        $nameTaken = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->where('name', $name)
+            ->exists();
+        if ($nameTaken) {
+            $this->toastError(__("An :engine instance named ':name' already exists on this server.", ['engine' => $engine, 'name' => $name]));
+
+            return;
+        }
+
+        $row = ServerCacheService::query()->create([
+            'server_id' => $this->server->id,
+            'engine' => $engine,
+            'name' => $name,
+            'status' => ServerCacheService::STATUS_PENDING,
+            'port' => $port,
+        ]);
+
+        InstallCacheServiceJob::dispatch($row->id);
+        $this->toastSuccess(__('Installing :engine instance ":name" on :port — refresh in a moment to see status.', [
+            'engine' => $engine,
+            'name' => $name,
+            'port' => $port,
+        ]));
         $this->workspace_tab = $engine;
     }
 
@@ -366,14 +574,14 @@ class WorkspaceCaches extends Component
 
             $version = trim($output->buffer);
             if ($version === '') {
-                $this->toastError(__('Could not detect a version for :engine.', ['engine' => $row->engine]));
+                $this->toastError(__('Could not detect a version for :engine.', ['engine' => $row->engine, 'name' => $row->name]));
 
                 return;
             }
 
             $row->update(['version' => Str::limit($version, 64, '')]);
             $this->forgetStats($row);
-            $this->toastSuccess(__('Detected :engine :version.', ['engine' => $row->engine, 'version' => $version]));
+            $this->toastSuccess(__('Detected :engine :version.', ['engine' => $row->engine, 'name' => $row->name, 'version' => $version]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
@@ -510,12 +718,12 @@ class WorkspaceCaches extends Component
         $audit->record(
             $row->server,
             ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
-            ['engine' => $row->engine, 'bytes' => strlen((string) $this->cacheConfigContent)],
+            ['engine' => $row->engine, 'name' => $row->name, 'bytes' => strlen((string) $this->cacheConfigContent)],
             auth()->user(),
         );
         $this->forgetStats($row);
 
-        $this->toastSuccess(__('Config saved and :engine restarted.', ['engine' => $row->engine]));
+        $this->toastSuccess(__('Config saved and :engine restarted.', ['engine' => $row->engine, 'name' => $row->name]));
     }
 
     public function loadCacheClients(CacheServiceStats $stats): void
@@ -537,7 +745,7 @@ class WorkspaceCaches extends Component
         }
 
         if (! ServerCacheService::engineSupportsAuth($row->engine)) {
-            $this->cacheClientsError = __(':engine has no CLIENT LIST equivalent.', ['engine' => $row->engine]);
+            $this->cacheClientsError = __(':engine has no CLIENT LIST equivalent.', ['engine' => $row->engine, 'name' => $row->name]);
 
             return;
         }
@@ -571,7 +779,7 @@ class WorkspaceCaches extends Component
         }
 
         if (! ServerCacheService::engineSupportsAuth($row->engine)) {
-            $this->cacheMemoryError = __(':engine has no maxmemory directive — memory limits are tuned via systemd or the engine launch flags.', ['engine' => $row->engine]);
+            $this->cacheMemoryError = __(':engine has no maxmemory directive — memory limits are tuned via systemd or the engine launch flags.', ['engine' => $row->engine, 'name' => $row->name]);
 
             return;
         }
@@ -623,7 +831,7 @@ class WorkspaceCaches extends Component
         }
 
         if (! ServerCacheService::engineSupportsAuth($row->engine)) {
-            $this->toastError(__(':engine does not support maxmemory.', ['engine' => $row->engine]));
+            $this->toastError(__(':engine does not support maxmemory.', ['engine' => $row->engine, 'name' => $row->name]));
 
             return;
         }
@@ -655,7 +863,7 @@ class WorkspaceCaches extends Component
             $row->server,
             ServerCacheServiceAuditEvent::EVENT_MEMORY_UPDATED,
             [
-                'engine' => $row->engine,
+                'engine' => $row->engine, 'name' => $row->name,
                 'maxmemory' => $maxmemory ?: null,
                 'maxmemory_policy' => $policy ?: null,
             ],
@@ -663,7 +871,7 @@ class WorkspaceCaches extends Component
         );
         $this->forgetStats($row);
 
-        $this->toastSuccess(__('Memory settings applied to :engine.', ['engine' => $row->engine]));
+        $this->toastSuccess(__('Memory settings applied to :engine.', ['engine' => $row->engine, 'name' => $row->name]));
     }
 
     public function generateAuthPassword(): void
@@ -694,7 +902,7 @@ class WorkspaceCaches extends Component
         }
 
         if (! ServerCacheService::engineSupportsAuth($row->engine)) {
-            $this->toastError(__(':engine has no native AUTH password.', ['engine' => $row->engine]));
+            $this->toastError(__(':engine has no native AUTH password.', ['engine' => $row->engine, 'name' => $row->name]));
 
             return;
         }
@@ -719,12 +927,12 @@ class WorkspaceCaches extends Component
         $audits->record(
             $row->server,
             ServerCacheServiceAuditEvent::EVENT_AUTH_SET,
-            ['engine' => $row->engine],
+            ['engine' => $row->engine, 'name' => $row->name],
             auth()->user(),
         );
         $this->forgetStats($row);
 
-        $this->toastSuccess(__('AUTH password set on :engine.', ['engine' => $row->engine]));
+        $this->toastSuccess(__('AUTH password set on :engine.', ['engine' => $row->engine, 'name' => $row->name]));
     }
 
     public function clearAuthPassword(CacheServiceAuth $auth, CacheServiceAuditLogger $audits): void
@@ -750,7 +958,7 @@ class WorkspaceCaches extends Component
         }
 
         if (! ServerCacheService::engineSupportsAuth($row->engine)) {
-            $this->toastError(__(':engine has no native AUTH password.', ['engine' => $row->engine]));
+            $this->toastError(__(':engine has no native AUTH password.', ['engine' => $row->engine, 'name' => $row->name]));
 
             return;
         }
@@ -768,12 +976,12 @@ class WorkspaceCaches extends Component
         $audits->record(
             $row->server,
             ServerCacheServiceAuditEvent::EVENT_AUTH_CLEARED,
-            ['engine' => $row->engine],
+            ['engine' => $row->engine, 'name' => $row->name],
             auth()->user(),
         );
         $this->forgetStats($row);
 
-        $this->toastSuccess(__('Cleared AUTH password on :engine.', ['engine' => $row->engine]));
+        $this->toastSuccess(__('Cleared AUTH password on :engine.', ['engine' => $row->engine, 'name' => $row->name]));
     }
 
     /**
@@ -836,7 +1044,7 @@ class WorkspaceCaches extends Component
             $audit->record(
                 $row->server,
                 ServerCacheServiceAuditEvent::EVENT_REPL_BLOCKED,
-                ['engine' => $row->engine, 'verb' => $verb],
+                ['engine' => $row->engine, 'name' => $row->name, 'verb' => $verb],
                 auth()->user(),
             );
 
@@ -856,7 +1064,7 @@ class WorkspaceCaches extends Component
             $audit->record(
                 $row->server,
                 ServerCacheServiceAuditEvent::EVENT_REPL_DENIED,
-                ['engine' => $row->engine, 'verb' => $verb],
+                ['engine' => $row->engine, 'name' => $row->name, 'verb' => $verb],
                 auth()->user(),
             );
 
@@ -889,7 +1097,7 @@ class WorkspaceCaches extends Component
             $row->server,
             ServerCacheServiceAuditEvent::EVENT_REPL_EXECUTED,
             [
-                'engine' => $row->engine,
+                'engine' => $row->engine, 'name' => $row->name,
                 'verb' => $verb,
                 'mutating' => ! $isReadOnly,
                 'exit_code' => $output->exitCode ?? 0,
@@ -919,7 +1127,7 @@ class WorkspaceCaches extends Component
                 $this->replUnlocked
                     ? ServerCacheServiceAuditEvent::EVENT_REPL_UNLOCKED
                     : ServerCacheServiceAuditEvent::EVENT_REPL_LOCKED,
-                ['engine' => $row->engine],
+                ['engine' => $row->engine, 'name' => $row->name],
                 auth()->user(),
             );
         }
@@ -959,14 +1167,14 @@ class WorkspaceCaches extends Component
         }
 
         if (! ServerCacheService::engineSupportsAuth($row->engine)) {
-            $this->keyspaceError = __(':engine has no INFO surface — see the connection snippet for memcached stats.', ['engine' => $row->engine]);
+            $this->keyspaceError = __(':engine has no INFO surface — see the connection snippet for memcached stats.', ['engine' => $row->engine, 'name' => $row->name]);
 
             return;
         }
 
         $raw = $stats->rawInfo($row->server, $row);
         if ($raw === null) {
-            $this->keyspaceError = __('Could not read INFO from :engine. Is it running?', ['engine' => $row->engine]);
+            $this->keyspaceError = __('Could not read INFO from :engine. Is it running?', ['engine' => $row->engine, 'name' => $row->name]);
 
             return;
         }
@@ -1051,12 +1259,12 @@ class WorkspaceCaches extends Component
             $audit->record(
                 $row->server,
                 ServerCacheServiceAuditEvent::EVENT_FLUSHED,
-                ['engine' => $row->engine],
+                ['engine' => $row->engine, 'name' => $row->name],
                 auth()->user(),
             );
             $this->forgetStats($row);
 
-            $this->toastSuccess(__('Flushed all keys on :engine.', ['engine' => $row->engine]));
+            $this->toastSuccess(__('Flushed all keys on :engine.', ['engine' => $row->engine, 'name' => $row->name]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
@@ -1106,12 +1314,12 @@ class WorkspaceCaches extends Component
                 $row->update(['status' => $newStatus]);
             }
 
-            $audit->record($row->server, $event, ['engine' => $row->engine], auth()->user());
+            $audit->record($row->server, $event, ['engine' => $row->engine, 'name' => $row->name], auth()->user());
             $this->forgetStats($row);
 
             $this->toastSuccess(__(':verb succeeded for :engine.', [
                 'verb' => ucfirst($verb),
-                'engine' => $row->engine,
+                'engine' => $row->engine, 'name' => $row->name,
             ]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -1137,14 +1345,34 @@ class WorkspaceCaches extends Component
         $services = $this->cacheServices();
 
         // Pull live stats per-engine when looking at Overview and the engine is RUNNING. The
-        // 30s cache inside the stats service keeps repeated renders cheap.
-        $statsByEngine = [];
+        // 30s cache inside the stats service keeps repeated renders cheap. With multi-instance,
+        // stats are shown per (engine, instance-name) — the overview cards iterate over all
+        // installed instances individually.
+        $statsByInstance = [];
         if ($this->workspace_tab === 'overview') {
             foreach ($services as $row) {
                 if ($row->status === ServerCacheService::STATUS_RUNNING) {
-                    $statsByEngine[$row->engine] = $statsService->snapshot($this->server, $row);
+                    $statsByInstance[$row->engine][$row->name] = $statsService->snapshot($this->server, $row);
                 }
             }
+        }
+
+        // Group instances under (engine, name) so the per-engine panel can find the
+        // row for the currently-active instance and the chip row can iterate over
+        // all installed instances of an engine. The legacy `cacheServicesByEngine`
+        // keyed map is preserved for the engine-level tab badge ("Running"/"Failed")
+        // — it picks any running instance, which is what we want for that badge.
+        $instancesByEngine = $services->groupBy('engine')->map(fn ($group) => $group->keyBy('name'));
+
+        // For tab-strip badges: prefer a running instance, fall back to any.
+        $primaryByEngine = collect();
+        foreach (CacheServiceInstallScripts::supportedEngines() as $engine) {
+            $group = $instancesByEngine->get($engine, collect());
+            if ($group->isEmpty()) {
+                continue;
+            }
+            $running = $group->first(fn ($r) => $r->status === ServerCacheService::STATUS_RUNNING);
+            $primaryByEngine[$engine] = $running ?? $group->first();
         }
 
         $auditEvents = ServerCacheServiceAuditEvent::query()
@@ -1157,8 +1385,9 @@ class WorkspaceCaches extends Component
         return view('livewire.servers.workspace-caches', [
             'capabilities' => $capabilities,
             'cacheServices' => $services,
-            'cacheServicesByEngine' => $services->keyBy('engine'),
-            'cacheStatsByEngine' => $statsByEngine,
+            'cacheInstancesByEngine' => $instancesByEngine,
+            'cacheServicesByEngine' => $primaryByEngine,
+            'cacheStatsByInstance' => $statsByInstance,
             'cacheAuditEvents' => $auditEvents,
             'engineLabels' => [
                 'redis' => 'Redis',
@@ -1187,13 +1416,34 @@ class WorkspaceCaches extends Component
             ->get();
     }
 
-    /** Look up a specific engine row by name. Returns null if not installed. */
+    /**
+     * Look up the engine row for the current `$active_instance`. With multi-
+     * instance, this is the row every per-engine action operates on. The
+     * default value (`'default'`) means existing single-instance servers
+     * continue to behave exactly as before.
+     */
     protected function cacheServiceFor(string $engine): ?ServerCacheService
     {
         return ServerCacheService::query()
             ->where('server_id', $this->server->id)
             ->where('engine', $engine)
+            ->where('name', $this->active_instance)
             ->first();
+    }
+
+    /**
+     * All instances of an engine on this server, ordered with the legacy
+     * `default` first and the rest by name. Used by the per-engine tab to
+     * render the chip row that lets the operator switch between instances.
+     */
+    protected function instancesFor(string $engine): Collection
+    {
+        return ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->orderByRaw("CASE WHEN name = '".ServerCacheService::DEFAULT_INSTANCE_NAME."' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
     }
 
     /** The engine name when the operator is on a per-engine tab; null otherwise. */
