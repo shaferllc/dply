@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -79,7 +80,7 @@ class Deploys extends Component
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      * @return list<array<string, mixed>>
      */
     private function collectRunning($sites): array
@@ -113,7 +114,7 @@ class Deploys extends Component
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      * @return list<array<string, mixed>>
      */
     private function collectFailedLatest($sites): array
@@ -147,7 +148,7 @@ class Deploys extends Component
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      * @return list<array<string, mixed>>
      */
     private function collectStale($sites): array

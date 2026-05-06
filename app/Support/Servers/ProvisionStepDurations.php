@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Support\Servers;
 
+use App\Models\ServerProvisionStepRun;
+use App\Services\Servers\ServerProvisionCommandBuilder;
+
 /**
  * Parses `[dply-step-end] <label>\t<seconds>[\tresumed]` markers out of
  * a provision task's stdout. Companion to {@see ProvisionStepSnapshots}
- * but emitted by {@see \App\Services\Servers\ServerProvisionCommandBuilder::withStep()}
+ * but emitted by {@see ServerProvisionCommandBuilder::withStep()}
  * once a step finishes — `ProvisionStepSnapshots` only sees start
  * markers and ungrouped output, so it can't tell us per-step durations.
  *
- * Output rows feed {@see \App\Models\ServerProvisionStepRun} so the
+ * Output rows feed {@see ServerProvisionStepRun} so the
  * journey UI can replace the static "Usually X minutes" copy with
  * data-driven averages.
  */

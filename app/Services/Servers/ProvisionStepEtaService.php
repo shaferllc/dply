@@ -21,8 +21,8 @@ class ProvisionStepEtaService
 {
     /**
      * @return array{seconds: int, samples: int}|null
-     *   null when fewer than `step_eta_min_samples` non-resumed rows
-     *   exist for this label_hash on this org.
+     *                                                null when fewer than `step_eta_min_samples` non-resumed rows
+     *                                                exist for this label_hash on this org.
      */
     public function averageForLabel(?string $labelHash, ?Organization $organization): ?array
     {
@@ -67,7 +67,7 @@ class ProvisionStepEtaService
      * each pending row gets an ETA chip without N+1 trips.
      *
      * @param  list<string>  $labelHashes
-     * @return array<string, array{seconds: int, samples: int}>  keyed by label_hash; missing keys = below threshold
+     * @return array<string, array{seconds: int, samples: int}> keyed by label_hash; missing keys = below threshold
      */
     public function averagesForLabels(array $labelHashes, ?Organization $organization): array
     {

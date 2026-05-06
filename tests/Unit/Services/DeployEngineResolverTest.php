@@ -2,10 +2,11 @@
 
 namespace Tests\Unit\Services;
 
+use App\Contracts\DeployEngine;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Site;
-use App\Contracts\DeployEngine;
+use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DeployEngineResolver;
 use Tests\TestCase;
 
@@ -68,35 +69,35 @@ class DeployEngineResolverTest extends TestCase
     {
         $byo = new class implements DeployEngine
         {
-            public function run(\App\Services\Deploy\DeployContext $context): array
+            public function run(DeployContext $context): array
             {
                 return ['output' => 'byo', 'sha' => null];
             }
         };
         $functions = new class implements DeployEngine
         {
-            public function run(\App\Services\Deploy\DeployContext $context): array
+            public function run(DeployContext $context): array
             {
                 return ['output' => 'functions', 'sha' => null];
             }
         };
         $awsLambda = new class implements DeployEngine
         {
-            public function run(\App\Services\Deploy\DeployContext $context): array
+            public function run(DeployContext $context): array
             {
                 return ['output' => 'aws', 'sha' => null];
             }
         };
         $docker = new class implements DeployEngine
         {
-            public function run(\App\Services\Deploy\DeployContext $context): array
+            public function run(DeployContext $context): array
             {
                 return ['output' => 'docker', 'sha' => null];
             }
         };
         $kubernetes = new class implements DeployEngine
         {
-            public function run(\App\Services\Deploy\DeployContext $context): array
+            public function run(DeployContext $context): array
             {
                 return ['output' => 'kubernetes', 'sha' => null];
             }

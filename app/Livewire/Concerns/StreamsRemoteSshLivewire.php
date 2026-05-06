@@ -2,6 +2,9 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\Debug\TaskRunnerPanel;
+use App\Support\Debug\TaskRunnerBroadcastBridge;
+
 /**
  * No-op trait kept for back-compat with ~28 callers across server / sites
  * Livewire components.
@@ -11,8 +14,8 @@ namespace App\Livewire\Concerns;
  * resources/views/livewire/servers/partials/remote-ssh-stream-panel.blade.php).
  * That partial has been removed and all live SSH/Process activity now flows
  * through the global TaskRunner debug panel
- * ({@see \App\Livewire\Debug\TaskRunnerPanel}, fed by
- * {@see \App\Support\Debug\TaskRunnerBroadcastBridge} on the org Reverb
+ * ({@see TaskRunnerPanel}, fed by
+ * {@see TaskRunnerBroadcastBridge} on the org Reverb
  * channel) — visible to platform admins only.
  *
  * The methods below are deliberate no-ops so call sites compile and run

@@ -8,7 +8,10 @@ use App\Jobs\ProvisionEdgeSiteJob;
 use App\Livewire\Edge\Create as EdgeCreate;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
+use App\Models\Site;
+use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -203,7 +206,7 @@ class EdgeCreatePageTest extends TestCase
     {
         $user = $this->ownerWithOrg();
 
-        $browser = new class extends \App\Services\SourceControl\SourceControlRepositoryBrowser
+        $browser = new class extends SourceControlRepositoryBrowser
         {
             public function __construct() {}
 
@@ -220,7 +223,7 @@ class EdgeCreatePageTest extends TestCase
                 ];
             }
         };
-        app()->instance(\App\Services\SourceControl\SourceControlRepositoryBrowser::class, $browser);
+        app()->instance(SourceControlRepositoryBrowser::class, $browser);
 
         Livewire::actingAs($user)
             ->test(EdgeCreate::class)
@@ -236,7 +239,7 @@ class EdgeCreatePageTest extends TestCase
         // Seed a real SocialAccount because the component's
         // loadRepositoriesForSelectedAccount() asks the User's relation
         // for it. The browser fake is consulted only after that lookup.
-        $account = \App\Models\SocialAccount::query()->create([
+        $account = SocialAccount::query()->create([
             'user_id' => $user->id,
             'provider' => 'github',
             'provider_id' => '12345',
@@ -245,7 +248,7 @@ class EdgeCreatePageTest extends TestCase
             'access_token' => encrypt('t'),
         ]);
 
-        $browser = new class($account->id) extends \App\Services\SourceControl\SourceControlRepositoryBrowser
+        $browser = new class($account->id) extends SourceControlRepositoryBrowser
         {
             public function __construct(public string $accountId) {}
 
@@ -261,7 +264,7 @@ class EdgeCreatePageTest extends TestCase
                 ];
             }
         };
-        app()->instance(\App\Services\SourceControl\SourceControlRepositoryBrowser::class, $browser);
+        app()->instance(SourceControlRepositoryBrowser::class, $browser);
 
         Livewire::actingAs($user)
             ->test(EdgeCreate::class)
@@ -296,7 +299,7 @@ class EdgeCreatePageTest extends TestCase
             ->assertHasNoErrors();
 
         Queue::assertPushed(ProvisionEdgeSiteJob::class);
-        $site = \App\Models\Site::query()->where('name', 'Acme API')->firstOrFail();
+        $site = Site::query()->where('name', 'Acme API')->firstOrFail();
         $this->assertNull($site->container_image);
         $this->assertSame('acme/api', $site->meta['container']['source']['repo']);
     }

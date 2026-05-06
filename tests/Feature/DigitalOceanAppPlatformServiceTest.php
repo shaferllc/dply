@@ -42,6 +42,7 @@ class DigitalOceanAppPlatformServiceTest extends TestCase
 
         Http::assertSent(function (Request $request) {
             $body = $request->data();
+
             return $request->method() === 'POST'
                 && str_ends_with($request->url(), '/v2/apps')
                 && $body['spec']['name'] === 'api-acme'

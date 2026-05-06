@@ -121,7 +121,5 @@ class InstallRuntimeRecordingShell implements RemoteShell
         return '';
     }
 
-    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-    }
+    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void {}
 }

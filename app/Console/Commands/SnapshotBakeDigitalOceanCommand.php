@@ -220,7 +220,7 @@ class SnapshotBakeDigitalOceanCommand extends Command
     }
 
     /**
-     * @return array{0: list<int|string>, 1: string|null, 2: int|null}  [keyIds, privateKey, tempKeyId]
+     * @return array{0: list<int|string>, 1: string|null, 2: int|null} [keyIds, privateKey, tempKeyId]
      */
     private function resolveSshKey(DigitalOceanService $do): array
     {

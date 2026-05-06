@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\ResolvesSiteForCliCommand;
+use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
 use App\Services\RemoteCli\WpCli;
 use Illuminate\Console\Command;
 
@@ -46,7 +47,7 @@ class WpPluginUpdateAllCommand extends Command
                 args: ['--all'],
                 queuedBy: $caller,
             );
-        } catch (\App\Services\RemoteCli\RemoteCliPermissionDeniedException $e) {
+        } catch (RemoteCliPermissionDeniedException $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;

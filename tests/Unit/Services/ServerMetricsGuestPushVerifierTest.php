@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use App\Models\Server;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;
+use App\Services\Servers\ServerMetricsGuestScript;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,7 +21,7 @@ class ServerMetricsGuestPushVerifierTest extends TestCase
                 'monitoring_callback_env_deployed_at' => '2026-03-31T12:00:00Z',
                 'monitoring_guest_cron_installed_at' => '2026-03-31T12:01:00Z',
                 'monitoring_guest_push_cron_expression' => '* * * * *',
-                'monitoring_guest_script_sha' => app(\App\Services\Servers\ServerMetricsGuestScript::class)->bundledSha256(),
+                'monitoring_guest_script_sha' => app(ServerMetricsGuestScript::class)->bundledSha256(),
                 'monitoring_callback_env_present_remote' => true,
                 'monitoring_guest_cron_present_remote' => true,
                 'monitoring_guest_push_last_sample_at' => '2026-03-31T12:05:00Z',

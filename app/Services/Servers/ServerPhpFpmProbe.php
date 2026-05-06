@@ -3,13 +3,14 @@
 namespace App\Services\Servers;
 
 use App\Models\Server;
+use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
 use Illuminate\Support\Facades\Log;
 
 /**
  * One-shot SSH probe of PHP-FPM saturation. Reads the configured `pm.max_children`
  * from the default www pool and counts running worker processes via `ps`.
  *
- * Used by {@see \App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner}.
+ * Used by {@see PhpFpmWorkersUndersizedInsightRunner}.
  * No FPM status page required — works on stock provisioned servers.
  */
 class ServerPhpFpmProbe

@@ -88,7 +88,7 @@ abstract class RemoteCli
      * @param  list<string>  $args
      *
      * @throws RemoteCliPermissionDeniedException When $queuedBy lacks
-     *     the role for the command's risk level.
+     *                                            the role for the command's risk level.
      */
     public function run(
         Site $site,

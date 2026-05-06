@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature\TaskRunner;
 
+use App\Models\Server;
 use App\Modules\TaskRunner\Connection;
+use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Jobs\UpdateTaskOutput;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\PendingTask;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\TaskRunner\ProcessRunner;
 use App\Modules\TaskRunner\RemoteProcessRunner;
-use App\Modules\TaskRunner\TrackTaskInBackground;
+use App\Modules\TaskRunner\Task;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\Tests\Helpers\TestTask;
-use App\Models\Server;
+use App\Modules\TaskRunner\TrackTaskInBackground;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -31,7 +33,7 @@ class RemoteTaskOutputPathTest extends TestCase
             'script' => 'echo test',
             'timeout' => 300,
             'user' => 'root',
-            'status' => \App\Modules\TaskRunner\Enums\TaskStatus::Running,
+            'status' => TaskStatus::Running,
             'options' => [
                 'remote_output_path' => '/root/.dply-task-runner/custom-remote.log',
             ],
@@ -77,7 +79,7 @@ class RemoteTaskOutputPathTest extends TestCase
             'script' => 'echo test',
             'timeout' => 300,
             'user' => 'root',
-            'status' => \App\Modules\TaskRunner\Enums\TaskStatus::Pending,
+            'status' => TaskStatus::Pending,
             'options' => [],
         ]);
         $task->setTaskModel($taskModel);
@@ -141,7 +143,7 @@ class RemoteTaskOutputPathTest extends TestCase
             'script' => 'echo test',
             'timeout' => 300,
             'user' => 'root',
-            'status' => \App\Modules\TaskRunner\Enums\TaskStatus::Pending,
+            'status' => TaskStatus::Pending,
             'options' => [],
         ]);
         $trackedTask->setTaskModel($taskModel);
@@ -251,7 +253,7 @@ class RemoteTaskOutputPathTest extends TestCase
             'script' => 'echo test',
             'timeout' => 300,
             'user' => 'root',
-            'status' => \App\Modules\TaskRunner\Enums\TaskStatus::Pending,
+            'status' => TaskStatus::Pending,
             'server_id' => $server->id,
             'options' => [],
         ]);
@@ -270,9 +272,7 @@ class RemoteTaskOutputPathTest extends TestCase
                 return ProcessOutput::make('remote started')->setExitCode(0);
             }
 
-            protected function startBackgroundMonitoring(\App\Modules\TaskRunner\Task $task, TaskModel $taskModel): void
-            {
-            }
+            protected function startBackgroundMonitoring(Task $task, TaskModel $taskModel): void {}
         };
 
         $dispatcher->runInBackgroundWithModel($trackedTask, $taskModel);
@@ -300,7 +300,7 @@ class RemoteTaskOutputPathTest extends TestCase
             'script' => 'echo test',
             'timeout' => 300,
             'user' => 'root',
-            'status' => \App\Modules\TaskRunner\Enums\TaskStatus::Pending,
+            'status' => TaskStatus::Pending,
             'server_id' => $server->id,
             'options' => [],
         ]);
@@ -340,7 +340,7 @@ class RemoteTaskOutputPathTest extends TestCase
             'script' => 'echo test',
             'timeout' => 300,
             'user' => 'root',
-            'status' => \App\Modules\TaskRunner\Enums\TaskStatus::Pending,
+            'status' => TaskStatus::Pending,
             'server_id' => $server->id,
             'options' => [],
         ]);
@@ -372,9 +372,7 @@ class RemoteTaskOutputPathTest extends TestCase
                 return ProcessOutput::make('local background started')->setExitCode(0);
             }
 
-            protected function startBackgroundMonitoring(\App\Modules\TaskRunner\Task $task, TaskModel $taskModel): void
-            {
-            }
+            protected function startBackgroundMonitoring(Task $task, TaskModel $taskModel): void {}
         };
 
         $dispatcher->runInBackgroundWithModel($trackedTask, $taskModel);

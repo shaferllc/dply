@@ -144,7 +144,7 @@ class MiseInstallScriptBuilder
             $preferBinary = true;
         }
         $env = $preferBinary
-            ? "MISE_NODE_COMPILE=0 MISE_PYTHON_COMPILE=0 MISE_RUBY_COMPILE=0 PYTHON_BUILD_USE_PREBUILT=1 "
+            ? 'MISE_NODE_COMPILE=0 MISE_PYTHON_COMPILE=0 MISE_RUBY_COMPILE=0 PYTHON_BUILD_USE_PREBUILT=1 '
             : '';
 
         $cmd = escapeshellarg($env."mise use --global {$miseTool}@{$version}");

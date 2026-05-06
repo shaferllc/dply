@@ -12,7 +12,7 @@ class DotEnvFileWriterTest extends TestCase
 {
     public function test_renders_simple_pairs(): void
     {
-        $w = new DotEnvFileWriter();
+        $w = new DotEnvFileWriter;
         $out = $w->render(['B' => 'two', 'A' => 'one']);
 
         $this->assertSame("A=one\nB=two\n", $out);
@@ -20,7 +20,7 @@ class DotEnvFileWriterTest extends TestCase
 
     public function test_quotes_values_with_whitespace_and_specials(): void
     {
-        $w = new DotEnvFileWriter();
+        $w = new DotEnvFileWriter;
         $out = $w->render([
             'PLAIN' => 'simple',
             'WITH_SPACE' => 'two words',
@@ -36,7 +36,7 @@ class DotEnvFileWriterTest extends TestCase
 
     public function test_escapes_quotes_and_backslashes_inside_quoted_values(): void
     {
-        $w = new DotEnvFileWriter();
+        $w = new DotEnvFileWriter;
         $out = $w->render(['PATH_LIKE' => 'a\\b "c"']);
 
         $this->assertStringContainsString('PATH_LIKE="a\\\\b \\"c\\""', $out);
@@ -51,8 +51,8 @@ class DotEnvFileWriterTest extends TestCase
             'QUOTED' => 'has "quotes"',
             'EMPTY' => '',
         ];
-        $rendered = (new DotEnvFileWriter())->render($original);
-        $parsed = (new DotEnvFileParser())->parse($rendered);
+        $rendered = (new DotEnvFileWriter)->render($original);
+        $parsed = (new DotEnvFileParser)->parse($rendered);
 
         $this->assertSame([], $parsed['errors']);
         ksort($original);
@@ -61,6 +61,6 @@ class DotEnvFileWriterTest extends TestCase
 
     public function test_empty_input_produces_empty_output(): void
     {
-        $this->assertSame('', (new DotEnvFileWriter())->render([]));
+        $this->assertSame('', (new DotEnvFileWriter)->render([]));
     }
 }

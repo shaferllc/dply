@@ -32,7 +32,8 @@ class ProvisionSiteSystemdUnitsJobTest extends TestCase
         ]);
 
         $shell = new ProvisionRecordingShell;
-        $provisioner = new class($shell) extends SiteSystemdProvisioner {
+        $provisioner = new class($shell) extends SiteSystemdProvisioner
+        {
             public function __construct(private RemoteShell $shell)
             {
                 parent::__construct(new SiteSystemdUnitBuilder);
@@ -117,7 +118,8 @@ class ProvisionSiteSystemdUnitsJobTest extends TestCase
         ]);
 
         $shell = new ProvisionRecordingShell;
-        $provisioner = new class($shell) extends SiteSystemdProvisioner {
+        $provisioner = new class($shell) extends SiteSystemdProvisioner
+        {
             public function __construct(private RemoteShell $shell)
             {
                 parent::__construct(new SiteSystemdUnitBuilder);

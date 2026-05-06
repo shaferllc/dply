@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\RemoteCli\RemoteCli;
 use App\Services\RemoteCli\RiskLevel;
+use App\Services\Snapshots\SnapshotService;
 use Database\Factories\SiteAuditEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Append-only audit row for a mutating action against a Site.
  *
- * Written by the {@see \App\Services\RemoteCli\RemoteCli} services (PR 2),
- * the {@see \App\Services\Snapshots\SnapshotService} (PR 10), the
+ * Written by the {@see RemoteCli} services (PR 2),
+ * the {@see SnapshotService} (PR 10), the
  * scaffold pipeline (PR 5/6), and the WordPress hardening surface (PR 10).
  * Reads don't audit by default; only mutating-recoverable and destructive
  * actions plus settled (success or failure) lifecycle events.
@@ -24,11 +27,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $user_id
  * @property string $action
  * @property RiskLevel $risk
- * @property string $transport       'web' | 'cli' | 'system'
+ * @property string $transport 'web' | 'cli' | 'system'
  * @property string $summary
  * @property array<string, mixed>|null $payload
- * @property string $result_status   'success' | 'failure'
- * @property \Illuminate\Support\Carbon $created_at
+ * @property string $result_status 'success' | 'failure'
+ * @property Carbon $created_at
  */
 class SiteAuditEvent extends Model
 {

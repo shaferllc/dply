@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Models\SiteDeployStep;
 use App\Services\Deploy\DeploymentRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;

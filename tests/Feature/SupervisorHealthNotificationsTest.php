@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\SupervisorProgram;
 use App\Models\User;
+use App\Notifications\UniversalEventNotification;
 use App\Services\Servers\SupervisorProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -69,7 +70,7 @@ class SupervisorHealthNotificationsTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'notifiable_type' => User::class,
             'notifiable_id' => $owner->id,
-            'type' => \App\Notifications\UniversalEventNotification::class,
+            'type' => UniversalEventNotification::class,
         ]);
     }
 }

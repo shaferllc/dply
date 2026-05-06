@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Console\Commands\Concerns\ResolvesSiteForCliCommand;
 use App\Models\Snapshot;
 use App\Services\RemoteCli\Artisan;
+use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
 use App\Services\Snapshots\SnapshotDestinationFactory;
 use App\Services\Snapshots\SnapshotService;
 use Illuminate\Console\Command;
@@ -84,7 +85,7 @@ class LaravelMigrateRollbackCommand extends Command
                 args: ['--force', '--step='.$step],
                 queuedBy: $caller,
             );
-        } catch (\App\Services\RemoteCli\RemoteCliPermissionDeniedException $e) {
+        } catch (RemoteCliPermissionDeniedException $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;

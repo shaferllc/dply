@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Auth\Register;
 use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,7 +17,7 @@ class RegistrationTest extends TestCase
     {
         // Bypass RedirectGuestsToComingSoon — non-local environments
         // (incl. testing) bounce guest traffic to /coming-soon by default.
-        $response = $this->withoutMiddleware([\App\Http\Middleware\RedirectGuestsToComingSoon::class])
+        $response = $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
             ->get('/register');
 
         $response->assertStatus(200);

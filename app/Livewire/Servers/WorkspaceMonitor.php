@@ -10,6 +10,7 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerPackageInstalls;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
+use App\Models\ServerManageAction;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -674,15 +675,15 @@ BASH);
         // card can show "Installing… started Xm ago" even after the
         // operator reloads. The cache-only $servicesRemoteTaskId only
         // survives within the current Livewire instance.
-        $monitoringInstallAction = \App\Models\ServerManageAction::query()
+        $monitoringInstallAction = ServerManageAction::query()
             ->where('server_id', $this->server->id)
             ->where('task_name', 'services-install:install_monitoring_prerequisites')
             ->latest('id')
             ->first();
         $monitoringInstallInProgress = $monitoringInstallAction !== null
             && in_array($monitoringInstallAction->status, [
-                \App\Models\ServerManageAction::STATUS_QUEUED,
-                \App\Models\ServerManageAction::STATUS_RUNNING,
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
             ], true);
 
         $latestPayloadSummary = $latest !== null
@@ -723,7 +724,7 @@ BASH);
                 'disk' => $thresholdDiskWarn,
                 'load' => $thresholdLoad,
             ],
-            'metricsRangeOptions' => array_keys(\App\Services\Servers\ServerMetricsRangeQuery::RANGES),
+            'metricsRangeOptions' => array_keys(ServerMetricsRangeQuery::RANGES),
             'storedSnapshotCount' => $storedSnapshotCount,
             'showMetricsPanels' => $pythonInstalled || $storedSnapshotCount > 0,
             'opsReady' => $this->serverOpsReady(),

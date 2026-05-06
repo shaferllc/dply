@@ -145,7 +145,7 @@ class S3DestinationTest extends TestCase
         $snapshot = Snapshot::factory()->s3()->create([
             'site_id' => $site->id,
             's3_bucket' => 'dply-backups',
-            's3_key' => 'prod/' . $site->organization_id . '/' . $site->id . '/snap.sql.gz',
+            's3_key' => 'prod/'.$site->organization_id.'/'.$site->id.'/snap.sql.gz',
             'engine' => 'mysql84',
         ]);
 

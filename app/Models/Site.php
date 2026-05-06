@@ -6,7 +6,9 @@ use App\Enums\SiteType;
 use App\Livewire\Sites\Settings;
 use App\Services\Deploy\DeploymentSecretInventory;
 use App\Services\Deploy\LaravelComposerPackageDetector;
+use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Deploy\ServerlessDeploymentConfigResolver;
+use App\Services\Scaffold\PlaceholderDnsManager;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 class Site extends Model
@@ -203,13 +207,13 @@ class Site extends Model
             // (it short-circuits when meta.scaffold.placeholder_dns is
             // absent), so it runs unconditionally on every site delete.
             try {
-                app(\App\Services\Scaffold\PlaceholderDnsManager::class)->release($site);
+                app(PlaceholderDnsManager::class)->release($site);
             } catch (\Throwable $e) {
                 // Best-effort cleanup. We do NOT want a transient DNS
                 // provider failure to block deletion of the site row;
                 // any orphaned record is recoverable via the manager's
                 // audit trail.
-                \Illuminate\Support\Facades\Log::warning('Site::deleting placeholder release failed', [
+                Log::warning('Site::deleting placeholder release failed', [
                     'site_id' => $site->getKey(),
                     'error' => $e->getMessage(),
                 ]);
@@ -896,7 +900,7 @@ class Site extends Model
 
     /**
      * True when the site's detected runtime app is WordPress (per
-     * {@see \App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector}),
+     * {@see PhpRuntimeDetector}),
      * OR when the site was scaffolded with the WordPress framework
      * pipeline (Q14 — gates the WordPress Settings section).
      */
@@ -951,7 +955,7 @@ class Site extends Model
 
     public function usesContainerRuntime(): bool
     {
-        return $this->type === \App\Enums\SiteType::Container
+        return $this->type === SiteType::Container
             || in_array($this->container_backend, [
                 'digitalocean_app_platform',
                 'aws_app_runner',
@@ -1760,7 +1764,7 @@ class Site extends Model
      */
     public function edgeRedeployHookUrl(): string
     {
-        return \Illuminate\Support\Facades\URL::signedRoute(
+        return URL::signedRoute(
             'hooks.edge.redeploy',
             ['site' => $this->id, 's' => substr((string) $this->webhook_secret, 0, 8)],
         );

@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteProcess;
 use App\Services\Sites\SiteSystemdProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;

@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Heroku-style `ps` for a site — list its SiteProcess rows.
@@ -77,7 +78,7 @@ class SitePsCommand extends Command
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, SiteProcess>  $processes
+     * @param  Collection<int, SiteProcess>  $processes
      */
     private function renderTable(Site $site, $processes): void
     {
@@ -107,7 +108,7 @@ class SitePsCommand extends Command
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, SiteProcess>  $processes
+     * @param  Collection<int, SiteProcess>  $processes
      * @return array<string, mixed>
      */
     private function jsonShape(Site $site, $processes): array

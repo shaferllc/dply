@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class FlyEligibilityCommandTest extends TestCase
@@ -129,13 +130,13 @@ class FlyEligibilityCommandTest extends TestCase
      */
     private function runJsonCommand(array $extraOptions): array
     {
-        $exit = \Illuminate\Support\Facades\Artisan::call(
+        $exit = Artisan::call(
             'dply:fly:eligibility',
             array_merge(['--json' => true], $extraOptions),
         );
         $this->assertSame(0, $exit);
 
-        $output = \Illuminate\Support\Facades\Artisan::output();
+        $output = Artisan::output();
         $decoded = json_decode($output, true);
         $this->assertIsArray($decoded, 'Command JSON should decode: '.$output);
 

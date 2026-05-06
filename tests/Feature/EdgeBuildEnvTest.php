@@ -8,6 +8,7 @@ use App\Enums\SiteType;
 use App\Jobs\RedeployEdgeSiteJob;
 use App\Livewire\Sites\Settings as SitesSettings;
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
@@ -237,12 +238,12 @@ class EdgeBuildEnvTest extends TestCase
         return [$user, $server, $site];
     }
 
-    private function credential(): \App\Models\ProviderCredential
+    private function credential(): ProviderCredential
     {
         $user = User::factory()->create();
         $org = Organization::factory()->create();
 
-        return \App\Models\ProviderCredential::query()->create([
+        return ProviderCredential::query()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'provider' => 'digitalocean_app_platform',

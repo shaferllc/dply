@@ -3,8 +3,8 @@
 namespace Tests\Unit;
 
 use App\Models\Server;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class ServerModelTest extends TestCase

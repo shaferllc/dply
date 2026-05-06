@@ -100,7 +100,7 @@ class MarketplaceTest extends TestCase
             ->set('deployServerId', $server->id)
             ->call('confirmDeployImport');
 
-        $recipe = \App\Models\ServerRecipe::query()
+        $recipe = ServerRecipe::query()
             ->where('server_id', $server->id)
             ->latest('created_at')
             ->first();

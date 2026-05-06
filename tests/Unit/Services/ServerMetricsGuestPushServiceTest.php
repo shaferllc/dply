@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services;
 
+use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Models\Server;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -82,7 +83,7 @@ class ServerMetricsGuestPushServiceTest extends TestCase
 
         app(ServerMetricsGuestPushService::class)->ensureConfigured($server);
 
-        Queue::assertPushed(\App\Jobs\DeployGuestMetricsCallbackEnvJob::class);
+        Queue::assertPushed(DeployGuestMetricsCallbackEnvJob::class);
     }
 
     public function test_ensure_configured_requeues_when_remote_callback_files_are_missing(): void
@@ -102,7 +103,7 @@ class ServerMetricsGuestPushServiceTest extends TestCase
 
         app(ServerMetricsGuestPushService::class)->ensureConfigured($server);
 
-        Queue::assertPushed(\App\Jobs\DeployGuestMetricsCallbackEnvJob::class);
+        Queue::assertPushed(DeployGuestMetricsCallbackEnvJob::class);
     }
 
     private function decodedCronLineFromBash(string $bash): string

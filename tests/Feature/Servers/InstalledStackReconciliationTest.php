@@ -105,7 +105,7 @@ class InstalledStackReconciliationTest extends TestCase
         $task = $this->makeProvisionTask(
             $user,
             $server,
-            "[dply-installed-stack] {not valid json"
+            '[dply-installed-stack] {not valid json'
         );
 
         $this->assertArrayNotHasKey(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\SiteType;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -58,7 +59,7 @@ class SiteSettingsProcessesPanelTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $server->organization_id,
             'runtime' => 'static',
-            'type' => \App\Enums\SiteType::Static,
+            'type' => SiteType::Static,
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 

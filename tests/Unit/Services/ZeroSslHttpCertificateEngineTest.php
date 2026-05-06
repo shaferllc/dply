@@ -132,9 +132,7 @@ class ZeroSslHttpCertificateEngineTest extends TestCase
                 $this->publishedFiles[] = compact('path', 'contents');
             }
 
-            protected function sleepMilliseconds(int $milliseconds): void
-            {
-            }
+            protected function sleepMilliseconds(int $milliseconds): void {}
         };
 
         $result = $engine->execute($certificate->fresh());

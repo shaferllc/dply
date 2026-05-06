@@ -12,23 +12,19 @@ use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\SiteApacheProvisioner;
 use Illuminate\Support\Collection;
 use Mockery;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SiteApacheProvisionerTest extends TestCase
 {
     #[Test]
-    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
-    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function provision_writes_apache_vhost_and_placeholder_page(): void
     {
-        $server = new class([
-            'name' => 'Apache Box',
-            'ip_address' => '203.0.113.20',
-            'ssh_user' => 'root',
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'status' => Server::STATUS_READY,
-        ]) extends Server
+        $server = new class(['name' => 'Apache Box', 'ip_address' => '203.0.113.20', 'ssh_user' => 'root', 'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----", 'status' => Server::STATUS_READY]) extends Server
         {
             public function recoverySshPrivateKey(): ?string
             {

@@ -5,6 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\Server;
+use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
@@ -206,12 +207,12 @@ trait RunsServerPackageInstalls
         // navigates away. The job updates this row through its lifecycle
         // (queued → running → finished/failed) via updateLog().
         $label = $this->guessInstallActionLabel($taskName) ?? $streamTitle;
-        $logRow = \App\Models\ServerManageAction::create([
+        $logRow = ServerManageAction::create([
             'server_id' => $server->id,
             'user_id' => auth()->id(),
             'task_name' => $taskName,
             'label' => $label,
-            'status' => \App\Models\ServerManageAction::STATUS_QUEUED,
+            'status' => ServerManageAction::STATUS_QUEUED,
         ]);
 
         ServerManageRemoteSshJob::dispatch(

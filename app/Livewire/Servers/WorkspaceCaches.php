@@ -15,8 +15,11 @@ use App\Models\ServerCacheServiceAuditEvent;
 use App\Services\Servers\CacheServiceAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\CacheServiceAuth;
+use App\Support\Servers\CacheServiceCli;
+use App\Support\Servers\CacheServiceCommandPolicy;
 use App\Support\Servers\CacheServiceConfigWriter;
 use App\Support\Servers\CacheServiceInstallScripts;
+use App\Support\Servers\CacheServiceKeyspaceSampler;
 use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
@@ -37,6 +40,19 @@ class WorkspaceCaches extends Component
     /** Active workspace tab. URL-bound so deep links + back/forward work. */
     #[Url(as: 'tab', except: 'overview', history: true)]
     public string $workspace_tab = 'overview';
+
+    /**
+     * Active sub-tab inside a per-engine tab. Per-engine layouts stack a lot of
+     * cards (status, console, stats, configure) so we group them under sub-tabs.
+     * URL-bound so deep links open to the right sub-section. Default 'overview'
+     * is the only sub-tab that always exists; redis-family engines also expose
+     * 'console' and 'stats'; both engine families expose 'configure'.
+     */
+    #[Url(as: 'subtab', except: 'overview', history: true)]
+    public string $engine_subtab = 'overview';
+
+    /** @var list<string> */
+    public const ENGINE_SUBTABS = ['overview', 'console', 'stats', 'configure'];
 
     /**
      * Lazy-loaded snapshot of the engine's main config file. Set by `loadCacheConfig()`,
@@ -74,6 +90,37 @@ class WorkspaceCaches extends Component
 
     public ?string $cacheMemoryError = null;
 
+    /** Current REPL input value (cleared after each successful run). */
+    public string $replInput = '';
+
+    /**
+     * Bounded ring buffer of past REPL entries. Capped at REPL_HISTORY_LIMIT;
+     * the front is dropped on overflow. Each entry is shaped like:
+     *   ['ts' => string, 'cmd' => string, 'output' => string,
+     *    'exit_code' => int, 'kind' => 'sent'|'error']
+     *
+     * @var list<array{ts: string, cmd: string, output: string, exit_code: int, kind: string}>
+     */
+    public array $replHistory = [];
+
+    /** Mutating commands require this toggle. NOT persisted across mounts. */
+    public bool $replUnlocked = false;
+
+    public const REPL_HISTORY_LIMIT = 50;
+
+    /**
+     * Bounded ring buffer of dashboard samples. Capped at KEYSPACE_SAMPLE_LIMIT.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $keyspaceSamples = [];
+
+    public bool $keyspaceLoaded = false;
+
+    public ?string $keyspaceError = null;
+
+    public const KEYSPACE_SAMPLE_LIMIT = 60;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -92,6 +139,36 @@ class WorkspaceCaches extends Component
         }
 
         $this->workspace_tab = $next;
+    }
+
+    public function setEngineSubtab(string $subtab): void
+    {
+        $next = in_array($subtab, self::ENGINE_SUBTABS, true) ? $subtab : 'overview';
+
+        if ($next !== $this->engine_subtab) {
+            // Lazy-loaded buffers are scoped to a sub-tab. Switching from
+            // Configure to Stats shouldn't carry the AUTH password input
+            // forward, and switching off Console should keep the unlock-toggle
+            // session-scoped trust intact (only mount resets it). Wipe the
+            // narrowest set of buffers here.
+            $this->cacheConfigContent = null;
+            $this->cacheConfigPath = null;
+            $this->cacheConfigError = null;
+            $this->cacheConfigEditing = false;
+            $this->cacheConfigDraft = '';
+            $this->cacheClients = null;
+            $this->cacheClientsError = null;
+            $this->cacheMemoryLoaded = false;
+            $this->cache_maxmemory = '';
+            $this->cache_maxmemory_policy = 'noeviction';
+            $this->cacheMemoryError = null;
+            $this->new_auth_password = '';
+            $this->keyspaceSamples = [];
+            $this->keyspaceLoaded = false;
+            $this->keyspaceError = null;
+        }
+
+        $this->engine_subtab = $next;
     }
 
     /**
@@ -699,6 +776,233 @@ class WorkspaceCaches extends Component
         $this->toastSuccess(__('Cleared AUTH password on :engine.', ['engine' => $row->engine]));
     }
 
+    /**
+     * Run a single redis-cli command from the workspace REPL. Read-only commands run
+     * unconditionally. Mutating commands require the unlock toggle. A small set of
+     * disruptive verbs (SHUTDOWN, MIGRATE, REPLICAOF, etc.) are blocked outright —
+     * those go through the dedicated buttons or stay out of the workspace.
+     *
+     * Every attempt — successful, denied, or blocked — writes an audit row. The
+     * audit meta records only the first command token (the verb), never arguments,
+     * to keep key contents and AUTH passwords out of the audit log.
+     */
+    public function runReplCommand(
+        CacheServiceCli $cli,
+        CacheServiceCommandPolicy $policy,
+        CacheServiceAuditLogger $audit,
+    ): void {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to run commands.'));
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Memcached has no redis-cli surface — use the connection snippet to talk to it from your app.'));
+
+            return;
+        }
+
+        $command = trim($this->replInput);
+        if ($command === '') {
+            return;
+        }
+
+        $verb = strtoupper(preg_split('/\s+/', $command)[0] ?? '');
+
+        // Hard-block check first — even with unlock on, these don't run.
+        if ($policy->isBlocked($command)) {
+            $this->pushReplEntry(
+                command: $command,
+                output: __('Blocked: :verb is not allowed from the REPL. Use the engine controls instead.', ['verb' => $verb]),
+                exitCode: -1,
+                kind: 'error',
+            );
+            $this->replInput = '';
+            $audit->record(
+                $row->server,
+                ServerCacheServiceAuditEvent::EVENT_REPL_BLOCKED,
+                ['engine' => $row->engine, 'verb' => $verb],
+                auth()->user(),
+            );
+
+            return;
+        }
+
+        $isReadOnly = $policy->isReadOnly($command);
+
+        if (! $isReadOnly && ! $this->replUnlocked) {
+            $this->pushReplEntry(
+                command: $command,
+                output: __('Read-only — flip the unlock toggle to run mutating commands.'),
+                exitCode: -1,
+                kind: 'error',
+            );
+            $this->replInput = '';
+            $audit->record(
+                $row->server,
+                ServerCacheServiceAuditEvent::EVENT_REPL_DENIED,
+                ['engine' => $row->engine, 'verb' => $verb],
+                auth()->user(),
+            );
+
+            return;
+        }
+
+        try {
+            $output = $cli->execute($row->server, $row, $command);
+            $this->pushReplEntry(
+                command: $command,
+                output: rtrim($output->buffer, "\n"),
+                exitCode: $output->exitCode,
+                kind: 'sent',
+            );
+        } catch (\Throwable $e) {
+            $this->pushReplEntry(
+                command: $command,
+                output: $e->getMessage(),
+                exitCode: -1,
+                kind: 'error',
+            );
+            $this->replInput = '';
+
+            return;
+        }
+
+        $this->replInput = '';
+
+        $audit->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_REPL_EXECUTED,
+            [
+                'engine' => $row->engine,
+                'verb' => $verb,
+                'mutating' => ! $isReadOnly,
+                'exit_code' => $output->exitCode ?? 0,
+            ],
+            auth()->user(),
+        );
+
+        // A mutating command can change INFO numbers; bust the cached snapshot so the
+        // overview reflects it on next render.
+        if (! $isReadOnly) {
+            $this->forgetStats($row);
+        }
+    }
+
+    public function toggleReplUnlock(CacheServiceAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+
+        $this->replUnlocked = ! $this->replUnlocked;
+
+        if ($row) {
+            $audit->record(
+                $row->server,
+                $this->replUnlocked
+                    ? ServerCacheServiceAuditEvent::EVENT_REPL_UNLOCKED
+                    : ServerCacheServiceAuditEvent::EVENT_REPL_LOCKED,
+                ['engine' => $row->engine],
+                auth()->user(),
+            );
+        }
+
+        $this->toastSuccess($this->replUnlocked
+            ? __('Unlocked — mutating commands will now run. Every command is recorded in the audit log.')
+            : __('Locked — only read-only commands will run.'));
+    }
+
+    public function clearReplHistory(): void
+    {
+        $this->replHistory = [];
+        $this->replInput = '';
+    }
+
+    /**
+     * Pull a fresh INFO sample, append to the dashboard ring buffer, and trim. The
+     * sampler computes deltas relative to the previous sample for ops/sec and hit-rate
+     * windows; absolute values for memory and clients come straight from the latest INFO.
+     */
+    public function loadKeyspaceDashboard(CacheServiceStats $stats, CacheServiceKeyspaceSampler $sampler): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->keyspaceError = __('Switch to an engine tab to view its keyspace dashboard.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->keyspaceError = __('No :engine installed.', ['engine' => $engine]);
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->keyspaceError = __(':engine has no INFO surface — see the connection snippet for memcached stats.', ['engine' => $row->engine]);
+
+            return;
+        }
+
+        $raw = $stats->rawInfo($row->server, $row);
+        if ($raw === null) {
+            $this->keyspaceError = __('Could not read INFO from :engine. Is it running?', ['engine' => $row->engine]);
+
+            return;
+        }
+
+        $previous = end($this->keyspaceSamples) ?: null;
+        $sample = $sampler->sample($raw, $previous ?: null);
+
+        $this->keyspaceSamples[] = $sample;
+        if (count($this->keyspaceSamples) > self::KEYSPACE_SAMPLE_LIMIT) {
+            $this->keyspaceSamples = array_slice(
+                $this->keyspaceSamples,
+                count($this->keyspaceSamples) - self::KEYSPACE_SAMPLE_LIMIT,
+            );
+        }
+
+        $this->keyspaceLoaded = true;
+        $this->keyspaceError = null;
+    }
+
+    public function pollKeyspaceDashboard(CacheServiceStats $stats, CacheServiceKeyspaceSampler $sampler): void
+    {
+        // Same call as load, but silent on failure — a poll tick shouldn't toast.
+        try {
+            $this->loadKeyspaceDashboard($stats, $sampler);
+        } catch (\Throwable) {
+            // swallow
+        }
+    }
+
+    public function hideKeyspaceDashboard(): void
+    {
+        $this->keyspaceSamples = [];
+        $this->keyspaceLoaded = false;
+        $this->keyspaceError = null;
+    }
+
     public function flushCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
     {
         $this->authorize('update', $this->server);
@@ -927,6 +1231,38 @@ class WorkspaceCaches extends Component
         $this->cache_maxmemory_policy = 'noeviction';
         $this->cacheMemoryError = null;
         $this->new_auth_password = '';
+
+        // REPL + dashboard are scoped to the current engine, so their buffers go
+        // away on tab change. The unlock toggle deliberately does NOT reset on
+        // tab change — it resets on remount, matching the existing
+        // "session-scoped trust" pattern in this component.
+        $this->replInput = '';
+        $this->replHistory = [];
+        $this->keyspaceSamples = [];
+        $this->keyspaceLoaded = false;
+        $this->keyspaceError = null;
+    }
+
+    /**
+     * Append an entry to the REPL ring buffer and trim from the front if we've
+     * exceeded the cap.
+     */
+    protected function pushReplEntry(string $command, string $output, int $exitCode, string $kind): void
+    {
+        $this->replHistory[] = [
+            'ts' => now()->toIso8601String(),
+            'cmd' => $command,
+            'output' => $output,
+            'exit_code' => $exitCode,
+            'kind' => $kind,
+        ];
+
+        if (count($this->replHistory) > self::REPL_HISTORY_LIMIT) {
+            $this->replHistory = array_slice(
+                $this->replHistory,
+                count($this->replHistory) - self::REPL_HISTORY_LIMIT,
+            );
+        }
     }
 
     /** @internal Drop the stats cache for a row's engine. */

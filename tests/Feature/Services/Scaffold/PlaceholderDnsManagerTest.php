@@ -54,7 +54,7 @@ class PlaceholderDnsManagerTest extends TestCase
 
         $site = $this->makeSite(serverIp: '203.0.113.42', slug: 'my-blog');
 
-        $assignment = (new PlaceholderDnsManager())->assign($site);
+        $assignment = (new PlaceholderDnsManager)->assign($site);
 
         // nip.io's dashed-IP form is what their docs recommend.
         $this->assertSame('my-blog.203-0-113-42.nip.io', $assignment['hostname']);
@@ -98,7 +98,7 @@ class PlaceholderDnsManagerTest extends TestCase
             'scaffold_placeholder.default_zone' => 'ondply.io',
         ]);
 
-        $assignment = (new PlaceholderDnsManager())->assign($site);
+        $assignment = (new PlaceholderDnsManager)->assign($site);
 
         $this->assertSame('my-blog.ondply.io', $assignment['hostname']);
         $this->assertSame('ondply.io', $assignment['zone']);
@@ -137,7 +137,7 @@ class PlaceholderDnsManagerTest extends TestCase
             'scaffold_placeholder.default_zone' => 'ondply.io',
         ]);
 
-        $assignment = (new PlaceholderDnsManager())->assign($site);
+        $assignment = (new PlaceholderDnsManager)->assign($site);
 
         // hash suffix appended → not the bare slug
         $this->assertNotSame('shared-name.ondply.io', $assignment['hostname']);
@@ -152,7 +152,7 @@ class PlaceholderDnsManagerTest extends TestCase
         $site->meta = ['scaffold' => ['framework' => 'wordpress', 'placeholder_dns' => $existing]];
         $site->save();
 
-        $result = (new PlaceholderDnsManager())->assign($site);
+        $result = (new PlaceholderDnsManager)->assign($site);
 
         $this->assertSame('pre-assigned.ondply.io', $result['hostname']);
     }
@@ -181,7 +181,7 @@ class PlaceholderDnsManagerTest extends TestCase
         ]];
         $site->save();
 
-        (new PlaceholderDnsManager())->release($site);
+        (new PlaceholderDnsManager)->release($site);
 
         Http::assertSent(fn ($req) => str_ends_with($req->url(), '/records/12345') && $req->method() === 'DELETE');
 
@@ -199,7 +199,7 @@ class PlaceholderDnsManagerTest extends TestCase
         ]];
         $site->save();
 
-        (new PlaceholderDnsManager())->release($site);
+        (new PlaceholderDnsManager)->release($site);
 
         Http::assertNothingSent();
 
@@ -215,6 +215,6 @@ class PlaceholderDnsManagerTest extends TestCase
 
         $this->expectExceptionMessage('no IP address');
 
-        (new PlaceholderDnsManager())->assign($site);
+        (new PlaceholderDnsManager)->assign($site);
     }
 }

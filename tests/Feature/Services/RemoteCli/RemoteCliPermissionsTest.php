@@ -52,7 +52,7 @@ class RemoteCliPermissionsTest extends TestCase
     public function test_owner_can_run_anything(): void
     {
         [$user, $site] = $this->makeUserWithRole('owner');
-        $gate = new RemoteCliPermissions();
+        $gate = new RemoteCliPermissions;
 
         $this->assertTrue($gate->can($user, $site, RiskLevel::Read));
         $this->assertTrue($gate->can($user, $site, RiskLevel::MutatingRecoverable));
@@ -62,7 +62,7 @@ class RemoteCliPermissionsTest extends TestCase
     public function test_admin_can_run_anything(): void
     {
         [$user, $site] = $this->makeUserWithRole('admin');
-        $gate = new RemoteCliPermissions();
+        $gate = new RemoteCliPermissions;
 
         $this->assertTrue($gate->can($user, $site, RiskLevel::Read));
         $this->assertTrue($gate->can($user, $site, RiskLevel::MutatingRecoverable));
@@ -72,7 +72,7 @@ class RemoteCliPermissionsTest extends TestCase
     public function test_member_can_read_and_recoverable_but_not_destructive(): void
     {
         [$user, $site] = $this->makeUserWithRole('member');
-        $gate = new RemoteCliPermissions();
+        $gate = new RemoteCliPermissions;
 
         $this->assertTrue($gate->can($user, $site, RiskLevel::Read));
         $this->assertTrue($gate->can($user, $site, RiskLevel::MutatingRecoverable));
@@ -82,7 +82,7 @@ class RemoteCliPermissionsTest extends TestCase
     public function test_non_member_can_run_nothing(): void
     {
         [$user, $site] = $this->makeUserWithRole(role: null);
-        $gate = new RemoteCliPermissions();
+        $gate = new RemoteCliPermissions;
 
         $this->assertFalse($gate->can($user, $site, RiskLevel::Read));
         $this->assertFalse($gate->can($user, $site, RiskLevel::MutatingRecoverable));
@@ -92,7 +92,7 @@ class RemoteCliPermissionsTest extends TestCase
     public function test_system_run_with_no_user_bypasses_gate(): void
     {
         [, $site] = $this->makeUserWithRole('member');
-        $gate = new RemoteCliPermissions();
+        $gate = new RemoteCliPermissions;
 
         $this->assertTrue($gate->can(null, $site, RiskLevel::Read));
         $this->assertTrue($gate->can(null, $site, RiskLevel::MutatingRecoverable));
@@ -102,7 +102,7 @@ class RemoteCliPermissionsTest extends TestCase
     public function test_ensure_can_throws_with_command_in_message(): void
     {
         [$user, $site] = $this->makeUserWithRole('member');
-        $gate = new RemoteCliPermissions();
+        $gate = new RemoteCliPermissions;
 
         try {
             $gate->ensureCan($user, $site, RiskLevel::Destructive, 'db drop');

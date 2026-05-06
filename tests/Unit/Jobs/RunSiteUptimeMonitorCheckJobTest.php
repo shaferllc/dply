@@ -6,6 +6,7 @@ use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SiteUptimeMonitor;
+use App\Services\Notifications\NotificationPublisher;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -34,7 +35,7 @@ class RunSiteUptimeMonitorCheckJobTest extends TestCase
 
         (new RunSiteUptimeMonitorCheckJob($monitor->id))->handle(
             app(SiteUptimeCheckUrlResolver::class),
-            app(\App\Services\Notifications\NotificationPublisher::class),
+            app(NotificationPublisher::class),
         );
 
         $monitor->refresh();

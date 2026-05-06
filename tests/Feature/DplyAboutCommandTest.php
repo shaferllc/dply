@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,7 +62,7 @@ class DplyAboutCommandTest extends TestCase
         // 1 image-mode + 1 source-mode + 1 source-mode preview
         Site::factory()->create([
             'server_id' => $server->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,
@@ -73,7 +74,7 @@ class DplyAboutCommandTest extends TestCase
         ]);
         $parent = Site::factory()->create([
             'server_id' => $server->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,
@@ -86,7 +87,7 @@ class DplyAboutCommandTest extends TestCase
         ]);
         Site::factory()->create([
             'server_id' => $server->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,

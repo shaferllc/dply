@@ -2,24 +2,45 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ApplyInsightFixJob;
+use App\Jobs\RevertInsightFixJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Livewire\Servers\WorkspaceInsights;
+use App\Livewire\Settings\Hub;
 use App\Models\InsightFinding;
 use App\Models\InsightSetting;
+use App\Models\NotificationChannel;
+use App\Models\NotificationSubscription;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\ServerProvisionRun;
 use App\Models\Site;
+use App\Models\SupervisorProgram;
 use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\Insights\Contracts\InsightFixActionInterface;
 use App\Services\Insights\Contracts\InsightRunnerInterface;
+use App\Services\Insights\FixActions\BumpFpmWorkersFixAction;
+use App\Services\Insights\FixActions\EnableNtpFixAction;
+use App\Services\Insights\FixResult;
 use App\Services\Insights\InsightCandidate;
 use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\InsightSettingsRepository;
+use App\Services\Insights\InsightsNotificationDispatcher;
+use App\Services\Insights\Runners\HorizonRecommendedInsightRunner;
+use App\Services\Insights\Runners\OctaneRecommendedInsightRunner;
+use App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner;
+use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
+use App\Services\Insights\Runners\SystemClockSyncInsightRunner;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\ServerPhpConfigEditor;
+use App\Services\Servers\ServerPhpFpmProbe;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -543,7 +564,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubRemoteBashOutput("total=12\nsecurity=3\n");
 
-        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $runner = app(PackageSecurityUpdatesInsightRunner::class);
         $candidates = $runner->run($server->fresh(), null, []);
 
         $this->assertCount(1, $candidates);
@@ -562,7 +583,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubRemoteBashOutput("total=42\nsecurity=15\n");
 
-        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $runner = app(PackageSecurityUpdatesInsightRunner::class);
         $candidates = $runner->run($server->fresh(), null, []);
 
         $this->assertCount(1, $candidates);
@@ -575,7 +596,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubRemoteBashOutput("total=2\nsecurity=0\n");
 
-        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $runner = app(PackageSecurityUpdatesInsightRunner::class);
         $this->assertSame([], $runner->run($server->fresh(), null, []));
     }
 
@@ -585,7 +606,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubRemoteBashOutput("no-apt\n");
 
-        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $runner = app(PackageSecurityUpdatesInsightRunner::class);
         $this->assertSame([], $runner->run($server->fresh(), null, []));
     }
 
@@ -596,7 +617,7 @@ class InsightsFeatureTest extends TestCase
         // Threshold 5; only 2 security updates → below threshold, no emission.
         $this->stubRemoteBashOutput("total=10\nsecurity=2\n");
 
-        $runner = app(\App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner::class);
+        $runner = app(PackageSecurityUpdatesInsightRunner::class);
         $this->assertSame([], $runner->run($server->fresh(), null, ['min_security_updates' => 5]));
     }
 
@@ -606,7 +627,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubRemoteBashOutput("ntp_service=inactive\nsynchronized=yes\ntimezone=UTC\n");
 
-        $runner = app(\App\Services\Insights\Runners\SystemClockSyncInsightRunner::class);
+        $runner = app(SystemClockSyncInsightRunner::class);
         $candidates = $runner->run($server->fresh(), null, []);
 
         $this->assertCount(1, $candidates);
@@ -624,7 +645,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubRemoteBashOutput("ntp_service=active\nsynchronized=no\ntimezone=UTC\n");
 
-        $runner = app(\App\Services\Insights\Runners\SystemClockSyncInsightRunner::class);
+        $runner = app(SystemClockSyncInsightRunner::class);
         $candidates = $runner->run($server->fresh(), null, []);
 
         $this->assertCount(1, $candidates);
@@ -637,7 +658,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubRemoteBashOutput("ntp_service=active\nsynchronized=yes\ntimezone=UTC\n");
 
-        $runner = app(\App\Services\Insights\Runners\SystemClockSyncInsightRunner::class);
+        $runner = app(SystemClockSyncInsightRunner::class);
         $this->assertSame([], $runner->run($server->fresh(), null, []));
     }
 
@@ -647,7 +668,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubRemoteBashOutput("no-timedatectl\n");
 
-        $runner = app(\App\Services\Insights\Runners\SystemClockSyncInsightRunner::class);
+        $runner = app(SystemClockSyncInsightRunner::class);
         $this->assertSame([], $runner->run($server->fresh(), null, []));
     }
 
@@ -675,7 +696,7 @@ class InsightsFeatureTest extends TestCase
             'resolved_at' => null,
         ]);
 
-        $action = app(\App\Services\Insights\FixActions\EnableNtpFixAction::class);
+        $action = app(EnableNtpFixAction::class);
         $this->assertNull($action->preflight($server->fresh(), null, $finding, []));
         $result = $action->apply($server->fresh(), null, $finding, []);
 
@@ -690,16 +711,16 @@ class InsightsFeatureTest extends TestCase
      */
     private function stubRemoteBashOutput(string $buffer): void
     {
-        $stub = new class($buffer) extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        $stub = new class($buffer) extends ExecuteRemoteTaskOnServer
         {
             public function __construct(private string $buffer) {}
 
-            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
             {
-                return new \App\Modules\TaskRunner\ProcessOutput($this->buffer, 0, false);
+                return new ProcessOutput($this->buffer, 0, false);
             }
         };
-        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stub);
+        $this->app->instance(ExecuteRemoteTaskOnServer::class, $stub);
     }
 
     /**
@@ -707,7 +728,7 @@ class InsightsFeatureTest extends TestCase
      */
     private function stubRemoteBashCapturing(array &$captured, string $buffer): void
     {
-        $stub = new class($captured, $buffer) extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        $stub = new class($captured, $buffer) extends ExecuteRemoteTaskOnServer
         {
             public array $captured;
 
@@ -716,16 +737,16 @@ class InsightsFeatureTest extends TestCase
                 $this->captured = &$captured;
             }
 
-            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
             {
                 $this->captured['name'] = $name;
                 $this->captured['script'] = $inlineBash;
                 $this->captured['as_root'] = $asRoot;
 
-                return new \App\Modules\TaskRunner\ProcessOutput($this->buffer, 0, false);
+                return new ProcessOutput($this->buffer, 0, false);
             }
         };
-        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stub);
+        $this->app->instance(ExecuteRemoteTaskOnServer::class, $stub);
     }
 
     public function test_php_fpm_workers_undersized_runner_emits_when_active_over_threshold(): void
@@ -735,7 +756,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubFpmProbe(['max_children' => 30, 'active_workers' => 28, 'php_version' => '8.3']);
 
-        $runner = app(\App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner::class);
+        $runner = app(PhpFpmWorkersUndersizedInsightRunner::class);
         $candidates = $runner->run($server->fresh(), null, []);
 
         $this->assertCount(1, $candidates);
@@ -754,7 +775,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubFpmProbe(['max_children' => 30, 'active_workers' => 5, 'php_version' => '8.3']);
 
-        $runner = app(\App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner::class);
+        $runner = app(PhpFpmWorkersUndersizedInsightRunner::class);
         $this->assertSame([], $runner->run($server->fresh(), null, []));
     }
 
@@ -765,7 +786,7 @@ class InsightsFeatureTest extends TestCase
 
         $this->stubFpmProbe(null);
 
-        $runner = app(\App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner::class);
+        $runner = app(PhpFpmWorkersUndersizedInsightRunner::class);
         $this->assertSame([], $runner->run($server->fresh(), null, []));
     }
 
@@ -809,7 +830,7 @@ class InsightsFeatureTest extends TestCase
 
         // Stub remote: capture the backup script invocation; return ProcessOutput with success.
         $remoteCalls = [];
-        $stubRemote = new class($remoteCalls) extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        $stubRemote = new class($remoteCalls) extends ExecuteRemoteTaskOnServer
         {
             /** @var array<int, array{name: string, script: string}> */
             public array $calls = [];
@@ -819,18 +840,18 @@ class InsightsFeatureTest extends TestCase
                 $this->calls = &$calls;
             }
 
-            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
             {
                 $this->calls[] = ['name' => $name, 'script' => $inlineBash];
 
-                return new \App\Modules\TaskRunner\ProcessOutput('backed-up', 0, false);
+                return new ProcessOutput('backed-up', 0, false);
             }
         };
-        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stubRemote);
+        $this->app->instance(ExecuteRemoteTaskOnServer::class, $stubRemote);
 
         // Stub editor: capture saveTarget() args + return content from openTarget().
         $editorState = ['saved_content' => null, 'saved_target' => null, 'saved_version' => null];
-        $stubEditor = new class($editorState) extends \App\Services\Servers\ServerPhpConfigEditor
+        $stubEditor = new class($editorState) extends ServerPhpConfigEditor
         {
             /** @var array<string, mixed> */
             public array $state;
@@ -840,7 +861,7 @@ class InsightsFeatureTest extends TestCase
                 $this->state = &$state;
             }
 
-            public function openTarget(\App\Models\Server $server, string $version, string $target): array
+            public function openTarget(Server $server, string $version, string $target): array
             {
                 return [
                     'version' => $version,
@@ -852,7 +873,7 @@ class InsightsFeatureTest extends TestCase
                 ];
             }
 
-            public function saveTarget(\App\Models\Server $server, string $version, string $target, string $content): array
+            public function saveTarget(Server $server, string $version, string $target, string $content): array
             {
                 $this->state['saved_content'] = $content;
                 $this->state['saved_target'] = $target;
@@ -861,10 +882,10 @@ class InsightsFeatureTest extends TestCase
                 return ['message' => 'saved', 'reload_guidance' => '', 'verification_output' => null, 'output' => 'php-fpm test ok'];
             }
         };
-        $this->app->instance(\App\Services\Servers\ServerPhpConfigEditor::class, $stubEditor);
+        $this->app->instance(ServerPhpConfigEditor::class, $stubEditor);
 
         // 4GB * 0.6 / 30 = ~81 → proposed should be 81 (or capped). Current 30 → 81 increase passes preflight.
-        $action = app(\App\Services\Insights\FixActions\BumpFpmWorkersFixAction::class);
+        $action = app(BumpFpmWorkersFixAction::class);
         $params = (array) (config('insights.insights.php_fpm_workers_undersized.fix.params') ?? []);
         $this->assertNull($action->preflight($server->fresh(), null, $finding, $params));
         $result = $action->apply($server->fresh(), null, $finding, $params);
@@ -914,7 +935,7 @@ class InsightsFeatureTest extends TestCase
             'resolved_at' => null,
         ]);
 
-        $action = app(\App\Services\Insights\FixActions\BumpFpmWorkersFixAction::class);
+        $action = app(BumpFpmWorkersFixAction::class);
         $reason = $action->preflight($server->fresh(), null, $finding, []);
         $this->assertNotNull($reason);
         $this->assertStringContainsString('RAM', $reason);
@@ -947,20 +968,20 @@ class InsightsFeatureTest extends TestCase
             'resolved_at' => now(),
         ]);
 
-        $stubRemote = new class extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        $stubRemote = new class extends ExecuteRemoteTaskOnServer
         {
             public function __construct() {}
 
-            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
             {
                 // Pretend we read the backup successfully — return prior config content.
-                return new \App\Modules\TaskRunner\ProcessOutput("[www]\npm = dynamic\npm.max_children = 30\n", 0, false);
+                return new ProcessOutput("[www]\npm = dynamic\npm.max_children = 30\n", 0, false);
             }
         };
-        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stubRemote);
+        $this->app->instance(ExecuteRemoteTaskOnServer::class, $stubRemote);
 
         $editorState = ['saved_content' => null];
-        $stubEditor = new class($editorState) extends \App\Services\Servers\ServerPhpConfigEditor
+        $stubEditor = new class($editorState) extends ServerPhpConfigEditor
         {
             public array $state;
 
@@ -969,16 +990,16 @@ class InsightsFeatureTest extends TestCase
                 $this->state = &$state;
             }
 
-            public function saveTarget(\App\Models\Server $server, string $version, string $target, string $content): array
+            public function saveTarget(Server $server, string $version, string $target, string $content): array
             {
                 $this->state['saved_content'] = $content;
 
                 return ['message' => 'reverted', 'reload_guidance' => '', 'verification_output' => null, 'output' => 'php-fpm test ok'];
             }
         };
-        $this->app->instance(\App\Services\Servers\ServerPhpConfigEditor::class, $stubEditor);
+        $this->app->instance(ServerPhpConfigEditor::class, $stubEditor);
 
-        $action = app(\App\Services\Insights\FixActions\BumpFpmWorkersFixAction::class);
+        $action = app(BumpFpmWorkersFixAction::class);
         $result = $action->revert($server->fresh(), null, $finding, []);
 
         $this->assertTrue($result->ok, 'Revert should succeed: '.$result->errorMessage);
@@ -994,16 +1015,16 @@ class InsightsFeatureTest extends TestCase
         [$user, $server] = $this->userWithServer();
 
         // Synthetic insight whose handler implements only the apply interface (no Revertable).
-        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        $handler = new class implements InsightFixActionInterface
         {
             public function preflight($server, $site, $finding, array $params): ?string
             {
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            public function apply($server, $site, $finding, array $params): FixResult
             {
-                return \App\Services\Insights\FixResult::success();
+                return FixResult::success();
             }
         };
         $handlerClass = get_class($handler);
@@ -1037,7 +1058,7 @@ class InsightsFeatureTest extends TestCase
             'resolved_at' => now(),
         ]);
 
-        \App\Jobs\RevertInsightFixJob::dispatch($finding->id, $user->id);
+        RevertInsightFixJob::dispatch($finding->id, $user->id);
 
         $finding->refresh();
         $this->assertSame('handler_not_revertable', $finding->meta['revert_failure_reason'] ?? null);
@@ -1077,7 +1098,7 @@ class InsightsFeatureTest extends TestCase
             ->assertSee('Revert')
             ->call('revertFix', $finding->id);
 
-        Bus::assertDispatched(\App\Jobs\RevertInsightFixJob::class, function ($job) use ($finding) {
+        Bus::assertDispatched(RevertInsightFixJob::class, function ($job) use ($finding) {
             return $job->insightFindingId === $finding->id;
         });
     }
@@ -1122,7 +1143,7 @@ class InsightsFeatureTest extends TestCase
             ),
         ])->save();
 
-        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        $handler = new class implements InsightFixActionInterface
         {
             public bool $applyCalled = false;
 
@@ -1131,11 +1152,11 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            public function apply($server, $site, $finding, array $params): FixResult
             {
                 $this->applyCalled = true;
 
-                return \App\Services\Insights\FixResult::success();
+                return FixResult::success();
             }
         };
         $handlerClass = get_class($handler);
@@ -1169,7 +1190,7 @@ class InsightsFeatureTest extends TestCase
             'resolved_at' => null,
         ]);
 
-        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+        ApplyInsightFixJob::dispatch($finding->id, $user->id);
 
         $this->assertFalse($handler->applyCalled, 'Handler must not run when org disables config mutation');
         $finding->refresh();
@@ -1186,7 +1207,7 @@ class InsightsFeatureTest extends TestCase
         session(['current_organization_id' => $org->id]);
 
         Livewire::actingAs($owner)
-            ->test(\App\Livewire\Settings\Hub::class)
+            ->test(Hub::class)
             ->set('organizationInsights.allow_config_mutation', false)
             ->call('saveOrganizationInsights');
 
@@ -1200,7 +1221,7 @@ class InsightsFeatureTest extends TestCase
 
         // Default behavior: no `allow_config_mutation` key set → gate is open.
 
-        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        $handler = new class implements InsightFixActionInterface
         {
             public bool $applyCalled = false;
 
@@ -1209,11 +1230,11 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            public function apply($server, $site, $finding, array $params): FixResult
             {
                 $this->applyCalled = true;
 
-                return \App\Services\Insights\FixResult::success();
+                return FixResult::success();
             }
         };
         $handlerClass = get_class($handler);
@@ -1247,7 +1268,7 @@ class InsightsFeatureTest extends TestCase
             'resolved_at' => null,
         ]);
 
-        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+        ApplyInsightFixJob::dispatch($finding->id, $user->id);
 
         $this->assertTrue($handler->applyCalled);
     }
@@ -1281,23 +1302,23 @@ class InsightsFeatureTest extends TestCase
             'resolved_at' => null,
         ]);
 
-        $stubRemote = new class extends \App\Services\Servers\ExecuteRemoteTaskOnServer
+        $stubRemote = new class extends ExecuteRemoteTaskOnServer
         {
             public function __construct() {}
 
-            public function runInlineBash(\App\Models\Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): \App\Modules\TaskRunner\ProcessOutput
+            public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
             {
-                return new \App\Modules\TaskRunner\ProcessOutput('backed-up', 0, false);
+                return new ProcessOutput('backed-up', 0, false);
             }
         };
-        $this->app->instance(\App\Services\Servers\ExecuteRemoteTaskOnServer::class, $stubRemote);
+        $this->app->instance(ExecuteRemoteTaskOnServer::class, $stubRemote);
 
         // Editor returns content with no pm.max_children line — substitution is a no-op.
-        $stubEditor = new class extends \App\Services\Servers\ServerPhpConfigEditor
+        $stubEditor = new class extends ServerPhpConfigEditor
         {
             public function __construct() {}
 
-            public function openTarget(\App\Models\Server $server, string $version, string $target): array
+            public function openTarget(Server $server, string $version, string $target): array
             {
                 return [
                     'version' => $version,
@@ -1309,14 +1330,14 @@ class InsightsFeatureTest extends TestCase
                 ];
             }
 
-            public function saveTarget(\App\Models\Server $server, string $version, string $target, string $content): array
+            public function saveTarget(Server $server, string $version, string $target, string $content): array
             {
                 throw new \RuntimeException('saveTarget should not be called when substitution is a no-op');
             }
         };
-        $this->app->instance(\App\Services\Servers\ServerPhpConfigEditor::class, $stubEditor);
+        $this->app->instance(ServerPhpConfigEditor::class, $stubEditor);
 
-        $action = app(\App\Services\Insights\FixActions\BumpFpmWorkersFixAction::class);
+        $action = app(BumpFpmWorkersFixAction::class);
         $result = $action->apply($server->fresh(), null, $finding, []);
 
         $this->assertFalse($result->ok);
@@ -1329,7 +1350,7 @@ class InsightsFeatureTest extends TestCase
         [, $server] = $this->userWithServer();
         // No stack-summary seeded → phpVersionFor() returns null → runner returns [].
 
-        $runner = app(\App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner::class);
+        $runner = app(PhpFpmWorkersUndersizedInsightRunner::class);
         $this->assertSame([], $runner->run($server->fresh(), null, []));
     }
 
@@ -1340,19 +1361,19 @@ class InsightsFeatureTest extends TestCase
      */
     private function stubFpmProbe(?array $snapshot): void
     {
-        $stub = new class($snapshot) extends \App\Services\Servers\ServerPhpFpmProbe
+        $stub = new class($snapshot) extends ServerPhpFpmProbe
         {
             public function __construct(private ?array $snapshot)
             {
                 // Skip parent constructor — we don't need the SSH executor in tests.
             }
 
-            public function probe(\App\Models\Server $server, string $phpVersion): ?array
+            public function probe(Server $server, string $phpVersion): ?array
             {
                 return $this->snapshot;
             }
         };
-        $this->app->instance(\App\Services\Servers\ServerPhpFpmProbe::class, $stub);
+        $this->app->instance(ServerPhpFpmProbe::class, $stub);
     }
 
     public function test_horizon_recommended_runner_emits_for_laravel_site_with_queue_worker_and_no_horizon(): void
@@ -1372,7 +1393,7 @@ class InsightsFeatureTest extends TestCase
             ],
         ]);
 
-        \App\Models\SupervisorProgram::query()->create([
+        SupervisorProgram::query()->create([
             'server_id' => $server->id,
             'site_id' => $site->id,
             'slug' => 'site-queue',
@@ -1391,7 +1412,7 @@ class InsightsFeatureTest extends TestCase
             'redirect_stderr' => true,
         ]);
 
-        $runner = app(\App\Services\Insights\Runners\HorizonRecommendedInsightRunner::class);
+        $runner = app(HorizonRecommendedInsightRunner::class);
         $candidates = $runner->run($server, $site, []);
 
         $this->assertCount(1, $candidates);
@@ -1419,7 +1440,7 @@ class InsightsFeatureTest extends TestCase
             ],
         ]);
 
-        \App\Models\SupervisorProgram::query()->create([
+        SupervisorProgram::query()->create([
             'server_id' => $server->id,
             'site_id' => $site->id,
             'slug' => 'site-queue',
@@ -1438,7 +1459,7 @@ class InsightsFeatureTest extends TestCase
             'redirect_stderr' => true,
         ]);
 
-        $runner = app(\App\Services\Insights\Runners\HorizonRecommendedInsightRunner::class);
+        $runner = app(HorizonRecommendedInsightRunner::class);
         $this->assertSame([], $runner->run($server, $site, []));
     }
 
@@ -1460,7 +1481,7 @@ class InsightsFeatureTest extends TestCase
         ]);
 
         // No SupervisorProgram seeded → no signal → suggestion does not fire.
-        $runner = app(\App\Services\Insights\Runners\HorizonRecommendedInsightRunner::class);
+        $runner = app(HorizonRecommendedInsightRunner::class);
         $this->assertSame([], $runner->run($server, $site, []));
     }
 
@@ -1481,7 +1502,7 @@ class InsightsFeatureTest extends TestCase
             ],
         ]);
 
-        \App\Models\SupervisorProgram::query()->create([
+        SupervisorProgram::query()->create([
             'server_id' => $server->id,
             'site_id' => $site->id,
             'slug' => 'site-queue',
@@ -1500,7 +1521,7 @@ class InsightsFeatureTest extends TestCase
             'redirect_stderr' => true,
         ]);
 
-        $runner = app(\App\Services\Insights\Runners\HorizonRecommendedInsightRunner::class);
+        $runner = app(HorizonRecommendedInsightRunner::class);
         $this->assertSame([], $runner->run($server, $site, []));
     }
 
@@ -1530,7 +1551,7 @@ class InsightsFeatureTest extends TestCase
             ]);
         }
 
-        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $runner = app(OctaneRecommendedInsightRunner::class);
         $candidates = $runner->run($server, $site, []);
 
         $this->assertCount(1, $candidates);
@@ -1569,7 +1590,7 @@ class InsightsFeatureTest extends TestCase
             ]);
         }
 
-        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $runner = app(OctaneRecommendedInsightRunner::class);
         $this->assertSame([], $runner->run($server, $site, []));
     }
 
@@ -1598,7 +1619,7 @@ class InsightsFeatureTest extends TestCase
             ]);
         }
 
-        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $runner = app(OctaneRecommendedInsightRunner::class);
         $this->assertSame([], $runner->run($server, $site, []));
     }
 
@@ -1628,7 +1649,7 @@ class InsightsFeatureTest extends TestCase
             ]);
         }
 
-        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $runner = app(OctaneRecommendedInsightRunner::class);
         $this->assertSame([], $runner->run($server, $site, []));
     }
 
@@ -1700,7 +1721,7 @@ class InsightsFeatureTest extends TestCase
             ]);
         }
 
-        $runner = app(\App\Services\Insights\Runners\OctaneRecommendedInsightRunner::class);
+        $runner = app(OctaneRecommendedInsightRunner::class);
         $this->assertSame([], $runner->run($server, $site, []));
     }
 
@@ -1864,7 +1885,7 @@ class InsightsFeatureTest extends TestCase
         // We can't easily assert the health-score side effect without coupling to its
         // implementation, but we can confirm the job invokes the coordinator with onlyKey.
         $coordinatorState = ['only_key_seen' => null];
-        $stubCoord = new class($coordinatorState) extends \App\Services\Insights\InsightRunCoordinator
+        $stubCoord = new class($coordinatorState) extends InsightRunCoordinator
         {
             public array $state;
 
@@ -1873,12 +1894,12 @@ class InsightsFeatureTest extends TestCase
                 $this->state = &$state;
             }
 
-            public function runForServer(\App\Models\Server $server, ?string $onlyKey = null): void
+            public function runForServer(Server $server, ?string $onlyKey = null): void
             {
                 $this->state['only_key_seen'] = $onlyKey;
             }
         };
-        $this->app->instance(\App\Services\Insights\InsightRunCoordinator::class, $stubCoord);
+        $this->app->instance(InsightRunCoordinator::class, $stubCoord);
 
         Bus::dispatchSync(new RunServerInsightsJob($server->id, 'cpu_ram_usage'));
 
@@ -2150,7 +2171,7 @@ class InsightsFeatureTest extends TestCase
         [$user, $server] = $this->userWithServer();
 
         // Stub handler that captures invocations.
-        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        $handler = new class implements InsightFixActionInterface
         {
             public bool $preflightCalled = false;
 
@@ -2163,11 +2184,11 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            public function apply($server, $site, $finding, array $params): FixResult
             {
                 $this->applyCalled = true;
 
-                return \App\Services\Insights\FixResult::success('did the thing');
+                return FixResult::success('did the thing');
             }
         };
         $handlerClass = get_class($handler);
@@ -2194,7 +2215,7 @@ class InsightsFeatureTest extends TestCase
         // After fix: runner returns no candidate so recheck closes the finding.
         $this->setStubRunnerEmits('stub_problem_with_fix', false);
 
-        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+        ApplyInsightFixJob::dispatch($finding->id, $user->id);
 
         $this->assertTrue($handler->preflightCalled);
         $this->assertTrue($handler->applyCalled);
@@ -2209,16 +2230,16 @@ class InsightsFeatureTest extends TestCase
     {
         [$user, $server] = $this->userWithServer();
 
-        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        $handler = new class implements InsightFixActionInterface
         {
             public function preflight($server, $site, $finding, array $params): ?string
             {
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            public function apply($server, $site, $finding, array $params): FixResult
             {
-                return \App\Services\Insights\FixResult::success('shell ran but condition persists');
+                return FixResult::success('shell ran but condition persists');
             }
         };
         $handlerClass = get_class($handler);
@@ -2236,7 +2257,7 @@ class InsightsFeatureTest extends TestCase
         $this->assertNotNull($finding);
 
         // Runner still emits → recheck won't clear the finding.
-        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+        ApplyInsightFixJob::dispatch($finding->id, $user->id);
 
         $finding->refresh();
         $this->assertSame(InsightFinding::STATUS_OPEN, $finding->status);
@@ -2247,7 +2268,7 @@ class InsightsFeatureTest extends TestCase
     {
         [$user, $server] = $this->userWithServer();
 
-        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        $handler = new class implements InsightFixActionInterface
         {
             public bool $applyCalled = false;
 
@@ -2256,11 +2277,11 @@ class InsightsFeatureTest extends TestCase
                 return 'not enough RAM headroom';
             }
 
-            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            public function apply($server, $site, $finding, array $params): FixResult
             {
                 $this->applyCalled = true;
 
-                return \App\Services\Insights\FixResult::success();
+                return FixResult::success();
             }
         };
         $handlerClass = get_class($handler);
@@ -2275,7 +2296,7 @@ class InsightsFeatureTest extends TestCase
             ->first();
         $this->assertNotNull($finding);
 
-        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+        ApplyInsightFixJob::dispatch($finding->id, $user->id);
 
         $this->assertFalse($handler->applyCalled);
         $finding->refresh();
@@ -2287,16 +2308,16 @@ class InsightsFeatureTest extends TestCase
     {
         [$user, $server] = $this->userWithServer();
 
-        $handler = new class implements \App\Services\Insights\Contracts\InsightFixActionInterface
+        $handler = new class implements InsightFixActionInterface
         {
             public function preflight($server, $site, $finding, array $params): ?string
             {
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): \App\Services\Insights\FixResult
+            public function apply($server, $site, $finding, array $params): FixResult
             {
-                return \App\Services\Insights\FixResult::success();
+                return FixResult::success();
             }
         };
         $handlerClass = get_class($handler);
@@ -2313,7 +2334,7 @@ class InsightsFeatureTest extends TestCase
 
         // Even though the runner still emits, the suggestion lifecycle resolves on apply success
         // without rechecking — windowed signals don't clear instantly.
-        \App\Jobs\ApplyInsightFixJob::dispatch($finding->id, $user->id);
+        ApplyInsightFixJob::dispatch($finding->id, $user->id);
 
         $finding->refresh();
         $this->assertSame(InsightFinding::STATUS_RESOLVED, $finding->status);
@@ -2374,18 +2395,18 @@ class InsightsFeatureTest extends TestCase
     {
         [$owner, $server] = $this->userWithServer();
 
-        $channel = \App\Models\NotificationChannel::factory()->forUser($owner)->create([
-            'type' => \App\Models\NotificationChannel::TYPE_SLACK,
+        $channel = NotificationChannel::factory()->forUser($owner)->create([
+            'type' => NotificationChannel::TYPE_SLACK,
             'config' => ['webhook_url' => 'https://hooks.slack.com/services/T/B/X'],
         ]);
-        \App\Models\NotificationSubscription::query()->create([
+        NotificationSubscription::query()->create([
             'notification_channel_id' => $channel->id,
             'subscribable_type' => Server::class,
             'subscribable_id' => $server->id,
-            'event_key' => \App\Services\Insights\InsightsNotificationDispatcher::EVENT_KEY,
+            'event_key' => InsightsNotificationDispatcher::EVENT_KEY,
         ]);
 
-        \Illuminate\Support\Facades\Http::fake();
+        Http::fake();
 
         $this->registerStubInsight('stub_suggestion_no_notify', requires: [], kind: InsightFinding::KIND_SUGGESTION);
 
@@ -2398,11 +2419,11 @@ class InsightsFeatureTest extends TestCase
         $this->assertNotNull($finding);
 
         $this->assertDatabaseMissing('notification_events', [
-            'event_key' => \App\Services\Insights\InsightsNotificationDispatcher::EVENT_KEY,
+            'event_key' => InsightsNotificationDispatcher::EVENT_KEY,
             'subject_type' => InsightFinding::class,
             'subject_id' => $finding->id,
         ]);
-        \Illuminate\Support\Facades\Http::assertNothingSent();
+        Http::assertNothingSent();
     }
 
     /**

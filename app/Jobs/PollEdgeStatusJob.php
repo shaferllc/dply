@@ -99,12 +99,9 @@ class PollEdgeStatusJob implements ShouldQueue
         // App Runner statuses: RUNNING, OPERATION_IN_PROGRESS,
         //   CREATE_FAILED, DELETED, DELETE_FAILED, PAUSED, PAUSING.
         return match (true) {
-            in_array($phase, ['ACTIVE', 'ACTIVE_RUNNING', 'RUNNING'], true)
-                => Site::STATUS_CONTAINER_ACTIVE,
-            in_array($phase, ['ERROR', 'CREATE_FAILED', 'DELETE_FAILED'], true)
-                => Site::STATUS_CONTAINER_FAILED,
-            in_array($phase, ['BUILDING', 'DEPLOYING', 'PENDING_DEPLOY', 'OPERATION_IN_PROGRESS'], true)
-                => Site::STATUS_CONTAINER_PROVISIONING,
+            in_array($phase, ['ACTIVE', 'ACTIVE_RUNNING', 'RUNNING'], true) => Site::STATUS_CONTAINER_ACTIVE,
+            in_array($phase, ['ERROR', 'CREATE_FAILED', 'DELETE_FAILED'], true) => Site::STATUS_CONTAINER_FAILED,
+            in_array($phase, ['BUILDING', 'DEPLOYING', 'PENDING_DEPLOY', 'OPERATION_IN_PROGRESS'], true) => Site::STATUS_CONTAINER_PROVISIONING,
             default => null,
         };
     }

@@ -57,6 +57,57 @@ class CacheServiceStats
     }
 
     /**
+     * The redis-family CLI binary for an engine. Centralised so the REPL, stats probe,
+     * client list, and config writer all agree on which binary to invoke. Falls back
+     * to redis-cli everywhere — every redis-family engine ships a wire-compatible
+     * client.
+     */
+    public static function binaryFor(string $engine): string
+    {
+        return match ($engine) {
+            'valkey' => 'valkey-cli',
+            'keydb' => 'keydb-cli',
+            default => 'redis-cli',
+        };
+    }
+
+    /**
+     * Run `INFO` against the engine and return the raw, unparsed buffer. Returns null on
+     * SSH/auth/exit-code failure. Used by the keyspace dashboard to compute windowed deltas
+     * over the cumulative counters that INFO reports — the parsed `snapshot()` view drops
+     * most of them.
+     */
+    public function rawInfo(Server $server, ServerCacheService $cacheService): ?string
+    {
+        if (! ServerCacheService::engineSupportsAuth($cacheService->engine)) {
+            return null;
+        }
+
+        $cli = self::binaryFor($cacheService->engine);
+        $authFlag = filled($cacheService->auth_password ?? null)
+            ? '-a '.escapeshellarg((string) $cacheService->auth_password).' '
+            : '';
+
+        try {
+            $output = $this->executor->runInlineBash(
+                $server,
+                'cache-service:info-raw:'.$cacheService->engine,
+                'command -v '.escapeshellarg($cli).' >/dev/null && '.$authFlag.escapeshellarg($cli).' -p '.(int) $cacheService->port.' INFO 2>/dev/null || '.$authFlag.'redis-cli -p '.(int) $cacheService->port.' INFO 2>/dev/null',
+                timeoutSeconds: 30,
+                asRoot: false,
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if ($output->exitCode !== 0) {
+            return null;
+        }
+
+        return $output->buffer;
+    }
+
+    /**
      * Pull the connected-client list for redis-family engines and parse the line-shaped output into
      * structured rows. Returns an empty array for memcached (no native equivalent) and on SSH/auth
      * failure — the UI surfaces an empty state in either case.
@@ -74,11 +125,7 @@ class CacheServiceStats
             return [];
         }
 
-        $cli = match ($cacheService->engine) {
-            'valkey' => 'valkey-cli',
-            'keydb' => 'keydb-cli',
-            default => 'redis-cli',
-        };
+        $cli = self::binaryFor($cacheService->engine);
 
         $authFlag = filled($cacheService->auth_password ?? null)
             ? '-a '.escapeshellarg((string) $cacheService->auth_password).' '
@@ -139,11 +186,7 @@ class CacheServiceStats
      */
     private function redisInfo(Server $server, ServerCacheService $cacheService): array
     {
-        $cli = match ($cacheService->engine) {
-            'valkey' => 'valkey-cli',
-            'keydb' => 'keydb-cli',
-            default => 'redis-cli',
-        };
+        $cli = self::binaryFor($cacheService->engine);
 
         $output = $this->executor->runInlineBash(
             $server,

@@ -10,6 +10,7 @@ use App\Models\ServerProvisionStepRun;
 use App\Modules\TaskRunner\Models\Task;
 use App\Support\Servers\ProvisionPipelineLog;
 use App\Support\Servers\ProvisionStepDurations;
+use Illuminate\Support\Str;
 
 /**
  * Bulk-insert one row per `[dply-step-end]` marker into
@@ -52,7 +53,7 @@ class RecordProvisionStepDurations
             $startedAt = $now->copy()->subSeconds(max(0, $row['duration_seconds']));
 
             $payload[] = [
-                'id' => (string) \Illuminate\Support\Str::ulid(),
+                'id' => (string) Str::ulid(),
                 'server_id' => $server->id,
                 'organization_id' => $server->organization_id,
                 'server_provision_run_id' => $run?->id,

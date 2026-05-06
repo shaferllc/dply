@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             try {
                 $table->dropUnique('users_dply_auth_id_unique');
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // Index may already be absent on dialects that drop indexes with the column.
             }
             $table->dropColumn('dply_auth_id');

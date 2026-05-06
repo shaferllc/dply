@@ -82,7 +82,7 @@ class OrganizationModelTest extends TestCase
 
     public function test_plan_tier_label_defaults_to_trial_without_a_pro_subscription(): void
     {
-        $org = new Organization();
+        $org = new Organization;
 
         $this->assertSame('Trial', $org->planTierLabel());
     }

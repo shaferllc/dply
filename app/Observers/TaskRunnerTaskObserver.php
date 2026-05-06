@@ -14,6 +14,7 @@ use App\Modules\TaskRunner\Models\Task;
 use App\Support\Servers\InstalledStack;
 use App\Support\Servers\ProvisionLogSections;
 use App\Support\Servers\ProvisionStepSnapshots;
+use Illuminate\Support\Facades\Log;
 
 class TaskRunnerTaskObserver
 {
@@ -83,7 +84,7 @@ class TaskRunnerTaskObserver
             } catch (\Throwable $e) {
                 // Best-effort: a duration insert failing should never
                 // halt provision bookkeeping. Log and move on.
-                \Illuminate\Support\Facades\Log::warning('server.provision.step_durations.record_failed', [
+                Log::warning('server.provision.step_durations.record_failed', [
                     'server_id' => $server->id,
                     'task_id' => $task->id,
                     'message' => $e->getMessage(),

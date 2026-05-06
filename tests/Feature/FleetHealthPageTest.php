@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
@@ -166,7 +167,7 @@ class FleetHealthPageTest extends TestCase
             'organization_id' => $org->id,
             'runtime' => 'node',
         ]);
-        \App\Models\ProviderCredential::factory()->create([
+        ProviderCredential::factory()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'provider' => 'fly_io',

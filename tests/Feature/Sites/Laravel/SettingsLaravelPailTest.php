@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\Laravel;
 
 use App\Enums\SiteType;
+use App\Livewire\Sites\Settings;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\Organization;
 use App\Models\Server;
@@ -170,7 +171,7 @@ class SettingsLaravelPailTest extends TestCase
 
         // Force initial state to "loaded with a near-cap buffer", then
         // append a chunk that pushes us over the limit.
-        $existing = str_repeat('a', \App\Livewire\Sites\Settings::PAIL_BUFFER_MAX_CHARS - 100);
+        $existing = str_repeat('a', Settings::PAIL_BUFFER_MAX_CHARS - 100);
         $appendBody = str_repeat('b', 200);
 
         $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
@@ -186,7 +187,7 @@ class SettingsLaravelPailTest extends TestCase
             ->call('loadLaravelPail', $executor);
 
         $buffer = $component->get('laravelPailBuffer');
-        $this->assertLessThanOrEqual(\App\Livewire\Sites\Settings::PAIL_BUFFER_MAX_CHARS + 100, strlen($buffer));
+        $this->assertLessThanOrEqual(Settings::PAIL_BUFFER_MAX_CHARS + 100, strlen($buffer));
         $this->assertStringContainsString('older lines trimmed', $buffer);
     }
 

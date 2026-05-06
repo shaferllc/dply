@@ -30,8 +30,8 @@ class ArtisanClassificationTest extends TestCase
     {
         return new Artisan(
             Mockery::mock(ExecuteRemoteTaskOnServer::class),
-            new RemoteCliPermissions(),
-            new SiteAuditWriter(),
+            new RemoteCliPermissions,
+            new SiteAuditWriter,
         );
     }
 

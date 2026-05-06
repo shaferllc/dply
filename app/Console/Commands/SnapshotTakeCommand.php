@@ -85,7 +85,7 @@ class SnapshotTakeCommand extends Command
                 'expires_at' => $snapshot->expires_at?->toISOString(),
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         } else {
-            $this->info("Snapshot saved: snap-{$snapshot->id} ({$snapshot->destination}, ".number_format(($snapshot->bytes ?? 0) / 1024, 1)." KB)");
+            $this->info("Snapshot saved: snap-{$snapshot->id} ({$snapshot->destination}, ".number_format(($snapshot->bytes ?? 0) / 1024, 1).' KB)');
         }
 
         return self::SUCCESS;

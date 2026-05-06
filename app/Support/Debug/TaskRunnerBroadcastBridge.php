@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace App\Support\Debug;
 
 use App\Events\Debug\TaskRunnerActivityBroadcast;
+use App\Livewire\Debug\TaskRunnerPanel;
 use App\Models\Server;
 use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
+use App\Providers\AppServiceProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Bridges {@see StreamingLoggerInterface} events into the org-scoped Reverb
- * channel consumed by {@see \App\Livewire\Debug\TaskRunnerPanel}.
+ * channel consumed by {@see TaskRunnerPanel}.
  *
- * Registered once at boot from {@see \App\Providers\AppServiceProvider}. Sits
+ * Registered once at boot from {@see AppServiceProvider}. Sits
  * on the SSH/SCP/Process hot path so this MUST swallow every error — a
  * broadcast hiccup must not break the underlying remote command.
  */

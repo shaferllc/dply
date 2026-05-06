@@ -47,6 +47,16 @@ class ServerCacheServiceAuditEvent extends Model
 
     public const EVENT_SWITCH_FAILED = 'cache_service_switch_failed';
 
+    public const EVENT_REPL_EXECUTED = 'cache_service_repl_executed';
+
+    public const EVENT_REPL_DENIED = 'cache_service_repl_denied';
+
+    public const EVENT_REPL_BLOCKED = 'cache_service_repl_blocked';
+
+    public const EVENT_REPL_UNLOCKED = 'cache_service_repl_unlocked';
+
+    public const EVENT_REPL_LOCKED = 'cache_service_repl_locked';
+
     protected $table = 'server_cache_service_audit_events';
 
     protected $fillable = [

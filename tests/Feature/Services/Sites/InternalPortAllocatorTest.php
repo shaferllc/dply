@@ -7,6 +7,7 @@ namespace Tests\Feature\Services\Sites;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\InternalPortAllocator;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -86,7 +87,7 @@ class InternalPortAllocatorTest extends TestCase
             'internal_port' => 30001,
         ]);
 
-        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        $this->expectException(UniqueConstraintViolationException::class);
 
         Site::factory()->create([
             'server_id' => $server->id,

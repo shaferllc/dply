@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerCronJobRun;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
@@ -72,7 +73,7 @@ class PruneServerCronJobRunsCommandTest extends TestCase
         ]);
     }
 
-    private function makeRun(ServerCronJob $job, \Carbon\Carbon $startedAt): ServerCronJobRun
+    private function makeRun(ServerCronJob $job, Carbon $startedAt): ServerCronJobRun
     {
         return ServerCronJobRun::query()->create([
             'server_cron_job_id' => $job->id,

@@ -7,6 +7,7 @@ namespace App\Services\Snapshots;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\Snapshot;
+use App\Models\User;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
@@ -86,7 +87,7 @@ class SnapshotService
 
         $this->audit->record(
             site: $site,
-            user: $userId !== null ? \App\Models\User::query()->find($userId) : null,
+            user: $userId !== null ? User::query()->find($userId) : null,
             action: 'snapshot_taken',
             risk: RiskLevel::MutatingRecoverable,
             transport: $userId !== null ? SiteAuditEvent::TRANSPORT_WEB : SiteAuditEvent::TRANSPORT_SYSTEM,
@@ -108,7 +109,7 @@ class SnapshotService
         } catch (Throwable $e) {
             $this->audit->record(
                 site: $snapshot->site,
-                user: $userId !== null ? \App\Models\User::query()->find($userId) : null,
+                user: $userId !== null ? User::query()->find($userId) : null,
                 action: 'snapshot_restore_failed',
                 risk: RiskLevel::Destructive,
                 transport: $userId !== null ? SiteAuditEvent::TRANSPORT_WEB : SiteAuditEvent::TRANSPORT_SYSTEM,
@@ -122,7 +123,7 @@ class SnapshotService
 
         $this->audit->record(
             site: $snapshot->site,
-            user: $userId !== null ? \App\Models\User::query()->find($userId) : null,
+            user: $userId !== null ? User::query()->find($userId) : null,
             action: 'snapshot_restored',
             risk: RiskLevel::Destructive,
             transport: $userId !== null ? SiteAuditEvent::TRANSPORT_WEB : SiteAuditEvent::TRANSPORT_SYSTEM,

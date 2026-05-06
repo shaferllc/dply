@@ -81,7 +81,7 @@ class ProcessScheduledServerDeletionsCommandTest extends TestCase
         Artisan::call('dply:process-scheduled-server-deletions');
 
         $audit = \DB::table('audit_logs')
-            ->where('subject_type', \App\Models\Server::class)
+            ->where('subject_type', Server::class)
             ->where('subject_id', $serverId)
             ->where('action', 'server.deleted')
             ->first();

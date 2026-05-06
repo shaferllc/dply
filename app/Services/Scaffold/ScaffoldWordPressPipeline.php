@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Scaffold;
 
+use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
+use App\Notifications\SiteDatabaseCredentialsNotification;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
@@ -199,7 +201,7 @@ class ScaffoldWordPressPipeline
         $username = 'dply_'.Str::slug($site->slug, '_');
         $password = Str::password(24, symbols: false);
 
-        $db = new \App\Models\ServerDatabase([
+        $db = new ServerDatabase([
             'server_id' => $site->server->id,
             'name' => $dbName,
             'username' => $username,
@@ -228,7 +230,7 @@ class ScaffoldWordPressPipeline
             && $creator
             && filled($creator->email)
         ) {
-            $creator->notify(new \App\Notifications\SiteDatabaseCredentialsNotification(
+            $creator->notify(new SiteDatabaseCredentialsNotification(
                 site: $site,
                 engine: $engine,
                 password: $password,

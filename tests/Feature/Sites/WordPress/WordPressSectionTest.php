@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\RemoteCliRun;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\Snapshot;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\RemoteCli\Kind;
@@ -266,13 +267,13 @@ class WordPressSectionTest extends TestCase
             ->call('takeSnapshot')
             ->assertHasErrors('snapshots');
 
-        $this->assertSame(0, \App\Models\Snapshot::query()->count());
+        $this->assertSame(0, Snapshot::query()->count());
     }
 
     public function test_database_tab_lists_existing_snapshots(): void
     {
         [$user, $site] = $this->makeWpSite();
-        \App\Models\Snapshot::factory()->create([
+        Snapshot::factory()->create([
             'site_id' => $site->id,
             'reason' => 'manual',
             'bytes' => 2048,

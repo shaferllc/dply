@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -14,7 +15,7 @@ class ExampleTest extends TestCase
     {
         // RedirectGuestsToComingSoon redirects '/' for non-local hosts;
         // bypass it here since this test asserts the homepage renders.
-        $response = $this->withoutMiddleware([\App\Http\Middleware\RedirectGuestsToComingSoon::class])
+        $response = $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
             ->get('/');
 
         $response->assertStatus(200);

@@ -5,8 +5,10 @@ namespace App\Livewire\Sites;
 use App\Enums\SiteType;
 use App\Jobs\DeleteServerSystemUserJob;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SiteSystemUserMutationJob;
+use App\Jobs\TearDownSiteSystemdUnitJob;
 use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\NotificationChannel;
@@ -19,9 +21,10 @@ use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
-use App\Models\SiteProcess;
 use App\Models\SitePreviewDomain;
+use App\Models\SiteProcess;
 use App\Models\SiteTenantDomain;
+use App\Models\Snapshot;
 use App\Models\Workspace;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Cloudflare\CloudflareDnsService;
@@ -29,6 +32,9 @@ use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\DigitalOceanService;
 use App\Services\Notifications\AssignableNotificationChannels;
+use App\Services\RemoteCli\Artisan;
+use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerSystemUserService;
@@ -36,6 +42,10 @@ use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteDeploySyncGroupManager;
 use App\Services\Sites\SiteScopedCommandWrapper;
+use App\Services\Sites\SiteSystemdProvisioner;
+use App\Services\Sites\SiteSystemdUnitBuilder;
+use App\Services\Snapshots\LocalDiskDestination;
+use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
@@ -672,7 +682,7 @@ class Settings extends Show
      * rather than throwing; broken parsing leaves the entry list empty
      * with a friendly message.
      */
-    public function loadLaravelSchedule(\App\Services\RemoteCli\Artisan $artisan): void
+    public function loadLaravelSchedule(Artisan $artisan): void
     {
         $this->authorize('view', $this->site);
 
@@ -683,7 +693,7 @@ class Settings extends Show
                 args: ['--json'],
                 queuedBy: auth()->user(),
             );
-        } catch (\App\Services\RemoteCli\RemoteCliPermissionDeniedException $e) {
+        } catch (RemoteCliPermissionDeniedException $e) {
             $this->addError('laravel_schedule', __('Your role can\'t inspect the Laravel schedule.'));
 
             return;
@@ -703,7 +713,7 @@ class Settings extends Show
      * The command is INSTANT-allowlisted so it returns inline. Parsed
      * rows feed the migrations-tab partial.
      */
-    public function loadLaravelMigrations(\App\Services\RemoteCli\Artisan $artisan): void
+    public function loadLaravelMigrations(Artisan $artisan): void
     {
         $this->authorize('view', $this->site);
 
@@ -714,7 +724,7 @@ class Settings extends Show
                 args: ['--json'],
                 queuedBy: auth()->user(),
             );
-        } catch (\App\Services\RemoteCli\RemoteCliPermissionDeniedException $e) {
+        } catch (RemoteCliPermissionDeniedException $e) {
             $this->addError('laravel_migrations', __('Your role can\'t inspect migrations.'));
 
             return;
@@ -734,9 +744,9 @@ class Settings extends Show
      * data without a snapshot to restore from is a real possibility.
      */
     public function rollbackLastMigrationBatch(
-        \App\Services\RemoteCli\Artisan $artisan,
-        \App\Services\Snapshots\SnapshotService $snapshots,
-        \App\Services\Servers\ExecuteRemoteTaskOnServer $executor,
+        Artisan $artisan,
+        SnapshotService $snapshots,
+        ExecuteRemoteTaskOnServer $executor,
     ): void {
         $this->authorize('update', $this->site);
 
@@ -751,8 +761,8 @@ class Settings extends Show
         try {
             $snapshot = $snapshots->take(
                 site: $this->site,
-                destination: new \App\Services\Snapshots\LocalDiskDestination($executor),
-                reason: \App\Models\Snapshot::REASON_PRE_MIGRATION_ROLLBACK,
+                destination: new LocalDiskDestination($executor),
+                reason: Snapshot::REASON_PRE_MIGRATION_ROLLBACK,
                 userId: auth()->id(),
             );
         } catch (\Throwable $e) {
@@ -768,7 +778,7 @@ class Settings extends Show
                 args: ['--force', '--step=1'],
                 queuedBy: auth()->user(),
             );
-        } catch (\App\Services\RemoteCli\RemoteCliPermissionDeniedException $e) {
+        } catch (RemoteCliPermissionDeniedException $e) {
             $this->addError('laravel_migrations', __('Permission denied: :err', ['err' => $e->getMessage()]));
 
             return;
@@ -793,7 +803,7 @@ class Settings extends Show
      * and dply already has the polling primitive plumbed everywhere
      * (no new infra to maintain).
      */
-    public function loadLaravelPail(\App\Services\Servers\ExecuteRemoteTaskOnServer $executor, int $lines = 200): void
+    public function loadLaravelPail(ExecuteRemoteTaskOnServer $executor, int $lines = 200): void
     {
         $this->authorize('view', $this->site);
 
@@ -2348,7 +2358,7 @@ class Settings extends Show
         // skips PHP/static sites internally so this is safe to call
         // unconditionally for non-PHP runtimes.
         if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            \App\Jobs\ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
+            ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
         }
 
         $this->new_site_process_name = '';
@@ -2385,7 +2395,7 @@ class Settings extends Show
         }
 
         $name = $process->name;
-        $unitName = app(\App\Services\Sites\SiteSystemdUnitBuilder::class)
+        $unitName = app(SiteSystemdUnitBuilder::class)
             ->processUnitName($this->site, $process);
         $process->delete();
 
@@ -2395,7 +2405,7 @@ class Settings extends Show
         // place, so dispatching for them is a guaranteed no-op (the
         // job's runtime guard would skip).
         if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            \App\Jobs\TearDownSiteSystemdUnitJob::dispatch($this->site->id, $unitName);
+            TearDownSiteSystemdUnitJob::dispatch($this->site->id, $unitName);
         }
 
         $this->toastSuccess(__('Process :name removed.', ['name' => $name]));
@@ -2443,6 +2453,7 @@ class Settings extends Show
      * Update a SiteProcess's scale (number of replicas).
      *
      * Per the strategy memo: "scale (default 1, implemented via systemd
+     *
      * @.service templates)". The data-layer update lands here; the
      * actual systemd template + multi-instance enable happens on the
      * next deploy / re-converge — re-running ProvisionSiteSystemdUnitsJob
@@ -2473,7 +2484,7 @@ class Settings extends Show
         // number of @{N}.service instances. Skipped for PHP/static —
         // those don't have systemd units to reflect scale into.
         if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            \App\Jobs\ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
+            ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
         }
 
         $this->toastSuccess(__('Scale set to :n for :name.', [
@@ -2538,11 +2549,11 @@ class Settings extends Show
             return;
         }
 
-        $unitName = app(\App\Services\Sites\SiteSystemdUnitBuilder::class)
+        $unitName = app(SiteSystemdUnitBuilder::class)
             ->processUnitName($this->site, $process);
 
         try {
-            app(\App\Services\Sites\SiteSystemdProvisioner::class)->restartUnit($this->site, $unitName);
+            app(SiteSystemdProvisioner::class)->restartUnit($this->site, $unitName);
         } catch (\Throwable $e) {
             $this->toastError(__('Restart failed: :msg', ['msg' => $e->getMessage()]));
 

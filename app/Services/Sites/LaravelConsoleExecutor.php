@@ -12,6 +12,7 @@ use App\Services\RemoteCli\Kind;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\SshConnection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -203,7 +204,7 @@ final class LaravelConsoleExecutor
         return array_values(array_slice($parts, 1));
     }
 
-    private function recordRun(Site $site, string $command, array $args, RiskLevel $risk, int $exitCode, string $output, \Illuminate\Support\Carbon $startedAt): void
+    private function recordRun(Site $site, string $command, array $args, RiskLevel $risk, int $exitCode, string $output, Carbon $startedAt): void
     {
         $finishedAt = now();
         $status = $exitCode === 0 ? RemoteCliRun::STATUS_COMPLETED : RemoteCliRun::STATUS_FAILED;

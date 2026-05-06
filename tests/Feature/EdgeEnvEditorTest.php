@@ -8,7 +8,6 @@ use App\Enums\SiteType;
 use App\Jobs\RedeployEdgeSiteJob;
 use App\Livewire\Sites\Settings as SitesSettings;
 use App\Models\Organization;
-use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;

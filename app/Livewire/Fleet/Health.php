@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 /**
@@ -261,7 +262,7 @@ class Health extends Component
      * deploys (idempotency conflicts) since they're not really
      * "tries" — a skipped deploy means another one was running.
      *
-     * @param  \Illuminate\Support\Collection<int, string>  $siteIds
+     * @param  Collection<int, string>  $siteIds
      * @return array{percent: ?int, total: int, success: int, failed: int, window_days: int}
      */
     private function computeSuccessRate($siteIds): array

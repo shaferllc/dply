@@ -19,8 +19,8 @@ interface GitCloner
      * exist as a directory — git creates it).
      *
      * @throws GitCloneException on any failure (network, auth, missing branch,
-     *                          invalid URL, etc.). Callers translate this into
-     *                          UI-friendly messages.
+     *                           invalid URL, etc.). Callers translate this into
+     *                           UI-friendly messages.
      */
     public function shallowClone(string $url, string $branch, string $destination): void;
 }

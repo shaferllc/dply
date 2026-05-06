@@ -62,8 +62,8 @@ class RemoteCliSyncExecutionTest extends TestCase
     {
         return new WpCli(
             $executor ?? Mockery::mock(ExecuteRemoteTaskOnServer::class),
-            new RemoteCliPermissions(),
-            new SiteAuditWriter(),
+            new RemoteCliPermissions,
+            new SiteAuditWriter,
         );
     }
 

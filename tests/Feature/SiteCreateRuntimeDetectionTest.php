@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\User;
@@ -278,7 +279,7 @@ class SiteCreateRuntimeDetectionTest extends TestCase
 
     public function test_store_materializes_runtime_aware_default_deploy_steps(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         [$user, $server] = $this->makeServerWithUser();
 
         Livewire::actingAs($user)
@@ -304,7 +305,7 @@ class SiteCreateRuntimeDetectionTest extends TestCase
 
     public function test_store_skips_default_steps_for_static_runtime(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         [$user, $server] = $this->makeServerWithUser();
 
         Livewire::actingAs($user)
@@ -322,12 +323,12 @@ class SiteCreateRuntimeDetectionTest extends TestCase
     public function test_engine_picker_renders_only_for_multi_engine_servers(): void
     {
         [$user, $server] = $this->makeServerWithUser();
-        \App\Models\ServerDatabaseEngine::create([
+        ServerDatabaseEngine::create([
             'server_id' => $server->id,
             'engine' => 'postgres',
             'is_default' => true,
         ]);
-        \App\Models\ServerDatabaseEngine::create([
+        ServerDatabaseEngine::create([
             'server_id' => $server->id,
             'engine' => 'mysql84',
             'is_default' => false,
@@ -342,7 +343,7 @@ class SiteCreateRuntimeDetectionTest extends TestCase
     public function test_engine_picker_hidden_for_single_engine_server(): void
     {
         [$user, $server] = $this->makeServerWithUser();
-        \App\Models\ServerDatabaseEngine::create([
+        ServerDatabaseEngine::create([
             'server_id' => $server->id,
             'engine' => 'postgres',
             'is_default' => true,
@@ -356,13 +357,13 @@ class SiteCreateRuntimeDetectionTest extends TestCase
     public function test_create_form_loads_server_database_engines_and_picks_default(): void
     {
         [$user, $server] = $this->makeServerWithUser();
-        \App\Models\ServerDatabaseEngine::create([
+        ServerDatabaseEngine::create([
             'server_id' => $server->id,
             'engine' => 'postgres',
             'version' => '17',
             'is_default' => true,
         ]);
-        \App\Models\ServerDatabaseEngine::create([
+        ServerDatabaseEngine::create([
             'server_id' => $server->id,
             'engine' => 'mysql84',
             'version' => '8.4',
@@ -377,9 +378,9 @@ class SiteCreateRuntimeDetectionTest extends TestCase
 
     public function test_store_persists_null_engine_when_user_keeps_server_default(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         [$user, $server] = $this->makeServerWithUser();
-        \App\Models\ServerDatabaseEngine::create([
+        ServerDatabaseEngine::create([
             'server_id' => $server->id,
             'engine' => 'postgres',
             'is_default' => true,
@@ -404,14 +405,14 @@ class SiteCreateRuntimeDetectionTest extends TestCase
 
     public function test_store_persists_engine_override_when_user_picks_non_default(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
         [$user, $server] = $this->makeServerWithUser();
-        \App\Models\ServerDatabaseEngine::create([
+        ServerDatabaseEngine::create([
             'server_id' => $server->id,
             'engine' => 'postgres',
             'is_default' => true,
         ]);
-        \App\Models\ServerDatabaseEngine::create([
+        ServerDatabaseEngine::create([
             'server_id' => $server->id,
             'engine' => 'mysql84',
             'is_default' => false,
@@ -433,7 +434,7 @@ class SiteCreateRuntimeDetectionTest extends TestCase
     }
 
     /**
-     * @return array{0: \App\Models\User, 1: Server}
+     * @return array{0: User, 1: Server}
      */
     private function makeServerWithUser(): array
     {

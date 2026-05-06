@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\SiteType;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -99,7 +102,7 @@ class FleetSummaryCommandTest extends TestCase
 
     public function test_fly_io_section_marks_connected_when_credential_exists(): void
     {
-        \App\Models\ProviderCredential::factory()->create([
+        ProviderCredential::factory()->create([
             'provider' => 'fly_io',
             'name' => 'Fly token',
             'credentials' => ['api_token' => 't'],
@@ -113,7 +116,7 @@ class FleetSummaryCommandTest extends TestCase
 
     public function test_edge_fleet_section_aggregates_by_backend_and_status(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $server = Server::factory()->create([
             'user_id' => $user->id,
             'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
@@ -121,7 +124,7 @@ class FleetSummaryCommandTest extends TestCase
         Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,
@@ -133,7 +136,7 @@ class FleetSummaryCommandTest extends TestCase
         Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,
@@ -164,7 +167,7 @@ class FleetSummaryCommandTest extends TestCase
 
     public function test_edge_fleet_section_breaks_down_by_mode_and_counts_previews(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $server = Server::factory()->create([
             'user_id' => $user->id,
             'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
@@ -173,7 +176,7 @@ class FleetSummaryCommandTest extends TestCase
         Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,
@@ -186,7 +189,7 @@ class FleetSummaryCommandTest extends TestCase
         $parent = Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,
@@ -200,7 +203,7 @@ class FleetSummaryCommandTest extends TestCase
         Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,
@@ -228,7 +231,7 @@ class FleetSummaryCommandTest extends TestCase
 
     public function test_edge_fleet_human_output_renders_section(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $server = Server::factory()->create([
             'user_id' => $user->id,
             'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
@@ -236,7 +239,7 @@ class FleetSummaryCommandTest extends TestCase
         Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
-            'type' => \App\Enums\SiteType::Container,
+            'type' => SiteType::Container,
             'runtime' => null,
             'document_root' => null,
             'repository_path' => null,

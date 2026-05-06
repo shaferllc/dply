@@ -3,8 +3,8 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Server;
-use App\Services\SshConnection;
 use App\Services\Servers\ServerCrontabReader;
+use App\Services\SshConnection;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -76,9 +76,7 @@ class ServerCrontabReaderTest extends TestCase
                         throw new \RuntimeException('stop after role capture');
                     }
 
-                    public function disconnect(): void
-                    {
-                    }
+                    public function disconnect(): void {}
                 };
             }
         };

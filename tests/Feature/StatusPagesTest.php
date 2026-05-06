@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Status\PublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Models\Organization;
@@ -42,7 +43,7 @@ class StatusPagesTest extends TestCase
 
         // Guest pages are caught by RedirectGuestsToComingSoon middleware in
         // non-local envs; bypass for tests asserting actual page render.
-        $response = $this->withoutMiddleware([\App\Http\Middleware\RedirectGuestsToComingSoon::class])
+        $response = $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
             ->get(route('status.public', $page));
 
         $response->assertOk();
@@ -60,7 +61,7 @@ class StatusPagesTest extends TestCase
             'is_public' => false,
         ]);
 
-        $this->withoutMiddleware([\App\Http\Middleware\RedirectGuestsToComingSoon::class])
+        $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
             ->get(route('status.public', $page))
             ->assertNotFound();
     }

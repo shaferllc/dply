@@ -12,23 +12,19 @@ use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
 use Illuminate\Support\Collection;
 use Mockery;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SiteOpenLiteSpeedProvisionerTest extends TestCase
 {
     #[Test]
-    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
-    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function provision_writes_openlitespeed_vhost_and_placeholder_page(): void
     {
-        $server = new class([
-            'name' => 'OLS Box',
-            'ip_address' => '203.0.113.21',
-            'ssh_user' => 'root',
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'status' => Server::STATUS_READY,
-        ]) extends Server
+        $server = new class(['name' => 'OLS Box', 'ip_address' => '203.0.113.21', 'ssh_user' => 'root', 'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----", 'status' => Server::STATUS_READY]) extends Server
         {
             public function recoverySshPrivateKey(): ?string
             {

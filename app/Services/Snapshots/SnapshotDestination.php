@@ -24,8 +24,8 @@ interface SnapshotDestination
      *
      * @param  string  $reason  one of {@see Snapshot::REASON_*}
      * @param  string  $dumpRemotePath  on-server path of the freshly-written
-     *     gzipped dump file produced by SnapshotService — the destination
-     *     is responsible for moving / streaming it out.
+     *                                  gzipped dump file produced by SnapshotService — the destination
+     *                                  is responsible for moving / streaming it out.
      */
     public function persist(Site $site, string $reason, string $dumpRemotePath, int $bytes, string $engine, ?string $userId): Snapshot;
 

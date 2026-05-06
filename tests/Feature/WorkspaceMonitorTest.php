@@ -2,15 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\NotificationChannel;
-use App\Models\NotificationSubscription;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Models\Workspace;
+use App\Services\Servers\ServerMetricsGuestScript;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -59,7 +57,7 @@ class WorkspaceMonitorTest extends TestCase
                 'monitoring_guest_push_cron_expression' => '* * * * *',
                 'monitoring_callback_env_present_remote' => true,
                 'monitoring_guest_cron_present_remote' => true,
-                'monitoring_guest_script_sha' => app(\App\Services\Servers\ServerMetricsGuestScript::class)->bundledSha256(),
+                'monitoring_guest_script_sha' => app(ServerMetricsGuestScript::class)->bundledSha256(),
             ],
         ]);
 
@@ -98,7 +96,7 @@ class WorkspaceMonitorTest extends TestCase
                 'monitoring_guest_push_cron_expression' => '* * * * *',
                 'monitoring_callback_env_present_remote' => true,
                 'monitoring_guest_cron_present_remote' => true,
-                'monitoring_guest_script_sha' => app(\App\Services\Servers\ServerMetricsGuestScript::class)->bundledSha256(),
+                'monitoring_guest_script_sha' => app(ServerMetricsGuestScript::class)->bundledSha256(),
             ],
         ]);
 
@@ -132,7 +130,7 @@ class WorkspaceMonitorTest extends TestCase
                 'monitoring_guest_push_cron_expression' => '* * * * *',
                 'monitoring_callback_env_present_remote' => true,
                 'monitoring_guest_cron_present_remote' => true,
-                'monitoring_guest_script_sha' => app(\App\Services\Servers\ServerMetricsGuestScript::class)->bundledSha256(),
+                'monitoring_guest_script_sha' => app(ServerMetricsGuestScript::class)->bundledSha256(),
             ],
         ]);
 
@@ -218,7 +216,7 @@ class WorkspaceMonitorTest extends TestCase
                 'monitoring_guest_push_cron_expression' => '* * * * *',
                 'monitoring_callback_env_present_remote' => true,
                 'monitoring_guest_cron_present_remote' => true,
-                'monitoring_guest_script_sha' => app(\App\Services\Servers\ServerMetricsGuestScript::class)->bundledSha256(),
+                'monitoring_guest_script_sha' => app(ServerMetricsGuestScript::class)->bundledSha256(),
             ],
         ]);
 

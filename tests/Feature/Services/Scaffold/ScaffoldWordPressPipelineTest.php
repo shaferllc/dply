@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Scaffold\PlaceholderDnsManager;
 use App\Services\Scaffold\PrerequisiteResult;
 use App\Services\Scaffold\ScaffoldPrerequisites;
@@ -87,7 +88,7 @@ class ScaffoldWordPressPipelineTest extends TestCase
         $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
         $executor->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('ok', 0, false));
 
-        $audit = app(\App\Services\RemoteCli\SiteAuditWriter::class);
+        $audit = app(SiteAuditWriter::class);
 
         $result = (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, $audit, $this->placeholderDnsAlwaysAssigns()))->run($site);
 
@@ -132,7 +133,7 @@ class ScaffoldWordPressPipelineTest extends TestCase
         $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
         $executor->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('ok', 0, false));
 
-        (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(\App\Services\RemoteCli\SiteAuditWriter::class), $this->placeholderDnsAlwaysAssigns()))->run($site);
+        (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $this->placeholderDnsAlwaysAssigns()))->run($site);
 
         $db = ServerDatabase::query()->sole();
         $this->assertSame('mysql84', $db->engine, 'Pipeline must fall back to mysql84 when server engine is incompatible');
@@ -158,7 +159,7 @@ class ScaffoldWordPressPipelineTest extends TestCase
             ->withArgs(fn ($s, string $name) => $name === 'scaffold-wp:core-install')
             ->andReturn(new ProcessOutput('Error: Could not connect to db', 1, false));
 
-        $result = (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(\App\Services\RemoteCli\SiteAuditWriter::class), $this->placeholderDnsAlwaysAssigns()))->run($site);
+        $result = (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $this->placeholderDnsAlwaysAssigns()))->run($site);
 
         $this->assertFalse($result['ok']);
         $this->assertSame('wp_install', $result['failed_step']);
@@ -198,7 +199,7 @@ class ScaffoldWordPressPipelineTest extends TestCase
 
         $dns = $this->placeholderDnsAlwaysAssigns(hostname: 'my-wp-blog.203-0-113-42.nip.io');
 
-        (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(\App\Services\RemoteCli\SiteAuditWriter::class), $dns))
+        (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $dns))
             ->run($site);
 
         $this->assertNotNull($installBash, 'wp core install step should have run');

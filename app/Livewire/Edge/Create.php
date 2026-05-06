@@ -11,6 +11,7 @@ use App\Models\ProviderCredential;
 use App\Services\Edge\AwsAppRunnerBackend;
 use App\Services\Edge\DigitalOceanAppPlatformBackend;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -287,7 +288,7 @@ class Create extends Component
             'connectedBackends' => $connected,
             'regions' => $this->backendRegions($this->backend),
             'awsSourceReady' => $awsSourceReady,
-            'fakeCloudActive' => \App\Support\Servers\FakeCloudProvision::enabled(),
+            'fakeCloudActive' => FakeCloudProvision::enabled(),
         ])->layout('layouts.app');
     }
 }

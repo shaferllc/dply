@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Server;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerSshAccessRepairer;
 use Mockery;
@@ -33,7 +34,7 @@ class ServerSshAccessRepairerTest extends TestCase
                     && str_contains($script, 'authorized_keys')
                     && str_contains($script, base64_encode((string) $server->openSshPublicKeyFromOperationalPrivate()));
             })
-            ->andReturn(new \App\Modules\TaskRunner\ProcessOutput("repair ok\n"));
+            ->andReturn(new ProcessOutput("repair ok\n"));
 
         $repairer = new ServerSshAccessRepairer($remote);
 

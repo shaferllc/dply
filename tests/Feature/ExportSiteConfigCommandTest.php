@@ -8,6 +8,7 @@ use App\Console\Commands\ExportSiteConfigCommand;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteEnvironmentVariable;
+use App\Models\SiteProcess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -76,7 +77,7 @@ class ExportSiteConfigCommandTest extends TestCase
         $site = $this->makeSite();
         // Site::created hook makes a 'web' process; add a worker.
         $site->processes()->create([
-            'type' => \App\Models\SiteProcess::TYPE_WORKER,
+            'type' => SiteProcess::TYPE_WORKER,
             'name' => 'queue',
             'command' => 'node worker.js',
             'scale' => 2,

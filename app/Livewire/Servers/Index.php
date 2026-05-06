@@ -8,6 +8,7 @@ use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
+use App\Models\ServerMetricSnapshot;
 use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Carbon\Carbon;
@@ -304,7 +305,7 @@ class Index extends Component
         $latestSnapshots = collect();
         if ($servers->isNotEmpty()) {
             $serverIds = $servers->pluck('id')->all();
-            $latestPerServer = \App\Models\ServerMetricSnapshot::query()
+            $latestPerServer = ServerMetricSnapshot::query()
                 ->whereIn('server_id', $serverIds)
                 ->whereIn('id', function ($q) use ($serverIds): void {
                     $q->from('server_metric_snapshots')

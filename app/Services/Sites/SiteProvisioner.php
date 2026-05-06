@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Events\Sites\SiteProvisioningUpdatedBroadcast;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Models\Site;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeploymentContractBuilder;
@@ -278,7 +279,7 @@ class SiteProvisioner
             // in the worker log but don't roll back the activation.
             if ($site->start_command !== null && $site->start_command !== ''
                 && ! in_array($site->runtimeKey(), ['php', 'static', null], true)) {
-                \App\Jobs\ProvisionSiteSystemdUnitsJob::dispatch($site->id);
+                ProvisionSiteSystemdUnitsJob::dispatch($site->id);
             }
 
             if ($previewDomain = $site->primaryPreviewDomain()) {

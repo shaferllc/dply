@@ -77,8 +77,8 @@ class SiteDoctorCommandTest extends TestCase
 
     public function test_no_domains_surfaces_as_drift(): void
     {
-        $server = \App\Models\Server::factory()->create();
-        $site = \App\Models\Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
+        $server = Server::factory()->create();
+        $site = Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
 
         Artisan::call('dply:site:doctor', [
             'site' => $site->slug,

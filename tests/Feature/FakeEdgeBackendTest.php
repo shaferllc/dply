@@ -7,10 +7,10 @@ namespace Tests\Feature;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionEdgeSiteJob;
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Edge\AwsAppRunnerBackend;
 use App\Services\Edge\DigitalOceanAppPlatformBackend;
 use App\Services\Edge\EdgeRouter;
 use App\Services\Edge\FakeEdgeBackend;
@@ -51,7 +51,7 @@ class FakeEdgeBackendTest extends TestCase
     public function test_router_returns_real_backend_when_credential_exists(): void
     {
         [$user, $org, $server] = $this->scaffold();
-        \App\Models\ProviderCredential::query()->create([
+        ProviderCredential::query()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'provider' => 'digitalocean_app_platform',

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Snapshots\SnapshotService;
 use Database\Factories\SnapshotFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Database snapshot of a Site's data, taken either manually or as the
@@ -15,20 +17,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * Stored either to local server disk (transient, TTL via expires_at) or
  * to a BYO S3-compatible bucket configured at the org level (durable).
- * The {@see \App\Services\Snapshots\SnapshotService} (added in PR 10)
+ * The {@see SnapshotService} (added in PR 10)
  * orchestrates take/restore; this model is the persistent record.
  *
  * @property int $id
  * @property string $site_id
- * @property string $destination     'local_disk' | 's3'
+ * @property string $destination 'local_disk' | 's3'
  * @property string|null $s3_bucket
  * @property string|null $s3_key
  * @property string|null $local_path
  * @property int|null $bytes
- * @property string $engine          'mysql' | 'mariadb' | 'postgres' | 'sqlite'
- * @property string $reason          'manual' | 'pre_migration_rollback' | 'pre_destructive_command' | 'scheduled'
+ * @property string $engine 'mysql' | 'mariadb' | 'postgres' | 'sqlite'
+ * @property string $reason 'manual' | 'pre_migration_rollback' | 'pre_destructive_command' | 'scheduled'
  * @property string|null $taken_by_user_id
- * @property \Illuminate\Support\Carbon|null $expires_at
+ * @property Carbon|null $expires_at
  */
 class Snapshot extends Model
 {

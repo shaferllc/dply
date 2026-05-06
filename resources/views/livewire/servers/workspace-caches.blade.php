@@ -13,6 +13,11 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4">
+        <p>{{ __('This workspace manages cache engines installed on this server via apt + systemd — Redis, Valkey, Memcached, KeyDB, and Dragonfly. Multiple engines can run side-by-side (e.g. Redis for queues, Memcached for app cache).') }}</p>
+        <p>{{ __('It is independent of how apps deployed here are configured to use cache: this page installs and operates the server, not your app\'s client code. The engine badges are read live from the server; install state lives in the dply database.') }}</p>
+    </x-explainer>
+
     @if ($opsReady)
         @php
             // Any engine in flight on this server. Used to render the global "an apt operation
@@ -175,7 +180,7 @@
             </x-server-workspace-tablist>
 
             <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:pb-0.5">
-                <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
+                <x-dropdown align="right" width="w-80" contentClasses="py-1.5">
                     <x-slot name="trigger">
                         <button
                             type="button"
@@ -197,11 +202,13 @@
                             wire:click="refreshCacheCapabilities"
                             wire:loading.attr="disabled"
                             wire:target="refreshCacheCapabilities"
-                            title="{{ __('Re-run engine detection (cached for a few minutes)') }}"
                             class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Recheck engines') }}</span>
-                            <span wire:loading wire:target="refreshCacheCapabilities">{{ __('Rechecking…') }}</span>
+                            <span class="block font-medium">
+                                <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Recheck engines') }}</span>
+                                <span wire:loading wire:target="refreshCacheCapabilities">{{ __('Rechecking…') }}</span>
+                            </span>
+                            <span class="mt-0.5 block text-xs leading-snug text-brand-mist">{{ __('Re-runs engine detection over SSH. Use this if you installed or removed something on the box and the badges look stale; detection is cached for a few minutes.') }}</span>
                         </button>
                     </x-slot>
                 </x-dropdown>
@@ -442,6 +449,61 @@
                         </p>
                     </div>
                 @else
+                    @php
+                        $isRedisFamily = \App\Models\ServerCacheService::engineSupportsAuth($row->engine);
+                        $availableSubtabs = $isRedisFamily
+                            ? ['overview', 'console', 'stats', 'configure']
+                            : ['overview', 'configure'];
+                        $activeSubtab = in_array($engine_subtab, $availableSubtabs, true) ? $engine_subtab : 'overview';
+                    @endphp
+
+                    {{-- Sub-tab strip — group the per-engine cards so the page isn't a 9-card scroll. --}}
+                    <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])">
+                        <x-server-workspace-tab
+                            :id="'cache-subtab-'.$engine.'-overview'"
+                            :active="$activeSubtab === 'overview'"
+                            wire:click="setEngineSubtab('overview')"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                <x-heroicon-o-presentation-chart-line class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Overview') }}
+                            </span>
+                        </x-server-workspace-tab>
+                        @if ($isRedisFamily)
+                            <x-server-workspace-tab
+                                :id="'cache-subtab-'.$engine.'-console'"
+                                :active="$activeSubtab === 'console'"
+                                wire:click="setEngineSubtab('console')"
+                            >
+                                <span class="inline-flex items-center gap-2">
+                                    <x-heroicon-o-command-line class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('Console') }}
+                                </span>
+                            </x-server-workspace-tab>
+                            <x-server-workspace-tab
+                                :id="'cache-subtab-'.$engine.'-stats'"
+                                :active="$activeSubtab === 'stats'"
+                                wire:click="setEngineSubtab('stats')"
+                            >
+                                <span class="inline-flex items-center gap-2">
+                                    <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('Stats') }}
+                                </span>
+                            </x-server-workspace-tab>
+                        @endif
+                        <x-server-workspace-tab
+                            :id="'cache-subtab-'.$engine.'-configure'"
+                            :active="$activeSubtab === 'configure'"
+                            wire:click="setEngineSubtab('configure')"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Configure') }}
+                            </span>
+                        </x-server-workspace-tab>
+                    </x-server-workspace-tablist>
+
+                    @if ($activeSubtab === 'overview')
                     {{-- Installed and idle: status grid + action row. --}}
                     <div class="{{ $card }} p-6 sm:p-8">
                         <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine status', ['engine' => $engineLabels[$engine]]) }}</h3>
@@ -512,7 +574,15 @@
                                 <span>{{ __('Restart, stop, start, flush, and uninstall are paused while another cache service is changing on this server.') }}</span>
                             </p>
                         @else
-                            <div class="mt-6 flex flex-wrap gap-2">
+                            <x-explainer class="mt-6" tone="warn" :title="__('What do these actions do?')">
+                                <ul>
+                                    <li><strong>{{ __('Restart') }}.</strong> {{ __('Issues systemctl restart. Briefly drops connections; clients reconnect on next command.') }}</li>
+                                    <li><strong>{{ __('Stop / Start') }}.</strong> {{ __('Halts or resumes the systemd unit. Stopped engines do not survive a reboot in the running state.') }}</li>
+                                    <li><strong>{{ __('Flush all keys') }}.</strong> {{ __('Drops every key in this engine — sessions, cache, queued tags, rate-limit counters. Cannot be undone.') }}</li>
+                                    <li><strong>{{ __('Uninstall') }}.</strong> {{ __('Runs apt purge for the package + data dirs. Other engines on this server are not affected.') }}</li>
+                                </ul>
+                            </x-explainer>
+                            <div class="mt-4 flex flex-wrap gap-2">
                                 @if (in_array($row->status, [\App\Models\ServerCacheService::STATUS_RUNNING, \App\Models\ServerCacheService::STATUS_STOPPED, \App\Models\ServerCacheService::STATUS_FAILED], true))
                                     <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
                                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
@@ -559,9 +629,11 @@
                         'card' => $card,
                         'engineLabels' => $engineLabels,
                     ])
+                    @endif {{-- /overview subtab --}}
 
-                    {{-- AUTH password card (redis-family only). --}}
+                    {{-- AUTH password card (redis-family only, Configure subtab). --}}
                     @if (\App\Models\ServerCacheService::engineSupportsAuth($row->engine))
+                        @if ($activeSubtab === 'configure')
                         <div class="{{ $card }} p-6 sm:p-8">
                             <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — AUTH password', ['engine' => $engineLabels[$engine]]) }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">
@@ -668,8 +740,10 @@
                                 </form>
                             @endif
                         </div>
+                        @endif {{-- /configure subtab (auth + memory) --}}
 
-                        {{-- Connected clients (redis-family only). --}}
+                        {{-- Connected clients (redis-family only, Stats subtab). --}}
+                        @if ($activeSubtab === 'stats')
                         <div class="{{ $card }} p-6 sm:p-8">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
@@ -731,9 +805,35 @@
                                 @endif
                             @endif
                         </div>
+
+                        {{-- Live keyspace dashboard — redis-family only, Stats subtab. --}}
+                        @include('livewire.servers.partials.cache-keyspace-card', [
+                            'engine' => $engine,
+                            'engineLabel' => $engineLabels[$engine] ?? ucfirst($engine),
+                            'row' => $row,
+                            'samples' => $keyspaceSamples,
+                            'loaded' => $keyspaceLoaded,
+                            'error' => $keyspaceError,
+                            'card' => $card,
+                        ])
+                        @endif {{-- /stats subtab (clients + keyspace) --}}
+
+                        {{-- Interactive console (REPL) — redis-family only, Console subtab. --}}
+                        @if ($activeSubtab === 'console')
+                        @include('livewire.servers.partials.cache-repl-card', [
+                            'engine' => $engine,
+                            'engineLabel' => $engineLabels[$engine] ?? ucfirst($engine),
+                            'row' => $row,
+                            'replInput' => $replInput,
+                            'replHistory' => $replHistory,
+                            'replUnlocked' => $replUnlocked,
+                            'card' => $card,
+                        ])
+                        @endif {{-- /console subtab --}}
                     @endif
 
-                    {{-- Server config file viewer/editor. Per-engine, scoped to current tab. --}}
+                    {{-- Server config file viewer/editor. Configure subtab. --}}
+                    @if ($activeSubtab === 'configure')
                     <div class="{{ $card }} p-6 sm:p-8">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
@@ -804,6 +904,7 @@
                             <pre class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink whitespace-pre">{{ $cacheConfigContent }}</pre>
                         @endif
                     </div>
+                    @endif {{-- /configure subtab (config viewer) --}}
                 @endif
             </x-server-workspace-tab-panel>
         @endforeach
@@ -820,6 +921,10 @@
             <div class="{{ $card }} p-6 sm:p-8">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
                 <p class="mt-2 text-sm text-brand-moss">{{ __('Recent install / uninstall / restart / stop / start / flush events on cache services for this server.') }}</p>
+                <x-explainer class="mt-3">
+                    <p>{{ __('Every operator action through this workspace writes a row here. Events are also forwarded to the organization-wide audit log when a signed-in user is the actor.') }}</p>
+                    <p>{{ __('Most recent 40 events shown. Event names are stable identifiers (e.g. cache_service_restarted) so they\'re grep-able from the org log; the engine field tells you which cache the event acted on.') }}</p>
+                </x-explainer>
                 <ul class="mt-6 divide-y divide-brand-ink/10 text-sm">
                     @forelse ($cacheAuditEvents as $ev)
                         <li class="py-3">

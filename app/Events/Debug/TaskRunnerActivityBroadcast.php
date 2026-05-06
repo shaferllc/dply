@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Events\Debug;
 
+use App\Livewire\Debug\TaskRunnerPanel;
+use App\Support\Debug\TaskRunnerBroadcastBridge;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -11,9 +14,9 @@ use Illuminate\Foundation\Events\Dispatchable;
 
 /**
  * Broadcasts a TaskRunner / SSH / Process activity event to the org-scoped
- * Reverb channel, fed by {@see \App\Support\Debug\TaskRunnerBroadcastBridge}.
+ * Reverb channel, fed by {@see TaskRunnerBroadcastBridge}.
  *
- * The TaskRunner debug panel ({@see \App\Livewire\Debug\TaskRunnerPanel})
+ * The TaskRunner debug panel ({@see TaskRunnerPanel})
  * subscribes to organization.{id} (already authorised via routes/channels.php)
  * and only renders for users who pass the viewPlatformAdmin gate. Members of
  * the same org who are not platform admins still receive the websocket frames
@@ -35,7 +38,7 @@ final class TaskRunnerActivityBroadcast implements ShouldBroadcastNow
     ) {}
 
     /**
-     * @return list<\Illuminate\Broadcasting\Channel>
+     * @return list<Channel>
      */
     public function broadcastOn(): array
     {

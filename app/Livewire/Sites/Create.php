@@ -2,15 +2,17 @@
 
 namespace App\Livewire\Sites;
 
+use App\Actions\Servers\InstallRuntimeOnServer;
 use App\Enums\ServerProvider;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionSiteJob;
+use App\Jobs\RunLaravelScaffoldJob;
+use App\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteDomain;
-use App\Actions\Servers\InstallRuntimeOnServer;
 use App\Models\SiteDeployStep;
+use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
@@ -278,10 +280,10 @@ class Create extends Component
         // in STATUS_SCAFFOLDING; the worker walks it through the steps
         // recorded under meta.scaffold.steps[] for the journey UI (PR 7).
         if ($this->form->scaffold_framework === 'laravel') {
-            \App\Jobs\RunLaravelScaffoldJob::dispatch($site->id);
+            RunLaravelScaffoldJob::dispatch($site->id);
             session()->flash('info', __('Laravel site queued for scaffolding. The pipeline runs in the background.'));
         } else {
-            \App\Jobs\RunWordPressScaffoldJob::dispatch($site->id);
+            RunWordPressScaffoldJob::dispatch($site->id);
             session()->flash('info', __('WordPress site queued for scaffolding. The pipeline runs in the background.'));
         }
 
@@ -525,6 +527,7 @@ class Create extends Component
      *
      * Exposed as a Livewire-magic computed property so the Blade panel
      * can call `$this->detectedRuntimeNeedsInstall` without an in-template
+     *
      * @php block (Blade's compileString has trouble parsing block-form
      * @php with array literals containing 'php'/'static' string keys —
      * Livewire-side computation sidesteps that entirely).

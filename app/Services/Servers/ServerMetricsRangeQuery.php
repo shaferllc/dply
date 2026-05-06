@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Server-side bucketed query for the per-metric panels on the Metrics page.
@@ -81,11 +82,11 @@ final class ServerMetricsRangeQuery
      * @return array{
      *     range: string,
      *     bucket_seconds: int,
-     *     from: \Illuminate\Support\Carbon,
-     *     to: \Illuminate\Support\Carbon,
+     *     from: Carbon,
+     *     to: Carbon,
      *     sample_count: int,
      *     latest_payload: array<string, mixed>,
-     *     latest_at: ?\Illuminate\Support\Carbon,
+     *     latest_at: ?Carbon,
      *     metrics: array<string, list<array{at: int, min: float, avg: float, max: float}>>
      * }
      */
@@ -131,7 +132,7 @@ final class ServerMetricsRangeQuery
      * per bucket. Buckets with no samples are skipped — the chart treats gaps
      * as gaps rather than zeros.
      *
-     * @param  \Illuminate\Support\Collection<int, ServerMetricSnapshot>  $snapshots
+     * @param  Collection<int, ServerMetricSnapshot>  $snapshots
      * @return list<array{at: int, min: float, avg: float, max: float}>
      */
     private function bucketSeries($snapshots, string $metric, int $bucketSeconds): array

@@ -30,7 +30,7 @@ class InstalledStackTest extends TestCase
 
     public function test_from_meta_uses_installed_stack_key_when_present(): void
     {
-        $server = new Server();
+        $server = new Server;
         $server->meta = [
             'database' => 'mysql84',                  // wizard request
             'installed_stack' => [                    // reconciled snapshot
@@ -58,7 +58,7 @@ class InstalledStackTest extends TestCase
     public function test_from_meta_falls_back_to_wizard_keys_for_legacy_servers(): void
     {
         // Server provisioned before reconciliation shipped — no installed_stack key.
-        $server = new Server();
+        $server = new Server;
         $server->meta = [
             'database' => 'mysql84',
             'php_version' => '8.3',
@@ -83,7 +83,7 @@ class InstalledStackTest extends TestCase
 
     public function test_from_meta_handles_completely_empty_meta(): void
     {
-        $server = new Server();
+        $server = new Server;
         $server->meta = [];
 
         $stack = InstalledStack::fromMeta($server);
@@ -163,7 +163,7 @@ class InstalledStackTest extends TestCase
 
     public function test_diverges_from_request_when_wizard_database_differs(): void
     {
-        $server = new Server();
+        $server = new Server;
         $server->meta = [
             'database' => 'mysql84',
             'installed_stack' => [
@@ -178,7 +178,7 @@ class InstalledStackTest extends TestCase
 
     public function test_diverges_from_request_is_false_when_aligned(): void
     {
-        $server = new Server();
+        $server = new Server;
         $server->meta = [
             'database' => 'mysql84',
             'installed_stack' => [
@@ -193,7 +193,7 @@ class InstalledStackTest extends TestCase
 
     public function test_diverges_from_request_is_false_when_no_wizard_request(): void
     {
-        $server = new Server();
+        $server = new Server;
         $server->meta = [
             'installed_stack' => [
                 'database' => 'sqlite3',

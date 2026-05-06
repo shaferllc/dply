@@ -9,8 +9,8 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\DeployPhaseRunner;
 use App\Services\Deploy\DeploymentRunner;
+use App\Services\Deploy\DeployPhaseRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -200,7 +200,5 @@ class DeploymentRunnerRecordingShell implements RemoteShell
         return '';
     }
 
-    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-    }
+    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void {}
 }

@@ -11,7 +11,7 @@ class DotEnvFileParserTest extends TestCase
 {
     public function test_parses_simple_assignments(): void
     {
-        $parser = new DotEnvFileParser();
+        $parser = new DotEnvFileParser;
         $r = $parser->parse("FOO=bar\nBAZ=qux\n");
 
         $this->assertSame(['FOO' => 'bar', 'BAZ' => 'qux'], $r['variables']);
@@ -20,7 +20,7 @@ class DotEnvFileParserTest extends TestCase
 
     public function test_skips_blank_lines_and_comments(): void
     {
-        $parser = new DotEnvFileParser();
+        $parser = new DotEnvFileParser;
         $r = $parser->parse("# header comment\n\nFOO=bar\n\n# trailing\n");
 
         $this->assertSame(['FOO' => 'bar'], $r['variables']);
@@ -29,7 +29,7 @@ class DotEnvFileParserTest extends TestCase
 
     public function test_strips_surrounding_quotes(): void
     {
-        $parser = new DotEnvFileParser();
+        $parser = new DotEnvFileParser;
         $r = $parser->parse("A=\"double\"\nB='single'\nC=plain\n");
 
         $this->assertSame(['A' => 'double', 'B' => 'single', 'C' => 'plain'], $r['variables']);
@@ -37,7 +37,7 @@ class DotEnvFileParserTest extends TestCase
 
     public function test_strips_inline_comment_on_unquoted_values_only(): void
     {
-        $parser = new DotEnvFileParser();
+        $parser = new DotEnvFileParser;
         $r = $parser->parse("PLAIN=value # trailing comment\nQUOTED=\"value # in quotes\"\n");
 
         $this->assertSame('value', $r['variables']['PLAIN']);
@@ -46,7 +46,7 @@ class DotEnvFileParserTest extends TestCase
 
     public function test_supports_export_prefix(): void
     {
-        $parser = new DotEnvFileParser();
+        $parser = new DotEnvFileParser;
         $r = $parser->parse("export PATH_PREFIX=/opt/bin\n");
 
         $this->assertSame(['PATH_PREFIX' => '/opt/bin'], $r['variables']);
@@ -54,7 +54,7 @@ class DotEnvFileParserTest extends TestCase
 
     public function test_reports_missing_equals_sign(): void
     {
-        $parser = new DotEnvFileParser();
+        $parser = new DotEnvFileParser;
         $r = $parser->parse("BROKEN_LINE\nVALID=ok\n");
 
         $this->assertSame(['VALID' => 'ok'], $r['variables']);
@@ -64,7 +64,7 @@ class DotEnvFileParserTest extends TestCase
 
     public function test_reports_invalid_key(): void
     {
-        $parser = new DotEnvFileParser();
+        $parser = new DotEnvFileParser;
         $r = $parser->parse("lower-case-key=foo\n3LEADING_DIGIT=bar\nGOOD_KEY=ok\n");
 
         $this->assertSame(['GOOD_KEY' => 'ok'], $r['variables']);
@@ -73,7 +73,7 @@ class DotEnvFileParserTest extends TestCase
 
     public function test_handles_empty_string_value(): void
     {
-        $parser = new DotEnvFileParser();
+        $parser = new DotEnvFileParser;
         $r = $parser->parse("EMPTY=\nALSO_EMPTY=\"\"\n");
 
         $this->assertSame('', $r['variables']['EMPTY']);

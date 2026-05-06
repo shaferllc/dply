@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\Organization;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -29,7 +30,7 @@ class PruneServerCreateDraftsCommandTest extends TestCase
         $this->assertNotNull(ServerCreateDraft::query()->find($undated->id));
     }
 
-    private function makeDraft(?\Carbon\Carbon $expiresAt, string $name): ServerCreateDraft
+    private function makeDraft(?Carbon $expiresAt, string $name): ServerCreateDraft
     {
         return ServerCreateDraft::query()->create([
             'user_id' => User::factory()->create()->id,

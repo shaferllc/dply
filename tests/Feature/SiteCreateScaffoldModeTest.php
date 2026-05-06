@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Jobs\RunLaravelScaffoldJob;
+use App\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Models\Organization;
 use App\Models\Server;
@@ -142,7 +144,7 @@ class SiteCreateScaffoldModeTest extends TestCase
         $this->assertSame($user->id, $site->meta['scaffold']['requested_by_user_id']);
         $this->assertNull($site->meta['scaffold']['requested_hostname']);
 
-        Bus::assertDispatched(\App\Jobs\RunWordPressScaffoldJob::class,
+        Bus::assertDispatched(RunWordPressScaffoldJob::class,
             fn ($job) => $job->siteId === $site->id);
     }
 
@@ -164,7 +166,7 @@ class SiteCreateScaffoldModeTest extends TestCase
         $site = Site::query()->sole();
         $this->assertSame('app.example.com', $site->meta['scaffold']['requested_hostname']);
 
-        Bus::assertDispatched(\App\Jobs\RunLaravelScaffoldJob::class,
+        Bus::assertDispatched(RunLaravelScaffoldJob::class,
             fn ($job) => $job->siteId === $site->id);
     }
 

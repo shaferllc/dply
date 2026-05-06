@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
+use App\Jobs\TearDownSiteSystemdUnitJob;
 use App\Livewire\Sites\Settings as SitesSettings;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\User;
+use App\Services\Sites\SiteSystemdProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -107,7 +109,7 @@ class SiteSettingsProcessesEditorTest extends TestCase
 
         $this->assertSame(0, $site->processes()->where('name', 'celery')->count());
 
-        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\TearDownSiteSystemdUnitJob::class, function ($job) use ($site) {
+        Queue::assertPushed(TearDownSiteSystemdUnitJob::class, function ($job) use ($site) {
             return $job->siteId === $site->id
                 && str_contains($job->unitName, 'celery.service');
         });
@@ -127,7 +129,7 @@ class SiteSettingsProcessesEditorTest extends TestCase
             ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
             ->call('removeSiteProcess', $process->id);
 
-        Queue::assertNotPushed(\App\Jobs\TearDownSiteSystemdUnitJob::class);
+        Queue::assertNotPushed(TearDownSiteSystemdUnitJob::class);
     }
 
     public function test_remove_site_process_refuses_to_delete_web_row(): void
@@ -192,7 +194,7 @@ class SiteSettingsProcessesEditorTest extends TestCase
             ->call('setSiteProcessScale', $process->id, 3);
 
         $this->assertSame(3, (int) $process->refresh()->scale);
-        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\ProvisionSiteSystemdUnitsJob::class);
+        Queue::assertPushed(ProvisionSiteSystemdUnitsJob::class);
     }
 
     public function test_set_scale_rejects_out_of_bounds_values(): void
@@ -229,9 +231,9 @@ class SiteSettingsProcessesEditorTest extends TestCase
             'command' => 'bundle exec sidekiq',
         ]);
 
-        $provisioner = \Mockery::mock(\App\Services\Sites\SiteSystemdProvisioner::class);
+        $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
         $provisioner->shouldReceive('restartUnit')->once()->andReturn('');
-        $this->app->instance(\App\Services\Sites\SiteSystemdProvisioner::class, $provisioner);
+        $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
 
         Livewire::actingAs($user)
             ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
@@ -245,9 +247,9 @@ class SiteSettingsProcessesEditorTest extends TestCase
         [$user, $server, $site] = $this->makeNodeSite();
         $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
 
-        $provisioner = \Mockery::mock(\App\Services\Sites\SiteSystemdProvisioner::class);
+        $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
         $provisioner->shouldNotReceive('restartUnit');
-        $this->app->instance(\App\Services\Sites\SiteSystemdProvisioner::class, $provisioner);
+        $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
 
         Livewire::actingAs($user)
             ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
@@ -264,9 +266,9 @@ class SiteSettingsProcessesEditorTest extends TestCase
             'command' => 'php artisan horizon',
         ]);
 
-        $provisioner = \Mockery::mock(\App\Services\Sites\SiteSystemdProvisioner::class);
+        $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
         $provisioner->shouldNotReceive('restartUnit');
-        $this->app->instance(\App\Services\Sites\SiteSystemdProvisioner::class, $provisioner);
+        $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
 
         Livewire::actingAs($user)
             ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])

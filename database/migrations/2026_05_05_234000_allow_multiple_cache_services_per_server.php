@@ -28,7 +28,7 @@ return new class extends Migration
             ->havingRaw('count(*) > 1')
             ->get();
         if ($dupes->isNotEmpty()) {
-            throw new \RuntimeException('Cannot apply migration: existing duplicate (server_id, engine) rows in server_cache_services. Resolve manually before running this migration.');
+            throw new RuntimeException('Cannot apply migration: existing duplicate (server_id, engine) rows in server_cache_services. Resolve manually before running this migration.');
         }
 
         Schema::table('server_cache_services', function (Blueprint $table) {
@@ -48,7 +48,7 @@ return new class extends Migration
             ->havingRaw('count(*) > 1')
             ->get();
         if ($multi->isNotEmpty()) {
-            throw new \RuntimeException('Cannot rollback: some servers have multiple cache_services rows. Pick one per server to keep, delete the others, then retry.');
+            throw new RuntimeException('Cannot rollback: some servers have multiple cache_services rows. Pick one per server to keep, delete the others, then retry.');
         }
 
         Schema::table('server_cache_services', function (Blueprint $table) {

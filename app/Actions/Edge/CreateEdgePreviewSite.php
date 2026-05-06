@@ -8,6 +8,8 @@ use App\Enums\SiteType;
 use App\Jobs\ProvisionEdgeSiteJob;
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -128,16 +130,16 @@ class CreateEdgePreviewSite
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Site>
+     * @return Collection<int, Site>
      */
-    public static function listForParent(Site $parent): \Illuminate\Database\Eloquent\Collection
+    public static function listForParent(Site $parent): Collection
     {
         return self::livePreviewQuery($parent)
             ->orderByDesc('created_at')
             ->get();
     }
 
-    private static function livePreviewQuery(Site $parent): \Illuminate\Database\Eloquent\Builder
+    private static function livePreviewQuery(Site $parent): Builder
     {
         return Site::query()
             ->where('organization_id', $parent->organization_id)

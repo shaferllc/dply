@@ -12,24 +12,20 @@ use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\SiteNginxProvisioner;
 use Illuminate\Support\Collection;
 use Mockery;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SiteNginxProvisionerTest extends TestCase
 {
     #[Test]
-    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
-    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function provision_writes_a_placeholder_index_page_for_new_php_sites(): void
     {
         $this->markTestSkipped('Provisioner now persists a webserver config profile; covered by feature tests with persisted sites.');
-        $server = new class([
-            'name' => 'Web Box',
-            'ip_address' => '203.0.113.10',
-            'ssh_user' => 'root',
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'status' => Server::STATUS_READY,
-        ]) extends Server
+        $server = new class(['name' => 'Web Box', 'ip_address' => '203.0.113.10', 'ssh_user' => 'root', 'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----", 'status' => Server::STATUS_READY]) extends Server
         {
             public function recoverySshPrivateKey(): ?string
             {
@@ -48,7 +44,7 @@ class SiteNginxProvisionerTest extends TestCase
         $site->setRelation('server', $server);
         $site->setRelation('domains', new Collection([
             new SiteDomain([
-            'hostname' => 'launch.example.com',
+                'hostname' => 'launch.example.com',
                 'is_primary' => true,
                 'www_redirect' => false,
             ]),

@@ -8,6 +8,7 @@ use App\Jobs\RunLaravelScaffoldJob;
 use App\Jobs\RunWordPressScaffoldJob;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Scaffold\PlaceholderDnsManager;
 use App\Services\Scaffold\ScaffoldStep;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -80,7 +81,7 @@ class ScaffoldJourney extends Component
      * + re-dispatches; cleanup of files / DB lands alongside the DNS
      * teardown work.
      */
-    public function retry(\App\Services\Scaffold\PlaceholderDnsManager $placeholderDns): void
+    public function retry(PlaceholderDnsManager $placeholderDns): void
     {
         if (! $this->canRetry()) {
             return;

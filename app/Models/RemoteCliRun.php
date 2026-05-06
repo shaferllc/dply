@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Services\RemoteCli\Kind;
+use App\Services\RemoteCli\RemoteCli;
 use App\Services\RemoteCli\RiskLevel;
 use Database\Factories\RemoteCliRunFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Persistent record of a single wp-cli or php artisan invocation.
  *
  * Created when the operator (or a system pipeline) invokes a command
- * via the {@see \App\Services\RemoteCli\RemoteCli} service. Sync runs
+ * via the {@see RemoteCli} service. Sync runs
  * complete in-process before insert returns; async runs are inserted
  * in 'queued' state and updated by a queue worker.
  *
@@ -25,15 +27,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $command
  * @property array<int, string>|null $args
  * @property RiskLevel $risk
- * @property string $mode             'sync' | 'async'
- * @property string $status           'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+ * @property string $mode 'sync' | 'async'
+ * @property string $status 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
  * @property int|null $exit_code
  * @property string|null $stdout
  * @property string|null $stderr
  * @property string|null $queued_by_user_id
- * @property \Illuminate\Support\Carbon|null $started_at
- * @property \Illuminate\Support\Carbon|null $finished_at
- * @property \Illuminate\Support\Carbon|null $cancelled_at
+ * @property Carbon|null $started_at
+ * @property Carbon|null $finished_at
+ * @property Carbon|null $cancelled_at
  */
 class RemoteCliRun extends Model
 {

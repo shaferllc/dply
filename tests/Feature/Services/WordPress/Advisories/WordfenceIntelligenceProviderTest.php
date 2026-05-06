@@ -23,7 +23,7 @@ class WordfenceIntelligenceProviderTest extends TestCase
             'wordfence.com/*' => Http::response(['vulnerabilities' => []], 200),
         ]);
 
-        $advisories = (new WordfenceIntelligenceProvider())->forPlugin('akismet', '5.3');
+        $advisories = (new WordfenceIntelligenceProvider)->forPlugin('akismet', '5.3');
 
         $this->assertSame([], $advisories);
     }
@@ -47,7 +47,7 @@ class WordfenceIntelligenceProviderTest extends TestCase
             ], 200),
         ]);
 
-        $advisories = (new WordfenceIntelligenceProvider())->forPlugin('wordpress-seo', '21.5');
+        $advisories = (new WordfenceIntelligenceProvider)->forPlugin('wordpress-seo', '21.5');
 
         $this->assertCount(1, $advisories);
         $advisory = $advisories[0];
@@ -65,7 +65,7 @@ class WordfenceIntelligenceProviderTest extends TestCase
             'wordfence.com/*' => Http::response(null, 503),
         ]);
 
-        $advisories = (new WordfenceIntelligenceProvider())->forPlugin('akismet', '5.3');
+        $advisories = (new WordfenceIntelligenceProvider)->forPlugin('akismet', '5.3');
 
         $this->assertSame([], $advisories);
     }
@@ -79,7 +79,7 @@ class WordfenceIntelligenceProviderTest extends TestCase
             return Http::response(['vulnerabilities' => []], 200);
         });
 
-        $provider = new WordfenceIntelligenceProvider();
+        $provider = new WordfenceIntelligenceProvider;
         $provider->forPlugin('akismet', '5.3');
         $provider->forPlugin('akismet', '5.3');
         $provider->forPlugin('akismet', '5.3');
@@ -96,7 +96,7 @@ class WordfenceIntelligenceProviderTest extends TestCase
             return Http::response(['vulnerabilities' => []], 200);
         });
 
-        $provider = new WordfenceIntelligenceProvider();
+        $provider = new WordfenceIntelligenceProvider;
         $provider->forPlugin('akismet', '5.3');
         $provider->forPlugin('akismet', '5.4');
 
@@ -105,6 +105,6 @@ class WordfenceIntelligenceProviderTest extends TestCase
 
     public function test_provider_name(): void
     {
-        $this->assertSame('Wordfence Intelligence', (new WordfenceIntelligenceProvider())->name());
+        $this->assertSame('Wordfence Intelligence', (new WordfenceIntelligenceProvider)->name());
     }
 }

@@ -8,6 +8,7 @@ use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionEdgeSiteJob;
 use App\Jobs\TeardownEdgeSiteJob;
+use App\Livewire\Sites\Settings;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -15,6 +16,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -209,8 +211,8 @@ class EdgePreviewFlowTest extends TestCase
         $parent = $this->makeSourceParent($user, $org);
         $preview = (new CreateEdgePreviewSite)->handle($parent, 'feature/x', prNumber: 7);
 
-        \Livewire\Livewire::actingAs($user)
-            ->test(\App\Livewire\Sites\Settings::class, [
+        Livewire::actingAs($user)
+            ->test(Settings::class, [
                 'server' => $parent->server,
                 'site' => $parent,
                 'section' => 'general',
@@ -218,7 +220,7 @@ class EdgePreviewFlowTest extends TestCase
             ->call('tearDownContainerPreview', $preview->id)
             ->assertHasNoErrors();
 
-        Queue::assertPushed(\App\Jobs\TeardownEdgeSiteJob::class, fn ($j) => $j->siteId === $preview->id);
+        Queue::assertPushed(TeardownEdgeSiteJob::class, fn ($j) => $j->siteId === $preview->id);
     }
 
     public function test_dashboard_teardown_rejects_unrelated_site(): void
@@ -228,15 +230,15 @@ class EdgePreviewFlowTest extends TestCase
         $parent = $this->makeSourceParent($user, $org);
         $orphan = $this->makeSourceParent($user, $org); // different parent — not a child of $parent
 
-        \Livewire\Livewire::actingAs($user)
-            ->test(\App\Livewire\Sites\Settings::class, [
+        Livewire::actingAs($user)
+            ->test(Settings::class, [
                 'server' => $parent->server,
                 'site' => $parent,
                 'section' => 'general',
             ])
             ->call('tearDownContainerPreview', $orphan->id);
 
-        Queue::assertNotPushed(\App\Jobs\TeardownEdgeSiteJob::class);
+        Queue::assertNotPushed(TeardownEdgeSiteJob::class);
     }
 
     public function test_dashboard_renders_github_webhook_section_for_source_sites(): void

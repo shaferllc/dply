@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Actions\Servers\AttachDatabaseEngineToServer;
 use App\Actions\Servers\InstallDatabaseEngineOnServer;
 use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
-use App\Services\Servers\ServerProvisionCommandBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -116,7 +114,8 @@ class InstallDatabaseEngineOnServerTest extends TestCase
         // would try to SSH. Bind a fake action that no-ops and returns
         // ok=false to exercise the fallback path.
         $this->app->bind(InstallDatabaseEngineOnServer::class, function () {
-            return new class extends InstallDatabaseEngineOnServer {
+            return new class extends InstallDatabaseEngineOnServer
+            {
                 public function __construct() {}
 
                 public function execute(
@@ -156,7 +155,5 @@ class InstallDbRecordingShell implements RemoteShell
         return '';
     }
 
-    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-    }
+    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void {}
 }

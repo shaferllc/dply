@@ -162,9 +162,6 @@ class PlaceholderDnsManager
         return $assignment;
     }
 
-    /**
-     * @param  ProviderCredential  $credential
-     */
     private function assignToZone(Site $site, string $serverIp, string $zone, ProviderCredential $credential): array
     {
         $name = $this->pickAvailableName($site, $zone, $credential);

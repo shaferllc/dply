@@ -6,12 +6,11 @@ namespace App\Livewire\Sites\WordPress;
 
 use App\Models\RemoteCliRun;
 use App\Models\Site;
+use App\Models\Snapshot;
 use App\Services\RemoteCli\Kind;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Services\RemoteCli\RemoteCliPermissions;
 use App\Services\RemoteCli\WpCli;
-use App\Models\Snapshot;
-use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotDestinationFactory;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
@@ -28,7 +27,7 @@ use Livewire\Component;
  * placeholders gated on a v2 message until PR 10 fills them in.
  *
  * Permission checks delegate to {@see WpCli} via the underlying
- * {@see \App\Services\RemoteCli\RemoteCliPermissions} gate (Q17), so
+ * {@see RemoteCliPermissions} gate (Q17), so
  * the same risk classification that drives the API layer also drives
  * the UI's enable/disable state.
  */

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Servers\Create\StepReview;
 use App\Models\Organization;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
+use App\Models\UserSshKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -39,14 +42,14 @@ class ServerCreateStepReviewSshKeyModalTest extends TestCase
     {
         $user = $this->seedUserWithDraftAtReview();
         // No keys → blocker should be present on first render.
-        $component = \Livewire\Livewire::actingAs($user)
-            ->test(\App\Livewire\Servers\Create\StepReview::class);
+        $component = Livewire::actingAs($user)
+            ->test(StepReview::class);
         $component->assertSee('Add a personal profile SSH key');
 
         // Now create a key out-of-band (simulating what the
         // PersonalSshKeyModal does when it persists) and dispatch
         // the event the modal would dispatch on save.
-        \App\Models\UserSshKey::factory()->create([
+        UserSshKey::factory()->create([
             'user_id' => $user->id,
             'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('z', 43).' refresh-test',
             'provision_on_new_servers' => true,

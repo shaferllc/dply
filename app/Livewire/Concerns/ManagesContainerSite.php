@@ -8,6 +8,7 @@ use App\Jobs\AttachEdgeDomainJob;
 use App\Jobs\DetachEdgeDomainJob;
 use App\Jobs\RedeployEdgeSiteJob;
 use App\Jobs\TeardownEdgeSiteJob;
+use App\Models\Site;
 use App\Services\Edge\EdgeRouter;
 
 /**
@@ -144,7 +145,7 @@ trait ManagesContainerSite
         }
         $this->authorize('update', $this->site);
 
-        $preview = \App\Models\Site::query()->find($previewSiteId);
+        $preview = Site::query()->find($previewSiteId);
         if ($preview === null
             || $preview->organization_id !== $this->site->organization_id
             || ($preview->meta['container']['preview_parent_site_id'] ?? null) !== $this->site->id) {

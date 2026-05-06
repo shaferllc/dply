@@ -471,7 +471,7 @@ class DigitalOceanService
      * Block until a droplet action completes or errors.
      *
      * @param  int  $timeoutSeconds  Hard cap; long snapshots can run several minutes.
-     * @param  int  $pollSeconds     Poll interval; snapshot actions only advance every 10–30s.
+     * @param  int  $pollSeconds  Poll interval; snapshot actions only advance every 10–30s.
      * @param  callable(array<string, mixed>): void|null  $onTick
      * @return array<string, mixed> Final action payload (status === 'completed' on success)
      */

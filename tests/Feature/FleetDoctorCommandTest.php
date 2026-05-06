@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -115,17 +116,17 @@ class FleetDoctorCommandTest extends TestCase
         $server = Server::factory()->create();
         $site = Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
         // Two running deploys: one fresh, one long-running.
-        \App\Models\SiteDeployment::query()->create([
+        SiteDeployment::query()->create([
             'site_id' => $site->id,
             'project_id' => $site->project_id,
-            'status' => \App\Models\SiteDeployment::STATUS_RUNNING,
+            'status' => SiteDeployment::STATUS_RUNNING,
             'trigger' => 'manual',
             'started_at' => now()->subMinutes(2),
         ]);
-        \App\Models\SiteDeployment::query()->create([
+        SiteDeployment::query()->create([
             'site_id' => $site->id,
             'project_id' => $site->project_id,
-            'status' => \App\Models\SiteDeployment::STATUS_RUNNING,
+            'status' => SiteDeployment::STATUS_RUNNING,
             'trigger' => 'manual',
             'started_at' => now()->subMinutes(30),
         ]);
@@ -142,26 +143,26 @@ class FleetDoctorCommandTest extends TestCase
         $server = Server::factory()->create();
         $broken = Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
         $recovered = Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
-        \App\Models\SiteDeployment::query()->create([
+        SiteDeployment::query()->create([
             'site_id' => $broken->id,
             'project_id' => $broken->project_id,
-            'status' => \App\Models\SiteDeployment::STATUS_FAILED,
+            'status' => SiteDeployment::STATUS_FAILED,
             'trigger' => 'manual',
             'started_at' => now()->subHour(),
             'finished_at' => now()->subHour(),
         ]);
-        \App\Models\SiteDeployment::query()->create([
+        SiteDeployment::query()->create([
             'site_id' => $recovered->id,
             'project_id' => $recovered->project_id,
-            'status' => \App\Models\SiteDeployment::STATUS_FAILED,
+            'status' => SiteDeployment::STATUS_FAILED,
             'trigger' => 'manual',
             'started_at' => now()->subDay(),
             'finished_at' => now()->subDay(),
         ]);
-        \App\Models\SiteDeployment::query()->create([
+        SiteDeployment::query()->create([
             'site_id' => $recovered->id,
             'project_id' => $recovered->project_id,
-            'status' => \App\Models\SiteDeployment::STATUS_SUCCESS,
+            'status' => SiteDeployment::STATUS_SUCCESS,
             'trigger' => 'manual',
             'started_at' => now()->subHour(),
             'finished_at' => now()->subHour(),
