@@ -85,6 +85,7 @@ class SwitchCacheServiceJob implements ShouldQueue
             $message = (string) ($preflightResult['reason'] ?? 'Insufficient resources.');
             $row->update([
                 'status' => ServerCacheService::STATUS_FAILED,
+                'target_engine' => null,
                 'error_message' => Str::limit('Switch blocked by resource preflight: '.$message, 800),
             ]);
             $audit->record($row->server, ServerCacheServiceAuditEvent::EVENT_SWITCH_FAILED, [
@@ -114,27 +115,49 @@ class SwitchCacheServiceJob implements ShouldQueue
             }
         }
 
-        // Mark the row as installing the NEW engine immediately so the workspace UI reflects what's
-        // about to happen. The unique server_id index plus this in-place edit avoids a window
-        // where the server appears to have no cache row at all.
+        // Phase 1 marker: row stays on the OLD engine while we tear it down. target_engine is set
+        // (carried over from the Livewire pre-flip) so the UI can show "Uninstalling redis —
+        // switching to valkey…" instead of the misleading "Installing valkey…" before apt has even
+        // touched the new engine. We'll do the engine flip after uninstall succeeds.
         $row->update([
-            'status' => ServerCacheService::STATUS_INSTALLING,
-            'engine' => $newEngine,
-            'port' => ServerCacheService::defaultPortFor($newEngine),
-            'version' => null,
+            'status' => ServerCacheService::STATUS_UNINSTALLING,
+            'target_engine' => $newEngine,
             'error_message' => null,
-            'auth_password' => null, // wiped now; re-applied after install if compatible
+            'install_output' => '',
         ]);
+
+        // Shared streaming buffer for both phases — flushes throttled writes to install_output so
+        // the workspace's 4s poll shows a live tail. Mirrors the install job; we keep one buffer
+        // across uninstall + install so the output panel reads top-to-bottom in operator order.
+        $bufferAcc = '';
+        $lastFlush = 0.0;
+        $flush = function (bool $force = false) use ($row, &$bufferAcc, &$lastFlush): void {
+            $now = microtime(true);
+            if (! $force && ($now - $lastFlush) < 3.0) {
+                return;
+            }
+            $lastFlush = $now;
+            $row->update(['install_output' => mb_substr($bufferAcc, -32_000)]);
+        };
+        $appendChunk = function (string $type, string $chunk) use (&$bufferAcc, $flush): void {
+            $bufferAcc .= $chunk;
+            $flush();
+        };
 
         // Step 1: uninstall the OLD engine.
         try {
-            $output = $executor->runInlineBash(
+            $bufferAcc .= "[dply] === Uninstalling {$oldEngine} ===\n";
+            $flush(true);
+
+            $output = $executor->runInlineBashWithOutputCallback(
                 $row->server,
                 'cache-service:switch-uninstall:'.$oldEngine,
                 CacheServiceInstallScripts::uninstallScript($oldEngine),
+                $appendChunk,
                 timeoutSeconds: 600,
                 asRoot: true,
             );
+            $flush(true);
 
             if ($output->exitCode !== 0) {
                 throw new \RuntimeException(Str::limit(trim($output->buffer), 800)
@@ -142,9 +165,10 @@ class SwitchCacheServiceJob implements ShouldQueue
             }
         } catch (\Throwable $e) {
             // Restore the row to the old engine + a failed status so the operator can retry.
+            // Engine never moved (we kept it on $oldEngine through phase 1), so just clear the
+            // target hint and re-attach the auth so a retry has the same starting state.
             $row->update([
-                'engine' => $oldEngine,
-                'port' => ServerCacheService::defaultPortFor($oldEngine),
+                'target_engine' => null,
                 'status' => ServerCacheService::STATUS_FAILED,
                 'error_message' => Str::limit('Switch failed during uninstall of '.$oldEngine.': '.$e->getMessage(), 800),
                 'auth_password' => $preservedAuth,
@@ -159,18 +183,34 @@ class SwitchCacheServiceJob implements ShouldQueue
             return;
         }
 
+        // Phase 2 marker: uninstall succeeded. Flip the row to the NEW engine in place and clear
+        // target_engine — the row IS the new engine now, the install just hasn't completed yet.
+        $row->update([
+            'status' => ServerCacheService::STATUS_INSTALLING,
+            'engine' => $newEngine,
+            'target_engine' => null,
+            'port' => ServerCacheService::defaultPortFor($newEngine),
+            'version' => null,
+            'auth_password' => null, // re-applied after install if compatible
+        ]);
+
         // Step 2: install the NEW engine.
         try {
             $script = CacheServiceInstallScripts::installScript($newEngine).
                 "\n".CacheServiceInstallScripts::versionProbeScript($newEngine);
 
-            $output = $executor->runInlineBash(
+            $bufferAcc .= "\n[dply] === Installing {$newEngine} ===\n";
+            $flush(true);
+
+            $output = $executor->runInlineBashWithOutputCallback(
                 $row->server,
                 'cache-service:switch-install:'.$newEngine,
                 $script,
+                $appendChunk,
                 timeoutSeconds: 900,
                 asRoot: true,
             );
+            $flush(true);
 
             if ($output->exitCode !== 0) {
                 throw new \RuntimeException(Str::limit(trim($output->buffer), 800)

@@ -8,25 +8,97 @@
     :server="$server"
     active="caches"
     :title="__('Caches')"
-    :description="__('Install and manage the cache service on this server — Redis, Valkey, Memcached, KeyDB, or Dragonfly.')"
+    :description="__('Install and manage cache services on this server — Redis, Valkey, Memcached, KeyDB, and Dragonfly. Multiple engines side-by-side are supported.')"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if ($opsReady)
         @php
-            $pollWhileWorking = $activeCacheService && in_array($activeCacheService->status, [
+            // Any engine in flight on this server. Used to render the global "an apt operation
+            // is running" banner and to disable other mutating actions across all engines.
+            $busyService = $cacheServices->first(fn ($row) => in_array($row->status, [
                 \App\Models\ServerCacheService::STATUS_PENDING,
                 \App\Models\ServerCacheService::STATUS_INSTALLING,
                 \App\Models\ServerCacheService::STATUS_UNINSTALLING,
-            ], true);
+            ], true));
+            $cacheBusy = $busyService !== null;
         @endphp
-        @if ($pollWhileWorking)
-            {{-- Poll the component every 4s while a queued job is in flight so the operator
-                 sees status flip from queued → installing → running without manual refresh.
-                 This element vanishes the moment status leaves the in-flight set, so polling
-                 stops automatically — the workspace is idle when the cache is idle. --}}
+
+        @if ($cacheBusy)
+            @php
+                $busyEngineLabel = $engineLabels[$busyService->engine] ?? ucfirst($busyService->engine);
+                $busyMessage = match ($busyService->status) {
+                    \App\Models\ServerCacheService::STATUS_PENDING => __('Queued — :engine install will start shortly…', ['engine' => $busyEngineLabel]),
+                    \App\Models\ServerCacheService::STATUS_INSTALLING => __('Installing :engine on the server…', ['engine' => $busyEngineLabel]),
+                    \App\Models\ServerCacheService::STATUS_UNINSTALLING => __('Uninstalling :engine from the server…', ['engine' => $busyEngineLabel]),
+                    default => __('Working on :engine…', ['engine' => $busyEngineLabel]),
+                };
+                $busyOutput = (string) ($busyService->install_output ?? '');
+            @endphp
+            {{-- Polling element only mounts while a job is in flight. The moment status leaves the
+                 in-flight set, this disappears and polling stops. --}}
             <div wire:poll.4s class="hidden" aria-hidden="true"></div>
+            <div class="mb-4 overflow-hidden rounded-xl border border-sky-200 bg-sky-50/80 text-sm text-sky-900 shadow-sm" role="status" aria-live="polite" x-data="{ expanded: false }">
+                <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+                    <div class="flex min-w-0 flex-1 items-center gap-3">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 ring-1 ring-sky-200">
+                            <x-spinner variant="forest" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate font-semibold leading-tight">{{ $busyMessage }}</p>
+                            <p class="mt-0.5 truncate text-xs text-sky-700/80">{{ __('Refreshing every 4s · safe to leave this page — the job runs on the queue. Other engines stay paused while apt runs.') }}</p>
+                        </div>
+                    </div>
+                    <div class="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                        @if ($busyService->status === \App\Models\ServerCacheService::STATUS_PENDING)
+                            <button
+                                type="button"
+                                wire:click="cancelCacheServiceChange('{{ $busyService->engine }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="cancelCacheServiceChange"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-300/70 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 shadow-sm hover:bg-rose-50 disabled:opacity-50"
+                                title="{{ __('The job has not started apt yet — safe to cancel.') }}"
+                            >
+                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                                <span wire:loading.remove wire:target="cancelCacheServiceChange">{{ __('Cancel') }}</span>
+                                <span wire:loading wire:target="cancelCacheServiceChange">{{ __('Cancelling…') }}</span>
+                            </button>
+                        @elseif ($busyService->status === \App\Models\ServerCacheService::STATUS_INSTALLING && $busyService->cancel_requested_at === null)
+                            <button
+                                type="button"
+                                wire:click="openConfirmActionModal('cancelCacheServiceChange', ['{{ $busyService->engine }}'], @js(__('Cancel install and revert?')), @js(__('Dply will stop the install at the next output chunk, run dpkg --configure -a + apt purge to clean up whatever apt left behind, and remove the row. Apt-purge takes a minute or two.')), @js(__('Cancel and revert')), true)"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-300/70 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 shadow-sm hover:bg-rose-50"
+                                title="{{ __('Stop the install and apt-purge to revert.') }}"
+                            >
+                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                                {{ __('Cancel & revert') }}
+                            </button>
+                        @elseif ($busyService->status === \App\Models\ServerCacheService::STATUS_INSTALLING && $busyService->cancel_requested_at !== null)
+                            <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-300/70 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700">
+                                <x-spinner variant="forest" />
+                                {{ __('Cancelling — reverting…') }}
+                            </span>
+                        @endif
+                        <button
+                            type="button"
+                            x-on:click="expanded = !expanded"
+                            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-sky-200 bg-white px-2.5 py-1.5 text-xs font-medium text-sky-900 shadow-sm hover:bg-sky-50"
+                            x-bind:aria-expanded="expanded.toString()"
+                        >
+                            <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition-transform" x-bind:class="expanded ? 'rotate-180' : ''" />
+                            <span x-text="expanded ? @js(__('Hide output')) : @js(__('View output'))"></span>
+                        </button>
+                    </div>
+                </div>
+                <div x-show="expanded" x-cloak class="border-t border-sky-200 bg-white/70 px-4 py-3">
+                    @if (trim($busyOutput) === '')
+                        <p class="text-xs text-sky-800/80">{{ __('No output yet — the worker may still be picking up the job. This refreshes every 4s.') }}</p>
+                    @else
+                        <pre class="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100" x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">{{ $busyOutput }}</pre>
+                    @endif
+                </div>
+            </div>
         @endif
 
         <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
@@ -42,16 +114,20 @@
                     </span>
                 </x-server-workspace-tab>
                 @foreach ($engines as $engine)
+                    @php
+                        $row = $cacheServicesByEngine[$engine] ?? null;
+                        $isInFlight = $row && in_array($row->status, [
+                            \App\Models\ServerCacheService::STATUS_PENDING,
+                            \App\Models\ServerCacheService::STATUS_INSTALLING,
+                            \App\Models\ServerCacheService::STATUS_UNINSTALLING,
+                        ], true);
+                    @endphp
                     <x-server-workspace-tab
                         :id="'cache-tab-'.$engine"
                         :active="$workspace_tab === $engine"
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
                         <span class="inline-flex items-center gap-2">
-                            {{-- Engine-specific icon. The Redis-family share `bolt` (Redis's logo
-                                 is a bolt; valkey/keydb/dragonfly are wire-compatible forks of
-                                 the same protocol) and memcached gets `archive-box` to signal
-                                 its different role as a slab-allocated key/value cache.       --}}
                             @switch($engine)
                                 @case('memcached')
                                     <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -69,20 +145,18 @@
                                     <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
                             @endswitch
                             {{ $engineLabels[$engine] }}
-                            @if ($activeCacheService && $activeCacheService->engine === $engine)
-                                @if (in_array($activeCacheService->status, [
-                                    \App\Models\ServerCacheService::STATUS_PENDING,
-                                    \App\Models\ServerCacheService::STATUS_INSTALLING,
-                                    \App\Models\ServerCacheService::STATUS_UNINSTALLING,
-                                ], true))
+                            @if ($row)
+                                @if ($isInFlight)
                                     <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
                                         <x-spinner variant="forest" />
                                         {{ __('Working') }}
                                     </span>
-                                @elseif ($activeCacheService->status === \App\Models\ServerCacheService::STATUS_FAILED)
+                                @elseif ($row->status === \App\Models\ServerCacheService::STATUS_FAILED)
                                     <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">{{ __('Failed') }}</span>
+                                @elseif ($row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
+                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Running') }}</span>
                                 @else
-                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Active') }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ ucfirst($row->status) }}</span>
                                 @endif
                             @endif
                         </span>
@@ -101,422 +175,298 @@
             </x-server-workspace-tablist>
 
             <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:pb-0.5">
-                <button
-                    type="button"
-                    wire:click="refreshCacheCapabilities"
-                    wire:loading.attr="disabled"
-                    title="{{ __('Re-run engine detection (cached for a few minutes)') }}"
-                    class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
-                >
-                    <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Recheck engines') }}</span>
-                    <span wire:loading wire:target="refreshCacheCapabilities" class="inline-flex items-center gap-2">
-                        <x-spinner variant="forest" />
-                    </span>
-                </button>
+                <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
+                    <x-slot name="trigger">
+                        <button
+                            type="button"
+                            aria-label="{{ __('Workspace actions') }}"
+                            aria-haspopup="true"
+                            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        >
+                            <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Actions') }}</span>
+                            <span wire:loading wire:target="refreshCacheCapabilities" class="inline-flex items-center gap-2">
+                                <x-spinner variant="forest" />
+                                {{ __('Working…') }}
+                            </span>
+                            <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-ink/70" />
+                        </button>
+                    </x-slot>
+                    <x-slot name="content">
+                        <button
+                            type="button"
+                            wire:click="refreshCacheCapabilities"
+                            wire:loading.attr="disabled"
+                            wire:target="refreshCacheCapabilities"
+                            title="{{ __('Re-run engine detection (cached for a few minutes)') }}"
+                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Recheck engines') }}</span>
+                            <span wire:loading wire:target="refreshCacheCapabilities">{{ __('Rechecking…') }}</span>
+                        </button>
+                    </x-slot>
+                </x-dropdown>
             </div>
         </div>
 
-        <div
-            class="relative"
-            wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150"
-            wire:target="setWorkspaceTab,installCacheService,uninstallCacheService,switchCacheService,restartCacheService,stopCacheService,startCacheService,flushCacheService,setAuthPassword,clearAuthPassword,saveCacheConfig,loadCacheConfig,saveCacheMemorySettings,loadCacheMemorySettings,loadCacheClients"
-        >
-            <div
-                class="pointer-events-none absolute inset-x-0 top-0 z-10 hidden items-center justify-center pt-12"
-                wire:loading.delay.shortest.flex
-                wire:target="setWorkspaceTab,installCacheService,uninstallCacheService,switchCacheService,restartCacheService,stopCacheService,startCacheService,flushCacheService,setAuthPassword,clearAuthPassword,saveCacheConfig,loadCacheConfig,saveCacheMemorySettings,loadCacheMemorySettings,loadCacheClients"
-                aria-live="polite"
-            >
-                <div class="dply-card flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-brand-ink shadow-lg">
-                    <x-spinner variant="forest" />
-                    <span>{{ __('Loading…') }}</span>
-                </div>
-            </div>
+        <div class="relative">
 
+        {{-- ============================================================================
+             OVERVIEW TAB — list every installed engine as its own card. Empty state when
+             nothing is installed; otherwise one card per engine with status, version,
+             port, and per-engine action buttons.
+             ============================================================================ --}}
         <x-server-workspace-tab-panel
             id="cache-panel-overview"
             labelled-by="cache-tab-overview"
             :hidden="$workspace_tab !== 'overview'"
             panel-class="space-y-8"
         >
-            <div class="{{ $card }} p-6 sm:p-8">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Cache service status') }}</h2>
-                @if (! $activeCacheService)
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('No cache service is installed on this server yet. Pick an engine from the tabs above to install one.') }}
-                    </p>
-                @else
-                    <dl class="mt-6 grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</dt>
-                            <dd class="mt-1 text-sm text-brand-ink">{{ $engineLabels[$activeCacheService->engine] ?? ucfirst($activeCacheService->engine) }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                            <dd class="mt-1 text-sm text-brand-ink">
-                                @switch($activeCacheService->status)
-                                    @case(\App\Models\ServerCacheService::STATUS_RUNNING)
-                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Running') }}</span>
-                                        @break
-                                    @case(\App\Models\ServerCacheService::STATUS_STOPPED)
-                                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{{ __('Stopped') }}</span>
-                                        @break
-                                    @case(\App\Models\ServerCacheService::STATUS_PENDING)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
-                                            <x-spinner variant="forest" />
-                                            {{ __('Queued…') }}
-                                        </span>
-                                        @break
-                                    @case(\App\Models\ServerCacheService::STATUS_INSTALLING)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
-                                            <x-spinner variant="forest" />
-                                            {{ __('Installing…') }}
-                                        </span>
-                                        @break
-                                    @case(\App\Models\ServerCacheService::STATUS_UNINSTALLING)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
-                                            <x-spinner variant="forest" />
-                                            {{ __('Uninstalling…') }}
-                                        </span>
-                                        @break
-                                    @case(\App\Models\ServerCacheService::STATUS_FAILED)
-                                        <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700" title="{{ $activeCacheService->error_message }}">{{ __('Failed') }}</span>
-                                        @break
-                                    @default
-                                        <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-medium text-brand-ink">{{ ucfirst($activeCacheService->status) }}</span>
-                                @endswitch
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
-                            <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $activeCacheService->version ?: '—' }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
-                            <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $activeCacheService->port }}</dd>
-                        </div>
-                    </dl>
-
-                    @if ($activeCacheService->status === \App\Models\ServerCacheService::STATUS_FAILED && filled($activeCacheService->error_message))
-                        <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">
-                            {{ $activeCacheService->error_message }}
-                        </p>
-                    @endif
-
-                    <div class="mt-6 flex flex-wrap gap-2">
-                        @if (in_array($activeCacheService->status, [\App\Models\ServerCacheService::STATUS_RUNNING, \App\Models\ServerCacheService::STATUS_STOPPED, \App\Models\ServerCacheService::STATUS_FAILED], true))
-                            <button type="button" wire:click="restartCacheService" wire:loading.attr="disabled" wire:target="restartCacheService" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                <span wire:loading.remove wire:target="restartCacheService">{{ __('Restart') }}</span>
-                                <span wire:loading wire:target="restartCacheService">{{ __('Restarting…') }}</span>
-                            </button>
-                            @if ($activeCacheService->status !== \App\Models\ServerCacheService::STATUS_STOPPED)
-                                <button type="button" wire:click="stopCacheService" wire:loading.attr="disabled" wire:target="stopCacheService" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                    {{ __('Stop') }}
-                                </button>
-                            @else
-                                <button type="button" wire:click="startCacheService" wire:loading.attr="disabled" wire:target="startCacheService" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                    {{ __('Start') }}
-                                </button>
-                            @endif
-                            <button
-                                type="button"
-                                wire:click="openConfirmActionModal('flushCacheService', [], @js(__('Flush all keys')), @js(__('Drop every key in the cache. App sessions, queued tags, and rate-limit counters will all be reset. Cannot be undone.')), @js(__('Flush all keys')), true)"
-                                class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                            >
-                                {{ __('Flush all keys') }}
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="openConfirmActionModal('uninstallCacheService', [], @js(__('Uninstall :engine', ['engine' => $engineLabels[$activeCacheService->engine] ?? $activeCacheService->engine])), @js(__('apt purge will remove the package and its data dirs. Cached entries will be lost.')), @js(__('Uninstall')), true)"
-                                class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                            >
-                                {{ __('Uninstall') }}
-                            </button>
-                        @endif
-                    </div>
-                @endif
-            </div>
-
-            @if ($activeCacheService)
-                @include('livewire.servers.partials.cache-stats', ['stats' => $cacheStats, 'card' => $card])
-                @include('livewire.servers.partials.cache-connection-snippet', ['cacheService' => $activeCacheService, 'card' => $card])
-
-                @if (\App\Models\ServerCacheService::engineSupportsAuth($activeCacheService->engine))
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('AUTH password') }}</h2>
-                        <p class="mt-2 text-sm text-brand-moss">
-                            @if (filled($activeCacheService->auth_password))
-                                {{ __('A password is set. Apps connecting to this engine must send AUTH. Rotate by entering a new value below.') }}
-                            @else
-                                {{ __('No AUTH password is set. Anything that can reach the loopback port can issue commands. Set one below to require authentication.') }}
-                            @endif
-                        </p>
-                        <form wire:submit="setAuthPassword" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div class="sm:col-span-2">
-                                <div class="flex items-end justify-between gap-2">
-                                    <x-input-label for="new_auth_password" :value="__('New password')" class="mb-0" />
-                                    <button type="button" wire:click="generateAuthPassword" wire:loading.attr="disabled" wire:target="setAuthPassword,generateAuthPassword" class="mb-1 text-xs font-medium text-brand-forest hover:underline disabled:opacity-50">{{ __('Generate') }}</button>
-                                </div>
-                                <x-text-input id="new_auth_password" type="password" wire:model="new_auth_password" autocomplete="new-password" class="mt-1 block w-full text-sm" placeholder="••••••••" wire:loading.attr="disabled" wire:target="setAuthPassword" />
-                                <p class="mt-1 text-xs text-brand-moss">{{ __('12–256 printable characters. Edit /etc/{engine}/{engine}.conf, restart the service, and verify with the new password — all atomic, with config rollback on verify failure.') }}</p>
-                                <x-input-error :messages="$errors->get('new_auth_password')" class="mt-1" />
-                            </div>
-                            <div class="sm:col-span-2 flex flex-wrap gap-2">
-                                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="setAuthPassword">
-                                    <span wire:loading.remove wire:target="setAuthPassword">{{ filled($activeCacheService->auth_password) ? __('Rotate password') : __('Set password') }}</span>
-                                    <span wire:loading wire:target="setAuthPassword">{{ __('Updating…') }}</span>
-                                </x-primary-button>
-                                @if (filled($activeCacheService->auth_password))
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('clearAuthPassword', [], @js(__('Clear AUTH password')), @js(__('Allow unauthenticated commands on the loopback port? Only safe if no other process can reach this server.')), @js(__('Clear password')), true)"
-                                        class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                                    >
-                                        {{ __('Clear password') }}
-                                    </button>
-                                @endif
-                            </div>
-                        </form>
-                    </div>
-                @endif
-
-                @if (\App\Models\ServerCacheService::engineSupportsAuth($activeCacheService->engine))
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Memory limits') }}</h2>
-                                <p class="mt-2 text-sm text-brand-moss">{{ __('Cap the engine\'s memory usage and pick what happens when the cap is hit. Backed by maxmemory + maxmemory-policy in the config file.') }}</p>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                @if (! $cacheMemoryLoaded && $cacheMemoryError === null)
-                                    <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                        <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Load current settings') }}</span>
-                                        <span wire:loading wire:target="loadCacheMemorySettings">{{ __('Loading…') }}</span>
-                                    </button>
-                                @else
-                                    <button type="button" wire:click="hideCacheMemorySettings" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Hide') }}</button>
-                                @endif
-                            </div>
-                        </div>
-
-                        @if ($cacheMemoryError)
-                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheMemoryError }}</p>
-                        @elseif ($cacheMemoryLoaded)
-                            <form wire:submit="saveCacheMemorySettings" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div>
-                                    <x-input-label for="cache_maxmemory" :value="__('maxmemory')" />
-                                    <x-text-input id="cache_maxmemory" wire:model="cache_maxmemory" class="mt-1 block w-full font-mono text-sm" placeholder="256mb" wire:loading.attr="disabled" wire:target="saveCacheMemorySettings" />
-                                    <p class="mt-1 text-xs text-brand-moss">{{ __('e.g. 256mb, 1gb, 0 for no limit. Empty removes the directive entirely.') }}</p>
-                                    <x-input-error :messages="$errors->get('cache_maxmemory')" class="mt-1" />
-                                </div>
-                                <div>
-                                    <x-input-label for="cache_maxmemory_policy" :value="__('maxmemory-policy')" />
-                                    <select id="cache_maxmemory_policy" wire:model="cache_maxmemory_policy" wire:loading.attr="disabled" wire:target="saveCacheMemorySettings" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm">
-                                        @foreach (\App\Support\Servers\CacheServiceMemoryConfig::POLICIES as $policyOption)
-                                            <option value="{{ $policyOption }}">{{ $policyOption }}</option>
-                                        @endforeach
-                                    </select>
-                                    <p class="mt-1 text-xs text-brand-moss">{{ __('What happens when the cap is hit. allkeys-lru is the most common pick for Laravel cache stores.') }}</p>
-                                    <x-input-error :messages="$errors->get('cache_maxmemory_policy')" class="mt-1" />
-                                </div>
-                                <div class="sm:col-span-2 flex flex-wrap gap-2">
-                                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveCacheMemorySettings">
-                                        <span wire:loading.remove wire:target="saveCacheMemorySettings">{{ __('Save and restart') }}</span>
-                                        <span wire:loading wire:target="saveCacheMemorySettings">{{ __('Saving…') }}</span>
-                                    </x-primary-button>
-                                </div>
-                            </form>
-                        @endif
-                    </div>
-
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Connected clients') }}</h2>
-                                <p class="mt-2 text-sm text-brand-moss">{{ __('Snapshot of CLIENT LIST. Pulled on demand — refresh to see who\'s connected right now.') }}</p>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                @if ($cacheClients === null && $cacheClientsError === null)
-                                    <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                        <span wire:loading.remove wire:target="loadCacheClients">{{ __('Load clients') }}</span>
-                                        <span wire:loading wire:target="loadCacheClients">{{ __('Loading…') }}</span>
-                                    </button>
-                                @else
-                                    <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">{{ __('Refresh') }}</button>
-                                    <button type="button" wire:click="hideCacheClients" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Hide') }}</button>
-                                @endif
-                            </div>
-                        </div>
-
-                        @if ($cacheClientsError)
-                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheClientsError }}</p>
-                        @elseif ($cacheClients !== null)
-                            @if (count($cacheClients) === 0)
-                                <p class="mt-4 text-sm text-brand-moss">{{ __('No clients connected.') }}</p>
-                            @else
-                                <div class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10">
-                                    <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                                        <thead class="bg-brand-sand/40 text-left text-xs font-semibold uppercase tracking-wide text-brand-mist">
-                                            <tr>
-                                                <th class="px-4 py-3">{{ __('ID') }}</th>
-                                                <th class="px-4 py-3">{{ __('Address') }}</th>
-                                                <th class="px-4 py-3">{{ __('Name') }}</th>
-                                                <th class="px-4 py-3">{{ __('Age (s)') }}</th>
-                                                <th class="px-4 py-3">{{ __('Idle (s)') }}</th>
-                                                <th class="px-4 py-3">{{ __('DB') }}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-brand-ink/10 bg-white">
-                                            @foreach ($cacheClients as $client)
-                                                <tr>
-                                                    <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-ink">{{ $client['id'] }}</td>
-                                                    <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-ink">{{ $client['addr'] }}</td>
-                                                    <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-moss">{{ $client['name'] ?: '—' }}</td>
-                                                    <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-moss">{{ $client['age'] }}</td>
-                                                    <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-moss">{{ $client['idle'] }}</td>
-                                                    <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-moss">{{ $client['db'] }}</td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            @endif
-                        @endif
-                    </div>
-                @endif
-
+            @if ($cacheServices->isEmpty())
                 <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Server config file') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss">
-                                @if ($cacheConfigEditing)
-                                    {{ __('Editing the live config. Save will write, restart the engine, verify it accepts the new config, and roll back if anything goes wrong.') }}
-                                @else
-                                    {{ __('Read-only view of the engine\'s main config file. Click Edit to change it — Dply backs up, restarts, verifies, and rolls back automatically on failure.') }}
-                                @endif
-                            </p>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            @if ($cacheConfigEditing)
-                                {{-- Edit-mode controls render with the form below. --}}
-                            @elseif ($cacheConfigContent === null && $cacheConfigError === null)
-                                <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                    <span wire:loading.remove wire:target="loadCacheConfig">{{ __('Load config') }}</span>
-                                    <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
-                                </button>
-                            @else
-                                <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">{{ __('Refresh') }}</button>
-                                @if ($cacheConfigContent !== null)
-                                    <button type="button" wire:click="startEditingCacheConfig" wire:loading.attr="disabled" wire:target="startEditingCacheConfig" class="inline-flex items-center gap-2 rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-sm font-medium text-brand-forest hover:bg-brand-forest/15">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
-                                        {{ __('Edit') }}
-                                    </button>
-                                @endif
-                                <button type="button" wire:click="hideCacheConfig" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Hide') }}</button>
-                            @endif
-                        </div>
-                    </div>
-
-                    @if ($cacheConfigError)
-                        <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheConfigError }}</p>
-                    @elseif ($cacheConfigEditing)
-                        @if ($cacheConfigPath)
-                            <p class="mt-4 break-all font-mono text-xs text-brand-mist">{{ $cacheConfigPath }}</p>
-                        @endif
-                        <form wire:submit="saveCacheConfig" class="mt-3 space-y-3">
-                            <textarea
-                                id="cache_config_draft"
-                                wire:model="cacheConfigDraft"
-                                rows="20"
-                                spellcheck="false"
-                                class="block w-full rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
-                            ></textarea>
-                            <x-input-error :messages="$errors->get('cacheConfigDraft')" />
-                            <div class="flex flex-wrap gap-2">
-                                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveCacheConfig">
-                                    <span wire:loading.remove wire:target="saveCacheConfig">{{ __('Save and restart') }}</span>
-                                    <span wire:loading wire:target="saveCacheConfig">{{ __('Saving…') }}</span>
-                                </x-primary-button>
-                                <x-secondary-button type="button" wire:click="cancelEditingCacheConfig">{{ __('Cancel') }}</x-secondary-button>
-                            </div>
-                        </form>
-                    @elseif ($cacheConfigContent !== null)
-                        @if ($cacheConfigPath)
-                            <p class="mt-4 break-all font-mono text-xs text-brand-mist">{{ $cacheConfigPath }}</p>
-                        @endif
-                        <pre class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink whitespace-pre">{{ $cacheConfigContent }}</pre>
-                    @endif
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('No cache services installed') }}</h2>
+                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+                        {{ __('Pick an engine from the tabs above to install one. You can install multiple engines side-by-side — for example Redis for queues and Memcached for app cache.') }}
+                    </p>
                 </div>
+            @else
+                @foreach ($cacheServices as $row)
+                    @php
+                        $engineLabel = $engineLabels[$row->engine] ?? ucfirst($row->engine);
+                        $rowInFlight = in_array($row->status, [
+                            \App\Models\ServerCacheService::STATUS_PENDING,
+                            \App\Models\ServerCacheService::STATUS_INSTALLING,
+                            \App\Models\ServerCacheService::STATUS_UNINSTALLING,
+                        ], true);
+                    @endphp
+                    <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <h2 class="text-lg font-semibold text-brand-ink">{{ $engineLabel }}</h2>
+                            @switch($row->status)
+                                @case(\App\Models\ServerCacheService::STATUS_RUNNING)
+                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Running') }}</span>
+                                    @break
+                                @case(\App\Models\ServerCacheService::STATUS_STOPPED)
+                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{{ __('Stopped') }}</span>
+                                    @break
+                                @case(\App\Models\ServerCacheService::STATUS_PENDING)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                                        <x-spinner variant="forest" /> {{ __('Queued…') }}
+                                    </span>
+                                    @break
+                                @case(\App\Models\ServerCacheService::STATUS_INSTALLING)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                                        <x-spinner variant="forest" /> {{ __('Installing…') }}
+                                    </span>
+                                    @break
+                                @case(\App\Models\ServerCacheService::STATUS_UNINSTALLING)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                                        <x-spinner variant="forest" /> {{ __('Uninstalling…') }}
+                                    </span>
+                                    @break
+                                @case(\App\Models\ServerCacheService::STATUS_FAILED)
+                                    <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700" title="{{ $row->error_message }}">{{ __('Failed') }}</span>
+                                    @break
+                                @default
+                                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-medium text-brand-ink">{{ ucfirst($row->status) }}</span>
+                            @endswitch
+                            <a
+                                href="#"
+                                wire:click.prevent="setWorkspaceTab('{{ $row->engine }}')"
+                                class="ml-auto text-xs font-medium text-brand-forest hover:underline"
+                            >{{ __('Open :engine workspace →', ['engine' => $engineLabel]) }}</a>
+                        </div>
+
+                        <dl class="mt-6 grid gap-4 sm:grid-cols-3">
+                            <div>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
+                                <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $row->version ?: '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
+                                <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $row->port }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                                <dd class="mt-1 text-sm text-brand-ink">{{ ucfirst($row->status) }}</dd>
+                            </div>
+                        </dl>
+
+                        @if ($row->status === \App\Models\ServerCacheService::STATUS_FAILED && filled($row->error_message))
+                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">
+                                {{ $row->error_message }}
+                            </p>
+                        @endif
+
+                        @php $stats = $cacheStatsByEngine[$row->engine] ?? []; @endphp
+                        @if (! empty($stats))
+                            <dl class="mt-4 grid gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                                @foreach ($stats as $label => $value)
+                                    <div>
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
+                                        <dd class="mt-1 font-mono text-xs text-brand-ink">{{ $value }}</dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                        @endif
+                    </div>
+                @endforeach
+
+                @foreach ($cacheServices as $row)
+                    @if (\App\Models\ServerCacheService::engineSupportsAuth($row->engine) || $row->engine === 'memcached')
+                        @include('livewire.servers.partials.cache-connection-snippet', [
+                            'cacheService' => $row,
+                            'card' => $card,
+                            'engineLabels' => $engineLabels,
+                        ])
+                    @endif
+                @endforeach
             @endif
         </x-server-workspace-tab-panel>
 
+        {{-- ============================================================================
+             PER-ENGINE TABS — each is independent. Three states:
+               1) not installed: rich engine info card + Install button
+               2) in flight: status banner (the global busy banner above already covers details)
+               3) installed: status, actions, AUTH/memory/config (where applicable)
+             ============================================================================ --}}
         @foreach ($engines as $engine)
+            @php
+                $row = $cacheServicesByEngine[$engine] ?? null;
+                $info = \App\Support\Servers\CacheEngineInfo::for($engine);
+                $rowInFlight = $row && in_array($row->status, [
+                    \App\Models\ServerCacheService::STATUS_PENDING,
+                    \App\Models\ServerCacheService::STATUS_INSTALLING,
+                    \App\Models\ServerCacheService::STATUS_UNINSTALLING,
+                ], true);
+                $probeRunning = (bool) ($capabilities[$engine] ?? false);
+            @endphp
             <x-server-workspace-tab-panel
                 :id="'cache-panel-'.$engine"
                 :labelled-by="'cache-tab-'.$engine"
                 :hidden="$workspace_tab !== $engine"
                 panel-class="space-y-8"
             >
-                @php
-                    $isActiveEngine = $activeCacheService && $activeCacheService->engine === $engine;
-                    $hasOtherEngine = $activeCacheService && $activeCacheService->engine !== $engine;
-                    $probeRunning = (bool) ($capabilities[$engine] ?? false);
-                @endphp
+                {{-- Engine information card (always present, regardless of install state). --}}
                 <div class="{{ $card }} p-6 sm:p-8">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ $engineDescriptions[$engine] }}</p>
+                            <h2 class="text-xl font-semibold text-brand-ink">{{ $info['label'] }}</h2>
+                            <p class="mt-1 text-sm text-brand-moss">{{ $info['tagline'] }}</p>
                         </div>
-                        @if ($isActiveEngine)
-                            <span class="inline-flex h-fit items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        @if ($row)
+                            <span class="inline-flex h-fit items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                                <x-heroicon-o-check-circle class="h-3.5 w-3.5" />
                                 {{ __('Installed on this server') }}
                             </span>
                         @endif
                     </div>
 
-                    @if ($hasOtherEngine)
-                        @php
-                            $oldLabel = $engineLabels[$activeCacheService->engine] ?? $activeCacheService->engine;
-                            $newLabel = $engineLabels[$engine];
-                            $bothSupportAuth = \App\Models\ServerCacheService::engineSupportsAuth($activeCacheService->engine)
-                                && \App\Models\ServerCacheService::engineSupportsAuth($engine);
-                        @endphp
-                        <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                            <p>
-                                {{ __(':other is currently installed. Switch will uninstall :other and install :this.', [
-                                    'other' => $oldLabel,
-                                    'this' => $newLabel,
-                                ]) }}
-                                @if ($bothSupportAuth)
-                                    {{ __('Your AUTH password and maxmemory settings will be carried over.') }}
-                                @else
-                                    {{ __('Settings will not carry over (different memory model).') }}
-                                @endif
-                            </p>
+                    <p class="mt-4 text-sm leading-relaxed text-brand-ink/85">{{ $info['description'] }}</p>
+
+                    <dl class="mt-6 grid gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('License') }}</dt>
+                            <dd class="mt-1 text-xs text-brand-ink leading-snug">{{ $info['license'] }}</dd>
                         </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-3">
-                            <button
-                                type="button"
-                                wire:click="openConfirmActionModal('switchCacheService', ['{{ $engine }}'], @js(__('Switch to :engine', ['engine' => $newLabel])), @js(__('Uninstall :other and install :new on this server. Settings carry over only between redis-family engines.', ['other' => $oldLabel, 'new' => $newLabel])), @js(__('Switch')), true)"
-                                wire:loading.attr="disabled"
-                                wire:target="switchCacheService"
-                                class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
-                            >
-                                <x-heroicon-o-arrows-right-left class="h-4 w-4" />
-                                <span wire:loading.remove wire:target="switchCacheService">{{ __('Switch to :engine', ['engine' => $newLabel]) }}</span>
-                                <span wire:loading wire:target="switchCacheService">{{ __('Queueing switch…') }}</span>
-                            </button>
-                            <p class="text-xs text-brand-moss">
-                                {{ __('Apt purges :other and installs :new — usually 5–15 minutes on a small box.', ['other' => $oldLabel, 'new' => $newLabel]) }}
-                            </p>
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Maintainer') }}</dt>
+                            <dd class="mt-1 text-xs text-brand-ink leading-snug">{{ $info['maintainer'] }}</dd>
                         </div>
-                    @elseif ($isActiveEngine)
-                        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Wire protocol') }}</dt>
+                            <dd class="mt-1 text-xs text-brand-ink leading-snug">{{ $info['wire_protocol'] }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('First released') }}</dt>
+                            <dd class="mt-1 text-xs text-brand-ink leading-snug">{{ $info['first_released'] }}</dd>
+                        </div>
+                    </dl>
+
+                    <div class="mt-4 flex items-start gap-3 rounded-xl border border-brand-forest/15 bg-brand-forest/5 p-3">
+                        <x-heroicon-o-light-bulb class="mt-0.5 h-4 w-4 shrink-0 text-brand-forest" />
+                        <p class="text-xs leading-relaxed text-brand-ink">
+                            <span class="font-semibold">{{ __('Best for:') }}</span>
+                            {{ $info['best_for'] }}
+                        </p>
+                    </div>
+
+                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                        <a href="{{ $info['homepage_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <x-heroicon-o-globe-alt class="h-3.5 w-3.5" />
+                            {{ __('Homepage') }}
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 text-brand-mist" />
+                        </a>
+                        <a href="{{ $info['docs_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <x-heroicon-o-book-open class="h-3.5 w-3.5" />
+                            {{ __('Documentation') }}
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 text-brand-mist" />
+                        </a>
+                    </div>
+                </div>
+
+                {{-- Install / status / action card. State-dependent. --}}
+                @if (! $row)
+                    {{-- Not installed: offer Install. --}}
+                    <div class="{{ $card }} p-6 sm:p-8">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
+                        <p class="mt-2 text-sm text-brand-moss">{{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.') }}</p>
+                        @if ($cacheBusy)
+                            <div class="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                                <p class="flex items-start gap-2">
+                                    <x-spinner variant="forest" class="mt-0.5 shrink-0" />
+                                    <span>{{ __('Apt is busy with another cache change — wait for the running operation to finish before installing :new.', ['new' => $info['label']]) }}</span>
+                                </p>
+                            </div>
+                        @else
+                            <div class="mt-4 flex flex-wrap items-center gap-3">
+                                <button
+                                    type="button"
+                                    wire:click="installCacheService('{{ $engine }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="installCacheService"
+                                    class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                                >
+                                    <x-heroicon-o-cloud-arrow-down class="h-4 w-4" />
+                                    <span wire:loading.remove wire:target="installCacheService">{{ __('Install :engine', ['engine' => $info['label']]) }}</span>
+                                    <span wire:loading wire:target="installCacheService">{{ __('Queueing install…') }}</span>
+                                </button>
+                            </div>
+                        @endif
+                    </div>
+                @elseif ($rowInFlight)
+                    {{-- In flight on this engine: small status note, the global banner up top has details. --}}
+                    <div class="{{ $card }} p-6 sm:p-8">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
+                        <p class="mt-2 text-sm text-brand-moss">
+                            {{ __(':engine is changing — see the progress banner above for live status and output.', ['engine' => $engineLabels[$engine]]) }}
+                        </p>
+                    </div>
+                @else
+                    {{-- Installed and idle: status grid + action row. --}}
+                    <div class="{{ $card }} p-6 sm:p-8">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine status', ['engine' => $engineLabels[$engine]]) }}</h3>
+                        <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                                <dd class="mt-1">
+                                    @switch($row->status)
+                                        @case(\App\Models\ServerCacheService::STATUS_RUNNING)
+                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Running') }}</span>
+                                            @break
+                                        @case(\App\Models\ServerCacheService::STATUS_STOPPED)
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{{ __('Stopped') }}</span>
+                                            @break
+                                        @case(\App\Models\ServerCacheService::STATUS_FAILED)
+                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">{{ __('Failed') }}</span>
+                                            @break
+                                        @default
+                                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-medium text-brand-ink">{{ ucfirst($row->status) }}</span>
+                                    @endswitch
+                                </dd>
+                            </div>
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
-                                <dd class="mt-1 text-sm text-brand-ink">
+                                <dd class="mt-1">
                                     @if ($probeRunning)
                                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Reachable') }}</span>
                                     @else
@@ -525,35 +475,342 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                                <dd class="mt-1 text-sm text-brand-ink">{{ ucfirst($activeCacheService->status) }}</dd>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
+                                <dd class="mt-1 flex flex-wrap items-center gap-2 font-mono text-sm text-brand-ink">
+                                    <span>{{ $row->version ?: '—' }}</span>
+                                    @if (! $row->version && $row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
+                                        <button
+                                            type="button"
+                                            wire:click="probeCacheServiceVersion('{{ $engine }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="probeCacheServiceVersion"
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
+                                        >
+                                            <span wire:loading.remove wire:target="probeCacheServiceVersion">{{ __('Probe') }}</span>
+                                            <span wire:loading wire:target="probeCacheServiceVersion" class="inline-flex items-center gap-1">
+                                                <x-spinner variant="forest" />
+                                            </span>
+                                        </button>
+                                    @endif
+                                </dd>
                             </div>
-                        </div>
-                        <p class="mt-4 text-sm text-brand-moss">
-                            {{ __('Use the Overview tab for restart / stop / uninstall actions.') }}
-                        </p>
-                    @else
-                        <div class="mt-6 flex flex-wrap items-center gap-3">
-                            <button
-                                type="button"
-                                wire:click="installCacheService('{{ $engine }}')"
-                                wire:loading.attr="disabled"
-                                wire:target="installCacheService"
-                                class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
-                            >
-                                <x-heroicon-o-cloud-arrow-down class="h-4 w-4" />
-                                <span wire:loading.remove wire:target="installCacheService">{{ __('Install :engine', ['engine' => $engineLabels[$engine]]) }}</span>
-                                <span wire:loading wire:target="installCacheService">{{ __('Queueing install…') }}</span>
-                            </button>
-                            <p class="text-xs text-brand-moss">
-                                {{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box.') }}
+                            <div>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
+                                <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $row->port }}</dd>
+                            </div>
+                        </dl>
+
+                        @if ($row->status === \App\Models\ServerCacheService::STATUS_FAILED && filled($row->error_message))
+                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">
+                                {{ $row->error_message }}
                             </p>
+                        @endif
+
+                        @if ($cacheBusy)
+                            <p class="mt-6 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 flex items-start gap-2">
+                                <x-spinner variant="forest" class="mt-0.5 shrink-0" />
+                                <span>{{ __('Restart, stop, start, flush, and uninstall are paused while another cache service is changing on this server.') }}</span>
+                            </p>
+                        @else
+                            <div class="mt-6 flex flex-wrap gap-2">
+                                @if (in_array($row->status, [\App\Models\ServerCacheService::STATUS_RUNNING, \App\Models\ServerCacheService::STATUS_STOPPED, \App\Models\ServerCacheService::STATUS_FAILED], true))
+                                    <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <span wire:loading.remove wire:target="restartCacheService">{{ __('Restart') }}</span>
+                                        <span wire:loading wire:target="restartCacheService">{{ __('Restarting…') }}</span>
+                                    </button>
+                                    @if ($row->status !== \App\Models\ServerCacheService::STATUS_STOPPED)
+                                        <button type="button" wire:click="stopCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="stopCacheService" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-o-stop-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Stop') }}
+                                        </button>
+                                    @else
+                                        <button type="button" wire:click="startCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="startCacheService" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-o-play-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Start') }}
+                                        </button>
+                                    @endif
+                                    @if ($row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
+                                        <button
+                                            type="button"
+                                            wire:click="openConfirmActionModal('flushCacheService', ['{{ $engine }}'], @js(__('Flush all keys')), @js(__('Drop every key in :engine. App sessions, queued tags, and rate-limit counters in this engine will all be reset. Cannot be undone.', ['engine' => $engineLabels[$engine]])), @js(__('Flush all keys')), true)"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                        >
+                                            <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Flush all keys') }}
+                                        </button>
+                                    @endif
+                                    <button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('uninstallCacheService', ['{{ $engine }}'], @js(__('Uninstall :engine', ['engine' => $engineLabels[$engine]])), @js(__('apt purge will remove the package and its data dirs. Cached entries will be lost. Other engines on this server are not affected.')), @js(__('Uninstall')), true)"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                    >
+                                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('Uninstall') }}
+                                    </button>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Connection snippet for this engine. --}}
+                    @include('livewire.servers.partials.cache-connection-snippet', [
+                        'cacheService' => $row,
+                        'card' => $card,
+                        'engineLabels' => $engineLabels,
+                    ])
+
+                    {{-- AUTH password card (redis-family only). --}}
+                    @if (\App\Models\ServerCacheService::engineSupportsAuth($row->engine))
+                        <div class="{{ $card }} p-6 sm:p-8">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — AUTH password', ['engine' => $engineLabels[$engine]]) }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss">
+                                @if (filled($row->auth_password))
+                                    {{ __('A password is set. Apps connecting to this engine must send AUTH. Rotate by entering a new value below.') }}
+                                @else
+                                    {{ __('No AUTH password is set. Anything that can reach the loopback port can issue commands. Set one below to require authentication.') }}
+                                @endif
+                            </p>
+                            <form wire:submit="setAuthPassword" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div class="sm:col-span-2">
+                                    <div class="flex items-end justify-between gap-2">
+                                        <x-input-label for="new_auth_password" :value="__('New password')" class="mb-0" />
+                                        <button type="button" wire:click="generateAuthPassword" wire:loading.attr="disabled" wire:target="setAuthPassword,generateAuthPassword" class="mb-1 text-xs font-medium text-brand-forest hover:underline disabled:opacity-50">{{ __('Generate') }}</button>
+                                    </div>
+                                    <div class="relative mt-1" x-data="{ shown: false }">
+                                        <x-text-input
+                                            id="new_auth_password"
+                                            x-ref="input"
+                                            ::type="shown ? 'text' : 'password'"
+                                            type="password"
+                                            wire:model="new_auth_password"
+                                            autocomplete="new-password"
+                                            class="block w-full pr-10 text-sm"
+                                            placeholder="••••••••"
+                                            wire:loading.attr="disabled"
+                                            wire:target="setAuthPassword"
+                                        />
+                                        <div class="absolute inset-y-0 right-2 flex items-center gap-1">
+                                            <button type="button" x-on:click="shown = !shown" class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink">
+                                                <x-heroicon-o-eye class="h-4 w-4" x-show="!shown" />
+                                                <x-heroicon-o-eye-slash class="h-4 w-4" x-show="shown" x-cloak />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('new_auth_password')" class="mt-1" />
+                                </div>
+                                <div class="sm:col-span-2 flex flex-wrap gap-2">
+                                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="setAuthPassword">
+                                        <span wire:loading.remove wire:target="setAuthPassword">{{ filled($row->auth_password) ? __('Rotate password') : __('Set password') }}</span>
+                                        <span wire:loading wire:target="setAuthPassword">{{ __('Updating…') }}</span>
+                                    </x-primary-button>
+                                    @if (filled($row->auth_password))
+                                        <button
+                                            type="button"
+                                            wire:click="openConfirmActionModal('clearAuthPassword', [], @js(__('Clear AUTH password')), @js(__('Allow unauthenticated commands on the loopback port? Only safe if no other process can reach this server.')), @js(__('Clear password')), true)"
+                                            class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                        >
+                                            {{ __('Clear password') }}
+                                        </button>
+                                    @endif
+                                </div>
+                            </form>
+                        </div>
+
+                        {{-- Memory limits card (redis-family only). --}}
+                        <div class="{{ $card }} p-6 sm:p-8">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — memory limits', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                    <p class="mt-2 text-sm text-brand-moss">{{ __('Cap the engine\'s memory usage and pick what happens when the cap is hit. Backed by maxmemory + maxmemory-policy in the config file.') }}</p>
+                                </div>
+                                <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
+                                    @if (! $cacheMemoryLoaded && $cacheMemoryError === null)
+                                        <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Load current settings') }}</span>
+                                            <span wire:loading wire:target="loadCacheMemorySettings">{{ __('Loading…') }}</span>
+                                        </button>
+                                    @else
+                                        <button type="button" wire:click="hideCacheMemorySettings" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
+                                            <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Hide') }}
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @if ($cacheMemoryError)
+                                <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheMemoryError }}</p>
+                            @elseif ($cacheMemoryLoaded)
+                                <form wire:submit="saveCacheMemorySettings" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="cache_maxmemory" :value="__('maxmemory')" />
+                                        <x-text-input id="cache_maxmemory" wire:model="cache_maxmemory" class="mt-1 block w-full font-mono text-sm" placeholder="256mb" wire:loading.attr="disabled" wire:target="saveCacheMemorySettings" />
+                                        <p class="mt-1 text-xs text-brand-moss">{{ __('e.g. 256mb, 1gb, 0 for no limit. Empty removes the directive entirely.') }}</p>
+                                        <x-input-error :messages="$errors->get('cache_maxmemory')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="cache_maxmemory_policy" :value="__('maxmemory-policy')" />
+                                        <select id="cache_maxmemory_policy" wire:model="cache_maxmemory_policy" wire:loading.attr="disabled" wire:target="saveCacheMemorySettings" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm">
+                                            @foreach (\App\Support\Servers\CacheServiceMemoryConfig::POLICIES as $policyOption)
+                                                <option value="{{ $policyOption }}">{{ $policyOption }}</option>
+                                            @endforeach
+                                        </select>
+                                        <x-input-error :messages="$errors->get('cache_maxmemory_policy')" class="mt-1" />
+                                    </div>
+                                    <div class="sm:col-span-2 flex flex-wrap gap-2">
+                                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveCacheMemorySettings">
+                                            <span wire:loading.remove wire:target="saveCacheMemorySettings">{{ __('Save and restart') }}</span>
+                                            <span wire:loading wire:target="saveCacheMemorySettings">{{ __('Saving…') }}</span>
+                                        </x-primary-button>
+                                    </div>
+                                </form>
+                            @endif
+                        </div>
+
+                        {{-- Connected clients (redis-family only). --}}
+                        <div class="{{ $card }} p-6 sm:p-8">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — connected clients', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                    <p class="mt-2 text-sm text-brand-moss">{{ __('Snapshot of CLIENT LIST. Pulled on demand — refresh to see who\'s connected right now.') }}</p>
+                                </div>
+                                <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
+                                    @if ($cacheClients === null && $cacheClientsError === null)
+                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-o-users class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <span wire:loading.remove wire:target="loadCacheClients">{{ __('Load clients') }}</span>
+                                            <span wire:loading wire:target="loadCacheClients">{{ __('Loading…') }}</span>
+                                        </button>
+                                    @else
+                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Refresh') }}
+                                        </button>
+                                        <button type="button" wire:click="hideCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
+                                            <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Hide') }}
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @if ($cacheClientsError)
+                                <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheClientsError }}</p>
+                            @elseif ($cacheClients !== null)
+                                @if (count($cacheClients) === 0)
+                                    <p class="mt-4 text-sm text-brand-moss">{{ __('No clients connected.') }}</p>
+                                @else
+                                    <div class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10">
+                                        <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                                            <thead class="bg-brand-sand/40 text-left text-xs font-semibold uppercase tracking-wide text-brand-mist">
+                                                <tr>
+                                                    <th class="px-4 py-3">{{ __('ID') }}</th>
+                                                    <th class="px-4 py-3">{{ __('Address') }}</th>
+                                                    <th class="px-4 py-3">{{ __('Name') }}</th>
+                                                    <th class="px-4 py-3">{{ __('Age (s)') }}</th>
+                                                    <th class="px-4 py-3">{{ __('Idle (s)') }}</th>
+                                                    <th class="px-4 py-3">{{ __('DB') }}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-brand-ink/10 bg-white">
+                                                @foreach ($cacheClients as $client)
+                                                    <tr>
+                                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-ink">{{ $client['id'] }}</td>
+                                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-ink">{{ $client['addr'] }}</td>
+                                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-moss">{{ $client['name'] ?: '—' }}</td>
+                                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-moss">{{ $client['age'] }}</td>
+                                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-moss">{{ $client['idle'] }}</td>
+                                                        <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-moss">{{ $client['db'] }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            @endif
                         </div>
                     @endif
-                </div>
+
+                    {{-- Server config file viewer/editor. Per-engine, scoped to current tab. --}}
+                    <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — server config file', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                <p class="mt-2 text-sm text-brand-moss">
+                                    @if ($cacheConfigEditing)
+                                        {{ __('Editing the live config. Save will write, restart the engine, verify it accepts the new config, and roll back if anything goes wrong.') }}
+                                    @else
+                                        {{ __('Read-only view of the engine\'s main config file. Click Edit to change it — Dply backs up, restarts, verifies, and rolls back automatically on failure.') }}
+                                    @endif
+                                </p>
+                            </div>
+                            <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
+                                @if ($cacheConfigEditing)
+                                    {{-- Edit-mode controls render with the form below. --}}
+                                @elseif ($cacheConfigContent === null && $cacheConfigError === null)
+                                    <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                        <x-heroicon-o-document-text class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <span wire:loading.remove wire:target="loadCacheConfig">{{ __('Load config') }}</span>
+                                        <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
+                                    </button>
+                                @else
+                                    <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('Refresh') }}
+                                    </button>
+                                    @if ($cacheConfigContent !== null)
+                                        <button type="button" wire:click="startEditingCacheConfig" wire:loading.attr="disabled" wire:target="startEditingCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-sm font-medium text-brand-forest hover:bg-brand-forest/15">
+                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                            {{ __('Edit') }}
+                                        </button>
+                                    @endif
+                                    <button type="button" wire:click="hideCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
+                                        <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('Hide') }}
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+
+                        @if ($cacheConfigError)
+                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheConfigError }}</p>
+                        @elseif ($cacheConfigEditing)
+                            @if ($cacheConfigPath)
+                                <p class="mt-4 break-all font-mono text-xs text-brand-mist">{{ $cacheConfigPath }}</p>
+                            @endif
+                            <form wire:submit="saveCacheConfig" class="mt-3 space-y-3">
+                                <textarea
+                                    id="cache_config_draft"
+                                    wire:model="cacheConfigDraft"
+                                    rows="20"
+                                    spellcheck="false"
+                                    class="block w-full rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                ></textarea>
+                                <x-input-error :messages="$errors->get('cacheConfigDraft')" />
+                                <div class="flex flex-wrap gap-2">
+                                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveCacheConfig">
+                                        <span wire:loading.remove wire:target="saveCacheConfig">{{ __('Save and restart') }}</span>
+                                        <span wire:loading wire:target="saveCacheConfig">{{ __('Saving…') }}</span>
+                                    </x-primary-button>
+                                    <x-secondary-button type="button" wire:click="cancelEditingCacheConfig">{{ __('Cancel') }}</x-secondary-button>
+                                </div>
+                            </form>
+                        @elseif ($cacheConfigContent !== null)
+                            @if ($cacheConfigPath)
+                                <p class="mt-4 break-all font-mono text-xs text-brand-mist">{{ $cacheConfigPath }}</p>
+                            @endif
+                            <pre class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink whitespace-pre">{{ $cacheConfigContent }}</pre>
+                        @endif
+                    </div>
+                @endif
             </x-server-workspace-tab-panel>
         @endforeach
 
+        {{-- ============================================================================
+             ADVANCED TAB — server-wide audit log across every cache service.
+             ============================================================================ --}}
         <x-server-workspace-tab-panel
             id="cache-panel-advanced"
             labelled-by="cache-tab-advanced"
@@ -562,7 +819,7 @@
         >
             <div class="{{ $card }} p-6 sm:p-8">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
-                <p class="mt-2 text-sm text-brand-moss">{{ __('Recent install / uninstall / restart / stop / start / flush events on the cache service for this server.') }}</p>
+                <p class="mt-2 text-sm text-brand-moss">{{ __('Recent install / uninstall / restart / stop / start / flush events on cache services for this server.') }}</p>
                 <ul class="mt-6 divide-y divide-brand-ink/10 text-sm">
                     @forelse ($cacheAuditEvents as $ev)
                         <li class="py-3">

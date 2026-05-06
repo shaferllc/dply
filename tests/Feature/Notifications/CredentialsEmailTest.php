@@ -6,8 +6,10 @@ namespace Tests\Feature\Notifications;
 
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\DeployGuestMetricsCallbackEnvJob;
+use App\Jobs\InstallMetricsAgentJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSetupScriptJob;
+use App\Jobs\SyncServerSystemdServicesJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -34,6 +36,8 @@ class CredentialsEmailTest extends TestCase
             RunServerInsightsJob::class,
             CheckServerHealthJob::class,
             DeployGuestMetricsCallbackEnvJob::class,
+            InstallMetricsAgentJob::class,
+            SyncServerSystemdServicesJob::class,
         ]);
 
         [$user, $org, $server] = $this->makeServer(['email_server_credentials_enabled' => false]);
@@ -50,6 +54,8 @@ class CredentialsEmailTest extends TestCase
             RunServerInsightsJob::class,
             CheckServerHealthJob::class,
             DeployGuestMetricsCallbackEnvJob::class,
+            InstallMetricsAgentJob::class,
+            SyncServerSystemdServicesJob::class,
         ]);
 
         [$user, $org, $server] = $this->makeServer(['email_server_credentials_enabled' => true]);
@@ -66,6 +72,8 @@ class CredentialsEmailTest extends TestCase
             RunServerInsightsJob::class,
             CheckServerHealthJob::class,
             DeployGuestMetricsCallbackEnvJob::class,
+            InstallMetricsAgentJob::class,
+            SyncServerSystemdServicesJob::class,
         ]);
 
         [$user, $org, $server] = $this->makeServer(['email_server_credentials_enabled' => true]);

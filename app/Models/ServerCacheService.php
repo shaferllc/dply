@@ -37,10 +37,13 @@ class ServerCacheService extends Model
     protected $fillable = [
         'server_id',
         'engine',
+        'target_engine',
         'version',
         'status',
         'port',
         'error_message',
+        'install_output',
+        'cancel_requested_at',
         'auth_password',
     ];
 
@@ -52,6 +55,7 @@ class ServerCacheService extends Model
     {
         return [
             'port' => 'integer',
+            'cancel_requested_at' => 'datetime',
             'auth_password' => 'encrypted',
         ];
     }

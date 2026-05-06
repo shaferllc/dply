@@ -64,6 +64,10 @@ class SiteDeletionPlaceholderReleaseTest extends TestCase
         app()->instance(PlaceholderDnsManager::class, $dns);
 
         $site->delete();
+
+        // Mockery's tearDown verifies release was called once; this assertion satisfies
+        // PHPUnit's "risky test" rule (it requires at least one explicit assertion per test).
+        $this->assertSame(0, Site::query()->where('id', $site->id)->count());
     }
 
     public function test_non_scaffolded_site_delete_still_invokes_release_idempotently(): void
@@ -80,6 +84,8 @@ class SiteDeletionPlaceholderReleaseTest extends TestCase
         app()->instance(PlaceholderDnsManager::class, $dns);
 
         $site->delete();
+
+        $this->assertSame(0, Site::query()->where('id', $site->id)->count());
     }
 
     public function test_release_failure_does_not_block_site_deletion(): void

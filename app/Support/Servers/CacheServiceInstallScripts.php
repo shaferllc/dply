@@ -114,20 +114,51 @@ BASH,
     }
 
     /**
-     * Read the engine's reported version after install (best-effort — returns null if the binary
-     * hides version info or isn't on PATH). Output is captured separately from the install script
-     * so an unparseable version doesn't fail the whole job.
+     * Emit the engine's raw `--version` line(s). Parsing happens PHP-side via
+     * {@see CacheServiceInstallScripts::parseVersionFromBuffer()}.
+     *
+     * The probe deliberately avoids awk-based field extraction because the previous
+     * `awk "{print \$2}"` shape was fragile (set -euo pipefail + PATH-restricted
+     * non-login root shell could silently produce empty output). Each `||` chain
+     * picks the first CLI that actually exists; trailing `|| true` keeps the script
+     * exit code 0 even when the engine isn't on PATH so set -e doesn't abort.
      */
     public static function versionProbeScript(string $engine): string
     {
         return match ($engine) {
-            'redis' => 'redis-cli --version 2>/dev/null | awk "{print \$2}"',
-            'valkey' => 'valkey-cli --version 2>/dev/null | awk "{print \$2}" || redis-cli --version 2>/dev/null | awk "{print \$2}"',
-            'memcached' => 'memcached --version 2>/dev/null | awk "{print \$2}"',
-            'keydb' => 'keydb-cli --version 2>/dev/null | awk "{print \$2}" || redis-cli --version 2>/dev/null | awk "{print \$2}"',
-            'dragonfly' => 'dragonfly --version 2>/dev/null | head -n1',
-            default => 'echo ""',
+            'redis' => '(command -v redis-cli >/dev/null 2>&1 && redis-cli --version) || true',
+            'valkey' => '(command -v valkey-cli >/dev/null 2>&1 && valkey-cli --version) || (command -v redis-cli >/dev/null 2>&1 && redis-cli --version) || true',
+            'memcached' => '(command -v memcached >/dev/null 2>&1 && memcached --version) || true',
+            'keydb' => '(command -v keydb-cli >/dev/null 2>&1 && keydb-cli --version) || (command -v redis-cli >/dev/null 2>&1 && redis-cli --version) || true',
+            'dragonfly' => '(command -v dragonfly >/dev/null 2>&1 && dragonfly --version | head -n1) || true',
+            default => 'true',
         };
+    }
+
+    /**
+     * Pull the version token out of a `--version` style output buffer. The line shape varies by
+     * engine — `redis-cli 7.0.5`, `memcached 1.6.18`, `dragonfly v1.13.0` — so we walk the last
+     * non-empty line and pick the first whitespace-separated token that looks like a version
+     * (digits, dots, alphanumerics). Returns null when nothing parseable is present.
+     */
+    public static function parseVersionFromBuffer(string $buffer): ?string
+    {
+        $lines = array_values(array_filter(array_map('trim', explode("\n", $buffer)), fn ($l) => $l !== ''));
+        if ($lines === []) {
+            return null;
+        }
+        $last = (string) end($lines);
+
+        // Strip a leading "v" (dragonfly emits "dragonfly v1.13.0").
+        foreach (preg_split('/\s+/', $last) as $token) {
+            if ($token === '' || ! preg_match('/^v?\d/', $token)) {
+                continue;
+            }
+
+            return ltrim($token, 'v');
+        }
+
+        return $last !== '' ? $last : null;
     }
 
     public static function systemdServiceFor(string $engine): string

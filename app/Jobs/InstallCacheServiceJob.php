@@ -42,9 +42,18 @@ class InstallCacheServiceJob implements ShouldQueue
             return;
         }
 
+        // Operator clicked Cancel between dispatch and worker pickup. Skip apt entirely and
+        // delete the row — there's nothing on the server to revert because we never started.
+        if ($row->cancel_requested_at !== null) {
+            $this->finishCancellation($row, $executor, $capabilities, $audit, ranAptInstall: false);
+
+            return;
+        }
+
         $row->update([
             'status' => ServerCacheService::STATUS_INSTALLING,
             'error_message' => null,
+            'install_output' => '',
         ]);
 
         // Resource preflight — bail BEFORE running any apt commands so a too-small box doesn't
@@ -72,17 +81,56 @@ class InstallCacheServiceJob implements ShouldQueue
             return;
         }
 
+        // Cancel may have been requested while preflight was running. Same path as above —
+        // nothing on the server to clean up, just delete the row and audit.
+        if ($row->fresh()?->cancel_requested_at !== null) {
+            $this->finishCancellation($row, $executor, $capabilities, $audit, ranAptInstall: false);
+
+            return;
+        }
+
         try {
             $script = CacheServiceInstallScripts::installScript($row->engine).
                 "\n".CacheServiceInstallScripts::versionProbeScript($row->engine);
 
-            $output = $executor->runInlineBash(
+            // Stream stdout/stderr chunks back to the row so the workspace's 4s poll can show
+            // a live tail of the install. We throttle DB writes to ~3s to keep the write rate
+            // sane even when apt-get is chatty.
+            $bufferAcc = '';
+            $lastFlush = 0.0;
+            $lastCancelCheck = 0.0;
+            $rowId = $row->id;
+            $flush = function (bool $force = false) use ($row, &$bufferAcc, &$lastFlush, &$lastCancelCheck, $rowId): void {
+                $now = microtime(true);
+                if (! $force && ($now - $lastFlush) < 3.0) {
+                    return;
+                }
+                $lastFlush = $now;
+                $row->update(['install_output' => mb_substr($bufferAcc, -32_000)]);
+
+                // Polling cancel intent on each flush keeps the cost cheap (one SELECT every ~3s).
+                // When the operator hits Cancel, the next chunk will see the flag and bail.
+                if (($now - $lastCancelCheck) >= 1.5) {
+                    $lastCancelCheck = $now;
+                    $cancelAt = ServerCacheService::query()->whereKey($rowId)->value('cancel_requested_at');
+                    if ($cancelAt !== null) {
+                        throw new CacheInstallCancelledException;
+                    }
+                }
+            };
+
+            $output = $executor->runInlineBashWithOutputCallback(
                 $row->server,
                 'cache-service:install:'.$row->engine,
                 $script,
+                function (string $type, string $chunk) use (&$bufferAcc, $flush): void {
+                    $bufferAcc .= $chunk;
+                    $flush();
+                },
                 timeoutSeconds: 900,
                 asRoot: true,
             );
+            $flush(true);
 
             if ($output->exitCode !== 0) {
                 throw new \RuntimeException(
@@ -90,7 +138,15 @@ class InstallCacheServiceJob implements ShouldQueue
                 );
             }
 
-            $version = $this->parseVersion($output->buffer);
+            // Apt may have completed successfully right before the operator clicked Cancel and
+            // before our next poll fired. Honor the intent: revert what we just installed.
+            if ($row->fresh()?->cancel_requested_at !== null) {
+                $this->finishCancellation($row, $executor, $capabilities, $audit, ranAptInstall: true);
+
+                return;
+            }
+
+            $version = CacheServiceInstallScripts::parseVersionFromBuffer($output->buffer);
 
             $row->update([
                 'status' => ServerCacheService::STATUS_RUNNING,
@@ -110,6 +166,10 @@ class InstallCacheServiceJob implements ShouldQueue
                 'version' => $version,
                 'port' => $row->port,
             ]);
+        } catch (CacheInstallCancelledException) {
+            // Operator-initiated abort. The SSH stream was cut mid-script, so apt may be in a
+            // half-configured state — finishCancellation runs `dpkg --configure -a` + purge.
+            $this->finishCancellation($row, $executor, $capabilities, $audit, ranAptInstall: true);
         } catch (\Throwable $e) {
             $row->update([
                 'status' => ServerCacheService::STATUS_FAILED,
@@ -124,14 +184,54 @@ class InstallCacheServiceJob implements ShouldQueue
     }
 
     /**
-     * The version probe script's last non-empty line is the version string. Some engines emit
-     * extra lines (Dragonfly's `--version` includes a banner), so we walk from the end.
+     * Run best-effort revert and delete the row. `ranAptInstall=false` means we never made it past
+     * preflight (or never started at all) and there's nothing to undo on the server, so we skip
+     * the SSH round-trip. Either way, the row ends up deleted so the workspace shows "no cache
+     * service installed" and the operator can pick a different engine.
      */
-    private function parseVersion(string $stdout): ?string
-    {
-        $lines = array_filter(array_map('trim', explode("\n", $stdout)), fn ($l) => $l !== '');
-        $last = end($lines);
+    private function finishCancellation(
+        ServerCacheService $row,
+        ExecuteRemoteTaskOnServer $executor,
+        ServerCacheServiceHostCapabilities $capabilities,
+        CacheServiceAuditLogger $audit,
+        bool $ranAptInstall,
+    ): void {
+        $engine = $row->engine;
+        $serverForAudit = $row->server;
+        $cleanupError = null;
 
-        return is_string($last) && $last !== '' ? Str::limit($last, 64, '') : null;
+        if ($ranAptInstall) {
+            try {
+                $script = "export DEBIAN_FRONTEND=noninteractive\n".
+                    "dpkg --configure -a 2>&1 || true\n".
+                    "apt-get install -y --fix-broken 2>&1 || true\n".
+                    CacheServiceInstallScripts::uninstallScript($engine);
+
+                $executor->runInlineBash(
+                    $row->server,
+                    'cache-service:install-cancel:'.$engine,
+                    $script,
+                    timeoutSeconds: 600,
+                    asRoot: true,
+                );
+            } catch (\Throwable $e) {
+                $cleanupError = Str::limit($e->getMessage(), 800);
+            }
+        }
+
+        $capabilities->forget($row->server);
+        $row->delete();
+
+        $audit->record($serverForAudit, ServerCacheServiceAuditEvent::EVENT_INSTALL_CANCELLED, array_filter([
+            'engine' => $engine,
+            'reverted' => $ranAptInstall,
+            'cleanup_error' => $cleanupError,
+        ], fn ($v) => $v !== null));
     }
 }
+
+/**
+ * Internal sentinel — thrown from the install job's output callback when the operator's
+ * `cancel_requested_at` flag is observed. Caught by the same job to switch into revert mode.
+ */
+final class CacheInstallCancelledException extends \RuntimeException {}

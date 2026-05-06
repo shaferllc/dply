@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Jobs\InstallCacheServiceJob;
-use App\Jobs\SwitchCacheServiceJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Models\Organization;
@@ -93,7 +92,7 @@ class WorkspaceCachesTest extends TestCase
             ->assertSee('Memcached')
             ->assertSee('KeyDB')
             ->assertSee('Dragonfly')
-            ->assertSee('No cache service is installed on this server yet.');
+            ->assertSee('No cache services installed');
     }
 
     public function test_install_dispatches_job_and_creates_row(): void
@@ -121,8 +120,11 @@ class WorkspaceCachesTest extends TestCase
         ]);
     }
 
-    public function test_install_blocks_when_a_different_engine_is_already_installed(): void
+    public function test_install_allows_a_second_engine_alongside_an_existing_one(): void
     {
+        // Multi-engine support: Redis + Memcached side-by-side is a legit pattern
+        // (Redis for queues/Horizon, Memcached for app cache). Installing a second
+        // engine while another is already running should queue a job and create the row.
         Queue::fake();
         [$user, $server] = $this->actingOwnerWithServer();
 
@@ -140,9 +142,47 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->call('installCacheService', 'memcached')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(InstallCacheServiceJob::class);
+        $this->assertDatabaseHas('server_cache_services', [
+            'server_id' => $server->id,
+            'engine' => 'memcached',
+            'status' => ServerCacheService::STATUS_PENDING,
+            'port' => 11211,
+        ]);
+        // The pre-existing Redis row is unaffected.
+        $this->assertDatabaseHas('server_cache_services', [
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'status' => ServerCacheService::STATUS_RUNNING,
+        ]);
+    }
+
+    public function test_install_blocks_when_another_install_is_in_flight(): void
+    {
+        // The new server-wide busy guard blocks even cross-engine installs while apt is
+        // running on the box (dpkg lock-frontend is per-host).
+        Queue::fake();
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'status' => ServerCacheService::STATUS_INSTALLING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
             ->call('installCacheService', 'valkey');
 
-        // No second job — the action toasts an error and bails.
         Queue::assertNotPushed(InstallCacheServiceJob::class);
         $this->assertDatabaseMissing('server_cache_services', [
             'server_id' => $server->id,
@@ -169,7 +209,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
-            ->call('uninstallCacheService')
+            ->call('uninstallCacheService', 'memcached')
             ->assertHasNoErrors();
 
         Queue::assertPushed(UninstallCacheServiceJob::class);
@@ -197,13 +237,14 @@ class WorkspaceCachesTest extends TestCase
             $mock->shouldReceive('snapshot')->andReturn(['Memory used' => '1.2 MB']);
         });
 
+        // Multi-engine Overview: connection snippet renders per engine, stats appear inline in the
+        // engine's status card (no separate "live stats" header card anymore).
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
-            ->assertSee('Connection snippet')
+            ->assertSee('Redis — connection snippet')
             ->assertSee('CACHE_STORE=redis')
             ->assertSee('REDIS_HOST=127.0.0.1')
             ->assertSee('REDIS_PORT=6379')
-            ->assertSee('Live stats')
             ->assertSee('Memory used')
             ->assertSee('1.2 MB');
     }
@@ -267,7 +308,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
-            ->call('flushCacheService')
+            ->call('flushCacheService', 'redis')
             ->assertHasNoErrors();
     }
 
@@ -303,7 +344,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
-            ->call('flushCacheService')
+            ->call('flushCacheService', 'memcached')
             ->assertHasNoErrors();
     }
 
@@ -333,7 +374,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
-            ->call('flushCacheService');
+            ->call('flushCacheService', 'redis');
     }
 
     public function test_flush_records_an_audit_event(): void
@@ -358,7 +399,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
-            ->call('flushCacheService')
+            ->call('flushCacheService', 'redis')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('server_cache_service_audit_events', [
@@ -397,6 +438,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->call('loadCacheConfig')
             ->assertSet('cacheConfigPath', '/etc/redis/redis.conf')
             ->assertSet('cacheConfigError', null)
@@ -430,6 +472,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->set('new_auth_password', $newPassword)
             ->call('setAuthPassword')
             ->assertHasNoErrors()
@@ -468,6 +511,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->set('new_auth_password', 'short')
             ->call('setAuthPassword')
             ->assertHasErrors(['new_auth_password' => 'min']);
@@ -495,6 +539,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'memcached')
             ->set('new_auth_password', 'PerfectlyValid-1234')
             ->call('setAuthPassword');
 
@@ -528,6 +573,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->call('clearAuthPassword')
             ->assertHasNoErrors();
 
@@ -566,6 +612,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->call('loadCacheClients')
             ->assertSet('cacheClientsError', null)
             ->assertSet('cacheClients', $sample)
@@ -597,6 +644,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'memcached')
             ->call('loadCacheClients')
             ->assertSet('cacheClients', null);
     }
@@ -628,6 +676,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->set('cacheConfigDraft', $newConfig)
             ->set('cacheConfigEditing', true)
             ->call('saveCacheConfig')
@@ -666,6 +715,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->set('cacheConfigDraft', str_repeat('a', 262145))
             ->call('saveCacheConfig')
             ->assertHasErrors(['cacheConfigDraft']);
@@ -746,6 +796,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->call('loadCacheMemorySettings')
             ->assertSet('cacheMemoryLoaded', true)
             ->assertSet('cache_maxmemory', '512mb')
@@ -778,6 +829,7 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->set('cache_maxmemory', '256MB')
             ->set('cache_maxmemory_policy', 'allkeys-lfu')
             ->call('saveCacheMemorySettings')
@@ -812,78 +864,10 @@ class WorkspaceCachesTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
             ->set('cache_maxmemory', 'bananas')
             ->call('saveCacheMemorySettings')
             ->assertHasErrors(['cache_maxmemory']);
-    }
-
-    public function test_switch_dispatches_job_with_target_engine(): void
-    {
-        Queue::fake();
-        [$user, $server] = $this->actingOwnerWithServer();
-
-        $row = ServerCacheService::query()->create([
-            'server_id' => $server->id,
-            'engine' => 'redis',
-            'status' => ServerCacheService::STATUS_RUNNING,
-            'port' => 6379,
-        ]);
-
-        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
-            $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
-            $mock->shouldReceive('forget')->zeroOrMoreTimes();
-        });
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceCaches::class, ['server' => $server])
-            ->call('switchCacheService', 'valkey')
-            ->assertHasNoErrors()
-            ->assertSet('workspace_tab', 'valkey');
-
-        Queue::assertPushed(SwitchCacheServiceJob::class, function (SwitchCacheServiceJob $job) use ($row): bool {
-            return $job->serverCacheServiceId === $row->id && $job->targetEngine === 'valkey';
-        });
-    }
-
-    public function test_switch_rejects_same_engine(): void
-    {
-        Queue::fake();
-        [$user, $server] = $this->actingOwnerWithServer();
-
-        ServerCacheService::query()->create([
-            'server_id' => $server->id,
-            'engine' => 'redis',
-            'status' => ServerCacheService::STATUS_RUNNING,
-            'port' => 6379,
-        ]);
-
-        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
-            $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
-            $mock->shouldReceive('forget')->zeroOrMoreTimes();
-        });
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceCaches::class, ['server' => $server])
-            ->call('switchCacheService', 'redis');
-
-        Queue::assertNotPushed(SwitchCacheServiceJob::class);
-    }
-
-    public function test_switch_rejects_when_no_cache_installed(): void
-    {
-        Queue::fake();
-        [$user, $server] = $this->actingOwnerWithServer();
-
-        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
-            $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
-            $mock->shouldReceive('forget')->zeroOrMoreTimes();
-        });
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceCaches::class, ['server' => $server])
-            ->call('switchCacheService', 'valkey');
-
-        Queue::assertNotPushed(SwitchCacheServiceJob::class);
     }
 
     public function test_url_drives_active_tab_and_unknowns_fall_back(): void

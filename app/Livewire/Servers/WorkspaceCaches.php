@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Jobs\InstallCacheServiceJob;
-use App\Jobs\SwitchCacheServiceJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
@@ -22,6 +21,7 @@ use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -40,8 +40,8 @@ class WorkspaceCaches extends Component
 
     /**
      * Lazy-loaded snapshot of the engine's main config file. Set by `loadCacheConfig()`,
-     * cleared by `hideCacheConfig()`. Stored on the component so the operator can scroll
-     * through it without it disappearing on the next Livewire roundtrip.
+     * cleared by `hideCacheConfig()` or by switching tabs. Scoped to the engine of the
+     * currently-active tab, so no per-engine indexing is needed on the property itself.
      */
     public ?string $cacheConfigContent = null;
 
@@ -49,18 +49,15 @@ class WorkspaceCaches extends Component
 
     public ?string $cacheConfigError = null;
 
-    /** True when the operator clicked Edit; the textarea binds to `$cacheConfigDraft`. */
     public bool $cacheConfigEditing = false;
 
     public string $cacheConfigDraft = '';
 
-    /** Form input for setting the AUTH password on the active redis-family engine. */
+    /** Form input for setting the AUTH password on the redis-family engine of the current tab. */
     public string $new_auth_password = '';
 
     /**
-     * Lazy-loaded snapshot of `CLIENT LIST` for redis-family engines. Set by `loadCacheClients()`,
-     * cleared by `hideCacheClients()`. Stored as a flat array of rows so the Blade can render it
-     * without re-running the SSH probe on every Livewire roundtrip.
+     * Lazy-loaded snapshot of `CLIENT LIST` for redis-family engines.
      *
      * @var list<array{id: string, addr: string, name: string, age: string, idle: string, db: string}>|null
      */
@@ -85,7 +82,41 @@ class WorkspaceCaches extends Component
     public function setWorkspaceTab(string $tab): void
     {
         $allowed = array_merge(['overview', 'advanced'], CacheServiceInstallScripts::supportedEngines());
-        $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'overview';
+        $next = in_array($tab, $allowed, true) ? $tab : 'overview';
+
+        // Reset all per-engine UI buffers when switching tabs — the config viewer / memory form /
+        // clients list are scoped to whichever engine the operator is looking at, and silently
+        // carrying redis config to the keydb tab would be confusing at best.
+        if ($next !== $this->workspace_tab) {
+            $this->resetPerEngineUiState();
+        }
+
+        $this->workspace_tab = $next;
+    }
+
+    /**
+     * Any cache service on this server in a queued/in-flight state. Mutating actions reject while
+     * busy because apt/dpkg on the box only allow one operation at a time — even per-engine ones
+     * like "restart valkey" would block on the redis apt purge holding the dpkg lock.
+     */
+    protected function cacheServiceBusy(): bool
+    {
+        return $this->cacheServices()->contains(fn (ServerCacheService $row) => in_array($row->status, [
+            ServerCacheService::STATUS_PENDING,
+            ServerCacheService::STATUS_INSTALLING,
+            ServerCacheService::STATUS_UNINSTALLING,
+        ], true));
+    }
+
+    protected function rejectIfCacheBusy(): bool
+    {
+        if ($this->cacheServiceBusy()) {
+            $this->toastError(__('Cache service is currently changing — wait for the running operation to finish before doing anything else.'));
+
+            return true;
+        }
+
+        return false;
     }
 
     public function refreshCacheCapabilities(ServerCacheServiceHostCapabilities $capabilities): void
@@ -96,29 +127,22 @@ class WorkspaceCaches extends Component
     }
 
     /**
-     * Queue an install for the requested engine. The Phase 1 invariant is one cache service per
-     * server, so attempting to install while a different engine is already tracked surfaces a
-     * clear toast pointing at the uninstall flow rather than silently swapping.
+     * Queue an install for the requested engine. Multi-engine is now allowed: Redis + Memcached
+     * side-by-side is a legit pattern (Redis for queues/Horizon, Memcached for app cache).
      */
     public function installCacheService(string $engine): void
     {
         $this->authorize('update', $this->server);
 
-        if (! in_array($engine, CacheServiceInstallScripts::supportedEngines(), true)) {
-            $this->toastError(__('Unsupported cache engine.'));
-
+        if (! $this->validateEngine($engine)) {
             return;
         }
 
-        $existing = $this->activeCacheService();
-        if ($existing && $existing->engine !== $engine) {
-            $this->toastError(__('Uninstall :current before installing :new — only one cache service is supported per server.', [
-                'current' => $existing->engine,
-                'new' => $engine,
-            ]));
-
+        if ($this->rejectIfCacheBusy()) {
             return;
         }
+
+        $existing = $this->cacheServiceFor($engine);
 
         $row = $existing ?? ServerCacheService::query()->create([
             'server_id' => $this->server->id,
@@ -134,9 +158,14 @@ class WorkspaceCaches extends Component
             ServerCacheService::STATUS_FAILED,
             ServerCacheService::STATUS_STOPPED,
         ], true)) {
-            $this->toastError(__('Install is already in progress or the engine is running.'));
+            $this->toastError(__(':engine is already installing or running.', ['engine' => $engine]));
 
             return;
+        }
+
+        // Clear stale cancel flag from a prior failed run so the worker doesn't immediately abort.
+        if ($row->cancel_requested_at !== null) {
+            $row->update(['cancel_requested_at' => null]);
         }
 
         InstallCacheServiceJob::dispatch($row->id);
@@ -145,94 +174,152 @@ class WorkspaceCaches extends Component
         $this->workspace_tab = $engine;
     }
 
-    public function uninstallCacheService(): void
+    /**
+     * Cancel an in-flight install for a specific engine. Same three branches as before:
+     * PENDING → delete the row; INSTALLING → flip cancel_requested_at; UNINSTALLING → can't cancel.
+     */
+    public function cancelCacheServiceChange(string $engine): void
     {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->toastError(__('No cache service to uninstall.'));
+            return;
+        }
+
+        if ($row->status === ServerCacheService::STATUS_PENDING) {
+            $row->delete();
+            $this->toastSuccess(__('Cancelled — the queued :engine change was discarded before apt started.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if ($row->status === ServerCacheService::STATUS_INSTALLING) {
+            if ($row->cancel_requested_at !== null) {
+                $this->toastSuccess(__('Cancellation already requested — finishing the current step, then reverting.'));
+
+                return;
+            }
+
+            $row->update(['cancel_requested_at' => now()]);
+            $this->toastSuccess(__('Cancelling :engine — the job will stop at the next output chunk and apt-purge to revert.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if ($row->status === ServerCacheService::STATUS_UNINSTALLING) {
+            $this->toastError(__('Uninstall is already running — wait for it to finish.'));
+
+            return;
+        }
+
+        $this->toastError(__('Nothing to cancel: the row is :status.', ['status' => $row->status]));
+    }
+
+    public function uninstallCacheService(string $engine): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->toastError(__('No :engine to uninstall.', ['engine' => $engine]));
 
             return;
         }
 
         UninstallCacheServiceJob::dispatch($row->id);
         $this->forgetStats($row);
-        $this->toastSuccess(__('Uninstall queued for :engine.', ['engine' => $row->engine]));
+        $this->toastSuccess(__('Uninstall queued for :engine.', ['engine' => $engine]));
+    }
+
+    public function restartCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
+    {
+        $this->runSystemctl($engine, $executor, $audit, 'restart', null, ServerCacheServiceAuditEvent::EVENT_RESTARTED);
+    }
+
+    public function stopCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
+    {
+        $this->runSystemctl($engine, $executor, $audit, 'stop', ServerCacheService::STATUS_STOPPED, ServerCacheServiceAuditEvent::EVENT_STOPPED);
+    }
+
+    public function startCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
+    {
+        $this->runSystemctl($engine, $executor, $audit, 'start', ServerCacheService::STATUS_RUNNING, ServerCacheServiceAuditEvent::EVENT_STARTED);
     }
 
     /**
-     * Replace the active cache engine with a different one in a single queued operation.
-     * Carries the AUTH password and maxmemory settings forward when both old and new engines
-     * support them (i.e. all redis-family pairs). The job updates the row in place so the
-     * audit history stays attached to one record.
+     * Run the engine's version probe and persist the result. Used to backfill the Version field
+     * when the original install probe came back empty (e.g. binary not yet on PATH).
      */
-    public function switchCacheService(string $newEngine): void
+    public function probeCacheServiceVersion(string $engine, ExecuteRemoteTaskOnServer $executor): void
     {
         $this->authorize('update', $this->server);
 
-        if (! in_array($newEngine, CacheServiceInstallScripts::supportedEngines(), true)) {
-            $this->toastError(__('Unsupported cache engine.'));
-
+        if (! $this->validateEngine($engine)) {
             return;
         }
 
-        $row = $this->activeCacheService();
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->toastError(__('No cache service installed yet — use Install instead of Switch.'));
+            $this->toastError(__('No :engine to probe.', ['engine' => $engine]));
 
             return;
         }
 
-        if ($row->engine === $newEngine) {
-            $this->toastError(__(':engine is already the active cache.', ['engine' => $newEngine]));
+        try {
+            $output = $executor->runInlineBash(
+                $row->server,
+                'cache-service:version-probe:'.$row->engine,
+                CacheServiceInstallScripts::versionProbeScript($row->engine),
+                timeoutSeconds: 30,
+                asRoot: true,
+            );
 
-            return;
+            $version = trim($output->buffer);
+            if ($version === '') {
+                $this->toastError(__('Could not detect a version for :engine.', ['engine' => $row->engine]));
+
+                return;
+            }
+
+            $row->update(['version' => Str::limit($version, 64, '')]);
+            $this->forgetStats($row);
+            $this->toastSuccess(__('Detected :engine :version.', ['engine' => $row->engine, 'version' => $version]));
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
         }
-
-        if (! in_array($row->status, [
-            ServerCacheService::STATUS_RUNNING,
-            ServerCacheService::STATUS_STOPPED,
-            ServerCacheService::STATUS_FAILED,
-        ], true)) {
-            $this->toastError(__('Cache must be running, stopped, or failed before switching. Wait for the current operation to finish.'));
-
-            return;
-        }
-
-        SwitchCacheServiceJob::dispatch($row->id, $newEngine);
-        $this->forgetStats($row);
-        $this->toastSuccess(__('Switching to :engine — refresh in a moment to see status.', ['engine' => $newEngine]));
-        $this->workspace_tab = $newEngine;
-    }
-
-    public function restartCacheService(ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
-    {
-        $this->runSystemctl($executor, $audit, 'restart', null, ServerCacheServiceAuditEvent::EVENT_RESTARTED);
-    }
-
-    public function stopCacheService(ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
-    {
-        $this->runSystemctl($executor, $audit, 'stop', ServerCacheService::STATUS_STOPPED, ServerCacheServiceAuditEvent::EVENT_STOPPED);
-    }
-
-    public function startCacheService(ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
-    {
-        $this->runSystemctl($executor, $audit, 'start', ServerCacheService::STATUS_RUNNING, ServerCacheServiceAuditEvent::EVENT_STARTED);
     }
 
     /**
      * SSH-cat the engine's main config file and stash the contents on the component for the
-     * read-only viewer card. We `head -c 64K` defensively in case an operator has dumped a giant
-     * config into the file; bigger configs are still readable, just truncated for the preview.
+     * read-only viewer card. Scoped to the engine of the currently-open tab (= $this->workspace_tab).
      */
     public function loadCacheConfig(ExecuteRemoteTaskOnServer $executor): void
     {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->cacheConfigError = __('Switch to an engine tab to view its config.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->cacheConfigError = __('No cache service installed.');
+            $this->cacheConfigError = __('No :engine installed.', ['engine' => $engine]);
 
             return;
         }
@@ -277,10 +364,6 @@ class WorkspaceCaches extends Component
         $this->cacheConfigDraft = '';
     }
 
-    /**
-     * Switch the config card from read-only to edit mode. Loads the file first if it's not already
-     * loaded so the operator always edits the *current* contents and not a stale snapshot.
-     */
     public function startEditingCacheConfig(ExecuteRemoteTaskOnServer $executor): void
     {
         $this->authorize('update', $this->server);
@@ -288,7 +371,6 @@ class WorkspaceCaches extends Component
         if ($this->cacheConfigContent === null) {
             $this->loadCacheConfig($executor);
             if ($this->cacheConfigContent === null) {
-                // load failed; cacheConfigError is already set
                 return;
             }
         }
@@ -303,12 +385,6 @@ class WorkspaceCaches extends Component
         $this->cacheConfigDraft = '';
     }
 
-    /**
-     * Apply the textarea draft to the engine's main config file. Runs the
-     * backup → write → restart → verify → rollback flow via
-     * {@see CacheServiceConfigWriter}; on success refreshes the read-only display
-     * with the new content and audits the change.
-     */
     public function saveCacheConfig(
         CacheServiceConfigWriter $writer,
         ExecuteRemoteTaskOnServer $executor,
@@ -316,15 +392,24 @@ class WorkspaceCaches extends Component
     ): void {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
-        if (! $row) {
-            $this->toastError(__('No cache service installed.'));
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to edit its config.'));
 
             return;
         }
 
-        // Light validation up front (mirrors the writer's guards) so the operator gets a Livewire
-        // error message before we burn an SSH round trip.
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
+
+            return;
+        }
+
         $this->validate([
             'cacheConfigDraft' => ['required', 'string', 'max:262144'],
         ], [
@@ -341,8 +426,6 @@ class WorkspaceCaches extends Component
             return;
         }
 
-        // Refresh the displayed content from the saved draft so the operator sees the live state
-        // without another SSH round trip. Exit edit mode and clear the draft.
         $this->cacheConfigContent = $this->cacheConfigDraft;
         $this->cacheConfigEditing = false;
         $this->cacheConfigDraft = '';
@@ -358,18 +441,20 @@ class WorkspaceCaches extends Component
         $this->toastSuccess(__('Config saved and :engine restarted.', ['engine' => $row->engine]));
     }
 
-    /**
-     * Pull `CLIENT LIST` for the active redis-family engine and stash the parsed rows on the
-     * component. Memcached is rejected at the model layer (no native equivalent) so this action
-     * is hidden in the UI for that engine; the guard is defensive.
-     */
     public function loadCacheClients(CacheServiceStats $stats): void
     {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->cacheClientsError = __('Switch to an engine tab to view its clients.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->cacheClientsError = __('No cache service installed.');
+            $this->cacheClientsError = __('No :engine installed.', ['engine' => $engine]);
 
             return;
         }
@@ -390,18 +475,20 @@ class WorkspaceCaches extends Component
         $this->cacheClientsError = null;
     }
 
-    /**
-     * Pull the live `maxmemory` and `maxmemory-policy` values from the engine's main config and
-     * pre-fill the form. Memcached has different memory mechanics so it's rejected up front; the
-     * UI also hides the card on memcached.
-     */
     public function loadCacheMemorySettings(CacheServiceMemoryConfig $memory): void
     {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->cacheMemoryError = __('Switch to an engine tab to view its memory settings.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->cacheMemoryError = __('No cache service installed.');
+            $this->cacheMemoryError = __('No :engine installed.', ['engine' => $engine]);
 
             return;
         }
@@ -434,20 +521,26 @@ class WorkspaceCaches extends Component
         $this->cacheMemoryError = null;
     }
 
-    /**
-     * Apply the form values to the engine's config + restart + verify. The helper handles the
-     * atomic flow with rollback. Emits an audit event with the engine + new values so the
-     * Advanced-tab log shows what changed.
-     */
     public function saveCacheMemorySettings(
         CacheServiceMemoryConfig $memory,
         CacheServiceAuditLogger $audit,
     ): void {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to update its memory settings.'));
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->toastError(__('No cache service to update.'));
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
 
             return;
         }
@@ -459,9 +552,6 @@ class WorkspaceCaches extends Component
         }
 
         $this->validate([
-            // Empty string = "remove the directive". Otherwise the helper rejects unparseable
-            // values via guardValues(); duplicating the regex here gives the operator a faster
-            // error on the form before we burn an SSH round-trip.
             'cache_maxmemory' => ['nullable', 'string', 'regex:/^(0|\d+(b|kb|mb|gb))$/i'],
             'cache_maxmemory_policy' => ['nullable', 'string', 'in:'.implode(',', CacheServiceMemoryConfig::POLICIES)],
         ], [
@@ -499,24 +589,29 @@ class WorkspaceCaches extends Component
         $this->toastSuccess(__('Memory settings applied to :engine.', ['engine' => $row->engine]));
     }
 
-    /** Pre-fill the AUTH form with a random 32-char password. Operator can edit before submitting. */
     public function generateAuthPassword(): void
     {
         $this->new_auth_password = Str::password(32, symbols: false);
     }
 
-    /**
-     * Apply (or rotate) the engine's `requirepass`. Persists the password encrypted on the row so
-     * the connection-snippet UI can render it back to the operator without another SSH probe.
-     * Memcached is rejected at the model layer.
-     */
     public function setAuthPassword(CacheServiceAuth $auth, CacheServiceAuditLogger $audits): void
     {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to set its AUTH password.'));
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->toastError(__('No cache service to authenticate.'));
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
 
             return;
         }
@@ -527,9 +622,6 @@ class WorkspaceCaches extends Component
             return;
         }
 
-        // Validate against a safe charset before letting it near the shell. The bash payload
-        // base64-encodes anyway, but a generous character whitelist keeps copy-paste passwords
-        // sane (and stops a lone newline from sneaking through the form).
         $this->validate([
             'new_auth_password' => ['required', 'string', 'min:12', 'max:256', 'regex:/^[\x21-\x7E]+$/'],
         ], [], [
@@ -558,14 +650,24 @@ class WorkspaceCaches extends Component
         $this->toastSuccess(__('AUTH password set on :engine.', ['engine' => $row->engine]));
     }
 
-    /** Strip `requirepass` from the engine's config and clear the stored password. */
     public function clearAuthPassword(CacheServiceAuth $auth, CacheServiceAuditLogger $audits): void
     {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to clear its AUTH password.'));
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->toastError(__('No cache service to update.'));
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
 
             return;
         }
@@ -597,19 +699,27 @@ class WorkspaceCaches extends Component
         $this->toastSuccess(__('Cleared AUTH password on :engine.', ['engine' => $row->engine]));
     }
 
-    public function flushCacheService(ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
+    public function flushCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
     {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->toastError(__('No cache service to flush.'));
+            $this->toastError(__('No :engine to flush.', ['engine' => $engine]));
 
             return;
         }
 
         if ($row->status !== ServerCacheService::STATUS_RUNNING) {
-            $this->toastError(__('Cache must be running to flush. Start it first.'));
+            $this->toastError(__(':engine must be running to flush. Start it first.', ['engine' => $engine]));
 
             return;
         }
@@ -648,20 +758,9 @@ class WorkspaceCaches extends Component
         }
     }
 
-    /**
-     * Shared implementation for restart/stop/start. Sync (not queued) because systemctl returns
-     * within ~1s in practice and the operator's UI feedback is "the action happened".
-     */
-    /** @internal Helper used by runSystemctl + flush/auth/memory/config savers to drop the stats cache. */
-    private function forgetStats(?ServerCacheService $row): void
-    {
-        if ($row === null) {
-            return;
-        }
-        app(CacheServiceStats::class)->forget($row->server, $row->engine);
-    }
-
+    /** @internal Reused by restart/stop/start. */
     protected function runSystemctl(
+        string $engine,
         ExecuteRemoteTaskOnServer $executor,
         CacheServiceAuditLogger $audit,
         string $verb,
@@ -670,9 +769,17 @@ class WorkspaceCaches extends Component
     ): void {
         $this->authorize('update', $this->server);
 
-        $row = $this->activeCacheService();
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
         if (! $row) {
-            $this->toastError(__('No cache service to :verb.', ['verb' => $verb]));
+            $this->toastError(__('No :engine to :verb.', ['engine' => $engine, 'verb' => $verb]));
 
             return;
         }
@@ -716,8 +823,6 @@ class WorkspaceCaches extends Component
             $capabilities = $capabilitiesService->forServer($this->server);
         } catch (\Throwable) {
             // Probe failures (SSH timeout, key issues) leave the per-engine "running" badges off.
-            // The operator can still queue install/uninstall — those flow through the queued jobs
-            // and surface their own errors back through the row's status/error_message.
         }
 
         $allowed = array_merge(['overview', 'advanced'], CacheServiceInstallScripts::supportedEngines());
@@ -725,15 +830,17 @@ class WorkspaceCaches extends Component
             $this->workspace_tab = 'overview';
         }
 
-        $active = $this->activeCacheService();
+        $services = $this->cacheServices();
 
-        // Pull live stats only when (a) the operator is actually looking at the Overview tab — no
-        // other tab renders the stats card — and (b) the engine is in the running state. Combined
-        // with the 30s cache inside the stats service, this keeps tab switching snappy: most tab
-        // changes don't fire any SSH at all.
-        $stats = [];
-        if ($this->workspace_tab === 'overview' && $active && $active->status === ServerCacheService::STATUS_RUNNING) {
-            $stats = $statsService->snapshot($this->server, $active);
+        // Pull live stats per-engine when looking at Overview and the engine is RUNNING. The
+        // 30s cache inside the stats service keeps repeated renders cheap.
+        $statsByEngine = [];
+        if ($this->workspace_tab === 'overview') {
+            foreach ($services as $row) {
+                if ($row->status === ServerCacheService::STATUS_RUNNING) {
+                    $statsByEngine[$row->engine] = $statsService->snapshot($this->server, $row);
+                }
+            }
         }
 
         $auditEvents = ServerCacheServiceAuditEvent::query()
@@ -745,8 +852,9 @@ class WorkspaceCaches extends Component
 
         return view('livewire.servers.workspace-caches', [
             'capabilities' => $capabilities,
-            'activeCacheService' => $active,
-            'cacheStats' => $stats,
+            'cacheServices' => $services,
+            'cacheServicesByEngine' => $services->keyBy('engine'),
+            'cacheStatsByEngine' => $statsByEngine,
             'cacheAuditEvents' => $auditEvents,
             'engineLabels' => [
                 'redis' => 'Redis',
@@ -766,10 +874,67 @@ class WorkspaceCaches extends Component
         ]);
     }
 
-    protected function activeCacheService(): ?ServerCacheService
+    /** All cache service rows for this server, keyed by ULID and ordered by engine name. */
+    protected function cacheServices(): Collection
     {
         return ServerCacheService::query()
             ->where('server_id', $this->server->id)
+            ->orderBy('engine')
+            ->get();
+    }
+
+    /** Look up a specific engine row by name. Returns null if not installed. */
+    protected function cacheServiceFor(string $engine): ?ServerCacheService
+    {
+        return ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
             ->first();
+    }
+
+    /** The engine name when the operator is on a per-engine tab; null otherwise. */
+    protected function currentEngineTab(): ?string
+    {
+        return in_array($this->workspace_tab, CacheServiceInstallScripts::supportedEngines(), true)
+            ? $this->workspace_tab
+            : null;
+    }
+
+    /** Validate caller-supplied engine name against the supported list. Toasts + returns false on miss. */
+    protected function validateEngine(string $engine): bool
+    {
+        if (! in_array($engine, CacheServiceInstallScripts::supportedEngines(), true)) {
+            $this->toastError(__('Unsupported cache engine.'));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Wipe the lazy-loaded per-engine UI buffers. Called on tab change. */
+    protected function resetPerEngineUiState(): void
+    {
+        $this->cacheConfigContent = null;
+        $this->cacheConfigPath = null;
+        $this->cacheConfigError = null;
+        $this->cacheConfigEditing = false;
+        $this->cacheConfigDraft = '';
+        $this->cacheClients = null;
+        $this->cacheClientsError = null;
+        $this->cacheMemoryLoaded = false;
+        $this->cache_maxmemory = '';
+        $this->cache_maxmemory_policy = 'noeviction';
+        $this->cacheMemoryError = null;
+        $this->new_auth_password = '';
+    }
+
+    /** @internal Drop the stats cache for a row's engine. */
+    private function forgetStats(?ServerCacheService $row): void
+    {
+        if ($row === null) {
+            return;
+        }
+        app(CacheServiceStats::class)->forget($row->server, $row->engine);
     }
 }

@@ -1,9 +1,13 @@
 @php
     /** @var array<string, string> $stats */
     $stats = $stats ?? [];
+    $engineLabel = $engineLabel ?? null;
+    $titleText = $engineLabel
+        ? __(':engine — live stats', ['engine' => $engineLabel])
+        : __('Live stats');
 @endphp
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8">
-    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Live stats') }}</h2>
+    <h2 class="text-lg font-semibold text-brand-ink">{{ $titleText }}</h2>
     @if (empty($stats))
         <p class="mt-2 text-sm text-brand-moss">{{ __('Stats unavailable — the engine isn\'t reachable yet, or the CLI tool isn\'t installed on the server.') }}</p>
     @else

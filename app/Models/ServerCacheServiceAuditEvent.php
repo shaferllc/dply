@@ -21,6 +21,8 @@ class ServerCacheServiceAuditEvent extends Model
 
     public const EVENT_INSTALL_FAILED = 'cache_service_install_failed';
 
+    public const EVENT_INSTALL_CANCELLED = 'cache_service_install_cancelled';
+
     public const EVENT_UNINSTALLED = 'cache_service_uninstalled';
 
     public const EVENT_UNINSTALL_FAILED = 'cache_service_uninstall_failed';

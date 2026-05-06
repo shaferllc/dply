@@ -429,14 +429,14 @@
                                     </p>
                                 @endif
                             </div>
-                            <div class="flex flex-wrap gap-2">
+                            <div class="flex shrink-0 flex-wrap gap-2 self-start">
                                 @if (! $engineRow || $engineRow->status === \App\Models\ServerDatabaseEngine::STATUS_FAILED)
                                     <button
                                         type="button"
                                         wire:click="installDatabaseEngine('{{ $engine }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="installDatabaseEngine"
-                                        class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
                                     >
                                         <x-heroicon-o-cloud-arrow-down class="h-4 w-4" />
                                         <span wire:loading.remove wire:target="installDatabaseEngine">
