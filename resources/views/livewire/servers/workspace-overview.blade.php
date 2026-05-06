@@ -35,6 +35,11 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4">
+        <p>{{ __('At-a-glance summary of this server: provisioning state, what\'s installed (PHP, databases, caches), the latest metrics snapshot, recent activity, and a project context bar when the server is bound to a workspace.') }}</p>
+        <p>{{ __('Most cards on this page are read-only summaries; the Manage / Sites / Caches / Databases / Monitor tabs are where mutating actions live. Use this page to land, then jump to the right tab from the cards or the top nav.') }}</p>
+    </x-explainer>
+
     @if ($server->workspace)
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
             <p class="font-semibold">{{ __('Project context') }}</p>
