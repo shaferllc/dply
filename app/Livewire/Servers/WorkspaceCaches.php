@@ -201,20 +201,8 @@ class WorkspaceCaches extends Component
             return;
         }
 
-        // Suggest the next free port: walk up from the engine's default until
-        // we find one not in use on this server. This lets the operator just
-        // hit "Add" without thinking about port assignment.
-        $usedPorts = ServerCacheService::query()
-            ->where('server_id', $this->server->id)
-            ->pluck('port')
-            ->all();
-        $candidate = ServerCacheService::defaultPortFor($engine);
-        while (in_array($candidate, $usedPorts, true)) {
-            $candidate++;
-        }
-
         $this->newInstanceName = '';
-        $this->newInstancePort = $candidate;
+        $this->newInstancePort = ServerCacheService::nextFreePortFor($this->server->id, $engine);
         $this->showAddInstanceForm = true;
     }
 
@@ -328,12 +316,30 @@ class WorkspaceCaches extends Component
 
         $existing = $this->cacheServiceFor($engine);
 
+        // For first-time installs, walk up from the engine's default port until
+        // we find one free on this server. `unique(server_id, port)` means two
+        // services can never share a port; without this autopicking the second
+        // redis-family install (Valkey on top of Redis) would crash at the DB
+        // layer with an ugly unique-violation.
+        $port = ServerCacheService::defaultPortFor($engine);
+        if ($existing === null) {
+            $port = ServerCacheService::nextFreePortFor($this->server->id, $engine);
+        }
+
         $row = $existing ?? ServerCacheService::query()->create([
             'server_id' => $this->server->id,
             'engine' => $engine,
             'status' => ServerCacheService::STATUS_PENDING,
-            'port' => ServerCacheService::defaultPortFor($engine),
+            'port' => $port,
         ]);
+
+        $portMessage = '';
+        if ($existing === null && $port !== ServerCacheService::defaultPortFor($engine)) {
+            $portMessage = ' '.__('Default port :default is in use; this instance will run on :port instead.', [
+                'default' => ServerCacheService::defaultPortFor($engine),
+                'port' => $port,
+            ]);
+        }
 
         // Re-run install on an existing row only when it's in failed/stopped — otherwise the row
         // is already installing or running and we'd just queue redundant work.
@@ -354,7 +360,7 @@ class WorkspaceCaches extends Component
 
         InstallCacheServiceJob::dispatch($row->id);
         $this->forgetStats($row);
-        $this->toastSuccess(__('Installing :engine — refresh in a moment to see status.', ['engine' => $engine]));
+        $this->toastSuccess(__('Installing :engine — refresh in a moment to see status.', ['engine' => $engine]).$portMessage);
         $this->workspace_tab = $engine;
     }
 

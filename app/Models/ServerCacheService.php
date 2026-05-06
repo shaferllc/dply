@@ -93,6 +93,31 @@ class ServerCacheService extends Model
     }
 
     /**
+     * The next free TCP port for an engine on a given server. Walks upward from
+     * the engine's default until it finds a port not in use by any cache service
+     * on this server (any engine, any instance) — `unique(server_id, port)`
+     * enforces per-server port uniqueness so two services can never share a port.
+     *
+     * Used at install time so the operator's first Valkey install doesn't try to
+     * land on 6379 when Redis is already there. The actual collision case
+     * (which port did we end up on?) is reported via a toast at the call site.
+     */
+    public static function nextFreePortFor(string $serverId, string $engine): int
+    {
+        $usedPorts = self::query()
+            ->where('server_id', $serverId)
+            ->pluck('port')
+            ->all();
+
+        $candidate = self::defaultPortFor($engine);
+        while (in_array($candidate, $usedPorts, true)) {
+            $candidate++;
+        }
+
+        return $candidate;
+    }
+
+    /**
      * True when this row is the legacy single-instance install for its engine.
      * Install/uninstall scripts use this to pick legacy paths (e.g.
      * `/etc/redis/redis.conf` + `redis-server.service`) over templated paths

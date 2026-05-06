@@ -331,6 +331,86 @@ class WorkspaceCachesAddInstanceTest extends TestCase
             ->assertSet('newInstancePort', null);
     }
 
+    public function test_install_auto_picks_next_free_port_when_default_is_taken(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        // Existing redis on the default 6379. Installing Valkey would normally
+        // also default to 6379 (wire-compatible) — the install flow must walk
+        // up to 6380 instead of crashing on the (server_id, port) unique key.
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'name' => ServerCacheService::DEFAULT_INSTANCE_NAME,
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn([
+                'redis' => true, 'valkey' => true, 'memcached' => false,
+                'keydb' => false, 'dragonfly' => false,
+            ]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->call('installCacheService', 'valkey')
+            ->assertHasNoErrors();
+
+        $valkey = ServerCacheService::query()
+            ->where('server_id', $server->id)
+            ->where('engine', 'valkey')
+            ->firstOrFail();
+
+        $this->assertSame(6380, $valkey->port, 'Valkey should land on 6380 because 6379 is taken by Redis.');
+    }
+
+    public function test_install_uses_default_port_when_free(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->call('installCacheService', 'redis')
+            ->assertHasNoErrors();
+
+        $row = ServerCacheService::query()
+            ->where('server_id', $server->id)
+            ->where('engine', 'redis')
+            ->firstOrFail();
+
+        $this->assertSame(6379, $row->port, 'First redis install should land on the default 6379.');
+    }
+
+    public function test_next_free_port_helper_walks_past_named_instances(): void
+    {
+        [, $server] = $this->actingOwnerWithServer();
+
+        // Both default 6379 and named 6380 in use.
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'name' => ServerCacheService::DEFAULT_INSTANCE_NAME,
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'name' => 'sessions',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6380,
+        ]);
+
+        $this->assertSame(
+            6381,
+            ServerCacheService::nextFreePortFor($server->id, 'valkey'),
+            'Walk past 6379 (redis/default) and 6380 (redis/sessions) to land on 6381.',
+        );
+    }
+
     public function test_per_engine_action_against_named_instance_records_instance_name_in_audit_meta(): void
     {
         [$user, $server] = $this->actingOwnerWithServer();
