@@ -28,6 +28,11 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4">
+        <p>{{ __('Inventory of the systemd units on this server, surfaced live from systemctl list-units. Restart, stop, start, and enable/disable map to the matching systemctl verbs and run as root over SSH.') }}</p>
+        <p>{{ __('Custom services are systemd unit files dply tracks specifically — they show up as actionable rows. Stock units (sshd, networkd, etc.) are visible but actions are gated to the ones dply considers safe to mutate.') }}</p>
+    </x-explainer>
+
     @if ($server->workspace)
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
             <p class="font-semibold">{{ __('Project operations shortcut') }}</p>
