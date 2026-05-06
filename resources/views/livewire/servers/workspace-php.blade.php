@@ -18,6 +18,11 @@
         @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
     @endif
 
+    <x-explainer class="mb-4">
+        <p>{{ __('This workspace inventories the PHP versions installed on this server, lets you set the default CLI version, and review FPM + ini configuration. Inventory is read live from the box via SSH on each render; default-version changes happen through update-alternatives.') }}</p>
+        <p>{{ __('Adding/removing PHP versions runs apt against the upstream Sury/Ondrej PPA. Existing sites pin to a specific version in their FPM pool, so changing the server default doesn\'t move sites — that\'s a per-site setting on the Sites workspace.') }}</p>
+    </x-explainer>
+
     <div class="space-y-6">
         <div class="{{ $card }}">
             <div class="p-6 sm:p-8">
@@ -127,6 +132,10 @@
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Installed and supported versions') }}</h2>
+                    <x-explainer class="mt-2">
+                        <p>{{ __('Each row reflects what dpkg reports for the given PHP version (e.g. php8.3-cli, php8.3-fpm). Install runs apt-get install for the matching package set; uninstall runs apt-get purge. Both are queued — the workspace stays responsive while apt is doing its thing.') }}</p>
+                        <p>{{ __('"Set as default" calls update-alternatives so /usr/bin/php points at the chosen version. CLI scripts pick this up; FPM pools each pin to a specific version and aren\'t affected.') }}</p>
+                    </x-explainer>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Keep actions visible, but disable any row action that would violate current site usage or server defaults.') }}</p>
                 </div>
 
