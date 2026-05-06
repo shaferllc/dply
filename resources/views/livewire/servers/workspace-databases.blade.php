@@ -17,6 +17,11 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4">
+        <p>{{ __('This workspace manages relational databases on this server — MySQL, MariaDB, and PostgreSQL — and the per-app credentials that grant access to them. Engines are installed via apt + systemd; databases live inside whatever engines are running.') }}</p>
+        <p>{{ __('Engine state is read live via SSH; database + credential rows live in the dply database. The "Discovered on server" panel reconciles both directions: databases the engine knows about that dply hasn\'t recorded yet.') }}</p>
+    </x-explainer>
+
     @if ($opsReady)
         @php
             $engineWorking = collect($engineRows ?? [])->contains(fn ($row) => in_array($row->status, [
@@ -233,6 +238,10 @@
                     </p>
                 @else
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Creates the database and a user on the server. Leave user and password empty to generate values automatically.') }}</p>
+                <x-explainer class="mt-3">
+                    <p>{{ __('Picks an engine, runs CREATE DATABASE, then creates a per-database user (defaulting to the same name) and grants it full access on that database only. The credentials are stored encrypted in the dply database — reveal + copy them from the Credentials column on each row.') }}</p>
+                    <p>{{ __('Auto-generation: an empty user defaults to the database name. An empty password generates a 32-character symbol-free string. Both are good defaults for app-only use.') }}</p>
+                </x-explainer>
                 <form wire:submit="createDatabase" class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div class="sm:col-span-2">
                         <x-input-label for="new_db_name" value="{{ __('Name') }}" />
@@ -584,6 +593,10 @@
                     <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                         {{ __('Names returned from the database engine. Import lets you attach credentials in Dply for databases that already exist on the host.') }}
                     </p>
+                    <x-explainer class="mt-3">
+                        <p>{{ __('Reads SHOW DATABASES (MySQL/MariaDB) and the equivalent for Postgres. The list is filtered against the dply records so only databases dply isn\'t already tracking show up here. Use this to adopt databases that were created outside the workspace (manually, by a backup restore, by another tool).') }}</p>
+                        <p>{{ __('Importing creates a dply row with the database name and lets you set credentials; it doesn\'t change anything on the engine itself. Removing a row from dply doesn\'t drop the database — use Drop on the row to actually remove it from the engine.') }}</p>
+                    </x-explainer>
                     @if (count($mysqlOnlyOnServer) > 0)
                         <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('MySQL / MariaDB') }}</p>
                         <ul class="mt-2 space-y-2">
@@ -627,6 +640,10 @@
             <div class="{{ $card }} p-6 sm:p-8">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
                 <p class="mt-2 text-sm text-brand-moss">{{ __('Recent database workspace actions for this server.') }}</p>
+                <x-explainer class="mt-3">
+                    <p>{{ __('Every workspace action — engine install/uninstall, database create/drop, credential set/clear, SQL run, share-link created/revoked — writes a row here. Events are also forwarded to the organization-wide audit log when a signed-in user is the actor.') }}</p>
+                    <p>{{ __('Event names are stable identifiers (e.g. database_dropped) so they\'re grep-able from the org log. SQL statements typed in the runner are NOT recorded in full — only the verb (SELECT, INSERT, …) so credentials and key contents stay out of the audit log.') }}</p>
+                </x-explainer>
                 <ul class="mt-6 divide-y divide-brand-ink/10 text-sm">
                     @forelse ($server->databaseAuditEvents as $ev)
                         <li class="py-3">
@@ -890,6 +907,10 @@
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('SQLite SQL console') }}</p>
                         <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Run SQL against this database') }}</h2>
                         <p class="mt-1 text-sm text-brand-moss">{{ __('Paste a SQL statement (or batch). Output streams back from sqlite3 on the server.') }}</p>
+                        <x-explainer class="mt-3" tone="warn">
+                            <p>{{ __('SQL runs as the engine\'s own DB user via SSH — this is full read + write + DDL access. There\'s no row-level safety net; SELECT and DROP are equally easy to type.') }}</p>
+                            <p>{{ __('The audit log records the verb (SELECT/INSERT/UPDATE/DELETE/DROP/etc.) but not the body of the query, so passwords and key contents never get logged. Output streams back as the engine emits it; there\'s no truncation client-side.') }}</p>
+                        </x-explainer>
                     </div>
 
                     <div class="space-y-4 px-6 py-6">
