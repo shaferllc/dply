@@ -955,7 +955,19 @@
                             'replUnlocked' => $replUnlocked,
                             'card' => $card,
                         ])
-                        @endif {{-- /stats subtab (clients + keyspace + key browser) --}}
+
+                        {{-- Live MONITOR tail — redis-family only, Stats subtab. --}}
+                        @include('livewire.servers.partials.cache-monitor-card', [
+                            'engine' => $engine,
+                            'engineLabel' => $engineLabels[$engine] ?? ucfirst($engine),
+                            'row' => $row,
+                            'runId' => $monitorRunId,
+                            'duration' => $monitorDurationSeconds,
+                            'payload' => $monitorPayload,
+                            'replUnlocked' => $replUnlocked,
+                            'card' => $card,
+                        ])
+                        @endif {{-- /stats subtab (clients + keyspace + key browser + monitor) --}}
 
                         {{-- Interactive console (REPL) — redis-family only, Console subtab. --}}
                         @if ($activeSubtab === 'console')

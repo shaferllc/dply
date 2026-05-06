@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Jobs\InstallCacheServiceJob;
+use App\Jobs\TailCacheServiceMonitorJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
@@ -26,6 +27,7 @@ use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -166,6 +168,25 @@ class WorkspaceCaches extends Component
 
     public ?string $keyBrowserValueError = null;
 
+    /**
+     * Active MONITOR run ID. Empty string when no MONITOR is in flight; a ULID
+     * while a tail is running. The Blade reads this to decide whether to poll
+     * the cache buffer for output.
+     */
+    public string $monitorRunId = '';
+
+    /** Operator-chosen MONITOR window (5/10/30 s). Bounded server-side too. */
+    public int $monitorDurationSeconds = 10;
+
+    /**
+     * Latest snapshot of the MONITOR cache buffer. Populated by the 1s poll
+     * while a run is in flight. Shape mirrors what `TailCacheServiceMonitorJob`
+     * writes — `status`, `lines`, `error`.
+     *
+     * @var array{status: string, lines: list<string>, error: ?string}|null
+     */
+    public ?array $monitorPayload = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -299,6 +320,8 @@ class WorkspaceCaches extends Component
             $this->keyBrowserValue = null;
             $this->keyBrowserValueError = null;
             $this->keyBrowserError = null;
+            $this->monitorRunId = '';
+            $this->monitorPayload = null;
         }
 
         $this->engine_subtab = $next;
@@ -1421,6 +1444,90 @@ class WorkspaceCaches extends Component
     }
 
     /**
+     * Start a bounded MONITOR tail on the active instance. Generates a fresh
+     * run ID (ULID-shaped string), dispatches the queued tail job, and the
+     * polling Blade picks up the cache-buffer payload from there. Gated by
+     * the existing REPL unlock toggle: MONITOR is technically read-only but
+     * costs Redis CPU on a hot cache, worth an explicit operator confirm.
+     */
+    public function startMonitor(int $durationSeconds = 10): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = $this->resolveKeyBrowserRow();
+        if (! $row) {
+            return;
+        }
+
+        if (! $this->replUnlocked) {
+            $this->toastError(__('Locked — flip the unlock toggle in the Console sub-tab to start MONITOR.'));
+
+            return;
+        }
+
+        if ($this->monitorRunId !== '') {
+            $this->toastError(__('A MONITOR run is already in flight on this instance. Wait for it to finish.'));
+
+            return;
+        }
+
+        $duration = max(
+            TailCacheServiceMonitorJob::MIN_DURATION,
+            min(TailCacheServiceMonitorJob::HARD_MAX_DURATION, $durationSeconds),
+        );
+
+        $this->monitorRunId = (string) Str::ulid();
+        $this->monitorDurationSeconds = $duration;
+        $this->monitorPayload = [
+            'status' => 'queued',
+            'lines' => [],
+            'error' => null,
+        ];
+
+        TailCacheServiceMonitorJob::dispatch(
+            $this->server->id,
+            $row->id,
+            $this->monitorRunId,
+            $duration,
+        );
+    }
+
+    /**
+     * Poll the MONITOR cache buffer for the active run. Called via
+     * `wire:poll.1s` while `monitorRunId` is set; clears the run id once the
+     * job reports `completed` or `failed`.
+     */
+    public function pollMonitorOutput(): void
+    {
+        if ($this->monitorRunId === '') {
+            return;
+        }
+
+        $payload = Cache::get(TailCacheServiceMonitorJob::cacheKey($this->monitorRunId));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        $this->monitorPayload = [
+            'status' => (string) ($payload['status'] ?? 'running'),
+            'lines' => array_values((array) ($payload['lines'] ?? [])),
+            'error' => $payload['error'] ?? null,
+        ];
+
+        if (in_array($this->monitorPayload['status'], ['completed', 'failed'], true)) {
+            // Stop polling but keep the buffer visible so the operator can scroll
+            // through the captured lines after the window ends.
+            $this->monitorRunId = '';
+        }
+    }
+
+    public function clearMonitorOutput(): void
+    {
+        $this->monitorRunId = '';
+        $this->monitorPayload = null;
+    }
+
+    /**
      * Resolve the row the key browser operates on (active instance of the
      * current engine tab). Returns null and sets a friendly error when the
      * engine doesn't support SCAN (memcached) or there's nothing installed.
@@ -1739,6 +1846,8 @@ class WorkspaceCaches extends Component
         $this->keyBrowserValue = null;
         $this->keyBrowserValueError = null;
         $this->keyBrowserError = null;
+        $this->monitorRunId = '';
+        $this->monitorPayload = null;
     }
 
     /**
