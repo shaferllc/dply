@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ApplyFirewallJob;
 use App\Livewire\Servers\WorkspaceFirewall;
 use App\Models\FirewallRuleTemplate;
 use App\Models\Organization;
@@ -13,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Servers\ServerFirewallProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 use Mockery;
@@ -221,8 +223,9 @@ class WorkspaceFirewallTest extends TestCase
         $response->assertSee('Web basics');
     }
 
-    public function test_apply_firewall_uses_the_provisioner_and_records_history(): void
+    public function test_apply_firewall_dispatches_queued_job_and_marks_meta(): void
     {
+        Queue::fake();
         $user = $this->userWithOrganization();
         $server = $this->readyServerFor($user);
 
@@ -237,9 +240,11 @@ class WorkspaceFirewallTest extends TestCase
             'sort_order' => 1,
         ]);
 
+        // sshAccessNotExplicitlyAllowed is called inside the dispatch path (before queueing)
+        // for the lockout warning. Stub it to false so the gate doesn't block.
         $provisioner = Mockery::mock(ServerFirewallProvisioner::class);
         $provisioner->shouldReceive('sshAccessNotExplicitlyAllowed')->andReturn(false);
-        $provisioner->shouldReceive('apply')->once()->andReturn('Applied HTTPS and SSH');
+        $provisioner->shouldNotReceive('apply'); // queued, runs in the job — not in the request
         $this->app->instance(ServerFirewallProvisioner::class, $provisioner);
 
         Livewire::actingAs($user)
@@ -247,15 +252,33 @@ class WorkspaceFirewallTest extends TestCase
             ->call('applyFirewall')
             ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('server_firewall_apply_logs', [
-            'server_id' => $server->id,
-            'user_id' => $user->id,
-            'success' => true,
-        ]);
-        $this->assertDatabaseHas('server_firewall_audit_events', [
-            'server_id' => $server->id,
-            'event' => ServerFirewallAuditEvent::EVENT_APPLY,
-        ]);
+        Queue::assertPushed(ApplyFirewallJob::class, fn ($job) => $job->serverId === $server->id);
+
+        $meta = $server->fresh()->meta ?? [];
+        $this->assertSame('queued', data_get($meta, config('server_firewall.meta_apply_status_key')));
+        $this->assertNotEmpty(data_get($meta, config('server_firewall.meta_apply_run_id_key')));
+    }
+
+    public function test_apply_firewall_no_ops_when_a_run_is_already_in_flight(): void
+    {
+        Queue::fake();
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+        $server->update(['meta' => array_merge($server->meta ?? [], [
+            config('server_firewall.meta_apply_status_key') => 'running',
+            config('server_firewall.meta_apply_run_id_key') => '01ABC',
+            config('server_firewall.meta_apply_started_at_key') => now()->toIso8601String(),
+        ])]);
+
+        $provisioner = Mockery::mock(ServerFirewallProvisioner::class);
+        $provisioner->shouldReceive('sshAccessNotExplicitlyAllowed')->andReturn(false);
+        $this->app->instance(ServerFirewallProvisioner::class, $provisioner);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('applyFirewall');
+
+        Queue::assertNotPushed(ApplyFirewallJob::class);
     }
 
     public function test_delete_firewall_rule_can_be_confirmed_through_modal_state(): void

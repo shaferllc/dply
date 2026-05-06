@@ -830,6 +830,126 @@
                             </form>
                         </div>
 
+                        {{-- Network exposure card (redis-family only). Default install binds to
+                             127.0.0.1; this affordance flips bind to 0.0.0.0 + opens a firewall
+                             allow rule for the configured source CIDR. Refuses to expose without
+                             an AUTH password set first. --}}
+                        @php
+                            $networkExposure = app(\App\Support\Servers\CacheServiceNetworkExposure::class);
+                            $isExposed = $networkExposure->isExposed($row);
+                            $exposedRule = $isExposed ? $networkExposure->findManagedRule($row) : null;
+                            $hasAuth = filled($row->auth_password ?? null);
+                        @endphp
+                        <div class="{{ $card }} p-6 sm:p-8">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0">
+                                    <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — network exposure', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                    <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                                        @if ($isExposed)
+                                            {{ __('This instance is exposed to :source on TCP :port. Other servers in that range can connect.', ['source' => $exposedRule?->source ?? '—', 'port' => $row->port]) }}
+                                        @else
+                                            {{ __('Currently bound to 127.0.0.1 — only processes on this server can connect. Expose to a private network (a VPC peer, a specific app server) to allow cross-server connections.') }}
+                                        @endif
+                                    </p>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2">
+                                    @if ($isExposed)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                            <x-heroicon-m-globe-alt class="h-3 w-3" />
+                                            {{ __('Exposed') }}
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                            <x-heroicon-m-lock-closed class="h-3 w-3" />
+                                            {{ __('Loopback only') }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @if (! $hasAuth && ! $isExposed)
+                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
+                                    <p class="flex items-start gap-2">
+                                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                                        <span>{{ __('Set an AUTH password above first. Exposing an unauthenticated cache to a network — even a private one — isn\'t allowed from this dialog.') }}</span>
+                                    </p>
+                                </div>
+                            @endif
+
+                            @if ($isExposed)
+                                <div class="mt-6 flex flex-wrap items-center gap-2">
+                                    <span class="text-xs text-brand-moss">{{ __('Currently allowed from:') }}</span>
+                                    <code class="rounded-md bg-brand-sand/40 px-2 py-0.5 font-mono text-xs text-brand-ink">{{ $exposedRule?->source }}</code>
+                                </div>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('lockdownCacheToLoopback', [], @js(__('Lock down to loopback?')), @js(__('Rebind :engine to 127.0.0.1, remove the firewall rule, and reapply UFW. Existing remote clients will be cut off as soon as the apply completes.', ['engine' => $engineLabels[$engine]])), @js(__('Lock down')), true)"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    >
+                                        <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                        {{ __('Lock down to loopback') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        x-on:click="$dispatch('open-modal', 'expose-cache-modal-{{ $engine }}')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    >
+                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        {{ __('Change source CIDR') }}
+                                    </button>
+                                </div>
+                            @else
+                                <div class="mt-4 flex flex-wrap items-end gap-2">
+                                    <button
+                                        type="button"
+                                        @disabled(! $hasAuth)
+                                        x-on:click="$dispatch('open-modal', 'expose-cache-modal-{{ $engine }}')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/15 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <x-heroicon-o-globe-alt class="h-3.5 w-3.5" />
+                                        {{ __('Expose to network…') }}
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- Expose modal — captures the source CIDR + final confirm. --}}
+                        <x-modal :name="'expose-cache-modal-'.$engine" maxWidth="lg" overlayClass="bg-brand-ink/40">
+                            <form wire:submit="exposeCacheToNetwork">
+                                <div class="border-b border-brand-ink/10 px-6 py-5">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Network exposure') }}</p>
+                                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Expose :engine to a network', ['engine' => $engineLabels[$engine]]) }}</h2>
+                                    <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                        {{ __('Rebinds :engine to 0.0.0.0, restarts the unit, opens a firewall allow rule for TCP :port from the source you choose, then queues a UFW apply.', ['engine' => $engineLabels[$engine], 'port' => $row->port]) }}
+                                    </p>
+                                </div>
+                                <div class="px-6 py-6">
+                                    <x-input-label for="expose_source_cidr_{{ $engine }}" :value="__('Source CIDR')" />
+                                    <x-text-input
+                                        id="expose_source_cidr_{{ $engine }}"
+                                        wire:model="expose_source_cidr"
+                                        type="text"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        class="mt-1 block w-full font-mono text-sm"
+                                        placeholder="10.0.0.0/8"
+                                    />
+                                    <p class="mt-2 text-xs text-brand-moss">
+                                        {{ __('e.g. 10.0.0.0/8 (full VPC), 10.0.4.5/32 (single peer). "any" / 0.0.0.0/0 are not allowed here — add such a rule manually in the firewall workspace if you really need it.') }}
+                                    </p>
+                                    <x-input-error :messages="$errors->get('expose_source_cidr')" class="mt-1" />
+                                </div>
+                                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                                    <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="exposeCacheToNetwork" x-on:click="$dispatch('close')">
+                                        <span wire:loading.remove wire:target="exposeCacheToNetwork">{{ __('Expose') }}</span>
+                                        <span wire:loading wire:target="exposeCacheToNetwork">{{ __('Working…') }}</span>
+                                    </x-primary-button>
+                                </div>
+                            </form>
+                        </x-modal>
+
                         {{-- Memory limits card (redis-family only). --}}
                         <div class="{{ $card }} p-6 sm:p-8">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

@@ -23,6 +23,7 @@ use App\Support\Servers\CacheServiceInstallScripts;
 use App\Support\Servers\CacheServiceKeyExplorer;
 use App\Support\Servers\CacheServiceKeyspaceSampler;
 use App\Support\Servers\CacheServiceMemoryConfig;
+use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\CacheServicePort;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
@@ -95,6 +96,9 @@ class WorkspaceCaches extends Component
 
     /** Form input for changing the listen port of the active instance on the current tab. */
     public ?int $new_port = null;
+
+    /** Form input for the network-exposure flow's source CIDR (e.g. "10.0.0.0/8"). */
+    public string $expose_source_cidr = '';
 
     /**
      * Lazy-loaded snapshot of `CLIENT LIST` for redis-family engines.
@@ -1146,6 +1150,118 @@ class WorkspaceCaches extends Component
         $this->forgetStats($row);
 
         $this->toastSuccess(__(':engine moved to port :port.', ['engine' => $row->engine, 'port' => $newPort]));
+    }
+
+    /**
+     * Expose this cache instance to other servers in a network: rewrites the engine's bind to
+     * 0.0.0.0, creates a panel firewall rule scoped to the source CIDR, and dispatches the
+     * firewall apply. Refuses to expose Redis-family without an AUTH password — exposing an
+     * un-authenticated cache to a network is the kind of foot-gun this dialog should prevent
+     * even if the source CIDR is restrictive.
+     */
+    public function exposeCacheToNetwork(CacheServiceNetworkExposure $exposure, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to expose its instance.'));
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Network exposure is currently only supported for Redis-family engines (Redis, Valkey, KeyDB).'));
+
+            return;
+        }
+
+        if (empty($row->auth_password)) {
+            $this->toastError(__('Set an AUTH password first — exposing an un-authenticated cache to the network is too risky to allow from this dialog.'));
+
+            return;
+        }
+
+        $this->validate([
+            'expose_source_cidr' => ['required', 'string', 'max:64'],
+        ], [], [
+            'expose_source_cidr' => __('Source CIDR'),
+        ]);
+
+        try {
+            $exposure->expose($row->server, $row, $this->expose_source_cidr, auth()->id());
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
+            ['engine' => $row->engine, 'name' => $row->name, 'change' => 'exposed', 'source' => $this->expose_source_cidr],
+            auth()->user(),
+        );
+        $this->forgetStats($row);
+        $this->expose_source_cidr = '';
+
+        $this->toastSuccess(__(':engine exposed on :port from :cidr — firewall apply queued.', [
+            'engine' => $row->engine,
+            'port' => $row->port,
+            'cidr' => $this->expose_source_cidr,
+        ]));
+    }
+
+    /**
+     * Reverse {@see exposeCacheToNetwork()} — bind back to 127.0.0.1, remove the firewall
+     * rule, dispatch apply.
+     */
+    public function lockdownCacheToLoopback(CacheServiceNetworkExposure $exposure, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            return;
+        }
+
+        try {
+            $exposure->lockdown($row->server, $row, auth()->id());
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
+            ['engine' => $row->engine, 'name' => $row->name, 'change' => 'locked_down'],
+            auth()->user(),
+        );
+        $this->forgetStats($row);
+
+        $this->toastSuccess(__(':engine locked down to loopback — firewall apply queued.', ['engine' => $row->engine]));
     }
 
     /**

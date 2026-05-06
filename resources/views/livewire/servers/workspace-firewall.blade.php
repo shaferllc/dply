@@ -65,20 +65,50 @@
         {{-- Workspace-wide console banner. Currently surfaces panel events from add/update/
              remove (via the EmitsPanelEvent trait). Phase 2 will hook the apply/diagnostics
              flows in here too once they queue. --}}
-        {{-- Optimistic running banners — wire:loading shows them only while their target
-             action is in flight. As soon as the request returns, these hide and the real
-             panel-event banner below takes over with the actual transcript. --}}
-        <div wire:loading wire:target="applyFirewall">
+        @php
+            $applyStatus = (string) data_get($server->meta ?? [], config('server_firewall.meta_apply_status_key'));
+            $applyRunId = (string) data_get($server->meta ?? [], config('server_firewall.meta_apply_run_id_key'));
+            $applyError = (string) data_get($server->meta ?? [], config('server_firewall.meta_apply_error_key'));
+            $applyFinishedAt = data_get($server->meta ?? [], config('server_firewall.meta_apply_finished_at_key'));
+            $applyBusy = in_array($applyStatus, ['queued', 'running'], true);
+            $applyShowBanner = $applyRunId !== '' && in_array($applyStatus, ['queued', 'running', 'completed', 'failed'], true);
+        @endphp
+
+        {{-- Queued / running / completed / failed apply banner. Takes precedence over the
+             panel-event banner — apply state is more time-sensitive. While running, polls
+             pollApplyStatus every 4 s to refresh the cached transcript. --}}
+        @if ($applyShowBanner)
+            @php
+                $applyMessage = match ($applyStatus) {
+                    'queued' => __('Firewall apply queued — waiting for a worker to pick it up…'),
+                    'running' => __('Applying firewall to :host …', ['host' => $server->getSshConnectionString()]),
+                    'completed' => __('Firewall applied — UFW updated.'),
+                    'failed' => __('Firewall apply failed.'),
+                    default => '',
+                };
+                $applySubtitle = match (true) {
+                    $applyBusy => __('Refreshing every 4s · safe to leave this page — the job runs on the queue.'),
+                    $applyStatus === 'failed' && $applyError !== '' => $applyError,
+                    $applyStatus === 'completed' && $applyFinishedAt
+                        => __('Finished :time', ['time' => \Illuminate\Support\Carbon::parse($applyFinishedAt)->diffForHumans()]),
+                    default => null,
+                };
+            @endphp
             <x-workspace-console-banner
-                status="running"
-                :message="__('Applying firewall to :host …', ['host' => $server->getSshConnectionString()])"
-                :subtitle="__('Running ufw allow / deny / reload over SSH. Output will appear when it returns.')"
-                :output="[]"
-                :busy="true"
-                :default-expanded="false"
-                :dismiss-action="null"
+                :status="$applyStatus"
+                :message="$applyMessage"
+                :subtitle="$applySubtitle"
+                :output="$this->applyOutputLines"
+                :busy="$applyBusy"
+                :dismiss-action="$applyBusy ? null : 'dismissApplyBanner'"
+                :poll-action="$applyBusy ? 'pollApplyStatus' : null"
+                poll-interval="4s"
+                :default-expanded="true"
             />
-        </div>
+        @endif
+
+        {{-- Optimistic running banners for the still-in-request actions (refresh + diagnostics).
+             wire:loading flips them on/off based on which action is mid-round-trip. --}}
         <div wire:loading wire:target="refreshUfwStatus">
             <x-workspace-console-banner
                 status="running"
@@ -102,11 +132,11 @@
             />
         </div>
 
-        {{-- Real result banner — populated by emitPanelEvent in the Livewire methods. Hidden
-             while any of the long actions is in flight to avoid showing stale data alongside
-             the optimistic running banner above. --}}
-        @if (! empty($panel_event_lines))
-            <div wire:loading.remove wire:target="applyFirewall,refreshUfwStatus,runFirewallDiagnostics">
+        {{-- Panel-event banner — populated by emitPanelEvent (add/delete rule, refresh /
+             diagnostics output). Suppressed while the apply banner has the slot or while a
+             refresh / diagnostics round-trip is in flight. --}}
+        @if (! $applyShowBanner && ! empty($panel_event_lines))
+            <div wire:loading.remove wire:target="refreshUfwStatus,runFirewallDiagnostics">
                 @php
                     $panelSubtitle = match ($panel_event_status) {
                         'failed' => null,
@@ -178,14 +208,16 @@
                                 @endif
                                 wire:loading.attr="disabled"
                                 wire:target="applyFirewall"
+                                @disabled($applyBusy)
+                                title="{{ $applyBusy ? __('A firewall apply is already running. Wait for it to finish.') : '' }}"
                                 class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <x-heroicon-o-bolt wire:loading.remove wire:target="applyFirewall" class="h-3.5 w-3.5" />
                                 <span wire:loading wire:target="applyFirewall" class="inline-flex h-3.5 w-3.5 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
                                 </span>
-                                <span wire:loading.remove wire:target="applyFirewall">{{ __('Apply rules') }}</span>
-                                <span wire:loading wire:target="applyFirewall">{{ __('Applying…') }}</span>
+                                <span wire:loading.remove wire:target="applyFirewall">{{ $applyBusy ? __('Applying…') : __('Apply rules') }}</span>
+                                <span wire:loading wire:target="applyFirewall">{{ __('Queueing…') }}</span>
                             </button>
                             <button
                                 type="button"
