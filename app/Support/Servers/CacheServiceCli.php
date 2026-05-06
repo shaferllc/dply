@@ -59,10 +59,24 @@ class CacheServiceCli
         // `(nil)`, `1) "foo"`) which is what an operator expects in a REPL.
         $cliBin = escapeshellarg($cli);
         $argString = implode(' ', array_map(static fn (string $t): string => escapeshellarg($t), $tokens));
+        $port = (int) $row->port;
 
-        $line = 'command -v '.$cliBin.' >/dev/null && '
-            .$authFlag.$cliBin.' -p '.(int) $row->port.' --no-raw -t '.max(1, $timeoutSeconds).' '.$argString
-            .' || '.$authFlag.'redis-cli -p '.(int) $row->port.' --no-raw -t '.max(1, $timeoutSeconds).' '.$argString;
+        // Branch with `if … elif redis-cli … else error`. Avoids the prior `cli || redis-cli`
+        // shape where redis-cli would fire on ANY non-zero from the engine's own cli (including
+        // routine cli errors like WRONGTYPE), and where a missing redis-cli surfaced as a
+        // confusing "command not found" trail in the REPL output.
+        // Also: do NOT pass `-t` — modern valkey-cli rejects it as an unknown option, and the
+        // outer SSH timeout already bounds the round-trip.
+        $line = <<<BASH
+if command -v {$cliBin} >/dev/null 2>&1; then
+    {$authFlag}{$cliBin} -p {$port} --no-raw {$argString}
+elif command -v redis-cli >/dev/null 2>&1; then
+    {$authFlag}redis-cli -p {$port} --no-raw {$argString}
+else
+    echo "ERROR: No RESP client found on this server (tried {$cli}, redis-cli)." >&2
+    exit 127
+fi
+BASH;
 
         return $this->executor->runInlineBash(
             $server,

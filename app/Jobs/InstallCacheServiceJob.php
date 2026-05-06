@@ -152,10 +152,14 @@ class InstallCacheServiceJob implements ShouldQueue
 
             $version = CacheServiceInstallScripts::parseVersionFromBuffer($output->buffer);
 
+            // Don't overwrite `port` — the row was created with the correct value at dispatch
+            // time (default for the legacy single-instance install, autopicked or operator-chosen
+            // for named instances). Forcing it back to defaultPortFor() collides with the
+            // (server_id, port) unique constraint when another instance already sits on that
+            // port and silently leaves the row stuck in INSTALLING.
             $row->update([
                 'status' => ServerCacheService::STATUS_RUNNING,
                 'version' => $version,
-                'port' => ServerCacheService::defaultPortFor($row->engine),
             ]);
 
             // Bust the capability probe cache so the workspace renders the freshly-installed engine
@@ -190,8 +194,13 @@ class InstallCacheServiceJob implements ShouldQueue
     /**
      * Run best-effort revert and delete the row. `ranAptInstall=false` means we never made it past
      * preflight (or never started at all) and there's nothing to undo on the server, so we skip
-     * the SSH round-trip. Either way, the row ends up deleted so the workspace shows "no cache
-     * service installed" and the operator can pick a different engine.
+     * the SSH round-trip.
+     *
+     * When OTHER instances of this engine exist on the same server (e.g. a default instance is
+     * already running and the operator cancels mid-install of a named one), we never purge the
+     * apt package — that would break the sibling instance. Instead we only roll back this
+     * instance's specific scaffolding (templated systemd unit + per-instance config). The
+     * package was already on the box before this run anyway, so leaving it costs nothing.
      */
     private function finishCancellation(
         ServerCacheService $row,
@@ -201,15 +210,23 @@ class InstallCacheServiceJob implements ShouldQueue
         bool $ranAptInstall,
     ): void {
         $engine = $row->engine;
+        $name = $row->name;
         $serverForAudit = $row->server;
         $cleanupError = null;
+
+        $otherInstances = ServerCacheService::query()
+            ->where('server_id', $serverForAudit->id)
+            ->where('engine', $engine)
+            ->where('id', '!=', $row->id)
+            ->count();
+        $isLastInstance = $otherInstances === 0;
 
         if ($ranAptInstall) {
             try {
                 $script = "export DEBIAN_FRONTEND=noninteractive\n".
                     "dpkg --configure -a 2>&1 || true\n".
                     "apt-get install -y --fix-broken 2>&1 || true\n".
-                    CacheServiceInstallScripts::uninstallScript($engine);
+                    CacheServiceInstallScripts::uninstallInstanceScript($engine, $name, $isLastInstance);
 
                 $executor->runInlineBash(
                     $row->server,
@@ -228,7 +245,9 @@ class InstallCacheServiceJob implements ShouldQueue
 
         $audit->record($serverForAudit, ServerCacheServiceAuditEvent::EVENT_INSTALL_CANCELLED, array_filter([
             'engine' => $engine,
+            'name' => $name,
             'reverted' => $ranAptInstall,
+            'package_purged' => $ranAptInstall && $isLastInstance,
             'cleanup_error' => $cleanupError,
         ], fn ($v) => $v !== null));
     }

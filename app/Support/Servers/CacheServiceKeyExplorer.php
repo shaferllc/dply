@@ -46,6 +46,21 @@ class CacheServiceKeyExplorer
     ) {}
 
     /**
+     * Tokens that redis-cli `--no-raw` uses to label empty / nil responses.
+     * These come back as if they were keys when SCAN finds nothing matching;
+     * we filter them so the browser doesn't show "(empty array)" as a key.
+     */
+    private static function isEmptyMarker(string $token): bool
+    {
+        return in_array(strtolower(trim($token)), [
+            '(empty array)',
+            '(empty list or set)',
+            '(empty hash)',
+            '(nil)',
+        ], true);
+    }
+
+    /**
      * Walk SCAN for up to `MAX_SCAN_ITERATIONS` iterations and return the
      * accumulated keys + the next cursor. The cursor is `'0'` once the scan
      * has completed; any other value means there's more to fetch.
@@ -72,14 +87,23 @@ class CacheServiceKeyExplorer
 
         // Walk a small number of iterations server-side. The shell loop keeps
         // us in one SSH round-trip per scan() call instead of N.
+        //
+        // Use a nowdoc (`<<<'BASH'`) so PHP does NOT interpolate the bash variables ($CURSOR,
+        // $OUT) — they need to stay literal for bash to evaluate. The previous `."..."` chain
+        // mixed double-quoted PHP segments and made PHP try to expand $CURSOR/$OUT, which under
+        // PHP 8 throws "Undefined variable" warnings that bubbled up as the SCAN error message.
+        $template = <<<'BASH'
+CURSOR=%s
+for i in $(seq 1 %d); do
+    OUT=$(%s%s -p %d --no-raw SCAN "$CURSOR" MATCH %s COUNT %d 2>&1) || { echo "__DPLY_SCAN_ERR__$OUT"; exit 1; }
+    CURSOR=$(echo "$OUT" | head -n 1)
+    echo "$OUT" | tail -n +2
+    if [ "$CURSOR" = "0" ]; then break; fi
+done
+echo "__DPLY_CURSOR__$CURSOR"
+BASH;
         $script = sprintf(
-            'CURSOR=%s; for i in $(seq 1 %d); do '
-            ."OUT=$(%s%s -p %d --no-raw SCAN \"$CURSOR\" MATCH %s COUNT %d 2>&1) || { echo \"__DPLY_SCAN_ERR__$OUT\"; exit 1; }; "
-            ."CURSOR=$(echo \"$OUT\" | head -n 1); "
-            ."echo \"$OUT\" | tail -n +2; "
-            ."if [ \"$CURSOR\" = \"0\" ]; then break; fi; "
-            .'done; '
-            ."echo \"__DPLY_CURSOR__$CURSOR\"",
+            $template,
             escapeshellarg($current),
             self::MAX_SCAN_ITERATIONS,
             $authFlag,
@@ -117,12 +141,20 @@ class CacheServiceKeyExplorer
             }
             // SCAN's --no-raw output for keys looks like `1) "foo"` / `2) "bar"`;
             // we strip the `N) ` prefix and the surrounding quotes.
+            $captured = null;
             if (preg_match('/^\d+\)\s*"(.*)"\s*$/', $trim, $m) === 1) {
-                $keys[] = $m[1];
+                $captured = $m[1];
             } elseif (preg_match('/^\d+\)\s*(.*)$/', $trim, $m) === 1) {
                 // Fallback when --no-raw emitted an unquoted token (e.g. an
                 // integer-shaped key); take it as-is.
-                $keys[] = $m[1];
+                $captured = $m[1];
+            }
+
+            // redis-cli --no-raw emits human-friendly markers for empty results / nil values
+            // (`(empty array)`, `(empty list or set)`, `(nil)`); drop them so they don't show
+            // up as bogus keys in the browser.
+            if ($captured !== null && ! self::isEmptyMarker($captured)) {
+                $keys[] = $captured;
             }
         }
 

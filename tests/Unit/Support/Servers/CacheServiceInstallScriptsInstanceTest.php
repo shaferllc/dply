@@ -243,4 +243,66 @@ class CacheServiceInstallScriptsInstanceTest extends TestCase
         $this->assertSame('/var/lib/redis/sessions', CacheServiceInstallScripts::instanceStateDir('redis', 'sessions'));
         $this->assertSame('/var/lib/valkey/cache', CacheServiceInstallScripts::instanceStateDir('valkey', 'cache'));
     }
+
+    public function test_parse_version_extracts_redis_cli_version(): void
+    {
+        $this->assertSame('7.0.5', CacheServiceInstallScripts::parseVersionFromBuffer("redis-cli 7.0.5\n"));
+    }
+
+    public function test_parse_version_extracts_memcached_version(): void
+    {
+        $this->assertSame('1.6.18', CacheServiceInstallScripts::parseVersionFromBuffer("memcached 1.6.18\n"));
+    }
+
+    public function test_parse_version_strips_dragonfly_v_prefix(): void
+    {
+        $this->assertSame('1.13.0', CacheServiceInstallScripts::parseVersionFromBuffer("dragonfly v1.13.0\n"));
+    }
+
+    public function test_parse_version_returns_null_when_buffer_is_empty(): void
+    {
+        $this->assertNull(CacheServiceInstallScripts::parseVersionFromBuffer(''));
+        $this->assertNull(CacheServiceInstallScripts::parseVersionFromBuffer("\n\n"));
+    }
+
+    public function test_parse_version_returns_null_for_apt_error_messages(): void
+    {
+        // Regression: previously the parser would fall back to returning the whole last line,
+        // which leaked apt errors like "E: Unable to locate package keydb" into the version
+        // field whenever the install script's exit code was wrongly 0.
+        $this->assertNull(CacheServiceInstallScripts::parseVersionFromBuffer('E: Unable to locate package keydb'));
+        $this->assertNull(CacheServiceInstallScripts::parseVersionFromBuffer("Reading package lists...\nE: Unable to locate package keydb-server\nE: Unable to locate package keydb"));
+    }
+
+    public function test_parse_version_walks_back_past_unrelated_trailing_lines(): void
+    {
+        // If the version probe line is followed by an unrelated stderr message, we should
+        // still find the version by walking up from the bottom.
+        $buffer = "redis-cli 7.0.5\nWarning: something benign happened on stderr";
+        $this->assertSame('7.0.5', CacheServiceInstallScripts::parseVersionFromBuffer($buffer));
+    }
+
+    public function test_install_package_script_verifies_keydb_binary_exists(): void
+    {
+        // Belt-and-suspenders: even if `||`-chained apt failures slip past `set -e`, the
+        // explicit binary check has to abort the script.
+        $script = CacheServiceInstallScripts::installPackageScript('keydb');
+        $this->assertStringContainsString('command -v keydb-server', $script);
+        $this->assertStringContainsString('exit 1', $script);
+    }
+
+    public function test_install_package_script_verifies_each_engines_binary(): void
+    {
+        $expected = [
+            'redis' => 'redis-server',
+            'valkey' => 'valkey-server',
+            'memcached' => 'memcached',
+            'keydb' => 'keydb-server',
+            'dragonfly' => 'dragonfly',
+        ];
+        foreach ($expected as $engine => $binary) {
+            $script = CacheServiceInstallScripts::installPackageScript($engine);
+            $this->assertStringContainsString("command -v {$binary}", $script, "Missing binary check for {$engine}");
+        }
+    }
 }

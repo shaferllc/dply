@@ -105,8 +105,13 @@ class TailCacheServiceMonitorJob implements ShouldQueue
         // even if MONITOR's own client-side stop fails for any reason.
         // Exit code 124 is timeout's "we killed it normally" code; we
         // treat it as success for our purposes.
+        //
+        // `stdbuf -oL -eL` forces the cli's stdout/stderr into line-buffered
+        // mode. Without it the cli block-buffers when piped over SSH, so on a
+        // low-traffic engine the 4 KB buffer never flushes during the window
+        // and the operator sees zero output even though MONITOR ran fine.
         $script = sprintf(
-            'timeout --preserve-status %d %s%s -p %d MONITOR 2>&1 || true',
+            'stdbuf -oL -eL timeout --preserve-status %d %s%s -p %d MONITOR 2>&1 || true',
             $duration,
             $authFlag,
             escapeshellarg($cli),

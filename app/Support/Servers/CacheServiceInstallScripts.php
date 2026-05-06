@@ -37,31 +37,56 @@ final class CacheServiceInstallScripts
     }
 
     /**
-     * Idempotent apt-install step for an engine. Re-running is a no-op
-     * (`apt-get install` reports "already newest" on second runs).
+     * Idempotent apt-install step for an engine. Each script first checks whether the engine's
+     * binary is already on PATH and skips the apt step entirely if so — this matters for
+     * "Add instance" which re-runs the install pipeline against an already-provisioned host;
+     * the apt step itself reports "already newest" but `apt-get update` still costs 20–60 s.
+     *
+     * Each script ends with an explicit `command -v` verification. That's a backstop against
+     * `||`-chained apt failures slipping past `set -e` — if the package isn't actually
+     * installed, the script exits non-zero with a clear message instead of marching on to
+     * systemctl and leaving a "Running" row pointing at nothing.
      */
     public static function installPackageScript(string $engine): string
     {
         return match ($engine) {
             'redis' => <<<'BASH'
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y redis-server
+if ! command -v redis-server >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y
+    apt-get install -y redis-server
+fi
+command -v redis-server >/dev/null 2>&1 || { echo "ERROR: redis-server binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
 BASH,
             'valkey' => <<<'BASH'
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y valkey-server || apt-get install -y valkey
+if ! command -v valkey-server >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y
+    if ! { apt-get install -y valkey-server || apt-get install -y valkey; }; then
+        echo "ERROR: Could not install valkey — neither 'valkey-server' nor 'valkey' is in the configured APT repositories. Enable 'universe' (Ubuntu 24.04+) or add the upstream Valkey APT source and retry." >&2
+        exit 1
+    fi
+fi
+command -v valkey-server >/dev/null 2>&1 || { echo "ERROR: valkey-server binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
 BASH,
             'memcached' => <<<'BASH'
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y memcached
+if ! command -v memcached >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y
+    apt-get install -y memcached
+fi
+command -v memcached >/dev/null 2>&1 || { echo "ERROR: memcached binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
 BASH,
             'keydb' => <<<'BASH'
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y keydb-server || apt-get install -y keydb
+if ! command -v keydb-server >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y
+    if ! { apt-get install -y keydb-server || apt-get install -y keydb; }; then
+        echo "ERROR: Could not install KeyDB — neither 'keydb-server' nor 'keydb' is in the configured APT repositories. Add the upstream KeyDB APT source per https://docs.keydb.dev/docs/build/ (or 'add-apt-repository ppa:eq-alpha-technology/keydb' on Ubuntu) and retry." >&2
+        exit 1
+    fi
+fi
+command -v keydb-server >/dev/null 2>&1 || { echo "ERROR: keydb-server binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
 BASH,
             'dragonfly' => <<<'BASH'
 export DEBIAN_FRONTEND=noninteractive
@@ -75,6 +100,7 @@ if ! command -v dragonfly >/dev/null 2>&1; then
         exit 1
     fi
 fi
+command -v dragonfly >/dev/null 2>&1 || { echo "ERROR: dragonfly binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
 BASH,
             default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
         };
@@ -447,28 +473,33 @@ CONF,
 
     /**
      * Pull the version token out of a `--version` style output buffer. The line shape varies by
-     * engine — `redis-cli 7.0.5`, `memcached 1.6.18`, `dragonfly v1.13.0` — so we walk the last
-     * non-empty line and pick the first whitespace-separated token that looks like a version
-     * (digits, dots, alphanumerics). Returns null when nothing parseable is present.
+     * engine — `redis-cli 7.0.5`, `memcached 1.6.18`, `dragonfly v1.13.0` — so we walk lines from
+     * the bottom up and return the first whitespace-separated token that looks like a version
+     * (optional `v` + digit + dot/digit/letter). Returns null when nothing parseable is present.
+     *
+     * We deliberately do NOT fall back to "return the last line as-is" — that path used to leak
+     * apt error messages ("E: Unable to locate package keydb") into the version field whenever
+     * the install script's exit code was 0 but the version probe produced no output (e.g. the
+     * `cli` binary isn't on PATH after a partially-failed install).
      */
     public static function parseVersionFromBuffer(string $buffer): ?string
     {
         $lines = array_values(array_filter(array_map('trim', explode("\n", $buffer)), fn ($l) => $l !== ''));
-        if ($lines === []) {
-            return null;
-        }
-        $last = (string) end($lines);
 
-        // Strip a leading "v" (dragonfly emits "dragonfly v1.13.0").
-        foreach (preg_split('/\s+/', $last) as $token) {
-            if ($token === '' || ! preg_match('/^v?\d/', $token)) {
-                continue;
+        // Walk from the bottom — version probe output is always last. Stop as soon as a line
+        // yields a version-shaped token; otherwise keep looking (handles the case where the
+        // last line is an unrelated stderr message that landed after the probe).
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            foreach (preg_split('/\s+/', $lines[$i]) as $token) {
+                if ($token === '' || ! preg_match('/^v?\d[\d.][\w.\-]*$/', $token)) {
+                    continue;
+                }
+
+                return ltrim($token, 'v');
             }
-
-            return ltrim($token, 'v');
         }
 
-        return $last !== '' ? $last : null;
+        return null;
     }
 
     /**

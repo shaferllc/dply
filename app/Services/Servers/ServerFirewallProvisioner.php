@@ -8,6 +8,34 @@ use App\Models\ServerFirewallRule;
 class ServerFirewallProvisioner
 {
     /**
+     * Optional output callback set by callers that want per-command streaming during apply.
+     * The callback receives one line at a time — usually a `> ufw …` header before the
+     * exec and the captured output indented after. Used by {@see \App\Jobs\ApplyFirewallJob}
+     * to surface live progress in the workspace banner; in-request callers leave it null
+     * and get the same buffered string return value as before.
+     *
+     * @var (callable(string $type, string $line): void)|null
+     */
+    protected $outputCallback = null;
+
+    /**
+     * @param  callable(string $type, string $line): void  $callback
+     */
+    public function withOutputCallback(callable $callback): static
+    {
+        $this->outputCallback = $callback;
+
+        return $this;
+    }
+
+    protected function emitOutput(string $line): void
+    {
+        if ($this->outputCallback !== null) {
+            ($this->outputCallback)('out', $line);
+        }
+    }
+
+    /**
      * UFW fragment after `ufw` (e.g. `allow 80/tcp`, `allow proto ipv6-icmp`, `deny from 10.0.0.0/8 to any port 22 proto tcp`).
      */
     public function ufwRuleFragment(ServerFirewallRule $rule): string
@@ -51,10 +79,14 @@ class ServerFirewallProvisioner
 
         $rules = $server->firewallRules()->where('enabled', true)->orderBy('sort_order')->get();
         if ($rules->isEmpty()) {
+            $this->emitOutput('> No enabled firewall rules to apply.');
+
             return 'No enabled firewall rules to apply.';
         }
 
         $log = "Applying UFW rules (ensure SSH is reachable before tightening UFW).\n";
+        $this->emitOutput('> Applying UFW rules to '.$server->getSshConnectionString().' …');
+        $this->emitOutput(sprintf('> %d enabled rule(s) to apply.', $rules->count()));
 
         // Safety rail: always allow the configured SSH port (whatever it is — 22 in the
         // common case, 2222 for the local fake-cloud container) so the user can never
@@ -64,16 +96,27 @@ class ServerFirewallProvisioner
         $log .= app(ServerSshConnectionRunner::class)->run(
             $server,
             function ($ssh) use ($rules, $server, $sshPort): string {
-                $output = $ssh->exec($this->ufwExecLine($server, 'allow '.$sshPort.'/tcp comment '.escapeshellarg('Dply: keep SSH reachable')), 60);
+                $sshGuardFragment = 'allow '.$sshPort.'/tcp comment '.escapeshellarg('Dply: keep SSH reachable');
+                $this->emitOutput('> ufw '.$sshGuardFragment);
+                $sshGuardOut = $ssh->exec($this->ufwExecLine($server, $sshGuardFragment), 60);
+                $this->emitIndented($sshGuardOut);
+                $output = $sshGuardOut;
 
                 foreach ($rules as $rule) {
-                    $output .= $this->applyRuleViaSsh($ssh, $server, $rule);
+                    $fragment = $this->ufwRuleFragment($rule);
+                    $this->emitOutput('> ufw '.$fragment.($rule->name ? '   # '.$rule->name : ''));
+                    $ruleOut = $ssh->exec($this->ufwExecLine($server, $fragment), 60);
+                    $this->emitIndented($ruleOut);
+                    $output .= $ruleOut;
                 }
 
                 // Make sure UFW is actually loaded — fresh installs leave it inactive,
                 // and rules with no enable are a silent no-op. `--force` skips the
                 // "Command may disrupt existing ssh connections" prompt.
-                $output .= $ssh->exec($this->ufwExecLine($server, '--force enable'), 30);
+                $this->emitOutput('> ufw --force enable');
+                $enableOut = $ssh->exec($this->ufwExecLine($server, '--force enable'), 30);
+                $this->emitIndented($enableOut);
+                $output .= $enableOut;
 
                 return $output;
             },
@@ -81,7 +124,28 @@ class ServerFirewallProvisioner
             $this->fallbackToDeployUserSsh()
         );
 
+        $this->emitOutput('> Done.');
+
         return $log;
+    }
+
+    /**
+     * Push a captured command output through the streaming callback as one indented line per
+     * non-empty source line, so the workspace transcript reads as `> ufw allow 80/tcp` followed
+     * by `  Rule added` rather than concatenating everything into the previous header.
+     */
+    protected function emitIndented(string $blob): void
+    {
+        if ($this->outputCallback === null) {
+            return;
+        }
+        foreach (preg_split("/\r?\n/", trim($blob)) ?: [] as $line) {
+            $line = rtrim($line);
+            if ($line === '') {
+                continue;
+            }
+            $this->emitOutput('  '.$line);
+        }
     }
 
     /**

@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\ApplyFirewallJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Forms\FirewallRuleForm;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
@@ -17,6 +19,9 @@ use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -25,6 +30,7 @@ use Livewire\Component;
 class WorkspaceFirewall extends Component
 {
     use ConfirmsActionWithModal;
+    use EmitsPanelEvent;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
@@ -149,8 +155,17 @@ class WorkspaceFirewall extends Component
             } else {
                 $this->toastSuccess(__('Rule updated and synced to UFW.'));
             }
+            $this->emitPanelEvent(
+                __('Rule updated — apply to reconcile the host firewall'),
+                array_values(array_filter([
+                    sprintf('> Updated "%s" in the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
+                    sprintf('  %s %s/%s from %s', strtoupper($rule->action), $rule->port ?? '*', strtoupper($rule->protocol), $rule->source),
+                    $this->lastUfwHostSyncError ? '> Host sync failed: '.\Illuminate\Support\Str::limit($this->lastUfwHostSyncError, 200) : '> Host sync attempted automatically.',
+                ])),
+            );
             $this->editing_rule_id = null;
             $this->form->resetForNew();
+            $this->dispatch('close-modal', 'add-firewall-rule-modal');
         } else {
             $rule = ServerFirewallRule::query()->create([
                 'server_id' => $this->server->id,
@@ -185,7 +200,21 @@ class WorkspaceFirewall extends Component
             } else {
                 $this->toastSuccess(__('Rule saved. Use “Apply firewall rules” to push enabled rules to the server.'));
             }
+            $this->emitPanelEvent(
+                __('Rule added — apply to push to the server'),
+                array_values(array_filter([
+                    sprintf('> Added "%s" to the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
+                    sprintf('  %s %s/%s from %s', strtoupper($rule->action), $rule->port ?? '*', strtoupper($rule->protocol), $rule->source),
+                    $rule->enabled
+                        ? '> Rule is enabled. Click "Apply rules" to reconcile the host firewall.'
+                        : '> Rule is disabled — Apply will skip it until you toggle it on.',
+                    isset($this->lastUfwHostSyncError) && $this->lastUfwHostSyncError !== null
+                        ? '> Inline host apply failed: '.\Illuminate\Support\Str::limit($this->lastUfwHostSyncError, 200)
+                        : null,
+                ])),
+            );
             $this->form->resetForNew();
+            $this->dispatch('close-modal', 'add-firewall-rule-modal');
         }
     }
 
@@ -291,6 +320,14 @@ class WorkspaceFirewall extends Component
         if ($remote !== null && $remote !== '') {
             $removedMsg .= ' '.Str::limit($remote, 500);
         }
+        $this->emitPanelEvent(
+            __('Rule removed — apply to push to the server'),
+            array_values(array_filter([
+                sprintf('> Removed "%s" from the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
+                $remote !== null && $remote !== '' ? '  ufw output: '.\Illuminate\Support\Str::limit(trim($remote), 200) : null,
+                '> Click "Apply rules" to reconcile the host firewall.',
+            ])),
+        );
         $this->toastSuccess($removedMsg);
     }
 
@@ -458,6 +495,9 @@ class WorkspaceFirewall extends Component
         $this->toastSuccess(__('Trimmed :n duplicate rule(s).', ['n' => count($removedRuleIds)]));
     }
 
+    /** A queued/running apply older than this is treated as stuck so the operator can re-dispatch. */
+    public const APPLY_STALE_THRESHOLD_SECONDS = 300;
+
     public function applyFirewall(
         ServerFirewallProvisioner $firewall,
         ServerFirewallAuditLogger $audit,
@@ -470,10 +510,6 @@ class WorkspaceFirewall extends Component
             return;
         }
 
-        $sshWarn = $firewall->sshAccessNotExplicitlyAllowed($this->server)
-            ? ' '.__('Warning: no enabled Dply rule allows TCP :port from “any” — confirm SSH access before locking yourself out.', ['port' => $this->server->ssh_port ?: 22])
-            : '';
-
         if ($firewall->sshAccessNotExplicitlyAllowed($this->server) && ! $this->firewall_ack_ssh_risk) {
             $this->toastError(
                 __('Check “I understand SSH may be unreachable” below, or add an allow rule for your SSH port, before applying.')
@@ -482,18 +518,115 @@ class WorkspaceFirewall extends Component
             return;
         }
 
-        try {
-            $out = $firewall->apply($this->server);
-            $audit->record($this->server, ServerFirewallAuditEvent::EVENT_APPLY, [
-                'output_excerpt' => Str::limit(trim($out), 1500),
-            ], auth()->user());
-            $recorder->recordSuccess($this->server, auth()->user(), null, $out, 'livewire');
-            $this->firewall_ack_ssh_risk = false;
-            $this->toastSuccess(Str::limit(trim($out).$sshWarn, 2200));
-        } catch (\Throwable $e) {
-            $recorder->recordFailure($this->server, auth()->user(), null, $e->getMessage(), 'livewire');
-            $this->toastError($e->getMessage());
+        if ($this->isApplyBusy()) {
+            $this->toastError(__('A firewall apply is already in flight on this server. Wait for it to finish before starting another.'));
+
+            return;
         }
+
+        $runId = (string) Str::ulid();
+        $meta = $this->server->fresh()->meta ?? [];
+        $meta[config('server_firewall.meta_apply_run_id_key')] = $runId;
+        $meta[config('server_firewall.meta_apply_status_key')] = 'queued';
+        $meta[config('server_firewall.meta_apply_started_at_key')] = now()->toIso8601String();
+        $meta[config('server_firewall.meta_apply_finished_at_key')] = null;
+        $meta[config('server_firewall.meta_apply_error_key')] = null;
+        $this->server->fresh()->update(['meta' => $meta]);
+        $this->server->refresh();
+
+        $this->firewall_ack_ssh_risk = false;
+        ApplyFirewallJob::dispatch($this->server->id, $runId, Auth::id());
+
+        $this->toastSuccess(__('Firewall apply queued — watch the banner for live output. You can leave this page; the job runs on the queue.'));
+    }
+
+    /**
+     * True while a firewall apply is queued or running. Treats stale entries (older than the
+     * threshold) as no-longer-in-flight so a dead worker doesn't permanently block re-dispatch.
+     */
+    protected function isApplyBusy(): bool
+    {
+        $meta = $this->server->fresh()->meta ?? [];
+        $status = (string) data_get($meta, config('server_firewall.meta_apply_status_key'));
+
+        if (! in_array($status, ['queued', 'running'], true)) {
+            return false;
+        }
+
+        $startedAt = (string) data_get($meta, config('server_firewall.meta_apply_started_at_key'));
+        if ($startedAt === '') {
+            return true;
+        }
+        try {
+            return ! Carbon::parse($startedAt)->lt(now()->subSeconds(self::APPLY_STALE_THRESHOLD_SECONDS));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public function pollApplyStatus(): void
+    {
+        $this->server->refresh();
+    }
+
+    public function dismissApplyBanner(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $status = (string) data_get($this->server->fresh()->meta ?? [], config('server_firewall.meta_apply_status_key'));
+        if (in_array($status, ['queued', 'running'], true)) {
+            return;
+        }
+
+        $meta = $this->server->fresh()->meta ?? [];
+        unset(
+            $meta[config('server_firewall.meta_apply_run_id_key')],
+            $meta[config('server_firewall.meta_apply_status_key')],
+            $meta[config('server_firewall.meta_apply_started_at_key')],
+            $meta[config('server_firewall.meta_apply_finished_at_key')],
+            $meta[config('server_firewall.meta_apply_error_key')],
+        );
+        $this->server->fresh()->update(['meta' => $meta]);
+        $this->server->refresh();
+    }
+
+    /**
+     * Streaming output buffer for the active (or most recent) apply run. Empty list when no
+     * run is tracked or the cache TTL has lapsed.
+     *
+     * @return list<string>
+     */
+    public function getApplyOutputLinesProperty(): array
+    {
+        $runId = (string) data_get($this->server->meta ?? [], config('server_firewall.meta_apply_run_id_key'));
+        if ($runId === '') {
+            return [];
+        }
+        $payload = Cache::get((string) config('server_firewall.apply_output_cache_key_prefix', 'firewall_apply_output:').$runId);
+        if (! is_array($payload)) {
+            return [];
+        }
+        $lines = $payload['lines'] ?? [];
+
+        return is_array($lines) ? array_values(array_filter($lines, 'is_string')) : [];
+    }
+
+    /**
+     * Split an SSH command-output blob into transcript lines, dropping empty lines and
+     * capping the total so an enormous ufw status doesn't overwhelm the banner cache.
+     *
+     * @return list<string>
+     */
+    protected function splitOutputForBanner(string $blob, int $maxLines = 200): array
+    {
+        $lines = array_values(array_filter(
+            array_map('rtrim', preg_split("/\r?\n/", trim($blob)) ?: []),
+            static fn (string $l): bool => $l !== '',
+        ));
+
+        return count($lines) > $maxLines
+            ? array_merge(array_slice($lines, 0, $maxLines), [sprintf('… (%d more lines truncated)', count($lines) - $maxLines)])
+            : $lines;
     }
 
     public function refreshUfwStatus(ServerFirewallProvisioner $firewall): void
@@ -502,9 +635,25 @@ class WorkspaceFirewall extends Component
         try {
             $this->server->refresh();
             $this->ufw_status_text = $firewall->status($this->server);
-            $this->toastSuccess(__('Refreshed UFW status from the server.'));
+            $this->emitPanelEvent(
+                __('UFW status refreshed.'),
+                array_merge(
+                    ['> ufw status verbose against '.$this->server->getSshConnectionString().' …'],
+                    $this->splitOutputForBanner((string) $this->ufw_status_text),
+                ),
+                'completed',
+            );
+            $this->toastSuccess(__('Refreshed UFW status — see the banner for the host output.'));
         } catch (\Throwable $e) {
             $this->ufw_status_text = null;
+            $this->emitPanelEvent(
+                __('UFW status fetch failed.'),
+                [
+                    '> ufw status verbose against '.$this->server->getSshConnectionString().' …',
+                    '> ERROR: '.Str::limit(trim($e->getMessage()), 800),
+                ],
+                'failed',
+            );
             $this->toastError($e->getMessage());
         }
     }
@@ -519,8 +668,24 @@ class WorkspaceFirewall extends Component
         try {
             $this->server->refresh();
             $this->ufw_diagnostics_text = $firewall->diagnostics($this->server);
-            $this->ufw_diagnostics_modal_open = true;
+            $this->emitPanelEvent(
+                __('Firewall diagnostics complete.'),
+                array_merge(
+                    ['> ufw status verbose · numbered · ss -ltn · iptables -L INPUT against '.$this->server->getSshConnectionString().' …'],
+                    $this->splitOutputForBanner((string) $this->ufw_diagnostics_text, 400),
+                ),
+                'completed',
+            );
+            $this->toastSuccess(__('Diagnostics complete — see the banner for the full output.'));
         } catch (\Throwable $e) {
+            $this->emitPanelEvent(
+                __('Firewall diagnostics failed.'),
+                [
+                    '> diagnostics against '.$this->server->getSshConnectionString().' …',
+                    '> ERROR: '.Str::limit(trim($e->getMessage()), 800),
+                ],
+                'failed',
+            );
             $this->toastError($e->getMessage());
         }
     }

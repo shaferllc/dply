@@ -23,6 +23,7 @@ use App\Support\Servers\CacheServiceInstallScripts;
 use App\Support\Servers\CacheServiceKeyExplorer;
 use App\Support\Servers\CacheServiceKeyspaceSampler;
 use App\Support\Servers\CacheServiceMemoryConfig;
+use App\Support\Servers\CacheServicePort;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Contracts\View\View;
@@ -91,6 +92,9 @@ class WorkspaceCaches extends Component
 
     /** Form input for setting the AUTH password on the redis-family engine of the current tab. */
     public string $new_auth_password = '';
+
+    /** Form input for changing the listen port of the active instance on the current tab. */
+    public ?int $new_port = null;
 
     /**
      * Lazy-loaded snapshot of `CLIENT LIST` for redis-family engines.
@@ -559,7 +563,17 @@ class WorkspaceCaches extends Component
             }
 
             $row->update(['cancel_requested_at' => now()]);
-            $this->toastSuccess(__('Cancelling :engine — the job will stop at the next output chunk and apt-purge to revert.', ['engine' => $engine]));
+
+            $hasOtherInstances = ServerCacheService::query()
+                ->where('server_id', $this->server->id)
+                ->where('engine', $engine)
+                ->where('id', '!=', $row->id)
+                ->exists();
+
+            $this->toastSuccess($hasOtherInstances
+                ? __('Cancelling :engine — the job will stop at the next chunk and remove this instance only. The package stays because other :engine instances are still using it; remove them first if you want the package gone.', ['engine' => $engine])
+                : __('Cancelling :engine — the job will stop at the next chunk and apt-purge to revert.', ['engine' => $engine])
+            );
 
             return;
         }
@@ -1053,6 +1067,88 @@ class WorkspaceCaches extends Component
     }
 
     /**
+     * Change the listen port for the active instance on the current engine tab. Validates the
+     * port range, rejects collisions with other cache services on this server (the
+     * `unique(server_id, port)` constraint would otherwise blow up at the DB layer with an
+     * ugly error), and delegates the on-server work to {@see CacheServicePort} which handles
+     * config rewrite + restart + verify + revert. The DB row is updated only after the SSH
+     * verify succeeds, so a failed port change leaves the row pointing at the old port.
+     */
+    public function changeCachePort(CacheServicePort $portChanger, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to change its port.'));
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $this->validate([
+            'new_port' => ['required', 'integer', 'min:1024', 'max:65535'],
+        ], [], [
+            'new_port' => __('Port'),
+        ]);
+
+        $newPort = (int) $this->new_port;
+
+        if ($newPort === $row->port) {
+            $this->toastError(__('That is already the current port.'));
+
+            return;
+        }
+
+        $collision = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('port', $newPort)
+            ->where('id', '!=', $row->id)
+            ->first();
+        if ($collision !== null) {
+            $this->toastError(__('Port :port is already used by :other on this server.', [
+                'port' => $newPort,
+                'other' => $collision->engine.' '.$collision->name,
+            ]));
+
+            return;
+        }
+
+        $oldPort = $row->port;
+
+        try {
+            $portChanger->changePort($row->server, $row, $newPort);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $row->update(['port' => $newPort]);
+        $this->new_port = null;
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
+            ['engine' => $row->engine, 'name' => $row->name, 'old_port' => $oldPort, 'new_port' => $newPort],
+            auth()->user(),
+        );
+        $this->forgetStats($row);
+
+        $this->toastSuccess(__(':engine moved to port :port.', ['engine' => $row->engine, 'port' => $newPort]));
+    }
+
+    /**
      * Run a single redis-cli command from the workspace REPL. Read-only commands run
      * unconditionally. Mutating commands require the unlock toggle. A small set of
      * disruptive verbs (SHUTDOWN, MIGRATE, REPLICAOF, etc.) are blocked outright —
@@ -1447,9 +1543,11 @@ class WorkspaceCaches extends Component
     /**
      * Start a bounded MONITOR tail on the active instance. Generates a fresh
      * run ID (ULID-shaped string), dispatches the queued tail job, and the
-     * polling Blade picks up the cache-buffer payload from there. Gated by
-     * the existing REPL unlock toggle: MONITOR is technically read-only but
-     * costs Redis CPU on a hot cache, worth an explicit operator confirm.
+     * polling Blade picks up the cache-buffer payload from there.
+     *
+     * MONITOR is read-only so we don't gate it on the REPL unlock toggle. The
+     * window picker (5/10/30 s) plus the explainer already cover the CPU-cost
+     * caveat for hot caches.
      */
     public function startMonitor(int $durationSeconds = 10): void
     {
@@ -1457,12 +1555,6 @@ class WorkspaceCaches extends Component
 
         $row = $this->resolveKeyBrowserRow();
         if (! $row) {
-            return;
-        }
-
-        if (! $this->replUnlocked) {
-            $this->toastError(__('Locked — flip the unlock toggle in the Console sub-tab to start MONITOR.'));
-
             return;
         }
 

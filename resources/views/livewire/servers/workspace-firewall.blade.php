@@ -51,19 +51,125 @@
                 id="firewall-panel-rules"
                 labelled-by="firewall-tab-rules"
                 :hidden="$firewall_workspace_tab !== 'rules'"
+                panel-class="space-y-6"
             >
+        @php
+            $ruleCount = $server->firewallRules->count();
+            $enabledRuleCount = $server->firewallRules->where('enabled', true)->count();
+            $lastApplyLog = \App\Models\ServerFirewallApplyLog::query()
+                ->where('server_id', $server->id)
+                ->orderByDesc('id')
+                ->first();
+        @endphp
+
+        {{-- Workspace-wide console banner. Currently surfaces panel events from add/update/
+             remove (via the EmitsPanelEvent trait). Phase 2 will hook the apply/diagnostics
+             flows in here too once they queue. --}}
+        {{-- Optimistic running banners — wire:loading shows them only while their target
+             action is in flight. As soon as the request returns, these hide and the real
+             panel-event banner below takes over with the actual transcript. --}}
+        <div wire:loading wire:target="applyFirewall">
+            <x-workspace-console-banner
+                status="running"
+                :message="__('Applying firewall to :host …', ['host' => $server->getSshConnectionString()])"
+                :subtitle="__('Running ufw allow / deny / reload over SSH. Output will appear when it returns.')"
+                :output="[]"
+                :busy="true"
+                :default-expanded="false"
+                :dismiss-action="null"
+            />
+        </div>
+        <div wire:loading wire:target="refreshUfwStatus">
+            <x-workspace-console-banner
+                status="running"
+                :message="__('Reading UFW status from :host …', ['host' => $server->getSshConnectionString()])"
+                :subtitle="__('Running ufw status verbose over SSH.')"
+                :output="[]"
+                :busy="true"
+                :default-expanded="false"
+                :dismiss-action="null"
+            />
+        </div>
+        <div wire:loading wire:target="runFirewallDiagnostics">
+            <x-workspace-console-banner
+                status="running"
+                :message="__('Running firewall diagnostics on :host …', ['host' => $server->getSshConnectionString()])"
+                :subtitle="__('Running ufw status verbose · numbered · ss -ltn · iptables -L INPUT.')"
+                :output="[]"
+                :busy="true"
+                :default-expanded="false"
+                :dismiss-action="null"
+            />
+        </div>
+
+        {{-- Real result banner — populated by emitPanelEvent in the Livewire methods. Hidden
+             while any of the long actions is in flight to avoid showing stale data alongside
+             the optimistic running banner above. --}}
+        @if (! empty($panel_event_lines))
+            <div wire:loading.remove wire:target="applyFirewall,refreshUfwStatus,runFirewallDiagnostics">
+                @php
+                    $panelSubtitle = match ($panel_event_status) {
+                        'failed' => null,
+                        default => __('The host firewall was touched. Output below — dismiss when you\'re done reading.'),
+                    };
+                @endphp
+                <x-workspace-console-banner
+                    :status="$panel_event_status"
+                    :message="$panel_event_message"
+                    :subtitle="$panelSubtitle"
+                    :output="$panel_event_lines"
+                    :busy="false"
+                    dismiss-action="dismissPanelBanner"
+                    :default-expanded="true"
+                />
+            </div>
+        @endif
+
         <div class="{{ $card }} overflow-hidden">
-                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+                    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                         <div class="flex min-w-0 items-start gap-3">
-                            <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest ring-1 ring-brand-forest/20">
+                            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
                                 <x-heroicon-o-shield-check class="h-5 w-5" />
                             </span>
                             <div class="min-w-0">
                                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
-                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Stored in Dply, applied to the server with UFW.') }}</p>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stored in Dply, applied to the server with UFW.') }}</p>
+                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                        {{ trans_choice('{0} no rules tracked|{1} :count rule tracked|[2,*] :count rules tracked', $ruleCount, ['count' => $ruleCount]) }}
+                                        @if ($enabledRuleCount !== $ruleCount && $ruleCount > 0)
+                                            ({{ __(':count enabled', ['count' => $enabledRuleCount]) }})
+                                        @endif
+                                    </span>
+                                    @if ($lastApplyLog)
+                                        <span class="text-brand-mist/60">·</span>
+                                        <span class="inline-flex items-center gap-1">
+                                            @if ($lastApplyLog->status === 'success')
+                                                <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
+                                                {{ __('applied :time', ['time' => $lastApplyLog->created_at?->diffForHumans()]) }}
+                                            @else
+                                                <x-heroicon-o-exclamation-triangle class="h-3 w-3 text-rose-600" />
+                                                {{ __('last apply failed :time', ['time' => $lastApplyLog->created_at?->diffForHumans()]) }}
+                                            @endif
+                                        </span>
+                                    @else
+                                        <span class="text-brand-mist/60">·</span>
+                                        <span>{{ __('not yet applied') }}</span>
+                                    @endif
+                                </div>
                             </div>
                         </div>
-                        <div class="flex shrink-0 flex-wrap gap-2">
+                        <div class="flex shrink-0 flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                x-on:click="$wire.cancelEditRule(); $dispatch('open-modal', 'add-firewall-rule-modal')"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                            >
+                                <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                {{ __('Add a rule') }}
+                            </button>
+                            <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
                             <button
                                 type="button"
                                 wire:click="applyFirewall({{ $applyFirewallConfirmMessage !== '' ? 'true' : 'false' }})"
@@ -71,41 +177,44 @@
                                     wire:confirm="{{ $applyFirewallConfirmMessage }}"
                                 @endif
                                 wire:loading.attr="disabled"
-                                class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3.5 py-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-50"
+                                wire:target="applyFirewall"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <x-heroicon-o-bolt wire:loading.remove wire:target="applyFirewall" class="h-3.5 w-3.5" />
-                                <span wire:loading.remove wire:target="applyFirewall">{{ __('Apply rules') }}</span>
-                                <span wire:loading wire:target="applyFirewall" class="inline-flex items-center gap-1.5">
-                                    <x-spinner variant="cream" size="sm" />
-                                    {{ __('Applying…') }}
+                                <span wire:loading wire:target="applyFirewall" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <x-spinner variant="forest" size="sm" />
                                 </span>
+                                <span wire:loading.remove wire:target="applyFirewall">{{ __('Apply rules') }}</span>
+                                <span wire:loading wire:target="applyFirewall">{{ __('Applying…') }}</span>
                             </button>
                             <button
                                 type="button"
                                 wire:click="refreshUfwStatus"
                                 wire:loading.attr="disabled"
-                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                                wire:target="refreshUfwStatus,applyFirewall"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <x-heroicon-o-arrow-path wire:loading.remove wire:target="refreshUfwStatus" class="h-3.5 w-3.5" />
-                                <span wire:loading.remove wire:target="refreshUfwStatus">{{ __('Refresh status') }}</span>
-                                <span wire:loading wire:target="refreshUfwStatus" class="inline-flex items-center gap-1.5">
+                                <span wire:loading wire:target="refreshUfwStatus" class="inline-flex h-3.5 w-3.5 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
-                                    {{ __('Reading…') }}
                                 </span>
+                                <span wire:loading.remove wire:target="refreshUfwStatus">{{ __('Refresh status') }}</span>
+                                <span wire:loading wire:target="refreshUfwStatus">{{ __('Reading…') }}</span>
                             </button>
                             <button
                                 type="button"
                                 wire:click="runFirewallDiagnostics"
                                 wire:loading.attr="disabled"
+                                wire:target="runFirewallDiagnostics,applyFirewall"
                                 title="{{ __('Run ufw status verbose, status numbered, ss -ltn, and iptables -L INPUT on the server.') }}"
-                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <x-heroicon-o-command-line wire:loading.remove wire:target="runFirewallDiagnostics" class="h-3.5 w-3.5" />
-                                <span wire:loading.remove wire:target="runFirewallDiagnostics">{{ __('Diagnostics') }}</span>
-                                <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex items-center gap-1.5">
+                                <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex h-3.5 w-3.5 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
-                                    {{ __('Running…') }}
                                 </span>
+                                <span wire:loading.remove wire:target="runFirewallDiagnostics">{{ __('Diagnostics') }}</span>
+                                <span wire:loading wire:target="runFirewallDiagnostics">{{ __('Running…') }}</span>
                             </button>
                         </div>
                     </div>
@@ -143,10 +252,13 @@
                         </div>
                     @endif
 
-                    <div class="px-6 py-5 sm:px-8 sm:py-6">
+                    <div>
 
             @if ($server->firewallRules->isNotEmpty())
-                        <div class="mt-6 flex flex-wrap items-center gap-2">
+                        {{-- Bulk-action strip: tinted bg + horizontal rule above and below so it
+                             reads as a distinct toolbar between the trigger header and the rules
+                             table, rather than floating mid-card. --}}
+                        <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-8">
                             <span class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Bulk') }}</span>
                             <button
                                 type="button"
@@ -221,7 +333,7 @@
                                 </span>
                             </button>
                         </div>
-                        <div class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10">
+                        <div class="mx-6 mt-5 mb-6 overflow-x-auto rounded-xl border border-brand-ink/10 sm:mx-8">
                             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                                 <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
                                     <tr>
@@ -286,6 +398,7 @@
                                                         type="button"
                                                         wire:click="startEditRule('{{ $fr->id }}')"
                                                         wire:loading.attr="disabled"
+                                                        x-on:click="$dispatch('open-modal', 'add-firewall-rule-modal')"
                                                         class="text-xs font-medium text-brand-forest hover:underline"
                                                     >
                                                         <span wire:loading.remove wire:target="startEditRule('{{ $fr->id }}')">{{ __('Edit') }}</span>
@@ -314,206 +427,165 @@
                             </table>
                         </div>
                     @else
-                        <p class="mt-6 text-sm text-brand-moss">{{ __('No rules yet. Add one below or start from a template.') }}</p>
-                    @endif
-
-                    <div class="mt-8 border-t border-brand-ink/10 pt-6">
-                        <h3 class="text-sm font-semibold text-brand-ink">
-                            @if ($editing_rule_id)
-                                {{ __('Edit rule') }}
-                            @else
-                                {{ __('Add rule') }}
-                            @endif
-                        </h3>
-                        @if (! $editing_rule_id)
-                            <p class="mt-3 text-xs font-medium uppercase tracking-wide text-brand-moss">
-                                {{ __('Quick presets') }}
-                            </p>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                @foreach (config('server_firewall.presets', []) as $presetKey => $preset)
-                                    <button
-                                        type="button"
-                                        wire:click="useFirewallPreset('{{ $presetKey }}')"
-                                        class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/60"
-                                    >
-                                        {{ __($preset['label'] ?? $presetKey) }}
-                                    </button>
-                                @endforeach
-                            </div>
-                        @endif
-                        @php
-                            $hasAdvanced = trim((string) ($form->name ?? '')) !== ''
-                                || trim((string) ($form->profile ?? '')) !== ''
-                                || trim((string) ($form->tags ?? '')) !== ''
-                                || trim((string) ($form->runbook_url ?? '')) !== ''
-                                || trim((string) ($form->site_id ?? '')) !== '';
-                        @endphp
-                        <form wire:submit="saveFirewallRule" class="mt-4 space-y-4">
-                            {{-- Essentials: Port · Protocol · Action on one row, Source on the next. --}}
-                            <div class="grid gap-3 sm:grid-cols-3">
-                                @if (! in_array($form->protocol, ['icmp', 'ipv6-icmp'], true))
-                                    <div>
-                                        <x-input-label for="fw-port" :value="__('Port')" />
-                                        <x-text-input id="fw-port" type="number" class="mt-1 block w-full" wire:model="form.port" min="1" max="65535" />
-                                        <x-input-error :messages="$errors->get('form.port')" class="mt-1" />
-                                    </div>
-                                @endif
-                                <div @class([
-                                    'sm:col-span-1' => ! in_array($form->protocol, ['icmp', 'ipv6-icmp'], true),
-                                    'sm:col-span-2' => in_array($form->protocol, ['icmp', 'ipv6-icmp'], true),
-                                ])>
-                                    <x-input-label for="fw-proto" :value="__('Protocol')" />
-                                    <select id="fw-proto" wire:model.live="form.protocol" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
-                                        <option value="tcp">TCP</option>
-                                        <option value="udp">UDP</option>
-                                        <option value="icmp">ICMP (IPv4)</option>
-                                        <option value="ipv6-icmp">{{ __('ICMPv6') }}</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <x-input-label for="fw-action" :value="__('Action')" />
-                                    <select id="fw-action" wire:model="form.action" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
-                                        <option value="allow">{{ __('Allow') }}</option>
-                                        <option value="deny">{{ __('Deny') }}</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div>
-                                <x-input-label for="fw-source" :value="__('Source')" />
-                                <x-text-input id="fw-source" type="text" class="mt-1 block w-full font-mono text-sm" wire:model="form.source" placeholder="any" autocomplete="off" />
-                                <p class="mt-1 text-xs text-brand-moss">{{ __('Use :keyword for any host, or an IPv4/IPv6 address or CIDR.', ['keyword' => 'any']) }}</p>
-                                <x-input-error :messages="$errors->get('form.source')" class="mt-1" />
-                            </div>
-
-                            <label class="flex items-center gap-2 text-sm">
-                                <input id="fw-enabled" type="checkbox" wire:model="form.enabled" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest" />
-                                <span>{{ __('Enabled (included when applying)') }}</span>
-                            </label>
-
-                            {{-- Advanced — label / profile / tags / runbook / related site. Auto-opens
-                                 when any of these have content (e.g. when editing an existing rule). --}}
-                            <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3" @if ($hasAdvanced) open @endif>
-                                <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wide text-brand-mist">
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <x-heroicon-o-chevron-down class="h-3.5 w-3.5" />
-                                        {{ __('Advanced — naming, tags, runbook, related site') }}
-                                    </span>
-                                </summary>
-                                <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                                    <div class="sm:col-span-2">
-                                        <x-input-label for="fw-name" :value="__('Label (optional)')" />
-                                        <x-text-input id="fw-name" type="text" class="mt-1 block w-full" wire:model="form.name" placeholder="{{ __('e.g. Monitoring, Office VPN') }}" />
-                                        <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
-                                    </div>
-                                    <div>
-                                        <x-input-label for="fw-profile" :value="__('Profile (optional)')" />
-                                        <x-text-input id="fw-profile" type="text" class="mt-1 block w-full" wire:model="form.profile" placeholder="{{ __('web, db, admin…') }}" />
-                                        <x-input-error :messages="$errors->get('form.profile')" class="mt-1" />
-                                    </div>
-                                    <div>
-                                        <x-input-label for="fw-tags" :value="__('Tags (comma-separated)')" />
-                                        <x-text-input id="fw-tags" type="text" class="mt-1 block w-full" wire:model="form.tags" placeholder="{{ __('monitoring, prod, …') }}" />
-                                        <x-input-error :messages="$errors->get('form.tags')" class="mt-1" />
-                                    </div>
-                                    <div class="sm:col-span-2">
-                                        <x-input-label for="fw-runbook" :value="__('Runbook URL (optional)')" />
-                                        <x-text-input id="fw-runbook" type="url" class="mt-1 block w-full" wire:model="form.runbook_url" placeholder="https://…" />
-                                        <x-input-error :messages="$errors->get('form.runbook_url')" class="mt-1" />
-                                    </div>
-                                    <div class="sm:col-span-2">
-                                        <x-input-label for="fw-site" :value="__('Related site (optional)')" />
-                                        <select id="fw-site" wire:model="form.site_id" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
-                                            <option value="">{{ __('— None —') }}</option>
-                                            @foreach ($server->sites as $site)
-                                                <option value="{{ $site->id }}">{{ $site->name }}</option>
-                                            @endforeach
-                                        </select>
-                                        <x-input-error :messages="$errors->get('form.site_id')" class="mt-1" />
-                                    </div>
-                                </div>
-                            </details>
-
-                            <div class="flex flex-wrap items-end gap-2 border-t border-brand-ink/5 pt-4">
-                                @if ($editing_rule_id)
-                                    <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
-                                        <span wire:loading.remove wire:target="saveFirewallRule">{{ __('Save changes') }}</span>
-                                        <span wire:loading wire:target="saveFirewallRule">{{ __('Saving…') }}</span>
-                                    </x-primary-button>
-                                    <button type="button" wire:click="cancelEditRule" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm">
-                                        {{ __('Cancel') }}
-                                    </button>
-                                @else
-                                    <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
-                                        <span wire:loading.remove wire:target="saveFirewallRule">{{ __('Add rule') }}</span>
-                                        <span wire:loading wire:target="saveFirewallRule">{{ __('Saving…') }}</span>
-                                    </x-primary-button>
-                                @endif
-                            </div>
-                        </form>
-                    </div>
-
-                    @if ($ufw_status_text !== null && $ufw_status_text !== '')
-                        <div class="mt-8 overflow-hidden rounded-2xl border border-brand-ink/10">
-                            <div class="flex items-center gap-2 border-b border-brand-ink/10 bg-zinc-50 px-5 py-3 text-sm font-medium text-brand-ink">
-                                <x-heroicon-o-shield-check class="h-4 w-4 text-brand-mist" />
-                                {{ __('UFW status') }}
-                            </div>
-                            <pre class="max-h-96 overflow-x-auto bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">{{ $ufw_status_text }}</pre>
+                        <div class="px-6 py-8 text-center sm:px-8">
+                            <p class="text-sm text-brand-moss">{{ __('No rules yet. Click "Add a rule" or start from a template.') }}</p>
                         </div>
                     @endif
-                    </div>
-                </div>
 
-                {{-- Full diagnostics modal — runs ufw status verbose/numbered + ss + iptables. --}}
-                @if ($ufw_diagnostics_modal_open)
-                    @teleport('body')
-                    <div
-                        class="fixed inset-0 z-[100] overflow-y-auto"
-                        role="dialog"
-                        aria-modal="true"
-                        x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.diagPre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
-                        x-on:keydown.escape.window="$wire.closeFirewallDiagnostics()"
-                    >
-                        <div class="fixed inset-0 z-0 bg-brand-ink/55 backdrop-blur-sm" wire:click="closeFirewallDiagnostics"></div>
-                        <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-6">
-                            <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl" @click.stop>
-                                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
-                                    <div class="min-w-0">
-                                        <div class="flex items-center gap-2">
-                                            <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest ring-1 ring-brand-forest/20">
-                                                <x-heroicon-o-command-line class="h-5 w-5" />
-                                            </span>
-                                            <div class="min-w-0">
-                                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Firewall diagnostics') }}</h2>
-                                                <p class="text-xs text-brand-moss">{{ __('Live snapshot from the server: ufw status verbose · numbered · ss -ltn · iptables -L INPUT.') }}</p>
-                                            </div>
+                    @php
+                        $hasAdvanced = trim((string) ($form->name ?? '')) !== ''
+                            || trim((string) ($form->profile ?? '')) !== ''
+                            || trim((string) ($form->tags ?? '')) !== ''
+                            || trim((string) ($form->runbook_url ?? '')) !== ''
+                            || trim((string) ($form->site_id ?? '')) !== '';
+                    @endphp
+
+                    {{-- Add / Edit rule modal. Triggered by the "Add a rule" button on the trigger
+                         card and by the per-row "Edit" button (which sets editing_rule_id first,
+                         then opens this modal). Closes on successful saveFirewallRule (Livewire
+                         dispatches close-modal from the action). --}}
+                    <x-modal name="add-firewall-rule-modal" maxWidth="3xl" overlayClass="bg-brand-ink/40">
+                        <div class="border-b border-brand-ink/10 px-6 py-5">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Firewall rule') }}</p>
+                            <h2 class="mt-2 text-xl font-semibold text-brand-ink">
+                                @if ($editing_rule_id)
+                                    {{ __('Edit firewall rule') }}
+                                @else
+                                    {{ __('Add a firewall rule') }}
+                                @endif
+                            </h2>
+                            <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                {{ __('Saved here · only written to the host on Apply.') }}
+                            </p>
+                        </div>
+
+                        <div class="px-6 py-6">
+                            @if (! $editing_rule_id)
+                                <p class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Quick presets') }}</p>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    @foreach (config('server_firewall.presets', []) as $presetKey => $preset)
+                                        <button
+                                            type="button"
+                                            wire:click="useFirewallPreset('{{ $presetKey }}')"
+                                            class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/60"
+                                        >
+                                            {{ __($preset['label'] ?? $presetKey) }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            <form wire:submit="saveFirewallRule" id="add-firewall-rule-form" class="@if (! $editing_rule_id) mt-5 @endif space-y-4">
+                                {{-- Essentials: Port · Protocol · Action on one row, Source on the next. --}}
+                                <div class="grid gap-3 sm:grid-cols-3">
+                                    @if (! in_array($form->protocol, ['icmp', 'ipv6-icmp'], true))
+                                        <div>
+                                            <x-input-label for="fw-port" :value="__('Port')" />
+                                            <x-text-input id="fw-port" type="number" class="mt-1 block w-full" wire:model="form.port" min="1" max="65535" />
+                                            <x-input-error :messages="$errors->get('form.port')" class="mt-1" />
+                                        </div>
+                                    @endif
+                                    <div @class([
+                                        'sm:col-span-1' => ! in_array($form->protocol, ['icmp', 'ipv6-icmp'], true),
+                                        'sm:col-span-2' => in_array($form->protocol, ['icmp', 'ipv6-icmp'], true),
+                                    ])>
+                                        <x-input-label for="fw-proto" :value="__('Protocol')" />
+                                        <select id="fw-proto" wire:model.live="form.protocol" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
+                                            <option value="tcp">TCP</option>
+                                            <option value="udp">UDP</option>
+                                            <option value="icmp">ICMP (IPv4)</option>
+                                            <option value="ipv6-icmp">{{ __('ICMPv6') }}</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <x-input-label for="fw-action" :value="__('Action')" />
+                                        <select id="fw-action" wire:model="form.action" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
+                                            <option value="allow">{{ __('Allow') }}</option>
+                                            <option value="deny">{{ __('Deny') }}</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="fw-source" :value="__('Source')" />
+                                    <x-text-input id="fw-source" type="text" class="mt-1 block w-full font-mono text-sm" wire:model="form.source" placeholder="any" autocomplete="off" />
+                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Use :keyword for any host, or an IPv4/IPv6 address or CIDR.', ['keyword' => 'any']) }}</p>
+                                    <x-input-error :messages="$errors->get('form.source')" class="mt-1" />
+                                </div>
+
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input id="fw-enabled" type="checkbox" wire:model="form.enabled" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest" />
+                                    <span>{{ __('Enabled (included when applying)') }}</span>
+                                </label>
+
+                                {{-- Advanced — label / profile / tags / runbook / related site. Auto-opens
+                                     when any of these have content (e.g. when editing an existing rule). --}}
+                                <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3" @if ($hasAdvanced) open @endif>
+                                    <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wide text-brand-mist">
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <x-heroicon-o-chevron-down class="h-3.5 w-3.5" />
+                                            {{ __('Advanced — naming, tags, runbook, related site') }}
+                                        </span>
+                                    </summary>
+                                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                        <div class="sm:col-span-2">
+                                            <x-input-label for="fw-name" :value="__('Label (optional)')" />
+                                            <x-text-input id="fw-name" type="text" class="mt-1 block w-full" wire:model="form.name" placeholder="{{ __('e.g. Monitoring, Office VPN') }}" />
+                                            <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="fw-profile" :value="__('Profile (optional)')" />
+                                            <x-text-input id="fw-profile" type="text" class="mt-1 block w-full" wire:model="form.profile" placeholder="{{ __('web, db, admin…') }}" />
+                                            <x-input-error :messages="$errors->get('form.profile')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="fw-tags" :value="__('Tags (comma-separated)')" />
+                                            <x-text-input id="fw-tags" type="text" class="mt-1 block w-full" wire:model="form.tags" placeholder="{{ __('monitoring, prod, …') }}" />
+                                            <x-input-error :messages="$errors->get('form.tags')" class="mt-1" />
+                                        </div>
+                                        <div class="sm:col-span-2">
+                                            <x-input-label for="fw-runbook" :value="__('Runbook URL (optional)')" />
+                                            <x-text-input id="fw-runbook" type="url" class="mt-1 block w-full" wire:model="form.runbook_url" placeholder="https://…" />
+                                            <x-input-error :messages="$errors->get('form.runbook_url')" class="mt-1" />
+                                        </div>
+                                        <div class="sm:col-span-2">
+                                            <x-input-label for="fw-site" :value="__('Related site (optional)')" />
+                                            <select id="fw-site" wire:model="form.site_id" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
+                                                <option value="">{{ __('— None —') }}</option>
+                                                @foreach ($server->sites as $site)
+                                                    <option value="{{ $site->id }}">{{ $site->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <x-input-error :messages="$errors->get('form.site_id')" class="mt-1" />
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <button type="button" wire:click="runFirewallDiagnostics" wire:loading.attr="disabled" wire:target="runFirewallDiagnostics" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-arrow-path wire:loading.remove wire:target="runFirewallDiagnostics" class="h-3.5 w-3.5" />
-                                            <span wire:loading.remove wire:target="runFirewallDiagnostics">{{ __('Re-run') }}</span>
-                                            <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex items-center gap-1.5">
-                                                <x-spinner variant="forest" size="sm" />
-                                                {{ __('Running…') }}
-                                            </span>
-                                        </button>
-                                        <button type="button" x-on:click="copy()" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <template x-if="!copied"><span class="inline-flex items-center gap-1.5"><x-heroicon-o-clipboard class="h-3.5 w-3.5" />{{ __('Copy') }}</span></template>
-                                            <template x-if="copied"><span class="inline-flex items-center gap-1.5 text-emerald-700"><x-heroicon-m-check class="h-3.5 w-3.5" />{{ __('Copied') }}</span></template>
-                                        </button>
-                                        <button type="button" wire:click="closeFirewallDiagnostics" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-mist transition hover:border-brand-ink/20 hover:bg-brand-sand/40 hover:text-brand-ink" aria-label="{{ __('Close') }}">
-                                            <x-heroicon-m-x-mark class="h-5 w-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <pre x-ref="diagPre" class="flex-1 min-h-0 overflow-auto whitespace-pre bg-zinc-950 px-6 py-5 font-mono text-xs leading-relaxed text-zinc-100">{{ $ufw_diagnostics_text }}</pre>
-                            </div>
+                                </details>
+                            </form>
                         </div>
+
+                        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                            @if ($editing_rule_id)
+                                <x-secondary-button type="button" wire:click="cancelEditRule" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                                <x-primary-button type="submit" form="add-firewall-rule-form" wire:loading.attr="disabled" wire:target="saveFirewallRule">
+                                    <span wire:loading.remove wire:target="saveFirewallRule">{{ __('Save changes') }}</span>
+                                    <span wire:loading wire:target="saveFirewallRule">{{ __('Saving…') }}</span>
+                                </x-primary-button>
+                            @else
+                                <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                                <x-primary-button type="submit" form="add-firewall-rule-form" wire:loading.attr="disabled" wire:target="saveFirewallRule">
+                                    <span wire:loading.remove wire:target="saveFirewallRule">{{ __('Add rule') }}</span>
+                                    <span wire:loading wire:target="saveFirewallRule">{{ __('Saving…') }}</span>
+                                </x-primary-button>
+                            @endif
+                        </div>
+                    </x-modal>
+
+                    {{-- UFW status + diagnostics output is now surfaced through the workspace
+                         console banner above (Refresh status / Diagnostics actions populate it
+                         via emitPanelEvent). The previous inline `<pre>` and full-page modal
+                         have been removed in favor of the shared banner pattern. --}}
                     </div>
-                    @endteleport
-                @endif
+                </div>
 
                 {{-- Listening ports — what's actually bound on the host right
                      now, sourced from the inventory probe. Useful context
@@ -640,8 +712,29 @@
                 :hidden="$firewall_workspace_tab !== 'audit'"
             >
                 <div class="{{ $card }} p-6 sm:p-8">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent audit') }}</h2>
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('Track recent firewall changes, template applications, and apply activity for this server.') }}</p>
+                    @php
+                        $firewallAuditCount = $auditEvents->count();
+                        $latestFirewallAudit = $auditEvents->first()?->created_at;
+                    @endphp
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                            <x-heroicon-o-clock class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent audit') }}</h2>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Track recent firewall changes, template applications, and apply activity for this server.') }}</p>
+                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                    {{ trans_choice('{0} no events recorded|{1} :count event recorded|[2,*] :count events recorded', $firewallAuditCount, ['count' => $firewallAuditCount]) }}
+                                </span>
+                                @if ($latestFirewallAudit)
+                                    <span class="text-brand-mist/60">·</span>
+                                    <span>{{ __('latest :time', ['time' => $latestFirewallAudit->diffForHumans()]) }}</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
 
                     @if ($auditEvents->isNotEmpty())
                         <ul class="mt-6 space-y-2 text-sm text-brand-moss">

@@ -43,6 +43,8 @@ class ServerCacheServiceAuditEvent extends Model
 
     public const EVENT_MEMORY_UPDATED = 'cache_service_memory_updated';
 
+    public const EVENT_PORT_CHANGED = 'cache_service_port_changed';
+
     public const EVENT_SWITCHED = 'cache_service_switched';
 
     public const EVENT_SWITCH_FAILED = 'cache_service_switch_failed';

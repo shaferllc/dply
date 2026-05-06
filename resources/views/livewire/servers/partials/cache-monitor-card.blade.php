@@ -37,7 +37,7 @@
     <x-explainer class="mt-4" tone="warn">
         <p>{{ __('MONITOR is read-only — it doesn\'t change keys — but it forces the engine to copy every command across all connections to this client. On a hot cache that costs a meaningful slice of CPU, so use a short window (5–30 s).') }}</p>
         <p>{{ __('Output is bounded at 500 lines (oldest dropped). The window stops itself even if the browser tab is closed; the audit log records the started + completed event with the line count.') }}</p>
-        <p>{{ __('Requires the unlock toggle in the Console sub-tab so the cost is an explicit choice.') }}</p>
+        <p>{{ __('Pick a short window — auto-stops when it ends.') }}</p>
     </x-explainer>
 
     @if (! $running)
@@ -47,25 +47,36 @@
                 <button
                     type="button"
                     wire:click="startMonitor({{ $opt }})"
-                    @disabled(! $replUnlocked)
-                    @class([
-                        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium',
-                        'border-brand-forest/30 bg-brand-forest/10 text-brand-forest hover:bg-brand-forest/15' => $replUnlocked,
-                        'cursor-not-allowed border-brand-ink/15 bg-brand-sand/30 text-brand-mist' => ! $replUnlocked,
-                    ])
+                    wire:loading.attr="disabled"
+                    wire:target="startMonitor"
+                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-forest/30 bg-brand-forest/10 px-2.5 py-1.5 text-xs font-medium text-brand-forest hover:bg-brand-forest/15 disabled:opacity-50"
                 >
-                    <x-heroicon-o-play class="h-3 w-3" />
-                    {{ __(':n s', ['n' => $opt]) }}
+                    <span wire:loading.remove wire:target="startMonitor({{ $opt }})" class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-play class="h-3 w-3" />
+                        {{ __(':n s', ['n' => $opt]) }}
+                    </span>
+                    <span wire:loading wire:target="startMonitor({{ $opt }})" class="inline-flex items-center gap-1.5">
+                        <x-spinner variant="forest" />
+                        {{ __('Starting…') }}
+                    </span>
                 </button>
             @endforeach
-            @if (! $replUnlocked)
-                <span class="text-xs text-brand-mist">{{ __('— unlock the Console toggle to enable.') }}</span>
-            @endif
         </div>
     @else
-        <div wire:poll.1000ms="pollMonitorOutput" class="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-            <x-spinner variant="forest" />
-            <span>{{ __('MONITOR running for :n seconds — chunks stream below as Redis emits them.', ['n' => $duration]) }}</span>
+        <div wire:poll.1000ms="pollMonitorOutput" class="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            <span class="inline-flex items-center gap-2">
+                <x-spinner variant="forest" />
+                <span>{{ __('MONITOR running for :n seconds — chunks stream below as Redis emits them.', ['n' => $duration]) }}</span>
+            </span>
+            <button
+                type="button"
+                wire:click="clearMonitorOutput"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-sky-300 bg-white px-2 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-100"
+                title="{{ __('Stop watching this run. The window itself auto-completes server-side.') }}"
+            >
+                <x-heroicon-o-stop-circle class="h-3 w-3" />
+                {{ __('Stop') }}
+            </button>
         </div>
     @endif
 
@@ -84,7 +95,11 @@
         @if ($error)
             <p class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $error }}</p>
         @elseif ($status === 'completed')
-            <p class="mt-3 text-xs text-brand-moss">{{ __('Window ended. Captured :n lines.', ['n' => count($lines)]) }}</p>
+            @if (count($lines) === 0)
+                <p class="mt-3 text-xs text-brand-moss">{{ __('Window ended with no traffic captured. Trigger something against this engine (run a command in the Console subtab, hit your app, etc.) and start another window to see it stream in.') }}</p>
+            @else
+                <p class="mt-3 text-xs text-brand-moss">{{ __('Window ended. Captured :n lines.', ['n' => count($lines)]) }}</p>
+            @endif
         @endif
     @endif
 </div>

@@ -82,11 +82,21 @@
                                 <span wire:loading wire:target="cancelCacheServiceChange">{{ __('Cancelling…') }}</span>
                             </button>
                         @elseif ($busyService->status === \App\Models\ServerCacheService::STATUS_INSTALLING && $busyService->cancel_requested_at === null)
+                            @php
+                                $hasOtherInstancesOfBusyEngine = \App\Models\ServerCacheService::query()
+                                    ->where('server_id', $this->server->id)
+                                    ->where('engine', $busyService->engine)
+                                    ->where('id', '!=', $busyService->id)
+                                    ->exists();
+                                $cancelMessage = $hasOtherInstancesOfBusyEngine
+                                    ? __('Stops the install at the next output chunk, removes this instance\'s systemd unit and config, and deletes the row. The :engine package stays installed because another instance is still using it — uninstall the other instance(s) first if you want it gone.', ['engine' => $busyService->engine])
+                                    : __('Stops the install at the next output chunk, runs dpkg --configure -a + apt purge to clean up whatever apt left behind, and removes the row. Apt-purge takes a minute or two.');
+                            @endphp
                             <button
                                 type="button"
-                                wire:click="openConfirmActionModal('cancelCacheServiceChange', ['{{ $busyService->engine }}'], @js(__('Cancel install and revert?')), @js(__('Dply will stop the install at the next output chunk, run dpkg --configure -a + apt purge to clean up whatever apt left behind, and remove the row. Apt-purge takes a minute or two.')), @js(__('Cancel and revert')), true)"
+                                wire:click="openConfirmActionModal('cancelCacheServiceChange', ['{{ $busyService->engine }}'], @js(__('Cancel install and revert?')), @js($cancelMessage), @js(__('Cancel and revert')), true)"
                                 class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-300/70 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 shadow-sm hover:bg-rose-50"
-                                title="{{ __('Stop the install and apt-purge to revert.') }}"
+                                title="{{ __('Stop the install and revert this instance.') }}"
                             >
                                 <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
                                 {{ __('Cancel & revert') }}
@@ -378,67 +388,14 @@
                 :hidden="$workspace_tab !== $engine"
                 panel-class="space-y-8"
             >
-                {{-- Engine information card (always present, regardless of install state). --}}
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <h2 class="text-xl font-semibold text-brand-ink">{{ $info['label'] }}</h2>
-                            <p class="mt-1 text-sm text-brand-moss">{{ $info['tagline'] }}</p>
-                        </div>
-                        @if ($row)
-                            <span class="inline-flex h-fit items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                                <x-heroicon-o-check-circle class="h-3.5 w-3.5" />
-                                {{ __('Installed on this server') }}
-                            </span>
-                        @endif
-                    </div>
-
-                    <p class="mt-4 text-sm leading-relaxed text-brand-ink/85">{{ $info['description'] }}</p>
-
-                    <dl class="mt-6 grid gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('License') }}</dt>
-                            <dd class="mt-1 text-xs text-brand-ink leading-snug">{{ $info['license'] }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Maintainer') }}</dt>
-                            <dd class="mt-1 text-xs text-brand-ink leading-snug">{{ $info['maintainer'] }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Wire protocol') }}</dt>
-                            <dd class="mt-1 text-xs text-brand-ink leading-snug">{{ $info['wire_protocol'] }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('First released') }}</dt>
-                            <dd class="mt-1 text-xs text-brand-ink leading-snug">{{ $info['first_released'] }}</dd>
-                        </div>
-                    </dl>
-
-                    <div class="mt-4 flex items-start gap-3 rounded-xl border border-brand-forest/15 bg-brand-forest/5 p-3">
-                        <x-heroicon-o-light-bulb class="mt-0.5 h-4 w-4 shrink-0 text-brand-forest" />
-                        <p class="text-xs leading-relaxed text-brand-ink">
-                            <span class="font-semibold">{{ __('Best for:') }}</span>
-                            {{ $info['best_for'] }}
-                        </p>
-                    </div>
-
-                    <div class="mt-4 flex flex-wrap items-center gap-2">
-                        <a href="{{ $info['homepage_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                            <x-heroicon-o-globe-alt class="h-3.5 w-3.5" />
-                            {{ __('Homepage') }}
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 text-brand-mist" />
-                        </a>
-                        <a href="{{ $info['docs_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                            <x-heroicon-o-book-open class="h-3.5 w-3.5" />
-                            {{ __('Documentation') }}
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 text-brand-mist" />
-                        </a>
-                    </div>
-                </div>
-
                 {{-- Install / status / action card. State-dependent. --}}
                 @if (! $row)
-                    {{-- Not installed: offer Install. --}}
+                    {{-- Not installed: show engine info, then offer Install. --}}
+                    @include('livewire.servers.partials.cache-engine-info-card', [
+                        'info' => $info,
+                        'row' => $row,
+                        'card' => $card,
+                    ])
                     <div class="{{ $card }} p-6 sm:p-8">
                         <h3 class="text-lg font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
                         <p class="mt-2 text-sm text-brand-moss">{{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.') }}</p>
@@ -466,7 +423,13 @@
                         @endif
                     </div>
                 @elseif ($rowInFlight)
-                    {{-- In flight on this engine: small status note, the global banner up top has details. --}}
+                    {{-- In flight on this engine: show engine info, then small status note —
+                         the global banner up top has live details. --}}
+                    @include('livewire.servers.partials.cache-engine-info-card', [
+                        'info' => $info,
+                        'row' => $row,
+                        'card' => $card,
+                    ])
                     <div class="{{ $card }} p-6 sm:p-8">
                         <h3 class="text-lg font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
                         <p class="mt-2 text-sm text-brand-moss">
@@ -482,10 +445,10 @@
                         $activeSubtab = in_array($engine_subtab, $availableSubtabs, true) ? $engine_subtab : 'overview';
                     @endphp
 
-                    {{-- Instance chip row — visible when the engine supports multi-instance.
-                         Memcached is single-instance for v1 of multi-port, so the chip row
-                         is hidden for it. The default instance (legacy single-instance) is
-                         pinned to the front of the chip row; named instances follow. --}}
+                    {{-- Instance chip row — visible across all subtabs so switching instances doesn't
+                         require navigating back to Overview. Memcached is single-instance for v1, so
+                         the row is hidden for it. The default instance is pinned to the front; named
+                         instances follow. --}}
                     @if ($isRedisFamily)
                         <div class="mb-4 flex flex-wrap items-center gap-2">
                             @foreach ($engineInstances as $inst)
@@ -638,6 +601,13 @@
                     </x-server-workspace-tablist>
 
                     @if ($activeSubtab === 'overview')
+                    {{-- Engine info — what this engine is, license, links, "best for". --}}
+                    @include('livewire.servers.partials.cache-engine-info-card', [
+                        'info' => $info,
+                        'row' => $row,
+                        'card' => $card,
+                    ])
+
                     {{-- Installed and idle: status grid + action row. --}}
                     <div class="{{ $card }} p-6 sm:p-8">
                         <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine status', ['engine' => $engineLabels[$engine]]) }}</h3>
@@ -764,6 +734,43 @@
                         'engineLabels' => $engineLabels,
                     ])
                     @endif {{-- /overview subtab --}}
+
+                    {{-- Port card (Configure subtab, all engines). Restarts the unit. --}}
+                    @if ($activeSubtab === 'configure')
+                        <div class="{{ $card }} p-6 sm:p-8">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — listen port', ['engine' => $engineLabels[$engine]]) }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss">
+                                {{ __('Change the TCP port :engine listens on. The systemd unit will restart and connections drop briefly while the new port comes up. If the engine fails to bind, the previous config is restored automatically.', ['engine' => $engineLabels[$engine]]) }}
+                            </p>
+                            <p class="mt-1 text-xs text-brand-mist">
+                                {{ __('Currently on port :port.', ['port' => $row->port]) }}
+                            </p>
+                            <form wire:submit="changeCachePort" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
+                                <div>
+                                    <x-input-label for="new_port" :value="__('New port')" />
+                                    <x-text-input
+                                        id="new_port"
+                                        wire:model="new_port"
+                                        type="number"
+                                        min="1024"
+                                        max="65535"
+                                        autocomplete="off"
+                                        class="mt-1 block w-full font-mono text-sm"
+                                        :placeholder="(string) $row->port"
+                                        wire:loading.attr="disabled"
+                                        wire:target="changeCachePort"
+                                    />
+                                    <x-input-error :messages="$errors->get('new_port')" class="mt-1" />
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="changeCachePort">
+                                        <span wire:loading.remove wire:target="changeCachePort">{{ __('Change port and restart') }}</span>
+                                        <span wire:loading wire:target="changeCachePort">{{ __('Updating…') }}</span>
+                                    </x-primary-button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
 
                     {{-- AUTH password card (redis-family only, Configure subtab). --}}
                     @if (\App\Models\ServerCacheService::engineSupportsAuth($row->engine))
@@ -995,78 +1002,108 @@
                         @endif {{-- /console subtab --}}
                     @endif
 
-                    {{-- Server config file viewer/editor. Configure subtab. --}}
+                    {{-- Server config file viewer/editor. Configure subtab.
+                         The trigger card stays slim; the viewer/editor itself lives in a modal
+                         so the read-only pre + textarea don't push the rest of the Configure
+                         subtab off-screen on long config files. --}}
                     @if ($activeSubtab === 'configure')
+                    @php $configModalName = 'cache-config-modal-'.$engine; @endphp
                     <div class="{{ $card }} p-6 sm:p-8">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — server config file', ['engine' => $engineLabels[$engine]]) }}</h3>
                                 <p class="mt-2 text-sm text-brand-moss">
-                                    @if ($cacheConfigEditing)
-                                        {{ __('Editing the live config. Save will write, restart the engine, verify it accepts the new config, and roll back if anything goes wrong.') }}
-                                    @else
-                                        {{ __('Read-only view of the engine\'s main config file. Click Edit to change it — Dply backs up, restarts, verifies, and rolls back automatically on failure.') }}
-                                    @endif
+                                    {{ __('Read-only view of the engine\'s main config file. Click Edit inside the viewer to change it — Dply backs up, restarts, verifies, and rolls back automatically on failure.') }}
                                 </p>
                             </div>
                             <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
-                                @if ($cacheConfigEditing)
-                                    {{-- Edit-mode controls render with the form below. --}}
-                                @elseif ($cacheConfigContent === null && $cacheConfigError === null)
-                                    <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                        <x-heroicon-o-document-text class="h-3.5 w-3.5" aria-hidden="true" />
-                                        <span wire:loading.remove wire:target="loadCacheConfig">{{ __('Load config') }}</span>
-                                        <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
-                                    </button>
-                                @else
-                                    <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
-                                        {{ __('Refresh') }}
-                                    </button>
-                                    @if ($cacheConfigContent !== null)
-                                        <button type="button" wire:click="startEditingCacheConfig" wire:loading.attr="disabled" wire:target="startEditingCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-sm font-medium text-brand-forest hover:bg-brand-forest/15">
-                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
-                                            {{ __('Edit') }}
-                                        </button>
+                                <button
+                                    type="button"
+                                    wire:click="loadCacheConfig"
+                                    wire:loading.attr="disabled"
+                                    wire:target="loadCacheConfig"
+                                    x-on:click="$dispatch('open-modal', @js($configModalName))"
+                                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                                >
+                                    <x-heroicon-o-document-text class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <span wire:loading.remove wire:target="loadCacheConfig">{{ __('View config') }}</span>
+                                    <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <x-modal :name="$configModalName" maxWidth="4xl" overlayClass="bg-brand-ink/40">
+                        <div class="border-b border-brand-ink/10 px-6 py-5">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Server config') }}</p>
+                                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __(':engine — server config file', ['engine' => $engineLabels[$engine]]) }}</h2>
+                                    <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                        @if ($cacheConfigEditing)
+                                            {{ __('Editing the live config. Save will write, restart the engine, verify it accepts the new config, and roll back if anything goes wrong.') }}
+                                        @else
+                                            {{ __('Read-only view of the engine\'s main config file. Click Edit to change it — Dply backs up, restarts, verifies, and rolls back automatically on failure.') }}
+                                        @endif
+                                    </p>
+                                    @if ($cacheConfigPath)
+                                        <p class="mt-2 break-all font-mono text-xs text-brand-mist">{{ $cacheConfigPath }}</p>
                                     @endif
-                                    <button type="button" wire:click="hideCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
-                                        <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
-                                        {{ __('Hide') }}
-                                    </button>
-                                @endif
+                                </div>
+                                <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
+                                    @if (! $cacheConfigEditing)
+                                        <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <span wire:loading.remove wire:target="loadCacheConfig">{{ __('Refresh') }}</span>
+                                            <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
+                                        </button>
+                                        @if ($cacheConfigContent !== null)
+                                            <button type="button" wire:click="startEditingCacheConfig" wire:loading.attr="disabled" wire:target="startEditingCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-sm font-medium text-brand-forest hover:bg-brand-forest/15">
+                                                <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                                {{ __('Edit') }}
+                                            </button>
+                                        @endif
+                                    @endif
+                                </div>
                             </div>
                         </div>
 
-                        @if ($cacheConfigError)
-                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheConfigError }}</p>
-                        @elseif ($cacheConfigEditing)
-                            @if ($cacheConfigPath)
-                                <p class="mt-4 break-all font-mono text-xs text-brand-mist">{{ $cacheConfigPath }}</p>
-                            @endif
-                            <form wire:submit="saveCacheConfig" class="mt-3 space-y-3">
-                                <textarea
-                                    id="cache_config_draft"
-                                    wire:model="cacheConfigDraft"
-                                    rows="20"
-                                    spellcheck="false"
-                                    class="block w-full rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
-                                ></textarea>
-                                <x-input-error :messages="$errors->get('cacheConfigDraft')" />
-                                <div class="flex flex-wrap gap-2">
-                                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveCacheConfig">
-                                        <span wire:loading.remove wire:target="saveCacheConfig">{{ __('Save and restart') }}</span>
-                                        <span wire:loading wire:target="saveCacheConfig">{{ __('Saving…') }}</span>
-                                    </x-primary-button>
-                                    <x-secondary-button type="button" wire:click="cancelEditingCacheConfig">{{ __('Cancel') }}</x-secondary-button>
+                        <div class="px-6 py-5">
+                            @if ($cacheConfigError)
+                                <p class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheConfigError }}</p>
+                            @elseif ($cacheConfigEditing)
+                                <form wire:submit="saveCacheConfig" id="cache-config-form-{{ $engine }}">
+                                    <textarea
+                                        id="cache_config_draft"
+                                        wire:model="cacheConfigDraft"
+                                        rows="22"
+                                        spellcheck="false"
+                                        class="block w-full rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                    ></textarea>
+                                    <x-input-error :messages="$errors->get('cacheConfigDraft')" class="mt-2" />
+                                </form>
+                            @elseif ($cacheConfigContent !== null)
+                                <pre class="max-h-[60vh] overflow-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink whitespace-pre">{{ $cacheConfigContent }}</pre>
+                            @else
+                                <div class="flex items-center gap-3 text-sm text-brand-moss" wire:loading wire:target="loadCacheConfig">
+                                    <x-spinner variant="forest" />
+                                    {{ __('Reading config over SSH…') }}
                                 </div>
-                            </form>
-                        @elseif ($cacheConfigContent !== null)
-                            @if ($cacheConfigPath)
-                                <p class="mt-4 break-all font-mono text-xs text-brand-mist">{{ $cacheConfigPath }}</p>
                             @endif
-                            <pre class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs leading-relaxed text-brand-ink whitespace-pre">{{ $cacheConfigContent }}</pre>
-                        @endif
-                    </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                            @if ($cacheConfigEditing)
+                                <x-secondary-button type="button" wire:click="cancelEditingCacheConfig">{{ __('Cancel') }}</x-secondary-button>
+                                <x-primary-button type="submit" form="cache-config-form-{{ $engine }}" wire:loading.attr="disabled" wire:target="saveCacheConfig">
+                                    <span wire:loading.remove wire:target="saveCacheConfig">{{ __('Save and restart') }}</span>
+                                    <span wire:loading wire:target="saveCacheConfig">{{ __('Saving…') }}</span>
+                                </x-primary-button>
+                            @else
+                                <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
+                            @endif
+                        </div>
+                    </x-modal>
                     @endif {{-- /configure subtab (config viewer) --}}
                 @endif
             </x-server-workspace-tab-panel>

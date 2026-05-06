@@ -17,6 +17,7 @@ use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\CacheServiceAuth;
 use App\Support\Servers\CacheServiceConfigWriter;
 use App\Support\Servers\CacheServiceMemoryConfig;
+use App\Support\Servers\CacheServicePort;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -892,5 +893,147 @@ class WorkspaceCachesTest extends TestCase
             ->test(WorkspaceCaches::class, ['server' => $server])
             ->set('workspace_tab', 'garbage')
             ->assertSet('workspace_tab', 'overview');
+    }
+
+    public function test_change_cache_port_invokes_helper_and_persists_new_port(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $row = ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'valkey',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => true, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        });
+
+        $this->mock(CacheServicePort::class, function ($mock): void {
+            $mock->shouldReceive('changePort')
+                ->once()
+                ->withArgs(function ($srv, $row, int $newPort): bool {
+                    return $row->engine === 'valkey' && $newPort === 6390;
+                });
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'valkey')
+            ->set('new_port', 6390)
+            ->call('changeCachePort')
+            ->assertHasNoErrors()
+            ->assertSet('new_port', null);
+
+        $this->assertSame(6390, $row->fresh()->port);
+
+        $this->assertDatabaseHas('server_cache_service_audit_events', [
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'event' => ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
+        ]);
+    }
+
+    public function test_change_cache_port_validates_range(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'valkey',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => true, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        });
+
+        // Helper must NOT be invoked — validation should bail first.
+        $this->mock(CacheServicePort::class, function ($mock): void {
+            $mock->shouldNotReceive('changePort');
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'valkey')
+            ->set('new_port', 80)
+            ->call('changeCachePort')
+            ->assertHasErrors(['new_port' => 'min']);
+    }
+
+    public function test_change_cache_port_rejects_collision_with_another_engine(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6380,
+        ]);
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'valkey',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => true, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        });
+
+        $this->mock(CacheServicePort::class, function ($mock): void {
+            $mock->shouldNotReceive('changePort');
+        });
+
+        // Try to move Valkey onto Redis's port — must be rejected before SSH.
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'valkey')
+            ->set('new_port', 6380)
+            ->call('changeCachePort')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseMissing('server_cache_service_audit_events', [
+            'server_id' => $server->id,
+            'event' => ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
+        ]);
+    }
+
+    public function test_change_cache_port_rejects_no_op(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'valkey',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => true, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        });
+
+        $this->mock(CacheServicePort::class, function ($mock): void {
+            $mock->shouldNotReceive('changePort');
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'valkey')
+            ->set('new_port', 6379)
+            ->call('changeCachePort');
+
+        $this->assertDatabaseMissing('server_cache_service_audit_events', [
+            'server_id' => $server->id,
+            'event' => ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
+        ]);
     }
 }

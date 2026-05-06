@@ -11,6 +11,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Server meta keys for the in-flight apply run banner
+    |--------------------------------------------------------------------------
+    | The workspace banner streams live UFW output during apply. Per-server run
+    | state lives under these meta keys (cleared/refreshed each run); the
+    | output buffer itself lives in the application cache keyed by run_id.
+    */
+    'meta_apply_run_id_key' => 'firewall_apply_run_id',
+    'meta_apply_status_key' => 'firewall_apply_status',
+    'meta_apply_started_at_key' => 'firewall_apply_started_at',
+    'meta_apply_finished_at_key' => 'firewall_apply_finished_at',
+    'meta_apply_error_key' => 'firewall_apply_error',
+    'apply_output_cache_key_prefix' => 'firewall_apply_output:',
+    'apply_output_cache_ttl_seconds' => 300,
+
+    /*
+    |--------------------------------------------------------------------------
     | New rule form defaults
     |--------------------------------------------------------------------------
     |

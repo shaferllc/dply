@@ -70,17 +70,24 @@ class WorkspaceCachesMonitorTest extends TestCase
         return [$user, $server, $row];
     }
 
-    public function test_start_monitor_requires_unlock(): void
+    public function test_start_monitor_does_not_require_unlock(): void
     {
-        [$user, $server] = $this->actingOwnerWithRedis();
+        // MONITOR is read-only — the bounded window picker (5/10/30 s) plus the explainer
+        // already cover the CPU-cost caveat, so we don't gate it on the REPL unlock toggle.
+        [$user, $server, $row] = $this->actingOwnerWithRedis();
 
-        Livewire::actingAs($user)
+        $component = Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
             ->call('setWorkspaceTab', 'redis')
+            ->assertSet('replUnlocked', false)
             ->call('startMonitor', 10)
-            ->assertSet('monitorRunId', '');
+            ->assertHasNoErrors();
 
-        Queue::assertNotPushed(TailCacheServiceMonitorJob::class);
+        $this->assertNotEmpty($component->get('monitorRunId'), 'Run id must be set even without unlock.');
+        Queue::assertPushed(
+            TailCacheServiceMonitorJob::class,
+            fn ($job) => $job->serverId === $server->id && $job->cacheServiceId === $row->id,
+        );
     }
 
     public function test_start_monitor_dispatches_job_and_sets_run_id(): void
