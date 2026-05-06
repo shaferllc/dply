@@ -19,6 +19,7 @@ use App\Support\Servers\CacheServiceCli;
 use App\Support\Servers\CacheServiceCommandPolicy;
 use App\Support\Servers\CacheServiceConfigWriter;
 use App\Support\Servers\CacheServiceInstallScripts;
+use App\Support\Servers\CacheServiceKeyExplorer;
 use App\Support\Servers\CacheServiceKeyspaceSampler;
 use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServiceStats;
@@ -136,6 +137,34 @@ class WorkspaceCaches extends Component
     public ?string $keyspaceError = null;
 
     public const KEYSPACE_SAMPLE_LIMIT = 60;
+
+    /** SCAN MATCH pattern. Defaults to `*` so the first scan returns everything. */
+    public string $keyBrowserPattern = '*';
+
+    /** Opaque SCAN cursor. `'0'` means a fresh scan; any other value means more pages. */
+    public string $keyBrowserCursor = '0';
+
+    /**
+     * Accumulated keys from one or more SCAN pages. Operators see the full list
+     * and "Load more" continues from the last cursor.
+     *
+     * @var list<string>
+     */
+    public array $keyBrowserKeys = [];
+
+    public bool $keyBrowserLoaded = false;
+
+    public ?string $keyBrowserError = null;
+
+    /** True when the last SCAN page reported cursor=0 (no more keys to fetch). */
+    public bool $keyBrowserComplete = false;
+
+    public ?string $keyBrowserSelected = null;
+
+    /** @var array{type: string, ttl: int, value: string|list<string>, truncated: bool}|null */
+    public ?array $keyBrowserValue = null;
+
+    public ?string $keyBrowserValueError = null;
 
     public function mount(Server $server): void
     {
@@ -261,6 +290,15 @@ class WorkspaceCaches extends Component
             $this->keyspaceSamples = [];
             $this->keyspaceLoaded = false;
             $this->keyspaceError = null;
+            $this->keyBrowserPattern = '*';
+            $this->keyBrowserCursor = '0';
+            $this->keyBrowserKeys = [];
+            $this->keyBrowserLoaded = false;
+            $this->keyBrowserComplete = false;
+            $this->keyBrowserSelected = null;
+            $this->keyBrowserValue = null;
+            $this->keyBrowserValueError = null;
+            $this->keyBrowserError = null;
         }
 
         $this->engine_subtab = $next;
@@ -1217,6 +1255,201 @@ class WorkspaceCaches extends Component
         $this->keyspaceError = null;
     }
 
+    /**
+     * Run a fresh SCAN on the active instance: starts at cursor 0, drops any
+     * previously-loaded keys + selected-key inspection, fetches the first page.
+     * Operators call this from the "Search" / pattern-change UI.
+     */
+    public function searchKeyBrowser(CacheServiceKeyExplorer $explorer): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = $this->resolveKeyBrowserRow();
+        if (! $row) {
+            return;
+        }
+
+        $this->keyBrowserKeys = [];
+        $this->keyBrowserCursor = '0';
+        $this->keyBrowserComplete = false;
+        $this->keyBrowserSelected = null;
+        $this->keyBrowserValue = null;
+        $this->keyBrowserValueError = null;
+        $this->keyBrowserError = null;
+
+        $this->loadKeyBrowserPage($explorer);
+    }
+
+    /**
+     * Fetch one page of keys via SCAN, append them to the existing list, and
+     * advance the cursor. Idempotent against a completed scan (returns early).
+     */
+    public function loadKeyBrowserPage(CacheServiceKeyExplorer $explorer): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = $this->resolveKeyBrowserRow();
+        if (! $row) {
+            return;
+        }
+
+        if ($this->keyBrowserComplete) {
+            return;
+        }
+
+        try {
+            $page = $explorer->scan($row->server, $row, $this->keyBrowserCursor, trim($this->keyBrowserPattern) ?: '*');
+        } catch (\Throwable $e) {
+            $this->keyBrowserError = $e->getMessage();
+
+            return;
+        }
+
+        // Merge + dedupe: SCAN can repeat keys across iterations under heavy
+        // write traffic. Operators only want one row per key.
+        $this->keyBrowserKeys = array_values(array_unique(array_merge($this->keyBrowserKeys, $page['keys'])));
+        $this->keyBrowserCursor = $page['cursor'];
+        $this->keyBrowserComplete = $page['complete'];
+        $this->keyBrowserLoaded = true;
+        $this->keyBrowserError = null;
+    }
+
+    /**
+     * Inspect a specific key — TYPE + TTL + value (formatted by type, capped at
+     * `CacheServiceKeyExplorer::MAX_VALUE_BYTES`). Sets the inspection panel's
+     * state on the component.
+     */
+    public function inspectKey(string $key, CacheServiceKeyExplorer $explorer): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = $this->resolveKeyBrowserRow();
+        if (! $row) {
+            return;
+        }
+
+        try {
+            $result = $explorer->inspect($row->server, $row, $key);
+        } catch (\Throwable $e) {
+            $this->keyBrowserSelected = $key;
+            $this->keyBrowserValue = null;
+            $this->keyBrowserValueError = $e->getMessage();
+
+            return;
+        }
+
+        $this->keyBrowserSelected = $key;
+        $this->keyBrowserValue = $result;
+        $this->keyBrowserValueError = null;
+    }
+
+    public function clearKeyInspection(): void
+    {
+        $this->keyBrowserSelected = null;
+        $this->keyBrowserValue = null;
+        $this->keyBrowserValueError = null;
+    }
+
+    public function hideKeyBrowser(): void
+    {
+        $this->keyBrowserKeys = [];
+        $this->keyBrowserCursor = '0';
+        $this->keyBrowserComplete = false;
+        $this->keyBrowserLoaded = false;
+        $this->keyBrowserSelected = null;
+        $this->keyBrowserValue = null;
+        $this->keyBrowserValueError = null;
+        $this->keyBrowserError = null;
+    }
+
+    /**
+     * Delete a key. Goes through the existing REPL unlock toggle as a safety
+     * gate — DEL mutates state. Audited as a REPL_EXECUTED with verb=DEL so
+     * the audit log captures the action consistently with the console.
+     */
+    public function deleteKey(string $key, CacheServiceCli $cli, CacheServiceCommandPolicy $policy, CacheServiceAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $row = $this->resolveKeyBrowserRow();
+        if (! $row) {
+            return;
+        }
+
+        if (! $this->replUnlocked) {
+            $this->toastError(__('Locked — flip the unlock toggle in the Console sub-tab to delete keys.'));
+
+            return;
+        }
+
+        try {
+            $output = $cli->execute($row->server, $row, 'DEL '.$key);
+        } catch (\Throwable $e) {
+            $this->keyBrowserValueError = $e->getMessage();
+
+            return;
+        }
+
+        if ($output->exitCode !== 0) {
+            $this->keyBrowserValueError = trim($output->buffer) ?: __('DEL command failed.');
+
+            return;
+        }
+
+        // Pull the deleted key from the in-memory list and clear the inspection
+        // panel if it was selected.
+        $this->keyBrowserKeys = array_values(array_filter(
+            $this->keyBrowserKeys,
+            fn ($k) => $k !== $key,
+        ));
+        if ($this->keyBrowserSelected === $key) {
+            $this->clearKeyInspection();
+        }
+
+        $audit->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_REPL_EXECUTED,
+            ['engine' => $row->engine, 'name' => $row->name, 'verb' => 'DEL', 'mutating' => true, 'exit_code' => 0],
+            auth()->user(),
+        );
+        $this->forgetStats($row);
+        $this->toastSuccess(__('Deleted :key.', ['key' => $key]));
+    }
+
+    /**
+     * Resolve the row the key browser operates on (active instance of the
+     * current engine tab). Returns null and sets a friendly error when the
+     * engine doesn't support SCAN (memcached) or there's nothing installed.
+     */
+    protected function resolveKeyBrowserRow(): ?ServerCacheService
+    {
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->keyBrowserError = __('Switch to an engine tab to browse its keys.');
+
+            return null;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->keyBrowserError = __('No :engine instance installed.', ['engine' => $engine]);
+
+            return null;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->keyBrowserError = __(':engine has no SCAN equivalent — the key browser is redis-family only.', ['engine' => $row->engine]);
+
+            return null;
+        }
+
+        return $row;
+    }
+
     public function flushCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
     {
         $this->authorize('update', $this->server);
@@ -1488,15 +1721,24 @@ class WorkspaceCaches extends Component
         $this->cacheMemoryError = null;
         $this->new_auth_password = '';
 
-        // REPL + dashboard are scoped to the current engine, so their buffers go
-        // away on tab change. The unlock toggle deliberately does NOT reset on
-        // tab change — it resets on remount, matching the existing
-        // "session-scoped trust" pattern in this component.
+        // REPL + dashboard + key browser are scoped to the current engine, so
+        // their buffers go away on tab change. The unlock toggle deliberately
+        // does NOT reset on tab change — it resets on remount, matching the
+        // existing "session-scoped trust" pattern in this component.
         $this->replInput = '';
         $this->replHistory = [];
         $this->keyspaceSamples = [];
         $this->keyspaceLoaded = false;
         $this->keyspaceError = null;
+        $this->keyBrowserPattern = '*';
+        $this->keyBrowserCursor = '0';
+        $this->keyBrowserKeys = [];
+        $this->keyBrowserLoaded = false;
+        $this->keyBrowserComplete = false;
+        $this->keyBrowserSelected = null;
+        $this->keyBrowserValue = null;
+        $this->keyBrowserValueError = null;
+        $this->keyBrowserError = null;
     }
 
     /**

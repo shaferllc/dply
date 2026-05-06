@@ -938,7 +938,24 @@
                             'error' => $keyspaceError,
                             'card' => $card,
                         ])
-                        @endif {{-- /stats subtab (clients + keyspace) --}}
+
+                        {{-- Key browser — redis-family only, Stats subtab. --}}
+                        @include('livewire.servers.partials.cache-key-browser-card', [
+                            'engine' => $engine,
+                            'engineLabel' => $engineLabels[$engine] ?? ucfirst($engine),
+                            'row' => $row,
+                            'pattern' => $keyBrowserPattern,
+                            'keys' => $keyBrowserKeys,
+                            'loaded' => $keyBrowserLoaded,
+                            'complete' => $keyBrowserComplete,
+                            'selected' => $keyBrowserSelected,
+                            'value' => $keyBrowserValue,
+                            'valueError' => $keyBrowserValueError,
+                            'error' => $keyBrowserError,
+                            'replUnlocked' => $replUnlocked,
+                            'card' => $card,
+                        ])
+                        @endif {{-- /stats subtab (clients + keyspace + key browser) --}}
 
                         {{-- Interactive console (REPL) — redis-family only, Console subtab. --}}
                         @if ($activeSubtab === 'console')
