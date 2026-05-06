@@ -29,6 +29,11 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4" tone="warn">
+        <p>{{ __('The Manage workspace covers server-level operations that don\'t fit other tabs: web server (nginx/caddy/apache) controls, system updates, the auto-update schedule, and dangerous actions (reboot, disable swap, etc.).') }}</p>
+        <p>{{ __('Most actions run via SSH and are queued — the page stays responsive while they run. Dangerous actions all confirm first; every one writes to the server\'s audit log.') }}</p>
+    </x-explainer>
+
     <div class="space-y-6">
         <x-server-tab-strip
             :tabs="config('server_manage.workspace_tabs', [])"
