@@ -119,7 +119,63 @@ class ServerCronBasicsTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceCron::class, ['server' => $server])
             ->call('syncCronJobs')
-            ->assertDispatched('notify', message: __('Crontab sync finished. Output: :out', ['out' => 'installed']), type: 'success');
+            ->assertDispatched('notify', message: __('Crontab sync finished — see the banner for the host output.'), type: 'success')
+            ->assertSet('panel_event_status', 'completed')
+            ->assertSet('panel_event_message', __('Crontab synced to server.'));
+    }
+
+    public function test_apply_cron_bundle_inserts_panel_rows_and_emits_panel_event(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServer($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCron::class, ['server' => $server])
+            ->call('applyCronBundle', 'certbot_renew')
+            ->assertSet('panel_event_status', 'completed')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('server_cron_jobs', [
+            'server_id' => $server->id,
+            'cron_expression' => '0 3 * * *',
+            'user' => 'root',
+            'is_synced' => false,
+            'enabled' => true,
+        ]);
+    }
+
+    public function test_apply_cron_bundle_skips_duplicates(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServer($user);
+
+        ServerCronJob::query()->create([
+            'server_id' => $server->id,
+            'cron_expression' => '0 3 * * *',
+            'command' => 'certbot renew --quiet --deploy-hook "systemctl reload nginx"',
+            'user' => 'root',
+            'enabled' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCron::class, ['server' => $server])
+            ->call('applyCronBundle', 'certbot_renew')
+            ->assertDispatched('notify', type: 'warning');
+
+        $this->assertSame(1, ServerCronJob::query()->where('server_id', $server->id)->count());
+    }
+
+    public function test_apply_cron_bundle_unknown_key_warns(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServer($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCron::class, ['server' => $server])
+            ->call('applyCronBundle', 'does_not_exist')
+            ->assertDispatched('notify', type: 'error');
+
+        $this->assertSame(0, ServerCronJob::query()->where('server_id', $server->id)->count());
     }
 
     public function test_loading_crontab_keeps_user_on_troubleshooting_tab(): void

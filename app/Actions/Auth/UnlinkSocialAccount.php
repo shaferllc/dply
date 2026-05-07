@@ -19,7 +19,7 @@ final class UnlinkSocialAccount
             return true;
         }
 
-        return $user->webAuthnCredentials()->whereEnabled()->exists();
+        return $user->passkeys()->exists();
     }
 
     public static function denyMessage(): string

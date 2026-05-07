@@ -20,51 +20,9 @@
 
     @if ($opsReady)
         <div class="space-y-6">
-            <x-server-workspace-tablist :aria-label="__('Firewall workspace sections')">
-                <x-server-workspace-tab id="firewall-tab-rules" :active="$firewall_workspace_tab === 'rules'" wire:click="$set('firewall_workspace_tab', 'rules')">
-                    <span class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Rules') }}
-                    </span>
-                </x-server-workspace-tab>
-                <x-server-workspace-tab id="firewall-tab-templates" :active="$firewall_workspace_tab === 'templates'" wire:click="$set('firewall_workspace_tab', 'templates')">
-                    <span class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-document-duplicate class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Templates') }}
-                    </span>
-                </x-server-workspace-tab>
-                <x-server-workspace-tab id="firewall-tab-history" :active="$firewall_workspace_tab === 'history'" wire:click="$set('firewall_workspace_tab', 'history')">
-                    <span class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
-                        {{ __('History') }}
-                    </span>
-                </x-server-workspace-tab>
-                <x-server-workspace-tab id="firewall-tab-audit" :active="$firewall_workspace_tab === 'audit'" wire:click="$set('firewall_workspace_tab', 'audit')">
-                    <span class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-list-bullet class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Audit') }}
-                    </span>
-                </x-server-workspace-tab>
-            </x-server-workspace-tablist>
 
-            <x-server-workspace-tab-panel
-                id="firewall-panel-rules"
-                labelled-by="firewall-tab-rules"
-                :hidden="$firewall_workspace_tab !== 'rules'"
-                panel-class="space-y-6"
-            >
-        @php
-            $ruleCount = $server->firewallRules->count();
-            $enabledRuleCount = $server->firewallRules->where('enabled', true)->count();
-            $lastApplyLog = \App\Models\ServerFirewallApplyLog::query()
-                ->where('server_id', $server->id)
-                ->orderByDesc('id')
-                ->first();
-        @endphp
-
-        {{-- Workspace-wide console banner. Currently surfaces panel events from add/update/
-             remove (via the EmitsPanelEvent trait). Phase 2 will hook the apply/diagnostics
-             flows in here too once they queue. --}}
+        {{-- Workspace-wide banner row. Positioned above the tab strip so apply / refresh /
+             diagnostics output spans the full content width and is visible on every tab. --}}
         @php
             $applyStatus = (string) data_get($server->meta ?? [], config('server_firewall.meta_apply_status_key'));
             $applyRunId = (string) data_get($server->meta ?? [], config('server_firewall.meta_apply_run_id_key'));
@@ -74,9 +32,6 @@
             $applyShowBanner = $applyRunId !== '' && in_array($applyStatus, ['queued', 'running', 'completed', 'failed'], true);
         @endphp
 
-        {{-- Queued / running / completed / failed apply banner. Takes precedence over the
-             panel-event banner — apply state is more time-sensitive. While running, polls
-             pollApplyStatus every 4 s to refresh the cached transcript. --}}
         @if ($applyShowBanner)
             @php
                 $applyMessage = match ($applyStatus) {
@@ -107,9 +62,7 @@
             />
         @endif
 
-        {{-- Optimistic running banners for the still-in-request actions (refresh + diagnostics).
-             wire:loading flips them on/off based on which action is mid-round-trip. --}}
-        <div wire:loading wire:target="refreshUfwStatus">
+        <div wire:loading.block wire:target="refreshUfwStatus" class="w-full">
             <x-workspace-console-banner
                 status="running"
                 :message="__('Reading UFW status from :host …', ['host' => $server->getSshConnectionString()])"
@@ -120,7 +73,7 @@
                 :dismiss-action="null"
             />
         </div>
-        <div wire:loading wire:target="runFirewallDiagnostics">
+        <div wire:loading.block wire:target="runFirewallDiagnostics" class="w-full">
             <x-workspace-console-banner
                 status="running"
                 :message="__('Running firewall diagnostics on :host …', ['host' => $server->getSshConnectionString()])"
@@ -132,9 +85,6 @@
             />
         </div>
 
-        {{-- Panel-event banner — populated by emitPanelEvent (add/delete rule, refresh /
-             diagnostics output). Suppressed while the apply banner has the slot or while a
-             refresh / diagnostics round-trip is in flight. --}}
         @if (! $applyShowBanner && ! empty($panel_event_lines))
             <div wire:loading.remove wire:target="refreshUfwStatus,runFirewallDiagnostics">
                 @php
@@ -154,6 +104,42 @@
                 />
             </div>
         @endif
+
+            <x-server-workspace-tablist :aria-label="__('Firewall workspace sections')">
+                <x-server-workspace-tab id="firewall-tab-rules" :active="$firewall_workspace_tab === 'rules'" wire:click="$set('firewall_workspace_tab', 'rules')">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Rules') }}
+                    </span>
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="firewall-tab-templates" :active="$firewall_workspace_tab === 'templates'" wire:click="$set('firewall_workspace_tab', 'templates')">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-document-duplicate class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Templates') }}
+                    </span>
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="firewall-tab-activity" :active="$firewall_workspace_tab === 'activity'" wire:click="$set('firewall_workspace_tab', 'activity')">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Activity') }}
+                    </span>
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+
+            <x-server-workspace-tab-panel
+                id="firewall-panel-rules"
+                labelled-by="firewall-tab-rules"
+                :hidden="$firewall_workspace_tab !== 'rules'"
+                panel-class="space-y-6"
+            >
+        @php
+            $ruleCount = $server->firewallRules->count();
+            $enabledRuleCount = $server->firewallRules->where('enabled', true)->count();
+            $lastApplyLog = \App\Models\ServerFirewallApplyLog::query()
+                ->where('server_id', $server->id)
+                ->orderByDesc('id')
+                ->first();
+        @endphp
 
         <div class="{{ $card }} overflow-hidden">
                     <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
@@ -219,35 +205,72 @@
                                 <span wire:loading.remove wire:target="applyFirewall">{{ $applyBusy ? __('Applying…') : __('Apply rules') }}</span>
                                 <span wire:loading wire:target="applyFirewall">{{ __('Queueing…') }}</span>
                             </button>
-                            <button
-                                type="button"
-                                wire:click="refreshUfwStatus"
-                                wire:loading.attr="disabled"
-                                wire:target="refreshUfwStatus,applyFirewall"
-                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                <x-heroicon-o-arrow-path wire:loading.remove wire:target="refreshUfwStatus" class="h-3.5 w-3.5" />
-                                <span wire:loading wire:target="refreshUfwStatus" class="inline-flex h-3.5 w-3.5 items-center justify-center">
-                                    <x-spinner variant="forest" size="sm" />
-                                </span>
-                                <span wire:loading.remove wire:target="refreshUfwStatus">{{ __('Refresh status') }}</span>
-                                <span wire:loading wire:target="refreshUfwStatus">{{ __('Reading…') }}</span>
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="runFirewallDiagnostics"
-                                wire:loading.attr="disabled"
-                                wire:target="runFirewallDiagnostics,applyFirewall"
-                                title="{{ __('Run ufw status verbose, status numbered, ss -ltn, and iptables -L INPUT on the server.') }}"
-                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                <x-heroicon-o-command-line wire:loading.remove wire:target="runFirewallDiagnostics" class="h-3.5 w-3.5" />
-                                <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex h-3.5 w-3.5 items-center justify-center">
-                                    <x-spinner variant="forest" size="sm" />
-                                </span>
-                                <span wire:loading.remove wire:target="runFirewallDiagnostics">{{ __('Diagnostics') }}</span>
-                                <span wire:loading wire:target="runFirewallDiagnostics">{{ __('Running…') }}</span>
-                            </button>
+                            <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
+                                <x-slot name="trigger">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        aria-haspopup="menu"
+                                        aria-label="{{ __('More firewall actions') }}"
+                                    >
+                                        {{ __('More') }}
+                                        <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-brand-ink/70" />
+                                    </button>
+                                </x-slot>
+                                <x-slot name="content">
+                                    <button
+                                        type="button"
+                                        wire:click="refreshUfwStatus"
+                                        wire:loading.attr="disabled"
+                                        wire:target="refreshUfwStatus,applyFirewall"
+                                        class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <span class="inline-flex items-center gap-2">
+                                            <x-heroicon-o-arrow-path wire:loading.remove wire:target="refreshUfwStatus" class="h-3.5 w-3.5 text-brand-moss" />
+                                            <span wire:loading wire:target="refreshUfwStatus" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-spinner variant="forest" size="sm" />
+                                            </span>
+                                            <span wire:loading.remove wire:target="refreshUfwStatus">{{ __('Refresh status') }}</span>
+                                            <span wire:loading wire:target="refreshUfwStatus">{{ __('Reading…') }}</span>
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="runFirewallDiagnostics"
+                                        wire:loading.attr="disabled"
+                                        wire:target="runFirewallDiagnostics,applyFirewall"
+                                        title="{{ __('Run ufw status verbose, status numbered, ss -ltn, and iptables -L INPUT on the server.') }}"
+                                        class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <span class="inline-flex items-center gap-2">
+                                            <x-heroicon-o-command-line wire:loading.remove wire:target="runFirewallDiagnostics" class="h-3.5 w-3.5 text-brand-moss" />
+                                            <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-spinner variant="forest" size="sm" />
+                                            </span>
+                                            <span wire:loading.remove wire:target="runFirewallDiagnostics">{{ __('Diagnostics') }}</span>
+                                            <span wire:loading wire:target="runFirewallDiagnostics">{{ __('Running…') }}</span>
+                                        </span>
+                                    </button>
+                                    <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
+                                    <button
+                                        type="button"
+                                        wire:click="previewImportHostRules"
+                                        wire:loading.attr="disabled"
+                                        wire:target="previewImportHostRules,applyFirewall"
+                                        title="{{ __('Read user-added rules from UFW (`ufw show added`) and pick which to import into the panel.') }}"
+                                        class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <span class="inline-flex items-center gap-2">
+                                            <x-heroicon-o-arrow-down-tray wire:loading.remove wire:target="previewImportHostRules" class="h-3.5 w-3.5 text-brand-moss" />
+                                            <span wire:loading wire:target="previewImportHostRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-spinner variant="forest" size="sm" />
+                                            </span>
+                                            <span wire:loading.remove wire:target="previewImportHostRules">{{ __('Import from host') }}</span>
+                                            <span wire:loading wire:target="previewImportHostRules">{{ __('Reading…') }}</span>
+                                        </span>
+                                    </button>
+                                </x-slot>
+                            </x-dropdown>
                         </div>
                     </div>
 
@@ -257,14 +280,30 @@
                                 <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
                                 <div class="min-w-0 flex-1">
                                     <p>{{ __('No enabled Dply rule allows TCP :port from "any". Add an allow for your SSH port (or a trusted CIDR) before applying deny-heavy changes.', ['port' => $server->ssh_port ?: 22]) }}</p>
-                                    <label class="mt-2 flex items-start gap-2 text-xs">
-                                        <input
-                                            type="checkbox"
-                                            wire:model.live="firewall_ack_ssh_risk"
-                                            class="mt-0.5 rounded border-amber-400 text-brand-forest focus:ring-brand-forest"
-                                        />
-                                        <span>{{ __('I understand SSH may be unreachable—still apply.') }}</span>
-                                    </label>
+                                    <div class="mt-2 flex flex-wrap items-center gap-3">
+                                        <button
+                                            type="button"
+                                            wire:click="ensureSshAllowRule"
+                                            wire:loading.attr="disabled"
+                                            wire:target="ensureSshAllowRule"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <x-heroicon-o-shield-check wire:loading.remove wire:target="ensureSshAllowRule" class="h-3.5 w-3.5" />
+                                            <span wire:loading wire:target="ensureSshAllowRule" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-spinner variant="forest" size="sm" />
+                                            </span>
+                                            <span wire:loading.remove wire:target="ensureSshAllowRule">{{ __('Add SSH allow rule') }}</span>
+                                            <span wire:loading wire:target="ensureSshAllowRule">{{ __('Adding…') }}</span>
+                                        </button>
+                                        <label class="flex items-start gap-2 text-xs">
+                                            <input
+                                                type="checkbox"
+                                                wire:model.live="firewall_ack_ssh_risk"
+                                                class="mt-0.5 rounded border-amber-400 text-brand-forest focus:ring-brand-forest"
+                                            />
+                                            <span>{{ __('I understand SSH may be unreachable—still apply.') }}</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -287,84 +326,93 @@
                     <div>
 
             @if ($server->firewallRules->isNotEmpty())
-                        {{-- Bulk-action strip: tinted bg + horizontal rule above and below so it
-                             reads as a distinct toolbar between the trigger header and the rules
-                             table, rather than floating mid-card. --}}
-                        <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-8">
-                            <span class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Bulk') }}</span>
-                            <button
-                                type="button"
-                                wire:click="selectAllFirewallRules"
-                                wire:loading.attr="disabled"
-                                class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
-                            >
-                                <span wire:loading.remove wire:target="selectAllFirewallRules">{{ __('Select all') }}</span>
-                                <span wire:loading wire:target="selectAllFirewallRules" class="inline-flex items-center gap-1.5">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Selecting…') }}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="clearFirewallBulkSelection"
-                                wire:loading.attr="disabled"
-                                class="rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-moss hover:bg-brand-sand/30"
-                            >
-                                <span wire:loading.remove wire:target="clearFirewallBulkSelection">{{ __('Clear') }}</span>
-                                <span wire:loading wire:target="clearFirewallBulkSelection" class="inline-flex items-center gap-1.5">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Clearing…') }}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="bulkEnableFirewallRules"
-                                wire:loading.attr="disabled"
-                                class="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100/80"
-                            >
-                                <span wire:loading.remove wire:target="bulkEnableFirewallRules">{{ __('Enable selected') }}</span>
-                                <span wire:loading wire:target="bulkEnableFirewallRules" class="inline-flex items-center gap-1.5">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Enabling…') }}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="bulkDisableFirewallRules"
-                                wire:loading.attr="disabled"
-                                class="rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-                            >
-                                <span wire:loading.remove wire:target="bulkDisableFirewallRules">{{ __('Disable selected') }}</span>
-                                <span wire:loading wire:target="bulkDisableFirewallRules" class="inline-flex items-center gap-1.5">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Disabling…') }}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="openConfirmActionModal('bulkDeleteFirewallRules', [], @js(__('Delete selected firewall rules')), @js(__('Remove selected rules from the panel and try to delete matching UFW entries?')), @js(__('Delete selected')), true)"
-                                wire:loading.attr="disabled"
-                                class="rounded-lg border border-red-200 bg-red-50/80 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100/80"
-                            >
-                                <span wire:loading.remove wire:target="bulkDeleteFirewallRules">{{ __('Delete selected') }}</span>
-                                <span wire:loading wire:target="bulkDeleteFirewallRules" class="inline-flex items-center gap-1.5">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Deleting…') }}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="openConfirmActionModal('trimDuplicateFirewallRules', [], @js(__('Trim duplicate firewall rules')), @js(__('Trim exact duplicate firewall rules and keep the first copy of each?')), @js(__('Trim duplicates')), false)"
-                                wire:loading.attr="disabled"
-                                class="rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-                            >
-                                <span wire:loading.remove wire:target="trimDuplicateFirewallRules">{{ __('Trim duplicates') }}</span>
-                                <span wire:loading wire:target="trimDuplicateFirewallRules" class="inline-flex items-center gap-1.5">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Trimming…') }}
-                                </span>
-                            </button>
-                        </div>
+                        {{-- Contextual bulk-action toolbar: only renders when one or more row
+                             checkboxes are ticked. Per-row checkboxes (still visible in the
+                             table below) are how an operator starts a selection. --}}
+                        @php $bulkSelectedCount = count(array_filter((array) ($firewall_bulk_ids ?? []))); @endphp
+                        @if ($bulkSelectedCount > 0)
+                            <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-8">
+                                <span class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __(':n selected', ['n' => $bulkSelectedCount]) }}</span>
+                                <button
+                                    type="button"
+                                    wire:click="selectAllFirewallRules"
+                                    wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
+                                >
+                                    <x-heroicon-o-check-circle wire:loading.remove wire:target="selectAllFirewallRules" class="h-3.5 w-3.5 text-brand-moss" />
+                                    <span wire:loading wire:target="selectAllFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                        <x-spinner variant="forest" size="sm" />
+                                    </span>
+                                    <span wire:loading.remove wire:target="selectAllFirewallRules">{{ __('Select all') }}</span>
+                                    <span wire:loading wire:target="selectAllFirewallRules">{{ __('Selecting…') }}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="clearFirewallBulkSelection"
+                                    wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-moss hover:bg-brand-sand/30"
+                                >
+                                    <x-heroicon-o-x-circle wire:loading.remove wire:target="clearFirewallBulkSelection" class="h-3.5 w-3.5" />
+                                    <span wire:loading wire:target="clearFirewallBulkSelection" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                        <x-spinner variant="forest" size="sm" />
+                                    </span>
+                                    <span wire:loading.remove wire:target="clearFirewallBulkSelection">{{ __('Clear') }}</span>
+                                    <span wire:loading wire:target="clearFirewallBulkSelection">{{ __('Clearing…') }}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="bulkEnableFirewallRules"
+                                    wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100/80"
+                                >
+                                    <x-heroicon-o-check wire:loading.remove wire:target="bulkEnableFirewallRules" class="h-3.5 w-3.5" />
+                                    <span wire:loading wire:target="bulkEnableFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                        <x-spinner variant="forest" size="sm" />
+                                    </span>
+                                    <span wire:loading.remove wire:target="bulkEnableFirewallRules">{{ __('Enable selected') }}</span>
+                                    <span wire:loading wire:target="bulkEnableFirewallRules">{{ __('Enabling…') }}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="bulkDisableFirewallRules"
+                                    wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-no-symbol wire:loading.remove wire:target="bulkDisableFirewallRules" class="h-3.5 w-3.5 text-brand-moss" />
+                                    <span wire:loading wire:target="bulkDisableFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                        <x-spinner variant="forest" size="sm" />
+                                    </span>
+                                    <span wire:loading.remove wire:target="bulkDisableFirewallRules">{{ __('Disable selected') }}</span>
+                                    <span wire:loading wire:target="bulkDisableFirewallRules">{{ __('Disabling…') }}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('bulkDeleteFirewallRules', [], @js(__('Delete selected firewall rules')), @js(__('Remove selected rules from the panel and try to delete matching UFW entries?')), @js(__('Delete selected')), true)"
+                                    wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/80 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100/80"
+                                >
+                                    <x-heroicon-o-trash wire:loading.remove wire:target="bulkDeleteFirewallRules" class="h-3.5 w-3.5" />
+                                    <span wire:loading wire:target="bulkDeleteFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                        <x-spinner variant="forest" size="sm" />
+                                    </span>
+                                    <span wire:loading.remove wire:target="bulkDeleteFirewallRules">{{ __('Delete selected') }}</span>
+                                    <span wire:loading wire:target="bulkDeleteFirewallRules">{{ __('Deleting…') }}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('trimDuplicateFirewallRules', [], @js(__('Trim duplicate firewall rules')), @js(__('Trim exact duplicate firewall rules and keep the first copy of each?')), @js(__('Trim duplicates')), false)"
+                                    wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-scissors wire:loading.remove wire:target="trimDuplicateFirewallRules" class="h-3.5 w-3.5 text-brand-moss" />
+                                    <span wire:loading wire:target="trimDuplicateFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                        <x-spinner variant="forest" size="sm" />
+                                    </span>
+                                    <span wire:loading.remove wire:target="trimDuplicateFirewallRules">{{ __('Trim duplicates') }}</span>
+                                    <span wire:loading wire:target="trimDuplicateFirewallRules">{{ __('Trimming…') }}</span>
+                                </button>
+                            </div>
+                        @endif
                         <div class="mx-6 mt-5 mb-6 overflow-x-auto rounded-xl border border-brand-ink/10 sm:mx-8">
                             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                                 <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
@@ -612,6 +660,90 @@
                         </div>
                     </x-modal>
 
+                    {{-- Import-from-host preview modal. Populated by previewImportHostRules from
+                         `ufw show added`; rows already in the panel are pre-unticked, parser-skipped
+                         lines render read-only so the operator can see them but not import them.
+                         Open/close is driven by the standard open-modal/close-modal dispatch pattern. --}}
+                    <x-modal name="import-host-firewall-rules-modal" maxWidth="3xl" overlayClass="bg-brand-ink/40">
+                            <div class="border-b border-brand-ink/10 px-6 py-5">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Import from host') }}</p>
+                                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Pull UFW rules into the panel') }}</h2>
+                                <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                    {{ __('Read from `ufw show added`. Importing only adds rows to the panel — nothing is changed on the host. Click "Apply rules" afterwards if you want the panel to be the source of truth for UFW.') }}
+                                </p>
+                            </div>
+
+                            <div class="px-6 py-4">
+                                @if (empty($import_host_rules))
+                                    <p class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-4 py-6 text-center text-sm text-brand-moss">
+                                        {{ __('No user-added UFW rules were found on the host.') }}
+                                    </p>
+                                @else
+                                    <div class="max-h-96 overflow-y-auto rounded-xl border border-brand-ink/10">
+                                        <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                                            <thead class="sticky top-0 bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
+                                                <tr>
+                                                    <th class="w-10 px-3 py-2"><span class="sr-only">{{ __('Select') }}</span></th>
+                                                    <th class="px-3 py-2 font-semibold">{{ __('Action') }}</th>
+                                                    <th class="px-3 py-2 font-semibold">{{ __('Port') }}</th>
+                                                    <th class="px-3 py-2 font-semibold">{{ __('Proto') }}</th>
+                                                    <th class="px-3 py-2 font-semibold">{{ __('Source') }}</th>
+                                                    <th class="px-3 py-2 font-semibold">{{ __('Status') }}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-brand-ink/8 bg-white">
+                                                @foreach ($import_host_rules as $row)
+                                                    <tr @class([
+                                                        'text-brand-ink',
+                                                        'opacity-50' => ! $row['importable'] || $row['already_in_panel'],
+                                                    ])>
+                                                        <td class="px-3 py-2 align-top">
+                                                            @if ($row['importable'] && ! $row['already_in_panel'])
+                                                                <input
+                                                                    type="checkbox"
+                                                                    wire:model.live="import_host_selected"
+                                                                    value="{{ $row['index'] }}"
+                                                                    class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest"
+                                                                />
+                                                            @else
+                                                                <span class="inline-block h-4 w-4"></span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-3 py-2 capitalize">{{ $row['action'] ?? '—' }}</td>
+                                                        <td class="px-3 py-2 font-mono text-xs">{{ $row['port'] ?? '—' }}</td>
+                                                        <td class="px-3 py-2 font-mono text-xs">{{ $row['protocol'] ?? '—' }}</td>
+                                                        <td class="max-w-[12rem] truncate px-3 py-2 font-mono text-xs" title="{{ $row['source'] ?? '' }}">{{ $row['source'] ?? '—' }}</td>
+                                                        <td class="px-3 py-2 text-xs">
+                                                            @if (! $row['importable'])
+                                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-brand-moss" title="{{ $row['raw'] }}">{{ __('Skipped (unparsed)') }}</span>
+                                                            @elseif ($row['already_in_panel'])
+                                                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('Already in panel') }}</span>
+                                                            @else
+                                                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/20">{{ __('New') }}</span>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 px-6 py-4">
+                                <p class="text-xs text-brand-moss">
+                                    {{ trans_choice('{0} 0 selected|{1} 1 rule selected|[2,*] :count rules selected', count($import_host_selected), ['count' => count($import_host_selected)]) }}
+                                </p>
+                                <div class="flex items-center gap-2">
+                                    <x-secondary-button type="button" wire:click="closeImportHostRulesModal" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                                    <x-primary-button type="button" wire:click="confirmImportHostRules" wire:loading.attr="disabled" wire:target="confirmImportHostRules">
+                                        <span wire:loading.remove wire:target="confirmImportHostRules">{{ __('Import selected') }}</span>
+                                        <span wire:loading wire:target="confirmImportHostRules">{{ __('Importing…') }}</span>
+                                    </x-primary-button>
+                                </div>
+                            </div>
+                        </x-modal>
+
                     {{-- UFW status + diagnostics output is now surfaced through the workspace
                          console banner above (Refresh status / Diagnostics actions populate it
                          via emitPanelEvent). The previous inline `<pre>` and full-page modal
@@ -636,15 +768,43 @@
                 <div class="{{ $card }} p-6 sm:p-8 space-y-8">
                     <div>
                         <h2 class="text-lg font-semibold text-brand-ink">{{ __('Bundled templates') }}</h2>
-                        <p class="mt-2 text-sm text-brand-moss">{{ __('Adds rules to this server’s list (does not replace existing rows).') }}</p>
-                        <div class="mt-4 flex flex-wrap gap-2">
+                        <p class="mt-2 text-sm text-brand-moss">{{ __('Adds rules to this server’s list (does not replace existing rows). Already-applied bundles are dimmed — re-applying is a no-op.') }}</p>
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($bundledTemplates as $bKey => $b)
+                                @php
+                                    $isApplied = (bool) ($bundledAppliedMap[$bKey] ?? false);
+                                    $ruleCount = count($b['rules'] ?? []);
+                                @endphp
                                 <button
                                     type="button"
                                     wire:click="applyBundledFirewallTemplate('{{ $bKey }}')"
-                                    class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/60"
+                                    wire:loading.attr="disabled"
+                                    wire:target="applyBundledFirewallTemplate('{{ $bKey }}')"
+                                    @class([
+                                        'group flex flex-col items-start gap-1.5 rounded-xl border px-3.5 py-3 text-left transition-colors',
+                                        'border-emerald-200 bg-emerald-50/40 hover:border-emerald-300 hover:bg-emerald-50/70' => $isApplied,
+                                        'border-brand-ink/10 bg-white hover:border-brand-forest/30 hover:bg-brand-sand/30' => ! $isApplied,
+                                    ])
                                 >
-                                    {{ __($b['label'] ?? $bKey) }}
+                                    <div class="flex w-full items-center justify-between gap-2">
+                                        <span class="text-sm font-semibold text-brand-ink">{{ __($b['label'] ?? $bKey) }}</span>
+                                        @if ($isApplied)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                                <x-heroicon-m-check class="h-3 w-3" />
+                                                {{ __('Applied') }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                                {{ trans_choice('{1} :n rule|[2,*] :n rules', $ruleCount, ['n' => $ruleCount]) }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    @if (! empty($b['description']))
+                                        <p class="text-[11px] leading-relaxed text-brand-moss">{{ __($b['description']) }}</p>
+                                    @endif
+                                    @if ($isApplied)
+                                        <p class="text-[10px] uppercase tracking-wide text-emerald-700">{{ __('All rules already in panel · click to re-add (no-op)') }}</p>
+                                    @endif
                                 </button>
                             @endforeach
                         </div>
@@ -704,82 +864,122 @@
             </x-server-workspace-tab-panel>
 
             <x-server-workspace-tab-panel
-                id="firewall-panel-history"
-                labelled-by="firewall-tab-history"
-                :hidden="$firewall_workspace_tab !== 'history'"
-            >
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Apply history') }}</h2>
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('Review recent firewall apply attempts and the rule set hash recorded for each run.') }}</p>
-
-                    @if (isset($applyLogs) && $applyLogs->isNotEmpty())
-                        <ul class="mt-6 space-y-3 text-sm">
-                            @foreach ($applyLogs as $log)
-                                <li class="border-b border-brand-ink/5 pb-3 last:border-0">
-                                    <div class="flex flex-wrap items-center justify-between gap-2">
-                                        <span class="font-medium {{ $log->success ? 'text-emerald-800' : 'text-red-700' }}">
-                                            {{ $log->success ? __('Applied') : __('Failed') }}
-                                        </span>
-                                        <span class="text-xs text-brand-moss">{{ $log->created_at?->diffForHumans() }}</span>
-                                    </div>
-                                    <p class="mt-1 font-mono text-xs text-brand-ink/80">
-                                        {{ $log->rules_hash ? substr($log->rules_hash, 0, 12).'…' : '—' }}
-                                        · {{ $log->rule_count }} {{ __('rules') }}
-                                    </p>
-                                    @if ($log->message)
-                                        <p class="mt-1 text-xs text-brand-moss">{{ \Illuminate\Support\Str::limit($log->message, 240) }}</p>
-                                    @endif
-                                </li>
-                            @endforeach
-                        </ul>
-                    @else
-                        <p class="mt-6 text-sm text-brand-moss">{{ __('No firewall apply history yet.') }}</p>
-                    @endif
-                </div>
-            </x-server-workspace-tab-panel>
-
-            <x-server-workspace-tab-panel
-                id="firewall-panel-audit"
-                labelled-by="firewall-tab-audit"
-                :hidden="$firewall_workspace_tab !== 'audit'"
+                id="firewall-panel-activity"
+                labelled-by="firewall-tab-activity"
+                :hidden="$firewall_workspace_tab !== 'activity'"
             >
                 <div class="{{ $card }} p-6 sm:p-8">
                     @php
-                        $firewallAuditCount = $auditEvents->count();
-                        $latestFirewallAudit = $auditEvents->first()?->created_at;
+                        $activityCount = count($activityItems);
+                        $latestActivity = $activityItems[0]['at'] ?? null;
+                        $linesOf = static function (?string $message): array {
+                            if (! is_string($message) || trim($message) === '') {
+                                return [];
+                            }
+                            $lines = array_values(array_filter(
+                                array_map('trim', preg_split("/\r?\n/", $message) ?: []),
+                                static fn (string $l): bool => $l !== '',
+                            ));
+
+                            return array_slice($lines, 0, 25);
+                        };
                     @endphp
                     <div class="flex min-w-0 items-start gap-3">
                         <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
                             <x-heroicon-o-clock class="h-5 w-5" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent audit') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Track recent firewall changes, template applications, and apply activity for this server.') }}</p>
+                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Activity') }}</h2>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Apply runs, rule edits, template applications, and imports — chronologically. Apply rows are expandable for the full UFW transcript.') }}</p>
                             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                                 <span class="inline-flex items-center gap-1">
                                     <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                    {{ trans_choice('{0} no events recorded|{1} :count event recorded|[2,*] :count events recorded', $firewallAuditCount, ['count' => $firewallAuditCount]) }}
+                                    {{ trans_choice('{0} no events recorded|{1} :count event recorded|[2,*] :count events recorded', $activityCount, ['count' => $activityCount]) }}
                                 </span>
-                                @if ($latestFirewallAudit)
+                                @if ($latestActivity)
                                     <span class="text-brand-mist/60">·</span>
-                                    <span>{{ __('latest :time', ['time' => $latestFirewallAudit->diffForHumans()]) }}</span>
+                                    <span>{{ __('latest :time', ['time' => $latestActivity->diffForHumans()]) }}</span>
                                 @endif
                             </div>
                         </div>
                     </div>
 
-                    @if ($auditEvents->isNotEmpty())
-                        <ul class="mt-6 space-y-2 text-sm text-brand-moss">
-                            @foreach ($auditEvents as $ev)
-                                <li class="flex flex-wrap justify-between gap-2 border-b border-brand-ink/5 pb-2">
-                                    <span class="font-mono text-xs text-brand-ink">{{ $ev->event }}</span>
-                                    <span class="text-xs">{{ $ev->created_at?->diffForHumans() }}</span>
-                                    <span class="w-full text-xs">{{ $ev->user?->name ?? __('API') }}</span>
-                                </li>
+                    @if ($activityCount > 0)
+                        <div class="mt-6 space-y-2">
+                            @foreach ($activityItems as $item)
+                                @if ($item['kind'] === 'apply')
+                                    @php
+                                        $log = $item['log'];
+                                        $isSuccess = (bool) $log->success;
+                                        $logLines = $linesOf($log->message);
+                                    @endphp
+                                    <details class="group overflow-hidden rounded-xl border border-brand-ink/10 bg-white" wire:key="activity-{{ $item['key'] }}">
+                                        <summary class="flex cursor-pointer list-none items-start gap-3 px-4 py-3 sm:px-5">
+                                            <span @class([
+                                                'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1',
+                                                'bg-emerald-50 text-emerald-700 ring-emerald-200' => $isSuccess,
+                                                'bg-rose-50 text-rose-700 ring-rose-200' => ! $isSuccess,
+                                            ])>
+                                                @if ($isSuccess)
+                                                    <x-heroicon-m-check class="h-4 w-4" />
+                                                @else
+                                                    <x-heroicon-m-exclamation-triangle class="h-4 w-4" />
+                                                @endif
+                                            </span>
+                                            <div class="min-w-0 flex-1">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <span @class([
+                                                        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                                                        'bg-emerald-50 text-emerald-800 ring-emerald-200' => $isSuccess,
+                                                        'bg-rose-50 text-rose-800 ring-rose-200' => ! $isSuccess,
+                                                    ])>
+                                                        {{ $isSuccess ? __('Applied') : __('Failed') }}
+                                                    </span>
+                                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss" title="{{ $log->rules_hash ?? '—' }}">
+                                                        <x-heroicon-m-hashtag class="h-3 w-3" />
+                                                        {{ $log->rules_hash ? substr($log->rules_hash, 0, 12) : '—' }}
+                                                    </span>
+                                                    <span class="inline-flex items-center gap-1 text-[11px] text-brand-mist">
+                                                        {{ trans_choice('{0} 0 rules|{1} :count rule|[2,*] :count rules', (int) $log->rule_count, ['count' => (int) $log->rule_count]) }}
+                                                    </span>
+                                                    @if ($log->source)
+                                                        <span class="inline-flex items-center rounded-md border border-brand-ink/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-brand-moss">{{ $log->source }}</span>
+                                                    @endif
+                                                    <span class="ml-auto text-[11px] text-brand-mist" title="{{ $log->created_at?->toIso8601String() }}">{{ $log->created_at?->diffForHumans() }}</span>
+                                                </div>
+                                                @if ($log->user)
+                                                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('by :name', ['name' => $log->user->name ?? $log->user->email]) }}</p>
+                                                @endif
+                                                @if (count($logLines) > 0)
+                                                    <p class="mt-1 truncate font-mono text-[11px] text-brand-moss">{{ $logLines[count($logLines) - 1] }}</p>
+                                                @endif
+                                            </div>
+                                            <span class="ml-2 mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-mist transition-transform group-open:rotate-180">
+                                                <x-heroicon-o-chevron-down class="h-4 w-4" />
+                                            </span>
+                                        </summary>
+                                        @if (count($logLines) > 0)
+                                            <div class="border-t border-brand-ink/8 bg-brand-sand/15 px-4 py-3 sm:px-5">
+                                                <pre class="max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-emerald-100">@foreach ($logLines as $line){{ $line }}
+@endforeach</pre>
+                                            </div>
+                                        @endif
+                                    </details>
+                                @else
+                                    <div wire:key="activity-{{ $item['key'] }}">
+                                        @include('livewire.servers.partials.activity-audit-row', ['event' => $item['event'], 'server' => $server])
+                                    </div>
+                                @endif
                             @endforeach
-                        </ul>
+                        </div>
                     @else
-                        <p class="mt-6 text-sm text-brand-moss">{{ __('No firewall audit events yet.') }}</p>
+                        <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
+                                <x-heroicon-o-clock class="h-5 w-5" />
+                            </span>
+                            <p class="text-sm font-medium text-brand-ink">{{ __('No firewall activity yet.') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('Adding, editing, importing, or applying rules will all show up here.') }}</p>
+                        </div>
                     @endif
                 </div>
             </x-server-workspace-tab-panel>

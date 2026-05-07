@@ -5,12 +5,16 @@ namespace App\Livewire\Sites;
 use App\Jobs\ApplyInsightFixJob;
 use App\Jobs\RunSiteInsightsJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Insights\InsightSettingsRepository;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -18,6 +22,7 @@ use Livewire\Component;
 class WorkspaceInsights extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
 
     public Server $server;
 
@@ -132,10 +137,17 @@ class WorkspaceInsights extends Component
     public function runChecksNow(): void
     {
         $this->authorize('view', $this->site);
+
+        if ($this->rejectIfInsightsBusy()) {
+            return;
+        }
+
+        $runId = (string) Str::ulid();
+        $this->seedRunBannerMeta($runId);
         $this->running = true;
-        RunSiteInsightsJob::dispatch($this->site->id);
+        RunSiteInsightsJob::dispatch($this->site->id, null, $runId);
         $this->running = false;
-        $this->toastSuccess(__('Insights check queued. Refresh in a moment for results.'));
+        $this->toastSuccess(__('Insights check queued — watch the banner for live output.'));
     }
 
     public function applyFix(int $findingId): void
@@ -155,8 +167,231 @@ class WorkspaceInsights extends Component
             return;
         }
 
-        ApplyInsightFixJob::dispatch($finding->id, $user->id);
-        $this->toastSuccess(__('Fix has been queued. This may take up to a minute.'));
+        if ($this->rejectIfInsightsBusy()) {
+            return;
+        }
+
+        $runId = (string) Str::ulid();
+        $this->seedFixBannerMeta($runId, $finding->id);
+        ApplyInsightFixJob::dispatch($finding->id, $user->id, $runId);
+        $this->toastSuccess(__('Fix queued — watch the banner for live output.'));
+    }
+
+    // ─── Workspace banner state ──────────────────────────────────────────────────────────
+    //
+    // Mirrors the server insights workspace, but writes to `site.meta` instead of
+    // `server.meta` so the site page only surfaces banner activity for THIS site.
+    // Two banner sources participate here (`run` and `fix`); revert is server-only
+    // today since site-scoped fixes don't yet record backups.
+
+    public const STALE_THRESHOLD_SECONDS = 300;
+
+    protected function isInsightsBusy(): bool
+    {
+        $meta = $this->site->fresh()->meta ?? [];
+        foreach (['run', 'fix'] as $kind) {
+            if ($this->kindBusy($meta, $kind)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    protected function kindBusy(array $meta, string $kind): bool
+    {
+        $status = (string) data_get($meta, (string) config("insights_workspace.meta_{$kind}_status_key"));
+        if (! in_array($status, ['queued', 'running'], true)) {
+            return false;
+        }
+
+        $startedAt = (string) data_get($meta, (string) config("insights_workspace.meta_{$kind}_started_at_key"));
+        if ($startedAt === '') {
+            return true;
+        }
+        try {
+            return ! Carbon::parse($startedAt)->lt(now()->subSeconds(self::STALE_THRESHOLD_SECONDS));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    protected function rejectIfInsightsBusy(): bool
+    {
+        if (! $this->isInsightsBusy()) {
+            return false;
+        }
+        $this->toastError(__('An insights operation is already running on this site. Wait for it to finish before starting another.'));
+
+        return true;
+    }
+
+    protected function seedRunBannerMeta(string $runId): void
+    {
+        $this->writeBannerSeed([
+            (string) config('insights_workspace.meta_run_run_id_key') => $runId,
+            (string) config('insights_workspace.meta_run_status_key') => 'queued',
+            (string) config('insights_workspace.meta_run_started_at_key') => now()->toIso8601String(),
+            (string) config('insights_workspace.meta_run_finished_at_key') => null,
+            (string) config('insights_workspace.meta_run_error_key') => null,
+        ]);
+    }
+
+    protected function seedFixBannerMeta(string $runId, int $findingId): void
+    {
+        $this->writeBannerSeed([
+            (string) config('insights_workspace.meta_fix_run_id_key') => $runId,
+            (string) config('insights_workspace.meta_fix_finding_id_key') => $findingId,
+            (string) config('insights_workspace.meta_fix_status_key') => 'queued',
+            (string) config('insights_workspace.meta_fix_started_at_key') => now()->toIso8601String(),
+            (string) config('insights_workspace.meta_fix_finished_at_key') => null,
+            (string) config('insights_workspace.meta_fix_error_key') => null,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $patch
+     */
+    private function writeBannerSeed(array $patch): void
+    {
+        $fresh = $this->site->fresh();
+        if ($fresh === null) {
+            return;
+        }
+        $meta = $fresh->meta ?? [];
+        foreach ($patch as $k => $v) {
+            $meta[$k] = $v;
+        }
+        $fresh->update(['meta' => $meta]);
+        $this->site->refresh();
+    }
+
+    public function pollInsightsStatus(): void
+    {
+        $this->site->refresh();
+        $this->reapStaleInsightsBanner();
+    }
+
+    /**
+     * Surface a worker-gone-away as a normal banner failure. See the server-side
+     * counterpart for the rationale.
+     */
+    protected function reapStaleInsightsBanner(): void
+    {
+        $fresh = $this->site->fresh();
+        if ($fresh === null) {
+            return;
+        }
+        $meta = $fresh->meta ?? [];
+        $changed = false;
+        $threshold = (int) config('insights_workspace.stale_threshold_seconds', 300);
+
+        foreach (['run', 'fix'] as $kind) {
+            $statusKey = (string) config("insights_workspace.meta_{$kind}_status_key");
+            $startedAtKey = (string) config("insights_workspace.meta_{$kind}_started_at_key");
+            $finishedAtKey = (string) config("insights_workspace.meta_{$kind}_finished_at_key");
+            $errorKey = (string) config("insights_workspace.meta_{$kind}_error_key");
+
+            $status = (string) data_get($meta, $statusKey);
+            if (! in_array($status, ['queued', 'running'], true)) {
+                continue;
+            }
+
+            $startedAt = (string) data_get($meta, $startedAtKey);
+            if ($startedAt === '') {
+                continue;
+            }
+            try {
+                $started = Carbon::parse($startedAt);
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($started->gt(now()->subSeconds($threshold))) {
+                continue;
+            }
+
+            $meta[$statusKey] = 'failed';
+            $meta[$finishedAtKey] = now()->toIso8601String();
+            $meta[$errorKey] = null;
+            $changed = true;
+        }
+
+        if ($changed) {
+            $fresh->update(['meta' => $meta]);
+            $this->site->refresh();
+        }
+    }
+
+    public function dismissInsightsBanner(string $kind): void
+    {
+        $this->authorize('view', $this->site);
+        if (! in_array($kind, ['run', 'fix'], true)) {
+            return;
+        }
+
+        $statusKey = (string) config("insights_workspace.meta_{$kind}_status_key");
+        $status = (string) data_get($this->site->fresh()->meta ?? [], $statusKey);
+        if (in_array($status, ['queued', 'running'], true)) {
+            return;
+        }
+
+        $fresh = $this->site->fresh();
+        if ($fresh === null) {
+            return;
+        }
+        $meta = $fresh->meta ?? [];
+        foreach ([
+            "meta_{$kind}_run_id_key",
+            "meta_{$kind}_status_key",
+            "meta_{$kind}_started_at_key",
+            "meta_{$kind}_finished_at_key",
+            "meta_{$kind}_error_key",
+        ] as $configKey) {
+            unset($meta[(string) config("insights_workspace.{$configKey}")]);
+        }
+        if ($kind === 'fix') {
+            unset($meta[(string) config('insights_workspace.meta_fix_finding_id_key')]);
+        }
+        $fresh->update(['meta' => $meta]);
+        $this->site->refresh();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getRunOutputLinesProperty(): array
+    {
+        return $this->readBannerLines('run');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getFixOutputLinesProperty(): array
+    {
+        return $this->readBannerLines('fix');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function readBannerLines(string $kind): array
+    {
+        $runId = (string) data_get($this->site->meta ?? [], (string) config("insights_workspace.meta_{$kind}_run_id_key"));
+        if ($runId === '') {
+            return [];
+        }
+        $prefix = (string) config("insights_workspace.{$kind}_output_cache_key_prefix");
+        $payload = Cache::get($prefix.$runId);
+        if (! is_array($payload)) {
+            return [];
+        }
+        $lines = $payload['lines'] ?? [];
+
+        return is_array($lines) ? array_values(array_filter($lines, 'is_string')) : [];
     }
 
     public function render(): View

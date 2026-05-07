@@ -28,11 +28,44 @@ class ServerManageRemoteSshJob implements ShouldQueue
         public int $timeoutSeconds,
         public ?string $flashSuccessMessage = null,
         public ?string $logId = null,
+        /**
+         * Fully-qualified class name of an event to broadcast on completion (success or failure).
+         * Constructor signature must accept (serverId, taskId, taskName, success, error,
+         * flashSuccess, finalOutput) to match {@see broadcastCompletion}. Cache write happens
+         * before the broadcast so listeners can re-read the authoritative cache state.
+         */
+        public ?string $broadcastEventClass = null,
     ) {
         $this->timeout = max(60, $timeoutSeconds + 60);
         $queue = config('server_manage.remote_task_queue');
         if (is_string($queue) && $queue !== '') {
             $this->onQueue($queue);
+        }
+    }
+
+    /**
+     * Fire the optional completion broadcast configured at construction time. No-op when no
+     * event class was provided — keeps SSH-keys / Firewall callers on the cache-poll path.
+     */
+    private function broadcastCompletion(bool $success, ?string $error, string $output): void
+    {
+        if ($this->broadcastEventClass === null || ! class_exists($this->broadcastEventClass)) {
+            return;
+        }
+
+        try {
+            broadcast(new $this->broadcastEventClass(
+                $this->serverId,
+                $this->cacheKey,
+                $this->taskName,
+                $success,
+                $error,
+                $this->flashSuccessMessage,
+                $output,
+            ));
+        } catch (\Throwable) {
+            // Swallow broadcast failures: the cache write already happened, so the wire:poll
+            // fallback will resolve the banner. We never want a Reverb hiccup to fail the job.
         }
     }
 
@@ -66,6 +99,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'flash_success' => null,
             ]);
             $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
+            $this->broadcastCompletion(false, __('This request was replaced by a newer one.'), '');
 
             return;
         }
@@ -119,6 +153,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                     'flash_success' => null,
                 ]);
                 $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'), output: $trimmed);
+                $this->broadcastCompletion(false, __('This request was replaced by a newer one.'), $trimmed);
 
                 return;
             }
@@ -132,6 +167,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                     'flash_success' => null,
                 ]);
                 $this->updateLog(ServerManageAction::STATUS_FAILED, error: $error, output: $trimmed);
+                $this->broadcastCompletion(false, $error, $trimmed);
 
                 return;
             }
@@ -143,6 +179,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'flash_success' => $this->flashSuccessMessage,
             ]);
             $this->updateLog(ServerManageAction::STATUS_FINISHED, output: $trimmed);
+            $this->broadcastCompletion(true, null, $trimmed);
 
             if ($this->taskName === 'services-install:install_monitoring_prerequisites') {
                 $server = Server::query()->find($this->serverId);
@@ -163,6 +200,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'flash_success' => null,
             ]);
             $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'), output: $trimmed);
+            $this->broadcastCompletion(false, __('This request was replaced by a newer one.'), $trimmed);
         } catch (Throwable $e) {
             $trimmed = trim(ServerManageSshExecutor::stripSshClientNoise($fullOutput));
             $this->mergePayload([
@@ -172,6 +210,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'flash_success' => null,
             ]);
             $this->updateLog(ServerManageAction::STATUS_FAILED, error: $e->getMessage(), output: $trimmed);
+            $this->broadcastCompletion(false, $e->getMessage(), $trimmed);
         }
     }
 

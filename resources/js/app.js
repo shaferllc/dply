@@ -1,6 +1,6 @@
 import './bootstrap';
 
-import './dply-webauthn.js';
+import './dply-passkeys.js';
 
 import { registerDplyThemeListeners } from './theme.js';
 

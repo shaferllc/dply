@@ -58,6 +58,41 @@
         ></div>
 
         <div class="space-y-6">
+
+        {{-- Workspace-level console banner. Surfaces panel events from add/edit/delete plus
+             the queued crontab sync output. --}}
+        <div wire:loading.block wire:target="syncCronJobs" class="w-full">
+            <x-workspace-console-banner
+                status="running"
+                :message="__('Syncing crontab to :host …', ['host' => $server->getSshConnectionString()])"
+                :subtitle="__('Writing the Dply-managed crontab block over SSH.')"
+                :output="[]"
+                :busy="true"
+                :default-expanded="false"
+                :dismiss-action="null"
+            />
+        </div>
+
+        @if (! empty($panel_event_lines))
+            <div wire:loading.remove wire:target="syncCronJobs" class="w-full">
+                @php
+                    $cronPanelSubtitle = match ($panel_event_status) {
+                        'failed' => null,
+                        default => __('The panel was updated. Sync the crontab to install the changes on the server.'),
+                    };
+                @endphp
+                <x-workspace-console-banner
+                    :status="$panel_event_status"
+                    :message="$panel_event_message"
+                    :subtitle="$cronPanelSubtitle"
+                    :output="$panel_event_lines"
+                    :busy="false"
+                    dismiss-action="dismissPanelBanner"
+                    :default-expanded="true"
+                />
+            </div>
+        @endif
+
         <x-server-workspace-tablist :aria-label="__('Cron sections')">
             <x-server-workspace-tab id="cron-tab-basics" :active="$cron_workspace_tab === 'jobs'" wire:click="$set('cron_workspace_tab', 'jobs')">
                 <span class="inline-flex items-center gap-1.5">
@@ -79,29 +114,97 @@
             :hidden="$cron_workspace_tab !== 'jobs'"
             panel-class="space-y-8"
         >
-        <div class="{{ $card }}">
-            <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+        @php
+            $cronJobCount = $server->cronJobs->count();
+            $enabledCronJobCount = $server->cronJobs->where('enabled', true)->count();
+            $unsyncedCronCount = $server->cronJobs->where('is_synced', false)->count();
+            $latestCronSync = $server->cronJobs->where('synced_at')->max('synced_at');
+        @endphp
+
+        {{-- Slim trigger card — primary "Add cron job" + "Sync crontab" actions, status meta-row.
+             The big add/edit form is now in a modal triggered by the button below. --}}
+        <div class="{{ $card }} overflow-hidden">
+            <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest ring-1 ring-brand-forest/20">
-                        @if ($editing_job_id)
-                            <x-heroicon-o-pencil-square class="h-5 w-5" />
-                        @else
-                            <x-heroicon-o-calendar-days class="h-5 w-5" />
-                        @endif
+                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                        <x-heroicon-o-calendar-days class="h-5 w-5" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">
-                            @if ($editing_job_id)
-                                {{ __('Edit cron job') }}
-                            @else
-                                {{ __('New cron job') }}
-                            @endif
-                        </h2>
-                        <p class="mt-0.5 text-sm text-brand-moss">
-                            {{ __('What should run, which user runs it, and how often. Advanced toggles tuck below when you need them.') }}
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Cron jobs') }}</h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                            {{ __('Stored in Dply, written to the server\'s crontab as a single Dply-managed block on each sync.') }}
                         </p>
+                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                            <span class="inline-flex items-center gap-1">
+                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                {{ trans_choice('{0} no jobs tracked|{1} :count job tracked|[2,*] :count jobs tracked', $cronJobCount, ['count' => $cronJobCount]) }}
+                                @if ($enabledCronJobCount !== $cronJobCount && $cronJobCount > 0)
+                                    ({{ __(':count enabled', ['count' => $enabledCronJobCount]) }})
+                                @endif
+                            </span>
+                            @if ($unsyncedCronCount > 0)
+                                <span class="text-brand-mist/60">·</span>
+                                <span class="inline-flex items-center gap-1 text-amber-700">
+                                    <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
+                                    {{ trans_choice('{1} :count unsynced change|[2,*] :count unsynced changes', $unsyncedCronCount, ['count' => $unsyncedCronCount]) }}
+                                </span>
+                            @elseif ($latestCronSync)
+                                <span class="text-brand-mist/60">·</span>
+                                <span class="inline-flex items-center gap-1">
+                                    <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
+                                    {{ __('synced :time', ['time' => \Illuminate\Support\Carbon::parse($latestCronSync)->diffForHumans()]) }}
+                                </span>
+                            @else
+                                <span class="text-brand-mist/60">·</span>
+                                <span>{{ __('not yet synced') }}</span>
+                            @endif
+                        </div>
                     </div>
                 </div>
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        x-on:click="$wire.cancelEdit(); $dispatch('open-modal', 'add-cron-job-modal')"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                    >
+                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                        {{ __('Add cron job') }}
+                    </button>
+                    <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
+                    <button
+                        type="button"
+                        wire:click="syncCronJobs"
+                        wire:loading.attr="disabled"
+                        wire:target="syncCronJobs"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <x-heroicon-o-arrow-path wire:loading.remove wire:target="syncCronJobs" class="h-3.5 w-3.5" />
+                        <span wire:loading wire:target="syncCronJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                            <x-spinner variant="forest" size="sm" />
+                        </span>
+                        <span wire:loading.remove wire:target="syncCronJobs">{{ __('Sync crontab') }}</span>
+                        <span wire:loading wire:target="syncCronJobs">{{ __('Syncing…') }}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- Add / Edit cron job modal. Triggered by the "Add cron job" button on the trigger
+             card and by the per-row Edit button (which sets editing_job_id first, then opens
+             this modal). Closes on successful saveCronJob. --}}
+        <x-modal name="add-cron-job-modal" maxWidth="3xl" overlayClass="bg-brand-ink/40">
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Cron job') }}</p>
+                <h2 class="mt-2 text-xl font-semibold text-brand-ink">
+                    @if ($editing_job_id)
+                        {{ __('Edit cron job') }}
+                    @else
+                        {{ __('New cron job') }}
+                    @endif
+                </h2>
+                <p class="mt-2 text-sm leading-6 text-brand-moss">
+                    {{ __('What should run, which user runs it, and how often. Advanced toggles tuck below when you need them.') }}
+                </p>
             </div>
             <div class="p-6 sm:p-8">
                 <form id="cron-job-form" wire:submit="saveCronJob" class="space-y-6">
@@ -305,32 +408,91 @@
                     </details>
                 </form>
             </div>
-            <div class="flex flex-col-reverse items-stretch justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
                 @if ($editing_job_id)
-                    <button
-                        type="button"
-                        wire:click="cancelEdit"
-                        class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                    >
-                        {{ __('Cancel') }}
-                    </button>
+                    <x-secondary-button type="button" wire:click="cancelEdit" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                @else
+                    <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
                 @endif
-                <button
-                    type="button"
-                    wire:click="syncCronJobs"
-                    class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                >
-                    {{ __('Sync crontab on server') }}
-                </button>
-                <x-primary-button type="submit" form="cron-job-form" class="justify-center">
-                    @if ($editing_job_id)
-                        {{ __('Save changes') }}
-                    @else
-                        {{ __('Add cron job') }}
-                    @endif
+                <x-primary-button type="submit" form="cron-job-form" wire:loading.attr="disabled" wire:target="saveCronJob">
+                    <span wire:loading.remove wire:target="saveCronJob">
+                        @if ($editing_job_id)
+                            {{ __('Save changes') }}
+                        @else
+                            {{ __('Add cron job') }}
+                        @endif
+                    </span>
+                    <span wire:loading wire:target="saveCronJob">{{ __('Saving…') }}</span>
                 </x-primary-button>
             </div>
-        </div>
+        </x-modal>
+
+        @if (! empty($bundledCronJobs))
+            <details class="{{ $card }} group" @if ($cronJobCount === 0) open @endif>
+                <summary class="flex cursor-pointer select-none items-center justify-between gap-3 px-6 py-4 sm:px-8">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-sparkles class="h-4 w-4" />
+                        </span>
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Common cron jobs') }}</h3>
+                            <p class="mt-0.5 text-xs text-brand-moss">
+                                {{ __('One-click starters for things people normally schedule. Each adds rows to the panel — review and edit (paths/domains), then sync the crontab.') }}
+                            </p>
+                        </div>
+                    </div>
+                    <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-180" />
+                </summary>
+                <div class="grid gap-3 border-t border-brand-ink/10 px-6 py-5 sm:grid-cols-2 sm:px-8 lg:grid-cols-3">
+                    @foreach ($bundledCronJobs as $bundleKey => $bundle)
+                        <div class="flex flex-col gap-3 rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm">
+                            <div class="flex min-w-0 items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $bundle['label'] }}</p>
+                                    <p class="mt-0.5 text-[11px] text-brand-mist">
+                                        {{ trans_choice('{1} :count entry|[2,*] :count entries', $bundle['entry_count'], ['count' => $bundle['entry_count']]) }}
+                                    </p>
+                                </div>
+                                @if ($bundle['applied'])
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+                                        <x-heroicon-o-check-circle class="h-3 w-3" />
+                                        {{ __('Added') }}
+                                    </span>
+                                @endif
+                            </div>
+                            <p class="text-xs leading-relaxed text-brand-moss">{{ $bundle['description'] }}</p>
+                            <div class="mt-auto">
+                                <button
+                                    type="button"
+                                    wire:click="applyCronBundle('{{ $bundleKey }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="applyCronBundle('{{ $bundleKey }}')"
+                                    @class([
+                                        'inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $bundle['applied'],
+                                        'bg-brand-forest text-brand-cream hover:bg-brand-forest/90' => ! $bundle['applied'],
+                                    ])
+                                >
+                                    <span wire:loading.remove wire:target="applyCronBundle('{{ $bundleKey }}')" class="inline-flex items-center gap-1.5">
+                                        @if ($bundle['applied'])
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                            {{ __('Add again') }}
+                                        @else
+                                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                            {{ __('Add to panel') }}
+                                        @endif
+                                    </span>
+                                    <span wire:loading wire:target="applyCronBundle('{{ $bundleKey }}')" class="inline-flex items-center gap-1.5">
+                                        <x-spinner variant="cream" size="sm" />
+                                        {{ __('Adding…') }}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </details>
+        @endif
 
         <div class="{{ $card }}">
             <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
@@ -390,8 +552,11 @@
                             if ($siteLabel && $primaryDomain?->hostname) {
                                 $siteLabel = $primaryDomain->hostname;
                             }
+                            $title = filled($cj->description) ? $cj->description : \Illuminate\Support\Str::limit($cj->command, 60);
+                            $rowSpinner = 'inline-block size-4 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink';
+                            $iconBtn = 'inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-ink/70 transition-colors hover:bg-brand-sand/60 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-40';
                         @endphp
-                        <li class="relative flex">
+                        <li class="group relative flex items-start gap-3 py-3 pl-5 pr-3 transition-colors hover:bg-brand-sand/15 sm:gap-4 sm:pl-6 sm:pr-4">
                             <span
                                 @class([
                                     'absolute bottom-0 left-0 top-0 w-1',
@@ -400,128 +565,151 @@
                                 ])
                                 aria-hidden="true"
                             ></span>
-                            <div class="min-w-0 flex-1 py-4 pl-5 pr-4 sm:py-5 sm:pl-6 sm:pr-6">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    @if (filled($cj->description))
-                                        <p class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ $cj->description }}</p>
+
+                            {{-- Body: title + chips on first line, command on second line --}}
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <h4 class="truncate text-sm font-semibold text-brand-ink" title="{{ $cj->description ?: '' }}">
+                                        {{ $title }}
+                                    </h4>
+                                    {{-- schedule chip --}}
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                                        <x-heroicon-m-clock class="h-3 w-3 text-brand-moss" />
+                                        {{ $cj->cron_expression }}
+                                    </span>
+                                    {{-- user chip --}}
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                                        <x-heroicon-m-user class="h-3 w-3 text-brand-moss" />
+                                        {{ $cj->user }}
+                                    </span>
+                                    @if (! $cj->enabled)
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200">
+                                            <x-heroicon-m-pause class="h-3 w-3" />
+                                            {{ __('Paused') }}
+                                        </span>
+                                    @endif
+                                    @if (! $cj->is_synced && ! $cj->system_managed)
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-[11px] font-medium text-sky-800 ring-1 ring-sky-200" title="{{ __('Pending changes — sync the crontab.') }}">
+                                            <x-heroicon-m-arrow-path class="h-3 w-3" />
+                                            {{ __('Unsynced') }}
+                                        </span>
                                     @endif
                                     @if ($cj->system_managed)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/30" title="{{ __('Auto-installed by Dply (read-only).') }}">
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-[11px] font-medium text-brand-forest ring-1 ring-brand-sage/30" title="{{ __('Auto-installed by Dply (read-only).') }}">
                                             <x-heroicon-m-shield-check class="h-3 w-3" />
-                                            {{ __('Managed by Dply') }}
+                                            {{ __('Managed') }}
                                         </span>
                                     @endif
                                 </div>
-                                <p class="mt-1 break-all font-mono text-sm font-semibold text-brand-ink">{{ $cj->command }}</p>
-                                <p class="mt-2 text-xs text-brand-moss">
-                                    <span class="font-mono text-brand-ink/90">{{ $cj->cron_expression }}</span>
-                                    {{ __('via user :user', ['user' => $cj->user]) }}
-                                    @if ($siteLabel)
-                                        <span class="text-brand-mist"> · </span>{{ __('attached to :host', ['host' => $siteLabel]) }}
-                                    @endif
-                                    @if ($cj->depends_on_job_id && $cj->dependsOn)
-                                        <span class="text-brand-mist"> · </span>{{ __('after :d', ['d' => $cj->dependsOn->description ?: \Illuminate\Support\Str::limit($cj->dependsOn->command, 32)]) }}
-                                    @endif
-                                    @if (! $cj->enabled)
-                                        <span class="ml-1 rounded bg-brand-mist/30 px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-brand-ink/70">{{ __('Paused') }}</span>
-                                    @endif
+
+                                <p class="mt-1 truncate font-mono text-[11px] leading-relaxed text-brand-moss" title="{{ $cj->command }}">
+                                    {{ $cj->command }}
                                 </p>
-                                @if ($cj->last_sync_error && ! $cj->is_synced)
-                                    <p class="mt-1 text-xs text-red-600">{{ __('Last sync issue — try syncing again.') }}</p>
+
+                                @if ($siteLabel || ($cj->depends_on_job_id && $cj->dependsOn) || ($cj->last_sync_error && ! $cj->is_synced))
+                                    <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                                        @if ($siteLabel)
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-m-globe-alt class="h-3 w-3" />
+                                                {{ $siteLabel }}
+                                            </span>
+                                        @endif
+                                        @if ($cj->depends_on_job_id && $cj->dependsOn)
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-m-link class="h-3 w-3" />
+                                                {{ __('after :d', ['d' => $cj->dependsOn->description ?: \Illuminate\Support\Str::limit($cj->dependsOn->command, 28)]) }}
+                                            </span>
+                                        @endif
+                                        @if ($cj->last_sync_error && ! $cj->is_synced)
+                                            <span class="inline-flex items-center gap-1 text-rose-600">
+                                                <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
+                                                {{ __('Last sync issue — try syncing again.') }}
+                                            </span>
+                                        @endif
+                                    </p>
                                 @endif
                             </div>
-                            <div class="flex shrink-0 items-center gap-1 border-l border-brand-ink/5 bg-brand-sand/10 px-2 py-3 sm:flex-col sm:justify-center sm:px-3">
-                                @php
-                                    // Each row's action buttons share a tiny inline spinner
-                                    // CSS so the icon → spinner swap stays visually centered
-                                    // inside the same 5×5 box.
-                                    $rowSpinner = 'inline-block size-5 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink';
-                                @endphp
 
+                            {{-- Actions: horizontal, top-aligned, smaller targets, fades in on hover --}}
+                            <div class="flex shrink-0 items-center gap-0.5 self-start pt-0.5 opacity-90 transition-opacity sm:opacity-60 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                                 @if (! $cj->system_managed)
-                                {{-- Edit (open form) --}}
-                                <button
-                                    type="button"
-                                    wire:click="startEdit('{{ $cj->id }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="startEdit('{{ $cj->id }}')"
-                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-50"
-                                    title="{{ __('Edit') }}"
-                                >
-                                    <span wire:loading.remove wire:target="startEdit('{{ $cj->id }}')">
-                                        <x-heroicon-o-pencil-square class="h-5 w-5" />
-                                    </span>
-                                    <span wire:loading wire:target="startEdit('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
-                                </button>
+                                    <button
+                                        type="button"
+                                        wire:click="startEdit('{{ $cj->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="startEdit('{{ $cj->id }}')"
+                                        x-on:click="$dispatch('open-modal', 'add-cron-job-modal')"
+                                        class="{{ $iconBtn }}"
+                                        title="{{ __('Edit') }}"
+                                    >
+                                        <span wire:loading.remove wire:target="startEdit('{{ $cj->id }}')">
+                                            <x-heroicon-o-pencil-square class="h-4 w-4" />
+                                        </span>
+                                        <span wire:loading wire:target="startEdit('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
+                                    </button>
 
-                                {{-- Pause / Resume --}}
-                                <button
-                                    type="button"
-                                    wire:click="toggleCronJob('{{ $cj->id }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="toggleCronJob('{{ $cj->id }}')"
-                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-50"
-                                    title="{{ $cj->enabled ? __('Pause') : __('Resume') }}"
-                                >
-                                    <span wire:loading.remove wire:target="toggleCronJob('{{ $cj->id }}')">
-                                        @if ($cj->enabled)
-                                            <x-heroicon-o-pause class="h-5 w-5" />
-                                        @else
-                                            <x-heroicon-o-play class="h-5 w-5" />
-                                        @endif
-                                    </span>
-                                    <span wire:loading wire:target="toggleCronJob('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
-                                </button>
+                                    <button
+                                        type="button"
+                                        wire:click="toggleCronJob('{{ $cj->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="toggleCronJob('{{ $cj->id }}')"
+                                        class="{{ $iconBtn }}"
+                                        title="{{ $cj->enabled ? __('Pause') : __('Resume') }}"
+                                    >
+                                        <span wire:loading.remove wire:target="toggleCronJob('{{ $cj->id }}')">
+                                            @if ($cj->enabled)
+                                                <x-heroicon-o-pause class="h-4 w-4" />
+                                            @else
+                                                <x-heroicon-o-play class="h-4 w-4" />
+                                            @endif
+                                        </span>
+                                        <span wire:loading wire:target="toggleCronJob('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
+                                    </button>
                                 @endif
 
-                                {{-- Run now --}}
                                 <button
                                     type="button"
                                     wire:click="runCronJobNow('{{ $cj->id }}')"
                                     wire:loading.attr="disabled"
                                     wire:target="runCronJobNow('{{ $cj->id }}')"
-                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-50"
+                                    class="{{ $iconBtn }}"
                                     title="{{ __('Run now') }}"
                                     @disabled(! $cj->enabled)
                                 >
                                     <span wire:loading.remove wire:target="runCronJobNow('{{ $cj->id }}')">
-                                        <x-heroicon-o-bolt class="h-5 w-5" />
+                                        <x-heroicon-o-bolt class="h-4 w-4" />
                                     </span>
                                     <span wire:loading wire:target="runCronJobNow('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
                                 </button>
 
-                                {{-- Last run output (modal) --}}
                                 <button
                                     type="button"
                                     wire:click="openLogsModal('{{ $cj->id }}')"
                                     wire:loading.attr="disabled"
                                     wire:target="openLogsModal('{{ $cj->id }}')"
-                                    class="rounded-lg p-2 text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-50"
+                                    class="{{ $iconBtn }}"
                                     title="{{ __('Last run output') }}"
                                 >
                                     <span wire:loading.remove wire:target="openLogsModal('{{ $cj->id }}')">
-                                        <x-heroicon-o-document-text class="h-5 w-5" />
+                                        <x-heroicon-o-document-text class="h-4 w-4" />
                                     </span>
                                     <span wire:loading wire:target="openLogsModal('{{ $cj->id }}')" class="{{ $rowSpinner }}" aria-hidden="true"></span>
                                 </button>
 
                                 @if (! $cj->system_managed)
-                                {{-- Delete (opens confirm modal). Hidden for system-managed
-                                     rows — those represent dply-installed lines (e.g. metrics
-                                     agent) that have their own deploy lifecycle. --}}
-                                <button
-                                    type="button"
-                                    wire:click="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)"
-                                    wire:loading.attr="disabled"
-                                    wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)"
-                                    class="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                    title="{{ __('Delete') }}"
-                                >
-                                    <span wire:loading.remove wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)">
-                                        <x-heroicon-o-trash class="h-5 w-5" />
-                                    </span>
-                                    <span wire:loading wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)" class="inline-block size-5 animate-spin rounded-full border-2 border-red-300 border-t-red-700" aria-hidden="true"></span>
-                                </button>
+                                    <button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)"
+                                        wire:loading.attr="disabled"
+                                        wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)"
+                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                        title="{{ __('Delete') }}"
+                                    >
+                                        <span wire:loading.remove wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)">
+                                            <x-heroicon-o-trash class="h-4 w-4" />
+                                        </span>
+                                        <span wire:loading wire:target="openConfirmActionModal('deleteCronJob', ['{{ $cj->id }}'], @js(__('Delete cron job')), @js(__('Delete this cron job? Sync the crontab afterward to remove it from the server.')), @js(__('Delete cron job')), true)" class="inline-block size-4 animate-spin rounded-full border-2 border-rose-200 border-t-rose-600" aria-hidden="true"></span>
+                                    </button>
                                 @endif
                             </div>
                         </li>

@@ -148,6 +148,12 @@
                     {{ __('Advanced') }}
                 </span>
             </x-server-workspace-tab>
+            <x-server-workspace-tab id="ssh-tab-activity" :active="$ssh_workspace_tab === 'activity'" wire:click="$set('ssh_workspace_tab', 'activity')">
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Activity') }}
+                </span>
+            </x-server-workspace-tab>
         </x-server-workspace-tablist>
 
         <x-server-workspace-tab-panel
@@ -572,66 +578,6 @@
                 @endif
             </div>
 
-            @php
-                $auditEventCount = $auditEvents->count();
-                $latestAuditAt = $auditEvents->first()?->created_at;
-            @endphp
-            <details class="{{ $card }} mt-6 group">
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 text-left sm:px-8">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                            <x-heroicon-o-clock class="h-5 w-5" />
-                        </span>
-                        <div class="min-w-0">
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Recent audit history') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('See who changed server SSH keys without giving audit its own full tab.') }}</p>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                    {{ trans_choice('{0} no events recorded|{1} :count event recorded|[2,*] :count events recorded', $auditEventCount, ['count' => $auditEventCount]) }}
-                                </span>
-                                @if ($latestAuditAt)
-                                    <span class="text-brand-mist/60">·</span>
-                                    <span>{{ __('latest :time', ['time' => $latestAuditAt->diffForHumans()]) }}</span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink shadow-sm group-hover:bg-brand-sand/40">
-                        <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
-                        <span class="group-open:hidden">{{ __('Show') }}</span>
-                        <span class="hidden group-open:inline">{{ __('Hide') }}</span>
-                    </span>
-                </summary>
-                <div class="border-t border-brand-ink/10 px-6 py-6 sm:px-8">
-                    <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
-                        <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                            <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase text-brand-moss">
-                                <tr>
-                                    <th class="px-3 py-2">{{ __('When') }}</th>
-                                    <th class="px-3 py-2">{{ __('Event') }}</th>
-                                    <th class="px-3 py-2">{{ __('Actor') }}</th>
-                                    <th class="px-3 py-2">{{ __('IP') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-brand-ink/10">
-                                @forelse ($auditEvents as $ev)
-                                    <tr>
-                                        <td class="whitespace-nowrap px-3 py-2 text-xs text-brand-moss">{{ \App\Support\Servers\ServerDateFormatter::format($ev->created_at, $server) ?? '—' }}</td>
-                                        <td class="px-3 py-2 font-mono text-xs">{{ $ev->event }}</td>
-                                        <td class="px-3 py-2 text-xs">{{ $ev->user?->email ?? '—' }}</td>
-                                        <td class="px-3 py-2 font-mono text-xs">{{ $ev->ip_address ?? '—' }}</td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="px-3 py-6 text-center text-sm text-brand-moss">{{ __('No events yet.') }}</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </details>
         </x-server-workspace-tab-panel>
 
         <x-server-workspace-tab-panel
@@ -923,6 +869,56 @@
                     </x-primary-button>
                 </form>
                 <p class="text-xs text-brand-moss">{{ __('Outbound webhooks: configure the server “Outbound webhook” URL in Settings to receive JSON when sync completes (signed with your webhook secret).') }}</p>
+            </div>
+        </x-server-workspace-tab-panel>
+
+        <x-server-workspace-tab-panel
+            id="ssh-panel-activity"
+            labelled-by="ssh-tab-activity"
+            :hidden="$ssh_workspace_tab !== 'activity'"
+        >
+            <div class="{{ $card }} p-6 sm:p-8">
+                @php
+                    $activityCount = $auditEvents->count();
+                    $latestActivity = $auditEvents->first()?->created_at;
+                @endphp
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                        <x-heroicon-o-clock class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Activity') }}</h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Key edits, syncs, deployments, and bulk imports — chronologically.') }}</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                            <span class="inline-flex items-center gap-1">
+                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                {{ trans_choice('{0} no events recorded|{1} :count event recorded|[2,*] :count events recorded', $activityCount, ['count' => $activityCount]) }}
+                            </span>
+                            @if ($latestActivity)
+                                <span class="text-brand-mist/60">·</span>
+                                <span>{{ __('latest :time', ['time' => $latestActivity->diffForHumans()]) }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                @if ($auditEvents->isNotEmpty())
+                    <div class="mt-6 space-y-2">
+                        @foreach ($auditEvents as $ev)
+                            <div wire:key="ssh-activity-{{ $ev->id }}">
+                                @include('livewire.servers.partials.activity-audit-row', ['event' => $ev, 'server' => $server])
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-clock class="h-5 w-5" />
+                        </span>
+                        <p class="text-sm font-medium text-brand-ink">{{ __('No SSH key activity yet.') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Adding, editing, syncing, or deploying keys will all show up here.') }}</p>
+                    </div>
+                @endif
             </div>
         </x-server-workspace-tab-panel>
 

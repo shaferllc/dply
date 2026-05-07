@@ -12,7 +12,9 @@
     $fixHistory = $detail['fixHistory'];
     $correlationFindings = $detail['correlationFindings'];
     $actions = $detail['actions'];
-    $appTimezone = config('app.timezone') ?: 'UTC';
+    // All datetime renders below funnel through ServerDateFormatter so the operator's
+    // server-level format + timezone preference (Settings → Reference) wins over raw UTC.
+    $fmt = fn ($v) => \App\Support\Servers\ServerDateFormatter::format($v, $server ?? null);
 
     [$severityChipClass, $severityIcon, $severityLabel] = match ($f->severity) {
         'critical' => ['bg-red-100 text-red-900 ring-red-300', 'heroicon-s-exclamation-triangle', __('Critical')],
@@ -66,7 +68,7 @@
             <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
                 <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Detected') }}</dt>
                 <dd class="text-sm text-brand-ink">
-                    <time datetime="{{ $f->detected_at->toIso8601String() }}" title="{{ $f->detected_at->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                    <time datetime="{{ $f->detected_at->toIso8601String() }}" title="{{ $fmt($f->detected_at) }}">
                         {{ $f->detected_at->diffForHumans() }}
                     </time>
                 </dd>
@@ -76,7 +78,7 @@
             <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
                 <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Acknowledged') }}</dt>
                 <dd class="text-sm text-brand-ink">
-                    <time datetime="{{ $f->acknowledged_at->toIso8601String() }}" title="{{ $f->acknowledged_at->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                    <time datetime="{{ $f->acknowledged_at->toIso8601String() }}" title="{{ $fmt($f->acknowledged_at) }}">
                         {{ $f->acknowledged_at->diffForHumans() }}
                     </time>
                     @if ($detail['acknowledgedByName'])
@@ -89,7 +91,7 @@
             <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
                 <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Ignored') }}</dt>
                 <dd class="text-sm text-brand-ink">
-                    <time datetime="{{ $f->ignored_at->toIso8601String() }}" title="{{ $f->ignored_at->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                    <time datetime="{{ $f->ignored_at->toIso8601String() }}" title="{{ $fmt($f->ignored_at) }}">
                         {{ $f->ignored_at->diffForHumans() }}
                     </time>
                     @if ($detail['ignoredByName'])
@@ -102,7 +104,7 @@
             <div class="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-3">
                 <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Resolved') }}</dt>
                 <dd class="text-sm text-brand-ink">
-                    <time datetime="{{ $f->resolved_at->toIso8601String() }}" title="{{ $f->resolved_at->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                    <time datetime="{{ $f->resolved_at->toIso8601String() }}" title="{{ $fmt($f->resolved_at) }}">
                         {{ $f->resolved_at->diffForHumans() }}
                     </time>
                 </dd>
@@ -170,7 +172,7 @@
                 @if ($fixHistory['run_started_at'] && $fixHistory['run_status'] === 'queued')
                     <p class="text-sm text-brand-moss">
                         {{ __('Dispatched') }}
-                        <time datetime="{{ $fixHistory['run_started_at']->toIso8601String() }}" title="{{ $fixHistory['run_started_at']->timezone($appTimezone)->format('Y-m-d H:i:s T') }}" class="font-medium text-brand-ink">
+                        <time datetime="{{ $fixHistory['run_started_at']->toIso8601String() }}" title="{{ $fmt($fixHistory['run_started_at']) }}" class="font-medium text-brand-ink">
                             {{ $fixHistory['run_started_at']->diffForHumans() }}
                         </time>
                         — {{ __('this view auto-refreshes while the job is in flight.') }}
@@ -179,7 +181,7 @@
                 @if ($fixHistory['applied_at'])
                     <p class="text-sm text-brand-ink">
                         {{ __('Applied') }}
-                        <time datetime="{{ $fixHistory['applied_at']->toIso8601String() }}" title="{{ $fixHistory['applied_at']->timezone($appTimezone)->format('Y-m-d H:i:s T') }}" class="font-medium">
+                        <time datetime="{{ $fixHistory['applied_at']->toIso8601String() }}" title="{{ $fmt($fixHistory['applied_at']) }}" class="font-medium">
                             {{ $fixHistory['applied_at']->diffForHumans() }}
                         </time>
                         @if ($fixHistory['applied_by'])
@@ -191,7 +193,7 @@
                     <div class="rounded-xl border border-red-200 bg-red-50 px-3 py-2">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-red-700">
                             {{ __('Failed') }}
-                            <time datetime="{{ $fixHistory['failed_at']->toIso8601String() }}" title="{{ $fixHistory['failed_at']->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                            <time datetime="{{ $fixHistory['failed_at']->toIso8601String() }}" title="{{ $fmt($fixHistory['failed_at']) }}">
                                 · {{ $fixHistory['failed_at']->diffForHumans() }}
                             </time>
                         </p>
@@ -204,7 +206,7 @@
                     <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
                             {{ __('Refused at preflight') }}
-                            <time datetime="{{ $fixHistory['refused_at']->toIso8601String() }}" title="{{ $fixHistory['refused_at']->timezone($appTimezone)->format('Y-m-d H:i:s T') }}">
+                            <time datetime="{{ $fixHistory['refused_at']->toIso8601String() }}" title="{{ $fmt($fixHistory['refused_at']) }}">
                                 · {{ $fixHistory['refused_at']->diffForHumans() }}
                             </time>
                         </p>

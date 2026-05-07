@@ -27,7 +27,7 @@ class SupervisorStartFixAction implements InsightFixActionInterface
         return null;
     }
 
-    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params): FixResult
+    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         $inline = <<<'BASH'
 if systemctl start supervisor 2>/dev/null || systemctl start supervisord 2>/dev/null; then

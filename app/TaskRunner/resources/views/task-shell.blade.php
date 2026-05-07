@@ -1,4 +1,4 @@
-<x-streamline::task-shell-defaults :set-options="$setOptions" />
+<x-task-runner::task-shell-defaults :set-options="$setOptions" />
 
 @include('task-runner::task-runner.common-functions')
 

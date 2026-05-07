@@ -109,6 +109,11 @@ class ApplyFirewallJob implements ShouldQueue
                 $finishedKey => now()->toIso8601String(),
                 $errorKey => null,
             ]);
+
+            // Refresh inventory in the background so the listening-ports table on the
+            // firewall workspace reflects any services that came/went as a side effect
+            // of the apply (e.g. ufw default deny closed something off).
+            RefreshServerInventoryJob::dispatch((string) $server->id);
         } catch (\Throwable $e) {
             $message = Str::limit(trim($e->getMessage()), 800) ?: 'Firewall apply failed.';
             $bufferLines[] = '> ERROR: '.$message;

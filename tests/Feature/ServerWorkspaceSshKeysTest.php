@@ -68,7 +68,7 @@ class ServerWorkspaceSshKeysTest extends TestCase
             ->test(WorkspaceSshKeys::class, ['server' => $server])
             ->assertSee('Add SSH key')
             ->assertSee('Keys on this server')
-            ->assertSee('Recent audit history')
+            ->assertSee('Activity')
             ->assertDontSee('Bulk import')
             ->assertDontSee('Export CSV')
             ->assertDontSee('Export audit CSV')

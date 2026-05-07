@@ -18,6 +18,7 @@ use App\Services\Servers\ServerFirewallApplyRecorder;
 use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\SshConnection;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -43,6 +44,32 @@ class WorkspaceFirewall extends Component
     public ?string $ufw_status_text = null;
 
     protected ?string $lastUfwHostSyncError = null;
+
+    /**
+     * Open state + parsed-rule list for the "Import from host" preview modal. Each row carries
+     * a stable index used as the checkbox value so we can reconcile selections back to the
+     * parsed rule on submit. Rows that the parser couldn't decode are flagged `importable=false`
+     * and rendered read-only.
+     *
+     * @var list<array{
+     *     index: int,
+     *     action: ?string,
+     *     port: ?int,
+     *     protocol: ?string,
+     *     source: ?string,
+     *     raw: string,
+     *     already_in_panel: bool,
+     *     importable: bool,
+     * }>
+     */
+    public array $import_host_rules = [];
+
+    /**
+     * Indexes of `import_host_rules` the operator has ticked for import.
+     *
+     * @var list<int>
+     */
+    public array $import_host_selected = [];
 
     public function mount(Server $server): void
     {
@@ -658,6 +685,72 @@ class WorkspaceFirewall extends Component
         }
     }
 
+    /**
+     * Re-run just the listening-ports portion of the inventory probe (`ss -lntpH`) and stamp
+     * the result onto `meta.manage_listening_ports` so the table on the Rules tab refreshes.
+     * Tries root first then falls back to the deploy user, mirroring the inventory probe.
+     */
+    public function refreshListeningPorts(): void
+    {
+        $this->authorize('update', $this->server);
+        if (! $this->opsReady()) {
+            $this->toastError(__('Server must be ready with SSH before refreshing listening ports.'));
+
+            return;
+        }
+
+        $this->server->refresh();
+
+        $command = '/bin/sh -c '.escapeshellarg(
+            '(sudo -n ss -lntpH 2>/dev/null || ss -lntpH 2>/dev/null) | head -n 60'
+        );
+
+        $deploy = trim((string) $this->server->ssh_user) ?: 'root';
+        $candidates = [];
+        if ((bool) config('server_settings.inventory_use_root_ssh', true) && $deploy !== 'root') {
+            $candidates[] = 'root';
+            if ((bool) config('server_settings.inventory_fallback_to_deploy_user_ssh', true)) {
+                $candidates[] = $deploy;
+            }
+        } else {
+            $candidates[] = $deploy;
+        }
+
+        $out = null;
+        $lastError = null;
+        foreach ($candidates as $loginUser) {
+            try {
+                $ssh = new SshConnection($this->server, $loginUser);
+                $out = trim($ssh->exec($command, 30));
+                $ssh->disconnect();
+                break;
+            } catch (\Throwable $e) {
+                $lastError = $e;
+            }
+        }
+
+        if ($out === null) {
+            $this->toastError($lastError !== null ? $lastError->getMessage() : __('SSH connection failed.'));
+
+            return;
+        }
+
+        if (strlen($out) > 16384) {
+            $out = substr($out, 0, 16384)."\n[dply] truncated";
+        }
+
+        $meta = $this->server->meta ?? [];
+        if ($out !== '') {
+            $meta['manage_listening_ports'] = $out;
+        } else {
+            unset($meta['manage_listening_ports']);
+        }
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
+
+        $this->toastSuccess(__('Listening ports refreshed.'));
+    }
+
     public bool $ufw_diagnostics_modal_open = false;
 
     public ?string $ufw_diagnostics_text = null;
@@ -695,10 +788,256 @@ class WorkspaceFirewall extends Component
         $this->ufw_diagnostics_modal_open = false;
     }
 
+    /**
+     * Pull the host's user-added UFW rules and stage them in the import-preview modal. Rules
+     * that already match a panel entry are flagged so the operator only ticks net-new ones by
+     * default. Existing panel rules are never modified by this action — the diff is one-way
+     * (host → panel), confirmed in {@see confirmImportHostRules()}.
+     */
+    public function previewImportHostRules(ServerFirewallProvisioner $firewall): void
+    {
+        $this->authorize('update', $this->server);
+        if (! $this->opsReady()) {
+            $this->toastError(__('Server must be ready with SSH before importing rules.'));
+
+            return;
+        }
+
+        try {
+            $this->server->refresh();
+            $hostRules = $firewall->importableRulesFromHost($this->server);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $existingKeys = $this->server->firewallRules
+            ->mapWithKeys(fn (ServerFirewallRule $r) => [
+                $this->ruleMatchKey($r->port, $r->protocol, $r->action, $r->source) => true,
+            ])
+            ->all();
+
+        $rows = [];
+        $defaultSelected = [];
+        foreach ($hostRules as $i => $r) {
+            $importable = $r['action'] !== null && ($r['protocol'] !== null);
+            $alreadyIn = false;
+            if ($importable) {
+                $alreadyIn = isset($existingKeys[$this->ruleMatchKey(
+                    $r['port'],
+                    $r['protocol'],
+                    $r['action'],
+                    $r['source']
+                )]);
+            }
+            $rows[] = [
+                'index' => $i,
+                'action' => $r['action'],
+                'port' => $r['port'],
+                'protocol' => $r['protocol'],
+                'source' => $r['source'],
+                'raw' => $r['raw'],
+                'already_in_panel' => $alreadyIn,
+                'importable' => $importable,
+            ];
+            if ($importable && ! $alreadyIn) {
+                $defaultSelected[] = $i;
+            }
+        }
+
+        $this->import_host_rules = $rows;
+        $this->import_host_selected = $defaultSelected;
+        $this->dispatch('open-modal', 'import-host-firewall-rules-modal');
+
+        if ($rows === []) {
+            $this->toastSuccess(__('No user-added UFW rules found on the host.'));
+        }
+    }
+
+    public function closeImportHostRulesModal(): void
+    {
+        $this->dispatch('close-modal', 'import-host-firewall-rules-modal');
+        $this->import_host_rules = [];
+        $this->import_host_selected = [];
+    }
+
+    /**
+     * Persist the operator-selected host rules into the panel. Rules that already exist in the
+     * panel (matched by port/proto/action/source) are skipped silently to make re-import safe.
+     */
+    public function confirmImportHostRules(ServerFirewallAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        $selected = array_values(array_unique(array_map('intval', $this->import_host_selected)));
+        $byIndex = [];
+        foreach ($this->import_host_rules as $row) {
+            $byIndex[(int) $row['index']] = $row;
+        }
+
+        $created = 0;
+        $skippedAsDuplicate = 0;
+        $createdRuleIds = [];
+
+        $nextSort = (int) ($this->server->firewallRules()->max('sort_order') ?? 0);
+
+        foreach ($selected as $idx) {
+            $row = $byIndex[$idx] ?? null;
+            if ($row === null || ! $row['importable']) {
+                continue;
+            }
+            $port = $row['port'];
+            $protocol = (string) $row['protocol'];
+            $action = (string) $row['action'];
+            $source = (string) ($row['source'] ?? 'any');
+            $matchKey = $this->ruleMatchKey($port, $protocol, $action, $source);
+
+            $alreadyThere = $this->server->firewallRules()
+                ->where('port', $port)
+                ->where('protocol', $protocol)
+                ->where('action', $action)
+                ->where('source', $source)
+                ->exists();
+            if ($alreadyThere) {
+                $skippedAsDuplicate++;
+
+                continue;
+            }
+
+            $nextSort++;
+            $rule = ServerFirewallRule::query()->create([
+                'server_id' => $this->server->id,
+                'name' => __('Imported from host'),
+                'port' => $port,
+                'protocol' => $protocol,
+                'source' => $source,
+                'action' => $action,
+                'enabled' => true,
+                'sort_order' => $nextSort,
+                'tags' => ['imported'],
+            ]);
+            $created++;
+            $createdRuleIds[] = $rule->id;
+        }
+
+        if ($created > 0) {
+            $audit->record($this->server, ServerFirewallAuditEvent::EVENT_IMPORT, [
+                'rule_ids' => $createdRuleIds,
+                'count' => $created,
+                'source' => 'ufw_show_added',
+            ], auth()->user());
+        }
+
+        $this->dispatch('close-modal', 'import-host-firewall-rules-modal');
+        $this->import_host_rules = [];
+        $this->import_host_selected = [];
+
+        if ($created === 0 && $skippedAsDuplicate === 0) {
+            $this->toastError(__('No rules were selected to import.'));
+
+            return;
+        }
+
+        $msg = __(':n rule(s) imported into the panel.', ['n' => $created]);
+        if ($skippedAsDuplicate > 0) {
+            $msg .= ' '.__(':n already existed and were skipped.', ['n' => $skippedAsDuplicate]);
+        }
+        $msg .= ' '.__('They are not yet pushed back to the host — click "Apply rules" to reconcile.');
+        $this->toastSuccess($msg);
+    }
+
+    /**
+     * Create (or re-enable) a panel rule that explicitly allows TCP on the server's configured
+     * SSH port from anywhere. Idempotent — already-correct setups just get a toast saying so.
+     * Use this when the "no SSH allow rule" warning fires, or before tightening UFW.
+     */
+    public function ensureSshAllowRule(
+        ServerFirewallProvisioner $firewall,
+        ServerFirewallAuditLogger $audit,
+    ): void {
+        $this->authorize('update', $this->server);
+        $this->server->refresh();
+
+        $sshPort = (int) ($this->server->ssh_port ?: 22);
+
+        $candidate = $this->server->firewallRules()
+            ->where('protocol', 'tcp')
+            ->where('action', 'allow')
+            ->where('port', $sshPort)
+            ->where(function ($q): void {
+                $q->where('source', 'any')
+                    ->orWhere('source', '0.0.0.0/0')
+                    ->orWhere('source', '::/0');
+            })
+            ->orderByDesc('enabled')
+            ->first();
+
+        if ($candidate && $candidate->enabled) {
+            $this->toastSuccess(__('SSH is already covered — TCP :port is allowed from any.', ['port' => $sshPort]));
+
+            return;
+        }
+
+        if ($candidate && ! $candidate->enabled) {
+            $candidate->update(['enabled' => true]);
+            $audit->record($this->server, ServerFirewallAuditEvent::EVENT_RULE_UPDATED, [
+                'rule_id' => $candidate->id,
+                'change' => 'ensure_ssh_allow_enabled',
+            ], auth()->user());
+            if ($this->opsReady()) {
+                try {
+                    $firewall->applyRule($this->server, $candidate->fresh());
+                } catch (\Throwable $e) {
+                    $this->toastWarning(__('Re-enabled the SSH rule, but pushing it to UFW failed: :err', ['err' => $e->getMessage()]));
+
+                    return;
+                }
+            }
+            $this->toastSuccess(__('Re-enabled the existing SSH allow rule for TCP :port.', ['port' => $sshPort]));
+
+            return;
+        }
+
+        $rule = ServerFirewallRule::query()->create([
+            'server_id' => $this->server->id,
+            'name' => __('SSH (auto)'),
+            'port' => $sshPort,
+            'protocol' => 'tcp',
+            'source' => 'any',
+            'action' => 'allow',
+            'enabled' => true,
+            'sort_order' => (int) ($this->server->firewallRules()->max('sort_order') ?? 0) + 1,
+            'tags' => ['ssh', 'safety-rail'],
+        ]);
+        $audit->record($this->server, ServerFirewallAuditEvent::EVENT_RULE_CREATED, [
+            'rule_id' => $rule->id,
+            'reason' => 'ensure_ssh_allow',
+        ], auth()->user());
+
+        if ($this->opsReady()) {
+            try {
+                $firewall->applyRule($this->server, $rule->fresh());
+            } catch (\Throwable $e) {
+                $this->toastWarning(__('Created the SSH allow rule, but pushing it to UFW failed: :err', ['err' => $e->getMessage()]));
+
+                return;
+            }
+        }
+
+        $this->toastSuccess(__('Added an allow rule for TCP :port from any. Apply when ready to push to UFW.', ['port' => $sshPort]));
+    }
+
     public function render(): View
     {
         $this->server->refresh();
         $this->server->load(['firewallRules', 'organization', 'sites']);
+
+        // Backwards compatibility: the History and Audit tabs were merged into a single
+        // Activity timeline. Snap stale tab values forward so deep links still land somewhere.
+        if (in_array($this->firewall_workspace_tab, ['history', 'audit'], true)) {
+            $this->firewall_workspace_tab = 'activity';
+        }
 
         $org = $this->server->organization;
         $savedTemplates = $org
@@ -713,16 +1052,98 @@ class WorkspaceFirewall extends Component
 
         $provisioner = app(ServerFirewallProvisioner::class);
 
+        // Build a normalized "key" for every panel rule so we can fast-check whether each
+        // bundled template's rules are already present. We compare on (port, protocol, action,
+        // source) — the operator-facing label intentionally isn't part of the match because
+        // they may have edited it after applying the bundle.
+        $appliedKeys = $this->server->firewallRules
+            ->mapWithKeys(fn ($r) => [$this->ruleMatchKey($r->port, $r->protocol, $r->action, $r->source) => true])
+            ->all();
+
+        $bundledTemplates = config('server_firewall.bundled_templates', []);
+        $bundledAppliedMap = [];
+        foreach ($bundledTemplates as $key => $bundle) {
+            $rules = $bundle['rules'] ?? [];
+            if ($rules === []) {
+                $bundledAppliedMap[$key] = false;
+                continue;
+            }
+            $bundledAppliedMap[$key] = collect($rules)->every(fn ($r) => isset($appliedKeys[
+                $this->ruleMatchKey($r['port'] ?? null, $r['protocol'] ?? null, $r['action'] ?? null, $r['source'] ?? null)
+            ]));
+        }
+
         return view('livewire.servers.workspace-firewall', [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
-            'bundledTemplates' => config('server_firewall.bundled_templates', []),
+            'bundledTemplates' => $bundledTemplates,
+            'bundledAppliedMap' => $bundledAppliedMap,
             'savedTemplates' => $savedTemplates,
-            'auditEvents' => $this->server->firewallAuditEvents()->with('user')->limit(40)->get(),
-            'applyLogs' => $this->server->firewallApplyLogs()->with(['user'])->limit(25)->get(),
+            'activityItems' => $this->buildActivityItems(),
             'sshNotCovered' => $provisioner->sshAccessNotExplicitlyAllowed($this->server),
             'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
+        ]);
+    }
+
+    /**
+     * Merge `firewallApplyLogs` and `firewallAuditEvents` into a single chronological timeline.
+     * Audit's `EVENT_APPLY` rows are dropped because the matching apply log carries the same
+     * fact in a richer shape (transcript + rules_hash + rule_count). Each item is a small
+     * shape the view can branch on: `kind=apply` (expandable, with output) vs `kind=audit`
+     * (compact one-liner).
+     *
+     * @return list<array{kind: string, at: \Carbon\Carbon|null, key: string, log?: \App\Models\ServerFirewallApplyLog, event?: \App\Models\ServerFirewallAuditEvent}>
+     */
+    protected function buildActivityItems(): array
+    {
+        $applyLogs = $this->server->firewallApplyLogs()->with(['user'])->limit(40)->get();
+        $auditEvents = $this->server->firewallAuditEvents()
+            ->with('user')
+            ->where('event', '!=', ServerFirewallAuditEvent::EVENT_APPLY)
+            ->limit(80)
+            ->get();
+
+        $items = [];
+        foreach ($applyLogs as $log) {
+            $items[] = [
+                'kind' => 'apply',
+                'at' => $log->created_at,
+                'key' => 'apply-'.$log->id,
+                'log' => $log,
+            ];
+        }
+        foreach ($auditEvents as $ev) {
+            $items[] = [
+                'kind' => 'audit',
+                'at' => $ev->created_at,
+                'key' => 'audit-'.$ev->id,
+                'event' => $ev,
+            ];
+        }
+
+        usort($items, function (array $a, array $b): int {
+            $at = $a['at']?->getTimestamp() ?? 0;
+            $bt = $b['at']?->getTimestamp() ?? 0;
+
+            return $bt <=> $at;
+        });
+
+        return array_slice($items, 0, 60);
+    }
+
+    /**
+     * Stable key for matching a panel rule against a bundled-template rule. Lower-cases protocol
+     * and action so the match doesn't trip on display-case mismatches. Port is the integer
+     * value (or empty for ICMP-style rules where port is null on both sides).
+     */
+    protected function ruleMatchKey(?int $port, ?string $protocol, ?string $action, ?string $source): string
+    {
+        return implode('|', [
+            $port === null ? '' : (string) $port,
+            strtolower((string) $protocol),
+            strtolower((string) $action),
+            strtolower(trim((string) $source)),
         ]);
     }
 }

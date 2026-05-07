@@ -58,7 +58,7 @@
 @endif
 
 <div
-    class="mb-2 overflow-hidden rounded-xl border {{ $bannerClasses }} text-sm shadow-sm"
+    class="mb-2 overflow-hidden rounded-xl border {{ $bannerClasses }} text-sm shadow-sm w-full"
     role="status"
     aria-live="polite"
     x-data="{ expanded: @js($busy || $status === 'failed' || $defaultExpanded) }"

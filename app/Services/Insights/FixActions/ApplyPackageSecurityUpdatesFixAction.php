@@ -40,7 +40,7 @@ class ApplyPackageSecurityUpdatesFixAction implements InsightFixActionInterface
         return null;
     }
 
-    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params): FixResult
+    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         // Bash strategy:
         //   1. Wait for any in-flight apt (cloud-init, our own provisioner) to release the lock.
@@ -89,13 +89,28 @@ apt list --upgradable 2>/dev/null | grep -E -- '-security' | wc -l
 BASH;
 
         try {
-            $out = $this->remote->runInlineBash(
-                $server,
-                'insight-fix-package-security-updates',
-                $script,
-                600, // 10 min timeout — 96-package upgrades on small droplets can sit at 5+
-                true,
-            );
+            // Stream live output to the workspace banner when a callback is supplied;
+            // a 10-minute apt-get upgrade with no visible progress feels indistinguishable
+            // from a hung worker. Without a callback we fall back to the bulk-run path
+            // (still 4 KB-bounded in the FixResult).
+            if ($onOutput !== null) {
+                $out = $this->remote->runInlineBashWithOutputCallback(
+                    $server,
+                    'insight-fix-package-security-updates',
+                    $script,
+                    $onOutput,
+                    600,
+                    true,
+                );
+            } else {
+                $out = $this->remote->runInlineBash(
+                    $server,
+                    'insight-fix-package-security-updates',
+                    $script,
+                    600, // 10 min timeout — 96-package upgrades on small droplets can sit at 5+
+                    true,
+                );
+            }
 
             return FixResult::success(mb_substr((string) $out->getBuffer(), 0, 4000));
         } catch (\Throwable $e) {

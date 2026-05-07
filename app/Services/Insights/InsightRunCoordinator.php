@@ -17,8 +17,14 @@ class InsightRunCoordinator
 
     /**
      * @param  string|null  $onlyKey  When set, run only this single insight (used by post-fix recheck).
+     * @param  (callable(string $event, string $insightKey, array<string, mixed> $context): void)|null  $onProgress
+     *     Optional progress hook for live workspace banner output. Events emitted:
+     *       'check.start'     — about to invoke the runner for $insightKey
+     *       'check.complete'  — runner finished; context: ['candidates' => int]
+     *       'check.error'     — runner threw; context: ['message' => string]
+     *     Runners themselves are unaware of the hook — the coordinator brackets each call.
      */
-    public function runForServer(Server $server, ?string $onlyKey = null): void
+    public function runForServer(Server $server, ?string $onlyKey = null, ?callable $onProgress = null): void
     {
         if (! $server->isReady()) {
             return;
@@ -61,15 +67,31 @@ class InsightRunCoordinator
             /** @var InsightRunnerInterface $runner */
             $runner = app($runnerClass);
             $params = ($settings->parameters ?? [])[$key] ?? [];
-            $candidates = $runner->run($server, null, is_array($params) ? $params : []);
-            $this->recorder->syncCandidates($server, null, $key, $candidates);
+
+            if ($onProgress !== null) {
+                $onProgress('check.start', $key, []);
+            }
+            try {
+                $candidates = $runner->run($server, null, is_array($params) ? $params : []);
+                $this->recorder->syncCandidates($server, null, $key, $candidates);
+                if ($onProgress !== null) {
+                    $onProgress('check.complete', $key, ['candidates' => count($candidates)]);
+                }
+            } catch (\Throwable $e) {
+                if ($onProgress !== null) {
+                    $onProgress('check.error', $key, ['message' => $e->getMessage()]);
+                }
+                throw $e;
+            }
         }
     }
 
     /**
      * @param  string|null  $onlyKey  When set, run only this single insight (used by post-fix recheck).
+     * @param  (callable(string $event, string $insightKey, array<string, mixed> $context): void)|null  $onProgress
+     *     See {@see runForServer} for event semantics.
      */
-    public function runForSite(Site $site, ?string $onlyKey = null): void
+    public function runForSite(Site $site, ?string $onlyKey = null, ?callable $onProgress = null): void
     {
         $server = $site->server;
         if (! $server->isReady()) {
@@ -113,8 +135,22 @@ class InsightRunCoordinator
             /** @var InsightRunnerInterface $runner */
             $runner = app($runnerClass);
             $params = ($settings->parameters ?? [])[$key] ?? [];
-            $candidates = $runner->run($server, $site, is_array($params) ? $params : []);
-            $this->recorder->syncCandidates($server, $site, $key, $candidates);
+
+            if ($onProgress !== null) {
+                $onProgress('check.start', $key, []);
+            }
+            try {
+                $candidates = $runner->run($server, $site, is_array($params) ? $params : []);
+                $this->recorder->syncCandidates($server, $site, $key, $candidates);
+                if ($onProgress !== null) {
+                    $onProgress('check.complete', $key, ['candidates' => count($candidates)]);
+                }
+            } catch (\Throwable $e) {
+                if ($onProgress !== null) {
+                    $onProgress('check.error', $key, ['message' => $e->getMessage()]);
+                }
+                throw $e;
+            }
         }
     }
 

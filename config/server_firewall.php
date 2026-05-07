@@ -131,25 +131,92 @@ return [
     |--------------------------------------------------------------------------
     */
     'bundled_templates' => [
+        // ── Web tiers ────────────────────────────────────────────────────────────────────
         'laravel_web' => [
             'label' => 'Laravel web',
+            'description' => 'SSH + HTTP + HTTPS — for a basic Laravel app server.',
             'rules' => [
                 ['name' => 'SSH', 'port' => 22, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
                 ['name' => 'HTTP', 'port' => 80, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
                 ['name' => 'HTTPS', 'port' => 443, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
             ],
         ],
+        'web_full_stack' => [
+            'label' => 'Web full-stack',
+            'description' => 'SSH + HTTP + HTTPS + outbound DNS + ICMPv6 (NDP).',
+            'rules' => [
+                ['name' => 'SSH', 'port' => 22, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'HTTP', 'port' => 80, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'HTTPS', 'port' => 443, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'DNS (UDP)', 'port' => 53, 'protocol' => 'udp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'ICMPv6', 'port' => null, 'protocol' => 'ipv6-icmp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+            ],
+        ],
+
+        // ── Database tiers ───────────────────────────────────────────────────────────────
         'db_replica' => [
-            'label' => 'DB replica',
+            'label' => 'DB replica (Postgres)',
+            'description' => 'SSH + PostgreSQL inbound — for a managed Postgres replica.',
             'rules' => [
                 ['name' => 'SSH', 'port' => 22, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
                 ['name' => 'PostgreSQL', 'port' => 5432, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
             ],
         ],
+        'mysql_replica' => [
+            'label' => 'DB replica (MySQL)',
+            'description' => 'SSH + MySQL inbound — for a managed MySQL replica.',
+            'rules' => [
+                ['name' => 'SSH', 'port' => 22, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'MySQL', 'port' => 3306, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+            ],
+        ],
         'postgres_inbound' => [
             'label' => 'PostgreSQL only',
+            'description' => 'PostgreSQL inbound only (no SSH allow — caller must manage SSH separately).',
             'rules' => [
                 ['name' => 'PostgreSQL', 'port' => 5432, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+            ],
+        ],
+        'web_and_db' => [
+            'label' => 'Web + DB (single box)',
+            'description' => 'SSH + HTTP + HTTPS + Postgres + MySQL — for a colocated single-server stack.',
+            'rules' => [
+                ['name' => 'SSH', 'port' => 22, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'HTTP', 'port' => 80, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'HTTPS', 'port' => 443, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'PostgreSQL', 'port' => 5432, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'MySQL', 'port' => 3306, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+            ],
+        ],
+
+        // ── Mail / SMTP ──────────────────────────────────────────────────────────────────
+        'mail_relay' => [
+            'label' => 'Mail relay',
+            'description' => 'SSH + SMTP (25) + Submission (587) + SMTPS (465) — for an outbound mail host.',
+            'rules' => [
+                ['name' => 'SSH', 'port' => 22, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'SMTP', 'port' => 25, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'Submission', 'port' => 587, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'SMTPS', 'port' => 465, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+            ],
+        ],
+
+        // ── Monitoring / agents ──────────────────────────────────────────────────────────
+        'monitoring_target' => [
+            'label' => 'Monitoring target',
+            'description' => 'SSH + Node Exporter (9100) for Prometheus scraping.',
+            'rules' => [
+                ['name' => 'SSH', 'port' => 22, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+                ['name' => 'Node Exporter', 'port' => 9100, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+            ],
+        ],
+
+        // ── Lockdown ─────────────────────────────────────────────────────────────────────
+        'ssh_only' => [
+            'label' => 'SSH only (lockdown)',
+            'description' => 'Just the SSH allow rule. Combined with UFW default-deny inbound, locks the host down to SSH-only.',
+            'rules' => [
+                ['name' => 'SSH', 'port' => 22, 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
             ],
         ],
     ],

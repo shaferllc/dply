@@ -4,6 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Jobs\RunServerMonitoringProbeJob;
+use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\UpgradeGuestMetricsScriptJob;
 use App\Livewire\Servers\Concerns\ConfirmsServerMonitoringInstall;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -23,6 +24,7 @@ use App\Services\Servers\ServerMetricsRangeQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -41,6 +43,86 @@ class WorkspaceMonitor extends Component
 
     /** Metrics page time range: '1h' | '6h' | '24h' | '7d' | '30d'. Persisted client-side via localStorage on the segmented control. */
     public string $metricsRange = '1h';
+
+    /** Workspace tab: 'status' (health + current usage) | 'history' (charts) | 'diagnostics' (repair / inspect tooling). */
+    public string $monitor_workspace_tab = 'status';
+
+    /**
+     * Identifies which Diagnostics action populated the shared $remote_output / $remote_error
+     * slots so the banner can render per-kind copy. Null when no banner should display.
+     * One of: 'repair' | 'diagnostics' | 'inspect'.
+     */
+    public ?string $remote_output_kind = null;
+
+    public function setMonitorWorkspaceTab(string $tab): void
+    {
+        if (! in_array($tab, ['status', 'history', 'diagnostics'], true)) {
+            return;
+        }
+        $this->monitor_workspace_tab = $tab;
+    }
+
+    /**
+     * Banner status derived from the queued cache payload (queued/running/finished/failed)
+     * or the inline-path success/error state. Empty string means "no banner".
+     */
+    public function getDiagnosticsBannerStatusProperty(): string
+    {
+        if ($this->servicesRemoteTaskId !== null && $this->servicesRemoteTaskId !== '') {
+            $payload = Cache::get(ServerManageRemoteSshJob::cacheKey($this->servicesRemoteTaskId));
+            if (is_array($payload)) {
+                return match ((string) ($payload['status'] ?? '')) {
+                    'queued' => 'queued',
+                    'running' => 'running',
+                    'finished' => 'completed',
+                    'failed' => 'failed',
+                    default => 'running',
+                };
+            }
+
+            return 'running';
+        }
+        if (is_string($this->remote_error) && $this->remote_error !== '') {
+            return 'failed';
+        }
+        if (is_string($this->remote_output) && $this->remote_output !== '') {
+            return 'completed';
+        }
+
+        return '';
+    }
+
+    /**
+     * Splits the shared $remote_output string into the banner's expected list<string> shape.
+     * Empty array when no transcript is available yet.
+     *
+     * @return list<string>
+     */
+    public function getDiagnosticsBannerOutputLinesProperty(): array
+    {
+        if (! is_string($this->remote_output) || $this->remote_output === '') {
+            return [];
+        }
+
+        return explode("\n", $this->remote_output);
+    }
+
+    /**
+     * Clears the diagnostics banner and any queued cache entry so it can dismiss cleanly.
+     * Safe to call when no banner is showing — no-op.
+     */
+    public function dismissDiagnosticsBanner(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if ($this->servicesRemoteTaskId !== null && $this->servicesRemoteTaskId !== '') {
+            Cache::forget(ServerManageRemoteSshJob::cacheKey($this->servicesRemoteTaskId));
+            $this->servicesRemoteTaskId = null;
+        }
+        $this->remote_output = null;
+        $this->remote_error = null;
+        $this->remote_output_kind = null;
+    }
 
     public function setMetricsRange(string $range): void
     {
@@ -210,6 +292,7 @@ class WorkspaceMonitor extends Component
         $this->authorize('view', $this->server);
         $this->remote_output = null;
         $this->remote_error = null;
+        $this->remote_output_kind = 'inspect';
 
         if (! $this->serverOpsReady()) {
             $msg = __('Provisioning and SSH must be ready before inspecting the callback env.');
@@ -302,6 +385,7 @@ BASH);
         $this->authorize('view', $this->server);
         $this->remote_output = null;
         $this->remote_error = null;
+        $this->remote_output_kind = 'diagnostics';
 
         if (! $this->serverOpsReady()) {
             $msg = __('Provisioning and SSH must be ready before running callback diagnostics.');
@@ -428,6 +512,7 @@ BASH);
         $this->authorize('update', $this->server);
         $this->remote_output = null;
         $this->remote_error = null;
+        $this->remote_output_kind = 'repair';
 
         if ($this->currentUserIsDeployer()) {
             $msg = __('Deployers cannot repair monitor installs on servers.');

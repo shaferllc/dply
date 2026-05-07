@@ -17,10 +17,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Laragear\WebAuthn\Contracts\WebAuthnAuthenticatable;
-use Laragear\WebAuthn\WebAuthnAuthentication;
-use Ramsey\Uuid\Uuid;
-use Ramsey\Uuid\UuidInterface;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\PasskeyAuthenticatable;
 
 #[Fillable([
     'name',
@@ -40,15 +38,10 @@ use Ramsey\Uuid\UuidInterface;
     'ui_preferences',
 ])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
-class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthenticatable
+class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUlids, Notifiable, WebAuthnAuthentication;
-
-    public function webAuthnId(): UuidInterface
-    {
-        return Uuid::uuid5(Uuid::NAMESPACE_DNS, 'dply:user:'.$this->getKey());
-    }
+    use HasFactory, HasUlids, Notifiable, PasskeyAuthenticatable;
 
     protected static function booted(): void
     {

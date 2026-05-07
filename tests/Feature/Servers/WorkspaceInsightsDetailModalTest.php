@@ -233,7 +233,7 @@ class StubFixHandler implements InsightFixActionInterface
         return null;
     }
 
-    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params): FixResult
+    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         return FixResult::success('stub-applied');
     }

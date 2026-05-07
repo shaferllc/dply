@@ -49,6 +49,8 @@ use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -97,6 +99,10 @@ class Settings extends Show
     public string $new_basic_auth_password = '';
 
     public string $new_basic_auth_path = '/';
+
+    public string $bulk_basic_auth_input = '';
+
+    public string $bulk_basic_auth_path = '/';
 
     public string $new_tenant_hostname = '';
 
@@ -1639,6 +1645,7 @@ class Settings extends Show
         $this->new_basic_auth_password = '';
         $this->new_basic_auth_path = '/';
         $this->site->load('basicAuthUsers');
+        $this->dispatch('close-modal', 'add-basic-auth-modal');
         $this->finalizeRoutingMutation(__('Basic authentication user saved.'));
     }
 
@@ -1659,6 +1666,239 @@ class Settings extends Show
     {
         $this->authorize('update', $this->site);
         $this->new_basic_auth_password = Str::password(20);
+    }
+
+    /**
+     * Clear the webserver-apply banner. Reads `site.meta` keys set by
+     * {@see ApplySiteWebserverConfigJob} and the cached transcript; both go away on dismiss.
+     * No-op while a run is still in flight (status=running) — same rule as the SSH-keys
+     * banners, even though apply is currently sync (defensive against future async dispatch).
+     */
+    public function dismissWebserverApplyBanner(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $fresh = $this->site->fresh();
+        $meta = is_array($fresh?->meta) ? $fresh->meta : [];
+
+        $statusKey = config('site_webserver_config.meta_apply_status_key');
+        if (($meta[$statusKey] ?? '') === 'running') {
+            return;
+        }
+
+        $runId = (string) ($meta[config('site_webserver_config.meta_apply_run_id_key')] ?? '');
+        if ($runId !== '') {
+            Cache::forget(config('site_webserver_config.apply_output_cache_key_prefix').$runId);
+        }
+
+        unset(
+            $meta[config('site_webserver_config.meta_apply_run_id_key')],
+            $meta[config('site_webserver_config.meta_apply_status_key')],
+            $meta[config('site_webserver_config.meta_apply_started_at_key')],
+            $meta[config('site_webserver_config.meta_apply_finished_at_key')],
+            $meta[config('site_webserver_config.meta_apply_error_key')],
+        );
+
+        $fresh?->update(['meta' => $meta]);
+        $this->site->refresh();
+    }
+
+    /**
+     * Banner state for the basic-auth partial — null when nothing recent to show.
+     * Returns: status ('completed'|'failed'|'running'), message, subtitle, output lines.
+     */
+    public function getWebserverApplyBannerProperty(): ?array
+    {
+        // Read straight from the DB — finalizeRoutingMutation's catch branch doesn't
+        // refresh the in-memory Site, so a failed apply would otherwise be invisible
+        // until the next round-trip. One query — assign fresh() once.
+        $fresh = $this->site->fresh();
+        $meta = is_array($fresh?->meta) ? $fresh->meta : [];
+
+        $status = (string) ($meta[config('site_webserver_config.meta_apply_status_key')] ?? '');
+        if (! in_array($status, ['running', 'completed', 'failed'], true)) {
+            return null;
+        }
+
+        $runId = (string) ($meta[config('site_webserver_config.meta_apply_run_id_key')] ?? '');
+        $finishedAt = $meta[config('site_webserver_config.meta_apply_finished_at_key')] ?? null;
+        $error = (string) ($meta[config('site_webserver_config.meta_apply_error_key')] ?? '');
+
+        $output = [];
+        if ($runId !== '') {
+            $cached = Cache::get(config('site_webserver_config.apply_output_cache_key_prefix').$runId);
+            if (is_array($cached) && isset($cached['lines']) && is_array($cached['lines'])) {
+                $output = array_values(array_filter($cached['lines'], 'is_string'));
+            }
+        }
+
+        $message = match ($status) {
+            'running' => __('Applying webserver config to :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+            'completed' => __('Webserver config applied.'),
+            'failed' => __('Webserver config apply failed.'),
+            default => '',
+        };
+
+        $subtitle = match (true) {
+            $status === 'failed' && $error !== '' => Str::limit($error, 200),
+            $status === 'completed' && $finishedAt
+                => __('Finished :time', ['time' => Carbon::parse($finishedAt)->diffForHumans()]),
+            $status === 'running'
+                => __('Refreshing every 4s · safe to leave this page — the job runs on the queue.'),
+            default => null,
+        };
+
+        return [
+            'status' => $status,
+            'message' => $message,
+            'subtitle' => $subtitle,
+            'output' => $output,
+            'busy' => $status === 'running',
+        ];
+    }
+
+    public function rotateBasicAuthPassword(string $userId): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            $this->toastError(__('Basic authentication is not available for this site runtime.'));
+
+            return;
+        }
+
+        /** @var SiteBasicAuthUser $user */
+        $user = $this->site->basicAuthUsers()->findOrFail($userId);
+
+        // Plaintext is dispatched to the browser once via a Livewire event and never stored
+        // on the component — the row in the panel keeps only the bcrypt hash.
+        $plain = Str::password(20);
+        $user->password_hash = Hash::make($plain);
+        $user->save();
+
+        $this->dispatch('dply-basic-auth-password-revealed', [
+            'username' => $user->username,
+            'path' => $user->normalizedPath(),
+            'password' => $plain,
+        ]);
+
+        $this->site->load('basicAuthUsers');
+        $this->finalizeRoutingMutation(__('Password rotated.'));
+    }
+
+    public function bulkImportBasicAuth(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            $this->toastError(__('Basic authentication is not available for this site runtime.'));
+
+            return;
+        }
+
+        $path = SiteBasicAuthUser::normalizePath($this->bulk_basic_auth_path ?: '/');
+        if (! $this->site->basicAuthSupportsPathPrefixes() && $path !== '/') {
+            $this->addError('bulk_basic_auth_path', __('Use path / for this site type.'));
+
+            return;
+        }
+        if (! preg_match('#^(/|/[a-zA-Z0-9/_-]*)$#', $path)) {
+            $this->addError('bulk_basic_auth_path', __('Enter a path like / or /wp-admin.'));
+
+            return;
+        }
+
+        $raw = (string) $this->bulk_basic_auth_input;
+        if (trim($raw) === '') {
+            $this->addError('bulk_basic_auth_input', __('Paste at least one user:password line.'));
+
+            return;
+        }
+
+        $existing = $this->site->basicAuthUsers()->pluck('username')->all();
+        $seen = [];
+        $created = 0;
+        $skipped = 0;
+        $invalid = 0;
+        $sortBase = (int) ($this->site->basicAuthUsers()->max('sort_order') ?? 0);
+
+        foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+
+            // Split on the first colon — htpasswd-style lines for bcrypt/apr1 contain `$` chars
+            // and additional colons in some encodings, so we never split more than once.
+            $colon = strpos($line, ':');
+            if ($colon === false || $colon === 0 || $colon === strlen($line) - 1) {
+                $invalid++;
+
+                continue;
+            }
+            $username = trim(substr($line, 0, $colon));
+            $secret = substr($line, $colon + 1);
+
+            if ($username === '' || strlen($username) > 128 || ! preg_match('/^[A-Za-z0-9._@\-]+$/', $username)) {
+                $invalid++;
+
+                continue;
+            }
+            if (in_array($username, $existing, true) || in_array($username, $seen, true)) {
+                $skipped++;
+
+                continue;
+            }
+
+            // Accept already-hashed entries (bcrypt $2y / apr1 $apr1$ / sha $5$/$6$) verbatim;
+            // otherwise treat the secret as plaintext and bcrypt-hash it server-side.
+            $alreadyHashed = (bool) preg_match('/^\$(2[aby]|apr1|5|6)\$/', $secret);
+            if (! $alreadyHashed && (strlen($secret) < 8 || strlen($secret) > 255)) {
+                $invalid++;
+
+                continue;
+            }
+            $hash = $alreadyHashed ? $secret : Hash::make($secret);
+
+            SiteBasicAuthUser::query()->create([
+                'site_id' => $this->site->id,
+                'username' => $username,
+                'password_hash' => $hash,
+                'path' => $path,
+                'sort_order' => ++$sortBase,
+            ]);
+            $seen[] = $username;
+            $created++;
+        }
+
+        if ($created === 0) {
+            $this->addError('bulk_basic_auth_input', __('No valid user:password lines were found.'));
+
+            return;
+        }
+
+        $this->bulk_basic_auth_input = '';
+        $this->bulk_basic_auth_path = '/';
+        $this->site->load('basicAuthUsers');
+        $this->dispatch('close-modal', 'add-basic-auth-modal');
+
+        $message = trans_choice(
+            '{1} :count user imported.|[2,*] :count users imported.',
+            $created,
+            ['count' => $created],
+        );
+        if ($skipped > 0 || $invalid > 0) {
+            $detail = [];
+            if ($skipped > 0) {
+                $detail[] = trans_choice('{1} :count duplicate skipped|[2,*] :count duplicates skipped', $skipped, ['count' => $skipped]);
+            }
+            if ($invalid > 0) {
+                $detail[] = trans_choice('{1} :count invalid line|[2,*] :count invalid lines', $invalid, ['count' => $invalid]);
+            }
+            $message .= ' ('.implode(', ', $detail).')';
+        }
+
+        $this->finalizeRoutingMutation($message);
     }
 
     public function addTenantDomain(): void

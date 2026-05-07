@@ -32,7 +32,7 @@ class EnableNtpFixAction implements InsightFixActionInterface
         return null;
     }
 
-    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params): FixResult
+    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         $script = <<<'BASH'
 if ! command -v timedatectl >/dev/null 2>&1; then

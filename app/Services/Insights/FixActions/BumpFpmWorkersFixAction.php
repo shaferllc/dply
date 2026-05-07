@@ -66,7 +66,7 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
         return null;
     }
 
-    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params): FixResult
+    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         $phpVersion = (string) $finding->meta['signal']['php_version'];
         $current = (int) $finding->meta['signal']['max_children'];
@@ -164,7 +164,7 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
         return preg_replace($pattern, '$1pm.max_children = '.$newValue, $content) ?? $content;
     }
 
-    public function revert(Server $server, ?Site $site, InsightFinding $finding, array $params): FixResult
+    public function revert(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         $backupPath = $finding->meta['backup_path'] ?? null;
         $phpVersion = $finding->meta['signal']['php_version'] ?? null;

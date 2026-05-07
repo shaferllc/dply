@@ -1,3 +1,3 @@
-<x-streamline::task-shell-defaults />
+<x-task-runner::task-shell-defaults />
 
 rm -rf {{ $path }}

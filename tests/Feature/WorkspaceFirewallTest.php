@@ -85,8 +85,7 @@ class WorkspaceFirewallTest extends TestCase
         $response->assertOk();
         $response->assertSee('Firewall rules');
         $response->assertSee('Templates');
-        $response->assertSee('History');
-        $response->assertSee('Audit');
+        $response->assertSee('Activity');
         $response->assertDontSee('↑');
         $response->assertDontSee('↓');
         // The view now shows an "Advanced" details panel collapsed by
@@ -124,14 +123,9 @@ class WorkspaceFirewallTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceFirewall::class, ['server' => $server])
-            ->set('firewall_workspace_tab', 'history')
-            ->assertSee('Apply history')
-            ->assertSee('Applied');
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceFirewall::class, ['server' => $server])
-            ->set('firewall_workspace_tab', 'audit')
-            ->assertSee('Recent audit')
+            ->set('firewall_workspace_tab', 'activity')
+            ->assertSee('Activity')
+            ->assertSee('Applied')
             ->assertSee(ServerFirewallAuditEvent::EVENT_RULE_CREATED);
     }
 

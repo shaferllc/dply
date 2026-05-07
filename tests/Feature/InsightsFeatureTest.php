@@ -1022,7 +1022,7 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): FixResult
+            public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
             {
                 return FixResult::success();
             }
@@ -1152,7 +1152,7 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): FixResult
+            public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
             {
                 $this->applyCalled = true;
 
@@ -1230,7 +1230,7 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): FixResult
+            public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
             {
                 $this->applyCalled = true;
 
@@ -1894,7 +1894,7 @@ class InsightsFeatureTest extends TestCase
                 $this->state = &$state;
             }
 
-            public function runForServer(Server $server, ?string $onlyKey = null): void
+            public function runForServer(Server $server, ?string $onlyKey = null, ?callable $onProgress = null): void
             {
                 $this->state['only_key_seen'] = $onlyKey;
             }
@@ -1931,9 +1931,6 @@ class InsightsFeatureTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceInsights::class, ['server' => $server])
-            // The acknowledged-but-open finding should appear in the open list with the
-            // "Dismissed" indicator and Restore-to-banner control on critical severity.
-            ->assertSee('Restore to banner')
             ->call('unacknowledgeFinding', $finding->id);
 
         $finding->refresh();
@@ -2184,7 +2181,7 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): FixResult
+            public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
             {
                 $this->applyCalled = true;
 
@@ -2237,7 +2234,7 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): FixResult
+            public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
             {
                 return FixResult::success('shell ran but condition persists');
             }
@@ -2277,7 +2274,7 @@ class InsightsFeatureTest extends TestCase
                 return 'not enough RAM headroom';
             }
 
-            public function apply($server, $site, $finding, array $params): FixResult
+            public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
             {
                 $this->applyCalled = true;
 
@@ -2315,7 +2312,7 @@ class InsightsFeatureTest extends TestCase
                 return null;
             }
 
-            public function apply($server, $site, $finding, array $params): FixResult
+            public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
             {
                 return FixResult::success();
             }

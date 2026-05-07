@@ -279,6 +279,103 @@ class ServerFirewallProvisioner
     }
 
     /**
+     * Pull the host's user-added UFW rules via `ufw show added` and parse each line into a
+     * structured rule we can reconcile against the panel. Lines we can't confidently parse are
+     * returned with a non-null `raw` and null structured fields so the caller can render them
+     * as "skipped" in the import preview.
+     *
+     * @return list<array{action: ?string, port: ?int, protocol: ?string, source: ?string, raw: string}>
+     */
+    public function importableRulesFromHost(Server $server): array
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $blob = app(ServerSshConnectionRunner::class)->run(
+            $server,
+            fn ($ssh): string => trim($ssh->exec($this->ufwExecLine($server, 'show added'), 30)),
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
+
+        $rules = [];
+        foreach (preg_split("/\r?\n/", $blob) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || ! str_starts_with($line, 'ufw ')) {
+                continue;
+            }
+            $rules[] = $this->parseUfwShowAddedLine($line);
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Parse one `ufw show added` line (e.g. `ufw allow 80/tcp`, `ufw deny from 10.0.0.0/8 to any
+     * port 22 proto tcp`, `ufw allow proto icmp`) into structured fields. Returns `raw` only
+     * when the line doesn't match a shape we know how to import.
+     *
+     * @return array{action: ?string, port: ?int, protocol: ?string, source: ?string, raw: string}
+     */
+    public function parseUfwShowAddedLine(string $line): array
+    {
+        $unknown = ['action' => null, 'port' => null, 'protocol' => null, 'source' => null, 'raw' => $line];
+
+        $stripped = preg_replace('/^ufw\s+/', '', $line, 1);
+        if (! is_string($stripped) || $stripped === '') {
+            return $unknown;
+        }
+        // Trailing `comment '...'` and route/log/limit prefixes aren't structured rules — drop
+        // them rather than guessing.
+        $stripped = preg_replace('/\s+comment\s+([\'"]).*?\1\s*$/', '', $stripped) ?? $stripped;
+        if (preg_match('/^(route|log|limit)\b/i', $stripped) === 1) {
+            return $unknown;
+        }
+
+        if (! preg_match('/^(allow|deny)\b\s*(.*)$/i', $stripped, $m)) {
+            return $unknown;
+        }
+        $action = strtolower($m[1]);
+        $rest = trim($m[2]);
+
+        // ICMP/ICMPv6: `allow proto icmp` (optionally `from <src>`).
+        if (preg_match('/^(?:from\s+(\S+)\s+)?proto\s+(icmp|ipv6-icmp)\s*$/i', $rest, $im)) {
+            return [
+                'action' => $action,
+                'port' => null,
+                'protocol' => strtolower($im[2]),
+                'source' => $im[1] !== '' ? $im[1] : 'any',
+                'raw' => $line,
+            ];
+        }
+
+        // Long form: `from <src> to any port <port> proto <tcp|udp>` (proto optional, defaults to tcp).
+        if (preg_match('/^from\s+(\S+)\s+to\s+\S+\s+port\s+(\d+)(?:\s+proto\s+(tcp|udp))?\s*$/i', $rest, $lm)) {
+            return [
+                'action' => $action,
+                'port' => (int) $lm[2],
+                'protocol' => strtolower($lm[3] ?? 'tcp'),
+                'source' => $lm[1],
+                'raw' => $line,
+            ];
+        }
+
+        // Short form: `<port>/<proto>` or just `<port>` (proto defaults to tcp).
+        if (preg_match('#^(\d+)(?:/(tcp|udp))?\s*$#i', $rest, $sm)) {
+            return [
+                'action' => $action,
+                'port' => (int) $sm[1],
+                'protocol' => strtolower($sm[2] ?? 'tcp'),
+                'source' => 'any',
+                'raw' => $line,
+            ];
+        }
+
+        return $unknown;
+    }
+
+    /**
      * True when no enabled Dply rule clearly allows inbound SSH on the server’s configured SSH port (TCP).
      */
     public function sshAccessNotExplicitlyAllowed(Server $server): bool

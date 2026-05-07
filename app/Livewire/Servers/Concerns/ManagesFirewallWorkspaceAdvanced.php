@@ -7,7 +7,7 @@ use App\Services\Servers\FirewallRuleTemplateApplicator;
 
 trait ManagesFirewallWorkspaceAdvanced
 {
-    /** @var 'rules'|'templates'|'history'|'audit' */
+    /** @var 'rules'|'templates'|'activity' */
     public string $firewall_workspace_tab = 'rules';
 
     public bool $firewall_ack_ssh_risk = false;

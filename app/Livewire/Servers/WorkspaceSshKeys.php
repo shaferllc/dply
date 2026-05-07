@@ -41,6 +41,7 @@ class WorkspaceSshKeys extends Component
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
+    /** @var 'keys'|'preview'|'advanced'|'activity' */
     public string $ssh_workspace_tab = 'keys';
 
     public string $new_auth_name = '';

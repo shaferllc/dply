@@ -4,6 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\RunServerCronJobNowJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\OrganizationCronJobTemplate;
@@ -31,6 +32,7 @@ use Livewire\Component;
 class WorkspaceCron extends Component
 {
     use ConfirmsActionWithModal;
+    use EmitsPanelEvent;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -361,21 +363,169 @@ class WorkspaceCron extends Component
         ];
 
         if ($this->editing_job_id) {
-            ServerCronJob::query()
+            $job = ServerCronJob::query()
                 ->where('server_id', $this->server->id)
                 ->whereKey($this->editing_job_id)
-                ->firstOrFail()
-                ->update($payload);
+                ->firstOrFail();
+            $job->update($payload);
+            $this->emitPanelEvent(
+                __('Cron job updated — sync to apply'),
+                array_filter([
+                    sprintf('> Updated "%s" in the panel.', $job->fresh()->description ?: $payload['command']),
+                    sprintf('  schedule: %s · user: %s', $payload['cron_expression'], $payload['user']),
+                    '> Click "Sync crontab" to install the new Dply-managed block on the server.',
+                ]),
+            );
             $this->toastSuccess(__('Cron job updated. Sync crontab on the server to apply changes.'));
         } else {
-            ServerCronJob::query()->create(array_merge($payload, [
+            $created = ServerCronJob::query()->create(array_merge($payload, [
                 'server_id' => $this->server->id,
                 'enabled' => true,
             ]));
+            $this->emitPanelEvent(
+                __('Cron job added — sync to install on server'),
+                array_filter([
+                    sprintf('> Added "%s" to the panel.', $created->description ?: $payload['command']),
+                    sprintf('  schedule: %s · user: %s', $payload['cron_expression'], $payload['user']),
+                    '> Click "Sync crontab" to install the Dply-managed block on the server.',
+                ]),
+            );
             $this->toastSuccess(__('Cron job added. Sync crontab on the server to install the Dply-managed block.'));
         }
 
         $this->cancelEdit();
+        $this->dispatch('close-modal', 'add-cron-job-modal');
+    }
+
+    /**
+     * Inserts panel rows from a `config('cron_workspace.bundled_jobs')` bundle. Skips entries
+     * that already match (same command + expression + user); commands often include placeholders
+     * the user must edit before syncing the crontab to the server.
+     */
+    public function applyCronBundle(string $key): void
+    {
+        $this->authorize('update', $this->server);
+
+        $bundle = config('cron_workspace.bundled_jobs.'.$key);
+        if (! is_array($bundle) || empty($bundle['entries'])) {
+            $this->toastError(__('Unknown cron bundle.'));
+
+            return;
+        }
+
+        $created = 0;
+        $skipped = 0;
+        $createdLines = [];
+        $defaultSshUser = trim((string) $this->server->ssh_user) ?: 'root';
+
+        foreach ($bundle['entries'] as $entry) {
+            $command = trim((string) ($entry['command'] ?? ''));
+            $expression = trim((string) ($entry['cron_expression'] ?? ''));
+            if ($command === '' || $expression === '') {
+                continue;
+            }
+            $user = trim((string) ($entry['user'] ?? '')) ?: $defaultSshUser;
+
+            $duplicate = ServerCronJob::query()
+                ->where('server_id', $this->server->id)
+                ->where('command', $command)
+                ->where('cron_expression', $expression)
+                ->where('user', $user)
+                ->exists();
+
+            if ($duplicate) {
+                $skipped++;
+
+                continue;
+            }
+
+            ServerCronJob::query()->create([
+                'server_id' => $this->server->id,
+                'cron_expression' => $expression,
+                'command' => $command,
+                'user' => $user,
+                'enabled' => true,
+                'is_synced' => false,
+                'description' => $entry['description'] ?? null,
+                'overlap_policy' => $entry['overlap_policy'] ?? ServerCronJob::OVERLAP_ALLOW,
+                'schedule_timezone' => config('app.timezone'),
+            ]);
+            $created++;
+            $createdLines[] = sprintf('  + %s   %s', $expression, Str::limit($command, 80));
+        }
+
+        if ($created === 0) {
+            $this->toastWarning(__('All entries from ":label" already exist on this server.', ['label' => $bundle['label'] ?? $key]));
+
+            return;
+        }
+
+        $this->emitPanelEvent(
+            __('Bundle ":label" added — sync to install on server', ['label' => $bundle['label'] ?? $key]),
+            array_values(array_filter([
+                sprintf('> Added %d cron %s from bundle "%s" to the panel.', $created, $created === 1 ? 'job' : 'jobs', $bundle['label'] ?? $key),
+                $skipped > 0 ? sprintf('  (%d duplicate %s skipped)', $skipped, $skipped === 1 ? 'entry' : 'entries') : null,
+                ...$createdLines,
+                '> Review commands (paths, domains, credentials), then click "Sync crontab" to install the Dply-managed block.',
+            ])),
+        );
+
+        $this->toastSuccess(__('Added :n cron :word from ":label". Review and sync.', [
+            'n' => $created,
+            'word' => $created === 1 ? 'job' : 'jobs',
+            'label' => $bundle['label'] ?? $key,
+        ]));
+    }
+
+    /**
+     * Returns the configured one-click bundles, augmented with `entry_count` and `applied`
+     * (true when every entry already exists on this server). The view renders an "Added"
+     * indicator when applied.
+     *
+     * @return array<string, array{label: string, description: string, entry_count: int, applied: bool}>
+     */
+    protected function bundledCronJobsForView(): array
+    {
+        $bundles = config('cron_workspace.bundled_jobs', []);
+        if (! is_array($bundles) || $bundles === []) {
+            return [];
+        }
+
+        $defaultSshUser = trim((string) $this->server->ssh_user) ?: 'root';
+        $existing = $this->server->cronJobs
+            ->map(fn (ServerCronJob $j) => trim((string) $j->cron_expression).'|'.trim((string) $j->command).'|'.trim((string) $j->user))
+            ->all();
+        $existingSet = array_flip($existing);
+
+        $out = [];
+        foreach ($bundles as $key => $bundle) {
+            $entries = $bundle['entries'] ?? [];
+            if (! is_array($entries) || $entries === []) {
+                continue;
+            }
+            $allApplied = true;
+            foreach ($entries as $entry) {
+                $cmd = trim((string) ($entry['command'] ?? ''));
+                $expr = trim((string) ($entry['cron_expression'] ?? ''));
+                if ($cmd === '' || $expr === '') {
+                    $allApplied = false;
+                    continue;
+                }
+                $user = trim((string) ($entry['user'] ?? '')) ?: $defaultSshUser;
+                if (! isset($existingSet[$expr.'|'.$cmd.'|'.$user])) {
+                    $allApplied = false;
+                    break;
+                }
+            }
+            $out[$key] = [
+                'label' => (string) ($bundle['label'] ?? $key),
+                'description' => (string) ($bundle['description'] ?? ''),
+                'entry_count' => count($entries),
+                'applied' => $allApplied,
+            ];
+        }
+
+        return $out;
     }
 
     public function toggleCronJob(string $jobId): void
@@ -402,10 +552,18 @@ class WorkspaceCron extends Component
 
             return;
         }
+        $jobLabel = $job->description ?: $job->command;
         $job->delete();
         if ($this->editing_job_id === $jobId) {
             $this->cancelEdit();
         }
+        $this->emitPanelEvent(
+            __('Cron job removed — sync to update server'),
+            [
+                sprintf('> Removed "%s" from the panel.', $jobLabel),
+                '> Click "Sync crontab" to remove it from the Dply-managed block on the server.',
+            ],
+        );
         $this->toastSuccess(__('Cron entry removed. Sync crontab again to update the server.'));
     }
 
@@ -672,10 +830,44 @@ class WorkspaceCron extends Component
         try {
             $this->server->refresh();
             $out = $synchronizer->sync($this->server);
-            $this->toastSuccess(__('Crontab sync finished. Output: :out', ['out' => Str::limit(trim($out), 800)]));
+            $this->emitPanelEvent(
+                __('Crontab synced to server.'),
+                array_merge(
+                    ['> Wrote the Dply-managed crontab block via SSH.'],
+                    $this->splitOutputForBanner($out),
+                ),
+                'completed',
+            );
+            $this->toastSuccess(__('Crontab sync finished — see the banner for the host output.'));
         } catch (\Throwable $e) {
+            $this->emitPanelEvent(
+                __('Crontab sync failed.'),
+                [
+                    '> Tried to write the Dply-managed crontab block via SSH.',
+                    '> ERROR: '.Str::limit(trim($e->getMessage()), 800),
+                ],
+                'failed',
+            );
             $this->toastError($e->getMessage());
         }
+    }
+
+    /**
+     * Split a buffered SSH command output into transcript lines for the panel banner —
+     * mirrors the helper on the firewall workspace, kept local since the format is the same.
+     *
+     * @return list<string>
+     */
+    protected function splitOutputForBanner(string $blob, int $maxLines = 200): array
+    {
+        $lines = array_values(array_filter(
+            array_map('rtrim', preg_split("/\r?\n/", trim($blob)) ?: []),
+            static fn (string $l): bool => $l !== '',
+        ));
+
+        return count($lines) > $maxLines
+            ? array_merge(array_slice($lines, 0, $maxLines), [sprintf('… (%d more lines truncated)', count($lines) - $maxLines)])
+            : $lines;
     }
 
     public function validateCronExpressionField(CronExpressionValidator $cronValidator): void
@@ -925,6 +1117,7 @@ class WorkspaceCron extends Component
                     ->find($this->viewing_logs_job_id)
                 : null,
             'commandInstallPresets' => $this->commandInstallPresets(),
+            'bundledCronJobs' => $this->bundledCronJobsForView(),
             'crontabInspectUserChoices' => $this->crontabInspectUserChoices(),
             'runAsUserDatalistChoices' => $this->runAsUserDatalistChoices(),
             'cronRunEchoSubscribable' => $this->cronRunEchoSubscribable(),

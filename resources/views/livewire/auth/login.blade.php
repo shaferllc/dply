@@ -54,8 +54,6 @@
         <button
             type="button"
             id="dply-passkey-login-btn"
-            data-options-url="{{ $webauthnLoginOptionsUrl }}"
-            data-login-url="{{ $webauthnLoginUrl }}"
             class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-brand-cream/80 px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 transition-colors disabled:opacity-60"
         >
             <x-heroicon-o-key class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />

@@ -19,6 +19,8 @@ interface RevertableInsightFixActionInterface
      * all failures (missing backup file, reload failure, etc.) go in the FixResult.
      *
      * @param  array<string, mixed>  $params
+     * @param  (callable(string $type, string $chunk): void)|null  $onOutput
+     *     Optional streaming hook for live banner output. See {@see InsightFixActionInterface::apply}.
      */
-    public function revert(Server $server, ?Site $site, InsightFinding $finding, array $params): FixResult;
+    public function revert(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult;
 }
