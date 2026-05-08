@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesSiteApplyState;
 use App\Models\Site;
 use App\Services\Sites\SiteSystemdProvisioner;
 use Illuminate\Bus\Queueable;
@@ -29,21 +30,23 @@ use Illuminate\Support\Facades\Log;
  *   - the site has no start_command (URL-first detection didn't
  *     produce one and the user didn't fill it in by hand).
  *
- * The job is fire-and-forget: a failure is logged but doesn't roll
- * back the site activation. NGINX will return 502 while the unit is
- * absent; the user can re-trigger by saving the site or clicking a
- * "redeploy" affordance (which currently hits the deploy pipeline
- * and isn't yet wired to call this job — that's a follow-up).
+ * Failures are logged and surfaced via the site-apply banner; NGINX
+ * will return 502 while the unit is absent until the next save / deploy.
  */
 class ProvisionSiteSystemdUnitsJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesSiteApplyState;
 
     public int $tries = 1;
 
     public int $timeout = 180;
 
     public function __construct(public string $siteId) {}
+
+    protected function applyKind(): string
+    {
+        return 'systemd';
+    }
 
     public function handle(SiteSystemdProvisioner $provisioner): void
     {
@@ -61,13 +64,20 @@ class ProvisionSiteSystemdUnitsJob implements ShouldQueue
             return;
         }
 
+        $runId = $this->beginApplyRun($site);
+
         try {
             $written = $provisioner->provision($site);
+            $this->cacheApplyOutput($runId, 'Provisioned units: '.implode(', ', (array) $written));
+            $this->completeApplyRun($site);
             Log::info('Provisioned site systemd units', [
                 'site_id' => $site->id,
                 'units' => $written,
             ]);
         } catch (\Throwable $e) {
+            $this->cacheApplyOutput($runId, $e->getMessage());
+            $this->failApplyRun($site, $e->getMessage());
+
             Log::warning('ProvisionSiteSystemdUnitsJob failed', [
                 'site_id' => $site->id,
                 'error' => $e->getMessage(),

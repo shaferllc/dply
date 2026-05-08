@@ -2,18 +2,20 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesSiteApplyState;
 use App\Models\Site;
 use App\Services\Servers\ServerSystemUserService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class SiteResetPermissionsJob implements ShouldQueue
+class SiteResetPermissionsJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesSiteApplyState;
 
     public int $tries = 1;
 
@@ -23,6 +25,16 @@ class SiteResetPermissionsJob implements ShouldQueue
         public string $siteId,
     ) {}
 
+    public function uniqueId(): string
+    {
+        return 'site-reset-permissions:'.$this->siteId;
+    }
+
+    protected function applyKind(): string
+    {
+        return 'permissions';
+    }
+
     public function handle(ServerSystemUserService $service): void
     {
         $site = Site::query()->find($this->siteId);
@@ -30,10 +42,22 @@ class SiteResetPermissionsJob implements ShouldQueue
             return;
         }
 
+        $runId = $this->beginApplyRun($site);
+
         try {
             $service->resetSiteFilePermissions($site->fresh());
+            $this->completeApplyRun($site);
         } catch (\Throwable $e) {
-            $this->recordFailure($site, $e->getMessage());
+            $this->cacheApplyOutput($runId, $e->getMessage());
+            $this->failApplyRun(
+                $site,
+                $e->getMessage(),
+                extraMeta: ['system_user_operation' => [
+                    'status' => 'error',
+                    'message' => $e->getMessage(),
+                    'at' => now()->toIso8601String(),
+                ]],
+            );
 
             Log::warning('SiteResetPermissionsJob failed', [
                 'site_id' => $site->id,
@@ -42,16 +66,5 @@ class SiteResetPermissionsJob implements ShouldQueue
 
             throw $e;
         }
-    }
-
-    private function recordFailure(Site $site, string $message): void
-    {
-        $meta = is_array($site->meta) ? $site->meta : [];
-        $meta['system_user_operation'] = [
-            'status' => 'error',
-            'message' => $message,
-            'at' => now()->toIso8601String(),
-        ];
-        $site->update(['meta' => $meta]);
     }
 }

@@ -248,7 +248,6 @@ class Show extends Component
 
     protected function syncFormFromSite(): void
     {
-        $this->site->refresh();
         $functionsConfig = $this->site->functionsConfig();
         $this->git_repository_url = (string) ($this->site->git_repository_url ?? '');
         $this->git_branch = (string) ($this->site->git_branch ?: 'main');
@@ -450,14 +449,11 @@ class Show extends Component
             return;
         }
 
-        try {
-            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
-            $this->site->refresh();
-            $this->toastSuccess($successMessage.' Webserver config reloaded.');
-        } catch (\Throwable $e) {
-            $this->toastSuccess($successMessage.' Saved, but the webserver config could not be re-applied automatically.');
-            $this->toastError($e->getMessage());
-        }
+        // Queued: errors surface via the apply banner (meta.status=failed) on the next
+        // poll, not as inline toasts. Inline-running this used to time out HTTP requests
+        // because SSH/nginx work was happening synchronously on the web worker.
+        ApplySiteWebserverConfigJob::dispatch($this->site->id);
+        $this->toastSuccess($successMessage.' '.__('Webserver config queued — track progress in the apply banner.'));
     }
 
     public function installNginx(): void
@@ -469,13 +465,8 @@ class Show extends Component
             return;
         }
 
-        try {
-            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
-            $this->site->refresh();
-            $this->toastSuccess('Webserver config written and reloaded.');
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
+        ApplySiteWebserverConfigJob::dispatch($this->site->id);
+        $this->toastSuccess(__('Webserver config write queued — track progress in the apply banner.'));
     }
 
     public function issueSsl(): void
@@ -487,14 +478,8 @@ class Show extends Component
             return;
         }
 
-        try {
-            IssueSiteSslJob::dispatchSync($this->site);
-            $this->site->refresh();
-            $this->toastSuccess('SSL certificate requested. Refresh if status still updating.');
-        } catch (\Throwable $e) {
-            $this->site->refresh();
-            $this->toastError($e->getMessage());
-        }
+        IssueSiteSslJob::dispatch($this->site->id);
+        $this->toastSuccess(__('SSL certificate issuance queued — track progress in the apply banner.'));
     }
 
     public function retryProvisioning(SiteProvisioner $siteProvisioner): void
@@ -852,6 +837,7 @@ class Show extends Component
         } else {
             $this->toastSuccess($result['message']);
         }
+        $this->site->refresh();
         $this->syncFormFromSite();
     }
 
@@ -866,6 +852,7 @@ class Show extends Component
 
         $provisioner->disable($this->site->fresh());
         $this->toastSuccess(__('Quick deploy disabled and provider hook removed when possible.'));
+        $this->site->refresh();
         $this->syncFormFromSite();
     }
 
@@ -1116,14 +1103,8 @@ class Show extends Component
         }
 
         if ($this->shouldAutoReapplyManagedWebserverConfig()) {
-            try {
-                ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
-                $this->site->refresh();
-                $this->toastSuccess($message.' '.__('Webserver config reloaded.'));
-            } catch (\Throwable $e) {
-                $this->toastSuccess($message.' '.__('Saved, but the webserver config could not be re-applied automatically.'));
-                $this->toastError($e->getMessage());
-            }
+            ApplySiteWebserverConfigJob::dispatch($this->site->id);
+            $this->toastSuccess($message.' '.__('Webserver config queued — track progress in the apply banner.'));
 
             return;
         }
@@ -1274,17 +1255,10 @@ class Show extends Component
         $this->site->refresh();
         $this->syncFormFromSite();
 
-        try {
-            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
-            $this->site->refresh();
-            $this->syncFormFromSite();
-            $this->toastSuccess($this->engine_http_cache_enabled
-                ? __('Engine HTTP cache enabled and web server config reloaded.')
-                : __('Engine HTTP cache disabled and web server config reloaded.'));
-        } catch (\Throwable $e) {
-            $this->toastError(__('Setting saved, but the web server config could not be re-applied automatically.'));
-            $this->toastError($e->getMessage());
-        }
+        ApplySiteWebserverConfigJob::dispatch($this->site->id);
+        $this->toastSuccess($this->engine_http_cache_enabled
+            ? __('Engine HTTP cache enabled. Web server config queued — track progress in the apply banner.')
+            : __('Engine HTTP cache disabled. Web server config queued — track progress in the apply banner.'));
     }
 
     public function addEnvironmentVariable(): void
@@ -1667,14 +1641,8 @@ class Show extends Component
         $this->site->refresh();
         $this->syncFormFromSite();
 
-        try {
-            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
-            $this->site->refresh();
-            $this->toastSuccess(__('Site suspended. Webserver config reloaded.'));
-        } catch (\Throwable $e) {
-            $this->toastSuccess(__('Suspension saved, but the webserver config could not be re-applied automatically.'));
-            $this->toastError($e->getMessage());
-        }
+        ApplySiteWebserverConfigJob::dispatch($this->site->id);
+        $this->toastSuccess(__('Site suspended. Webserver config queued — track progress in the apply banner.'));
     }
 
     public function resumeSite(): void
@@ -1698,14 +1666,8 @@ class Show extends Component
         $this->site->refresh();
         $this->settings_suspended_message = '';
 
-        try {
-            ApplySiteWebserverConfigJob::dispatchSync($this->site->id);
-            $this->site->refresh();
-            $this->toastSuccess(__('Site resumed. Webserver config reloaded.'));
-        } catch (\Throwable $e) {
-            $this->toastSuccess(__('Resume saved, but the webserver config could not be re-applied automatically.'));
-            $this->toastError($e->getMessage());
-        }
+        ApplySiteWebserverConfigJob::dispatch($this->site->id);
+        $this->toastSuccess(__('Site resumed. Webserver config queued — track progress in the apply banner.'));
     }
 
     public function render(): View

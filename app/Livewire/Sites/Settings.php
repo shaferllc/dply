@@ -352,7 +352,9 @@ class Settings extends Show
         }
 
         parent::mount($server, $site);
-        $this->syncGeneralSettingsForm();
+        // parent::mount → syncFormFromSite already refreshed the site; skip the
+        // redundant refresh here.
+        $this->syncGeneralSettingsForm(skipRefresh: true);
         $this->syncPreviewSettingsForm();
         if ($this->section === 'dns') {
             $this->syncDnsSettingsForm();
@@ -1326,9 +1328,14 @@ class Settings extends Show
             : self::ROUTING_TABS[0];
     }
 
-    private function syncGeneralSettingsForm(): void
+    private function syncGeneralSettingsForm(bool $skipRefresh = false): void
     {
-        $this->site->refresh();
+        // Skip the refresh when the caller has just refreshed (mount path —
+        // parent::mount → syncFormFromSite already pulled a fresh site, and after
+        // $this->site->update() / load() the in-memory model is current).
+        if (! $skipRefresh) {
+            $this->site->refresh();
+        }
         $this->settings_primary_domain = (string) optional($this->site->primaryDomain())->hostname;
         $this->settings_document_root = (string) ($this->site->document_root ?? '');
         $this->project_workspace_id = $this->site->workspace_id;
@@ -1683,7 +1690,22 @@ class Settings extends Show
 
         $statusKey = config('site_webserver_config.meta_apply_status_key');
         if (($meta[$statusKey] ?? '') === 'running') {
-            return;
+            // Allow dismissal once the run is past the staleness threshold so a dead
+            // worker can't strand the banner forever. While still within the threshold,
+            // keep the no-op so an in-flight job isn't accidentally cleared.
+            $startedAt = $meta[config('site_webserver_config.meta_apply_started_at_key')] ?? null;
+            $stale = false;
+            if ($startedAt) {
+                try {
+                    $stale = Carbon::parse($startedAt)
+                        ->lt(now()->subSeconds((int) config('site_webserver_config.apply_stale_after_seconds', 600)));
+                } catch (\Throwable) {
+                    $stale = false;
+                }
+            }
+            if (! $stale) {
+                return;
+            }
         }
 
         $runId = (string) ($meta[config('site_webserver_config.meta_apply_run_id_key')] ?? '');
@@ -1694,6 +1716,7 @@ class Settings extends Show
         unset(
             $meta[config('site_webserver_config.meta_apply_run_id_key')],
             $meta[config('site_webserver_config.meta_apply_status_key')],
+            $meta[config('site_webserver_config.meta_apply_kind_key')],
             $meta[config('site_webserver_config.meta_apply_started_at_key')],
             $meta[config('site_webserver_config.meta_apply_finished_at_key')],
             $meta[config('site_webserver_config.meta_apply_error_key')],
@@ -1704,16 +1727,26 @@ class Settings extends Show
     }
 
     /**
-     * Banner state for the basic-auth partial — null when nothing recent to show.
+     * Polled by the site-apply banner while a queued server-touching job is running,
+     * so the page flips from "running" to "completed/failed" without a manual refresh.
+     * Refresh on the model is enough — the banner getter re-reads meta.
+     */
+    public function pollWebserverApplyStatus(): void
+    {
+        $this->site->refresh();
+    }
+
+    /**
+     * Banner state for any site-apply run — null when nothing recent to show.
      * Returns: status ('completed'|'failed'|'running'), message, subtitle, output lines.
+     *
+     * Reads the `site_apply_kind` meta to pick user-facing copy from the kinds table
+     * in config/site_webserver_config.php — so SSL, system-user, systemd, permissions
+     * and webserver-config jobs all share this single banner.
      */
     public function getWebserverApplyBannerProperty(): ?array
     {
-        // Read straight from the DB — finalizeRoutingMutation's catch branch doesn't
-        // refresh the in-memory Site, so a failed apply would otherwise be invisible
-        // until the next round-trip. One query — assign fresh() once.
-        $fresh = $this->site->fresh();
-        $meta = is_array($fresh?->meta) ? $fresh->meta : [];
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
 
         $status = (string) ($meta[config('site_webserver_config.meta_apply_status_key')] ?? '');
         if (! in_array($status, ['running', 'completed', 'failed'], true)) {
@@ -1721,8 +1754,32 @@ class Settings extends Show
         }
 
         $runId = (string) ($meta[config('site_webserver_config.meta_apply_run_id_key')] ?? '');
+        $startedAt = $meta[config('site_webserver_config.meta_apply_started_at_key')] ?? null;
         $finishedAt = $meta[config('site_webserver_config.meta_apply_finished_at_key')] ?? null;
         $error = (string) ($meta[config('site_webserver_config.meta_apply_error_key')] ?? '');
+        // Default to webserver_config for legacy meta written before the kind field
+        // existed — that keeps still-stuck banners legible.
+        $kind = (string) ($meta[config('site_webserver_config.meta_apply_kind_key')] ?? 'webserver_config');
+
+        // Treat status=running as failed/stale once it has been "running" longer than
+        // the configured threshold. Without this, a queue worker that died mid-job
+        // (or a host PHP request killed mid-dispatchSync, before the queue switch)
+        // would leave the banner stuck forever and dismissal would be blocked.
+        $isStale = false;
+        if ($status === 'running' && $startedAt) {
+            try {
+                $isStale = Carbon::parse($startedAt)
+                    ->lt(now()->subSeconds((int) config('site_webserver_config.apply_stale_after_seconds', 600)));
+            } catch (\Throwable) {
+                $isStale = false;
+            }
+        }
+        if ($isStale) {
+            $status = 'failed';
+            if ($error === '') {
+                $error = __('No completion recorded — the worker likely died before finishing. Re-trigger the apply, or dismiss this banner.');
+            }
+        }
 
         $output = [];
         if ($runId !== '') {
@@ -1732,10 +1789,23 @@ class Settings extends Show
             }
         }
 
+        $kinds = (array) config('site_webserver_config.apply_kinds', []);
+        $labels = is_array($kinds[$kind] ?? null)
+            ? $kinds[$kind]
+            : ($kinds['webserver_config'] ?? [
+                'running' => 'Working on :host …',
+                'completed' => 'Done.',
+                'failed' => 'Failed.',
+                'stale' => 'Did not finish.',
+            ]);
+
+        $host = $this->site->server?->name ?? $this->site->name;
         $message = match ($status) {
-            'running' => __('Applying webserver config to :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
-            'completed' => __('Webserver config applied.'),
-            'failed' => __('Webserver config apply failed.'),
+            'running' => __($labels['running'] ?? 'Working on :host …', ['host' => $host]),
+            'completed' => __($labels['completed'] ?? 'Done.'),
+            'failed' => $isStale
+                ? __($labels['stale'] ?? ($labels['failed'] ?? 'Did not finish.'))
+                : __($labels['failed'] ?? 'Failed.'),
             default => '',
         };
 
@@ -1754,6 +1824,7 @@ class Settings extends Show
             'subtitle' => $subtitle,
             'output' => $output,
             'busy' => $status === 'running',
+            'kind' => $kind,
         ];
     }
 
@@ -2085,18 +2156,14 @@ class Settings extends Show
             ],
         ]);
 
-        try {
-            ExecuteSiteCertificateJob::dispatchSync($certificate->id);
-            $providerLabel = $validated['quick_ssl_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
-                ? 'ZeroSSL'
-                : 'Let\'s Encrypt';
-            $this->toastSuccess(__('SSL request started for :domain via :provider.', [
-                'domain' => $hostname,
-                'provider' => $providerLabel,
-            ]));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
+        ExecuteSiteCertificateJob::dispatch($certificate->id);
+        $providerLabel = $validated['quick_ssl_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
+            ? 'ZeroSSL'
+            : 'Let\'s Encrypt';
+        $this->toastSuccess(__('SSL request queued for :domain via :provider — track progress in the apply banner.', [
+            'domain' => $hostname,
+            'provider' => $providerLabel,
+        ]));
 
         $this->site->load('certificates');
         $this->closeQuickDomainSslModal();
@@ -2277,9 +2344,12 @@ class Settings extends Show
 
         try {
             if (in_array($certificate->provider_type, [SiteCertificate::PROVIDER_IMPORTED, SiteCertificate::PROVIDER_CSR], true)) {
+                // Imported / CSR-backed certs are processed inline because there's no
+                // long-running ACME or remote install step — the cert material is
+                // already in hand and the service just persists/installs it.
                 $certificateRequestService->execute($certificate);
             } else {
-                ExecuteSiteCertificateJob::dispatchSync($certificate->id);
+                ExecuteSiteCertificateJob::dispatch($certificate->id);
             }
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -2289,7 +2359,7 @@ class Settings extends Show
         }
 
         $this->resetCertificateRequestForm();
-        $this->toastSuccess('Certificate request saved.');
+        $this->toastSuccess(__('Certificate request saved — track progress in the apply banner.'));
         $this->site->load('certificates');
     }
 
@@ -2809,7 +2879,10 @@ class Settings extends Show
             return parent::render();
         }
 
-        $this->site->load([
+        // loadMissing instead of load: earlier lifecycle hooks (mount,
+        // syncGeneralSettingsForm, syncPreviewSettingsForm) already loadMissing some of
+        // these — reloading them in render() doubled queries on every render.
+        $this->site->loadMissing([
             'domains',
             'domainAliases',
             'basicAuthUsers',

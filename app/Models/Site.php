@@ -427,6 +427,13 @@ class Site extends Model
 
     public function primaryDomain(): ?SiteDomain
     {
+        // Avoid re-querying when callers have already eager-loaded `domains`
+        // (Settings::render() does this) — the in-memory collection is the same
+        // source of truth for is_primary/first.
+        if ($this->relationLoaded('domains')) {
+            return $this->domains->firstWhere('is_primary', true) ?? $this->domains->first();
+        }
+
         return $this->domains()->where('is_primary', true)->first()
             ?? $this->domains()->first();
     }

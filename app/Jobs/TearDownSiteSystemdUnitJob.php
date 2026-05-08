@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesSiteApplyState;
 use App\Models\Site;
 use App\Services\Sites\SiteSystemdProvisioner;
 use Illuminate\Bus\Queueable;
@@ -27,7 +28,7 @@ use Illuminate\Support\Facades\Log;
  */
 class TearDownSiteSystemdUnitJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesSiteApplyState;
 
     public int $tries = 1;
 
@@ -38,6 +39,11 @@ class TearDownSiteSystemdUnitJob implements ShouldQueue
         public string $unitName,
     ) {}
 
+    protected function applyKind(): string
+    {
+        return 'systemd';
+    }
+
     public function handle(SiteSystemdProvisioner $provisioner): void
     {
         $site = Site::query()->with('server')->find($this->siteId);
@@ -45,16 +51,22 @@ class TearDownSiteSystemdUnitJob implements ShouldQueue
             return;
         }
 
+        $runId = $this->beginApplyRun($site);
+
         try {
             $provisioner->teardownUnit($site, $this->unitName);
+            $this->cacheApplyOutput($runId, 'Tore down unit: '.$this->unitName);
+            $this->completeApplyRun($site);
             Log::info('Tore down site systemd unit', [
                 'site_id' => $site->id,
                 'unit' => $this->unitName,
             ]);
         } catch (\Throwable $e) {
-            // Best-effort cleanup. If the SSH session is unhealthy, the
-            // unit just lingers; the next deploy or site-delete cleanup
-            // will get it.
+            // Best-effort cleanup. Banner shows failed; the next deploy or
+            // site-delete cleanup will re-attempt the same unit.
+            $this->cacheApplyOutput($runId, $e->getMessage());
+            $this->failApplyRun($site, $e->getMessage());
+
             Log::warning('TearDownSiteSystemdUnitJob failed', [
                 'site_id' => $site->id,
                 'unit' => $this->unitName,

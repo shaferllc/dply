@@ -191,25 +191,29 @@
             </x-slot>
             <x-slot name="actions">
                 @if ($readyForWorkspace && $site->workspace)
-                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                    <x-outline-link :href="route('projects.resources', $site->workspace)" wire:navigate>
+                        <x-heroicon-o-folder-open class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Open project') }}
-                    </a>
+                    </x-outline-link>
                 @endif
                 @if ($showWebserverConfigEditor)
-                    <a href="{{ route('sites.webserver-config', [$server, $site]) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                    <x-outline-link :href="route('sites.webserver-config', [$server, $site])" wire:navigate>
+                        <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Web server config') }}
-                    </a>
+                    </x-outline-link>
                 @endif
                 @if ($readyForWorkspace)
-                    <a href="{{ route('sites.insights', [$server, $site]) }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                    <x-outline-link :href="route('sites.insights', [$server, $site])" wire:navigate>
+                        <x-heroicon-o-light-bulb class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Insights') }}
                         @if ($openSiteInsightsCount > 0)
                             <span class="inline-flex min-w-[1.25rem] justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" title="{{ trans_choice(':count open finding|:count open findings', $openSiteInsightsCount, ['count' => $openSiteInsightsCount]) }}">{{ $openSiteInsightsCount }}</span>
                         @endif
-                    </a>
-                    <a href="{{ route('sites.monitor', [$server, $site]) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                    </x-outline-link>
+                    <x-outline-link :href="route('sites.monitor', [$server, $site])" wire:navigate>
+                        <x-heroicon-o-signal class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Monitor') }}
-                    </a>
+                    </x-outline-link>
                 @endif
             </x-slot>
         </x-page-header>

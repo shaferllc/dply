@@ -15,18 +15,8 @@
 @endphp
 
 <section class="space-y-6">
-    @php $applyBanner = $this->webserverApplyBanner; @endphp
-    @if ($applyBanner !== null)
-        <x-workspace-console-banner
-            :status="$applyBanner['status']"
-            :message="$applyBanner['message']"
-            :subtitle="$applyBanner['subtitle']"
-            :output="$applyBanner['output']"
-            :busy="$applyBanner['busy']"
-            dismiss-action="dismissWebserverApplyBanner"
-            :default-expanded="$applyBanner['status'] === 'failed'"
-        />
-    @endif
+    {{-- Apply banner is rendered at the settings.blade.php top level so it's visible on
+         every section, not just basic-auth. --}}
 
     <x-explainer tone="info">
         <p>{{ __('HTTP basic auth puts a username/password gate in front of all or part of this site. Dply hashes credentials in the database and writes htpasswd files on the server inside your repo\'s .dply/basic-auth directory; the webserver config references those files.') }}</p>
@@ -112,12 +102,26 @@
                             <x-input-error :messages="$errors->get('new_basic_auth_username')" class="mt-1" />
                         </div>
                         <div x-data="{ visible: false, copied: false }">
-                            <div class="flex items-end justify-between gap-2">
-                                <x-input-label for="new_basic_auth_password" :value="__('Password')" class="flex-1" />
-                                <div class="flex items-center gap-3 text-xs font-medium">
-                                    <button type="button" x-on:click="visible = !visible" class="text-brand-sage hover:underline">
-                                        <span x-show="!visible">{{ __('Show') }}</span>
-                                        <span x-show="visible" x-cloak>{{ __('Hide') }}</span>
+                            <x-input-label for="new_basic_auth_password" :value="__('Password')" />
+                            <div class="relative mt-1">
+                                <x-text-input
+                                    id="new_basic_auth_password"
+                                    wire:model="new_basic_auth_password"
+                                    x-bind:type="visible ? 'text' : 'password'"
+                                    type="password"
+                                    class="block w-full pr-24 font-mono text-sm"
+                                    autocomplete="new-password"
+                                />
+                                <div class="pointer-events-none absolute inset-y-0 right-1.5 flex items-center gap-0.5">
+                                    <button
+                                        type="button"
+                                        x-on:click="visible = !visible"
+                                        class="pointer-events-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink"
+                                        x-bind:title="visible ? @js(__('Hide')) : @js(__('Show'))"
+                                        x-bind:aria-label="visible ? @js(__('Hide')) : @js(__('Show'))"
+                                    >
+                                        <x-heroicon-o-eye class="h-4 w-4" x-show="!visible" aria-hidden="true" />
+                                        <x-heroicon-o-eye-slash class="h-4 w-4" x-show="visible" x-cloak aria-hidden="true" />
                                     </button>
                                     <button
                                         type="button"
@@ -126,24 +130,24 @@
                                             if (!v) return;
                                             navigator.clipboard.writeText(v).then(() => { copied = true; setTimeout(() => copied = false, 1800); }).catch(() => {});
                                         "
-                                        class="text-brand-sage hover:underline"
+                                        class="pointer-events-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink"
+                                        x-bind:title="copied ? @js(__('Copied')) : @js(__('Copy'))"
+                                        x-bind:aria-label="copied ? @js(__('Copied')) : @js(__('Copy'))"
                                     >
-                                        <span x-show="!copied">{{ __('Copy') }}</span>
-                                        <span x-show="copied" x-cloak class="text-emerald-700">{{ __('Copied') }}</span>
+                                        <x-heroicon-o-clipboard class="h-4 w-4" x-show="!copied" aria-hidden="true" />
+                                        <x-heroicon-o-clipboard-document-check class="h-4 w-4 text-emerald-700" x-show="copied" x-cloak aria-hidden="true" />
                                     </button>
-                                    <button type="button" wire:click="generateBasicAuthPassword" class="text-brand-sage hover:underline">
-                                        {{ __('Generate') }}
+                                    <button
+                                        type="button"
+                                        wire:click="generateBasicAuthPassword"
+                                        class="pointer-events-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink"
+                                        title="{{ __('Generate') }}"
+                                        aria-label="{{ __('Generate') }}"
+                                    >
+                                        <x-heroicon-o-sparkles class="h-4 w-4" aria-hidden="true" />
                                     </button>
                                 </div>
                             </div>
-                            <x-text-input
-                                id="new_basic_auth_password"
-                                wire:model="new_basic_auth_password"
-                                x-bind:type="visible ? 'text' : 'password'"
-                                type="password"
-                                class="mt-1 block w-full font-mono text-sm"
-                                autocomplete="new-password"
-                            />
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Stored as a bcrypt hash. Minimum 8 characters.') }}</p>
                             <x-input-error :messages="$errors->get('new_basic_auth_password')" class="mt-1" />
                         </div>

@@ -106,9 +106,43 @@
         default => null,
     };
     $workspaceTitle = $workspacePrefix ? $workspacePrefix.' '.$resourceNounLower.' '.__('workspace') : $resourceNoun.' '.__('workspace');
-    $workspaceDescription = $workspacePrefix
-        ? __('Manage this :resource from one workspace tuned for its :prefix runtime path, with General as the default landing section.', ['resource' => strtolower($resourceNoun), 'prefix' => strtolower($workspacePrefix)])
-        : __('Manage this :resource from one workspace with General as the default landing section.', ['resource' => strtolower($resourceNoun)]);
+
+    // Per-section header metadata (title, description, icon) — drives the
+    // <x-page-header> on each settings section so the operator sees a specific
+    // orientation ("HTTP basic authentication", "Routing", …) rather than the
+    // generic "Site workspace" copy on every tab.
+    $sectionHeader = \App\Support\SiteSettingsHeader::for($site, $server, $section);
+
+    // Authorization snapshot for the header. Drives the role badge and the
+    // description fallback for read-only / deployer roles. Resolved once so the
+    // view doesn't re-call Gate::allows for every conditional.
+    $headerUser = auth()->user();
+    $headerOrg = $headerUser?->currentOrganization();
+    $headerCanUpdateSite = (bool) $headerUser?->can('update', $site);
+    $headerCanDeleteSite = (bool) $headerUser?->can('delete', $site);
+    $headerIsDeployer = (bool) $headerOrg?->userIsDeployer($headerUser);
+    $headerIsAdmin = (bool) $headerOrg?->hasAdminAccess($headerUser);
+    $headerRoleLabel = match (true) {
+        $headerIsAdmin => null, // admins/owners get no badge — full power is the default
+        $headerIsDeployer => __('Deployer'),
+        $headerCanUpdateSite => __('Editor'),
+        default => __('Read-only'),
+    };
+    $headerRoleTone = match (true) {
+        $headerIsDeployer => 'bg-amber-100 text-amber-900 ring-amber-200/60',
+        $headerCanUpdateSite => 'bg-emerald-100 text-emerald-900 ring-emerald-200/60',
+        default => 'bg-slate-100 text-slate-700 ring-slate-200/60',
+    };
+
+    // For read-only / deployer roles, swap the section's "Manage / Configure / …"
+    // copy with a role-aware sentence so the user knows up-front why the editing
+    // affordances are missing or disabled. Admin and editor roles see the
+    // section's native description as written.
+    $sectionDescription = $headerCanUpdateSite
+        ? $sectionHeader['description']
+        : ($headerIsDeployer
+            ? __('Review this section — settings are read-only for the Deployer role. Use Deploy actions to ship changes.')
+            : __('You have read-only access to this section — settings cannot be changed from this account.'));
     $generalOverviewTitle = $runtimeMode === 'vm' ? __('Site domain') : __('Primary hostname');
     $generalOverviewDescription = $runtimeMode === 'vm'
         ? __('Update the primary domain and web directory for this site here. Changing the primary hostname updates the site record Dply uses for routing and future server automation.')
@@ -162,7 +196,10 @@
             'icon' => 'globe-alt',
         ];
         if ($section !== 'general') {
-            $settingsBreadcrumbs[] = ['label' => $workspaceTitle, 'icon' => 'cog-6-tooth'];
+            // Match the breadcrumb tail to the section the user is on (e.g. "HTTP basic
+            // authentication") instead of the generic "Site workspace" — keeps trail
+            // and page header aligned.
+            $settingsBreadcrumbs[] = ['label' => $sectionHeader['title'], 'icon' => 'cog-6-tooth'];
         }
     @endphp
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
@@ -171,41 +208,67 @@
         <div class="min-w-0 lg:col-span-9">
             <x-breadcrumb-trail :items="$settingsBreadcrumbs" />
 
+            @if ($headerRoleLabel !== null)
+                {{-- Role badge sits above the page-header title so a viewer/deployer
+                     sees the access level before they look for save actions that
+                     aren't there. Admins/owners get no badge — full power is the
+                     default reading. --}}
+                <div class="mb-2 flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                          title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                        @if ($headerIsDeployer)
+                            <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                        @elseif ($headerCanUpdateSite)
+                            <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                        @else
+                            <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                        @endif
+                        {{ $headerRoleLabel }}
+                    </span>
+                </div>
+            @endif
+
             <x-page-header
-                :title="$workspaceTitle"
-                :description="$workspaceDescription"
+                :title="$sectionHeader['title']"
+                :description="$sectionDescription"
                 doc-route="docs.index"
                 toolbar
                 flush
             >
-                <x-slot name="actions">
-                    @if ($showWebserverConfigEditor)
-                        <a
-                            href="{{ route('sites.webserver-config', [$server, $site]) }}"
-                            wire:navigate
-                            class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                        >
-                            {{ __('Web server config') }}
-                        </a>
-                    @endif
-                    <a
-                        href="{{ route('sites.insights', [$server, $site]) }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                    >
-                        {{ __('Insights') }}
-                    </a>
-                    <a
-                        href="{{ route('sites.monitor', [$server, $site]) }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                    >
-                        {{ __('Monitor') }}
-                    </a>
+                <x-slot name="leading">
+                    {{-- Section icon: the same icon family the sidebar uses, so the title
+                         and the active sidebar item visually agree. --}}
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                        @svg($sectionHeader['icon'], 'h-7 w-7 text-brand-ink')
+                    </span>
                 </x-slot>
+                {{-- Web server config / Insights / Monitor links removed from the section
+                     header — they're already in the sidebar / dedicated routes. The
+                     header keeps just the Documentation link (rendered by <x-page-header>
+                     when doc-route is set) so the action area stays focused on docs. --}}
             </x-page-header>
 
             <main class="min-w-0 space-y-6 mt-8">
+                {{-- Server-activity banner: visible on every section so the operator can
+                     see queued/running webserver-config applies (htpasswd writes, nginx
+                     reloads, etc.) regardless of which tab they're on. Polls itself
+                     while busy so the running -> completed/failed flip happens without
+                     a manual refresh. --}}
+                @php $applyBanner = $this->webserverApplyBanner; @endphp
+                @if ($applyBanner !== null)
+                    <x-workspace-console-banner
+                        :status="$applyBanner['status']"
+                        :message="$applyBanner['message']"
+                        :subtitle="$applyBanner['subtitle']"
+                        :output="$applyBanner['output']"
+                        :busy="$applyBanner['busy']"
+                        dismiss-action="dismissWebserverApplyBanner"
+                        :poll-action="$applyBanner['busy'] ? 'pollWebserverApplyStatus' : null"
+                        poll-interval="4s"
+                        :default-expanded="$applyBanner['status'] === 'failed'"
+                    />
+                @endif
+
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
                     @if ($section === 'general' && $site->usesContainerRuntime())
                         @include('livewire.sites.partials.container-dashboard')

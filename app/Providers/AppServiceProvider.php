@@ -59,6 +59,7 @@ use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesDeployEngine;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
 use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
+use App\Services\Deploy\SiteResourceBindingResolver;
 use App\Services\Deploy\RuntimeDetection\NodeRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\ProcessGitCloner;
@@ -116,6 +117,11 @@ class AppServiceProvider extends ServiceProvider
         // WordPress advisory feed (Q20 — Wordfence Intelligence default).
         // Singleton because it caches per-request lookups in process.
         $this->app->singleton(AdvisoryProvider::class, WordfenceIntelligenceProvider::class);
+
+        // Scoped (request-singleton, Octane-safe): the resolver memoizes its expensive
+        // per-site count queries on the instance, and is hit twice per render
+        // (DeploymentContractBuilder::build + DeploymentPreflightValidator::validate).
+        $this->app->scoped(SiteResourceBindingResolver::class);
 
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
