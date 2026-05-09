@@ -63,6 +63,7 @@ APACHE;
         $phpBa = $this->apacheDirectoryAndPrefixLocations($site, $root);
         $staticBa = $this->apacheDirectoryAndPrefixLocations($site, $root);
         $nodeBa = $this->apacheRootLocationBasicAuth($site);
+        $dotfileDeny = $this->apacheDotfileDenyBlock();
 
         return match ($site->type) {
             SiteType::Php => <<<APACHE
@@ -73,7 +74,7 @@ APACHE;
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
     ProxyPreserveHost On
-{$engineApache}{$redirectLines}{$reverbPhp}    <Directory {$root}>
+{$dotfileDeny}{$engineApache}{$redirectLines}{$reverbPhp}    <Directory {$root}>
         AllowOverride All
 {$phpBa['directory']}
         Options FollowSymLinks
@@ -94,7 +95,7 @@ APACHE,
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
 
-{$redirectLines}    <Directory {$root}>
+{$dotfileDeny}{$redirectLines}    <Directory {$root}>
         AllowOverride All
 {$staticBa['directory']}
         Options FollowSymLinks
@@ -111,11 +112,28 @@ APACHE,
 {$aliasLines}    ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
     ProxyPreserveHost On
-{$redirectLines}{$nodeBa}    ProxyPass / http://127.0.0.1:{$site->app_port}/
+{$dotfileDeny}{$redirectLines}{$nodeBa}    ProxyPass / http://127.0.0.1:{$site->app_port}/
     ProxyPassReverse / http://127.0.0.1:{$site->app_port}/
 </VirtualHost>
 APACHE,
         };
+    }
+
+    /**
+     * Block requests for any URL whose path component starts with `.` —
+     * e.g. `/.env`, `/.git/HEAD`, `/some/dir/.htaccess`. The `.well-known/`
+     * prefix is exempted because ACME challenges and similar legitimate
+     * mechanisms live there. Mirrors the equivalent rule the Nginx builder
+     * has injected by default.
+     */
+    protected function apacheDotfileDenyBlock(): string
+    {
+        return <<<'APACHE'
+    <LocationMatch "(?i)(^|/)\.(?!well-known)">
+        Require all denied
+    </LocationMatch>
+
+APACHE;
     }
 
     /**
@@ -124,7 +142,8 @@ APACHE,
     protected function apacheDirectoryAndPrefixLocations(Site $site, string $documentRoot): array
     {
         $site->loadMissing('basicAuthUsers');
-        if ($site->basicAuthUsers->isEmpty()) {
+        $users = $site->enforceableBasicAuthUsers();
+        if ($users->isEmpty()) {
             return [
                 'directory' => '        Require all granted'."\n",
                 'locations' => '',
@@ -132,7 +151,7 @@ APACHE,
         }
 
         $directory = '        Require all granted'."\n";
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($users->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $f = $site->basicAuthHtpasswdPathForNormalizedPath('/');
             $directory = <<<AUTH
         AuthType Basic
@@ -144,7 +163,7 @@ AUTH;
         }
 
         $locations = '';
-        $paths = $site->basicAuthUsers
+        $paths = $users
             ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
             ->unique()
             ->filter(fn (string $p): bool => $p !== '/')
@@ -152,7 +171,7 @@ AUTH;
             ->values();
 
         foreach ($paths as $locPath) {
-            if (! $site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath)) {
+            if (! $users->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath)) {
                 continue;
             }
             $f = $site->basicAuthHtpasswdPathForNormalizedPath($locPath);
@@ -173,7 +192,7 @@ APACHE;
     protected function apacheRootLocationBasicAuth(Site $site): string
     {
         $site->loadMissing('basicAuthUsers');
-        if (! $site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if (! $site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             return '';
         }
 

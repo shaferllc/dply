@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -18,11 +17,18 @@ class FindFleetEnvCommandTest extends TestCase
     public function test_finds_a_key_across_multiple_sites(): void
     {
         $server = Server::factory()->create();
-        $a = Site::factory()->create(['server_id' => $server->id, 'name' => 'alpha-site', 'slug' => 'alpha']);
-        $b = Site::factory()->create(['server_id' => $server->id, 'name' => 'bravo-site', 'slug' => 'bravo']);
-        $this->seedVar($a, 'DATABASE_URL', 'postgres://a', 'production');
-        $this->seedVar($b, 'DATABASE_URL', 'postgres://b', 'production');
-        $this->seedVar($b, 'OTHER_KEY', 'irrelevant', 'production');
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'name' => 'alpha-site',
+            'slug' => 'alpha',
+            'env_file_content' => 'DATABASE_URL=postgres://a',
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'name' => 'bravo-site',
+            'slug' => 'bravo',
+            'env_file_content' => "DATABASE_URL=postgres://b\nOTHER_KEY=irrelevant",
+        ]);
 
         Artisan::call('dply:fleet:env-find', [
             'key' => 'DATABASE_URL',
@@ -40,10 +46,11 @@ class FindFleetEnvCommandTest extends TestCase
     public function test_prefix_mode_matches_keys_with_same_prefix(): void
     {
         $server = Server::factory()->create();
-        $a = Site::factory()->create(['server_id' => $server->id, 'slug' => 'alpha']);
-        $this->seedVar($a, 'AWS_REGION', 'us-east-1', 'production');
-        $this->seedVar($a, 'AWS_BUCKET', 'mybucket', 'production');
-        $this->seedVar($a, 'OTHER', 'x', 'production');
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'slug' => 'alpha',
+            'env_file_content' => "AWS_REGION=us-east-1\nAWS_BUCKET=mybucket\nOTHER=x",
+        ]);
 
         Artisan::call('dply:fleet:env-find', [
             'key' => 'AWS_',
@@ -61,8 +68,11 @@ class FindFleetEnvCommandTest extends TestCase
     public function test_masks_values_by_default(): void
     {
         $server = Server::factory()->create();
-        $a = Site::factory()->create(['server_id' => $server->id, 'slug' => 'alpha']);
-        $this->seedVar($a, 'API_KEY', 'super-secret-value', 'production');
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'slug' => 'alpha',
+            'env_file_content' => 'API_KEY=super-secret-value',
+        ]);
 
         Artisan::call('dply:fleet:env-find', [
             'key' => 'API_KEY',
@@ -72,25 +82,6 @@ class FindFleetEnvCommandTest extends TestCase
 
         $this->assertStringNotContainsString('super-secret-value', json_encode($decoded));
         $this->assertStringContainsString('•', $decoded['matches'][0]['value']);
-    }
-
-    public function test_groups_results_with_environment_field(): void
-    {
-        $server = Server::factory()->create();
-        $a = Site::factory()->create(['server_id' => $server->id, 'slug' => 'alpha']);
-        $this->seedVar($a, 'DATABASE_URL', 'prod', 'production');
-        $this->seedVar($a, 'DATABASE_URL', 'staging', 'staging');
-
-        Artisan::call('dply:fleet:env-find', [
-            'key' => 'DATABASE_URL',
-            '--json' => true,
-        ]);
-        $decoded = json_decode(Artisan::output(), true);
-
-        $this->assertSame(2, $decoded['count']);
-        $envs = array_column($decoded['matches'], 'environment');
-        sort($envs);
-        $this->assertSame(['production', 'staging'], $envs);
     }
 
     public function test_exits_non_zero_on_no_matches(): void
@@ -115,15 +106,5 @@ class FindFleetEnvCommandTest extends TestCase
 
         $this->assertSame(1, $exit);
         $this->assertStringContainsString('cannot be empty', $output);
-    }
-
-    private function seedVar(Site $site, string $key, string $value, string $environment): void
-    {
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => $key,
-            'env_value' => $value,
-            'environment' => $environment,
-        ]);
     }
 }

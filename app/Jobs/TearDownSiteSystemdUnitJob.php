@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Jobs\Concerns\WritesSiteApplyState;
+use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
 use App\Services\Sites\SiteSystemdProvisioner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Log;
  */
 class TearDownSiteSystemdUnitJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesSiteApplyState;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
     public int $tries = 1;
 
@@ -37,11 +38,22 @@ class TearDownSiteSystemdUnitJob implements ShouldQueue
     public function __construct(
         public string $siteId,
         public string $unitName,
+        public ?string $userId = null,
     ) {}
 
-    protected function applyKind(): string
+    protected function consoleSubject(): Model
+    {
+        return Site::query()->findOrFail($this->siteId);
+    }
+
+    protected function consoleKind(): string
     {
         return 'systemd';
+    }
+
+    protected function triggeringUserId(): ?string
+    {
+        return $this->userId;
     }
 
     public function handle(SiteSystemdProvisioner $provisioner): void
@@ -51,12 +63,13 @@ class TearDownSiteSystemdUnitJob implements ShouldQueue
             return;
         }
 
-        $runId = $this->beginApplyRun($site);
+        $emit = $this->beginConsoleAction();
 
         try {
+            $emit->step('systemd', 'tearing down unit '.$this->unitName);
             $provisioner->teardownUnit($site, $this->unitName);
-            $this->cacheApplyOutput($runId, 'Tore down unit: '.$this->unitName);
-            $this->completeApplyRun($site);
+            $emit->success('tore down '.$this->unitName, 'systemd');
+            $this->completeConsoleAction();
             Log::info('Tore down site systemd unit', [
                 'site_id' => $site->id,
                 'unit' => $this->unitName,
@@ -64,8 +77,8 @@ class TearDownSiteSystemdUnitJob implements ShouldQueue
         } catch (\Throwable $e) {
             // Best-effort cleanup. Banner shows failed; the next deploy or
             // site-delete cleanup will re-attempt the same unit.
-            $this->cacheApplyOutput($runId, $e->getMessage());
-            $this->failApplyRun($site, $e->getMessage());
+            $emit->error($e->getMessage(), 'systemd');
+            $this->failConsoleAction($e->getMessage());
 
             Log::warning('TearDownSiteSystemdUnitJob failed', [
                 'site_id' => $site->id,

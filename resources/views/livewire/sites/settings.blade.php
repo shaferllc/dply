@@ -1,7 +1,7 @@
 @php
     $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
     $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
-    $supportsNginxProvisioning = $server->hostCapabilities()->supportsNginxProvisioning();
+    $supportsWebserverProvisioning = $server->hostCapabilities()->supportsWebserverProvisioning();
     $showWebserverConfigEditor = $server->hostCapabilities()->supportsSsh()
         && ! $site->usesFunctionsRuntime()
         && ! $site->usesDockerRuntime()
@@ -249,24 +249,26 @@
             </x-page-header>
 
             <main class="min-w-0 space-y-6 mt-8">
-                {{-- Server-activity banner: visible on every section so the operator can
-                     see queued/running webserver-config applies (htpasswd writes, nginx
-                     reloads, etc.) regardless of which tab they're on. Polls itself
-                     while busy so the running -> completed/failed flip happens without
-                     a manual refresh. --}}
-                @php $applyBanner = $this->webserverApplyBanner; @endphp
-                @if ($applyBanner !== null)
-                    <x-workspace-console-banner
-                        :status="$applyBanner['status']"
-                        :message="$applyBanner['message']"
-                        :subtitle="$applyBanner['subtitle']"
-                        :output="$applyBanner['output']"
-                        :busy="$applyBanner['busy']"
-                        dismiss-action="dismissWebserverApplyBanner"
-                        :poll-action="$applyBanner['busy'] ? 'pollWebserverApplyStatus' : null"
-                        poll-interval="4s"
-                        :default-expanded="$applyBanner['status'] === 'failed'"
-                    />
+                {{-- Single console-actions banner. Each Settings section declares the kinds
+                     it cares about in config/console_actions.php#section_kinds; sections
+                     without an entry (notifications, logs, environment, …) render no
+                     banner so unrelated runs don't leak across tabs. Newer runs supersede
+                     older ones; dismiss hides the current one until the next run starts. --}}
+                @php
+                    $sectionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
+                    $consoleActionRun = $sectionKinds === [] ? null : \App\Models\ConsoleAction::query()
+                        ->where('subject_type', $site->getMorphClass())
+                        ->where('subject_id', $site->id)
+                        ->whereIn('kind', $sectionKinds)
+                        ->whereNull('dismissed_at')
+                        ->orderByDesc('created_at')
+                        ->first();
+                @endphp
+                @if ($sectionKinds !== [])
+                    @include('livewire.partials.console-action-banner-static', [
+                        'run' => $consoleActionRun,
+                        'kindLabels' => (array) config('console_actions.kinds', []),
+                    ])
                 @endif
 
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
@@ -1554,46 +1556,6 @@
         </x-modal>
 
         <x-modal
-            name="site-system-user-create-modal"
-            :show="false"
-            maxWidth="lg"
-            overlayClass="bg-brand-ink/30"
-            panelClass="dply-modal-panel"
-            focusable
-        >
-            <div class="border-b border-brand-ink/10 px-6 py-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('System user') }}</p>
-                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Create system user') }}</h2>
-                <p class="mt-2 text-sm leading-6 text-brand-moss">
-                    {{ __('Creates a Linux account on the server, assigns this site’s files to it, and sets the PHP-FPM pool user. Ensure you have backups; ownership changes affect the site directory tree.') }}
-                </p>
-            </div>
-
-            <div class="space-y-4 px-6 py-6">
-                <div>
-                    <x-input-label for="system_user_new_username" :value="__('System user name')" />
-                    <x-text-input id="system_user_new_username" wire:model="system_user_new_username" class="mt-1 block w-full font-mono text-sm" placeholder="app-user" autocomplete="off" />
-                    <x-input-error :messages="$errors->get('system_user_new_username')" class="mt-1" />
-                </div>
-                <label class="flex items-center gap-2 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="system_user_new_sudo" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
-                    {{ __('Sudo access') }}
-                </label>
-            </div>
-
-            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
-                <x-secondary-button type="button" wire:click="closeSystemUserCreateModal">{{ __('Cancel') }}</x-secondary-button>
-                <x-primary-button type="button" wire:click="queueCreateSystemUser" wire:loading.attr="disabled" wire:target="queueCreateSystemUser">
-                    <span wire:loading.remove wire:target="queueCreateSystemUser">{{ __('Save') }}</span>
-                    <span wire:loading wire:target="queueCreateSystemUser" class="inline-flex items-center gap-2">
-                        <x-spinner variant="cream" />
-                        {{ __('Queueing…') }}
-                    </span>
-                </x-primary-button>
-            </div>
-        </x-modal>
-
-        <x-modal
             name="site-system-user-assign-modal"
             :show="false"
             maxWidth="lg"
@@ -1623,52 +1585,6 @@
                         {{ __('Queueing…') }}
                     </span>
                 </x-primary-button>
-            </div>
-        </x-modal>
-
-        <x-modal
-            name="site-system-user-remove-modal"
-            :show="false"
-            maxWidth="lg"
-            overlayClass="bg-brand-ink/30"
-            panelClass="dply-modal-panel"
-            focusable
-        >
-            <div class="border-b border-brand-ink/10 px-6 py-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('System user') }}</p>
-                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Remove user from server') }}</h2>
-                <p class="mt-2 text-sm leading-6 text-brand-moss">
-                    {{ __('Deletes the Linux account from the host when policy allows. root, dply, and the deploy user cannot be removed. Type the username to confirm.') }}
-                </p>
-            </div>
-
-            <div class="space-y-4 px-6 py-6">
-                <div>
-                    <x-input-label for="system_user_remove_username" :value="__('User to remove')" />
-                    <select id="system_user_remove_username" wire:model="system_user_remove_username" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                        <option value="">{{ __('Choose…') }}</option>
-                        @foreach ($system_user_remote_rows as $row)
-                            <option value="{{ $row['username'] }}">{{ $row['username'] }}</option>
-                        @endforeach
-                    </select>
-                    <x-input-error :messages="$errors->get('system_user_remove_username')" class="mt-1" />
-                </div>
-                <div>
-                    <x-input-label for="system_user_remove_confirm" :value="__('Type the username to confirm')" />
-                    <x-text-input id="system_user_remove_confirm" wire:model="system_user_remove_confirm" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
-                    <x-input-error :messages="$errors->get('system_user_remove_confirm')" class="mt-1" />
-                </div>
-            </div>
-
-            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
-                <x-secondary-button type="button" wire:click="closeSystemUserRemoveModal">{{ __('Cancel') }}</x-secondary-button>
-                <x-danger-button type="button" wire:click="queueRemoveSystemUser" wire:loading.attr="disabled" wire:target="queueRemoveSystemUser">
-                    <span wire:loading.remove wire:target="queueRemoveSystemUser">{{ __('Remove user') }}</span>
-                    <span wire:loading wire:target="queueRemoveSystemUser" class="inline-flex items-center gap-2">
-                        <x-spinner variant="cream" />
-                        {{ __('Queueing…') }}
-                    </span>
-                </x-danger-button>
             </div>
         </x-modal>
 
@@ -1734,6 +1650,14 @@
                 </x-primary-button>
             </div>
         </x-modal>
-        @include('livewire.partials.confirm-action-modal')
     </x-slot>
+
+    {{-- IMPORTANT: keep the confirm-action-modal include OUTSIDE the modals slot.
+         Slot content is captured by the layout on the initial GET only — Livewire
+         AJAX updates re-render only the component (no layout), so anything inside
+         <x-slot name="modals"> never updates after first paint. The confirm modal
+         is Livewire-driven (its visibility flips on $showConfirmActionModal), so
+         it has to live in the component's main render output to actually appear
+         when the operator clicks a "destructive action" trigger. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

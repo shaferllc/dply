@@ -6,21 +6,23 @@ namespace App\Livewire\Sites;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\SiteEnvReader;
 use Illuminate\Contracts\View\View;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Browser view of dply:site:env-diff. Compares two environment
- * scopes for a site and renders three buckets:
- *   - only in 'from'
- *   - only in 'to'
+ * Browser view of dply:site:env-diff. Compares Dply's encrypted cache to the
+ * live `.env` file on the server and renders three buckets:
+ *   - only in cache (the operator added it locally but never pushed)
+ *   - only on server (the server has keys our cache doesn't — drift)
  *   - keys in both with different values
  *
- * Values are masked with • dots by default for the same reason
- * env-list is masked: scrollback safety. The "Reveal" toggle
- * surfaces cleartext but resets on navigation away.
+ * Replaces the previous prod/staging axis (which went away when we collapsed
+ * site_environment_variables into a single per-site cache).
+ *
+ * Values are masked with • dots by default; the "Reveal" toggle surfaces
+ * cleartext but resets on navigation away.
  */
 class EnvDiff extends Component
 {
@@ -28,13 +30,13 @@ class EnvDiff extends Component
 
     public Site $site;
 
-    #[Url(as: 'from')]
-    public string $fromEnv = 'production';
-
-    #[Url(as: 'to')]
-    public string $toEnv = 'staging';
-
     public bool $reveal = false;
+
+    /** Set to true when this runtime has no server file to diff against. */
+    public bool $unsupported = false;
+
+    /** Populated on render() when the SSH read succeeds. */
+    public string $serverError = '';
 
     public function mount(Server $server, Site $site): void
     {
@@ -47,6 +49,7 @@ class EnvDiff extends Component
 
         $this->server = $server;
         $this->site = $site;
+        $this->unsupported = ! $server->hostCapabilities()->supportsEnvPushToHost();
     }
 
     public function toggleReveal(): void
@@ -54,60 +57,42 @@ class EnvDiff extends Component
         $this->reveal = ! $this->reveal;
     }
 
-    public function render(): View
+    public function render(SiteEnvReader $reader, DotEnvFileParser $parser): View
     {
-        $fromVars = $this->loadVars($this->fromEnv);
-        $toVars = $this->loadVars($this->toEnv);
+        $cacheVars = $parser->parse((string) ($this->site->env_file_content ?? ''))['variables'];
+        $serverVars = [];
 
-        $onlyInFrom = array_diff_key($fromVars, $toVars);
-        $onlyInTo = array_diff_key($toVars, $fromVars);
-        $shared = array_intersect_key($fromVars, $toVars);
+        if (! $this->unsupported) {
+            try {
+                $serverVars = $parser->parse($reader->read($this->site))['variables'];
+            } catch (\Throwable $e) {
+                $this->serverError = $e->getMessage();
+            }
+        }
+
+        $onlyInCache = array_diff_key($cacheVars, $serverVars);
+        $onlyInServer = array_diff_key($serverVars, $cacheVars);
+        $shared = array_intersect_key($cacheVars, $serverVars);
         $differs = [];
-        foreach ($shared as $key => $fromVal) {
-            $toVal = $toVars[$key];
-            if ($fromVal !== $toVal) {
+        foreach ($shared as $key => $cacheVal) {
+            $serverVal = $serverVars[$key];
+            if ($cacheVal !== $serverVal) {
                 $differs[$key] = [
-                    'from' => $this->reveal ? $fromVal : $this->mask($fromVal),
-                    'to' => $this->reveal ? $toVal : $this->mask($toVal),
+                    'cache' => $this->reveal ? $cacheVal : $this->mask($cacheVal),
+                    'server' => $this->reveal ? $serverVal : $this->mask($serverVal),
                 ];
             }
         }
-        ksort($onlyInFrom);
-        ksort($onlyInTo);
+        ksort($onlyInCache);
+        ksort($onlyInServer);
         ksort($differs);
 
-        $availableEnvs = SiteEnvironmentVariable::query()
-            ->where('site_id', $this->site->id)
-            ->distinct()
-            ->orderBy('environment')
-            ->pluck('environment')
-            ->all();
-
         return view('livewire.sites.env-diff', [
-            'onlyInFrom' => array_keys($onlyInFrom),
-            'onlyInTo' => array_keys($onlyInTo),
+            'onlyInCache' => array_keys($onlyInCache),
+            'onlyInServer' => array_keys($onlyInServer),
             'differs' => $differs,
-            'availableEnvs' => $availableEnvs,
-            'inSync' => $onlyInFrom === [] && $onlyInTo === [] && $differs === [],
+            'inSync' => $onlyInCache === [] && $onlyInServer === [] && $differs === [] && $this->serverError === '',
         ])->layout('layouts.app');
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function loadVars(string $environment): array
-    {
-        $rows = SiteEnvironmentVariable::query()
-            ->where('site_id', $this->site->id)
-            ->where('environment', $environment)
-            ->get(['env_key', 'env_value']);
-
-        $out = [];
-        foreach ($rows as $r) {
-            $out[$r->env_key] = (string) $r->env_value;
-        }
-
-        return $out;
     }
 
     private function mask(string $value): string

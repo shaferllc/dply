@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ProviderCredential;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class DigitalOceanService
@@ -201,12 +202,7 @@ class DigitalOceanService
      */
     public function getRegions(): array
     {
-        $response = $this->request('get', '/regions');
-        $this->assertSuccess($response, 'list regions');
-        $data = $response->json();
-        $regions = $data['regions'] ?? $data['data'] ?? [];
-
-        return is_array($regions) ? $regions : [];
+        return $this->cachedCatalogList('do_regions', '/regions', 'regions');
     }
 
     /**
@@ -216,12 +212,34 @@ class DigitalOceanService
      */
     public function getSizes(): array
     {
-        $response = $this->request('get', '/sizes');
-        $this->assertSuccess($response, 'list sizes');
-        $data = $response->json();
-        $sizes = $data['sizes'] ?? $data['data'] ?? [];
+        return $this->cachedCatalogList('do_sizes', '/sizes', 'sizes');
+    }
 
-        return is_array($sizes) ? $sizes : [];
+    /**
+     * Cache regions/sizes responses per token. The wizard renders these on every
+     * step and they don't change often — a 10 minute cache keeps the page fast
+     * even when the DO API is slow, and bounded HTTP timeouts (in request())
+     * keep the worst-case render under ~10s instead of stalling for 30s+.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function cachedCatalogList(string $kind, string $path, string $primaryKey): array
+    {
+        $cacheKey = $kind.':'.sha1($this->token);
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $response = $this->request('get', $path);
+        $this->assertSuccess($response, 'list '.$primaryKey);
+        $data = $response->json();
+        $items = $data[$primaryKey] ?? $data['data'] ?? [];
+        $items = is_array($items) ? $items : [];
+
+        Cache::put($cacheKey, $items, now()->addMinutes(10));
+
+        return $items;
     }
 
     /**
@@ -557,9 +575,17 @@ class DigitalOceanService
     protected function request(string $method, string $path, array $bodyOrQuery = []): Response
     {
         $url = $this->baseUrl.$path;
+        // Bounded timeouts: connect within 5s, finish within 8s. Without these,
+        // a slow or stuck DO endpoint can consume the request's entire 30s
+        // PHP max-execution-time budget — the server-create wizard hits the
+        // catalog (regions/sizes) on every render, so any stall blocks the
+        // whole page. The catalog calls also cache for 10 minutes upstream,
+        // so this timeout only applies to fresh fetches.
         $request = Http::withToken($this->token)
             ->acceptJson()
-            ->contentType('application/json');
+            ->contentType('application/json')
+            ->connectTimeout(5)
+            ->timeout(8);
 
         $method = strtolower($method);
         if ($method === 'get') {

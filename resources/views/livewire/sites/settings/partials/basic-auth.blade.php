@@ -2,8 +2,19 @@
     $card = 'dply-card overflow-hidden';
     $supportsBA = $site->supportsBasicAuthProvisioning();
     $supportsPathPrefixes = $supportsBA && $site->basicAuthSupportsPathPrefixes();
+    // Caddy is the only engine that can't enforce non-bcrypt hashes (apr1, sha).
+    // Other engines read htpasswd directly via files, which support all formats.
+    // We surface a "Rotate to enforce" chip on Caddy sites for any row that
+    // arrived from Sync-from-server with a non-bcrypt hash.
+    $isCaddy = $site->webserver() === 'caddy';
     $entries = $site->basicAuthUsers;
-    $entryCount = $entries->count();
+    // The active count drives the "N credentials" pill and the empty-state copy.
+    // Pending-removal rows still render in the list (with a "Removing" badge) so
+    // the operator can see the apply is mid-flight, but they shouldn't count as
+    // gates that are actually live on the server.
+    $activeEntries = $entries->reject(fn ($u) => $u->isPendingRemoval());
+    $entryCount = $activeEntries->count();
+    $pendingCount = $entries->count() - $entryCount;
     $latestUpdated = $entries->max('updated_at');
     // Group entries by normalized path so users can scan "what's protected" without
     // mentally bucketing a flat list. Single-path setups still render cleanly: one group.
@@ -22,6 +33,7 @@
         <p>{{ __('HTTP basic auth puts a username/password gate in front of all or part of this site. Dply hashes credentials in the database and writes htpasswd files on the server inside your repo\'s .dply/basic-auth directory; the webserver config references those files.') }}</p>
         <p>{{ __('Path scope: use / to protect the whole site, or a prefix like /wp-admin to gate just one section. Octane and Node sites only support / in this release.') }}</p>
         <p>{{ __('Dply only stores password hashes — the plaintext is shown once in this UI. Use Rotate password if you need a fresh credential without losing the entry.') }}</p>
+        <p>{{ __('Sync from server scans the repository for stray .htpasswd files (Dply-written or otherwise) and imports their entries so you can remove them through this UI. Discovered rows are tagged so you can tell them apart from credentials you added here.') }}</p>
     </x-explainer>
 
     @if (! $supportsBA)
@@ -64,6 +76,25 @@
                     </div>
                 </div>
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    {{-- Pulls leftover .htpasswd files from inside the site repo back into
+                         the database so they show up below and can be removed via the
+                         normal flow. Useful when a previous setup (or a partial Dply apply)
+                         left a gate on disk that the UI didn't know about. --}}
+                    <button
+                        type="button"
+                        wire:click="syncBasicAuthFromServer"
+                        wire:loading.attr="disabled"
+                        wire:target="syncBasicAuthFromServer"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        title="{{ __('Scan the server for .htpasswd files inside this site\'s repo and import any users we don\'t already track.') }}"
+                    >
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="syncBasicAuthFromServer" />
+                        <span wire:loading wire:target="syncBasicAuthFromServer" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                            <x-spinner variant="forest" size="sm" />
+                        </span>
+                        <span wire:loading.remove wire:target="syncBasicAuthFromServer">{{ __('Sync from server') }}</span>
+                        <span wire:loading wire:target="syncBasicAuthFromServer">{{ __('Scanning…') }}</span>
+                    </button>
                     <button
                         type="button"
                         x-on:click="$dispatch('open-modal', 'add-basic-auth-modal')"
@@ -87,67 +118,91 @@
                 </p>
             </div>
 
-            <div class="px-6 py-6">
+            <div
+                class="px-6 py-6"
+                x-data="{
+                    /* Local Alpine state mirrored from Livewire via $wire.$watch — reading
+                       $wire.* directly inside getters does NOT register as a reactive
+                       dependency in Alpine, so the auth-header preview stays empty even
+                       when fields are filled. Watching wires up the change feed (covers
+                       both typing in the inputs AND the Generate button's wire:click
+                       roundtrip pushing a new password value). */
+                    username: '',
+                    password: '',
+                    copiedHeader: false,
+                    init() {
+                        this.username = (this.$wire.new_basic_auth_username || '').toString();
+                        this.password = (this.$wire.new_basic_auth_password || '').toString();
+                        this.$wire.$watch('new_basic_auth_username', (v) => { this.username = (v || '').toString(); });
+                        this.$wire.$watch('new_basic_auth_password', (v) => { this.password = (v || '').toString(); });
+                    },
+                    get authHeader() {
+                        const u = this.username.trim();
+                        const p = this.password;
+                        if (!u || !p) return '';
+                        try { return 'Basic ' + btoa(u + ':' + p); } catch (e) { return ''; }
+                    },
+                    async copyHeader() {
+                        const h = this.authHeader;
+                        if (!h) return;
+                        try {
+                            await navigator.clipboard.writeText(h);
+                            this.copiedHeader = true;
+                            setTimeout(() => this.copiedHeader = false, 1800);
+                        } catch (e) {}
+                    },
+                }"
+            >
                 <form wire:submit="addBasicAuthUser" id="add-basic-auth-form" class="space-y-4">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <x-input-label for="new_basic_auth_username" :value="__('Username')" />
                             <x-text-input
                                 id="new_basic_auth_username"
-                                wire:model="new_basic_auth_username"
+                                wire:model.live="new_basic_auth_username"
                                 class="mt-1 block w-full font-mono text-sm"
                                 autocomplete="off"
                                 placeholder="{{ __('e.g. staging') }}"
                             />
                             <x-input-error :messages="$errors->get('new_basic_auth_username')" class="mt-1" />
                         </div>
-                        <div x-data="{ visible: false, copied: false }">
-                            <x-input-label for="new_basic_auth_password" :value="__('Password')" />
-                            <div class="relative mt-1">
-                                <x-text-input
-                                    id="new_basic_auth_password"
-                                    wire:model="new_basic_auth_password"
-                                    x-bind:type="visible ? 'text' : 'password'"
-                                    type="password"
-                                    class="block w-full pr-24 font-mono text-sm"
-                                    autocomplete="new-password"
-                                />
-                                <div class="pointer-events-none absolute inset-y-0 right-1.5 flex items-center gap-0.5">
-                                    <button
-                                        type="button"
-                                        x-on:click="visible = !visible"
-                                        class="pointer-events-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink"
-                                        x-bind:title="visible ? @js(__('Hide')) : @js(__('Show'))"
-                                        x-bind:aria-label="visible ? @js(__('Hide')) : @js(__('Show'))"
-                                    >
-                                        <x-heroicon-o-eye class="h-4 w-4" x-show="!visible" aria-hidden="true" />
-                                        <x-heroicon-o-eye-slash class="h-4 w-4" x-show="visible" x-cloak aria-hidden="true" />
+                        {{-- Mirrors the rotate-reveal modal's password area: label on the
+                             left with Copy + Generate as inline links on the right, a single
+                             clean input below. We keep wire:model.live so the Authorization-header
+                             block in the wrapping x-data sees the value live. --}}
+                        <div x-data="{
+                                copied: false,
+                                showPassword: false,
+                                async copyPassword() {
+                                    const v = document.getElementById('new_basic_auth_password')?.value || '';
+                                    if (!v) return;
+                                    try { await navigator.clipboard.writeText(v); this.copied = true; setTimeout(() => this.copied = false, 1800); } catch (e) {}
+                                },
+                        }">
+                            <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="new_basic_auth_password">
+                                <span>{{ __('Password') }}</span>
+                                <span class="flex items-center gap-3 text-xs">
+                                    <button type="button" class="font-medium text-brand-sage hover:underline" @click="copyPassword()">
+                                        <span x-show="!copied">{{ __('Copy') }}</span>
+                                        <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                                     </button>
-                                    <button
-                                        type="button"
-                                        x-on:click="
-                                            const v = document.getElementById('new_basic_auth_password')?.value || '';
-                                            if (!v) return;
-                                            navigator.clipboard.writeText(v).then(() => { copied = true; setTimeout(() => copied = false, 1800); }).catch(() => {});
-                                        "
-                                        class="pointer-events-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink"
-                                        x-bind:title="copied ? @js(__('Copied')) : @js(__('Copy'))"
-                                        x-bind:aria-label="copied ? @js(__('Copied')) : @js(__('Copy'))"
-                                    >
-                                        <x-heroicon-o-clipboard class="h-4 w-4" x-show="!copied" aria-hidden="true" />
-                                        <x-heroicon-o-clipboard-document-check class="h-4 w-4 text-emerald-700" x-show="copied" x-cloak aria-hidden="true" />
+                                    <button type="button" class="font-medium text-brand-sage hover:underline" @click="showPassword = !showPassword">
+                                        <span x-show="!showPassword">{{ __('Show') }}</span>
+                                        <span x-show="showPassword" x-cloak>{{ __('Hide') }}</span>
                                     </button>
-                                    <button
-                                        type="button"
-                                        wire:click="generateBasicAuthPassword"
-                                        class="pointer-events-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink"
-                                        title="{{ __('Generate') }}"
-                                        aria-label="{{ __('Generate') }}"
-                                    >
-                                        <x-heroicon-o-sparkles class="h-4 w-4" aria-hidden="true" />
+                                    <button type="button" wire:click="generateBasicAuthPassword" class="font-medium text-brand-sage hover:underline">
+                                        {{ __('Generate') }}
                                     </button>
-                                </div>
-                            </div>
+                                </span>
+                            </label>
+                            <input
+                                id="new_basic_auth_password"
+                                wire:model.live="new_basic_auth_password"
+                                x-bind:type="showPassword ? 'text' : 'password'"
+                                autocomplete="new-password"
+                                spellcheck="false"
+                                class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
+                            />
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Stored as a bcrypt hash. Minimum 8 characters.') }}</p>
                             <x-input-error :messages="$errors->get('new_basic_auth_password')" class="mt-1" />
                         </div>
@@ -170,6 +225,33 @@
                             @endif
                         </p>
                         <x-input-error :messages="$errors->get('new_basic_auth_path')" class="mt-1" />
+                    </div>
+
+                    {{-- Live Authorization-header preview. Mirrors the box in the rotate-
+                         reveal modal so the operator can verify their credential with
+                         curl -H "Authorization: Basic <…>" the moment they finish typing
+                         (or pressing Generate). Hidden until both username and password
+                         are non-empty so it doesn't dangle as a half-built header. --}}
+                    <div
+                        x-show="authHeader"
+                        x-cloak
+                        class="rounded-xl border border-brand-sage/25 bg-brand-sage/5 px-4 py-3"
+                    >
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Authorization header') }}</p>
+                            <button
+                                type="button"
+                                @click="copyHeader()"
+                                class="text-xs font-semibold text-brand-forest hover:underline"
+                            >
+                                <span x-show="!copiedHeader">{{ __('Copy header') }}</span>
+                                <span x-show="copiedHeader" x-cloak>{{ __('Copied') }}</span>
+                            </button>
+                        </div>
+                        <p class="mt-1 break-all font-mono text-[11px] text-brand-moss" x-text="authHeader"></p>
+                        <p class="mt-1 text-[11px] text-brand-moss">
+                            {{ __('Standard HTTP Basic auth — base64 of username:password. Drop into curl -H or a proxy config to verify the credential.') }}
+                        </p>
                     </div>
                 </form>
 
@@ -305,51 +387,97 @@
 
                             <ul class="divide-y divide-brand-ink/8">
                                 @foreach ($usersForPath->sortBy('username') as $authUser)
-                                    <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-8" wire:key="ba-user-{{ $authUser->id }}">
+                                    @php $pending = $authUser->isPendingRemoval(); @endphp
+                                    <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-8 {{ $pending ? 'opacity-60' : '' }}" wire:key="ba-user-{{ $authUser->id }}">
                                         <div class="flex min-w-0 items-center gap-3">
                                             <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
                                                 <x-heroicon-o-user-circle class="h-4 w-4" />
                                             </span>
                                             <div class="min-w-0">
-                                                <p class="font-mono text-sm font-semibold text-brand-ink">{{ $authUser->username }}</p>
+                                                <p class="flex flex-wrap items-center gap-2 font-mono text-sm font-semibold text-brand-ink">
+                                                    <span class="{{ $pending ? 'line-through' : '' }}">{{ $authUser->username }}</span>
+                                                    @if ($pending)
+                                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/60">
+                                                            <x-spinner variant="forest" size="sm" />
+                                                            {{ __('Removing') }}
+                                                        </span>
+                                                    @endif
+                                                    @if ($authUser->isDiscoveredFromServer())
+                                                        {{-- Badge on rows imported via "Sync from server". The chip's tooltip
+                                                             carries the absolute source path so the operator can spot a
+                                                             surprise file (something outside .dply/basic-auth) without
+                                                             scrolling through SSH output. --}}
+                                                        <span
+                                                            class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70"
+                                                            title="{{ __('Imported from :path', ['path' => $authUser->source_file_path]) }}"
+                                                        >
+                                                            <x-heroicon-m-magnifying-glass class="h-3 w-3" />
+                                                            {{ __('Discovered') }}
+                                                        </span>
+                                                    @endif
+                                                    @if ($isCaddy && ! $authUser->passwordHashIsBcrypt())
+                                                        {{-- Caddy v2 can only enforce bcrypt hashes inline. Imported apr1/sha
+                                                             entries get this chip until the operator rotates the password
+                                                             (which regenerates a bcrypt hash). --}}
+                                                        <span
+                                                            class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70"
+                                                            title="{{ __('Caddy can only enforce bcrypt hashes — click Rotate to regenerate this credential.') }}"
+                                                        >
+                                                            <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
+                                                            {{ __('Rotate to enforce') }}
+                                                        </span>
+                                                    @endif
+                                                </p>
                                                 <p class="mt-0.5 text-[11px] text-brand-mist">
-                                                    @if ($authUser->updated_at && $authUser->updated_at->ne($authUser->created_at))
+                                                    @if ($pending)
+                                                        {{ __('Marked :time — drops at the end of the running webserver apply.', ['time' => $authUser->pending_removal_at?->diffForHumans() ?? '—']) }}
+                                                    @elseif ($authUser->updated_at && $authUser->updated_at->ne($authUser->created_at))
                                                         {{ __('Updated :time', ['time' => $authUser->updated_at->diffForHumans()]) }}
                                                     @else
                                                         {{ __('Added :time', ['time' => $authUser->created_at?->diffForHumans() ?? '—']) }}
+                                                    @endif
+                                                    @if ($authUser->isDiscoveredFromServer())
+                                                        <span class="text-brand-mist/70">·</span>
+                                                        <span class="font-mono text-[10px] text-brand-mist">{{ $authUser->source_file_path }}</span>
                                                     @endif
                                                 </p>
                                             </div>
                                         </div>
 
                                         <div class="flex flex-wrap items-center gap-2">
+                                            {{-- Opens the rotate dialog in `pending` state via a browser
+                                                 event — no server call yet. The actual rotate fires from
+                                                 the dialog's Submit button, which calls Livewire's
+                                                 rotateBasicAuthPassword(). --}}
                                             <button
                                                 type="button"
-                                                wire:click="rotateBasicAuthPassword('{{ $authUser->id }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="rotateBasicAuthPassword('{{ $authUser->id }}')"
+                                                @click="$dispatch('dply-basic-auth-password-rotate-prompt', {
+                                                    user_id: @js($authUser->id),
+                                                    username: @js($authUser->username),
+                                                    path: @js($authUser->normalizedPath() ?: '/'),
+                                                    host: @js($primaryHost),
+                                                })"
+                                                @disabled($pending)
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                                                 title="{{ __('Generate a new password and reveal it once') }}"
                                             >
-                                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="rotateBasicAuthPassword('{{ $authUser->id }}')" />
-                                                <span wire:loading wire:target="rotateBasicAuthPassword('{{ $authUser->id }}')" class="inline-flex h-3.5 w-3.5 items-center justify-center">
-                                                    <x-spinner variant="forest" size="sm" />
-                                                </span>
-                                                <span wire:loading.remove wire:target="rotateBasicAuthPassword('{{ $authUser->id }}')">{{ __('Rotate') }}</span>
-                                                <span wire:loading wire:target="rotateBasicAuthPassword('{{ $authUser->id }}')">{{ __('Rotating…') }}</span>
+                                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                                {{ __('Rotate') }}
                                             </button>
-                                            <button
-                                                type="button"
-                                                wire:click="removeBasicAuthUser('{{ $authUser->id }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="removeBasicAuthUser('{{ $authUser->id }}')"
-                                                class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                title="{{ __('Remove credential') }}"
-                                                aria-label="{{ __('Remove') }}"
-                                            >
-                                                <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="removeBasicAuthUser('{{ $authUser->id }}')" />
-                                                <span wire:loading wire:target="removeBasicAuthUser('{{ $authUser->id }}')"><x-spinner variant="forest" size="sm" /></span>
-                                            </button>
+                                            @if (! $pending)
+                                                <button
+                                                    type="button"
+                                                    wire:click="confirmRemoveBasicAuthUser('{{ $authUser->id }}')"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="confirmRemoveBasicAuthUser('{{ $authUser->id }}')"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    title="{{ __('Remove credential') }}"
+                                                    aria-label="{{ __('Remove') }}"
+                                                >
+                                                    <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveBasicAuthUser('{{ $authUser->id }}')" />
+                                                    <span wire:loading wire:target="confirmRemoveBasicAuthUser('{{ $authUser->id }}')"><x-spinner variant="forest" size="sm" /></span>
+                                                </button>
+                                            @endif
                                         </div>
                                     </li>
                                 @endforeach

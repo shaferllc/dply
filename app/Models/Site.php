@@ -120,6 +120,9 @@ class Site extends Model
         'deployment_environment',
         'php_fpm_user',
         'env_file_content',
+        'env_synced_at',
+        'env_cache_origin',
+        'env_file_path',
         'container_image',
         'container_registry',
         'container_port',
@@ -137,6 +140,7 @@ class Site extends Model
             'webhook_secret' => 'encrypted',
             'webhook_allowed_ips' => 'array',
             'env_file_content' => 'encrypted',
+            'env_synced_at' => 'datetime',
             'meta' => 'array',
             'laravel_scheduler' => 'boolean',
             'restart_supervisor_programs_after_deploy' => 'boolean',
@@ -334,6 +338,25 @@ class Site extends Model
         return $this->hasMany(SiteBasicAuthUser::class)->orderBy('sort_order')->orderBy('username');
     }
 
+    /**
+     * Subset of {@see basicAuthUsers()} that the webserver should actually
+     * enforce: managed (Dply wrote the htpasswd) AND not pending-removal
+     * (the next apply will drop them). Both the nginx config builder and the
+     * htpasswd-sync helper must use this same subset — otherwise the config
+     * can reference an htpasswd file the sync just deleted, locking everyone
+     * out with a 500 from nginx.
+     *
+     * @return Collection<int, SiteBasicAuthUser>
+     */
+    public function enforceableBasicAuthUsers(): Collection
+    {
+        $this->loadMissing('basicAuthUsers');
+
+        return $this->basicAuthUsers->reject(
+            fn (SiteBasicAuthUser $u): bool => $u->isPendingRemoval() || $u->isDiscoveredFromServer()
+        )->values();
+    }
+
     public function uptimeMonitors(): HasMany
     {
         return $this->hasMany(SiteUptimeMonitor::class)->orderBy('sort_order')->orderBy('id');
@@ -380,11 +403,6 @@ class Site extends Model
     public function processes(): HasMany
     {
         return $this->hasMany(SiteProcess::class)->orderBy('name');
-    }
-
-    public function environmentVariables(): HasMany
-    {
-        return $this->hasMany(SiteEnvironmentVariable::class)->orderBy('env_key');
     }
 
     public function redirects(): HasMany
@@ -1624,8 +1642,17 @@ class Site extends Model
         }
 
         $server = $this->server;
+        if ($server === null || ! $server->hostCapabilities()->supportsSsh()) {
+            return false;
+        }
 
-        return $server !== null && $server->hostCapabilities()->supportsNginxProvisioning();
+        return in_array($this->webserver(), [
+            'nginx',
+            'apache',
+            'caddy',
+            'traefik',
+            'openlitespeed',
+        ], true);
     }
 
     /**
@@ -1686,6 +1713,27 @@ class Site extends Model
         }
 
         return rtrim($this->effectiveRepositoryPath(), '/');
+    }
+
+    /**
+     * Absolute path on the host where Dply reads/writes the .env file.
+     * Defaults to {@see effectiveEnvDirectory()}/.env, but the operator can
+     * override via the env_file_path column to relocate the file outside the
+     * docroot — e.g. /etc/dply/<slug>.env — so it cannot be served by the
+     * webserver even if the deny rule is bypassed.
+     *
+     * Override paths are validated to be absolute at the service layer; this
+     * helper trusts the stored value (validation lives at write time, not
+     * read time).
+     */
+    public function effectiveEnvFilePath(): string
+    {
+        $override = trim((string) ($this->env_file_path ?? ''));
+        if ($override !== '') {
+            return $override;
+        }
+
+        return rtrim($this->effectiveEnvDirectory(), '/').'/.env';
     }
 
     public function isSuspended(): bool

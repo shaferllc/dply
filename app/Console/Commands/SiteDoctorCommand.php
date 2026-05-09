@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
+use App\Services\Sites\DotEnvFileParser;
 use Illuminate\Console\Command;
 
 /**
@@ -97,9 +98,35 @@ class SiteDoctorCommand extends Command
             ];
         }
 
+        $envParsed = app(DotEnvFileParser::class)
+            ->parse((string) ($site->env_file_content ?? ''));
         $envCounts = [
-            'production' => $site->environmentVariables()->where('environment', 'production')->count(),
-            'staging' => $site->environmentVariables()->where('environment', 'staging')->count(),
+            'cached_keys' => count($envParsed['variables']),
+            'parse_errors' => count($envParsed['errors']),
+        ];
+
+        // Surface "env file lives inside the docroot" as drift. The webserver
+        // deny rule blocks /.env over HTTP, but defense-in-depth prefers the
+        // file outside the docroot entirely. We only flag VM-style hosts —
+        // container/serverless runtimes don't have a host file and the cache
+        // is canonical.
+        $envInDocroot = false;
+        if ($server?->hostCapabilities()->supportsEnvPushToHost()) {
+            $envPath = $site->effectiveEnvFilePath();
+            $docroot = rtrim((string) $site->effectiveDocumentRoot(), '/');
+            $envInDocroot = $docroot !== '' && str_starts_with($envPath, $docroot.'/');
+            if ($envInDocroot) {
+                $drift[] = sprintf(
+                    'Env file is inside the docroot (%s). Move it outside via dply:site:env-relocate %s, or set a custom env_file_path on the Environment page.',
+                    $envPath,
+                    $site->slug,
+                );
+            }
+        }
+        $envLocation = [
+            'path' => $site->effectiveEnvFilePath(),
+            'in_docroot' => $envInDocroot,
+            'overridden' => $site->env_file_path !== null && trim((string) $site->env_file_path) !== '',
         ];
 
         $domains = $site->domains()
@@ -148,6 +175,7 @@ class SiteDoctorCommand extends Command
             ],
             'latest_deployment' => $latestSummary,
             'env_var_counts' => $envCounts,
+            'env_location' => $envLocation,
             'domains' => $domains,
             'drift' => $drift,
         ];

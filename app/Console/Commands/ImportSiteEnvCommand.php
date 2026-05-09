@@ -5,22 +5,21 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
 use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 /**
- * Bulk import env vars from a .env file.
+ * Bulk import env vars from a .env file into a site's encrypted cache.
  *
- *   dply:site:env-import <site> --file=path/to/.env [--environment=production]
+ *   dply:site:env-import <site> --file=path/to/.env
  *                               [--replace] [--dry-run] [--json]
  *
- * Default mode merges: existing keys not in the file are kept; keys
- * in the file are upserted. --replace deletes everything in the
- * environment first, then writes the file's contents — true sync.
+ * Default mode merges: existing keys not in the file are kept; keys in
+ * the file overwrite. --replace drops the cache and writes only the
+ * file's contents — true sync.
  *
- * --dry-run parses + validates without touching the DB so you can
+ * --dry-run parses + validates without touching the cache so you can
  * vet a file before committing. Errors (invalid lines) are reported
  * either way; presence of errors does NOT abort writes by default.
  */
@@ -29,14 +28,13 @@ class ImportSiteEnvCommand extends Command
     protected $signature = 'dply:site:env-import
         {site : Site ID, slug, or name}
         {--file= : Path to a .env file to import}
-        {--environment=production : Environment scope}
-        {--replace : Delete existing vars in this environment before importing}
-        {--dry-run : Parse and report without writing to the database}
+        {--replace : Drop existing env cache before importing}
+        {--dry-run : Parse and report without writing the cache}
         {--json : Output the import summary as JSON}';
 
-    protected $description = 'Bulk import environment variables from a .env file.';
+    protected $description = 'Bulk import environment variables from a .env file into a site\'s env cache.';
 
-    public function handle(DotEnvFileParser $parser): int
+    public function handle(DotEnvFileParser $parser, DotEnvFileWriter $writer): int
     {
         $needle = (string) $this->argument('site');
         $site = $this->resolveSite($needle);
@@ -58,7 +56,6 @@ class ImportSiteEnvCommand extends Command
             return self::FAILURE;
         }
 
-        $environment = (string) ($this->option('environment') ?? 'production');
         $replace = (bool) $this->option('replace');
         $dryRun = (bool) $this->option('dry-run');
 
@@ -67,22 +64,17 @@ class ImportSiteEnvCommand extends Command
         $variables = $parsed['variables'];
         $errors = $parsed['errors'];
 
-        $existing = SiteEnvironmentVariable::query()
-            ->where('site_id', $site->id)
-            ->where('environment', $environment)
-            ->pluck('env_key')
-            ->all();
+        $existing = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
 
-        $created = array_values(array_diff(array_keys($variables), $existing));
-        $updated = array_values(array_intersect(array_keys($variables), $existing));
+        $created = array_values(array_diff(array_keys($variables), array_keys($existing)));
+        $updated = array_values(array_intersect(array_keys($variables), array_keys($existing)));
         $removed = $replace
-            ? array_values(array_diff($existing, array_keys($variables)))
+            ? array_values(array_diff(array_keys($existing), array_keys($variables)))
             : [];
 
         $summary = [
             'site_id' => $site->id,
             'site_name' => $site->name,
-            'environment' => $environment,
             'mode' => $replace ? 'replace' : 'merge',
             'dry_run' => $dryRun,
             'parsed_count' => count($variables),
@@ -93,25 +85,11 @@ class ImportSiteEnvCommand extends Command
         ];
 
         if (! $dryRun) {
-            DB::transaction(function () use ($site, $environment, $variables, $replace) {
-                if ($replace) {
-                    SiteEnvironmentVariable::query()
-                        ->where('site_id', $site->id)
-                        ->where('environment', $environment)
-                        ->whereNotIn('env_key', array_keys($variables))
-                        ->delete();
-                }
-                foreach ($variables as $key => $value) {
-                    SiteEnvironmentVariable::query()->updateOrCreate(
-                        [
-                            'site_id' => $site->id,
-                            'environment' => $environment,
-                            'env_key' => $key,
-                        ],
-                        ['env_value' => $value],
-                    );
-                }
-            });
+            $merged = $replace ? $variables : array_merge($existing, $variables);
+            $site->forceFill([
+                'env_file_content' => $writer->render($merged),
+                'env_cache_origin' => 'local-edit',
+            ])->save();
         }
 
         if ($this->option('json')) {
@@ -132,10 +110,9 @@ class ImportSiteEnvCommand extends Command
     {
         $this->newLine();
         $this->line(sprintf(
-            '<fg=cyan>%s import</> for <fg=white;options=bold>%s</> (%s) — parsed %d variable(s)',
+            '<fg=cyan>%s import</> for <fg=white;options=bold>%s</> — parsed %d variable(s)',
             $s['dry_run'] ? 'Dry-run' : ucfirst((string) $s['mode']),
             $s['site_name'],
-            $s['environment'],
             $s['parsed_count'],
         ));
 

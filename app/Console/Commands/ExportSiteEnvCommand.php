@@ -5,37 +5,34 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use Illuminate\Console\Command;
 
 /**
- * Export a site's environment variables to .env file format.
+ * Export a site's env cache to .env file format.
  *
- *   dply:site:env-export <site> [--environment=production]
- *                               [--to=path] [--force]
+ *   dply:site:env-export <site> [--to=path] [--force]
  *
  * Writes to stdout by default — pipe into a file or another tool.
  * --to=path writes directly to disk; refuses to overwrite an
  * existing file unless --force is given. Round-trips with
- * dply:site:env-import. Values are sorted by key.
+ * dply:site:env-import.
  *
- * SECURITY: this command writes cleartext secret values. There is
- * no --reveal flag because the only useful export is the actual
- * value; we accept that and document it. Operators should treat
- * the output as sensitive.
+ * SECURITY: this writes cleartext secret values. There is no --reveal
+ * flag because the only useful export is the actual value; we accept
+ * that and document it. Operators should treat the output as sensitive.
  */
 class ExportSiteEnvCommand extends Command
 {
     protected $signature = 'dply:site:env-export
         {site : Site ID, slug, or name}
-        {--environment=production : Environment scope}
         {--to= : Write to this file path instead of stdout}
         {--force : Overwrite the destination file if it exists}';
 
     protected $description = 'Export site environment variables in .env file format.';
 
-    public function handle(DotEnvFileWriter $writer): int
+    public function handle(DotEnvFileParser $parser, DotEnvFileWriter $writer): int
     {
         $needle = (string) $this->argument('site');
         $site = $this->resolveSite($needle);
@@ -45,18 +42,8 @@ class ExportSiteEnvCommand extends Command
             return self::FAILURE;
         }
 
-        $environment = (string) ($this->option('environment') ?? 'production');
-        $rows = SiteEnvironmentVariable::query()
-            ->where('site_id', $site->id)
-            ->where('environment', $environment)
-            ->orderBy('env_key')
-            ->get(['env_key', 'env_value']);
-
-        $variables = [];
-        foreach ($rows as $r) {
-            $variables[$r->env_key] = (string) $r->env_value;
-        }
-
+        $variables = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+        ksort($variables);
         $rendered = $writer->render($variables);
 
         $to = (string) ($this->option('to') ?? '');

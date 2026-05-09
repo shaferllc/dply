@@ -5,33 +5,33 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
 use Illuminate\Console\Command;
 
 /**
  * Set / unset a single environment variable on a site.
  *
- *   dply:site:env-set <site> KEY=VALUE [--environment=production]
+ *   dply:site:env-set <site> KEY=VALUE
  *   dply:site:env-set <site> KEY= --unset      # remove the variable
  *
- * Useful for CI scripts and ad-hoc ops without going through the
- * dashboard. Values are stored encrypted by the model's cast.
+ * Values are written into the encrypted env cache (`sites.env_file_content`).
+ * Use `dply:site:env-push` (or the dashboard's Push button) afterwards to
+ * write the resulting .env file to the server.
  *
- * Idempotent: re-running with the same KEY=VALUE updates the
- * existing row in place rather than creating a duplicate. Per-site
- * uniqueness is by (site, environment, env_key).
+ * Idempotent: re-running with the same KEY=VALUE updates the existing
+ * line in place. Per-site uniqueness is by env_key.
  */
 class SetSiteEnvCommand extends Command
 {
     protected $signature = 'dply:site:env-set
         {site : Site ID, slug, or name}
         {assignment : KEY=VALUE format (use empty value with --unset to remove)}
-        {--environment=production : Environment scope}
         {--unset : Remove the variable instead of setting it}';
 
     protected $description = 'Set or unset a single environment variable on a site.';
 
-    public function handle(): int
+    public function handle(DotEnvFileParser $parser, DotEnvFileWriter $writer): int
     {
         $needle = (string) $this->argument('site');
         $site = $this->resolveSite($needle);
@@ -57,38 +57,31 @@ class SetSiteEnvCommand extends Command
             return self::FAILURE;
         }
 
-        $environment = (string) ($this->option('environment') ?? 'production');
         $unset = (bool) $this->option('unset');
+        $map = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+        $existed = array_key_exists($key, $map);
 
         if ($unset) {
-            $deleted = SiteEnvironmentVariable::query()
-                ->where('site_id', $site->id)
-                ->where('environment', $environment)
-                ->where('env_key', $key)
-                ->delete();
+            unset($map[$key]);
+            $site->forceFill([
+                'env_file_content' => $writer->render($map),
+                'env_cache_origin' => 'local-edit',
+            ])->save();
 
-            $this->info($deleted > 0
-                ? sprintf('Removed %s from %s (%s).', $key, $site->name, $environment)
-                : sprintf('%s was not set on %s (%s).', $key, $site->name, $environment));
+            $this->info($existed
+                ? sprintf('Removed %s from %s.', $key, $site->name)
+                : sprintf('%s was not set on %s.', $key, $site->name));
 
             return self::SUCCESS;
         }
 
-        SiteEnvironmentVariable::query()->updateOrCreate(
-            [
-                'site_id' => $site->id,
-                'environment' => $environment,
-                'env_key' => $key,
-            ],
-            ['env_value' => $value],
-        );
+        $map[$key] = $value;
+        $site->forceFill([
+            'env_file_content' => $writer->render($map),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
 
-        $this->info(sprintf(
-            'Set %s on %s (%s).',
-            $key,
-            $site->name,
-            $environment,
-        ));
+        $this->info(sprintf('Set %s on %s.', $key, $site->name));
 
         return self::SUCCESS;
     }

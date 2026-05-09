@@ -1191,7 +1191,7 @@ class SiteTest extends TestCase
             ->assertSee('Detected');
     }
 
-    public function test_site_environment_section_uses_shared_inventory_for_serverless_sites(): void
+    public function test_site_environment_section_renders_keys_for_serverless_sites(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -1231,18 +1231,16 @@ class SiteTest extends TestCase
             'section' => 'environment',
         ], false));
 
+        // Functions-backed sites have no host .env, so the cache IS the truth
+        // and the page hides Sync/Push CTAs but keeps the keys list usable.
+        // The explainer paragraph mentions the verbs as concepts; check for the
+        // CTA wire:click handlers to confirm the actual buttons are absent.
         $response->assertOk()
-            ->assertSee('Shared environment inventory')
-            ->assertSee('Final inventory')
-            ->assertSee('2')
-            ->assertSee('Runtime delivery')
-            ->assertSee('Injected into the provider runtime environment payload during publish.')
-            ->assertSee('Shared inventory preview')
+            ->assertSee('Environment variables')
             ->assertSee('APP_KEY')
-            ->assertSee('Redacted')
             ->assertSee('APP_NAME')
-            ->assertSee('Functions Demo')
-            ->assertDontSee('Push .env to server');
+            ->assertDontSee('wire:click="syncEnvFromServer"', false)
+            ->assertDontSee('wire:click="pushEnvToServer"', false);
     }
 
     public function test_site_settings_legacy_routing_section_redirects_to_routing_tab(): void

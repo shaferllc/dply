@@ -5,35 +5,32 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
 use Illuminate\Console\Command;
 
 /**
- * Bulk-delete every environment variable in a scope.
+ * Wipe every environment variable in a site's encrypted env cache.
  *
- *   dply:site:env-clear <site> [--environment=production] --force
+ *   dply:site:env-clear <site> --force
  *   dply:site:env-clear <site> --dry-run
  *
- * Requires --force to actually delete (a strict opt-in since this
- * is destructive). --dry-run reports the count without writing.
+ * Requires --force to actually delete (a strict opt-in since this is
+ * destructive). --dry-run reports the count without writing.
  *
  * Companion to env-import --replace for the case where you want to
- * fully drain the scope without immediately seeding from a file.
- * Useful when migrating envs across runtimes — tear down the old
- * config first, then import the new one.
+ * fully drain the site without immediately seeding from a file.
  */
 class ClearSiteEnvCommand extends Command
 {
     protected $signature = 'dply:site:env-clear
         {site : Site ID, slug, or name}
-        {--environment=production : Environment scope to clear}
         {--force : Required to actually delete}
         {--dry-run : Report what would be deleted without writing}
         {--json : Output as JSON}';
 
-    protected $description = 'Bulk-delete all environment variables in a scope.';
+    protected $description = 'Wipe all environment variables from a site\'s env cache.';
 
-    public function handle(): int
+    public function handle(DotEnvFileParser $parser): int
     {
         $needle = (string) $this->argument('site');
         $site = $this->resolveSite($needle);
@@ -43,16 +40,12 @@ class ClearSiteEnvCommand extends Command
             return self::FAILURE;
         }
 
-        $environment = (string) ($this->option('environment') ?? 'production');
         $force = (bool) $this->option('force');
         $dryRun = (bool) $this->option('dry-run');
 
-        $rows = SiteEnvironmentVariable::query()
-            ->where('site_id', $site->id)
-            ->where('environment', $environment)
-            ->pluck('env_key')
-            ->all();
-        sort($rows);
+        $existing = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+        $keys = array_keys($existing);
+        sort($keys);
 
         if (! $force && ! $dryRun) {
             $this->error('Refusing to clear without --force (or --dry-run to preview).');
@@ -62,20 +55,20 @@ class ClearSiteEnvCommand extends Command
 
         $deleted = 0;
         if ($force && ! $dryRun) {
-            $deleted = SiteEnvironmentVariable::query()
-                ->where('site_id', $site->id)
-                ->where('environment', $environment)
-                ->delete();
+            $deleted = count($keys);
+            $site->forceFill([
+                'env_file_content' => '',
+                'env_cache_origin' => 'local-edit',
+            ])->save();
         }
 
         $payload = [
             'site_id' => $site->id,
             'site_name' => $site->name,
-            'environment' => $environment,
             'dry_run' => $dryRun,
-            'count' => count($rows),
+            'count' => count($keys),
             'deleted' => $deleted,
-            'keys' => $rows,
+            'keys' => $keys,
         ];
 
         if ($this->option('json')) {
@@ -85,18 +78,12 @@ class ClearSiteEnvCommand extends Command
         }
 
         if ($dryRun) {
-            $this->info(sprintf(
-                'Would delete %d variable(s) from %s (%s).',
-                count($rows), $site->name, $environment,
-            ));
+            $this->info(sprintf('Would delete %d variable(s) from %s.', count($keys), $site->name));
         } else {
-            $this->info(sprintf(
-                'Deleted %d variable(s) from %s (%s).',
-                $deleted, $site->name, $environment,
-            ));
+            $this->info(sprintf('Deleted %d variable(s) from %s.', $deleted, $site->name));
         }
-        if ($rows !== []) {
-            foreach ($rows as $k) {
+        if ($keys !== []) {
+            foreach ($keys as $k) {
                 $this->line('  - '.$k);
             }
         }

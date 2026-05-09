@@ -5,6 +5,7 @@ namespace App\Livewire\Sites;
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
@@ -79,11 +80,10 @@ class Monitor extends Component
 
         $this->reset('newLabel', 'newPath');
         $this->site->load('uptimeMonitors');
+        $this->dispatch('close-modal', 'add-uptime-monitor-modal');
         $this->toastSuccess(__('Monitor added.'));
 
-        if (config('site_uptime.enabled', true)) {
-            RunSiteUptimeMonitorCheckJob::dispatch($created->id);
-        }
+        RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($this->site, $created, auth()->id());
     }
 
     public function runCheckNow(string $monitorId): void
@@ -94,12 +94,34 @@ class Monitor extends Component
             ->where('site_id', $this->site->id)
             ->findOrFail($monitorId);
 
-        if (config('site_uptime.enabled', true)) {
-            RunSiteUptimeMonitorCheckJob::dispatch($monitor->id);
-        }
+        RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($this->site, $monitor, auth()->id());
 
         $this->site->load('uptimeMonitors');
-        $this->toastSuccess(__('Check queued.'));
+    }
+
+    /**
+     * Soft-dismiss a finished (or stale) console_actions row so its banner stops
+     * showing on the page. In-flight rows are protected — clicking dismiss while
+     * the worker is still running is a no-op. Mirrors the Settings component's
+     * implementation; consolidate to a trait if a third caller appears.
+     */
+    public function dismissConsoleActionRun(string $runId): void
+    {
+        $row = ConsoleAction::query()
+            ->where('id', $runId)
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->first();
+
+        if ($row === null) {
+            return;
+        }
+
+        if ($row->isInFlight() && ! $row->isStale()) {
+            return;
+        }
+
+        $row->forceFill(['dismissed_at' => now()])->save();
     }
 
     public function confirmRemoveMonitor(string $monitorId): void

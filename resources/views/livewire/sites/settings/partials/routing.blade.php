@@ -259,7 +259,7 @@
         </div>
     @endif
 
-    @if ($supportsNginxProvisioning)
+    @if ($supportsWebserverProvisioning)
         <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/60 p-4">
             <p class="text-sm text-brand-moss">{{ __('Routing changes apply automatically after save. Use the manual apply action only if you want to re-run the current webserver config without changing data.') }}</p>
             <div class="mt-3 flex flex-wrap gap-3">

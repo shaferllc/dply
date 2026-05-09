@@ -36,12 +36,19 @@ class CheckSiteUrlHealthJob implements ShouldQueue
         $host = $domain->hostname;
         $url = 'https://'.$host;
 
+        // "Up" here means the webserver answered authoritatively — including 401/403
+        // for sites that gate traffic behind basic auth or a deny rule. Treating those
+        // as down would mark every credential-protected site as unhealthy as soon as
+        // someone enables htaccess. 5xx still counts as down: app stack is broken.
+        $isUp = static fn (int $status): bool => ($status >= 200 && $status < 400)
+            || in_array($status, [401, 403, 404, 405, 410], true);
+
         $ok = false;
         try {
-            $ok = Http::timeout(8)->connectTimeout(4)->get($url)->successful();
+            $ok = $isUp(Http::timeout(8)->connectTimeout(4)->get($url)->status());
         } catch (\Throwable) {
             try {
-                $ok = Http::timeout(8)->connectTimeout(4)->get('http://'.$host)->successful();
+                $ok = $isUp(Http::timeout(8)->connectTimeout(4)->get('http://'.$host)->status());
             } catch (\Throwable) {
                 $ok = false;
             }

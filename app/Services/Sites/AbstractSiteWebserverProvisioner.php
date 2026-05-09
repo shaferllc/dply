@@ -6,9 +6,9 @@ use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -66,7 +66,39 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         }
     }
 
-    protected function installPlaceholderPage(Site $site, SshConnection $ssh): void
+    /**
+     * Reads the remote file's current contents and only writes when the desired
+     * payload differs. Returns true when a write happened, false when the file
+     * was already in the desired state. Used by the steady-state idempotent
+     * helpers (engine HTTP cache, layer snippets, htpasswd, main vhost) so an
+     * apply triggered by a tiny change (one credential rotation, etc.) doesn't
+     * spam the banner with rewrites that produced no actual change.
+     */
+    protected function writeSystemFileIfChanged(Server $server, SshConnection $ssh, string $remotePath, string $contents): bool
+    {
+        // readRemoteFile() trims whitespace and returns null for empty; trim
+        // the desired side too so a file whose only difference is a trailing
+        // newline doesn't trigger a "changed" branch on every apply.
+        $current = $this->readRemoteFile($server, $ssh, $remotePath);
+        if ($current !== null && trim($current) === trim($contents)) {
+            return false;
+        }
+
+        $this->writeSystemFile($ssh, $remotePath, $contents);
+
+        return true;
+    }
+
+    /**
+     * Writes a friendly "site is being set up" page when the doc root has no
+     * index file yet (freshly-created site between provision and first deploy).
+     * Callers gate this on a first-apply signal (nginx: nginx_installed_at;
+     * other webservers: their meta.{webserver}_last_output key) so steady-state
+     * applies (basic-auth rotations, SSL renewals, any config rewrite) never
+     * even invoke this helper. A site whose doc root is wiped after the first
+     * provision relies on the next deploy to repopulate it.
+     */
+    protected function installPlaceholderPage(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
     {
         if (! in_array($site->type, [SiteType::Php, SiteType::Static], true)) {
             return;
@@ -77,12 +109,33 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
             return;
         }
 
-        // Make sure the web root exists before we look at it. Without this,
-        // a freshly-created site whose deploy path has never been touched
-        // returns "missing" for the index inspect (no path → no files),
-        // we then write index.html via writeSystemFile (which mkdir -p's
-        // the parent), but if any other process races us nginx may serve
-        // a bare 404 in the gap. mkdir -p here closes that window.
+        // Inspect first; only mkdir/write when we know the placeholder is needed.
+        // The probe checks for any index.* (php, html, htm) so once a placeholder
+        // or real deploy has populated the root we never re-enter the write path.
+        $out = $ssh->exec(sprintf(
+            '(%s) 2>&1; printf "\nDPLY_INDEX_PLACEHOLDER_EXIT:%%s" "$?"',
+            $this->privilegedCommand(
+                $site->server,
+                sprintf(
+                    'if ls -A %1$s/index.php %1$s/index.html %1$s/index.htm 2>/dev/null | grep -q .; then echo present; else echo missing; fi',
+                    escapeshellarg($root)
+                )
+            )
+        ), 60);
+
+        if (! preg_match('/DPLY_INDEX_PLACEHOLDER_EXIT:0\s*$/', $out)) {
+            throw new \RuntimeException('Unable to inspect the site web root before writing a placeholder page. Output: '.Str::limit($out, 1000));
+        }
+
+        // Anything index.* present means either a deploy populated this root or
+        // a previous provision wrote our placeholder. Either way: leave it alone.
+        if (str_contains($out, 'present')) {
+            return;
+        }
+
+        // Doc root is empty — make sure the directory exists, then write the
+        // placeholder. mkdir -p closes a tiny race where nginx could serve a
+        // bare 404 between us inspecting and writing.
         $mkdir = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_PLACEHOLDER_MKDIR:%%s" "$?"',
             $this->privilegedCommand(
@@ -94,38 +147,16 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
             throw new \RuntimeException('Unable to create the site web root for the placeholder. Output: '.Str::limit($mkdir, 1000));
         }
 
-        $out = $ssh->exec(sprintf(
-            '(%s) 2>&1; printf "\nDPLY_INDEX_PLACEHOLDER_EXIT:%%s" "$?"',
-            $this->privilegedCommand(
-                $site->server,
-                sprintf(
-                    'if [ -f %1$s/index.php ]; then echo deployed; else echo placeholder; fi',
-                    escapeshellarg($root)
-                )
-            )
-        ), 60);
-
-        if (! preg_match('/DPLY_INDEX_PLACEHOLDER_EXIT:0\s*$/', $out)) {
-            throw new \RuntimeException('Unable to inspect the site web root before writing a placeholder page. Output: '.Str::limit($out, 1000));
-        }
-
-        // index.php on disk means a deploy has populated this doc root —
-        // don't clobber the user's app entrypoint. Any other state (empty
-        // dir, lingering index.html from a prior placeholder, partial
-        // static deploy without index.php) gets the latest placeholder
-        // written so the site never serves a bare nginx 404.
-        if (str_contains($out, 'deployed')) {
-            return;
-        }
-
         $builder = $this->placeholderPageBuilder ??= new SitePlaceholderPageBuilder;
         $this->writeSystemFile($ssh, $root.'/index.html', $builder->render($site));
+        $emit?->step($this->emitterSource(), 'installing placeholder page');
     }
 
     /**
      * Writes {@see SiteSuspendedPageBuilder} HTML under {@see Site::suspendedStaticRoot()}.
+     * No-op unless the site is suspended; emits a `step` only when actual work happens.
      */
-    protected function ensureSuspendedPage(Site $site, SshConnection $ssh): void
+    protected function ensureSuspendedPage(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
     {
         if (! $site->isSuspended()) {
             return;
@@ -136,8 +167,20 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
             return;
         }
 
+        $emit?->step($this->emitterSource(), 'ensuring suspended page');
         $builder = new SiteSuspendedPageBuilder;
         $this->writeSystemFile($ssh, $dir.'/index.html', $builder->render($site));
+    }
+
+    /**
+     * Source label for emit lines from helpers shared across all webservers.
+     * Falls back to 'webserver' when a subclass doesn't expose webserver()
+     * (only AbstractSiteWebserverProvisioner without the contract — shouldn't
+     * happen in practice, but the guard keeps the helper defensive).
+     */
+    private function emitterSource(): string
+    {
+        return method_exists($this, 'webserver') ? $this->webserver() : 'webserver';
     }
 
     protected function privilegedCommand(Server $server, string $command): string
@@ -156,7 +199,8 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         $meta = is_array($site->meta) ? $site->meta : [];
         $meta[$key] = $output;
 
-        $site->update(['meta' => $meta]);
+        $site->meta = $meta;
+        $site->save();
     }
 
     protected function readRemoteFile(Server $server, SshConnection $ssh, string $path): ?string
@@ -188,21 +232,66 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
 
     /**
      * Writes grouped htpasswd files under {@see Site::basicAuthStorageDirectoryOnHost()}.
+     * Emits per-file `step` lines only when an htpasswd file actually changed —
+     * a no-op apply (no managed rows, or content already on-disk) produces no
+     * banner noise from this helper.
+     *
+     * Iterates over every URL path that EVER had a managed row (including the
+     * paths whose users are all pending-removal). For each path, if there are
+     * active users we rewrite the file; if all users at that path are pending,
+     * we unlink the stale file so the next sync doesn't re-discover the
+     * just-removed credentials. Without this, removing the last user at a path
+     * leaves an orphan .htpasswd around forever.
      */
-    protected function syncBasicAuthHtpasswdFiles(Site $site, SshConnection $ssh): void
+    protected function syncBasicAuthHtpasswdFiles(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
     {
         $site->loadMissing('basicAuthUsers');
+        $server = $site->server;
         $base = $site->basicAuthStorageDirectoryOnHost();
 
-        $groups = $site->basicAuthUsers->groupBy(fn (SiteBasicAuthUser $u): string => $u->normalizedPath());
+        // Discovered rows (source_file_path set) live in arbitrary files outside
+        // the managed group dir; their reconcile loop is below. Here we only
+        // touch Dply-owned group files derived from the URL path.
+        $managed = $site->basicAuthUsers->filter(
+            fn (SiteBasicAuthUser $u): bool => ! $u->isDiscoveredFromServer()
+        );
 
-        foreach ($groups as $normalizedPath => $users) {
-            if (! $users instanceof Collection || $users->isEmpty()) {
+        $activeManaged = $managed->filter(fn (SiteBasicAuthUser $u): bool => ! $u->isPendingRemoval());
+
+        // The set of paths Dply has EVER managed for this site (incl. paths
+        // whose users are all pending-removal). The apply loop iterates this
+        // set so a "remove last credential at /" leg correctly unlinks
+        // /…/group-<hash>.htpasswd instead of leaving a stale file behind.
+        $allPaths = $managed
+            ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
+            ->unique()
+            ->values();
+
+        foreach ($allPaths as $normalizedPath) {
+            $usersForPath = $activeManaged->filter(
+                fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $normalizedPath
+            );
+            $path = $site->basicAuthHtpasswdPathForNormalizedPath($normalizedPath);
+
+            if ($usersForPath->isEmpty()) {
+                // All users at this path are pending — remove the htpasswd file.
+                if ($server !== null) {
+                    $check = $ssh->exec(
+                        $this->privilegedCommand($server, 'test -f '.escapeshellarg($path).' && echo present || echo missing'),
+                        15
+                    );
+                    if (str_contains((string) $check, 'present')) {
+                        $ssh->exec($this->privilegedCommand($server, 'rm -f '.escapeshellarg($path)), 15);
+                        $emit?->step($this->emitterSource(), 'removed basic-auth credentials for '.$normalizedPath);
+                    }
+                } else {
+                    $ssh->exec('rm -f '.escapeshellarg($path), 15);
+                }
+
                 continue;
             }
 
-            $path = $site->basicAuthHtpasswdPathForNormalizedPath($normalizedPath);
-            $lines = $users->map(function (SiteBasicAuthUser $user): string {
+            $lines = $usersForPath->map(function (SiteBasicAuthUser $user): string {
                 $name = trim($user->username);
 
                 return $name.':'.trim($user->password_hash);
@@ -210,11 +299,118 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
 
             $content = $lines->implode("\n").($lines->isNotEmpty() ? "\n" : '');
 
-            $this->writeSystemFile($ssh, $path, $content);
+            if ($server !== null) {
+                if ($this->writeSystemFileIfChanged($server, $ssh, $path, $content)) {
+                    $emit?->step($this->emitterSource(), 'updating basic-auth credentials for '.$normalizedPath);
+                }
+            } else {
+                $this->writeSystemFile($ssh, $path, $content);
+            }
         }
 
-        if ($site->basicAuthUsers->isEmpty()) {
-            $ssh->exec(sprintf('rm -rf %s 2>/dev/null || true', escapeshellarg($base)), 30);
+        // Once every path has been cleared, drop the managed dir entirely so a
+        // subsequent sync doesn't even see an empty `.dply/basic-auth/` lying
+        // around. Discovered entries live elsewhere — they don't keep this dir
+        // alive.
+        if ($activeManaged->isEmpty()) {
+            $out = $ssh->exec(sprintf('test -d %1$s && rm -rf %1$s && echo dropped 2>/dev/null || true', escapeshellarg($base)), 30);
+            if (str_contains((string) $out, 'dropped')) {
+                $emit?->step($this->emitterSource(), 'removed basic-auth directory (no credentials remaining)');
+            }
+        }
+
+        $this->reconcileDiscoveredBasicAuthFiles($site, $ssh);
+    }
+
+    /**
+     * For each discovered (source_file_path-bearing) row marked pending_removal_at,
+     * drop the matching `username:` line from the source file on the server.
+     * If the file ends up with no credential lines we unlink it; otherwise we
+     * leave any unrelated lines (comments, entries Dply never imported because
+     * the username collided) in place. That conservative rewrite avoids wiping
+     * configuration the operator might still want.
+     */
+    protected function reconcileDiscoveredBasicAuthFiles(Site $site, SshConnection $ssh): void
+    {
+        $server = $site->server;
+        if ($server === null) {
+            return;
+        }
+
+        $pendingDiscovered = $site->basicAuthUsers->filter(
+            fn (SiteBasicAuthUser $u): bool => $u->isDiscoveredFromServer() && $u->isPendingRemoval()
+        );
+
+        if ($pendingDiscovered->isEmpty()) {
+            return;
+        }
+
+        $byFile = $pendingDiscovered->groupBy(fn (SiteBasicAuthUser $u): string => (string) $u->source_file_path);
+
+        foreach ($byFile as $filePath => $rows) {
+            $filePath = (string) $filePath;
+            if ($filePath === '') {
+                continue;
+            }
+
+            $contents = $this->readRemoteFile($server, $ssh, $filePath);
+            if ($contents === null) {
+                // File already gone — nothing to strip; the row gets hard-deleted by the job.
+                continue;
+            }
+
+            $usernamesToDrop = $rows
+                ->map(fn (SiteBasicAuthUser $u): string => trim($u->username))
+                ->filter(fn (string $u): bool => $u !== '')
+                ->unique()
+                ->all();
+
+            $lines = preg_split('/\r\n|\r|\n/', $contents) ?: [];
+            $kept = [];
+            $hasCredentialLine = false;
+
+            foreach ($lines as $line) {
+                $trimmed = trim($line);
+                if ($trimmed === '') {
+                    $kept[] = $line;
+
+                    continue;
+                }
+
+                $colon = strpos($trimmed, ':');
+                if ($colon === false || str_starts_with($trimmed, '#')) {
+                    $kept[] = $line;
+
+                    continue;
+                }
+
+                $username = trim(substr($trimmed, 0, $colon));
+                if (in_array($username, $usernamesToDrop, true)) {
+                    continue;
+                }
+
+                $kept[] = $line;
+                $hasCredentialLine = true;
+            }
+
+            if (! $hasCredentialLine) {
+                // No credential lines remain — unlink the file so the gate is fully gone.
+                // We use rm via the privileged channel because writeSystemFile already
+                // assumes root ownership for the path; matching that here keeps perms consistent.
+                $ssh->exec(
+                    $this->privilegedCommand($server, 'rm -f '.escapeshellarg($filePath)),
+                    30
+                );
+
+                continue;
+            }
+
+            $newContents = implode("\n", $kept);
+            if ($newContents !== '' && substr($newContents, -1) !== "\n") {
+                $newContents .= "\n";
+            }
+
+            $this->writeSystemFile($ssh, $filePath, $newContents);
         }
     }
 }

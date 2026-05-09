@@ -67,7 +67,6 @@ class DoctorOrphansCommandTest extends TestCase
 
         $this->assertArrayHasKey('orphans', $decoded);
         $this->assertArrayHasKey('site_deployments', $decoded['orphans']);
-        $this->assertArrayHasKey('site_environment_variables', $decoded['orphans']);
         $this->assertArrayHasKey('site_domains', $decoded['orphans']);
         $this->assertArrayHasKey('site_processes', $decoded['orphans']);
         $this->assertArrayHasKey('server_database_engines', $decoded['orphans']);

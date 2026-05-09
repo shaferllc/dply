@@ -8,7 +8,6 @@ use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Models\SiteEnvironmentVariable;
 use App\Models\SiteProcess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -45,12 +44,7 @@ class SiteDoctorCommandTest extends TestCase
             'is_active' => false,
             'scale' => 1,
         ]);
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'A',
-            'env_value' => 'x',
-            'environment' => 'production',
-        ]);
+        $site->forceFill(['env_file_content' => 'A=x'])->save();
         $site->domains()->create(['hostname' => 'jobs.example.com', 'is_primary' => true]);
 
         Artisan::call('dply:site:doctor', [
@@ -67,7 +61,8 @@ class SiteDoctorCommandTest extends TestCase
         $this->assertSame(2, $decoded['processes']['total']);
         $this->assertSame(1, $decoded['processes']['active']);
         $this->assertSame(2, $decoded['processes']['total_scale']);
-        $this->assertSame(1, $decoded['env_var_counts']['production']);
+        $this->assertSame(1, $decoded['env_var_counts']['cached_keys']);
+        $this->assertSame(0, $decoded['env_var_counts']['parse_errors']);
         $this->assertCount(1, $decoded['domains']);
         $this->assertSame('jobs.example.com', $decoded['domains'][0]['hostname']);
         $this->assertTrue($decoded['domains'][0]['is_primary']);
@@ -178,5 +173,53 @@ class SiteDoctorCommandTest extends TestCase
 
         $this->assertSame(1, $exit);
         $this->assertStringContainsString('Site not found', $output);
+    }
+
+    public function test_drift_reports_env_file_inside_docroot(): void
+    {
+        $server = Server::factory()->create();
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'runtime' => 'php',
+            'document_root' => '/var/www/jobs/public',
+            'repository_path' => '/var/www/jobs',
+            'env_file_path' => '/var/www/jobs/public/.env',
+        ]);
+        $site->domains()->create(['hostname' => 'jobs.example.com', 'is_primary' => true]);
+
+        Artisan::call('dply:site:doctor', [
+            'site' => $site->slug,
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertTrue($decoded['env_location']['in_docroot']);
+        $this->assertSame('/var/www/jobs/public/.env', $decoded['env_location']['path']);
+        $this->assertNotEmpty($decoded['drift']);
+        $this->assertStringContainsString('inside the docroot', implode(' ', $decoded['drift']));
+    }
+
+    public function test_drift_does_not_report_env_when_relocated_outside(): void
+    {
+        $server = Server::factory()->create();
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'runtime' => 'php',
+            'document_root' => '/var/www/jobs/public',
+            'repository_path' => '/var/www/jobs',
+            'env_file_path' => '/etc/dply/jobs.env',
+        ]);
+        $site->domains()->create(['hostname' => 'jobs.example.com', 'is_primary' => true]);
+
+        Artisan::call('dply:site:doctor', [
+            'site' => $site->slug,
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertFalse($decoded['env_location']['in_docroot']);
+        $this->assertTrue($decoded['env_location']['overridden']);
+        $envDrift = collect($decoded['drift'])->filter(fn ($d) => str_contains($d, 'docroot'));
+        $this->assertCount(0, $envDrift);
     }
 }

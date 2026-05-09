@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -15,11 +15,9 @@ class ClearSiteEnvCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_clears_all_vars_in_scope_with_force(): void
+    public function test_clears_all_vars_with_force(): void
     {
-        $site = $this->makeSite();
-        $this->seedVar($site, 'A', 'a', 'production');
-        $this->seedVar($site, 'B', 'b', 'production');
+        $site = $this->makeSite(['env_file_content' => "A=a\nB=b"]);
 
         $exit = Artisan::call('dply:site:env-clear', [
             'site' => $site->slug,
@@ -31,27 +29,24 @@ class ClearSiteEnvCommandTest extends TestCase
         $this->assertSame(0, $exit);
         $this->assertSame(2, $decoded['deleted']);
         $this->assertSame(['A', 'B'], $decoded['keys']);
-        $this->assertSame(0, SiteEnvironmentVariable::query()->where('site_id', $site->id)->count());
+        $this->assertSame([], $this->parsed($site->fresh()));
     }
 
     public function test_refuses_without_force(): void
     {
-        $site = $this->makeSite();
-        $this->seedVar($site, 'A', 'a', 'production');
+        $site = $this->makeSite(['env_file_content' => 'A=a']);
 
         $exit = Artisan::call('dply:site:env-clear', ['site' => $site->slug]);
         $output = Artisan::output();
 
         $this->assertSame(1, $exit);
         $this->assertStringContainsString('Refusing', $output);
-        $this->assertSame(1, SiteEnvironmentVariable::query()->where('site_id', $site->id)->count());
+        $this->assertSame(['A' => 'a'], $this->parsed($site->fresh()));
     }
 
     public function test_dry_run_reports_without_deleting(): void
     {
-        $site = $this->makeSite();
-        $this->seedVar($site, 'A', 'a', 'production');
-        $this->seedVar($site, 'B', 'b', 'production');
+        $site = $this->makeSite(['env_file_content' => "A=a\nB=b"]);
 
         Artisan::call('dply:site:env-clear', [
             'site' => $site->slug,
@@ -63,23 +58,7 @@ class ClearSiteEnvCommandTest extends TestCase
         $this->assertTrue($decoded['dry_run']);
         $this->assertSame(2, $decoded['count']);
         $this->assertSame(0, $decoded['deleted']);
-        $this->assertSame(2, SiteEnvironmentVariable::query()->where('site_id', $site->id)->count());
-    }
-
-    public function test_environment_scopes_the_clear(): void
-    {
-        $site = $this->makeSite();
-        $this->seedVar($site, 'A', 'a', 'production');
-        $this->seedVar($site, 'B', 'b', 'staging');
-
-        Artisan::call('dply:site:env-clear', [
-            'site' => $site->slug,
-            '--environment' => 'staging',
-            '--force' => true,
-        ]);
-
-        $this->assertSame(1, SiteEnvironmentVariable::query()->where('site_id', $site->id)->count());
-        $this->assertSame('A', SiteEnvironmentVariable::query()->where('site_id', $site->id)->first()->env_key);
+        $this->assertSame(['A' => 'a', 'B' => 'b'], $this->parsed($site->fresh()));
     }
 
     public function test_clear_when_already_empty_is_idempotent(): void
@@ -109,23 +88,27 @@ class ClearSiteEnvCommandTest extends TestCase
         $this->assertStringContainsString('Site not found', $output);
     }
 
-    private function makeSite(): Site
+    /**
+     * @param  array<string, mixed>  $attrs
+     */
+    private function makeSite(array $attrs = []): Site
     {
         $server = Server::factory()->create();
 
-        return Site::factory()->create([
+        return Site::factory()->create(array_merge([
             'server_id' => $server->id,
             'slug' => 'jobs',
-        ]);
+        ], $attrs));
     }
 
-    private function seedVar(Site $site, string $key, string $value, string $environment): void
+    /**
+     * @return array<string, string>
+     */
+    private function parsed(Site $site): array
     {
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => $key,
-            'env_value' => $value,
-            'environment' => $environment,
-        ]);
+        $vars = app(DotEnvFileParser::class)->parse((string) ($site->env_file_content ?? ''))['variables'];
+        ksort($vars);
+
+        return $vars;
     }
 }

@@ -213,6 +213,9 @@
                                 @case('bolt')
                                     <x-heroicon-o-bolt class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('user-group')
+                                    <x-heroicon-o-user-group class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                             @endswitch
                             {{ $label }}
                         </a>

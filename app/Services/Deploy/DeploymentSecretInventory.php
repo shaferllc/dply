@@ -5,31 +5,28 @@ declare(strict_types=1);
 namespace App\Services\Deploy;
 
 use App\Models\Site;
+use App\Services\Sites\DotEnvFileParser;
 use App\Support\Deployment\DeploymentSecret;
 
 final class DeploymentSecretInventory
 {
+    public function __construct(
+        private readonly DotEnvFileParser $parser,
+    ) {}
+
     /**
      * @return list<DeploymentSecret>
      */
     public function forSite(Site $site): array
     {
-        $site->loadMissing(['environmentVariables', 'workspace.variables']);
+        $site->loadMissing(['workspace.variables']);
         $environment = $site->deployment_environment ?: 'production';
         $inventory = [];
 
-        foreach ($this->parseDotEnv((string) ($site->env_file_content ?? '')) as $key => $value) {
-            $inventory[] = new DeploymentSecret(
-                key: $key,
-                value: $value,
-                scope: 'site',
-                source: 'site_env_file',
-                environment: $environment,
-                classification: $this->classify($key),
-                isSecret: $this->looksSensitiveKey($key),
-            );
-        }
-
+        // Order matters: environmentMapForSite() collapses the inventory into a
+        // map by overwriting on duplicate keys. Workspace vars come first
+        // (lowest priority); the site env_file_content blob comes last so its
+        // keys override workspace inheritance for matching names.
         if ($site->workspace) {
             foreach ($site->workspace->variables as $row) {
                 $inventory[] = new DeploymentSecret(
@@ -44,19 +41,16 @@ final class DeploymentSecretInventory
             }
         }
 
-        foreach ($site->environmentVariables as $row) {
-            if ((string) $row->environment !== $environment) {
-                continue;
-            }
-
+        $parsed = $this->parser->parse((string) ($site->env_file_content ?? ''));
+        foreach ($parsed['variables'] as $key => $value) {
             $inventory[] = new DeploymentSecret(
-                key: (string) $row->env_key,
-                value: (string) ($row->env_value ?? ''),
+                key: $key,
+                value: $value,
                 scope: 'site',
-                source: 'site_environment_variable',
+                source: 'site_env_file',
                 environment: $environment,
-                classification: $this->classify((string) $row->env_key),
-                isSecret: $this->looksSensitiveKey((string) $row->env_key),
+                classification: $this->classify($key),
+                isSecret: $this->looksSensitiveKey($key),
             );
         }
 
@@ -113,7 +107,7 @@ final class DeploymentSecretInventory
      */
     public function effectiveEnvironmentMapForSite(Site $site): array
     {
-        $site->loadMissing(['environmentVariables', 'workspace.variables']);
+        $site->loadMissing(['workspace.variables']);
 
         $environment = $this->environmentMapForSite($site);
         $appEnvironment = (string) ($site->deployment_environment ?: 'production');
@@ -143,42 +137,6 @@ final class DeploymentSecretInventory
         }
 
         return null;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function parseDotEnv(string $raw): array
-    {
-        $map = [];
-
-        foreach (preg_split("/\r\n|\n|\r/", $raw) ?: [] as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#') || ! str_contains($line, '=')) {
-                continue;
-            }
-
-            [$key, $value] = explode('=', $line, 2);
-            $key = trim($key);
-            $value = trim($value);
-
-            if ($key === '') {
-                continue;
-            }
-
-            $map[$key] = $this->unquote($value);
-        }
-
-        return $map;
-    }
-
-    private function unquote(string $value): string
-    {
-        if (strlen($value) >= 2 && (($value[0] === '"' && str_ends_with($value, '"')) || ($value[0] === "'" && str_ends_with($value, "'")))) {
-            return stripcslashes(substr($value, 1, -1));
-        }
-
-        return $value;
     }
 
     private function classify(string $key): string

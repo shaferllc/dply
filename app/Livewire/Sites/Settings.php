@@ -3,14 +3,15 @@
 namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
-use App\Jobs\DeleteServerSystemUserJob;
+use App\Jobs\AssignSystemUserToSiteJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Jobs\SiteResetPermissionsJob;
-use App\Jobs\SiteSystemUserMutationJob;
+use App\Jobs\SyncBasicAuthFromServerJob;
 use App\Jobs\TearDownSiteSystemdUnitJob;
 use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
+use App\Models\ConsoleAction;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\NotificationWebhookDestination;
@@ -49,10 +50,9 @@ use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -158,19 +158,17 @@ class Settings extends Show
 
     public ?string $laravel_ssh_setup_error = null;
 
-    public string $system_user_panel_mode = 'existing';
-
-    public string $system_user_new_username = '';
-
-    public bool $system_user_new_sudo = false;
-
     public string $system_user_assign_username = '';
 
-    public string $system_user_remove_username = '';
-
-    public string $system_user_remove_confirm = '';
-
-    /** @var list<array{username: string, site_count: int}> */
+    /**
+     * Cached list of usernames present on the server. Populated by
+     * {@see loadSystemUsersForPanel()} on first load of the system-user section
+     * and used as both the picker's option list and the validation allow-list
+     * for {@see queueAssignSystemUser()}. Site-count metadata lives only on the
+     * server-level /system-users page now; here we just need the usernames.
+     *
+     * @var list<array{username: string, site_count: int}>
+     */
     public array $system_user_remote_rows = [];
 
     public ?string $system_user_list_error = null;
@@ -1653,7 +1651,32 @@ class Settings extends Show
         $this->new_basic_auth_path = '/';
         $this->site->load('basicAuthUsers');
         $this->dispatch('close-modal', 'add-basic-auth-modal');
-        $this->finalizeRoutingMutation(__('Basic authentication user saved.'));
+        $this->finalizeRoutingMutation(__('Basic authentication user saved.'), __('Adding credential to :host …', ['host' => $this->site->server?->name ?? $this->site->name]));
+    }
+
+    /**
+     * Open a confirm-modal before removing a basic-auth credential. The actual
+     * mark-and-apply happens in {@see removeBasicAuthUser()} only after the
+     * operator clicks through the modal.
+     */
+    public function confirmRemoveBasicAuthUser(string $userId): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            return;
+        }
+
+        $user = $this->site->basicAuthUsers()->findOrFail($userId);
+
+        $this->openConfirmActionModal(
+            'removeBasicAuthUser',
+            [$userId],
+            __('Remove credential?'),
+            __('Stops :username from passing the basic-auth gate. The credential is marked Removing while the webserver config rewrites; we hard-delete the row only after the apply succeeds.', ['username' => $user->username]),
+            __('Remove credential'),
+            true,
+        );
     }
 
     public function removeBasicAuthUser(string $userId): void
@@ -1664,9 +1687,21 @@ class Settings extends Show
             return;
         }
 
-        $this->site->basicAuthUsers()->findOrFail($userId)->delete();
+        // Stamp pending_removal_at instead of hard-deleting. The htpasswd-sync
+        // step in the apply skips pending rows, so this row stops authenticating
+        // the moment the apply succeeds. ApplySiteWebserverConfigJob hard-deletes
+        // the row after a clean run — that way the UI never claims the credential
+        // is gone before the webserver actually agrees.
+        $user = $this->site->basicAuthUsers()->findOrFail($userId);
+        if ($user->pending_removal_at === null) {
+            $user->forceFill(['pending_removal_at' => now()])->save();
+        }
+
         $this->site->load('basicAuthUsers');
-        $this->finalizeRoutingMutation(__('Basic authentication user removed.'));
+        $this->finalizeRoutingMutation(
+            __('Basic auth credential marked for removal — track the apply in the banner.'),
+            __('Removing credential from :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+        );
     }
 
     public function generateBasicAuthPassword(): void
@@ -1676,159 +1711,78 @@ class Settings extends Show
     }
 
     /**
-     * Clear the webserver-apply banner. Reads `site.meta` keys set by
-     * {@see ApplySiteWebserverConfigJob} and the cached transcript; both go away on dismiss.
-     * No-op while a run is still in flight (status=running) — same rule as the SSH-keys
-     * banners, even though apply is currently sync (defensive against future async dispatch).
+     * Dispatches a backgrounded job that walks the server, finds every .htpasswd
+     * inside the site repo, and imports the user entries Dply doesn't already
+     * track. Progress streams into a console_actions row whose banner is mounted
+     * at the top of the settings page, so the operator can watch the scan happen
+     * line-by-line instead of seeing a synchronous toast that hides the work.
      */
-    public function dismissWebserverApplyBanner(): void
+    public function syncBasicAuthFromServer(): void
     {
         $this->authorize('update', $this->site);
 
-        $fresh = $this->site->fresh();
-        $meta = is_array($fresh?->meta) ? $fresh->meta : [];
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            $this->toastError(__('Basic authentication is not available for this site runtime.'));
 
-        $statusKey = config('site_webserver_config.meta_apply_status_key');
-        if (($meta[$statusKey] ?? '') === 'running') {
-            // Allow dismissal once the run is past the staleness threshold so a dead
-            // worker can't strand the banner forever. While still within the threshold,
-            // keep the no-op so an in-flight job isn't accidentally cleared.
-            $startedAt = $meta[config('site_webserver_config.meta_apply_started_at_key')] ?? null;
-            $stale = false;
-            if ($startedAt) {
-                try {
-                    $stale = Carbon::parse($startedAt)
-                        ->lt(now()->subSeconds((int) config('site_webserver_config.apply_stale_after_seconds', 600)));
-                } catch (\Throwable) {
-                    $stale = false;
-                }
-            }
-            if (! $stale) {
-                return;
-            }
+            return;
         }
 
-        $runId = (string) ($meta[config('site_webserver_config.meta_apply_run_id_key')] ?? '');
-        if ($runId !== '') {
-            Cache::forget(config('site_webserver_config.apply_output_cache_key_prefix').$runId);
-        }
+        // Seed a queued ConsoleAction row BEFORE dispatch so the page-top banner
+        // shows immediately on this re-render. Without this, the row only exists
+        // once the worker calls beginConsoleAction(), which is async — the
+        // banner reads from the DB on parent render and would stay empty until
+        // the user navigated or another action triggered a re-render.
+        $this->seedQueuedConsoleAction('basic_auth_sync');
 
-        unset(
-            $meta[config('site_webserver_config.meta_apply_run_id_key')],
-            $meta[config('site_webserver_config.meta_apply_status_key')],
-            $meta[config('site_webserver_config.meta_apply_kind_key')],
-            $meta[config('site_webserver_config.meta_apply_started_at_key')],
-            $meta[config('site_webserver_config.meta_apply_finished_at_key')],
-            $meta[config('site_webserver_config.meta_apply_error_key')],
+        SyncBasicAuthFromServerJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
         );
 
-        $fresh?->update(['meta' => $meta]);
-        $this->site->refresh();
+        $this->toastSuccess(__('Sync queued — track progress in the banner at the top of this page.'));
+    }
+
+    // seedQueuedConsoleAction lives on Show.php and is inherited — see
+    // {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()}.
+
+    // The webserver-apply banner is now read in settings.blade as a `console_actions`
+    // query and rendered through `livewire.partials.console-action-banner-static`,
+    // which lives in the parent component's render tree (no nested Livewire component).
+    // The banner's Dismiss button posts to {@see dismissConsoleActionRun()} below.
+
+    /**
+     * Soft-dismiss a finished (or stale) console_actions row so its banner stops
+     * showing on the page. In-flight rows are protected — clicking dismiss while
+     * the worker is still running is a no-op, mirroring the "no clobbering live
+     * runs" rule the legacy banner enforced.
+     */
+    public function dismissConsoleActionRun(string $runId): void
+    {
+        $row = ConsoleAction::query()
+            ->where('id', $runId)
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->first();
+
+        if ($row === null) {
+            return;
+        }
+
+        if ($row->isInFlight() && ! $row->isStale()) {
+            return;
+        }
+
+        $row->forceFill(['dismissed_at' => now()])->save();
     }
 
     /**
-     * Polled by the site-apply banner while a queued server-touching job is running,
-     * so the page flips from "running" to "completed/failed" without a manual refresh.
-     * Refresh on the model is enough — the banner getter re-reads meta.
+     * @param  string  $customPassword  Operator-supplied plaintext from the rotate
+     *                                  dialog. The dialog generates a random default and lets the operator copy
+     *                                  it before submit, so by the time we hit this method the value is always
+     *                                  present. Validated against the same min:8/max:255 rules used by the
+     *                                  add-credential form.
      */
-    public function pollWebserverApplyStatus(): void
-    {
-        $this->site->refresh();
-    }
-
-    /**
-     * Banner state for any site-apply run — null when nothing recent to show.
-     * Returns: status ('completed'|'failed'|'running'), message, subtitle, output lines.
-     *
-     * Reads the `site_apply_kind` meta to pick user-facing copy from the kinds table
-     * in config/site_webserver_config.php — so SSL, system-user, systemd, permissions
-     * and webserver-config jobs all share this single banner.
-     */
-    public function getWebserverApplyBannerProperty(): ?array
-    {
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-
-        $status = (string) ($meta[config('site_webserver_config.meta_apply_status_key')] ?? '');
-        if (! in_array($status, ['running', 'completed', 'failed'], true)) {
-            return null;
-        }
-
-        $runId = (string) ($meta[config('site_webserver_config.meta_apply_run_id_key')] ?? '');
-        $startedAt = $meta[config('site_webserver_config.meta_apply_started_at_key')] ?? null;
-        $finishedAt = $meta[config('site_webserver_config.meta_apply_finished_at_key')] ?? null;
-        $error = (string) ($meta[config('site_webserver_config.meta_apply_error_key')] ?? '');
-        // Default to webserver_config for legacy meta written before the kind field
-        // existed — that keeps still-stuck banners legible.
-        $kind = (string) ($meta[config('site_webserver_config.meta_apply_kind_key')] ?? 'webserver_config');
-
-        // Treat status=running as failed/stale once it has been "running" longer than
-        // the configured threshold. Without this, a queue worker that died mid-job
-        // (or a host PHP request killed mid-dispatchSync, before the queue switch)
-        // would leave the banner stuck forever and dismissal would be blocked.
-        $isStale = false;
-        if ($status === 'running' && $startedAt) {
-            try {
-                $isStale = Carbon::parse($startedAt)
-                    ->lt(now()->subSeconds((int) config('site_webserver_config.apply_stale_after_seconds', 600)));
-            } catch (\Throwable) {
-                $isStale = false;
-            }
-        }
-        if ($isStale) {
-            $status = 'failed';
-            if ($error === '') {
-                $error = __('No completion recorded — the worker likely died before finishing. Re-trigger the apply, or dismiss this banner.');
-            }
-        }
-
-        $output = [];
-        if ($runId !== '') {
-            $cached = Cache::get(config('site_webserver_config.apply_output_cache_key_prefix').$runId);
-            if (is_array($cached) && isset($cached['lines']) && is_array($cached['lines'])) {
-                $output = array_values(array_filter($cached['lines'], 'is_string'));
-            }
-        }
-
-        $kinds = (array) config('site_webserver_config.apply_kinds', []);
-        $labels = is_array($kinds[$kind] ?? null)
-            ? $kinds[$kind]
-            : ($kinds['webserver_config'] ?? [
-                'running' => 'Working on :host …',
-                'completed' => 'Done.',
-                'failed' => 'Failed.',
-                'stale' => 'Did not finish.',
-            ]);
-
-        $host = $this->site->server?->name ?? $this->site->name;
-        $message = match ($status) {
-            'running' => __($labels['running'] ?? 'Working on :host …', ['host' => $host]),
-            'completed' => __($labels['completed'] ?? 'Done.'),
-            'failed' => $isStale
-                ? __($labels['stale'] ?? ($labels['failed'] ?? 'Did not finish.'))
-                : __($labels['failed'] ?? 'Failed.'),
-            default => '',
-        };
-
-        $subtitle = match (true) {
-            $status === 'failed' && $error !== '' => Str::limit($error, 200),
-            $status === 'completed' && $finishedAt
-                => __('Finished :time', ['time' => Carbon::parse($finishedAt)->diffForHumans()]),
-            $status === 'running'
-                => __('Refreshing every 4s · safe to leave this page — the job runs on the queue.'),
-            default => null,
-        };
-
-        return [
-            'status' => $status,
-            'message' => $message,
-            'subtitle' => $subtitle,
-            'output' => $output,
-            'busy' => $status === 'running',
-            'kind' => $kind,
-        ];
-    }
-
-    public function rotateBasicAuthPassword(string $userId): void
+    public function rotateBasicAuthPassword(string $userId, string $customPassword): void
     {
         $this->authorize('update', $this->site);
 
@@ -1841,20 +1795,24 @@ class Settings extends Show
         /** @var SiteBasicAuthUser $user */
         $user = $this->site->basicAuthUsers()->findOrFail($userId);
 
-        // Plaintext is dispatched to the browser once via a Livewire event and never stored
-        // on the component — the row in the panel keeps only the bcrypt hash.
-        $plain = Str::password(20);
-        $user->password_hash = Hash::make($plain);
+        $validator = Validator::make(
+            ['password' => $customPassword],
+            ['password' => ['required', 'string', 'min:8', 'max:255']],
+        );
+        if ($validator->fails()) {
+            $this->toastError($validator->errors()->first('password') ?: __('Password must be 8–255 characters.'));
+
+            return;
+        }
+
+        $user->password_hash = Hash::make($customPassword);
         $user->save();
 
-        $this->dispatch('dply-basic-auth-password-revealed', [
-            'username' => $user->username,
-            'path' => $user->normalizedPath(),
-            'password' => $plain,
-        ]);
-
         $this->site->load('basicAuthUsers');
-        $this->finalizeRoutingMutation(__('Password rotated.'));
+        $this->finalizeRoutingMutation(
+            __('Password rotated.'),
+            __('Rotating credential password on :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+        );
     }
 
     public function bulkImportBasicAuth(): void
@@ -1969,7 +1927,10 @@ class Settings extends Show
             $message .= ' ('.implode(', ', $detail).')';
         }
 
-        $this->finalizeRoutingMutation($message);
+        $this->finalizeRoutingMutation(
+            $message,
+            __('Importing credentials to :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+        );
     }
 
     public function addTenantDomain(): void
@@ -2160,7 +2121,7 @@ class Settings extends Show
         $providerLabel = $validated['quick_ssl_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
             ? 'ZeroSSL'
             : 'Let\'s Encrypt';
-        $this->toastSuccess(__('SSL request queued for :domain via :provider — track progress in the apply banner.', [
+        $this->toastSuccess(__('SSL request queued for :domain via :provider.', [
             'domain' => $hostname,
             'provider' => $providerLabel,
         ]));
@@ -2359,7 +2320,7 @@ class Settings extends Show
         }
 
         $this->resetCertificateRequestForm();
-        $this->toastSuccess(__('Certificate request saved — track progress in the apply banner.'));
+        $this->toastSuccess(__('Certificate request saved.'));
         $this->site->load('certificates');
     }
 
@@ -2424,15 +2385,6 @@ class Settings extends Show
         }
     }
 
-    public function openSystemUserCreateModal(): void
-    {
-        $this->authorize('update', $this->site);
-        $this->resetErrorBag();
-        $this->system_user_new_username = '';
-        $this->system_user_new_sudo = false;
-        $this->dispatch('open-modal', 'site-system-user-create-modal');
-    }
-
     public function openSystemUserAssignModal(): void
     {
         $this->authorize('update', $this->site);
@@ -2444,15 +2396,6 @@ class Settings extends Show
         ]);
 
         $this->dispatch('open-modal', 'site-system-user-assign-modal');
-    }
-
-    public function openSystemUserRemoveModal(): void
-    {
-        $this->authorize('update', $this->server);
-        $this->resetErrorBag();
-        $this->system_user_remove_username = '';
-        $this->system_user_remove_confirm = '';
-        $this->dispatch('open-modal', 'site-system-user-remove-modal');
     }
 
     public function openSystemUserResetPermissionsModal(): void
@@ -2467,49 +2410,9 @@ class Settings extends Show
         $this->dispatch('close-modal', 'site-reset-permissions-modal');
     }
 
-    public function closeSystemUserCreateModal(): void
-    {
-        $this->dispatch('close-modal', 'site-system-user-create-modal');
-    }
-
     public function closeSystemUserAssignModal(): void
     {
         $this->dispatch('close-modal', 'site-system-user-assign-modal');
-    }
-
-    public function closeSystemUserRemoveModal(): void
-    {
-        $this->dispatch('close-modal', 'site-system-user-remove-modal');
-    }
-
-    public function queueCreateSystemUser(): void
-    {
-        $this->authorize('update', $this->site);
-
-        if (! $this->shouldShowSystemUserPanel()) {
-            return;
-        }
-
-        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->toastError(__('The server must be ready with SSH.'));
-
-            return;
-        }
-
-        $this->validate([
-            'system_user_new_username' => ['required', 'string', 'max:32', 'regex:/^[a-z_][a-z0-9_-]*$/'],
-            'system_user_new_sudo' => ['boolean'],
-        ]);
-
-        SiteSystemUserMutationJob::dispatch(
-            $this->site->id,
-            'create',
-            $this->system_user_new_username,
-            $this->system_user_new_sudo,
-        );
-
-        $this->closeSystemUserCreateModal();
-        $this->toastSuccess(__('System user operation queued. Refresh in a moment to see updates.'));
     }
 
     public function queueAssignSystemUser(): void
@@ -2531,38 +2434,14 @@ class Settings extends Show
             'system_user_assign_username' => ['required', 'string', 'max:64', Rule::in($allowed)],
         ]);
 
-        SiteSystemUserMutationJob::dispatch(
+        AssignSystemUserToSiteJob::dispatch(
             $this->site->id,
-            'assign',
             $this->system_user_assign_username,
-            false,
+            auth()->id(),
         );
 
         $this->closeSystemUserAssignModal();
-        $this->toastSuccess(__('System user operation queued. Refresh in a moment to see updates.'));
-    }
-
-    public function queueRemoveSystemUser(): void
-    {
-        $this->authorize('update', $this->server);
-
-        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->toastError(__('The server must be ready with SSH.'));
-            $this->closeSystemUserRemoveModal();
-
-            return;
-        }
-
-        $allowed = collect($this->system_user_remote_rows)->pluck('username')->filter()->all();
-        $this->validate([
-            'system_user_remove_username' => ['required', 'string', 'max:64', Rule::in($allowed)],
-            'system_user_remove_confirm' => ['required', 'same:system_user_remove_username'],
-        ]);
-
-        DeleteServerSystemUserJob::dispatch($this->server->id, $this->system_user_remove_username);
-
-        $this->closeSystemUserRemoveModal();
-        $this->toastSuccess(__('User removal queued. Refresh server and site lists shortly.'));
+        $this->toastSuccess(__('System user assignment queued. Refresh in a moment to see updates.'));
     }
 
     public function queueResetSitePermissions(): void
@@ -2890,7 +2769,6 @@ class Settings extends Show
             'dnsProviderCredential',
             'certificates.previewDomain',
             'deployments',
-            'environmentVariables',
             'redirects',
             'tenantDomains',
             'deployHooks',

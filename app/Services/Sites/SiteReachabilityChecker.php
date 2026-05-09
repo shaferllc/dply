@@ -62,7 +62,7 @@ class SiteReachabilityChecker
                     ->withHeaders(['Host' => $hostname])
                     ->get($url);
 
-                if ($response->successful() || in_array($response->status(), [301, 302, 307, 308], true)) {
+                if ($this->statusMeansReachable($response->status())) {
                     $checks[] = [
                         'hostname' => $hostname,
                         'url' => $url,
@@ -124,5 +124,29 @@ class SiteReachabilityChecker
             'checked_at' => $checkedAt,
             'checks' => $checks,
         ];
+    }
+
+    /**
+     * Whether an HTTP status means the webserver is actively answering on this
+     * hostname — i.e. the site is reachable, even if the response itself isn't
+     * a 2xx. Crucially this includes 401/403 so a site gated by basic auth or
+     * a deny rule still flips the provisioner from "waiting_for_http" to
+     * "ready" — the htaccess/htpasswd file IS the site's intended behavior.
+     *
+     * Also accepts a handful of other 4xx codes (404, 405, 410) where the
+     * server is plainly responding but disagrees with this exact GET. That's
+     * still a reachable site — any further misconfig is a separate concern
+     * from "did provisioning finish writing the webserver config."
+     *
+     * 5xx is intentionally excluded: that means the server is up but its app
+     * stack is broken, which we shouldn't celebrate as ready.
+     */
+    private function statusMeansReachable(int $status): bool
+    {
+        if ($status >= 200 && $status < 400) {
+            return true;
+        }
+
+        return in_array($status, [401, 403, 404, 405, 410], true);
     }
 }

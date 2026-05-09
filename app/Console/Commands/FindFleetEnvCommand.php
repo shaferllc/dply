@@ -5,24 +5,28 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
 use Illuminate\Console\Command;
 
 /**
- * Search for an environment variable key across every site.
+ * Search for an environment variable key across every site's env cache.
  *
  *   dply:fleet:env-find <key>
  *   dply:fleet:env-find DATABASE_URL --reveal
  *   dply:fleet:env-find SECRET --json
  *   dply:fleet:env-find API_ --prefix
  *
- * Prefix mode (--prefix) treats the argument as a key prefix and
- * matches every variable starting with it — useful for finding all
- * AWS_* or STRIPE_* keys at once.
+ * Prefix mode (--prefix) treats the argument as a key prefix and matches
+ * every variable starting with it — useful for finding all AWS_* or
+ * STRIPE_* keys at once.
  *
- * Values are masked by default. Output is grouped by site, sorted
- * by site name, then by environment within each site. Empty result
- * exits 1 so scripts can detect "no matches".
+ * Since env values now live in encrypted blobs (one per site), search
+ * decrypts each site's cache in PHP — there is no LIKE we can push to
+ * the DB. Acceptable for org-scale; if perf regresses, add a denormalized
+ * key index table.
+ *
+ * Values are masked by default. Output is grouped by site, sorted by
+ * site name. Empty result exits 1 so scripts can detect "no matches".
  */
 class FindFleetEnvCommand extends Command
 {
@@ -34,7 +38,7 @@ class FindFleetEnvCommand extends Command
 
     protected $description = 'Search for an env key across every site in the fleet.';
 
-    public function handle(): int
+    public function handle(DotEnvFileParser $parser): int
     {
         $needle = trim((string) $this->argument('key'));
         if ($needle === '') {
@@ -46,16 +50,30 @@ class FindFleetEnvCommand extends Command
         $reveal = (bool) $this->option('reveal');
         $isPrefix = (bool) $this->option('prefix');
 
-        $query = SiteEnvironmentVariable::query()
-            ->select(['id', 'site_id', 'env_key', 'env_value', 'environment']);
-        if ($isPrefix) {
-            $query->where('env_key', 'like', $this->escapeLike($needle).'%');
-        } else {
-            $query->where('env_key', $needle);
-        }
-        $rows = $query->get();
+        $sites = Site::query()
+            ->whereNotNull('env_file_content')
+            ->get(['id', 'name', 'slug', 'deployment_environment', 'env_file_content']);
 
-        if ($rows->isEmpty()) {
+        $matches = [];
+        foreach ($sites as $site) {
+            $vars = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+            foreach ($vars as $key => $value) {
+                $hits = $isPrefix ? str_starts_with($key, $needle) : $key === $needle;
+                if (! $hits) {
+                    continue;
+                }
+                $matches[] = [
+                    'site_id' => $site->id,
+                    'site_name' => $site->name,
+                    'site_slug' => $site->slug,
+                    'environment' => (string) ($site->deployment_environment ?: 'production'),
+                    'key' => $key,
+                    'value' => $reveal ? (string) $value : $this->mask((string) $value),
+                ];
+            }
+        }
+
+        if ($matches === []) {
             if ($this->option('json')) {
                 $this->line(json_encode([
                     'key' => $needle,
@@ -69,25 +87,6 @@ class FindFleetEnvCommand extends Command
             return self::FAILURE;
         }
 
-        $siteIds = $rows->pluck('site_id')->unique()->all();
-        $sites = Site::query()->whereIn('id', $siteIds)->get(['id', 'name', 'slug'])->keyBy('id');
-
-        $matches = [];
-        foreach ($rows as $r) {
-            $site = $sites->get($r->site_id);
-            if ($site === null) {
-                continue;
-            }
-            $value = (string) $r->env_value;
-            $matches[] = [
-                'site_id' => $site->id,
-                'site_name' => $site->name,
-                'site_slug' => $site->slug,
-                'environment' => $r->environment,
-                'key' => $r->env_key,
-                'value' => $reveal ? $value : $this->mask($value),
-            ];
-        }
         usort($matches, function ($a, $b) {
             return [$a['site_name'], $a['environment'], $a['key']]
                 <=> [$b['site_name'], $b['environment'], $b['key']];
@@ -118,11 +117,6 @@ class FindFleetEnvCommand extends Command
         $this->table(['site', 'env', 'key', $reveal ? 'value' : 'value (masked)'], $rowsForTable);
 
         return self::SUCCESS;
-    }
-
-    private function escapeLike(string $s): string
-    {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $s);
     }
 
     private function mask(string $value): string

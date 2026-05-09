@@ -7,10 +7,13 @@ use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
+use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RemoveSiteRepositoryJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\ConsoleAction;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
@@ -19,7 +22,6 @@ use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
-use App\Models\SiteEnvironmentVariable;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
 use App\Models\SocialAccount;
@@ -30,9 +32,10 @@ use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Deploy\SiteRuntimeActionExecutor;
 use App\Services\Servers\ServerPhpManager;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\Sites\SiteDeploySyncCoordinator;
-use App\Services\Sites\SiteEnvPusher;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
 use App\Services\Sites\SiteReleaseRollback;
@@ -59,6 +62,9 @@ class Show extends Component
 
     public Site $site;
 
+    /** Active tab on the post-provisioning dashboard (overview|deploys|runtime|logs|ssl). */
+    public string $dashboard_tab = 'overview';
+
     public string $git_repository_url = '';
 
     public string $git_branch = 'main';
@@ -80,8 +86,6 @@ class Show extends Component
     public string $functions_artifact_output_path = '';
 
     public string $post_deploy_command = '';
-
-    public string $env_file_content = '';
 
     public string $new_domain_hostname = '';
 
@@ -169,7 +173,34 @@ class Show extends Component
 
     public string $new_env_value = '';
 
-    public string $new_env_environment = 'production';
+    /** Optional `# comment` rendered above the KEY=value line on the server. */
+    public string $new_env_comment = '';
+
+    /** Multi-line .env block pasted into the bulk-import disclosure inside the Add modal. */
+    public string $bulk_env_input = '';
+
+    /** When non-null, the keys list shows an inline edit form for this key. */
+    public ?string $editing_env_key = null;
+
+    public string $editing_env_value = '';
+
+    public string $editing_env_comment = '';
+
+    /**
+     * Server-side reveal state — keys the operator has clicked Show for, this render.
+     * Stored on the component (not Alpine) so reveals survive re-renders triggered
+     * by edit/save actions on neighboring rows.
+     *
+     * @var list<string>
+     */
+    public array $revealed_env_keys = [];
+
+    /**
+     * Operator-overridable absolute path on the host where the .env file is
+     * read/written. Empty = use the default ($effectiveEnvDirectory/.env).
+     * Stored on the Site row's `env_file_path` column when saved.
+     */
+    public string $env_file_path_override = '';
 
     public string $new_redirect_from = '';
 
@@ -234,7 +265,7 @@ class Show extends Component
         if ($site->server_id !== $server->id) {
             abort(404);
         }
-        if ($server->organization_id !== auth()->user()->currentOrganization()?->id) {
+        if ($server->organization_id !== request()->user()?->currentOrganization()?->id) {
             abort(404);
         }
 
@@ -263,7 +294,7 @@ class Show extends Component
             ? $functionsConfig['detected_runtime']
             : [];
         $this->post_deploy_command = (string) ($this->site->post_deploy_command ?? '');
-        $this->env_file_content = (string) ($this->site->env_file_content ?? '');
+        $this->env_file_path_override = (string) ($this->site->env_file_path ?? '');
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
         $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
         $dm = is_array($this->site->meta) ? $this->site->meta : [];
@@ -386,11 +417,10 @@ class Show extends Component
         // PHP-version writes now flow through runtime_version (the
         // canonical column post-php_version-drop). Always pin runtime
         // to 'php' on the way out so future reads of runtimeKey() agree.
-        $this->site->update([
-            'runtime' => 'php',
-            'runtime_version' => $validated['php_version'],
-            'meta' => $meta,
-        ]);
+        $this->site->runtime = 'php';
+        $this->site->runtime_version = $validated['php_version'];
+        $this->site->meta = $meta;
+        $this->site->save();
 
         $this->toastSuccess('PHP settings saved.');
         $this->syncFormFromSite();
@@ -416,9 +446,8 @@ class Show extends Component
             }
             $clean[] = $line;
         }
-        $this->site->update([
-            'webhook_allowed_ips' => $clean !== [] ? $clean : null,
-        ]);
+        $this->site->webhook_allowed_ips = $clean !== [] ? $clean : null;
+        $this->site->save();
         $this->toastSuccess('Webhook IP allow list saved. Leave empty to allow any source (signature still required).');
         $this->syncFormFromSite();
     }
@@ -434,52 +463,112 @@ class Show extends Component
 
     public function shouldAutoReapplyManagedWebserverConfig(): bool
     {
-        return $this->server->hostCapabilities()->supportsNginxProvisioning()
+        return $this->server->hostCapabilities()->supportsWebserverProvisioning()
             && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesDockerRuntime()
             && ! $this->site->usesKubernetesRuntime();
     }
 
-    protected function finalizeRoutingMutation(string $successMessage): void
+    /**
+     * Dispatches the webserver-config apply for the current site (when the host
+     * runtime supports it) and shows a toast.
+     *
+     * `$bannerLabel` is the user-perceived action shown in the page-top
+     * console-action banner — "Removing credential", "Saving site settings",
+     * etc. NULL falls back to the kind's default copy ("Applying webserver
+     * config to :host …"). Setting it lets a single shared apply job carry
+     * different banner titles depending on which UI path triggered it.
+     */
+    protected function finalizeRoutingMutation(string $successMessage, ?string $bannerLabel = null): void
     {
-
         if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
             $this->toastSuccess($successMessage);
 
             return;
         }
 
-        // Queued: errors surface via the apply banner (meta.status=failed) on the next
+        // Pre-seed a queued console_actions row so the banner appears immediately
+        // (before the worker picks the job up), and so we can stamp the per-action
+        // label. The job's beginConsoleAction() reuses this row instead of
+        // creating a new one.
+        $this->seedQueuedConsoleAction('webserver_config', $bannerLabel);
+
+        // Queued: errors surface via the apply banner (status=failed) on the next
         // poll, not as inline toasts. Inline-running this used to time out HTTP requests
         // because SSH/nginx work was happening synchronously on the web worker.
         ApplySiteWebserverConfigJob::dispatch($this->site->id);
-        $this->toastSuccess($successMessage.' '.__('Webserver config queued — track progress in the apply banner.'));
+        $this->toastSuccess($successMessage.' '.__('Webserver config queued.'));
+    }
+
+    /**
+     * Pre-seeds a `queued` console_actions row for the current site. Shared by
+     * finalizeRoutingMutation() and the per-Livewire-action callers (e.g. sync)
+     * so the banner appears the moment a job is dispatched, with the operator's
+     * intended label already attached.
+     *
+     * Auto-dismisses any existing completed/failed rows for the same subject so
+     * the banner shows ONE thing — the just-started run — rather than stacking
+     * stale completion banners behind a fresh run.
+     */
+    protected function seedQueuedConsoleAction(string $kind, ?string $label = null): ConsoleAction
+    {
+        // Auto-dismiss completed / failed runs (the "always supersede" rule).
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->whereNull('dismissed_at', 'and', false)
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], 'and', false)
+            ->update(['dismissed_at' => now()]);
+
+        // Also dismiss orphaned queued/running rows past the staleness threshold
+        // — they represent jobs whose workers never picked them up (queue down,
+        // redis flushed) or that died mid-run. Without this, the new dispatch
+        // would race against a zombie banner and the operator would be unsure
+        // which run is theirs.
+        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->whereNull('dismissed_at', 'and', false)
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING], 'and', false)
+            ->where('created_at', '<', now()->subSeconds($staleSeconds))
+            ->update(['dismissed_at' => now()]);
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => $kind,
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => request()->user()?->id ?? 0,
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
     }
 
     public function installNginx(): void
     {
         $this->authorize('update', $this->site);
-        if (! $this->server->hostCapabilities()->supportsNginxProvisioning()) {
+        if (! $this->server->hostCapabilities()->supportsWebserverProvisioning()) {
             $this->toastError(__('This host runtime does not use managed webserver config.'));
 
             return;
         }
 
         ApplySiteWebserverConfigJob::dispatch($this->site->id);
-        $this->toastSuccess(__('Webserver config write queued — track progress in the apply banner.'));
+        $this->toastSuccess(__('Webserver config write queued.'));
     }
 
     public function issueSsl(): void
     {
         $this->authorize('update', $this->site);
-        if (! $this->server->hostCapabilities()->supportsNginxProvisioning()) {
+        if (! $this->server->hostCapabilities()->supportsWebserverProvisioning()) {
             $this->toastError(__('This host runtime does not issue SSL from the server workspace.'));
 
             return;
         }
 
         IssueSiteSslJob::dispatch($this->site->id);
-        $this->toastSuccess(__('SSL certificate issuance queued — track progress in the apply banner.'));
+        $this->toastSuccess(__('SSL certificate issuance queued.'));
     }
 
     public function retryProvisioning(SiteProvisioner $siteProvisioner): void
@@ -494,9 +583,8 @@ class Show extends Component
             return;
         }
 
-        $this->site->update([
-            'status' => Site::STATUS_PENDING,
-        ]);
+        $this->site->status = Site::STATUS_PENDING;
+        $this->site->save();
 
         $siteProvisioner->markQueued($this->site->fresh());
         ProvisionSiteJob::dispatch($this->site->id);
@@ -519,7 +607,7 @@ class Show extends Component
         );
     }
 
-    public function cancelProvisioning(SiteProvisioningCanceller $canceller): mixed
+    public function cancelProvisioning(SiteProvisioningCanceller $canceller): void
     {
         $this->authorize('update', $this->site);
 
@@ -528,7 +616,7 @@ class Show extends Component
         if ($this->site->isReadyForWorkspace()) {
             $this->toastError(__('This site is already configured. Delete it from the site actions instead.'));
 
-            return null;
+            return;
         }
 
         try {
@@ -536,10 +624,10 @@ class Show extends Component
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
 
-            return null;
+            return;
         }
 
-        return $this->redirect(route('sites.create', $this->server), navigate: true);
+        $this->redirect(route('sites.create', $this->server), navigate: true);
     }
 
     public function deployNow(): void
@@ -772,7 +860,7 @@ class Show extends Component
     public function saveRepositoryWorkspace(): void
     {
         $this->authorize('update', $this->site);
-        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+        if (request()->user()?->currentOrganization()?->userIsDeployer(request()->user())) {
             $this->dispatch('notify', message: __('Deployers cannot change repository settings.'));
 
             return;
@@ -816,14 +904,14 @@ class Show extends Component
     public function enableQuickDeploy(RepositoryWebhookProvisioner $provisioner): void
     {
         $this->authorize('update', $this->site);
-        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+        if (request()->user()?->currentOrganization()?->userIsDeployer(request()->user())) {
             $this->dispatch('notify', message: __('Deployers cannot enable Quick deploy.'));
 
             return;
         }
 
         $account = $this->git_source_control_account_id !== ''
-            ? SocialAccount::query()->where('user_id', auth()->id())->find($this->git_source_control_account_id)
+            ? SocialAccount::query()->where('user_id', request()->user()?->id ?? 0)->findOrFail($this->git_source_control_account_id)
             : null;
         if ($account === null) {
             $this->toastError(__('Select a connected source control account first.'));
@@ -844,7 +932,7 @@ class Show extends Component
     public function disableQuickDeploy(RepositoryWebhookProvisioner $provisioner): void
     {
         $this->authorize('update', $this->site);
-        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+        if (request()->user()?->currentOrganization()?->userIsDeployer(request()->user())) {
             $this->dispatch('notify', message: __('Deployers cannot change Quick deploy.'));
 
             return;
@@ -859,7 +947,7 @@ class Show extends Component
     public function queueRemoveRemoteRepository(): void
     {
         $this->authorize('update', $this->site);
-        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
+        if (request()->user()?->currentOrganization()?->userIsDeployer(request()->user())) {
             $this->dispatch('notify', message: __('Deployers cannot remove the repository checkout.'));
 
             return;
@@ -905,7 +993,7 @@ class Show extends Component
             return;
         }
 
-        $account = auth()->user()->socialAccounts()->find($value);
+        $account = request()->user()?->socialAccounts()->findOrFail($value);
         if (! $account) {
             return;
         }
@@ -1034,10 +1122,9 @@ class Show extends Component
 
         try {
             [$private, $public] = SiteDeployKeyGenerator::generate();
-            $this->site->update([
-                'git_deploy_key_private' => $private,
-                'git_deploy_key_public' => $public,
-            ]);
+            $this->site->git_deploy_key_private = $private;
+            $this->site->git_deploy_key_public = $public;
+            $this->site->save();
             $this->toastSuccess('New deploy key generated. Add the public key to your Git host.');
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -1048,21 +1135,21 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
         $plain = Str::random(48);
-        $this->site->update(['webhook_secret' => $plain]);
+        $this->site->webhook_secret = $plain;
+        $this->site->save();
         $this->revealed_webhook_secret = $plain;
         $provisioner->syncProviderHookSecret($this->site->fresh());
         $this->toastSuccess('Webhook secret rotated. Copy it below — it will not be shown again.');
     }
 
-    public function saveEnvDraft(): void
-    {
-        $this->authorize('update', $this->site);
-        $this->validate(['env_file_content' => 'nullable|string|max:65535']);
-        $this->site->update(['env_file_content' => $this->env_file_content]);
-        $this->toastSuccess('.env saved in Dply (not yet on server). Use “Push .env to server” to write the file.');
-    }
-
-    public function pushEnvToServer(SiteEnvPusher $pusher): void
+    /**
+     * Dispatches the env-push job (via console banner). The actual SSH write
+     * happens in the worker; the banner streams progress to the page top.
+     * One-in-flight per site is enforced by PushSiteEnvJob's ShouldBeUnique
+     * guard, so back-to-back clicks coalesce into a single push that uses
+     * the latest cache state.
+     */
+    public function pushEnvToServer(): void
     {
         $this->authorize('update', $this->site);
         if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
@@ -1071,13 +1158,142 @@ class Show extends Component
             return;
         }
 
-        $this->validate(['env_file_content' => 'nullable|string|max:65535']);
-        try {
-            $path = $pusher->push($this->site, $this->env_file_content);
-            $this->toastSuccess('.env written to '.$path);
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+        $this->seedQueuedConsoleAction('env_push');
+
+        PushSiteEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+        );
+
+        $this->toastSuccess(__('Push queued — track progress in the banner at the top of this page.'));
+    }
+
+    /**
+     * Lazy first-visit sync. Fired by wire:init on the Environment partial:
+     * the page renders synchronously, then this runs in a follow-up request,
+     * dispatching the env-sync job when (and only when) we've never touched
+     * the cache before. Subsequent visits with a populated cache are no-ops.
+     *
+     * Conditions for firing:
+     *   - Runtime supports a server .env file (VM hosts only)
+     *   - Cache is empty AND has no origin (truly first visit — never synced
+     *     and never edited)
+     *   - No env_sync job already in flight (idempotent against navigation
+     *     bouncing in/out of the section)
+     *
+     * Auth uses 'view' rather than 'update' because read is a lower-priv
+     * action and the operator hasn't asked to mutate anything yet.
+     */
+    public function autoSyncIfFirstVisit(): void
+    {
+        $this->authorize('view', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            return;
         }
+        if (filled($this->site->env_file_content) || $this->site->env_cache_origin !== null) {
+            return;
+        }
+
+        $inFlight = ConsoleAction::query()
+            ->forSubject($this->site)
+            ->ofKind('env_sync')
+            ->notDismissed()
+            ->inFlight()
+            ->exists();
+        if ($inFlight) {
+            return;
+        }
+
+        $this->seedQueuedConsoleAction('env_sync');
+        SyncEnvFromServerJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+        );
+    }
+
+    /**
+     * Dispatches a backgrounded job that SSHes into the host, reads the live
+     * `.env` file, and writes it into the encrypted env_file_content cache.
+     * Mirrors {@see Settings::syncBasicAuthFromServer()}: progress streams to
+     * a console_actions row whose banner is mounted on the settings page.
+     */
+    public function syncEnvFromServer(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime does not expose a server .env file.'));
+
+            return;
+        }
+
+        $this->seedQueuedConsoleAction('env_sync');
+
+        SyncEnvFromServerJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+        );
+
+        $this->toastSuccess(__('Env sync queued — track progress in the banner at the top of this page.'));
+    }
+
+    /**
+     * One-click "move .env outside docroot" — sets env_file_path to the
+     * default convention (/etc/dply/<slug>.env) and dispatches the push job
+     * so the file lands at the new location immediately. The doctor finding
+     * surfaces the issue; this action resolves it without making the
+     * operator type the path.
+     */
+    public function relocateEnvOutsideDocroot(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime does not have a server .env to relocate.'));
+
+            return;
+        }
+
+        $newPath = '/etc/dply/'.$this->site->slug.'.env';
+        $this->site->forceFill(['env_file_path' => $newPath])->save();
+        $this->env_file_path_override = $newPath;
+
+        $this->seedQueuedConsoleAction('env_push');
+        PushSiteEnvJob::dispatch($this->site->id, (string) (auth()->id() ?? ''));
+
+        $this->toastSuccess(__('Relocating .env to :path — see banner for progress.', ['path' => $newPath]));
+    }
+
+    /**
+     * Saves a custom .env file path on the Site row. Empty input clears the
+     * override (revert to default $effectiveEnvDirectory/.env). Used by
+     * security-conscious operators to relocate the file outside the docroot —
+     * e.g. /etc/dply/<slug>.env — so the webserver can never serve it.
+     *
+     * Path must be absolute. Validation is intentionally strict to avoid
+     * accidental relative paths that resolve unpredictably on the host.
+     */
+    public function saveEnvFilePath(): void
+    {
+        $this->authorize('update', $this->site);
+        $value = trim($this->env_file_path_override);
+
+        if ($value === '') {
+            $this->site->forceFill(['env_file_path' => null])->save();
+            $this->autoPushAfterCacheMutation(__('Default .env path restored.'));
+
+            return;
+        }
+
+        $this->validate([
+            'env_file_path_override' => ['required', 'string', 'max:1024', 'regex:/^\/[^\\\\\\0]+$/'],
+        ], [
+            'env_file_path_override.regex' => __('Path must be absolute (start with /) and not contain backslashes or null bytes.'),
+        ]);
+
+        $this->site->forceFill(['env_file_path' => $value])->save();
+        $this->autoPushAfterCacheMutation(__('Custom .env path saved.'));
     }
 
     public function saveZeroDowntimeDeployment(): void
@@ -1104,7 +1320,7 @@ class Show extends Component
 
         if ($this->shouldAutoReapplyManagedWebserverConfig()) {
             ApplySiteWebserverConfigJob::dispatch($this->site->id);
-            $this->toastSuccess($message.' '.__('Webserver config queued — track progress in the apply banner.'));
+            $this->toastSuccess($message.' '.__('Webserver config queued.'));
 
             return;
         }
@@ -1249,44 +1465,217 @@ class Show extends Component
             'engine_http_cache_enabled' => ['boolean'],
         ]);
 
-        $this->site->update([
-            'engine_http_cache_enabled' => $this->engine_http_cache_enabled,
-        ]);
+        $this->site->engine_http_cache_enabled = $this->engine_http_cache_enabled;
+        $this->site->save();
         $this->site->refresh();
         $this->syncFormFromSite();
 
         ApplySiteWebserverConfigJob::dispatch($this->site->id);
         $this->toastSuccess($this->engine_http_cache_enabled
-            ? __('Engine HTTP cache enabled. Web server config queued — track progress in the apply banner.')
-            : __('Engine HTTP cache disabled. Web server config queued — track progress in the apply banner.'));
+            ? __('Engine HTTP cache enabled. Web server config queued.')
+            : __('Engine HTTP cache disabled. Web server config queued.'));
     }
 
-    public function addEnvironmentVariable(): void
+    /**
+     * Single-row add: writes one key into the encrypted env cache, then
+     * auto-pushes to the server's .env file. The push is synchronous so the
+     * operator gets immediate feedback; on push failure the cache update is
+     * preserved so they can manually retry via the Push button.
+     */
+    public function addEnvVar(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
     {
         $this->authorize('update', $this->site);
         $this->validate([
             'new_env_key' => 'required|string|max:128|regex:/^[A-Za-z_][A-Za-z0-9_]*$/',
             'new_env_value' => 'nullable|string|max:20000',
-            'new_env_environment' => 'required|string|max:32',
+            'new_env_comment' => 'nullable|string|max:1000',
         ]);
-        SiteEnvironmentVariable::query()->updateOrCreate(
-            [
-                'site_id' => $this->site->id,
-                'env_key' => $this->new_env_key,
-                'environment' => $this->new_env_environment,
-            ],
-            ['env_value' => $this->new_env_value]
-        );
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+        $comments = $parsed['comments'];
+        $map[$this->new_env_key] = (string) $this->new_env_value;
+        $trimmedComment = trim($this->new_env_comment);
+        if ($trimmedComment !== '') {
+            $comments[$this->new_env_key] = $trimmedComment;
+        } else {
+            unset($comments[$this->new_env_key]);
+        }
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $comments),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
         $this->new_env_key = '';
         $this->new_env_value = '';
-        $this->toastSuccess('Environment variable saved.');
+        $this->new_env_comment = '';
+        $this->autoPushAfterCacheMutation(__('Variable saved.'));
     }
 
-    public function deleteEnvironmentVariable(int $id): void
+    /**
+     * Bulk paste — accepts a multi-line .env block. Existing keys not in the
+     * pasted block are preserved (additive merge); pasted keys overwrite
+     * matching existing keys (last value wins, matches `.env` semantics).
+     */
+    public function bulkImportEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
     {
         $this->authorize('update', $this->site);
-        SiteEnvironmentVariable::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->toastSuccess('Variable removed.');
+        $this->validate(['bulk_env_input' => 'required|string|max:65535']);
+
+        $incoming = $parser->parse($this->bulk_env_input);
+        if ($incoming['errors'] !== []) {
+            foreach ($incoming['errors'] as $err) {
+                $this->addError('bulk_env_input', $err);
+            }
+
+            return;
+        }
+
+        $existing = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $mergedVars = array_merge($existing['variables'], $incoming['variables']);
+        // Comments merge with incoming taking precedence — pasting `# foo`
+        // above an existing KEY in the bulk block REPLACES that KEY's
+        // existing comment. Keys not in the paste keep their old comments.
+        $mergedComments = array_merge($existing['comments'], $incoming['comments']);
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($mergedVars, $mergedComments),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $count = count($incoming['variables']);
+        $this->bulk_env_input = '';
+        $this->autoPushAfterCacheMutation(__(':count variable(s) imported.', ['count' => $count]));
+    }
+
+    /**
+     * Open the inline editor for a single key. Pulls the current value out
+     * of the encrypted cache and parks it in editing_env_value for the
+     * blade form to bind.
+     */
+    public function editEnvVar(DotEnvFileParser $parser, string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        if (! array_key_exists($key, $parsed['variables'])) {
+            return;
+        }
+        $this->editing_env_key = $key;
+        $this->editing_env_value = $parsed['variables'][$key];
+        $this->editing_env_comment = (string) ($parsed['comments'][$key] ?? '');
+    }
+
+    public function cancelEditEnvVar(): void
+    {
+        $this->editing_env_key = null;
+        $this->editing_env_value = '';
+        $this->editing_env_comment = '';
+    }
+
+    public function saveEditedEnvVar(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'editing_env_key' => 'required|string|max:128|regex:/^[A-Za-z_][A-Za-z0-9_]*$/',
+            'editing_env_value' => 'nullable|string|max:20000',
+            'editing_env_comment' => 'nullable|string|max:1000',
+        ]);
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+        $comments = $parsed['comments'];
+        $key = (string) $this->editing_env_key;
+        $map[$key] = (string) $this->editing_env_value;
+        $trimmedComment = trim($this->editing_env_comment);
+        if ($trimmedComment !== '') {
+            $comments[$key] = $trimmedComment;
+        } else {
+            unset($comments[$key]);
+        }
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $comments),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $this->cancelEditEnvVar();
+        $this->autoPushAfterCacheMutation(__('Variable updated.'));
+    }
+
+    /**
+     * Trash button on a key row hits this first; it opens the shared
+     * confirm-action modal pointing at {@see removeEnvVar()}. The modal's
+     * confirm button dispatches the underlying method via the
+     * ConfirmsActionWithModal trait, which container-resolves the
+     * DotEnvFileParser / DotEnvFileWriter dependencies.
+     */
+    public function confirmRemoveEnvVar(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            method: 'removeEnvVar',
+            arguments: [$key],
+            title: __('Remove :key?', ['key' => $key]),
+            message: __('This deletes :key from the cache and auto-pushes the change to the server. The variable will be gone from the live .env immediately.', ['key' => $key]),
+            confirmLabel: __('Remove'),
+            destructive: true,
+        );
+    }
+
+    public function removeEnvVar(string $key, DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        if (! array_key_exists($key, $parsed['variables'])) {
+            return;
+        }
+        unset($parsed['variables'][$key], $parsed['comments'][$key]);
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($parsed['variables'], $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $this->revealed_env_keys = array_values(array_diff($this->revealed_env_keys, [$key]));
+        $this->autoPushAfterCacheMutation(__('Variable removed.'));
+    }
+
+    /**
+     * Dispatches the push job after a successful cache mutation. On hosts
+     * without a server-side .env (Docker/K8s/Serverless), the push is a
+     * no-op — those runtimes inject env at deploy time. PushSiteEnvJob's
+     * ShouldBeUnique guard means rapid-fire mutations coalesce into a
+     * single push with the latest cache state.
+     *
+     * Errors will surface in the banner; the cache write is always
+     * preserved. There's no manual Push button anymore — Sync from server
+     * re-reads if needed, and any subsequent mutation re-fires this method.
+     */
+    protected function autoPushAfterCacheMutation(string $savedMessage): void
+    {
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastSuccess($savedMessage.' '.__('Saved.'));
+
+            return;
+        }
+
+        $this->seedQueuedConsoleAction('env_push');
+
+        PushSiteEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+        );
+
+        $this->toastSuccess($savedMessage.' '.__('Pushing to server — see banner.'));
+    }
+
+    public function toggleRevealEnvVar(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        if (in_array($key, $this->revealed_env_keys, true)) {
+            $this->revealed_env_keys = array_values(array_diff($this->revealed_env_keys, [$key]));
+
+            return;
+        }
+        $this->revealed_env_keys[] = $key;
     }
 
     public function addRedirectRule(): void
@@ -1457,7 +1846,7 @@ class Show extends Component
     public function moveDeployStepUp(int $id): void
     {
         $this->authorize('update', $this->site);
-        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order')->pluck('id')->all();
+        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order', 'asc')->pluck('id')->all();
         $pos = array_search($id, $ids, true);
         if ($pos === false || $pos === 0) {
             return;
@@ -1472,7 +1861,7 @@ class Show extends Component
     public function moveDeployStepDown(int $id): void
     {
         $this->authorize('update', $this->site);
-        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order')->pluck('id')->all();
+        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order', 'asc')->pluck('id')->all();
         $pos = array_search($id, $ids, true);
         if ($pos === false || $pos >= count($ids) - 1) {
             return;
@@ -1580,12 +1969,12 @@ class Show extends Component
         $this->finalizeRoutingMutation('Domain removed.');
     }
 
-    public function deleteSite(): mixed
+    public function deleteSite(): void
     {
         $this->authorize('delete', $this->site);
         $this->site->delete();
 
-        return $this->redirect(route('servers.show', $this->server), navigate: true);
+        $this->redirect(route('servers.show', $this->server), navigate: true);
     }
 
     public function confirmSuspendSite(): void
@@ -1642,7 +2031,7 @@ class Show extends Component
         $this->syncFormFromSite();
 
         ApplySiteWebserverConfigJob::dispatch($this->site->id);
-        $this->toastSuccess(__('Site suspended. Webserver config queued — track progress in the apply banner.'));
+        $this->toastSuccess(__('Site suspended. Webserver config queued.'));
     }
 
     public function resumeSite(): void
@@ -1658,16 +2047,15 @@ class Show extends Component
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         unset($meta['suspended_message']);
 
-        $this->site->update([
-            'suspended_at' => null,
-            'suspended_reason' => null,
-            'meta' => $meta,
-        ]);
+        $this->site->suspended_at = null;
+        $this->site->suspended_reason = null;
+        $this->site->meta = $meta;
+        $this->site->save();
         $this->site->refresh();
         $this->settings_suspended_message = '';
 
         ApplySiteWebserverConfigJob::dispatch($this->site->id);
-        $this->toastSuccess(__('Site resumed. Webserver config queued — track progress in the apply banner.'));
+        $this->toastSuccess(__('Site resumed. Webserver config queued.'));
     }
 
     public function render(): View
@@ -1681,7 +2069,6 @@ class Show extends Component
             'certificates',
             'deployments' => fn ($q) => $q->limit(25),
             'webhookDeliveryLogs' => fn ($q) => $q->limit(30),
-            'environmentVariables',
             'redirects',
             'deployHooks',
             'deploySteps',
@@ -1708,7 +2095,7 @@ class Show extends Component
 
     private function loadFunctionsSourceControlState(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
-        $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser(auth()->user());
+        $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser(request()->user());
 
         if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
             return;
@@ -1728,7 +2115,7 @@ class Show extends Component
             return;
         }
 
-        $account = auth()->user()->socialAccounts()->find($this->functions_source_control_account_id);
+        $account = request()->user()?->socialAccounts()->findOrFail($this->functions_source_control_account_id);
         $this->availableFunctionsRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];

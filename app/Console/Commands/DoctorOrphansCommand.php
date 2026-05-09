@@ -9,7 +9,6 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDomain;
-use App\Models\SiteEnvironmentVariable;
 use App\Models\SiteProcess;
 use Illuminate\Console\Command;
 
@@ -44,7 +43,6 @@ class DoctorOrphansCommand extends Command
     {
         $report = [
             'site_deployments' => $this->orphanIdsByForeign(SiteDeployment::class, 'site_id', Site::class),
-            'site_environment_variables' => $this->orphanIdsByForeign(SiteEnvironmentVariable::class, 'site_id', Site::class),
             'site_domains' => $this->orphanIdsByForeign(SiteDomain::class, 'site_id', Site::class),
             'site_processes' => $this->orphanIdsByForeign(SiteProcess::class, 'site_id', Site::class),
             'server_database_engines' => $this->orphanIdsByForeign(ServerDatabaseEngine::class, 'server_id', Server::class),
@@ -106,7 +104,6 @@ class DoctorOrphansCommand extends Command
     {
         $count = 0;
         $count += $this->deleteByIds(SiteDeployment::class, $report['site_deployments']);
-        $count += $this->deleteByIds(SiteEnvironmentVariable::class, $report['site_environment_variables']);
         $count += $this->deleteByIds(SiteDomain::class, $report['site_domains']);
         $count += $this->deleteByIds(SiteProcess::class, $report['site_processes']);
         $count += $this->deleteByIds(ServerDatabaseEngine::class, $report['server_database_engines']);

@@ -13,7 +13,7 @@ class SiteDotEnvComposerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_merges_project_variables_before_site_environment_variables(): void
+    public function test_it_merges_project_variables_with_site_env_file_content(): void
     {
         $workspace = Workspace::factory()->create();
         $workspace->variables()->create([
@@ -33,19 +33,15 @@ class SiteDotEnvComposerTest extends TestCase
             'workspace_id' => $workspace->id,
         ]);
 
+        // The site's env_file_content is now the only site-scoped store; it
+        // overrides workspace values for matching keys.
         $site = Site::factory()->create([
             'server_id' => $server->id,
             'organization_id' => $workspace->organization_id,
             'user_id' => $workspace->user_id,
             'workspace_id' => $workspace->id,
             'deployment_environment' => 'production',
-            'env_file_content' => "APP_NAME=dply\nSHARED_KEY=raw-draft",
-        ]);
-
-        $site->environmentVariables()->create([
-            'env_key' => 'SHARED_KEY',
-            'env_value' => 'site-override',
-            'environment' => 'production',
+            'env_file_content' => "APP_NAME=dply\nSHARED_KEY=site-override",
         ]);
 
         $content = app(SiteDotEnvComposer::class)->compose($site->fresh());
@@ -54,6 +50,5 @@ class SiteDotEnvComposerTest extends TestCase
         $this->assertStringContainsString('PROJECT_ONLY=available', $content);
         $this->assertStringContainsString('SHARED_KEY=site-override', $content);
         $this->assertStringNotContainsString('SHARED_KEY=project-value', $content);
-        $this->assertStringNotContainsString('SHARED_KEY=raw-draft', $content);
     }
 }

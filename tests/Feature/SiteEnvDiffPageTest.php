@@ -7,8 +7,8 @@ namespace Tests\Feature;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
 use App\Models\User;
+use App\Services\Sites\SiteEnvReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,11 +16,10 @@ class SiteEnvDiffPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_renders_in_sync_when_environments_match(): void
+    public function test_renders_in_sync_when_cache_matches_server(): void
     {
-        [$user, $server, $site] = $this->makeUserSite();
-        $this->seedVar($site, 'A', 'one', 'production');
-        $this->seedVar($site, 'A', 'one', 'staging');
+        [$user, $server, $site] = $this->makeUserSite(['env_file_content' => 'A=one']);
+        $this->bindFakeReader("A=one\n");
 
         $response = $this->actingAs($user)->get(route('sites.env-diff', [
             'server' => $server,
@@ -33,11 +32,10 @@ class SiteEnvDiffPageTest extends TestCase
 
     public function test_categorizes_keys_into_three_buckets(): void
     {
-        [$user, $server, $site] = $this->makeUserSite();
-        $this->seedVar($site, 'PROD_ONLY', 'p', 'production');
-        $this->seedVar($site, 'SHARED', 'prod-value', 'production');
-        $this->seedVar($site, 'STAGING_ONLY', 's', 'staging');
-        $this->seedVar($site, 'SHARED', 'staging-value', 'staging');
+        [$user, $server, $site] = $this->makeUserSite([
+            'env_file_content' => "CACHE_ONLY=c\nSHARED=cache-value",
+        ]);
+        $this->bindFakeReader("SERVER_ONLY=s\nSHARED=server-value\n");
 
         $response = $this->actingAs($user)->get(route('sites.env-diff', [
             'server' => $server,
@@ -45,17 +43,18 @@ class SiteEnvDiffPageTest extends TestCase
         ]));
 
         $response->assertOk()
-            ->assertSee('PROD_ONLY')
-            ->assertSee('STAGING_ONLY')
+            ->assertSee('CACHE_ONLY')
+            ->assertSee('SERVER_ONLY')
             ->assertSee('SHARED')
             ->assertSee('Differs in value');
     }
 
     public function test_masks_values_by_default(): void
     {
-        [$user, $server, $site] = $this->makeUserSite();
-        $this->seedVar($site, 'API_KEY', 'super-prod-secret', 'production');
-        $this->seedVar($site, 'API_KEY', 'super-stage-secret', 'staging');
+        [$user, $server, $site] = $this->makeUserSite([
+            'env_file_content' => 'API_KEY=super-cache-secret',
+        ]);
+        $this->bindFakeReader("API_KEY=super-server-secret\n");
 
         $response = $this->actingAs($user)->get(route('sites.env-diff', [
             'server' => $server,
@@ -63,43 +62,44 @@ class SiteEnvDiffPageTest extends TestCase
         ]));
 
         $response->assertOk()
-            ->assertDontSee('super-prod-secret')
-            ->assertDontSee('super-stage-secret')
+            ->assertDontSee('super-cache-secret')
+            ->assertDontSee('super-server-secret')
             ->assertSee('•');
     }
 
-    public function test_url_params_select_environments(): void
+    public function test_unsupported_runtime_renders_short_circuit(): void
     {
-        [$user, $server, $site] = $this->makeUserSite();
-        $this->seedVar($site, 'DEV_ONLY', 'd', 'development');
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        session(['current_organization_id' => $org->id]);
+
+        // App-Platform host has no server-side .env to diff against.
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_APP_PLATFORM],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+        ]);
 
         $response = $this->actingAs($user)->get(route('sites.env-diff', [
             'server' => $server,
             'site' => $site,
-        ]).'?from=production&to=development');
+        ]));
 
         $response->assertOk()
-            ->assertSee('DEV_ONLY')
-            ->assertSee('development');
-    }
-
-    public function test_same_from_and_to_emits_warning(): void
-    {
-        [$user, $server, $site] = $this->makeUserSite();
-
-        $response = $this->actingAs($user)->get(route('sites.env-diff', [
-            'server' => $server,
-            'site' => $site,
-        ]).'?from=production&to=production');
-
-        $response->assertOk()
-            ->assertSee('From and To are the same');
+            ->assertSee('does not have a server-side .env file', false);
     }
 
     /**
+     * @param  array<string, mixed>  $siteAttrs
      * @return array{0: User, 1: Server, 2: Site}
      */
-    private function makeUserSite(): array
+    private function makeUserSite(array $siteAttrs = []): array
     {
         $user = User::factory()->create();
         $org = Organization::factory()->create();
@@ -109,23 +109,30 @@ class SiteEnvDiffPageTest extends TestCase
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
+            'ssh_private_key' => 'fake-key',
         ]);
-        $site = Site::factory()->create([
+        $site = Site::factory()->create(array_merge([
             'server_id' => $server->id,
             'user_id' => $user->id,
             'organization_id' => $org->id,
-        ]);
+        ], $siteAttrs));
 
         return [$user, $server, $site];
     }
 
-    private function seedVar(Site $site, string $key, string $value, string $environment): void
+    private function bindFakeReader(string $serverEnv): void
     {
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => $key,
-            'env_value' => $value,
-            'environment' => $environment,
-        ]);
+        $this->app->bind(SiteEnvReader::class, fn () => new class($serverEnv) extends SiteEnvReader
+        {
+            public function __construct(private readonly string $payload)
+            {
+                // Bypass parent constructor; the wrapper is unused for the fake.
+            }
+
+            public function read(Site $site): string
+            {
+                return $this->payload;
+            }
+        });
     }
 }

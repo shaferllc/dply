@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
+use App\Services\Sites\DotEnvFileParser;
 use Illuminate\Console\Command;
 
 /**
@@ -114,16 +115,17 @@ class ExportSiteConfigCommand extends Command
             ])
             ->all();
 
-        $envVars = $site->environmentVariables()
-            ->orderBy('environment')
-            ->orderBy('env_key')
-            ->get(['env_key', 'env_value', 'environment'])
-            ->map(fn ($v) => [
-                'environment' => $v->environment,
-                'key' => $v->env_key,
-                'value' => $withSecrets ? (string) $v->env_value : '***',
-            ])
-            ->all();
+        $parser = app(DotEnvFileParser::class);
+        $variables = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+        ksort($variables);
+        $envVars = [];
+        foreach ($variables as $key => $value) {
+            $envVars[] = [
+                'environment' => (string) ($site->deployment_environment ?: 'production'),
+                'key' => $key,
+                'value' => $withSecrets ? (string) $value : '***',
+            ];
+        }
 
         return [
             'format_version' => self::FORMAT_VERSION,

@@ -1,0 +1,191 @@
+<?php
+
+namespace App\Models;
+
+use App\Jobs\Concerns\WritesConsoleAction;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+
+/**
+ * One row per backgrounded action whose progress we want to surface in the
+ * page-top console banner. Polymorphic so anything (Site, Server, Deploy, …)
+ * can have console-able runs without per-model schema gymnastics.
+ *
+ * Lifecycle (driven by {@see WritesConsoleAction}):
+ *   queued  → seedQueuedRun()   — row exists before the worker picks it up
+ *   running → beginConsoleRun() — worker started, started_at stamped
+ *   completed | failed          — terminal; finished_at + (optional) error set
+ *
+ * Output is a versioned JSON wrapper:
+ *   { v: 1, lines: [{ t: epochMs, level: "info|step|warn|error|success", source: "nginx", line: "..." }, ...] }
+ *
+ * Append trims to config('console_actions.max_lines') so a chatty run can't
+ * grow the row unboundedly.
+ */
+class ConsoleAction extends Model
+{
+    use HasFactory, HasUlids;
+
+    public const STATUS_QUEUED = 'queued';
+
+    public const STATUS_RUNNING = 'running';
+
+    public const STATUS_COMPLETED = 'completed';
+
+    public const STATUS_FAILED = 'failed';
+
+    public const LEVEL_INFO = 'info';
+
+    public const LEVEL_STEP = 'step';
+
+    public const LEVEL_WARN = 'warn';
+
+    public const LEVEL_ERROR = 'error';
+
+    public const LEVEL_SUCCESS = 'success';
+
+    /** @var list<string> */
+    public const LEVELS = [
+        self::LEVEL_INFO,
+        self::LEVEL_STEP,
+        self::LEVEL_WARN,
+        self::LEVEL_ERROR,
+        self::LEVEL_SUCCESS,
+    ];
+
+    protected $table = 'console_actions';
+
+    protected $fillable = [
+        'subject_type',
+        'subject_id',
+        'kind',
+        'status',
+        'started_at',
+        'finished_at',
+        'dismissed_at',
+        'error',
+        'label',
+        'output',
+        'user_id',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'started_at' => 'datetime',
+            'finished_at' => 'datetime',
+            'dismissed_at' => 'datetime',
+            'output' => 'array',
+        ];
+    }
+
+    public function subject(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Latest non-dismissed row for a subject. Pages call this to drive the banner.
+     */
+    public function scopeForSubject(Builder $query, Model $subject): Builder
+    {
+        return $query
+            ->where('subject_type', $subject->getMorphClass())
+            ->where('subject_id', $subject->getKey());
+    }
+
+    public function scopeNotDismissed(Builder $query): Builder
+    {
+        return $query->whereNull('dismissed_at');
+    }
+
+    public function scopeOfKind(Builder $query, string $kind): Builder
+    {
+        return $query->where('kind', $kind);
+    }
+
+    public function scopeInFlight(Builder $query): Builder
+    {
+        return $query->whereIn('status', [self::STATUS_QUEUED, self::STATUS_RUNNING]);
+    }
+
+    public function isInFlight(): bool
+    {
+        return in_array($this->status, [self::STATUS_QUEUED, self::STATUS_RUNNING], true);
+    }
+
+    public function isDismissed(): bool
+    {
+        return $this->dismissed_at !== null;
+    }
+
+    public function isStale(): bool
+    {
+        $threshold = (int) config('console_actions.stale_after_seconds', 600);
+
+        // A row stuck in `running` past the threshold is stale (worker died
+        // mid-job). A row stuck in `queued` past the threshold is also stale —
+        // it means the dispatch happened but the worker never picked the job
+        // up (queue paused, redis flushed, etc.), so the banner would otherwise
+        // hang forever with "no output yet" copy.
+        if ($this->status === self::STATUS_RUNNING && $this->started_at !== null) {
+            return $this->started_at->lt(now()->subSeconds($threshold));
+        }
+
+        if ($this->status === self::STATUS_QUEUED) {
+            return $this->created_at !== null
+                && $this->created_at->lt(now()->subSeconds($threshold));
+        }
+
+        return false;
+    }
+
+    /**
+     * Materialised view of the JSON column as a list of entries. Defensive against
+     * a row written by an older writer (no wrapper) or a manual SQL insert.
+     *
+     * @return list<array{t: int, level: string, source: ?string, line: string}>
+     */
+    public function lines(): array
+    {
+        $output = $this->output;
+        if (! is_array($output)) {
+            return [];
+        }
+
+        // v1: { v: 1, lines: [...] }; tolerate "raw list" shape too in case
+        // something writes [{...}, ...] directly.
+        $lines = $output['lines'] ?? (array_is_list($output) ? $output : []);
+        if (! is_array($lines)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($lines as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $line = (string) ($entry['line'] ?? '');
+            if ($line === '') {
+                continue;
+            }
+            $normalized[] = [
+                't' => (int) ($entry['t'] ?? 0),
+                'level' => is_string($entry['level'] ?? null) ? (string) $entry['level'] : self::LEVEL_INFO,
+                'source' => isset($entry['source']) && $entry['source'] !== '' ? (string) $entry['source'] : null,
+                'line' => $line,
+            ];
+        }
+
+        return $normalized;
+    }
+}

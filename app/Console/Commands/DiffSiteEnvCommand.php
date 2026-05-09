@@ -5,40 +5,39 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\SiteEnvReader;
 use Illuminate\Console\Command;
 
 /**
- * Compare environment variables across two scopes for a site.
+ * Compare a site's encrypted env cache to the live `.env` on the server.
  *
- *   dply:site:env-diff <site> [--from=production] [--to=staging]
- *                             [--reveal] [--json]
+ *   dply:site:env-diff <site> [--reveal] [--json]
  *
  * Reports three buckets:
- *   - only_in_from: keys configured in --from but missing in --to
- *   - only_in_to:   keys configured in --to but missing in --from
- *   - differs:      keys present in both but with different values
+ *   - only_in_cache:  keys we have locally but the server file doesn't
+ *   - only_in_server: keys present on disk but missing from our cache (drift)
+ *   - differs:        keys present in both with different values
  *
- * Values are MASKED by default (same masking rule as env-list).
- * --reveal prints cleartext for both sides — useful for "why is
- * staging configured differently?" investigation but obviously
- * leaks secrets to scrollback.
+ * Values are MASKED by default. --reveal prints cleartext.
  *
- * Designed for "production vs staging drift" workflows. Exits with
- * code 0 always — drift is a state to surface, not an error.
+ * For runtimes without a server file (Docker / K8s / Serverless), the
+ * cache IS the truth — the command exits 0 with `unsupported: true` in
+ * the JSON payload so scripts can short-circuit.
+ *
+ * Designed for "did someone edit the .env on disk out-of-band?" sweeps.
+ * Exits with code 0 always — drift is a state to surface, not an error.
  */
 class DiffSiteEnvCommand extends Command
 {
     protected $signature = 'dply:site:env-diff
         {site : Site ID, slug, or name}
-        {--from=production : Environment on the left side of the diff}
-        {--to=staging : Environment on the right side of the diff}
         {--reveal : Show full values instead of masked previews}
         {--json : Output as JSON}';
 
-    protected $description = 'Compare environment variables across two scopes for a site.';
+    protected $description = 'Compare a site\'s env cache to the live .env on the server.';
 
-    public function handle(): int
+    public function handle(DotEnvFileParser $parser, SiteEnvReader $reader): int
     {
         $needle = (string) $this->argument('site');
         $site = $this->resolveSite($needle);
@@ -48,45 +47,71 @@ class DiffSiteEnvCommand extends Command
             return self::FAILURE;
         }
 
-        $from = (string) ($this->option('from') ?? 'production');
-        $to = (string) ($this->option('to') ?? 'staging');
-        if ($from === $to) {
-            $this->error('--from and --to must differ.');
-
-            return self::FAILURE;
-        }
         $reveal = (bool) $this->option('reveal');
+        $unsupported = ! $site->server?->hostCapabilities()->supportsEnvPushToHost();
 
-        $fromVars = $this->loadVars($site, $from);
-        $toVars = $this->loadVars($site, $to);
+        if ($unsupported) {
+            $payload = [
+                'site_id' => $site->id,
+                'site_name' => $site->name,
+                'unsupported' => true,
+                'message' => 'This site\'s runtime does not have a server .env file.',
+            ];
+            if ($this->option('json')) {
+                $this->line(json_encode($payload, JSON_PRETTY_PRINT));
+            } else {
+                $this->info($payload['message']);
+            }
 
-        $onlyInFrom = array_keys(array_diff_key($fromVars, $toVars));
-        $onlyInTo = array_keys(array_diff_key($toVars, $fromVars));
-        $shared = array_intersect_key($fromVars, $toVars);
+            return self::SUCCESS;
+        }
+
+        $cacheVars = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+
+        try {
+            $serverRaw = $reader->read($site);
+        } catch (\Throwable $e) {
+            $payload = [
+                'site_id' => $site->id,
+                'site_name' => $site->name,
+                'error' => $e->getMessage(),
+            ];
+            if ($this->option('json')) {
+                $this->line(json_encode($payload, JSON_PRETTY_PRINT));
+            } else {
+                $this->error('Could not read .env from server: '.$e->getMessage());
+            }
+
+            return self::SUCCESS;
+        }
+
+        $serverVars = $parser->parse($serverRaw)['variables'];
+
+        $onlyInCache = array_keys(array_diff_key($cacheVars, $serverVars));
+        $onlyInServer = array_keys(array_diff_key($serverVars, $cacheVars));
+        $shared = array_intersect_key($cacheVars, $serverVars);
         $differs = [];
-        foreach ($shared as $key => $fromVal) {
-            $toVal = $toVars[$key];
-            if ($fromVal !== $toVal) {
+        foreach ($shared as $key => $cacheVal) {
+            $serverVal = $serverVars[$key];
+            if ($cacheVal !== $serverVal) {
                 $differs[$key] = [
-                    'from' => $reveal ? $fromVal : $this->mask($fromVal),
-                    'to' => $reveal ? $toVal : $this->mask($toVal),
+                    'cache' => $reveal ? $cacheVal : $this->mask($cacheVal),
+                    'server' => $reveal ? $serverVal : $this->mask($serverVal),
                 ];
             }
         }
-        sort($onlyInFrom);
-        sort($onlyInTo);
+        sort($onlyInCache);
+        sort($onlyInServer);
         ksort($differs);
 
         $payload = [
             'site_id' => $site->id,
             'site_name' => $site->name,
-            'from' => $from,
-            'to' => $to,
             'revealed' => $reveal,
-            'only_in_from' => $onlyInFrom,
-            'only_in_to' => $onlyInTo,
+            'only_in_cache' => $onlyInCache,
+            'only_in_server' => $onlyInServer,
             'differs' => $differs,
-            'in_sync' => $onlyInFrom === [] && $onlyInTo === [] && $differs === [],
+            'in_sync' => $onlyInCache === [] && $onlyInServer === [] && $differs === [],
         ];
 
         if ($this->option('json')) {
@@ -101,55 +126,35 @@ class DiffSiteEnvCommand extends Command
     }
 
     /**
-     * @return array<string, string>
-     */
-    private function loadVars(Site $site, string $environment): array
-    {
-        $rows = SiteEnvironmentVariable::query()
-            ->where('site_id', $site->id)
-            ->where('environment', $environment)
-            ->get(['env_key', 'env_value']);
-
-        $out = [];
-        foreach ($rows as $r) {
-            $out[$r->env_key] = (string) $r->env_value;
-        }
-
-        return $out;
-    }
-
-    /**
      * @param  array<string, mixed>  $p
      */
     private function renderHuman(Site $site, array $p): void
     {
         $this->newLine();
         $this->line(sprintf(
-            '<fg=cyan>env-diff</> for <fg=white;options=bold>%s</> — <fg=yellow>%s</> ↔ <fg=yellow>%s</>',
+            '<fg=cyan>env-diff</> for <fg=white;options=bold>%s</> — <fg=yellow>cache</> ↔ <fg=yellow>server</>',
             $site->name,
-            $p['from'],
-            $p['to'],
         ));
 
         if ($p['in_sync']) {
             $this->newLine();
-            $this->info('Environments are in sync.');
+            $this->info('Cache and server are in sync.');
 
             return;
         }
 
-        if ($p['only_in_from'] !== []) {
+        if ($p['only_in_cache'] !== []) {
             $this->newLine();
-            $this->line(sprintf('<fg=red>Only in %s:</>', $p['from']));
-            foreach ($p['only_in_from'] as $k) {
+            $this->line('<fg=red>Only in cache (not yet pushed):</>');
+            foreach ($p['only_in_cache'] as $k) {
                 $this->line('  -  '.$k);
             }
         }
 
-        if ($p['only_in_to'] !== []) {
+        if ($p['only_in_server'] !== []) {
             $this->newLine();
-            $this->line(sprintf('<fg=green>Only in %s:</>', $p['to']));
-            foreach ($p['only_in_to'] as $k) {
+            $this->line('<fg=green>Only on server (drift):</>');
+            foreach ($p['only_in_server'] as $k) {
                 $this->line('  +  '.$k);
             }
         }
@@ -159,7 +164,8 @@ class DiffSiteEnvCommand extends Command
             $this->line('<fg=yellow>Differs:</>');
             foreach ($p['differs'] as $k => $pair) {
                 $this->line(sprintf('  %s', $k));
-                $this->line(sprintf('    %s → %s', $pair['from'], $pair['to']));
+                $this->line(sprintf('    cache: %s', $pair['cache']));
+                $this->line(sprintf('    server: %s', $pair['server']));
             }
         }
     }

@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\SiteEnvReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -15,34 +15,10 @@ class DiffSiteEnvCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_reports_in_sync_when_envs_match(): void
+    public function test_categorizes_keys_with_a_mocked_server_read(): void
     {
-        $site = $this->makeSite();
-        $this->seedVar($site, 'A', 'one', 'production');
-        $this->seedVar($site, 'A', 'one', 'staging');
-
-        Artisan::call('dply:site:env-diff', [
-            'site' => $site->slug,
-            '--json' => true,
-        ]);
-        $decoded = json_decode(Artisan::output(), true);
-
-        $this->assertTrue($decoded['in_sync']);
-        $this->assertSame([], $decoded['only_in_from']);
-        $this->assertSame([], $decoded['only_in_to']);
-        $this->assertSame([], $decoded['differs']);
-    }
-
-    public function test_categorizes_only_in_from_only_in_to_and_differs(): void
-    {
-        $site = $this->makeSite();
-        $this->seedVar($site, 'PROD_ONLY', 'p', 'production');
-        $this->seedVar($site, 'SHARED', 'prod-value', 'production');
-        $this->seedVar($site, 'IDENTICAL', 'same', 'production');
-
-        $this->seedVar($site, 'STAGING_ONLY', 's', 'staging');
-        $this->seedVar($site, 'SHARED', 'staging-value', 'staging');
-        $this->seedVar($site, 'IDENTICAL', 'same', 'staging');
+        $site = $this->makeSiteWithEnvSupport(env: "CACHE_ONLY=c\nSHARED=cache-value\nIDENTICAL=same");
+        $this->bindFakeReader("SERVER_ONLY=s\nSHARED=server-value\nIDENTICAL=same\n");
 
         Artisan::call('dply:site:env-diff', [
             'site' => $site->slug,
@@ -52,18 +28,31 @@ class DiffSiteEnvCommandTest extends TestCase
         $decoded = json_decode(Artisan::output(), true);
 
         $this->assertFalse($decoded['in_sync']);
-        $this->assertSame(['PROD_ONLY'], $decoded['only_in_from']);
-        $this->assertSame(['STAGING_ONLY'], $decoded['only_in_to']);
+        $this->assertSame(['CACHE_ONLY'], $decoded['only_in_cache']);
+        $this->assertSame(['SERVER_ONLY'], $decoded['only_in_server']);
         $this->assertSame(['SHARED'], array_keys($decoded['differs']));
-        $this->assertSame('prod-value', $decoded['differs']['SHARED']['from']);
-        $this->assertSame('staging-value', $decoded['differs']['SHARED']['to']);
+        $this->assertSame('cache-value', $decoded['differs']['SHARED']['cache']);
+        $this->assertSame('server-value', $decoded['differs']['SHARED']['server']);
+    }
+
+    public function test_reports_in_sync_when_cache_matches_server(): void
+    {
+        $site = $this->makeSiteWithEnvSupport(env: 'A=one');
+        $this->bindFakeReader("A=one\n");
+
+        Artisan::call('dply:site:env-diff', [
+            'site' => $site->slug,
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertTrue($decoded['in_sync']);
     }
 
     public function test_masks_values_in_differs_by_default(): void
     {
-        $site = $this->makeSite();
-        $this->seedVar($site, 'API_KEY', 'super-prod-secret', 'production');
-        $this->seedVar($site, 'API_KEY', 'super-stage-secret', 'staging');
+        $site = $this->makeSiteWithEnvSupport(env: 'API_KEY=super-cache-secret');
+        $this->bindFakeReader("API_KEY=super-server-secret\n");
 
         Artisan::call('dply:site:env-diff', [
             'site' => $site->slug,
@@ -71,55 +60,22 @@ class DiffSiteEnvCommandTest extends TestCase
         ]);
         $decoded = json_decode(Artisan::output(), true);
 
-        $this->assertStringNotContainsString('super-prod-secret', json_encode($decoded));
-        $this->assertStringNotContainsString('super-stage-secret', json_encode($decoded));
-        $this->assertStringContainsString('•', $decoded['differs']['API_KEY']['from']);
+        $this->assertStringNotContainsString('super-cache-secret', json_encode($decoded));
+        $this->assertStringNotContainsString('super-server-secret', json_encode($decoded));
+        $this->assertStringContainsString('•', $decoded['differs']['API_KEY']['cache']);
     }
 
-    public function test_custom_from_and_to_options(): void
+    public function test_unsupported_runtime_short_circuits(): void
     {
-        $site = $this->makeSite();
-        $this->seedVar($site, 'A', 'p', 'production');
-        $this->seedVar($site, 'B', 's', 'staging');
-        $this->seedVar($site, 'C', 'd', 'development');
+        $site = $this->makeSiteWithoutEnvSupport();
 
         Artisan::call('dply:site:env-diff', [
             'site' => $site->slug,
-            '--from' => 'staging',
-            '--to' => 'development',
             '--json' => true,
         ]);
         $decoded = json_decode(Artisan::output(), true);
 
-        $this->assertSame('staging', $decoded['from']);
-        $this->assertSame('development', $decoded['to']);
-        $this->assertSame(['B'], $decoded['only_in_from']);
-        $this->assertSame(['C'], $decoded['only_in_to']);
-    }
-
-    public function test_rejects_same_from_and_to(): void
-    {
-        $site = $this->makeSite();
-
-        $exit = Artisan::call('dply:site:env-diff', [
-            'site' => $site->slug,
-            '--from' => 'production',
-            '--to' => 'production',
-        ]);
-        $output = Artisan::output();
-
-        $this->assertSame(1, $exit);
-        $this->assertStringContainsString('must differ', $output);
-    }
-
-    public function test_human_renders_in_sync_when_no_drift(): void
-    {
-        $site = $this->makeSite();
-
-        Artisan::call('dply:site:env-diff', ['site' => $site->slug]);
-        $output = Artisan::output();
-
-        $this->assertStringContainsString('in sync', $output);
+        $this->assertTrue($decoded['unsupported']);
     }
 
     public function test_command_fails_when_site_not_found(): void
@@ -131,9 +87,28 @@ class DiffSiteEnvCommandTest extends TestCase
         $this->assertStringContainsString('Site not found', $output);
     }
 
-    private function makeSite(): Site
+    private function makeSiteWithEnvSupport(string $env = ''): Site
     {
-        $server = Server::factory()->create();
+        // Default ServerFactory makes a VM-kind server, which is the only host
+        // family that supportsEnvPushToHost(). isReady() and an SSH key are
+        // required to even attempt a read; tests bind a fake reader so the
+        // bytes never matter, but the early-return guards still need to pass.
+        $server = Server::factory()->create([
+            'ssh_private_key' => 'fake-key',
+        ]);
+
+        return Site::factory()->create([
+            'server_id' => $server->id,
+            'slug' => 'jobs',
+            'env_file_content' => $env,
+        ]);
+    }
+
+    private function makeSiteWithoutEnvSupport(): Site
+    {
+        $server = Server::factory()->create([
+            'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_APP_PLATFORM],
+        ]);
 
         return Site::factory()->create([
             'server_id' => $server->id,
@@ -141,13 +116,19 @@ class DiffSiteEnvCommandTest extends TestCase
         ]);
     }
 
-    private function seedVar(Site $site, string $key, string $value, string $environment): void
+    private function bindFakeReader(string $serverEnv): void
     {
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => $key,
-            'env_value' => $value,
-            'environment' => $environment,
-        ]);
+        $this->app->bind(SiteEnvReader::class, fn () => new class($serverEnv) extends SiteEnvReader
+        {
+            public function __construct(private readonly string $payload)
+            {
+                // Bypass parent constructor — we don't need the wrapper for the fake.
+            }
+
+            public function read(Site $site): string
+            {
+                return $this->payload;
+            }
+        });
     }
 }

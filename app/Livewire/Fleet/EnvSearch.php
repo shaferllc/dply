@@ -6,22 +6,26 @@ namespace App\Livewire\Fleet;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Browser view of dply:fleet:env-find. Search every site's env
- * variables by exact key OR by prefix. Useful for "where did I
- * leave DATABASE_URL" investigations and "show me every AWS_*"
- * audit sweeps.
+ * Browser view of dply:fleet:env-find. Searches every site's env cache by
+ * exact key OR by prefix. Useful for "where did I leave DATABASE_URL"
+ * investigations and "show me every AWS_*" audit sweeps.
  *
- * Values are masked by default; --reveal-equivalent toggle is
- * gated to require an explicit click since this is shared infra.
+ * Since env values now live in the encrypted `sites.env_file_content` blob
+ * (one per site), search runs in PHP after decrypting each blob — there is
+ * no LIKE we can push to the DB. Acceptable for org-scale; if perf
+ * regresses on very large fleets, follow up with a `site_env_keys` index
+ * table.
  *
- * Org-scoped — only shows sites in the user's current
- * organization.
+ * Values are masked by default; reveal toggle is gated to require an
+ * explicit click since this is shared infra.
+ *
+ * Org-scoped — only shows sites in the user's current organization.
  */
 class EnvSearch extends Component
 {
@@ -38,7 +42,7 @@ class EnvSearch extends Component
         $this->reveal = ! $this->reveal;
     }
 
-    public function render(): View
+    public function render(DotEnvFileParser $parser): View
     {
         $org = auth()->user()?->currentOrganization();
         abort_if($org === null, 403);
@@ -46,37 +50,31 @@ class EnvSearch extends Component
         $serverIds = Server::query()
             ->where('organization_id', $org->id)
             ->pluck('id');
-        $siteIdToName = Site::query()
+        $sites = Site::query()
             ->whereIn('server_id', $serverIds)
-            ->get(['id', 'name', 'slug', 'server_id'])
-            ->keyBy('id');
+            ->whereNotNull('env_file_content')
+            ->get(['id', 'name', 'slug', 'server_id', 'deployment_environment', 'env_file_content']);
 
         $rows = [];
         if ($this->query !== '') {
             $needle = trim($this->query);
-            $envQuery = SiteEnvironmentVariable::query()
-                ->whereIn('site_id', $siteIdToName->keys())
-                ->select(['id', 'site_id', 'env_key', 'env_value', 'environment']);
 
-            if ($this->mode === 'prefix') {
-                $envQuery->where('env_key', 'like', $this->escapeLike($needle).'%');
-            } else {
-                $envQuery->where('env_key', $needle);
-            }
-            $matches = $envQuery->get();
-
-            foreach ($matches as $match) {
-                $site = $siteIdToName->get($match->site_id);
-                if ($site === null) {
-                    continue;
+            foreach ($sites as $site) {
+                $vars = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+                foreach ($vars as $key => $value) {
+                    $matches = $this->mode === 'prefix'
+                        ? str_starts_with($key, $needle)
+                        : $key === $needle;
+                    if (! $matches) {
+                        continue;
+                    }
+                    $rows[] = [
+                        'site' => $site,
+                        'environment' => (string) ($site->deployment_environment ?: 'production'),
+                        'key' => $key,
+                        'value' => $this->reveal ? $value : $this->mask($value),
+                    ];
                 }
-                $value = (string) $match->env_value;
-                $rows[] = [
-                    'site' => $site,
-                    'environment' => $match->environment,
-                    'key' => $match->env_key,
-                    'value' => $this->reveal ? $value : $this->mask($value),
-                ];
             }
             usort($rows, function ($a, $b) {
                 return [$a['site']->name, $a['environment'], $a['key']]
@@ -88,11 +86,6 @@ class EnvSearch extends Component
             'rows' => $rows,
             'hasQuery' => $this->query !== '',
         ])->layout('layouts.app');
-    }
-
-    private function escapeLike(string $s): string
-    {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $s);
     }
 
     private function mask(string $value): string

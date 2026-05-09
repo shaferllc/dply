@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
 use Illuminate\Console\Command;
 
 /**
- * List the environment variables a site has configured.
+ * List the environment variables in a site's encrypted env cache.
  *
- *   dply:site:env-list <site> [--environment=production] [--reveal] [--json]
+ *   dply:site:env-list <site> [--reveal] [--json]
  *
- * Values are MASKED by default. Pass --reveal to print the cleartext
- * — useful for piping into a .env file for local runs, but never the
+ * Values are MASKED by default. Pass --reveal to print cleartext —
+ * useful for piping into a .env file for local runs, but never the
  * default to avoid leaking secrets into terminal scrollback / shared
- * screens. JSON mode always honors --reveal too.
+ * screens. JSON mode honors --reveal too.
  *
  * Output is sorted by env_key for deterministic diffing.
  */
@@ -24,13 +24,12 @@ class ListSiteEnvCommand extends Command
 {
     protected $signature = 'dply:site:env-list
         {site : Site ID, slug, or name}
-        {--environment=production : Environment scope}
         {--reveal : Show full values instead of masked previews}
         {--json : Output as JSON}';
 
-    protected $description = 'List environment variables configured for a site (values masked unless --reveal).';
+    protected $description = 'List environment variables in a site\'s env cache (values masked unless --reveal).';
 
-    public function handle(): int
+    public function handle(DotEnvFileParser $parser): int
     {
         $needle = (string) $this->argument('site');
         $site = $this->resolveSite($needle);
@@ -40,25 +39,22 @@ class ListSiteEnvCommand extends Command
             return self::FAILURE;
         }
 
-        $environment = (string) ($this->option('environment') ?? 'production');
         $reveal = (bool) $this->option('reveal');
+        $vars = $parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+        ksort($vars);
 
-        $rows = SiteEnvironmentVariable::query()
-            ->where('site_id', $site->id)
-            ->where('environment', $environment)
-            ->orderBy('env_key')
-            ->get(['env_key', 'env_value']);
-
-        $entries = $rows->map(fn (SiteEnvironmentVariable $v) => [
-            'key' => $v->env_key,
-            'value' => $reveal ? (string) $v->env_value : $this->mask((string) $v->env_value),
-        ])->all();
+        $entries = [];
+        foreach ($vars as $key => $value) {
+            $entries[] = [
+                'key' => $key,
+                'value' => $reveal ? (string) $value : $this->mask((string) $value),
+            ];
+        }
 
         if ($this->option('json')) {
             $this->line(json_encode([
                 'site_id' => $site->id,
                 'site_name' => $site->name,
-                'environment' => $environment,
                 'revealed' => $reveal,
                 'count' => count($entries),
                 'variables' => $entries,
@@ -68,7 +64,7 @@ class ListSiteEnvCommand extends Command
         }
 
         if ($entries === []) {
-            $this->info("No environment variables set for {$site->name} ({$environment}).");
+            $this->info("No environment variables set for {$site->name}.");
 
             return self::SUCCESS;
         }

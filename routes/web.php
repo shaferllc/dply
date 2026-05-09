@@ -69,6 +69,7 @@ use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSshKeys;
+use App\Livewire\Servers\WorkspaceSystemUsers;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
 use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
@@ -291,6 +292,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
+    Route::livewire('servers/{server}/system-users', WorkspaceSystemUsers::class)->name('servers.system-users');
     // /run replaces both /recipes and /deploy. The merged page hosts
     // the saved-command list (CRUD + inline run), an ad-hoc command
     // runner, and the marketplace import path. Old URLs 404 by

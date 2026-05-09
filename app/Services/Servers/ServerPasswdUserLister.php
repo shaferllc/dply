@@ -5,7 +5,12 @@ namespace App\Services\Servers;
 use App\Models\Server;
 
 /**
- * Lists usernames from /etc/passwd on the remote host (for UI comboboxes).
+ * Lists "regular" usernames from /etc/passwd on the remote host (UID >= 1000,
+ * excluding the `nobody` overflow account). Filters out distro-shipped system
+ * accounts like _apt, bin, daemon, mail, sshd, systemd-* etc. that no UI
+ * combobox in this app has a legitimate use for — assigning them as a site's
+ * file owner, an SSH-key target, or a cron user is never what the operator
+ * means. The deploy user (typically `dply`, UID 1000) is included.
  */
 class ServerPasswdUserLister
 {
@@ -23,7 +28,7 @@ class ServerPasswdUserLister
         $out = app(ServerSshConnectionRunner::class)->run(
             $server,
             fn ($ssh): string => $ssh->exec(
-                'cut -d: -f1 /etc/passwd 2>/dev/null | sort -u | head -n '.(string) $maxLines,
+                'awk -F: \'$3 >= 1000 && $1 != "nobody" { print $1 }\' /etc/passwd 2>/dev/null | sort -u | head -n '.(string) $maxLines,
                 $timeoutSeconds
             )
         );

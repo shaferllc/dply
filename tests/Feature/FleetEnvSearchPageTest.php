@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -31,11 +30,18 @@ class FleetEnvSearchPageTest extends TestCase
     {
         [$user, $org] = $this->makeUserOrg();
         $server = Server::factory()->create(['organization_id' => $org->id]);
-        $a = Site::factory()->create(['server_id' => $server->id, 'organization_id' => $org->id, 'name' => 'alpha']);
-        $b = Site::factory()->create(['server_id' => $server->id, 'organization_id' => $org->id, 'name' => 'bravo']);
-        $this->seedVar($a, 'DATABASE_URL', 'postgres://a', 'production');
-        $this->seedVar($b, 'DATABASE_URL', 'postgres://b', 'staging');
-        $this->seedVar($a, 'OTHER', 'noise', 'production');
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $org->id,
+            'name' => 'alpha',
+            'env_file_content' => "DATABASE_URL=postgres://a\nOTHER=noise",
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $org->id,
+            'name' => 'bravo',
+            'env_file_content' => 'DATABASE_URL=postgres://b',
+        ]);
 
         $response = $this->actingAs($user)->get(route('fleet.env-search').'?q=DATABASE_URL');
 
@@ -50,10 +56,11 @@ class FleetEnvSearchPageTest extends TestCase
     {
         [$user, $org] = $this->makeUserOrg();
         $server = Server::factory()->create(['organization_id' => $org->id]);
-        $site = Site::factory()->create(['server_id' => $server->id, 'organization_id' => $org->id]);
-        $this->seedVar($site, 'AWS_REGION', 'us-east-1', 'production');
-        $this->seedVar($site, 'AWS_BUCKET', 'data', 'production');
-        $this->seedVar($site, 'OTHER', 'x', 'production');
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $org->id,
+            'env_file_content' => "AWS_REGION=us-east-1\nAWS_BUCKET=data\nOTHER=x",
+        ]);
 
         $response = $this->actingAs($user)->get(route('fleet.env-search').'?q=AWS_&mode=prefix');
 
@@ -67,8 +74,11 @@ class FleetEnvSearchPageTest extends TestCase
     {
         [$user, $org] = $this->makeUserOrg();
         $server = Server::factory()->create(['organization_id' => $org->id]);
-        $site = Site::factory()->create(['server_id' => $server->id, 'organization_id' => $org->id]);
-        $this->seedVar($site, 'API_KEY', 'super-secret-token', 'production');
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'organization_id' => $org->id,
+            'env_file_content' => 'API_KEY=super-secret-token',
+        ]);
 
         $response = $this->actingAs($user)->get(route('fleet.env-search').'?q=API_KEY');
 
@@ -93,8 +103,12 @@ class FleetEnvSearchPageTest extends TestCase
         [$user, $org] = $this->makeUserOrg();
         $otherOrg = Organization::factory()->create();
         $otherServer = Server::factory()->create(['organization_id' => $otherOrg->id]);
-        $otherSite = Site::factory()->create(['server_id' => $otherServer->id, 'organization_id' => $otherOrg->id, 'name' => 'sneaky']);
-        $this->seedVar($otherSite, 'CROSS_ORG_KEY', 'leak', 'production');
+        Site::factory()->create([
+            'server_id' => $otherServer->id,
+            'organization_id' => $otherOrg->id,
+            'name' => 'sneaky',
+            'env_file_content' => 'CROSS_ORG_KEY=leak',
+        ]);
 
         $response = $this->actingAs($user)->get(route('fleet.env-search').'?q=CROSS_ORG_KEY');
 
@@ -114,15 +128,5 @@ class FleetEnvSearchPageTest extends TestCase
         session(['current_organization_id' => $org->id]);
 
         return [$user, $org];
-    }
-
-    private function seedVar(Site $site, string $key, string $value, string $environment): void
-    {
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => $key,
-            'env_value' => $value,
-            'environment' => $environment,
-        ]);
     }
 }

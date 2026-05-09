@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -17,13 +16,7 @@ class ExportSiteEnvCommandTest extends TestCase
 
     public function test_writes_to_stdout_by_default(): void
     {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'API_KEY',
-            'env_value' => 'super-secret',
-            'environment' => 'production',
-        ]);
+        $site = $this->makeSite(['env_file_content' => 'API_KEY=super-secret']);
 
         $exit = Artisan::call('dply:site:env-export', ['site' => $site->slug]);
         $output = Artisan::output();
@@ -34,13 +27,7 @@ class ExportSiteEnvCommandTest extends TestCase
 
     public function test_writes_to_file_with_to_option(): void
     {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'A',
-            'env_value' => '1',
-            'environment' => 'production',
-        ]);
+        $site = $this->makeSite(['env_file_content' => 'A=1']);
 
         $path = sys_get_temp_dir().'/dply-export-'.uniqid().'.env';
         $exit = Artisan::call('dply:site:env-export', [
@@ -59,13 +46,7 @@ class ExportSiteEnvCommandTest extends TestCase
 
     public function test_refuses_to_overwrite_without_force(): void
     {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'A',
-            'env_value' => '1',
-            'environment' => 'production',
-        ]);
+        $site = $this->makeSite(['env_file_content' => 'A=1']);
 
         $path = sys_get_temp_dir().'/dply-export-'.uniqid().'.env';
         file_put_contents($path, 'pre-existing');
@@ -85,13 +66,7 @@ class ExportSiteEnvCommandTest extends TestCase
 
     public function test_force_overwrites_existing(): void
     {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'A',
-            'env_value' => '1',
-            'environment' => 'production',
-        ]);
+        $site = $this->makeSite(['env_file_content' => 'A=1']);
 
         $path = sys_get_temp_dir().'/dply-export-'.uniqid().'.env';
         file_put_contents($path, 'pre-existing');
@@ -108,32 +83,6 @@ class ExportSiteEnvCommandTest extends TestCase
         unlink($path);
     }
 
-    public function test_environment_flag_scopes_export(): void
-    {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'PROD',
-            'env_value' => 'p',
-            'environment' => 'production',
-        ]);
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'STAGE',
-            'env_value' => 's',
-            'environment' => 'staging',
-        ]);
-
-        Artisan::call('dply:site:env-export', [
-            'site' => $site->slug,
-            '--environment' => 'staging',
-        ]);
-        $output = Artisan::output();
-
-        $this->assertStringContainsString('STAGE=s', $output);
-        $this->assertStringNotContainsString('PROD=', $output);
-    }
-
     public function test_command_fails_when_site_not_found(): void
     {
         $exit = Artisan::call('dply:site:env-export', ['site' => 'nope']);
@@ -143,13 +92,16 @@ class ExportSiteEnvCommandTest extends TestCase
         $this->assertStringContainsString('Site not found', $output);
     }
 
-    private function makeSite(): Site
+    /**
+     * @param  array<string, mixed>  $attrs
+     */
+    private function makeSite(array $attrs = []): Site
     {
         $server = Server::factory()->create();
 
-        return Site::factory()->create([
+        return Site::factory()->create(array_merge([
             'server_id' => $server->id,
             'slug' => 'jobs',
-        ]);
+        ], $attrs));
     }
 }

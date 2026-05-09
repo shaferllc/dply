@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
+use App\Services\Sites\DotEnvFileParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -17,19 +17,7 @@ class ImportSiteEnvCommandTest extends TestCase
 
     public function test_merge_mode_creates_and_updates_without_removing(): void
     {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'KEEP_ME',
-            'env_value' => 'k',
-            'environment' => 'production',
-        ]);
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'OVERRIDE_ME',
-            'env_value' => 'old',
-            'environment' => 'production',
-        ]);
+        $site = $this->makeSite(['env_file_content' => "KEEP_ME=k\nOVERRIDE_ME=old"]);
 
         $file = $this->writeEnvFile("OVERRIDE_ME=new\nNEW_ONE=fresh\n");
 
@@ -46,22 +34,16 @@ class ImportSiteEnvCommandTest extends TestCase
         $this->assertSame(['OVERRIDE_ME'], $decoded['updated']);
         $this->assertSame([], $decoded['removed']);
 
-        $rows = SiteEnvironmentVariable::query()->where('site_id', $site->id)->get();
-        $this->assertCount(3, $rows);
-        $this->assertSame('new', $rows->firstWhere('env_key', 'OVERRIDE_ME')->env_value);
-        $this->assertSame('k', $rows->firstWhere('env_key', 'KEEP_ME')->env_value);
-        $this->assertSame('fresh', $rows->firstWhere('env_key', 'NEW_ONE')->env_value);
+        $this->assertSame([
+            'KEEP_ME' => 'k',
+            'NEW_ONE' => 'fresh',
+            'OVERRIDE_ME' => 'new',
+        ], $this->parsed($site->fresh()));
     }
 
     public function test_replace_mode_removes_keys_not_in_file(): void
     {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'GOING_AWAY',
-            'env_value' => 'g',
-            'environment' => 'production',
-        ]);
+        $site = $this->makeSite(['env_file_content' => 'GOING_AWAY=g']);
 
         $file = $this->writeEnvFile("KEPT=ok\n");
 
@@ -76,8 +58,7 @@ class ImportSiteEnvCommandTest extends TestCase
         $this->assertSame('replace', $decoded['mode']);
         $this->assertSame(['GOING_AWAY'], $decoded['removed']);
 
-        $remaining = SiteEnvironmentVariable::query()->where('site_id', $site->id)->pluck('env_key')->all();
-        $this->assertSame(['KEPT'], $remaining);
+        $this->assertSame(['KEPT' => 'ok'], $this->parsed($site->fresh()));
     }
 
     public function test_dry_run_does_not_write(): void
@@ -95,7 +76,7 @@ class ImportSiteEnvCommandTest extends TestCase
 
         $this->assertTrue($decoded['dry_run']);
         $this->assertSame(['FRESH'], $decoded['created']);
-        $this->assertSame(0, SiteEnvironmentVariable::query()->where('site_id', $site->id)->count());
+        $this->assertSame([], $this->parsed($site->fresh()));
     }
 
     public function test_command_reports_parse_errors(): void
@@ -112,7 +93,7 @@ class ImportSiteEnvCommandTest extends TestCase
 
         $this->assertSame(['GOOD'], $decoded['created']);
         $this->assertCount(1, $decoded['errors']);
-        $this->assertSame(1, SiteEnvironmentVariable::query()->where('site_id', $site->id)->count());
+        $this->assertSame(['GOOD' => 'value'], $this->parsed($site->fresh()));
     }
 
     public function test_command_fails_when_file_missing(): void
@@ -140,48 +121,17 @@ class ImportSiteEnvCommandTest extends TestCase
         $this->assertStringContainsString('--file is required', $output);
     }
 
-    public function test_environment_flag_scopes_writes_and_replaces(): void
-    {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'PROD_KEY',
-            'env_value' => 'p',
-            'environment' => 'production',
-        ]);
-
-        $file = $this->writeEnvFile("STAGING_KEY=s\n");
-
-        Artisan::call('dply:site:env-import', [
-            'site' => $site->slug,
-            '--file' => $file,
-            '--environment' => 'staging',
-            '--replace' => true,
-            '--json' => true,
-        ]);
-
-        // Production left alone, staging populated.
-        $prod = SiteEnvironmentVariable::query()
-            ->where('site_id', $site->id)
-            ->where('environment', 'production')
-            ->pluck('env_key')->all();
-        $staging = SiteEnvironmentVariable::query()
-            ->where('site_id', $site->id)
-            ->where('environment', 'staging')
-            ->pluck('env_key')->all();
-
-        $this->assertSame(['PROD_KEY'], $prod);
-        $this->assertSame(['STAGING_KEY'], $staging);
-    }
-
-    private function makeSite(): Site
+    /**
+     * @param  array<string, mixed>  $attrs
+     */
+    private function makeSite(array $attrs = []): Site
     {
         $server = Server::factory()->create();
 
-        return Site::factory()->create([
+        return Site::factory()->create(array_merge([
             'server_id' => $server->id,
             'slug' => 'jobs',
-        ]);
+        ], $attrs));
     }
 
     private function writeEnvFile(string $contents): string
@@ -190,5 +140,16 @@ class ImportSiteEnvCommandTest extends TestCase
         file_put_contents($path, $contents);
 
         return $path;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function parsed(Site $site): array
+    {
+        $vars = app(DotEnvFileParser::class)->parse((string) ($site->env_file_content ?? ''))['variables'];
+        ksort($vars);
+
+        return $vars;
     }
 }

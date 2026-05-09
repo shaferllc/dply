@@ -2,7 +2,9 @@
 
 namespace App\Services\Sites;
 
+use App\Models\ConsoleAction;
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use Illuminate\Support\Str;
 
@@ -20,8 +22,11 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
         return 'caddy';
     }
 
-    public function provision(Site $site): string
+    public function provision(Site $site, ?ConsoleEmitter $emit = null): string
     {
+        $emit ??= new ConsoleEmitter;
+
+        $emit->step('caddy', 'resolving server connection');
         $server = $this->ensureServerReady($site);
 
         $config = $this->builder->build($site);
@@ -29,10 +34,18 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
         $importLine = 'import /etc/caddy/sites-enabled/*.caddy';
 
         $ssh = $this->systemSsh($site);
-        $this->installPlaceholderPage($site, $ssh);
-        $this->ensureSuspendedPage($site, $ssh);
-        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
-        $this->writeSystemFile($ssh, $configFile, $config);
+        // First-apply only — meta.caddy_last_output is written at the end of the
+        // first successful provision, so subsequent applies skip the placeholder
+        // probe entirely.
+        if (! isset(($site->meta ?? [])['caddy_last_output'])) {
+            $this->installPlaceholderPage($site, $ssh, $emit);
+        }
+        $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        if ($this->writeSystemFileIfChanged($server, $ssh, $configFile, $config)) {
+            $emit->step('caddy', 'writing site config: '.$configFile);
+        }
+        $emit->step('caddy', 'running caddy validate and reloading');
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_CADDY_EXIT:%%s" "$?"',
             $this->privilegedCommand(
@@ -45,10 +58,18 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
             )
         ), 120);
 
-        $caddyOk = (bool) preg_match('/DPLY_CADDY_EXIT:0\s*$/', $out);
-        if (! $caddyOk) {
+        foreach (preg_split('/\r\n|\r|\n/', trim($out)) ?: [] as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $emit($line, ConsoleAction::LEVEL_INFO, 'caddy');
+        }
+
+        if (! preg_match('/DPLY_CADDY_EXIT:0\s*$/', $out)) {
             throw new \RuntimeException('Caddy validate or reload failed. Output: '.Str::limit($out, 2000));
         }
+
+        $emit->success('reload OK', 'caddy');
 
         $meta = is_array($site->meta) ? $site->meta : [];
         $meta['caddy_last_output'] = $out;

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Jobs\Concerns\WritesSiteApplyState;
+use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
 use App\Services\Sites\SiteSystemdProvisioner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -30,22 +31,34 @@ use Illuminate\Support\Facades\Log;
  *   - the site has no start_command (URL-first detection didn't
  *     produce one and the user didn't fill it in by hand).
  *
- * Failures are logged and surfaced via the site-apply banner; NGINX
- * will return 502 while the unit is absent until the next save / deploy.
+ * Failures surface in the site's console-actions banner.
  */
 class ProvisionSiteSystemdUnitsJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesSiteApplyState;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
     public int $tries = 1;
 
     public int $timeout = 180;
 
-    public function __construct(public string $siteId) {}
+    public function __construct(
+        public string $siteId,
+        public ?string $userId = null,
+    ) {}
 
-    protected function applyKind(): string
+    protected function consoleSubject(): Model
+    {
+        return Site::query()->findOrFail($this->siteId);
+    }
+
+    protected function consoleKind(): string
     {
         return 'systemd';
+    }
+
+    protected function triggeringUserId(): ?string
+    {
+        return $this->userId;
     }
 
     public function handle(SiteSystemdProvisioner $provisioner): void
@@ -64,19 +77,20 @@ class ProvisionSiteSystemdUnitsJob implements ShouldQueue
             return;
         }
 
-        $runId = $this->beginApplyRun($site);
+        $emit = $this->beginConsoleAction();
 
         try {
+            $emit->step('systemd', 'writing units');
             $written = $provisioner->provision($site);
-            $this->cacheApplyOutput($runId, 'Provisioned units: '.implode(', ', (array) $written));
-            $this->completeApplyRun($site);
+            $emit->success('provisioned: '.implode(', ', (array) $written), 'systemd');
+            $this->completeConsoleAction();
             Log::info('Provisioned site systemd units', [
                 'site_id' => $site->id,
                 'units' => $written,
             ]);
         } catch (\Throwable $e) {
-            $this->cacheApplyOutput($runId, $e->getMessage());
-            $this->failApplyRun($site, $e->getMessage());
+            $emit->error($e->getMessage(), 'systemd');
+            $this->failConsoleAction($e->getMessage());
 
             Log::warning('ProvisionSiteSystemdUnitsJob failed', [
                 'site_id' => $site->id,

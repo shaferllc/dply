@@ -12,17 +12,29 @@ namespace App\Services\Sites;
  * in escapes inside quoted values.
  *
  * Output is sorted by key for deterministic diffing across runs.
+ *
+ * Optional comments map: { KEY => "comment text" } emits `# comment\n`
+ * lines immediately above each KEY=value. Multi-line comments (\n in
+ * the value) become multiple `# ` lines. Round-trips with
+ * {@see DotEnvFileParser::parse()}.
  */
 class DotEnvFileWriter
 {
     /**
      * @param  array<string, string>  $variables
+     * @param  array<string, string>  $comments  KEY => comment text
      */
-    public function render(array $variables): string
+    public function render(array $variables, array $comments = []): string
     {
         ksort($variables);
         $lines = [];
         foreach ($variables as $key => $value) {
+            $comment = trim((string) ($comments[$key] ?? ''));
+            if ($comment !== '') {
+                foreach (preg_split('/\r\n|\r|\n/', $comment) ?: [] as $commentLine) {
+                    $lines[] = '# '.$commentLine;
+                }
+            }
             $lines[] = $key.'='.$this->formatValue((string) $value);
         }
 

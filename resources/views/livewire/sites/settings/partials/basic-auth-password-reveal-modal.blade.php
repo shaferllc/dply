@@ -1,8 +1,15 @@
 {{--
-  One-shot HTTP basic-auth password reveal dialog.
-  Listens for the `dply-basic-auth-password-revealed` browser event Livewire dispatches
-  after a server-side rotate, then shows the plaintext with copy buttons. Plaintext lives
-  in Alpine local state only — never round-trips back to Livewire.
+  HTTP basic-auth rotate dialog.
+
+  Opened from a row's Rotate button via the `dply-basic-auth-password-rotate-prompt`
+  browser event with { user_id, username, path, host }. The operator either keeps
+  the random pre-fill, types their own, or clicks Generate; Show/Hide and Copy let
+  them grab the plaintext before submit. On Submit we call Livewire's
+  rotateBasicAuthPassword(userId, plaintext) — server hashes, persists, and
+  triggers the webserver-config apply via finalizeRoutingMutation. The dialog
+  closes immediately after the call resolves: we never round-trip the plaintext
+  back to the browser, so the operator must Copy/Show before submitting if they
+  want a record of it.
 --}}
 <script>
     (function () {
@@ -11,47 +18,69 @@
         }
         window.dplyBasicAuthPasswordReveal = () => ({
             revealOpen: false,
+            userId: '',
             username: '',
             path: '',
             password: '',
-            copiedPassword: false,
-            copiedHeader: false,
-            acknowledged: false,
-            openFromLivewire(detail) {
+            host: '',
+            showPassword: false,
+            submitting: false,
+            copied: false,
+            randomPassword(length = 20) {
+                // 94-printable ASCII (excluding space) — parity with Laravel's Str::password.
+                const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:;<=>?@[]^_{|}~';
+                const buf = new Uint32Array(length);
+                crypto.getRandomValues(buf);
+                let out = '';
+                for (let i = 0; i < length; i++) out += charset[buf[i] % charset.length];
+                return out;
+            },
+            openPending(detail) {
                 const d = detail || {};
+                this.userId = d.user_id ?? '';
                 this.username = d.username ?? '';
                 this.path = d.path ?? '/';
-                this.password = d.password ?? '';
-                this.copiedPassword = false;
-                this.copiedHeader = false;
-                this.acknowledged = false;
+                this.host = d.host ?? '';
+                // Pre-fill with a random password so the operator can either keep it,
+                // edit it, or replace it entirely before submitting.
+                this.password = this.randomPassword(20);
+                this.showPassword = false;
+                this.submitting = false;
+                this.copied = false;
                 this.revealOpen = true;
             },
-            authHeader() {
-                try {
-                    return 'Basic ' + btoa(`${this.username}:${this.password}`);
-                } catch (e) {
-                    return '';
-                }
+            regeneratePending() {
+                this.password = this.randomPassword(20);
+                this.copied = false;
             },
             async copyPassword() {
-                try { await navigator.clipboard.writeText(this.password); this.copiedPassword = true; } catch (e) {}
+                if (!this.password) return;
+                try { await navigator.clipboard.writeText(this.password); this.copied = true; } catch (e) {}
             },
-            async copyHeader() {
-                try { await navigator.clipboard.writeText(this.authHeader()); this.copiedHeader = true; } catch (e) {}
-            },
-            closeReveal() {
-                if (!this.acknowledged) return;
-                this.cancelReveal();
+            async submitRotate($wire) {
+                if (!this.userId || this.submitting) return;
+                if (this.password.length < 8 || this.password.length > 255) return;
+                this.submitting = true;
+                try {
+                    await $wire.call('rotateBasicAuthPassword', this.userId, this.password);
+                    // Server-side validation passes if we made it here; close out.
+                    this.cancelReveal();
+                } catch (e) {
+                    // Error toasts are surfaced by Livewire; reset so the operator
+                    // can retry without re-opening the dialog.
+                    this.submitting = false;
+                }
             },
             cancelReveal() {
                 this.revealOpen = false;
+                this.userId = '';
                 this.username = '';
                 this.path = '';
                 this.password = '';
-                this.copiedPassword = false;
-                this.copiedHeader = false;
-                this.acknowledged = false;
+                this.host = '';
+                this.showPassword = false;
+                this.submitting = false;
+                this.copied = false;
             },
         });
     })();
@@ -62,7 +91,7 @@
         wire:ignore
         class="relative z-[110]"
         x-data="dplyBasicAuthPasswordReveal()"
-        x-on:dply-basic-auth-password-revealed.window="openFromLivewire($event.detail?.[0] ?? $event.detail)"
+        x-on:dply-basic-auth-password-rotate-prompt.window="openPending($event.detail?.[0] ?? $event.detail)"
         x-on:keydown.escape.window="if (revealOpen) cancelReveal()"
     >
         <div
@@ -77,10 +106,10 @@
             <div class="relative z-10 my-auto w-full max-w-xl overflow-hidden dply-modal-panel">
                 <div class="flex items-start justify-between gap-4 border-b border-brand-ink/10 px-6 py-5">
                     <div class="min-w-0 flex-1">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Password rotated') }}</p>
-                        <h2 id="ba-pw-reveal-title" class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Copy the new password now') }}</h2>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Rotate password') }}</p>
+                        <h2 id="ba-pw-reveal-title" class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Set a new password') }}</h2>
                         <p class="mt-2 text-sm leading-6 text-brand-moss">
-                            {{ __('Dply only stores a hash. This dialog shows the plaintext once — copy it before you close.') }}
+                            {{ __('Set a new password for this user, or keep the random one we generated. The current password stops working as soon as the webserver config reapplies — copy this value before you submit if you need a record.') }}
                         </p>
                     </div>
                     <button
@@ -106,49 +135,53 @@
                     </div>
 
                     <div>
-                        <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="ba-pw-reveal-input">
+                        <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="ba-pw-pending-input">
                             <span>{{ __('New password') }}</span>
-                            <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="copyPassword()">
-                                <span x-show="!copiedPassword">{{ __('Copy') }}</span>
-                                <span x-show="copiedPassword" x-cloak>{{ __('Copied') }}</span>
-                            </button>
+                            <span class="flex items-center gap-3 text-xs">
+                                <button type="button" class="font-medium text-brand-sage hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                    @click="copyPassword()" :disabled="!password">
+                                    <span x-show="!copied">{{ __('Copy') }}</span>
+                                    <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                </button>
+                                <button type="button" class="font-medium text-brand-sage hover:underline" @click="showPassword = !showPassword">
+                                    <span x-show="!showPassword">{{ __('Show') }}</span>
+                                    <span x-show="showPassword" x-cloak>{{ __('Hide') }}</span>
+                                </button>
+                                <button type="button" class="font-medium text-brand-sage hover:underline" @click="regeneratePending()">{{ __('Generate') }}</button>
+                            </span>
                         </label>
                         <input
-                            id="ba-pw-reveal-input"
-                            readonly
-                            type="text"
-                            class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
-                            x-bind:value="password"
-                            @click="$event.target.select()"
+                            id="ba-pw-pending-input"
+                            x-bind:type="showPassword ? 'text' : 'password'"
+                            x-model="password"
+                            x-on:input="copied = false"
+                            class="block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30"
+                            autocomplete="new-password"
+                            spellcheck="false"
                         />
+                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('8–255 characters. Click Generate for a fresh random secret.') }}</p>
                     </div>
-
-                    <div class="rounded-xl border border-brand-sage/25 bg-brand-sage/5 px-4 py-3">
-                        <div class="flex items-center justify-between gap-3">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Authorization header') }}</p>
-                            <button type="button" class="text-xs font-semibold text-brand-forest hover:underline" @click="copyHeader()">
-                                <span x-show="!copiedHeader">{{ __('Copy header') }}</span>
-                                <span x-show="copiedHeader" x-cloak>{{ __('Copied') }}</span>
-                            </button>
-                        </div>
-                        <p class="mt-1 break-all font-mono text-[11px] text-brand-moss" x-text="authHeader()"></p>
-                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('Drop into a curl -H or proxy config to test the credential.') }}</p>
-                    </div>
-
-                    <label class="flex cursor-pointer items-start gap-3">
-                        <input type="checkbox" class="mt-1 rounded border-brand-ink/20 text-brand-ink focus:ring-brand-sage" x-model="acknowledged" />
-                        <span class="text-sm leading-relaxed text-brand-moss">{{ __('I have copied this password somewhere safe.') }}</span>
-                    </label>
                 </div>
 
                 <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
-                        @click="closeReveal()"
-                        :disabled="!acknowledged"
+                        class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                        @click="cancelReveal()"
                     >
-                        {{ __('Done') }}
+                        {{ __('Cancel') }}
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        @click="submitRotate($wire)"
+                        :disabled="submitting || !userId || password.length < 8 || password.length > 255"
+                    >
+                        <span x-show="!submitting">{{ __('Rotate password') }}</span>
+                        <span x-show="submitting" x-cloak class="inline-flex items-center gap-2">
+                            <x-spinner variant="cream" size="sm" />
+                            {{ __('Rotating…') }}
+                        </span>
                     </button>
                 </div>
             </div>

@@ -2,12 +2,14 @@
 
 namespace App\Jobs;
 
-use App\Jobs\Concerns\WritesSiteApplyState;
+use App\Jobs\Concerns\WritesConsoleAction;
+use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Services\Sites\SiteSslProvisioner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -15,23 +17,34 @@ use Illuminate\Support\Facades\Log;
 
 class IssueSiteSslJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesSiteApplyState;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
     public int $tries = 1;
 
     public function __construct(
         public string $siteId,
         public ?string $email = null,
+        public ?string $userId = null,
     ) {}
 
     public function uniqueId(): string
     {
-        return 'site-issue-ssl:'.$this->siteId;
+        return 'console-action:ssl:'.$this->siteId;
     }
 
-    protected function applyKind(): string
+    protected function consoleSubject(): Model
+    {
+        return Site::query()->findOrFail($this->siteId);
+    }
+
+    protected function consoleKind(): string
     {
         return 'ssl';
+    }
+
+    protected function triggeringUserId(): ?string
+    {
+        return $this->userId;
     }
 
     public function handle(SiteSslProvisioner $provisioner): void
@@ -41,15 +54,24 @@ class IssueSiteSslJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $runId = $this->beginApplyRun($site);
+        $emit = $this->beginConsoleAction();
 
         try {
+            // SSL provisioner today returns a transcript string and doesn't
+            // accept a streaming emitter. Wire the final transcript into the
+            // console row line-by-line so the operator still sees structured
+            // output instead of one giant blob.
             $output = $provisioner->provision($site, $this->email);
-            $this->cacheApplyOutput($runId, (string) $output);
-            $this->completeApplyRun($site);
+            foreach (preg_split('/\r\n|\r|\n/', trim((string) $output)) ?: [] as $line) {
+                if (trim($line) === '') {
+                    continue;
+                }
+                $emit($line, ConsoleAction::LEVEL_INFO, 'ssl');
+            }
+            $this->completeConsoleAction();
         } catch (\Throwable $e) {
-            $this->cacheApplyOutput($runId, $e->getMessage());
-            $this->failApplyRun($site, $e->getMessage());
+            $emit->error($e->getMessage(), 'ssl');
+            $this->failConsoleAction($e->getMessage());
 
             Log::warning('IssueSiteSslJob failed', [
                 'site_id' => $site->id,

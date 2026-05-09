@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Console\Commands\ExportSiteConfigCommand;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteEnvironmentVariable;
 use App\Models\SiteProcess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -35,13 +34,7 @@ class ExportSiteConfigCommandTest extends TestCase
 
     public function test_masks_env_values_by_default(): void
     {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'API_KEY',
-            'env_value' => 'super-secret',
-            'environment' => 'production',
-        ]);
+        $site = $this->makeSite(['env_file_content' => 'API_KEY=super-secret']);
 
         Artisan::call('dply:site:export-config', ['site' => $site->slug]);
         $output = Artisan::output();
@@ -54,13 +47,7 @@ class ExportSiteConfigCommandTest extends TestCase
 
     public function test_with_secrets_writes_cleartext(): void
     {
-        $site = $this->makeSite();
-        SiteEnvironmentVariable::query()->create([
-            'site_id' => $site->id,
-            'env_key' => 'API_KEY',
-            'env_value' => 'super-secret',
-            'environment' => 'production',
-        ]);
+        $site = $this->makeSite(['env_file_content' => 'API_KEY=super-secret']);
 
         Artisan::call('dply:site:export-config', [
             'site' => $site->slug,
@@ -135,15 +122,18 @@ class ExportSiteConfigCommandTest extends TestCase
         $this->assertStringContainsString('Site not found', $output);
     }
 
-    private function makeSite(): Site
+    /**
+     * @param  array<string, mixed>  $attrs
+     */
+    private function makeSite(array $attrs = []): Site
     {
         $server = Server::factory()->create();
 
-        return Site::factory()->create([
+        return Site::factory()->create(array_merge([
             'server_id' => $server->id,
             'slug' => 'jobs',
             'runtime' => 'node',
             'runtime_version' => '20.10.0',
-        ]);
+        ], $attrs));
     }
 }

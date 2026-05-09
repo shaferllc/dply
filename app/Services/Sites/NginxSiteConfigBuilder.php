@@ -397,7 +397,7 @@ NGINX;
             ? $this->nginxBasicAuthPhpPrefixLocations($site, $phpSock, $fcgiEngine)
             : '';
         $slashAuth = '';
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $slashAuth = $this->nginxBasicAuthDirectives($site->basicAuthHtpasswdPathForNormalizedPath('/'));
         }
 
@@ -418,7 +418,7 @@ NGINX;
             ? $this->nginxBasicAuthStaticPrefixLocations($site)
             : '';
         $slashAuth = '';
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $slashAuth = $this->nginxBasicAuthDirectives($site->basicAuthHtpasswdPathForNormalizedPath('/'));
         }
 
@@ -436,7 +436,7 @@ NGINX;
 
         $preamble = $webRoot !== '' ? $this->nginxBasicAuthAcmeChallengeBlock($webRoot) : '';
         $slashAuth = '';
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $slashAuth = $this->nginxBasicAuthDirectives($site->basicAuthHtpasswdPathForNormalizedPath('/'));
         }
 
@@ -454,7 +454,7 @@ NGINX;
 
         $preamble = $this->nginxBasicAuthAcmeChallengeBlock($root);
         $auth = '';
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $auth = $this->nginxBasicAuthDirectives($site->basicAuthHtpasswdPathForNormalizedPath('/'));
         }
 
@@ -467,7 +467,7 @@ NGINX;
 
     protected function nginxBasicAuthEnabled(Site $site): bool
     {
-        return $site->basicAuthUsers->isNotEmpty();
+        return $site->enforceableBasicAuthUsers()->isNotEmpty();
     }
 
     protected function nginxBasicAuthAcmeChallengeBlock(string $root): string
@@ -490,7 +490,7 @@ NGINX;
 
     protected function nginxBasicAuthPhpPrefixLocations(Site $site, string $phpSock, string $fcgiEngine): string
     {
-        $paths = $site->basicAuthUsers
+        $paths = $site->enforceableBasicAuthUsers()
             ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
             ->unique()
             ->filter(fn (string $p): bool => $p !== '/')
@@ -499,7 +499,7 @@ NGINX;
 
         $out = '';
         foreach ($paths as $locPath) {
-            $has = $site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
+            $has = $site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
             if (! $has) {
                 continue;
             }
@@ -523,7 +523,7 @@ NGINX;
 
     protected function nginxBasicAuthStaticPrefixLocations(Site $site): string
     {
-        $paths = $site->basicAuthUsers
+        $paths = $site->enforceableBasicAuthUsers()
             ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
             ->unique()
             ->filter(fn (string $p): bool => $p !== '/')
@@ -532,7 +532,7 @@ NGINX;
 
         $out = '';
         foreach ($paths as $locPath) {
-            $has = $site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
+            $has = $site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
             if (! $has) {
                 continue;
             }

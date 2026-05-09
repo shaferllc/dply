@@ -37,19 +37,32 @@ class ServerSystemUserService
     }
 
     /**
+     * Creates a Linux account on the server. Server-scoped operation: nothing
+     * about a particular site is touched here. Used by the server-level
+     * /system-users page; the site-level "Create user" path is gone — sites
+     * pick from the existing-users dropdown via {@see assignExistingUserToSite()}.
+     *
+     * @throws \RuntimeException
+     */
+    public function createUser(Server $server, string $username, bool $grantSudo): void
+    {
+        $this->assertServerReady($server);
+        $u = $this->validateNewUsername($username);
+
+        $this->assertAcceptableCreateUsername($server, $u);
+        $this->createUserIfMissing($server, $u, $grantSudo);
+    }
+
+    /**
      * Ensures a Linux user exists, then assigns ownership of the site tree.
+     * Thin wrapper kept for any caller that still wants the single-shot path.
      *
      * @throws \RuntimeException
      */
     public function createUserAndAssignSite(Site $site, string $username, bool $grantSudo): void
     {
-        $server = $site->server;
-        $this->assertServerReady($server);
+        $this->createUser($site->server, $username, $grantSudo);
         $u = $this->validateNewUsername($username);
-
-        $this->assertAcceptableCreateUsername($server, $u);
-
-        $this->createUserIfMissing($server, $u, $grantSudo);
         $this->chownSiteRepositoryTree($site, $u);
 
         $site->update(['php_fpm_user' => $u]);

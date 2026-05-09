@@ -6,30 +6,55 @@ namespace App\Services\Sites;
 
 /**
  * Minimal .env file parser. Returns [KEY => value] for valid lines,
- * skipping blank lines and `#` comments. Strips matching surrounding
- * single or double quotes from values. Keys must match
- * /^[A-Z_][A-Z0-9_]*$/i — non-conforming lines are reported via
- * $errors so the caller can surface them.
+ * collecting `#` comment lines that immediately precede a KEY=value as a
+ * comment attached to that KEY. Strips matching surrounding single or
+ * double quotes from values. Keys must match /^[A-Z_][A-Z0-9_]*$/i —
+ * non-conforming lines are reported via $errors so the caller can surface
+ * them.
+ *
+ * Free-floating comments (those NOT immediately above a KEY=value) and
+ * blank lines are dropped on parse. Comment-above-key associations are
+ * preserved across the parse → render round-trip, so an operator who
+ * adds a `# foo` line above `BAR=baz` will see that comment kept when
+ * the file is rewritten.
  *
  * Deliberately NOT a full bash parser: no variable interpolation,
- * no `export` prefix expansion, no escape sequence handling beyond
- * trimming the outer quotes. The platform should normalize on a
- * single-format we control end-to-end.
+ * no `export` prefix expansion beyond literal stripping, no escape
+ * sequence handling beyond trimming the outer quotes.
  */
 class DotEnvFileParser
 {
     /**
-     * @return array{variables: array<string, string>, errors: array<int, string>}
+     * @return array{variables: array<string, string>, errors: array<int, string>, comments: array<string, string>}
      */
     public function parse(string $contents): array
     {
         $variables = [];
         $errors = [];
+        $comments = [];
+        // Buffer of consecutive `#` lines waiting to be attached to the next
+        // KEY=value. Cleared whenever we hit a blank line (which would break
+        // the visual association) or whenever a key is consumed.
+        $pendingComment = [];
 
         $lines = preg_split('/\r\n|\r|\n/', $contents) ?: [];
         foreach ($lines as $i => $rawLine) {
             $line = trim($rawLine);
-            if ($line === '' || str_starts_with($line, '#')) {
+
+            if ($line === '') {
+                // Blank line breaks comment-to-key association — comments above
+                // a blank are considered free-floating and discarded.
+                $pendingComment = [];
+
+                continue;
+            }
+
+            if (str_starts_with($line, '#')) {
+                // Strip the leading `#` and one optional space. The stored
+                // comment is the prose, not the formatting.
+                $text = ltrim(substr($line, 1));
+                $pendingComment[] = $text;
+
                 continue;
             }
 
@@ -41,6 +66,7 @@ class DotEnvFileParser
             $eq = strpos($line, '=');
             if ($eq === false) {
                 $errors[] = sprintf('line %d: missing "=" — "%s"', $i + 1, $rawLine);
+                $pendingComment = [];
 
                 continue;
             }
@@ -52,14 +78,19 @@ class DotEnvFileParser
 
             if (! preg_match('/^[A-Z_][A-Z0-9_]*$/i', $key)) {
                 $errors[] = sprintf('line %d: invalid key "%s"', $i + 1, $key);
+                $pendingComment = [];
 
                 continue;
             }
 
             $variables[$key] = $value;
+            if ($pendingComment !== []) {
+                $comments[$key] = implode("\n", $pendingComment);
+                $pendingComment = [];
+            }
         }
 
-        return ['variables' => $variables, 'errors' => $errors];
+        return ['variables' => $variables, 'errors' => $errors, 'comments' => $comments];
     }
 
     /**
