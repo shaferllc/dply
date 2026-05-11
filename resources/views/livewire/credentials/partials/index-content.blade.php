@@ -18,7 +18,7 @@
     <div class="dply-card overflow-hidden">
         <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
             <div class="lg:col-span-4">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Provider credentials') }}</h2>
+                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Providers') }}</h2>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                     {{ __('Store encrypted API keys for the cloud providers your organization uses. Tokens are validated when possible. Use the list on the left to configure one provider at a time.') }}
                 </p>
@@ -30,6 +30,28 @@
                 </x-outline-link>
             </div>
         </div>
+
+        {{-- Capability tabs — filter the provider sidebar by what each credential is for.
+             Dual-capability providers (DigitalOcean, AWS) appear in both Server and DNS. --}}
+        <nav class="flex flex-wrap gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-6 py-3 sm:px-8" aria-label="{{ __('Capability tabs') }}">
+            @foreach ([
+                ['id' => 'all', 'label' => __('All')],
+                ['id' => 'server', 'label' => __('Server')],
+                ['id' => 'dns', 'label' => __('DNS')],
+            ] as $tabItem)
+                <button
+                    type="button"
+                    wire:click="$set('tab', '{{ $tabItem['id'] }}')"
+                    @class([
+                        'inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition',
+                        'bg-brand-ink text-brand-cream shadow-sm shadow-brand-ink/10' => $tab === $tabItem['id'],
+                        'border border-brand-ink/15 bg-white text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $tab !== $tabItem['id'],
+                    ])
+                >
+                    {{ $tabItem['label'] }}
+                </button>
+            @endforeach
+        </nav>
     </div>
 
     {{-- Mobile: jump to provider --}}
@@ -39,7 +61,7 @@
             @foreach ($providerNav as $group)
                 <optgroup label="{{ $group['label'] }}">
                     @foreach ($group['items'] as $item)
-                        <option value="{{ $item['id'] }}">{{ $item['label'] }}</option>
+                        <option value="{{ $item['id'] }}">{{ $item['label'] }}@if (! empty($item['comingSoon'])) — {{ __('coming soon') }}@endif</option>
                     @endforeach
                 </optgroup>
             @endforeach
@@ -58,7 +80,10 @@
                             <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-mist">{{ $group['label'] }}</p>
                             <ul class="space-y-0.5">
                                 @foreach ($group['items'] as $item)
-                                    @php $count = $this->credentialCountFor($item['id']); @endphp
+                                    @php
+                                        $count = $this->credentialCountFor($item['id']);
+                                        $isComing = ! empty($item['comingSoon']);
+                                    @endphp
                                     <li>
                                         <button
                                             type="button"
@@ -66,14 +91,17 @@
                                             @class([
                                                 'w-full text-left rounded-lg px-3 py-1.5 transition-colors flex items-center justify-between gap-2',
                                                 'bg-brand-sand/60 text-brand-ink font-medium' => $active_provider === $item['id'],
-                                                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active_provider !== $item['id'],
+                                                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active_provider !== $item['id'] && ! $isComing,
+                                                'text-brand-mist hover:bg-brand-sand/40 hover:text-brand-moss' => $active_provider !== $item['id'] && $isComing,
                                             ])
                                         >
                                             <span class="flex min-w-0 flex-1 items-center gap-2">
                                                 <x-credentials-provider-icon :provider="$item['id']" />
                                                 <span class="truncate">{{ $item['label'] }}</span>
                                             </span>
-                                            @if ($count > 0)
+                                            @if ($isComing)
+                                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('soon') }}</span>
+                                            @elseif ($count > 0)
                                                 <span class="shrink-0 text-[10px] font-semibold tabular-nums rounded-full bg-brand-sage/25 text-brand-ink px-1.5 py-0.5">{{ $count }}</span>
                                             @endif
                                         </button>

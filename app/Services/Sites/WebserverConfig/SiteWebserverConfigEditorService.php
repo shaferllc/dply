@@ -2,10 +2,12 @@
 
 namespace App\Services\Sites\WebserverConfig;
 
+use App\Models\ConfigRevision;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
-use App\Models\SiteWebserverConfigRevision;
 use App\Models\User;
+use App\Services\ConfigRevisions\ConfigRevisionContext;
+use App\Services\ConfigRevisions\ConfigRevisionRecorder;
 use App\Services\Sites\SiteApacheProvisioner;
 use App\Services\Sites\SiteCaddyProvisioner;
 use App\Services\Sites\SiteNginxProvisioner;
@@ -28,7 +30,18 @@ class SiteWebserverConfigEditorService
         private readonly SiteCaddyProvisioner $caddyProvisioner,
         private readonly SiteOpenLiteSpeedProvisioner $openLiteSpeedProvisioner,
         private readonly SiteTraefikProvisioner $traefikProvisioner,
+        private readonly ConfigRevisionRecorder $recorder,
     ) {}
+
+    public function profileStreamKey(Site $site): string
+    {
+        return 'site:'.$site->id.':webserver_config';
+    }
+
+    public function streamHasRevisions(Site $site): bool
+    {
+        return ConfigRevision::query()->forStream($this->profileStreamKey($site))->exists();
+    }
 
     public function lock(Site $site): Lock
     {
@@ -110,26 +123,35 @@ class SiteWebserverConfigEditorService
         return $out;
     }
 
-    public function saveRevision(Site $site, SiteWebserverConfigProfile $profile, User $user, ?string $summary = null): SiteWebserverConfigRevision
+    /**
+     * Capture a webserver-config profile snapshot into config_revisions.
+     * Returns null when the recorder dedupes against an identical previous
+     * revision (no real change). Callers should not assume a row was written.
+     *
+     * @param  array{
+     *     mode: string,
+     *     before_body: ?string,
+     *     main_snippet_body: ?string,
+     *     after_body: ?string,
+     *     full_override_body: ?string
+     * }  $snapshot
+     */
+    public function captureProfileSnapshot(Site $site, array $snapshot, User $user, ?string $summary = null): ?ConfigRevision
     {
-        $snapshot = [
-            'mode' => $profile->mode,
-            'before_body' => $profile->before_body,
-            'main_snippet_body' => $profile->main_snippet_body,
-            'after_body' => $profile->after_body,
-            'full_override_body' => $profile->full_override_body,
-        ];
-
-        return SiteWebserverConfigRevision::query()->create([
-            'site_webserver_config_profile_id' => $profile->id,
-            'user_id' => $user->id,
-            'summary' => $summary,
-            'snapshot' => $snapshot,
-            'checksum' => hash('sha256', json_encode($snapshot)),
-        ]);
+        return $this->recorder->capture(
+            $this->profileStreamKey($site),
+            'webserver_config',
+            $snapshot,
+            new ConfigRevisionContext(
+                server: $site->server,
+                subject: $site,
+                user: $user,
+                summary: $summary,
+            ),
+        );
     }
 
-    public function restoreRevision(SiteWebserverConfigProfile $profile, SiteWebserverConfigRevision $revision): void
+    public function restoreRevision(SiteWebserverConfigProfile $profile, ConfigRevision $revision): void
     {
         $snap = $revision->snapshot;
         $profile->update([

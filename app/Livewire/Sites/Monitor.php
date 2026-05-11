@@ -4,14 +4,15 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -21,7 +22,13 @@ use Livewire\Component;
 class Monitor extends Component
 {
     use ConfirmsActionWithModal;
+    use DismissesConsoleActionRun;
     use DispatchesToastNotifications;
+
+    protected function consoleActionSubject(): Model
+    {
+        return $this->site;
+    }
 
     public Server $server;
 
@@ -97,31 +104,6 @@ class Monitor extends Component
         RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($this->site, $monitor, auth()->id());
 
         $this->site->load('uptimeMonitors');
-    }
-
-    /**
-     * Soft-dismiss a finished (or stale) console_actions row so its banner stops
-     * showing on the page. In-flight rows are protected — clicking dismiss while
-     * the worker is still running is a no-op. Mirrors the Settings component's
-     * implementation; consolidate to a trait if a third caller appears.
-     */
-    public function dismissConsoleActionRun(string $runId): void
-    {
-        $row = ConsoleAction::query()
-            ->where('id', $runId)
-            ->where('subject_type', $this->site->getMorphClass())
-            ->where('subject_id', $this->site->id)
-            ->first();
-
-        if ($row === null) {
-            return;
-        }
-
-        if ($row->isInFlight() && ! $row->isStale()) {
-            return;
-        }
-
-        $row->forceFill(['dismissed_at' => now()])->save();
     }
 
     public function confirmRemoveMonitor(string $monitorId): void

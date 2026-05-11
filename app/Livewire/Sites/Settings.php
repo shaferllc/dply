@@ -4,20 +4,23 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
 use App\Jobs\AssignSystemUserToSiteJob;
+use App\Jobs\AttachEdgeDomainJob;
+use App\Jobs\DetachEdgeDomainJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SyncBasicAuthFromServerJob;
 use App\Jobs\TearDownSiteSystemdUnitJob;
+use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
-use App\Models\ConsoleAction;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\NotificationWebhookDestination;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteAuditEvent;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
@@ -35,12 +38,15 @@ use App\Services\DigitalOceanService;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\RemoteCli\Artisan;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Services\RemoteCli\RiskLevel;
+use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerSystemUserService;
 use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
+use App\Services\Sites\PrimaryHostnameRenamePlanner;
 use App\Services\Sites\SiteDeploySyncGroupManager;
 use App\Services\Sites\SiteScopedCommandWrapper;
 use App\Services\Sites\SiteSystemdProvisioner;
@@ -52,14 +58,21 @@ use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class Settings extends Show
 {
+    use DismissesConsoleActionRun;
     use ManagesContainerSite;
     use StreamsRemoteSshLivewire;
+
+    protected function consoleActionSubject(): Model
+    {
+        return $this->site;
+    }
 
     private const ROUTING_TABS = ['domains', 'aliases', 'redirects', 'preview', 'tenants'];
 
@@ -86,6 +99,22 @@ class Settings extends Show
 
     public string $settings_document_root = '';
 
+    /**
+     * Cascade preview for a primary-hostname rename. Set by saveGeneralSettings()
+     * when the change is non-trivial (existing cert / container backend / etc.)
+     * and consumed by the confirmation modal in `livewire.sites.settings`. Null
+     * when no rename is pending. Shape matches {@see PrimaryHostnameRenamePlanner::plan()}.
+     *
+     * @var array{old: string, new: string, auto: list<array{key: string, label: string}>, optIn: list<array{key: string, label: string, detail?: array<string, mixed>}>, manual: list<string>}|null
+     */
+    public ?array $rename_plan = null;
+
+    /** Opt-in: re-issue SSL cert covering the new hostname during rename confirmation. */
+    public bool $rename_reissue_cert = false;
+
+    /** Opt-in: detach old + attach new on the site's container backend during rename confirmation. */
+    public bool $rename_cycle_backend = false;
+
     public ?string $project_workspace_id = null;
 
     public string $site_notes = '';
@@ -93,6 +122,20 @@ class Settings extends Show
     public string $new_alias_hostname = '';
 
     public string $new_alias_label = '';
+
+    public string $new_alias_comment = '';
+
+    /** Multi-line bulk paste — `hostname` or `hostname,label` per line. */
+    public string $bulk_alias_input = '';
+
+    /** When non-null, the aliases list shows an inline edit form for this row. */
+    public ?string $editing_alias_id = null;
+
+    public string $editing_alias_hostname = '';
+
+    public string $editing_alias_label = '';
+
+    public string $editing_alias_comment = '';
 
     public string $new_basic_auth_username = '';
 
@@ -110,7 +153,26 @@ class Settings extends Show
 
     public string $new_tenant_label = '';
 
-    public string $new_tenant_notes = '';
+    /**
+     * Free-text comment for tenant rows. Replaces the legacy `notes` field
+     * (column dropped in the routing-tables migration); existing notes were
+     * backfilled into `comment`.
+     */
+    public string $new_tenant_comment = '';
+
+    /** Multi-line bulk paste — `hostname,key,label` per line. */
+    public string $bulk_tenant_input = '';
+
+    /** When non-null, the tenants list shows an inline edit form for this row. */
+    public ?string $editing_tenant_id = null;
+
+    public string $editing_tenant_hostname = '';
+
+    public string $editing_tenant_key = '';
+
+    public string $editing_tenant_label = '';
+
+    public string $editing_tenant_comment = '';
 
     public string $preview_primary_hostname = '';
 
@@ -1174,13 +1236,10 @@ class Settings extends Show
             return;
         }
 
-        $rules = [
-            'deployment_environment' => 'required|string|max:32',
-        ];
+        $rules = [];
 
         if ($this->shouldShowRuntimePhpRolloutFields()) {
             $rules['laravel_scheduler'] = 'boolean';
-            $rules['restart_supervisor_programs_after_deploy'] = 'boolean';
             if (! $this->shouldShowSystemUserPanel()) {
                 $rules['php_fpm_user'] = 'nullable|string|max:64';
             }
@@ -1205,13 +1264,10 @@ class Settings extends Show
 
         $this->validate($rules);
 
-        $update = [
-            'deployment_environment' => $this->deployment_environment,
-        ];
+        $update = [];
 
         if ($this->shouldShowRuntimePhpRolloutFields()) {
             $update['laravel_scheduler'] = $this->laravel_scheduler;
-            $update['restart_supervisor_programs_after_deploy'] = $this->restart_supervisor_programs_after_deploy;
             if (! $this->shouldShowSystemUserPanel()) {
                 $update['php_fpm_user'] = $this->php_fpm_user !== '' ? $this->php_fpm_user : null;
             }
@@ -1352,7 +1408,6 @@ class Settings extends Show
 
     private function syncDnsSettingsForm(): void
     {
-        $this->site->refresh();
         $this->settings_dns_provider_credential_id = (string) ($this->site->dns_provider_credential_id ?? '');
         $savedZone = trim((string) ($this->site->dns_zone ?? ''));
         $this->settings_dns_zone = $savedZone !== '' ? strtolower($savedZone) : '';
@@ -1482,26 +1537,208 @@ class Settings extends Show
             'settings_document_root' => ['required', 'string', 'max:500'],
         ]);
 
+        // document_root has no cascade and is independent of the primary hostname,
+        // so it always commits inline regardless of whether the rename branch
+        // opens the modal below.
         $this->site->update([
             'document_root' => trim($validated['settings_document_root']),
         ]);
 
-        if ($primaryDomain) {
-            $primaryDomain->update([
-                'hostname' => strtolower(trim($validated['settings_primary_domain'])),
+        $old = strtolower(trim((string) optional($primaryDomain)->hostname));
+        $new = strtolower(trim($validated['settings_primary_domain']));
+
+        // Greenfield path: no prior primary domain → first-time set. Or no actual
+        // change → noop on the hostname row. Either way, skip the modal.
+        if ($primaryDomain === null || $old === $new) {
+            $this->commitPrimaryDomainHostname($primaryDomain, $new);
+            $this->site->load('domains');
+            $this->syncGeneralSettingsForm();
+            $this->finalizeRoutingMutation('Site settings saved.');
+
+            return;
+        }
+
+        // Real rename: ask the planner what would cascade. If only the always-auto
+        // rows fire, commit inline with a lightweight audit event; otherwise open
+        // the confirmation modal so the operator picks the opt-in cascades.
+        $planner = app(PrimaryHostnameRenamePlanner::class);
+        $plan = $planner->plan($this->site, $new);
+
+        if ($planner->isTrivial($plan)) {
+            $this->commitPrimaryDomainHostname($primaryDomain, $new);
+            $this->recordRenameAudit($old, $new, [], false);
+            $this->site->load('domains');
+            $this->syncGeneralSettingsForm();
+            $this->finalizeRoutingMutation('Site settings saved.');
+
+            return;
+        }
+
+        $this->rename_plan = $plan;
+        $this->rename_reissue_cert = false;
+        $this->rename_cycle_backend = false;
+        $this->dispatch('open-modal', name: 'primary-hostname-rename-modal');
+    }
+
+    /**
+     * Commit the primary-hostname rename selected in the confirmation modal,
+     * applying the opt-in cascades the operator checked. Mutates only when
+     * `$rename_plan` is set (defensive — the modal can't fire otherwise).
+     */
+    public function confirmPrimaryHostnameRename(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->rename_plan === null) {
+            return;
+        }
+
+        $primaryDomain = $this->site->primaryDomain();
+        if ($primaryDomain === null) {
+            // Defensive: planner only sets `rename_plan` when there was a prior
+            // primary domain. If the row got deleted between save and confirm,
+            // fall back to the greenfield path.
+            $this->rename_plan = null;
+
+            return;
+        }
+
+        $old = strtolower(trim((string) $primaryDomain->hostname));
+        $new = strtolower(trim((string) $this->rename_plan['new']));
+
+        // Re-plan defensively in case the site changed under us (modal could
+        // have been open while another tab issued a cert, etc.). Use the fresh
+        // plan to decide which opt-ins are still applicable.
+        $planner = app(PrimaryHostnameRenamePlanner::class);
+        $freshPlan = $planner->plan($this->site, $new);
+        $optInKeys = array_map(fn (array $row) => $row['key'], $freshPlan['optIn']);
+
+        $reissueCert = $this->rename_reissue_cert && in_array('reissue_cert', $optInKeys, true);
+        $cycleBackend = $this->rename_cycle_backend && in_array('cycle_backend', $optInKeys, true);
+        $rewriteDnsZone = collect($freshPlan['auto'])->contains(fn (array $row) => $row['key'] === 'dns_zone');
+
+        $this->commitPrimaryDomainHostname($primaryDomain, $new);
+
+        if ($rewriteDnsZone) {
+            $this->site->update([
+                'dns_zone' => Site::apexGuessForHostname($new),
             ]);
+        }
+
+        $cascadeKeys = [];
+        if ($reissueCert) {
+            $cascadeKeys[] = 'reissue_cert';
+            $this->dispatchCertReissue($freshPlan);
+        }
+        if ($cycleBackend) {
+            $cascadeKeys[] = 'cycle_backend';
+            DetachEdgeDomainJob::dispatch($this->site->id, $old);
+            AttachEdgeDomainJob::dispatch($this->site->id, $new);
+        }
+
+        $this->recordRenameAudit($old, $new, $cascadeKeys, $rewriteDnsZone);
+
+        $this->rename_plan = null;
+        $this->rename_reissue_cert = false;
+        $this->rename_cycle_backend = false;
+        $this->dispatch('close-modal', name: 'primary-hostname-rename-modal');
+
+        $this->site->load('domains');
+        $this->syncGeneralSettingsForm();
+        $this->finalizeRoutingMutation('Primary hostname renamed.');
+    }
+
+    /**
+     * Discard the pending rename — leaves the form's edited (unsaved) value
+     * in place so the operator can keep editing or revert manually.
+     */
+    public function cancelPrimaryHostnameRename(): void
+    {
+        $this->rename_plan = null;
+        $this->rename_reissue_cert = false;
+        $this->rename_cycle_backend = false;
+        $this->dispatch('close-modal', name: 'primary-hostname-rename-modal');
+    }
+
+    /**
+     * Persist the primary hostname — extracted from saveGeneralSettings so both
+     * the inline-commit path and the modal-confirm path stay in sync.
+     */
+    private function commitPrimaryDomainHostname(?SiteDomain $primaryDomain, string $hostname): void
+    {
+        if ($primaryDomain) {
+            $primaryDomain->update(['hostname' => $hostname]);
         } else {
             SiteDomain::query()->create([
                 'site_id' => $this->site->id,
-                'hostname' => strtolower(trim($validated['settings_primary_domain'])),
+                'hostname' => $hostname,
                 'is_primary' => true,
                 'www_redirect' => false,
             ]);
         }
+    }
 
-        $this->site->load('domains');
-        $this->syncGeneralSettingsForm();
-        $this->finalizeRoutingMutation('Site settings saved.');
+    /**
+     * Clone the customer-scope certs that covered the old hostname and queue
+     * issuance against the now-current `sslIssuanceHostnames()`. Mirrors the
+     * pattern at {@see saveQuickDomainSslModal()} (Settings.php quick-issue flow):
+     * create a SiteCertificate row + dispatch ExecuteSiteCertificateJob.
+     *
+     * @param  array{optIn: list<array{key: string, label: string, detail?: array<string, mixed>}>}  $plan
+     */
+    private function dispatchCertReissue(array $plan): void
+    {
+        $row = collect($plan['optIn'] ?? [])->firstWhere('key', 'reissue_cert');
+        $certIds = is_array($row) ? ($row['detail']['cert_ids'] ?? []) : [];
+        if (! is_array($certIds) || $certIds === []) {
+            return;
+        }
+
+        $certificateRequestService = app(CertificateRequestService::class);
+        $sourceCerts = SiteCertificate::query()
+            ->where('site_id', $this->site->id)
+            ->whereIn('id', $certIds)
+            ->get();
+        $newHostnames = $this->site->sslIssuanceHostnames();
+
+        foreach ($sourceCerts as $source) {
+            $certificate = $certificateRequestService->create([
+                'site_id' => $this->site->id,
+                'scope_type' => $source->scope_type ?? SiteCertificate::SCOPE_CUSTOMER,
+                'provider_type' => $source->provider_type ?? SiteCertificate::PROVIDER_LETSENCRYPT,
+                'challenge_type' => $source->challenge_type ?? SiteCertificate::CHALLENGE_HTTP,
+                'domains_json' => $newHostnames,
+                'status' => SiteCertificate::STATUS_PENDING,
+                'requested_settings' => [
+                    'source' => 'primary_hostname_rename',
+                    'replaced_certificate_id' => (string) $source->id,
+                ],
+            ]);
+
+            ExecuteSiteCertificateJob::dispatch($certificate->id);
+        }
+    }
+
+    /**
+     * @param  list<string>  $cascades  Opt-in cascade keys the operator selected
+     *                                  (used to make audit payload self-describing).
+     */
+    private function recordRenameAudit(string $old, string $new, array $cascades, bool $dnsZoneRewritten): void
+    {
+        app(SiteAuditWriter::class)->record(
+            site: $this->site,
+            user: auth()->user(),
+            action: 'site_primary_hostname_renamed',
+            risk: RiskLevel::MutatingRecoverable,
+            transport: SiteAuditEvent::TRANSPORT_WEB,
+            summary: __('Primary hostname changed from :old to :new', ['old' => $old !== '' ? $old : '(none)', 'new' => $new]),
+            payload: [
+                'old_hostname' => $old,
+                'new_hostname' => $new,
+                'cascades' => $cascades,
+                'dns_zone_rewritten' => $dnsZoneRewritten,
+            ],
+        );
     }
 
     public function saveProjectSettings(): void
@@ -1575,19 +1812,35 @@ class Settings extends Show
                 },
             ],
             'new_alias_label' => ['nullable', 'string', 'max:255'],
+            'new_alias_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
         SiteDomainAlias::query()->create([
             'site_id' => $this->site->id,
             'hostname' => strtolower(trim($validated['new_alias_hostname'])),
             'label' => trim((string) ($validated['new_alias_label'] ?? '')) ?: null,
+            'comment' => trim((string) ($validated['new_alias_comment'] ?? '')) ?: null,
             'sort_order' => (int) ($this->site->domainAliases()->max('sort_order') ?? 0) + 1,
         ]);
 
         $this->new_alias_hostname = '';
         $this->new_alias_label = '';
+        $this->new_alias_comment = '';
         $this->site->load('domainAliases');
         $this->finalizeRoutingMutation('Alias added.');
+    }
+
+    public function confirmRemoveAlias(string $aliasId): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            'removeAlias',
+            [$aliasId],
+            __('Remove alias'),
+            __('Remove this alias from the webserver server_name list?'),
+            __('Remove alias'),
+            true,
+        );
     }
 
     public function removeAlias(string $aliasId): void
@@ -1597,6 +1850,120 @@ class Settings extends Show
         $this->site->domainAliases()->findOrFail($aliasId)->delete();
         $this->site->load('domainAliases');
         $this->finalizeRoutingMutation('Alias removed.');
+    }
+
+    public function editAlias(string $aliasId): void
+    {
+        $this->authorize('update', $this->site);
+        $alias = $this->site->domainAliases()->findOrFail($aliasId);
+        $this->editing_alias_id = (string) $alias->id;
+        $this->editing_alias_hostname = (string) $alias->hostname;
+        $this->editing_alias_label = (string) ($alias->label ?? '');
+        $this->editing_alias_comment = (string) ($alias->comment ?? '');
+    }
+
+    public function cancelEditAlias(): void
+    {
+        $this->editing_alias_id = null;
+        $this->editing_alias_hostname = '';
+        $this->editing_alias_label = '';
+        $this->editing_alias_comment = '';
+    }
+
+    public function saveEditedAlias(): void
+    {
+        $this->authorize('update', $this->site);
+        if ($this->editing_alias_id === null) {
+            return;
+        }
+        $alias = $this->site->domainAliases()->findOrFail($this->editing_alias_id);
+        $this->validate([
+            'editing_alias_hostname' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('site_domain_aliases', 'hostname')->ignore($alias->id),
+                Rule::unique('site_domains', 'hostname'),
+                Rule::unique('site_preview_domains', 'hostname'),
+                Rule::unique('site_tenant_domains', 'hostname'),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                        $fail('Enter a valid alias like www.example.com.');
+                    }
+                },
+            ],
+            'editing_alias_label' => ['nullable', 'string', 'max:255'],
+            'editing_alias_comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $alias->forceFill([
+            'hostname' => strtolower(trim($this->editing_alias_hostname)),
+            'label' => trim($this->editing_alias_label) ?: null,
+            'comment' => trim($this->editing_alias_comment) ?: null,
+        ])->save();
+
+        $this->cancelEditAlias();
+        $this->site->load('domainAliases');
+        $this->finalizeRoutingMutation('Alias updated.');
+    }
+
+    /**
+     * Bulk paste aliases — `hostname` or `hostname,label` per line. Existing
+     * hostnames (in any routing table) are silently skipped to make repeated
+     * pastes safe.
+     */
+    public function bulkImportAliases(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate(['bulk_alias_input' => 'required|string|max:65535']);
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($this->bulk_alias_input)) ?: [];
+        $rows = [];
+        foreach ($lines as $i => $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            $parts = array_map('trim', explode(',', $line, 2));
+            $hostname = strtolower($parts[0] ?? '');
+            $label = $parts[1] ?? null;
+            if ($hostname === '' || ! HostnameValidator::isValid($hostname)) {
+                $this->addError('bulk_alias_input', sprintf('Line %d: "%s" is not a valid hostname.', $i + 1, $hostname));
+
+                return;
+            }
+            $rows[] = ['hostname' => $hostname, 'label' => $label];
+        }
+
+        // Filter out hostnames already present anywhere in the routing
+        // namespace (domains, aliases, preview, tenants). Skipping silently
+        // keeps `paste a snapshot from prod` ergonomic.
+        $taken = collect()
+            ->merge(SiteDomain::query()->pluck('hostname'))
+            ->merge(SiteDomainAlias::query()->pluck('hostname'))
+            ->merge(SitePreviewDomain::query()->pluck('hostname'))
+            ->merge(SiteTenantDomain::query()->pluck('hostname'))
+            ->map(fn ($h) => strtolower((string) $h))
+            ->unique()
+            ->all();
+
+        $sortBase = (int) ($this->site->domainAliases()->max('sort_order') ?? 0);
+        $imported = 0;
+        foreach ($rows as $row) {
+            if (in_array($row['hostname'], $taken, true)) {
+                continue;
+            }
+            SiteDomainAlias::query()->create([
+                'site_id' => $this->site->id,
+                'hostname' => $row['hostname'],
+                'label' => $row['label'] !== null && $row['label'] !== '' ? $row['label'] : null,
+                'sort_order' => ++$sortBase,
+            ]);
+            $imported++;
+        }
+
+        $this->bulk_alias_input = '';
+        $this->site->load('domainAliases');
+        $this->finalizeRoutingMutation(__(':count alias(es) imported.', ['count' => $imported]));
     }
 
     public function addBasicAuthUser(): void
@@ -1749,31 +2116,6 @@ class Settings extends Show
     // query and rendered through `livewire.partials.console-action-banner-static`,
     // which lives in the parent component's render tree (no nested Livewire component).
     // The banner's Dismiss button posts to {@see dismissConsoleActionRun()} below.
-
-    /**
-     * Soft-dismiss a finished (or stale) console_actions row so its banner stops
-     * showing on the page. In-flight rows are protected — clicking dismiss while
-     * the worker is still running is a no-op, mirroring the "no clobbering live
-     * runs" rule the legacy banner enforced.
-     */
-    public function dismissConsoleActionRun(string $runId): void
-    {
-        $row = ConsoleAction::query()
-            ->where('id', $runId)
-            ->where('subject_type', $this->site->getMorphClass())
-            ->where('subject_id', $this->site->id)
-            ->first();
-
-        if ($row === null) {
-            return;
-        }
-
-        if ($row->isInFlight() && ! $row->isStale()) {
-            return;
-        }
-
-        $row->forceFill(['dismissed_at' => now()])->save();
-    }
 
     /**
      * @param  string  $customPassword  Operator-supplied plaintext from the rotate
@@ -1954,7 +2296,7 @@ class Settings extends Show
             ],
             'new_tenant_key' => ['nullable', 'string', 'max:255'],
             'new_tenant_label' => ['nullable', 'string', 'max:255'],
-            'new_tenant_notes' => ['nullable', 'string', 'max:2000'],
+            'new_tenant_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
         SiteTenantDomain::query()->create([
@@ -1962,16 +2304,29 @@ class Settings extends Show
             'hostname' => strtolower(trim($validated['new_tenant_hostname'])),
             'tenant_key' => trim((string) ($validated['new_tenant_key'] ?? '')) ?: null,
             'label' => trim((string) ($validated['new_tenant_label'] ?? '')) ?: null,
-            'notes' => trim((string) ($validated['new_tenant_notes'] ?? '')) ?: null,
+            'comment' => trim((string) ($validated['new_tenant_comment'] ?? '')) ?: null,
             'sort_order' => (int) ($this->site->tenantDomains()->max('sort_order') ?? 0) + 1,
         ]);
 
         $this->new_tenant_hostname = '';
         $this->new_tenant_key = '';
         $this->new_tenant_label = '';
-        $this->new_tenant_notes = '';
+        $this->new_tenant_comment = '';
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain added.');
+    }
+
+    public function confirmRemoveTenantDomain(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            'removeTenantDomain',
+            [$tenantDomainId],
+            __('Remove tenant domain'),
+            __('Remove this tenant domain? Your application is responsible for resolving traffic for it; that traffic stops being routed after the next webserver apply.'),
+            __('Remove tenant'),
+            true,
+        );
     }
 
     public function removeTenantDomain(string $tenantDomainId): void
@@ -1981,6 +2336,127 @@ class Settings extends Show
         $this->site->tenantDomains()->findOrFail($tenantDomainId)->delete();
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain removed.');
+    }
+
+    public function editTenantDomain(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+        $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
+        $this->editing_tenant_id = (string) $tenant->id;
+        $this->editing_tenant_hostname = (string) $tenant->hostname;
+        $this->editing_tenant_key = (string) ($tenant->tenant_key ?? '');
+        $this->editing_tenant_label = (string) ($tenant->label ?? '');
+        $this->editing_tenant_comment = (string) ($tenant->comment ?? '');
+    }
+
+    public function cancelEditTenantDomain(): void
+    {
+        $this->editing_tenant_id = null;
+        $this->editing_tenant_hostname = '';
+        $this->editing_tenant_key = '';
+        $this->editing_tenant_label = '';
+        $this->editing_tenant_comment = '';
+    }
+
+    public function saveEditedTenantDomain(): void
+    {
+        $this->authorize('update', $this->site);
+        if ($this->editing_tenant_id === null) {
+            return;
+        }
+        $tenant = $this->site->tenantDomains()->findOrFail($this->editing_tenant_id);
+        $this->validate([
+            'editing_tenant_hostname' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('site_tenant_domains', 'hostname')->ignore($tenant->id),
+                Rule::unique('site_domains', 'hostname'),
+                Rule::unique('site_domain_aliases', 'hostname'),
+                Rule::unique('site_preview_domains', 'hostname'),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                        $fail('Enter a valid tenant domain like customer.example.com.');
+                    }
+                },
+            ],
+            'editing_tenant_key' => ['nullable', 'string', 'max:255'],
+            'editing_tenant_label' => ['nullable', 'string', 'max:255'],
+            'editing_tenant_comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $tenant->forceFill([
+            'hostname' => strtolower(trim($this->editing_tenant_hostname)),
+            'tenant_key' => trim($this->editing_tenant_key) ?: null,
+            'label' => trim($this->editing_tenant_label) ?: null,
+            'comment' => trim($this->editing_tenant_comment) ?: null,
+        ])->save();
+
+        $this->cancelEditTenantDomain();
+        $this->site->load('tenantDomains');
+        $this->finalizeRoutingMutation('Tenant domain updated.');
+    }
+
+    /**
+     * Bulk paste tenants — `hostname,key,label` per line; key/label optional.
+     * Hostnames already present anywhere in the routing namespace are skipped
+     * (same convention as the alias bulk import).
+     */
+    public function bulkImportTenantDomains(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate(['bulk_tenant_input' => 'required|string|max:65535']);
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($this->bulk_tenant_input)) ?: [];
+        $rows = [];
+        foreach ($lines as $i => $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            $parts = array_map('trim', explode(',', $line, 3));
+            $hostname = strtolower($parts[0] ?? '');
+            $key = $parts[1] ?? null;
+            $label = $parts[2] ?? null;
+            if ($hostname === '' || ! HostnameValidator::isValid($hostname)) {
+                $this->addError('bulk_tenant_input', sprintf('Line %d: "%s" is not a valid hostname.', $i + 1, $hostname));
+
+                return;
+            }
+            $rows[] = [
+                'hostname' => $hostname,
+                'key' => $key !== null && $key !== '' ? $key : null,
+                'label' => $label !== null && $label !== '' ? $label : null,
+            ];
+        }
+
+        $taken = collect()
+            ->merge(SiteDomain::query()->pluck('hostname'))
+            ->merge(SiteDomainAlias::query()->pluck('hostname'))
+            ->merge(SitePreviewDomain::query()->pluck('hostname'))
+            ->merge(SiteTenantDomain::query()->pluck('hostname'))
+            ->map(fn ($h) => strtolower((string) $h))
+            ->unique()
+            ->all();
+
+        $sortBase = (int) ($this->site->tenantDomains()->max('sort_order') ?? 0);
+        $imported = 0;
+        foreach ($rows as $row) {
+            if (in_array($row['hostname'], $taken, true)) {
+                continue;
+            }
+            SiteTenantDomain::query()->create([
+                'site_id' => $this->site->id,
+                'hostname' => $row['hostname'],
+                'tenant_key' => $row['key'],
+                'label' => $row['label'],
+                'sort_order' => ++$sortBase,
+            ]);
+            $imported++;
+        }
+
+        $this->bulk_tenant_input = '';
+        $this->site->load('tenantDomains');
+        $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]));
     }
 
     public function savePreviewSettings(): void
@@ -2031,6 +2507,19 @@ class Settings extends Show
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation('Preview settings saved.');
+    }
+
+    public function confirmRemovePreviewDomain(string $previewDomainId): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            'removePreviewDomain',
+            [$previewDomainId],
+            __('Remove preview domain'),
+            __('Remove this preview hostname? Any pending preview certificate is dropped after the next webserver apply.'),
+            __('Remove preview'),
+            true,
+        );
     }
 
     public function removePreviewDomain(string $previewDomainId): void

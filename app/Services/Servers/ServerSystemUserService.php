@@ -3,8 +3,10 @@
 namespace App\Services\Servers;
 
 use App\Models\Server;
+use App\Models\ServerSystemUser;
 use App\Models\Site;
 use App\Services\SshConnection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ServerSystemUserService
@@ -15,19 +17,103 @@ class ServerSystemUserService
     ) {}
 
     /**
-     * @return list<array{username: string, site_count: int}>
+     * SSH-probes the server, persists the snapshot to `server_system_users`,
+     * and returns enriched rows for rendering (site list + orphan/protected
+     * flags). Stale records (users no longer present on the host) are removed
+     * in the same transaction so the table reflects reality on each sync.
+     *
+     * @return list<array{username: string, site_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     public function listPasswdUsersWithSiteCounts(Server $server, ServerPasswdUserLister $lister): array
     {
-        $names = $lister->listUsernames($server);
-        $counts = $this->deletionPolicy->siteCountsByUsername($server);
+        $details = $lister->listPasswdDetails($server);
+        $this->persistSystemUsers($server, $details);
+
+        return $this->buildEnrichedRows($server, $details);
+    }
+
+    /**
+     * DB-backed read of the last persisted snapshot. Used by the workspace
+     * page on mount so the table is populated without a fresh SSH probe.
+     *
+     * @return list<array{username: string, site_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
+     */
+    public function storedSystemUsersWithMetadata(Server $server): array
+    {
+        $details = $server->systemUsers()->get()
+            ->map(static fn (ServerSystemUser $u): array => [
+                'username' => $u->username,
+                'uid' => $u->uid,
+                'home' => (string) $u->home,
+                'shell' => (string) $u->shell,
+                'groups' => is_array($u->groups) ? array_values($u->groups) : [],
+            ])
+            ->all();
+
+        return $this->buildEnrichedRows($server, $details);
+    }
+
+    /**
+     * @param  list<array{username: string, uid?: int|null, home?: string, shell?: string, groups?: list<string>}>  $details
+     */
+    private function persistSystemUsers(Server $server, array $details): void
+    {
+        $now = now();
+        $seen = [];
+
+        DB::transaction(function () use ($server, $details, $now, &$seen): void {
+            foreach ($details as $d) {
+                $username = (string) ($d['username'] ?? '');
+                if ($username === '') {
+                    continue;
+                }
+                $seen[] = $username;
+
+                ServerSystemUser::query()->updateOrCreate(
+                    ['server_id' => $server->id, 'username' => $username],
+                    [
+                        'uid' => $d['uid'] ?? null,
+                        'home' => (string) ($d['home'] ?? ''),
+                        'shell' => (string) ($d['shell'] ?? ''),
+                        'groups' => array_values($d['groups'] ?? []),
+                        'last_seen_at' => $now,
+                    ],
+                );
+            }
+
+            $stale = ServerSystemUser::query()->where('server_id', $server->id);
+            if ($seen !== []) {
+                $stale->whereNotIn('username', $seen);
+            }
+            $stale->delete();
+        });
+    }
+
+    /**
+     * @param  list<array{username: string, uid?: int|null, home?: string, shell?: string, groups?: list<string>}>  $details
+     * @return list<array{username: string, site_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
+     */
+    private function buildEnrichedRows(Server $server, array $details): array
+    {
+        $sitesByUser = $this->sitesByEffectiveUser($server);
 
         $rows = [];
-        foreach ($names as $name) {
-            $key = strtolower($name);
+        foreach ($details as $d) {
+            $key = strtolower($d['username']);
+            $sites = $sitesByUser[$key] ?? [];
+            $siteCount = count($sites);
+            $protected = $this->deletionPolicy->isProtected($server, $d['username']);
+
             $rows[] = [
-                'username' => $name,
-                'site_count' => $counts[$key] ?? 0,
+                'username' => $d['username'],
+                'site_count' => $siteCount,
+                'is_protected' => $protected,
+                'is_orphan' => ! $protected && $siteCount === 0,
+                'uid' => $d['uid'] ?? null,
+                'home' => (string) ($d['home'] ?? ''),
+                'shell' => (string) ($d['shell'] ?? ''),
+                'groups' => array_values($d['groups'] ?? []),
+                'sites' => $sites,
             ];
         }
 
@@ -37,20 +123,42 @@ class ServerSystemUserService
     }
 
     /**
+     * @return array<string, list<array{id: string, name: string}>>
+     */
+    private function sitesByEffectiveUser(Server $server): array
+    {
+        $map = [];
+        foreach (Site::query()->where('server_id', $server->id)->get(['id', 'name', 'php_fpm_user']) as $site) {
+            $u = strtolower(trim($site->effectiveSystemUser($server)));
+            if ($u === '') {
+                continue;
+            }
+            $map[$u][] = [
+                'id' => (string) $site->id,
+                'name' => (string) ($site->name ?? $site->id),
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
      * Creates a Linux account on the server. Server-scoped operation: nothing
      * about a particular site is touched here. Used by the server-level
      * /system-users page; the site-level "Create user" path is gone — sites
      * pick from the existing-users dropdown via {@see assignExistingUserToSite()}.
      *
+     * @param  list<string>  $extraGroups  supplementary groups (e.g. www-data)
+     *
      * @throws \RuntimeException
      */
-    public function createUser(Server $server, string $username, bool $grantSudo): void
+    public function createUser(Server $server, string $username, bool $grantSudo, string $shell = '/bin/bash', array $extraGroups = []): void
     {
         $this->assertServerReady($server);
         $u = $this->validateNewUsername($username);
 
         $this->assertAcceptableCreateUsername($server, $u);
-        $this->createUserIfMissing($server, $u, $grantSudo);
+        $this->createUserIfMissing($server, $u, $grantSudo, $shell, $extraGroups);
     }
 
     /**
@@ -110,6 +218,11 @@ class ServerSystemUserService
         }
 
         $this->runPrivileged($server, 'userdel '.escapeshellarg($u), 120);
+
+        ServerSystemUser::query()
+            ->where('server_id', $server->id)
+            ->where('username', $u)
+            ->delete();
     }
 
     private function assertUserExistsOnServer(Server $server, string $username): void
@@ -120,16 +233,45 @@ class ServerSystemUserService
         }
     }
 
-    private function createUserIfMissing(Server $server, string $username, bool $grantSudo): void
+    /**
+     * @param  list<string>  $extraGroups
+     */
+    private function createUserIfMissing(Server $server, string $username, bool $grantSudo, string $shell, array $extraGroups): void
     {
         if ($this->remoteUserUid($server, $username) !== null) {
             throw new \RuntimeException(__('That user already exists on the server. Use “Select existing” instead.'));
         }
 
-        $group = $grantSudo ? '-G sudo ' : '';
-        $cmd = 'useradd -m -s /bin/bash '.$group.escapeshellarg($username);
+        $shellPath = $this->validateShell($shell);
+
+        $groups = [];
+        if ($grantSudo) {
+            $groups[] = 'sudo';
+        }
+        foreach ($extraGroups as $g) {
+            $groups[] = $this->validateWebServerGroup($g);
+        }
+        $groups = array_values(array_unique($groups));
+
+        $groupArg = $groups === [] ? '' : '-G '.escapeshellarg(implode(',', $groups)).' ';
+        $cmd = 'useradd -m -s '.escapeshellarg($shellPath).' '.$groupArg.escapeshellarg($username);
 
         $this->runPrivileged($server, $cmd, 120);
+    }
+
+    private function validateShell(string $shell): string
+    {
+        $s = trim($shell);
+        $allowed = [
+            '/bin/bash',
+            '/bin/sh',
+            '/usr/sbin/nologin',
+        ];
+        if (! in_array($s, $allowed, true)) {
+            throw new \RuntimeException(__('Login shell must be one of: :list.', ['list' => implode(', ', $allowed)]));
+        }
+
+        return $s;
     }
 
     public function chownSiteRepositoryTree(Site $site, string $linuxUser): void

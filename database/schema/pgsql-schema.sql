@@ -1832,8 +1832,7 @@ CREATE TABLE public.users (
     referral_code character varying(64),
     referred_by_user_id character(26),
     referral_converted_at timestamp(0) without time zone,
-    ui_preferences json,
-    dply_auth_id bigint
+    ui_preferences json
 );
 
 
@@ -3039,14 +3038,6 @@ ALTER TABLE ONLY public.teams
 
 ALTER TABLE ONLY public.user_ssh_keys
     ADD CONSTRAINT user_ssh_keys_pkey PRIMARY KEY (id);
-
-
---
--- Name: users users_dply_auth_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_dply_auth_id_unique UNIQUE (dply_auth_id);
 
 
 --

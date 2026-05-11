@@ -11,7 +11,7 @@ use App\Models\Site;
 final class SiteSettingsSidebar
 {
     /**
-     * @return list<array{id: string, label: string, icon: string}>
+     * @return list<array{id: string, label: string, icon: string, parent?: string}>
      */
     public static function items(Site $site, Server $server): array
     {
@@ -62,8 +62,21 @@ final class SiteSettingsSidebar
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box'],
             ];
 
+        $withRuntimeChild = collect($base)
+            ->flatMap(function (array $item) use ($site): array {
+                if ($item['id'] !== 'runtime') {
+                    return [$item];
+                }
+
+                $child = self::runtimeChildFor($site);
+
+                return $child === null ? [$item] : [$item, $child];
+            })
+            ->values()
+            ->all();
+
         $withWebserver = $showWebserverConfigEditor
-            ? collect($base)
+            ? collect($withRuntimeChild)
                 ->flatMap(function (array $item): array {
                     if ($item['id'] !== 'routing') {
                         return [$item];
@@ -80,12 +93,27 @@ final class SiteSettingsSidebar
                 })
                 ->values()
                 ->all()
-            : $base;
+            : $withRuntimeChild;
 
         return collect($withWebserver)
             ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
             ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{id: string, label: string, icon: string, parent: string}|null
+     */
+    private static function runtimeChildFor(Site $site): ?array
+    {
+        $runtime = (string) ($site->runtime ?? '');
+
+        return match ($runtime) {
+            'php' => ['id' => 'runtime-php', 'label' => __('PHP'), 'icon' => 'heroicon-o-cog', 'parent' => 'runtime'],
+            'ruby' => ['id' => 'runtime-ruby', 'label' => __('Ruby'), 'icon' => 'heroicon-o-cog', 'parent' => 'runtime'],
+            'static' => ['id' => 'runtime-static', 'label' => __('Static'), 'icon' => 'heroicon-o-cog', 'parent' => 'runtime'],
+            default => null,
+        };
     }
 }

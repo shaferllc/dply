@@ -56,6 +56,22 @@ class ServerSystemUserDeletionPolicyTest extends TestCase
         $this->assertNull($policy->deletionBlockedReason($server, 'orphan'));
     }
 
+    public function test_is_protected_flags_root_dply_and_deploy(): void
+    {
+        $policy = new ServerSystemUserDeletionPolicy;
+        $org = Organization::factory()->create();
+        $server = Server::factory()->for($org)->create(['ssh_user' => 'mydeploy']);
+
+        config(['server_provision.deploy_ssh_user' => 'dply']);
+
+        $this->assertTrue($policy->isProtected($server, 'root'));
+        $this->assertTrue($policy->isProtected($server, 'dply'));
+        $this->assertTrue($policy->isProtected($server, 'DPLY'));
+        $this->assertTrue($policy->isProtected($server, 'mydeploy'));
+        $this->assertFalse($policy->isProtected($server, 'appuser'));
+        $this->assertFalse($policy->isProtected($server, ''));
+    }
+
     public function test_site_counts_by_effective_user(): void
     {
         $policy = new ServerSystemUserDeletionPolicy;

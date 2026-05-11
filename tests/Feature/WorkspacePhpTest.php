@@ -373,7 +373,7 @@ class WorkspacePhpTest extends TestCase
             ]);
         $this->app->instance(ServerPhpManager::class, $manager);
 
-        $editor = Mockery::mock(ServerPhpConfigEditor::class);
+        $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial();
         $editor->shouldReceive('openTarget')
             ->once()
             ->withArgs(fn (Server $refreshedServer, string $version, string $target) => $refreshedServer->is($server) && $version === '8.3' && $target === 'cli_ini')
@@ -437,7 +437,7 @@ class WorkspacePhpTest extends TestCase
             ]);
         $this->app->instance(ServerPhpManager::class, $manager);
 
-        $editor = Mockery::mock(ServerPhpConfigEditor::class);
+        $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial();
         $editor->shouldReceive('openTarget')
             ->once()
             ->andReturn([
@@ -450,7 +450,7 @@ class WorkspacePhpTest extends TestCase
             ]);
         $editor->shouldReceive('saveTarget')
             ->once()
-            ->withArgs(fn (Server $refreshedServer, string $version, string $target, string $content) => $refreshedServer->is($server) && $version === '8.3' && $target === 'fpm_ini' && $content === "memory_limit=512M\n")
+            ->withArgs(fn (Server $refreshedServer, string $version, string $target, string $content, $user = null, $summary = null) => $refreshedServer->is($server) && $version === '8.3' && $target === 'fpm_ini' && $content === "memory_limit=512M\n")
             ->andReturn([
                 'message' => 'FPM ini saved for PHP 8.3.',
                 'reload_guidance' => 'Reload PHP-FPM 8.3 after saving to apply these changes.',
@@ -511,7 +511,7 @@ class WorkspacePhpTest extends TestCase
             ]);
         $this->app->instance(ServerPhpManager::class, $manager);
 
-        $editor = Mockery::mock(ServerPhpConfigEditor::class);
+        $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial();
         $editor->shouldReceive('openTarget')
             ->once()
             ->andReturn([
@@ -694,7 +694,7 @@ class WorkspacePhpTest extends TestCase
             ]);
         $this->app->instance(ServerPhpManager::class, $manager);
 
-        $editor = Mockery::mock(ServerPhpConfigEditor::class);
+        $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial();
         $editor->shouldReceive('openTarget')
             ->once()
             ->andReturn([

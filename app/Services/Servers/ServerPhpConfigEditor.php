@@ -2,11 +2,55 @@
 
 namespace App\Services\Servers;
 
+use App\Models\ConfigRevision;
 use App\Models\Server;
+use App\Models\User;
+use App\Services\ConfigRevisions\ConfigRevisionContext;
+use App\Services\ConfigRevisions\ConfigRevisionRecorder;
 use Illuminate\Support\Facades\Cache;
 
 class ServerPhpConfigEditor
 {
+    public function __construct(
+        protected ConfigRevisionRecorder $recorder,
+    ) {}
+
+    /**
+     * Map an editor target slug (cli_ini, fpm_ini, pool_config) to the
+     * ConfigRevision `kind` used to discriminate snapshots and route
+     * diff renderers. Public so the Livewire view can resolve it for
+     * the revision sidebar.
+     */
+    public function kindForTarget(string $target): string
+    {
+        return match ($target) {
+            'cli_ini' => 'php_cli_ini',
+            'fpm_ini' => 'php_fpm_ini',
+            'pool_config' => 'php_pool',
+            default => throw new \RuntimeException('Unknown PHP config target.'),
+        };
+    }
+
+    /**
+     * Identifier for a (server, php_version, target) revision stream.
+     * Opaque to the recorder; the format is owned here.
+     */
+    public function streamKey(Server $server, string $version, string $target): string
+    {
+        return 'server:'.$server->id.':php:'.$version.':'.$target;
+    }
+
+    /**
+     * sha256 of the snapshot a `php_*` revision would store for the
+     * given file content. Used by the Livewire to compare against the
+     * latest revision's `checksum` column for drift detection.
+     */
+    public function snapshotChecksumFor(string $path, string $content): string
+    {
+        return $this->recorder->checksumFor(['path' => $path, 'content' => $content]);
+    }
+
+
     /**
      * @return array{
      *     version: string,
@@ -85,10 +129,16 @@ class ServerPhpConfigEditor
     }
 
     /**
-     * @return array{message: string, reload_guidance: string, verification_output: ?string, output?: ?string}
+     * @return array{message: string, reload_guidance: string, verification_output: ?string, output?: ?string, revision_id?: ?string}
      */
-    public function saveTarget(Server $server, string $version, string $target, string $content): array
-    {
+    public function saveTarget(
+        Server $server,
+        string $version,
+        string $target,
+        string $content,
+        ?User $user = null,
+        ?string $summary = null,
+    ): array {
         $version = $this->normalizeVersionId($version);
         $target = trim($target);
 
@@ -106,8 +156,46 @@ class ServerPhpConfigEditor
             $server = $server->fresh() ?? $server;
             $resolved = $this->resolveEditableTarget($server, $version, $target);
             $verification = $this->verifyProposedContent($server, $resolved, $content);
+
+            // Baseline-on-first-save: before we replace the file, if no revisions
+            // exist yet for this stream, snapshot whatever's currently on disk so
+            // the user has a "before" state to roll back to. Costs one extra SSH
+            // read on the first save only.
+            $streamKey = $this->streamKey($server, $resolved['version'], $resolved['target']);
+            $kind = $this->kindForTarget($resolved['target']);
+            if (! ConfigRevision::query()->forStream($streamKey)->exists()) {
+                try {
+                    $preContent = $this->readRemoteTarget($server, $resolved);
+                    $this->recorder->capture(
+                        $streamKey,
+                        $kind,
+                        ['path' => $resolved['path'], 'content' => $preContent],
+                        new ConfigRevisionContext(
+                            server: $server,
+                            user: $user,
+                            summary: __('Baseline (auto-captured)'),
+                        ),
+                    );
+                } catch (\Throwable) {
+                    // If the baseline read fails for any reason, don't block
+                    // the save the user actually asked for — the post-save
+                    // capture below still gives them a starting point.
+                }
+            }
+
             $this->replaceRemoteTarget($server, $resolved, $content);
             $reloadMessage = $this->reloadRuntimeIfNeeded($server, $resolved);
+
+            $revision = $this->recorder->capture(
+                $streamKey,
+                $kind,
+                ['path' => $resolved['path'], 'content' => $content],
+                new ConfigRevisionContext(
+                    server: $server,
+                    user: $user,
+                    summary: $summary,
+                ),
+            );
 
             return [
                 'message' => $reloadMessage ?? __(':label saved for PHP :version.', [
@@ -120,10 +208,46 @@ class ServerPhpConfigEditor
                     $verification['output'] ?? null,
                     $reloadMessage,
                 ]))) ?: null,
+                'revision_id' => $revision?->id,
             ];
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Capture the file currently on disk as a revision. Used by the
+     * "Capture live content" drift-banner button so an out-of-band edit
+     * doesn't get overwritten without a recovery path.
+     */
+    public function captureLiveAsRevision(
+        Server $server,
+        string $version,
+        string $target,
+        ?User $user = null,
+        ?string $summary = null,
+    ): ?ConfigRevision {
+        $version = $this->normalizeVersionId($version);
+        $target = trim($target);
+
+        if ($version === null || $target === '') {
+            throw new \RuntimeException('A PHP version and config target are required.');
+        }
+
+        $server = $server->fresh() ?? $server;
+        $resolved = $this->resolveEditableTarget($server, $version, $target);
+        $content = $this->readRemoteTarget($server, $resolved);
+
+        return $this->recorder->capture(
+            $this->streamKey($server, $resolved['version'], $resolved['target']),
+            $this->kindForTarget($resolved['target']),
+            ['path' => $resolved['path'], 'content' => $content],
+            new ConfigRevisionContext(
+                server: $server,
+                user: $user,
+                summary: $summary ?? __('Captured from live file'),
+            ),
+        );
     }
 
     /**

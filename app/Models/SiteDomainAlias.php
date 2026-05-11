@@ -15,6 +15,7 @@ class SiteDomainAlias extends Model
         'site_id',
         'hostname',
         'label',
+        'comment',
         'sort_order',
         'meta',
     ];

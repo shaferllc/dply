@@ -90,9 +90,13 @@ class Login extends Component
             abort(404);
         }
 
+<<<<<<< Updated upstream
         if (User::query()->where('email', 'tj@tjshafer.com')->doesntExist()) {
             EnsureLocalDevAdminUser::run();
         }
+=======
+        EnsureLocalDevAdminUser::run();
+>>>>>>> Stashed changes
 
         $this->email = 'tj@tjshafer.com';
         $this->password = '';

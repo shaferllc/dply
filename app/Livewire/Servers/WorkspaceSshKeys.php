@@ -464,6 +464,7 @@ class WorkspaceSshKeys extends Component
         );
 
         $key->delete();
+        $this->server->unsetRelation('authorizedKeys');
         $this->loadReviewDateInputs();
         $this->toastSuccess(__('Key removed. Sync again to update the server.'));
     }
@@ -487,7 +488,8 @@ class WorkspaceSshKeys extends Component
             return false;
         }
 
-        $loginKeyCount = $this->server->fresh(['authorizedKeys'])->authorizedKeys
+        $this->server->loadMissing('authorizedKeys');
+        $loginKeyCount = $this->server->authorizedKeys
             ->filter(static function ($k) use ($loginUser): bool {
                 $t = (string) ($k->target_linux_user ?? '');
 
@@ -854,8 +856,7 @@ class WorkspaceSshKeys extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
-        $this->server->load(['authorizedKeys']);
+        $this->server->loadMissing('authorizedKeys');
         $user = Auth::user();
 
         $profileKeys = UserSshKey::query()

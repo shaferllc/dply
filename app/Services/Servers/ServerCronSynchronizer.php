@@ -10,6 +10,76 @@ use Illuminate\Support\Collection;
 
 class ServerCronSynchronizer
 {
+    /**
+     * Composed crontab body from the most recent sync() call. Captured so the
+     * Livewire workspace can render the exact rendered file with line numbers
+     * when the host rejects it — the host's "bad minute" error references a
+     * line in this body, not in our DB.
+     */
+    private ?string $lastBody = null;
+
+    /** Offending line number parsed out of the host's `/tmp/...:N:` error. */
+    private ?int $lastBadLine = null;
+
+    /** Content of that line, sliced out of {@see $lastBody}. */
+    private ?string $lastBadLineContent = null;
+
+    public function lastBody(): ?string
+    {
+        return $this->lastBody;
+    }
+
+    public function lastBadLine(): ?int
+    {
+        return $this->lastBadLine;
+    }
+
+    public function lastBadLineContent(): ?string
+    {
+        return $this->lastBadLineContent;
+    }
+
+    /**
+     * Pre-flight: returns rows whose cron_expression would be rejected by
+     * `crontab` (e.g. "bad minute"). Callers should run this BEFORE sync()
+     * and surface the list with edit affordances — pushing a bad expression
+     * over SSH means the whole DPLY MANAGED block is rejected and the
+     * remote crontab keeps its prior state (including any stale lines).
+     *
+     * Whitespace inside expressions is collapsed before validation so a
+     * trailing space or double-tap doesn't trip an otherwise valid line.
+     *
+     * @param  Collection<int, ServerCronJob>  $jobs
+     * @return list<array{id: string, description: string, command: string, cron_expression: string}>
+     */
+    public function invalidExpressions(Collection $jobs): array
+    {
+        $validator = app(CronExpressionValidator::class);
+        $invalid = [];
+
+        foreach ($jobs as $job) {
+            if ($job->system_managed || ! $job->enabled) {
+                continue;
+            }
+
+            if (! $validator->isValid($this->normalizeExpression((string) $job->cron_expression))) {
+                $invalid[] = [
+                    'id' => (string) $job->id,
+                    'description' => (string) ($job->description ?? ''),
+                    'command' => (string) $job->command,
+                    'cron_expression' => (string) $job->cron_expression,
+                ];
+            }
+        }
+
+        return $invalid;
+    }
+
+    private function normalizeExpression(string $expression): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', $expression));
+    }
+
     public function sync(Server $server, ?Collection $onlyJobs = null): string
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -56,7 +126,13 @@ class ServerCronSynchronizer
                 if ($segment === '') {
                     continue;
                 }
-                $block .= trim($job->cron_expression).' '.$segment."\n";
+                // Belt-and-braces: every crontab entry must fit on a single line.
+                // ServerCronCommandBuilder already flattens multi-line inputs, but
+                // if anything regresses we'd silently produce a "bad minute" error
+                // because the second half of the entry has no schedule fields.
+                $segment = (string) preg_replace('/\r?\n+/', '; ', $segment);
+                $expression = (string) preg_replace('/\s+/', ' ', trim($job->cron_expression));
+                $block .= $expression.' '.$segment."\n";
             }
         }
         $block .= $markerEnd."\n";
@@ -64,12 +140,35 @@ class ServerCronSynchronizer
         $schedBlock = $this->buildLaravelSchedulerBlock($server);
 
         $newCrontab = $before.$block.$schedBlock;
+        $this->lastBody = $newCrontab;
+        $this->lastBadLine = null;
+        $this->lastBadLineContent = null;
+
         $out = $this->writeCrontab($server, $newCrontab);
         $ok = (bool) preg_match('/DPLY_CRON_EXIT:0\s*$/', $out);
+
+        if (! $ok) {
+            // crontab(1) emits `"/tmp/dply_crontab_xxx":N: bad <field>` when it
+            // rejects a line. Pull N out and grab that line from the body so the
+            // workspace can show the operator exactly what the host rejected —
+            // our PHP validator (dragonmantank/cron-expression) is more lenient
+            // than vixie/ISC cron, so passing pre-flight doesn't guarantee the
+            // host will accept it.
+            if (preg_match('/:(?<line>\d+):\s*bad\s+\w+/i', $out, $m)) {
+                $lineNumber = (int) $m['line'];
+                $lines = preg_split("/\r?\n/", $newCrontab) ?: [];
+                $this->lastBadLine = $lineNumber;
+                $this->lastBadLineContent = $lines[$lineNumber - 1] ?? null;
+            }
+        }
 
         foreach ($jobs as $job) {
             $job->update([
                 'is_synced' => $ok,
+                // Snapshot the `enabled` value the host now reflects. Toggle
+                // round-trips read this back to decide if `is_synced` should
+                // flip clean again — see WorkspaceCron::toggleCronJob.
+                'last_synced_enabled' => $ok ? (bool) $job->enabled : $job->last_synced_enabled,
                 'last_sync_error' => $ok ? null : $out,
             ]);
         }

@@ -14,6 +14,7 @@ use App\Models\FirewallRuleTemplate;
 use App\Models\Server;
 use App\Models\ServerFirewallAuditEvent;
 use App\Models\ServerFirewallRule;
+use App\Models\User;
 use App\Services\Servers\ServerFirewallApplyRecorder;
 use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;
@@ -1030,8 +1031,7 @@ class WorkspaceFirewall extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
-        $this->server->load(['firewallRules', 'organization', 'sites']);
+        $this->server->loadMissing(['firewallRules', 'organization', 'sites']);
 
         // Backwards compatibility: the History and Audit tabs were merged into a single
         // Activity timeline. Snap stale tab values forward so deep links still land somewhere.
@@ -1097,12 +1097,26 @@ class WorkspaceFirewall extends Component
      */
     protected function buildActivityItems(): array
     {
-        $applyLogs = $this->server->firewallApplyLogs()->with(['user'])->limit(40)->get();
+        $applyLogs = $this->server->firewallApplyLogs()->limit(40)->get();
         $auditEvents = $this->server->firewallAuditEvents()
-            ->with('user')
             ->where('event', '!=', ServerFirewallAuditEvent::EVENT_APPLY)
             ->limit(80)
             ->get();
+
+        // Both rowsets reference the same `users` table; eager-loading via the relations
+        // would issue two `users where id in (...)` queries that often return identical
+        // rows (one operator does most of the work on a server). Pull the union once and
+        // attach manually so we hit the table at most once per render.
+        $userIds = $applyLogs->pluck('user_id')
+            ->merge($auditEvents->pluck('user_id'))
+            ->filter()
+            ->unique()
+            ->values();
+        $users = $userIds->isEmpty()
+            ? collect()
+            : User::query()->whereIn('id', $userIds)->get()->keyBy('id');
+        $applyLogs->each(fn ($log) => $log->setRelation('user', $log->user_id ? $users->get($log->user_id) : null));
+        $auditEvents->each(fn ($ev) => $ev->setRelation('user', $ev->user_id ? $users->get($ev->user_id) : null));
 
         $items = [];
         foreach ($applyLogs as $log) {

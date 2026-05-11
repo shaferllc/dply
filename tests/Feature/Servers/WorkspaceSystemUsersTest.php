@@ -6,9 +6,12 @@ namespace Tests\Feature\Servers;
 
 use App\Jobs\CreateServerSystemUserJob;
 use App\Jobs\DeleteServerSystemUserJob;
+use App\Jobs\SyncServerSystemUsersJob;
 use App\Livewire\Servers\WorkspaceSystemUsers;
+use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerSystemUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -54,12 +57,15 @@ class WorkspaceSystemUsersTest extends TestCase
     public function test_create_dispatches_create_server_system_user_job(): void
     {
         Bus::fake();
+        config(['site_settings.vm_site_file_web_group' => 'www-data']);
         [$user, $server] = $this->userAndServer();
 
         Livewire::actingAs($user)
             ->test(WorkspaceSystemUsers::class, ['server' => $server])
             ->set('new_username', 'app-user')
             ->set('new_sudo', true)
+            ->set('new_shell', '/usr/sbin/nologin')
+            ->set('new_add_web_group', true)
             ->call('queueCreate')
             ->assertHasNoErrors();
 
@@ -67,8 +73,46 @@ class WorkspaceSystemUsersTest extends TestCase
             CreateServerSystemUserJob::class,
             fn (CreateServerSystemUserJob $job): bool => $job->serverId === $server->id
                 && $job->username === 'app-user'
-                && $job->grantSudo === true,
+                && $job->grantSudo === true
+                && $job->shell === '/usr/sbin/nologin'
+                && $job->extraGroups === ['www-data'],
         );
+    }
+
+    public function test_create_omits_web_group_when_unchecked(): void
+    {
+        Bus::fake();
+        config(['site_settings.vm_site_file_web_group' => 'www-data']);
+        [$user, $server] = $this->userAndServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSystemUsers::class, ['server' => $server])
+            ->set('new_username', 'svc-runner')
+            ->set('new_add_web_group', false)
+            ->call('queueCreate')
+            ->assertHasNoErrors();
+
+        Bus::assertDispatched(
+            CreateServerSystemUserJob::class,
+            fn (CreateServerSystemUserJob $job): bool => $job->username === 'svc-runner'
+                && $job->shell === '/bin/bash'
+                && $job->extraGroups === [],
+        );
+    }
+
+    public function test_create_rejects_unsupported_shell(): void
+    {
+        Bus::fake();
+        [$user, $server] = $this->userAndServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSystemUsers::class, ['server' => $server])
+            ->set('new_username', 'app-user')
+            ->set('new_shell', '/bin/zsh')
+            ->call('queueCreate')
+            ->assertHasErrors(['new_shell']);
+
+        Bus::assertNotDispatched(CreateServerSystemUserJob::class);
     }
 
     public function test_create_validates_username_format(): void
@@ -89,10 +133,10 @@ class WorkspaceSystemUsersTest extends TestCase
     {
         Bus::fake();
         [$user, $server] = $this->userAndServer();
+        $this->seedRemote($server, 'app-user');
 
         Livewire::actingAs($user)
             ->test(WorkspaceSystemUsers::class, ['server' => $server])
-            ->set('remote_rows', [['username' => 'app-user', 'site_count' => 0]])
             ->call('openRemoveModal', 'app-user')
             ->set('remove_confirm', 'app-user')
             ->call('queueRemove')
@@ -109,10 +153,10 @@ class WorkspaceSystemUsersTest extends TestCase
     {
         Bus::fake();
         [$user, $server] = $this->userAndServer();
+        $this->seedRemote($server, 'app-user');
 
         Livewire::actingAs($user)
             ->test(WorkspaceSystemUsers::class, ['server' => $server])
-            ->set('remote_rows', [['username' => 'app-user', 'site_count' => 0]])
             ->call('openRemoveModal', 'app-user')
             ->set('remove_confirm', 'wrong')
             ->call('queueRemove')
@@ -124,12 +168,73 @@ class WorkspaceSystemUsersTest extends TestCase
     public function test_open_remove_modal_rejects_unknown_username(): void
     {
         [$user, $server] = $this->userAndServer();
+        $this->seedRemote($server, 'app-user');
 
         Livewire::actingAs($user)
             ->test(WorkspaceSystemUsers::class, ['server' => $server])
-            ->set('remote_rows', [['username' => 'app-user', 'site_count' => 0]])
             ->call('openRemoveModal', 'something-not-listed')
             ->assertSet('remove_username', '');
+    }
+
+    private function seedRemote(Server $server, string $username): void
+    {
+        ServerSystemUser::create([
+            'server_id' => $server->id,
+            'username' => $username,
+            'uid' => 1099,
+            'home' => '/home/'.$username,
+            'shell' => '/bin/bash',
+            'groups' => [$username],
+            'last_seen_at' => now(),
+        ]);
+    }
+
+    public function test_load_users_dispatches_sync_job_and_seeds_console_row(): void
+    {
+        Bus::fake();
+        [$user, $server] = $this->userAndServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSystemUsers::class, ['server' => $server])
+            ->call('loadUsers')
+            ->assertHasNoErrors();
+
+        Bus::assertDispatched(
+            SyncServerSystemUsersJob::class,
+            fn (SyncServerSystemUsersJob $job): bool => $job->serverId === $server->id
+                && $job->userId === $user->id,
+        );
+
+        $this->assertSame(1, ConsoleAction::query()
+            ->where('subject_type', $server->getMorphClass())
+            ->where('subject_id', $server->id)
+            ->where('kind', 'system_user')
+            ->where('status', ConsoleAction::STATUS_QUEUED)
+            ->count());
+    }
+
+    public function test_create_seeds_a_queued_console_row(): void
+    {
+        Bus::fake();
+        [$user, $server] = $this->userAndServer();
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSystemUsers::class, ['server' => $server])
+            ->set('new_username', 'app-user')
+            ->call('queueCreate')
+            ->assertHasNoErrors();
+
+        Bus::assertDispatched(CreateServerSystemUserJob::class);
+
+        $row = ConsoleAction::query()
+            ->where('subject_type', $server->getMorphClass())
+            ->where('subject_id', $server->id)
+            ->where('kind', 'system_user')
+            ->where('status', ConsoleAction::STATUS_QUEUED)
+            ->first();
+
+        $this->assertNotNull($row);
+        $this->assertStringContainsString('app-user', (string) $row->label);
     }
 
     public function test_unauthorized_user_cannot_render(): void

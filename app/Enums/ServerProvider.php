@@ -25,6 +25,9 @@ enum ServerProvider: string
     case Azure = 'azure';
     case Oracle = 'oracle';
     case Custom = 'custom';
+    case Gandi = 'gandi';
+    case Namecheap = 'namecheap';
+    case VercelDns = 'vercel_dns';
 
     /**
      * Human-readable label for UI.
@@ -53,7 +56,83 @@ enum ServerProvider: string
             self::Azure => 'Azure',
             self::Oracle => 'Oracle Cloud',
             self::Custom => 'Custom',
+            self::Gandi => 'Gandi',
+            self::Namecheap => 'Namecheap',
+            self::VercelDns => 'Vercel DNS',
         };
+    }
+
+    /**
+     * Whether this provider can be used for compute / server provisioning. Mirrors the
+     * `hasFullSupport()` semantics for the credential UI surface — exposed separately so
+     * the credentials page can filter by capability without overloading "full support."
+     */
+    public function supportsCompute(): bool
+    {
+        return $this->hasFullSupport();
+    }
+
+    /**
+     * Whether this provider can be used for DNS automation (site DNS settings, DNS-01,
+     * preview-hostname provisioning). DigitalOcean and AWS are dual-purpose; Cloudflare
+     * and the stub providers are DNS-only.
+     */
+    public function supportsDns(): bool
+    {
+        return match ($this) {
+            self::DigitalOcean,
+            self::Cloudflare,
+            self::Aws,
+            self::Gandi,
+            self::Namecheap,
+            self::VercelDns => true,
+            default => false,
+        };
+    }
+
+    /**
+     * Capability tags for badge rendering on credential rows.
+     *
+     * @return list<string>
+     */
+    public function capabilities(): array
+    {
+        $caps = [];
+        if ($this->supportsCompute()) {
+            $caps[] = 'compute';
+        }
+        if ($this->supportsDns()) {
+            $caps[] = 'dns';
+        }
+
+        return $caps;
+    }
+
+    /**
+     * Provider keys that can manage DNS for sites. Canonical taxonomy lives here so the
+     * UI, the DNS provider factory, and the credential model all read from one place.
+     *
+     * @return list<string>
+     */
+    public static function dnsProviderKeys(): array
+    {
+        return array_values(array_map(
+            fn (self $p) => $p->value,
+            array_filter(self::cases(), fn (self $p) => $p->supportsDns())
+        ));
+    }
+
+    /**
+     * Provider keys that can be used for compute / server provisioning.
+     *
+     * @return list<string>
+     */
+    public static function computeProviderKeys(): array
+    {
+        return array_values(array_map(
+            fn (self $p) => $p->value,
+            array_filter(self::cases(), fn (self $p) => $p->supportsCompute())
+        ));
     }
 
     /**

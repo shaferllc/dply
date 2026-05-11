@@ -277,18 +277,25 @@
                     @endif
 
                     @if ($section === 'general')
-                        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <section class="dply-card overflow-hidden">
                             <form wire:submit="saveGeneralSettings">
                                 <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                    <div class="border-b border-slate-200 bg-slate-50 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ $generalOverviewTitle }}</h2>
-                                        <p class="mt-3 text-sm leading-6 text-slate-600">
-                                            {{ $generalOverviewDescription }}
-                                        </p>
+                                    <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                                        <div class="flex items-start gap-3">
+                                            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                                <x-heroicon-o-globe-alt class="h-5 w-5" />
+                                            </span>
+                                            <div class="min-w-0">
+                                                <h2 class="text-lg font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
+                                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                    {{ $generalOverviewDescription }}
+                                                </p>
+                                            </div>
+                                        </div>
                                         @if ($testingHostname !== '')
-                                            <div class="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-                                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
-                                                <p class="mt-2 break-all font-mono text-sm text-slate-900">{{ $testingHostname }}</p>
+                                            <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white p-4">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
+                                                <p class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $testingHostname }}</p>
                                             </div>
                                         @endif
                                     </div>
@@ -307,11 +314,11 @@
                                                 <x-input-error :messages="$errors->get('settings_document_root')" class="mt-2" />
                                             </div>
 
-                                            <dl class="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                                            <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-2">
                                                 @foreach ($summaryCards as $card)
                                                     <div>
-                                                        <dt class="text-slate-500">{{ $card['label'] }}</dt>
-                                                        <dd class="mt-1 break-all font-medium text-slate-900">{{ $card['value'] }}</dd>
+                                                        <dt class="text-brand-mist">{{ $card['label'] }}</dt>
+                                                        <dd class="mt-1 break-all font-medium text-brand-ink">{{ $card['value'] }}</dd>
                                                     </div>
                                                 @endforeach
                                             </dl>
@@ -319,330 +326,262 @@
                                     </div>
                                 </div>
 
-                                <div class="flex justify-end border-t border-slate-200 bg-slate-50 px-6 py-4 sm:px-8">
+                                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
                                     <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
                                 </div>
                             </form>
                         </section>
 
-                        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        {{-- Primary-hostname rename confirmation modal. Opens when saveGeneralSettings()
+                             detects a non-trivial rename (cert, container backend, or auto-derived
+                             dns_zone). Renders the cascade preview computed by PrimaryHostnameRenamePlanner. --}}
+                        @if ($rename_plan !== null)
+                            <x-modal name="primary-hostname-rename-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
+                                <div class="border-b border-brand-ink/10 px-6 py-5">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Confirm rename') }}</p>
+                                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Rename primary hostname?') }}</h2>
+                                    <div class="mt-3 inline-flex flex-wrap items-center gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-3 py-2 font-mono text-sm text-brand-ink">
+                                        <span class="break-all">{{ $rename_plan['old'] !== '' ? $rename_plan['old'] : __('(none)') }}</span>
+                                        <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
+                                        <span class="break-all">{{ $rename_plan['new'] }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-5 px-6 py-6">
+                                    {{-- Auto cascades — always-on, read-only checks --}}
+                                    <div>
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Always applied') }}</p>
+                                        <ul class="mt-2 space-y-1.5">
+                                            @foreach ($rename_plan['auto'] as $row)
+                                                <li class="flex items-start gap-2 text-sm text-brand-ink">
+                                                    <x-heroicon-m-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                                                    <span>{{ $row['label'] }}</span>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+
+                                    {{-- Opt-in cascades — operator selects which heavier cleanups to run --}}
+                                    @if (! empty($rename_plan['optIn']))
+                                        <div>
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Opt in') }}</p>
+                                            <ul class="mt-2 space-y-2">
+                                                @foreach ($rename_plan['optIn'] as $row)
+                                                    @php
+                                                        $wireModel = match ($row['key']) {
+                                                            'reissue_cert' => 'rename_reissue_cert',
+                                                            'cycle_backend' => 'rename_cycle_backend',
+                                                            default => null,
+                                                        };
+                                                    @endphp
+                                                    @if ($wireModel)
+                                                        <li class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5">
+                                                            <input id="rename-optin-{{ $row['key'] }}" type="checkbox" wire:model="{{ $wireModel }}" class="mt-0.5 h-4 w-4 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage/30" />
+                                                            <label for="rename-optin-{{ $row['key'] }}" class="text-sm leading-relaxed text-brand-ink">{{ $row['label'] }}</label>
+                                                        </li>
+                                                    @endif
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+
+                                    {{-- Manual / external — informational; dply cannot fix these from here --}}
+                                    @if (! empty($rename_plan['manual']))
+                                        <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+                                            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
+                                                <x-heroicon-m-information-circle class="h-3.5 w-3.5" />
+                                                {{ __('Cannot be fixed from here') }}
+                                            </p>
+                                            <ul class="mt-2 space-y-1 text-sm text-amber-900">
+                                                @foreach ($rename_plan['manual'] as $line)
+                                                    <li class="flex items-start gap-2">
+                                                        <span class="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-amber-700"></span>
+                                                        <span>{{ $line }}</span>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                                    <x-secondary-button type="button" wire:click="cancelPrimaryHostnameRename">{{ __('Cancel') }}</x-secondary-button>
+                                    <x-primary-button type="button" wire:click="confirmPrimaryHostnameRename" wire:loading.attr="disabled" wire:target="confirmPrimaryHostnameRename">
+                                        <span wire:loading.remove wire:target="confirmPrimaryHostnameRename">{{ __('Save & apply selected') }}</span>
+                                        <span wire:loading wire:target="confirmPrimaryHostnameRename">{{ __('Saving…') }}</span>
+                                    </x-primary-button>
+                                </div>
+                            </x-modal>
+                        @endif
+
+                        <section class="dply-card overflow-hidden">
                             <form wire:submit="saveProjectSettings">
                                 <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                    <div class="border-b border-slate-200 bg-slate-50 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ $projectSettingsTitle }}</h2>
-                                        <p class="mt-3 text-sm leading-6 text-slate-600">
-                                            {{ $projectSettingsDescription }}
-                                        </p>
+                                    <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                                        <div class="flex items-start gap-3">
+                                            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                                <x-heroicon-o-folder-open class="h-5 w-5" />
+                                            </span>
+                                            <div class="min-w-0">
+                                                <h2 class="text-lg font-semibold text-brand-ink">{{ $projectSettingsTitle }}</h2>
+                                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                    {{ $projectSettingsDescription }}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="space-y-5 p-6 sm:p-8">
                                         <div>
                                             <x-input-label for="project_workspace_id" value="Project" />
-                                            <select id="project_workspace_id" wire:model="project_workspace_id" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                                            <select id="project_workspace_id" wire:model="project_workspace_id" class="dply-input">
                                                 <option value="">{{ __('No project') }}</option>
                                                 @foreach ($availableWorkspaces as $workspace)
                                                     <option value="{{ $workspace->id }}">{{ $workspace->name }}</option>
                                                 @endforeach
                                             </select>
                                             <x-input-error :messages="$errors->get('project_workspace_id')" class="mt-2" />
-                                            <p class="mt-2 text-sm text-slate-600">
+                                            <p class="mt-2 text-sm text-brand-moss">
                                                 {{ __('Project membership can be managed here or from the project resources page.') }}
                                             </p>
                                         </div>
 
                                         @if ($site->workspace)
-                                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                                <p class="text-sm font-semibold text-slate-900">{{ __('Current project') }}</p>
-                                                <p class="mt-1 text-sm text-slate-600">
+                                            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                                <p class="text-sm font-semibold text-brand-ink">{{ __('Current project') }}</p>
+                                                <p class="mt-1 text-sm text-brand-moss">
                                                     {{ __('This site currently rolls up into :project.', ['project' => $site->workspace->name]) }}
                                                 </p>
                                                 <div class="mt-3 flex flex-wrap gap-3 text-sm">
-                                                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project resources') }}</a>
-                                                    <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project operations') }}</a>
-                                                    <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project delivery') }}</a>
+                                                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project resources') }}</a>
+                                                    <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project operations') }}</a>
+                                                    <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project delivery') }}</a>
                                                 </div>
                                             </div>
                                         @endif
                                     </div>
                                 </div>
 
-                                <div class="flex justify-end border-t border-slate-200 bg-slate-50 px-6 py-4 sm:px-8">
+                                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
                                     <x-primary-button type="submit">{{ __('Save project settings') }}</x-primary-button>
                                 </div>
                             </form>
                         </section>
 
-                        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
-                            <div class="flex flex-wrap items-start justify-between gap-4">
-                                <div>
-                                    <h2 class="text-lg font-semibold text-slate-900">{{ __('Deployment foundation') }}</h2>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Shared preflight, revision drift, and resource attachment state for this site.') }}</p>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    @if ($this->latestDeployment !== null)
-                                        <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $this->latestDeployment]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] hover:opacity-80 {{ $this->latestDeployment->status === 'success' ? 'bg-emerald-100 text-emerald-900' : ($this->latestDeployment->status === 'failed' ? 'bg-rose-100 text-rose-900' : 'bg-slate-100 text-slate-700') }}" title="{{ __('Open deployment detail') }}">
-                                            {{ __('Last deploy') }} · {{ $this->latestDeployment->status }}
-                                            @if ($this->latestDeployment->started_at)
-                                                <span class="font-mono text-[10px] opacity-80">{{ $this->latestDeployment->started_at->diffForHumans(null, true) }}</span>
-                                            @endif
-                                        </a>
-                                    @endif
-                                    <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}" wire:navigate class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700 hover:bg-slate-200" title="{{ __('All deployments') }}">
-                                        {{ __('All deploys') }}
-                                    </a>
-                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ ($foundationStatus['runtime_drifted'] ?? false) ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800' }}">
-                                        {{ ($foundationStatus['runtime_drifted'] ?? false) ? __('Detected') : __('In sync') }}
+                        <section class="dply-card overflow-hidden">
+                            <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                        <x-heroicon-o-chart-bar class="h-5 w-5" />
                                     </span>
+                                    <div class="min-w-0">
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Status') }}</h2>
+                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('At-a-glance deploy, runtime, and certificate state. Detailed editors live on the dedicated tabs.') }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-code-bracket-square class="h-3.5 w-3.5" />
+                                        {{ __('Deploy') }}
+                                    </a>
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-cube-transparent class="h-3.5 w-3.5" />
+                                        {{ __('Runtime') }}
+                                    </a>
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'certificates']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-shield-check class="h-3.5 w-3.5" />
+                                        {{ __('Certificates') }}
+                                    </a>
                                 </div>
                             </div>
 
-                            @php
-                                $isEdgeEligible = in_array($site->runtime, ['node', 'static'], true);
-                            @endphp
-                            @if ($isEdgeEligible)
-                                <div class="mt-4 rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs text-sky-900">
-                                    <span class="font-semibold">{{ __('Edge-eligible') }}</span> —
-                                    {{ __('this :runtime site can deploy globally on dply edge — managed HTTPS, auto-scaling, no VM to babysit.', ['runtime' => $site->runtime]) }}
-                                    <a href="{{ route('edge.create') }}" wire:navigate class="ml-1 font-medium underline hover:text-sky-950">{{ __('Deploy to dply edge') }} →</a>
-                                </div>
-                            @endif
-
-                            <dl class="grid gap-4 sm:grid-cols-3">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Current revision') }}</dt>
-                                    <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $foundationStatus['current_runtime_revision'] ?? '—' }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Last applied revision') }}</dt>
-                                    <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $foundationStatus['last_applied_runtime_revision'] ?? __('Not applied yet') }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Launch preflight') }}</dt>
-                                    <dd class="mt-2 text-sm font-medium text-slate-900">{{ $preflightErrors->isEmpty() ? __('Ready to review') : __('Needs attention') }}</dd>
-                                </div>
-                                @if ($site->runtimeKey())
-                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Runtime') }}</dt>
-                                        <dd class="mt-2 text-sm font-medium text-slate-900">
-                                            <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
-                                                <span class="font-mono text-slate-500"> · {{ $site->runtimeVersion() }}</span>
+                            <div class="p-6 sm:p-8">
+                                <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Last deploy') }}</dt>
+                                        <dd class="mt-2 text-sm font-medium text-brand-ink">
+                                            @if ($this->latestDeployment !== null)
+                                                <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $this->latestDeployment]) }}" wire:navigate class="inline-flex items-center gap-1 hover:underline">
+                                                    @if ($this->latestDeployment->status === 'success')
+                                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                                    @elseif ($this->latestDeployment->status === 'failed')
+                                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-rose-600"></span>
+                                                    @else
+                                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-mist"></span>
+                                                    @endif
+                                                    <span class="capitalize">{{ $this->latestDeployment->status }}</span>
+                                                    @if ($this->latestDeployment->started_at)
+                                                        <span class="font-normal text-brand-mist">· {{ $this->latestDeployment->started_at->diffForHumans(null, true) }}</span>
+                                                    @endif
+                                                </a>
+                                            @else
+                                                <span class="text-brand-mist">{{ __('Not deployed yet') }}</span>
                                             @endif
                                         </dd>
                                     </div>
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Runtime') }}</dt>
+                                        <dd class="mt-2 text-sm font-medium text-brand-ink">
+                                            @if ($site->runtimeKey())
+                                                <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
+                                                    <span class="font-mono text-brand-mist"> · {{ $site->runtimeVersion() }}</span>
+                                                @endif
+                                            @else
+                                                <span class="text-brand-mist">—</span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Preflight') }}</dt>
+                                        <dd class="mt-2 text-sm font-medium">
+                                            @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
+                                                <span class="inline-flex items-center gap-1.5 text-emerald-700">
+                                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+                                                    {{ __('Ready') }}
+                                                </span>
+                                            @elseif ($preflightErrors->isNotEmpty())
+                                                <span class="inline-flex items-center gap-1.5 text-rose-700">
+                                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-rose-600"></span>
+                                                    {{ trans_choice('{1} :count blocker|[2,*] :count blockers', $preflightErrors->count(), ['count' => $preflightErrors->count()]) }}
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1.5 text-amber-700">
+                                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                                                    {{ trans_choice('{1} :count warning|[2,*] :count warnings', $preflightWarnings->count(), ['count' => $preflightWarnings->count()]) }}
+                                                </span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('SSL') }}</dt>
+                                        <dd class="mt-2 text-sm font-medium text-brand-ink">{{ $site->currentSslSummary() }}</dd>
+                                    </div>
+                                </dl>
+
+                                @if (in_array($site->runtime, ['node', 'static'], true))
+                                    <div class="mt-5 rounded-xl border border-brand-sage/30 bg-brand-sage/10 p-3 text-xs text-brand-ink">
+                                        <span class="font-semibold text-brand-forest">{{ __('Edge-eligible') }}</span> —
+                                        <span class="text-brand-moss">{{ __('this :runtime site can deploy globally on dply edge — managed HTTPS, auto-scaling, no VM to babysit.', ['runtime' => $site->runtime]) }}</span>
+                                        <a href="{{ route('edge.create') }}" wire:navigate class="ml-1 font-medium text-brand-forest underline decoration-brand-sage/40 hover:decoration-brand-sage">{{ __('Deploy to dply edge') }} →</a>
+                                    </div>
                                 @endif
-                                @if ($site->internal_port)
-                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Internal port') }}</dt>
-                                        <dd class="mt-2 font-mono text-xs text-slate-900">127.0.0.1:{{ $site->internal_port }}</dd>
-                                    </div>
-                                @endif
-                                @if ($site->build_command)
-                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-3">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Build command') }}</dt>
-                                        <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $site->build_command }}</dd>
-                                    </div>
-                                @endif
-                                @if ($site->start_command)
-                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-3">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Start command') }}</dt>
-                                        <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $site->start_command }}</dd>
-                                    </div>
-                                @endif
-                            </dl>
-
-                            @if ($site->processes->isNotEmpty())
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <div class="flex flex-wrap items-baseline justify-between gap-2">
-                                        <h3 class="text-sm font-semibold text-slate-900">{{ __('Site processes') }}</h3>
-                                        <p class="text-xs text-slate-500">{{ trans_choice('{1} 1 process|[2,*] :count processes', $site->processes->count(), ['count' => $site->processes->count()]) }}</p>
-                                    </div>
-                                    <p class="mt-1 text-xs text-slate-600">{{ __('The web row drives NGINX upstream. Workers and schedulers run as separate systemd units (dply-site-:id-:name.service).', ['id' => $site->id, 'name' => '<name>']) }}</p>
-                                    <ul class="mt-3 space-y-2">
-                                        @foreach ($site->processes as $process)
-                                            <li class="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                                                <div class="min-w-0 flex-1">
-                                                    <div class="flex flex-wrap items-center gap-2">
-                                                        <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">{{ $process->type }}</span>
-                                                        <span class="text-sm font-semibold text-slate-900">{{ $process->name }}</span>
-                                                        @if (! $process->is_active)
-                                                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900">{{ __('inactive') }}</span>
-                                                        @endif
-                                                        @if ((int) $process->scale > 1)
-                                                            <span class="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-900">{{ __('scale :n', ['n' => $process->scale]) }}</span>
-                                                        @endif
-                                                    </div>
-                                                    <p class="mt-1 break-all font-mono text-xs text-slate-700">{{ $process->command ?? __('(unset — runtime-default applies)') }}</p>
-                                                </div>
-                                                <div class="flex flex-wrap items-center gap-3 text-xs">
-                                                    @if ($process->type !== 'web')
-                                                        <label class="flex items-center gap-1 text-slate-600">
-                                                            {{ __('scale') }}
-                                                            <input
-                                                                type="number"
-                                                                min="1"
-                                                                max="16"
-                                                                value="{{ (int) $process->scale }}"
-                                                                wire:change="setSiteProcessScale('{{ $process->id }}', $event.target.valueAsNumber)"
-                                                                class="w-14 rounded border-slate-300 px-2 py-1 text-xs"
-                                                            />
-                                                        </label>
-                                                        <button type="button" wire:click="restartSiteProcess('{{ $process->id }}')" wire:loading.attr="disabled" wire:target="restartSiteProcess" class="font-medium text-sky-700 hover:text-sky-800 disabled:opacity-50">
-                                                            {{ __('Restart') }}
-                                                        </button>
-                                                        <button type="button" wire:click="toggleSiteProcessActive('{{ $process->id }}')" class="font-medium {{ $process->is_active ? 'text-amber-700 hover:text-amber-800' : 'text-emerald-700 hover:text-emerald-800' }}">
-                                                            {{ $process->is_active ? __('Deactivate') : __('Activate') }}
-                                                        </button>
-                                                        <button type="button" wire:click="removeSiteProcess('{{ $process->id }}')" wire:confirm="{{ __('Remove the :name process? Its systemd unit will be torn down on the next deploy.', ['name' => $process->name]) }}" class="font-medium text-rose-700 hover:text-rose-800">{{ __('Remove') }}</button>
-                                                    @endif
-                                                </div>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-
-                                    <div class="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Add a process') }}</p>
-                                        <div class="mt-2 grid gap-2 sm:grid-cols-[110px,200px,1fr,auto] sm:items-end">
-                                            <div>
-                                                <label for="new_site_process_type" class="block text-[11px] font-medium text-slate-600">{{ __('Type') }}</label>
-                                                <select id="new_site_process_type" wire:model="new_site_process_type" class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm">
-                                                    <option value="worker">{{ __('worker') }}</option>
-                                                    <option value="scheduler">{{ __('scheduler') }}</option>
-                                                    <option value="custom">{{ __('custom') }}</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label for="new_site_process_name" class="block text-[11px] font-medium text-slate-600">{{ __('Name') }}</label>
-                                                <input type="text" id="new_site_process_name" wire:model="new_site_process_name" placeholder="sidekiq" class="mt-1 block w-full rounded-lg border-slate-300 font-mono text-sm shadow-sm" />
-                                                <x-input-error :messages="$errors->get('new_site_process_name')" class="mt-1" />
-                                            </div>
-                                            <div>
-                                                <label for="new_site_process_command" class="block text-[11px] font-medium text-slate-600">{{ __('Command') }}</label>
-                                                <input type="text" id="new_site_process_command" wire:model="new_site_process_command" placeholder="bundle exec sidekiq -C config/sidekiq.yml" class="mt-1 block w-full rounded-lg border-slate-300 font-mono text-sm shadow-sm" />
-                                                <x-input-error :messages="$errors->get('new_site_process_command')" class="mt-1" />
-                                            </div>
-                                            <button type="button" wire:click="addSiteProcess" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
-                                                {{ __('Add') }}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif
-
-                            @if ($this->recentDeploymentsWithPhases->isNotEmpty())
-                                @include('livewire.sites.partials.recent-deployments', [
-                                    'deployments' => $this->recentDeploymentsWithPhases,
-                                ])
-                            @endif
-
-                            <div class="grid gap-4 lg:grid-cols-2">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <h3 class="text-sm font-semibold text-slate-900">{{ __('Launch preflight') }}</h3>
-                                    <div class="mt-3 space-y-2">
-                                        @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
-                                            <p class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">{{ __('No blocking preflight issues.') }}</p>
-                                        @endif
-                                        @foreach ($preflightErrors as $error)
-                                            <p class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $error }}</p>
-                                        @endforeach
-                                        @foreach ($preflightWarnings as $warning)
-                                            <p class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ $warning }}</p>
-                                        @endforeach
-                                    </div>
-                                </div>
-
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <h3 class="text-sm font-semibold text-slate-900">{{ __('Attached resources') }}</h3>
-                                    <div class="mt-3 space-y-2">
-                                        @foreach ($resourceBindings as $binding)
-                                            @include('livewire.sites.partials.resource-binding-row', ['binding' => $binding])
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div>
-                                        <h3 class="text-sm font-semibold text-slate-900">{{ __('Shared secrets & config') }}</h3>
-                                        <p class="mt-1 text-sm text-slate-600">{{ __('Dply-managed environment inventory for this site across env file, site variables, workspace variables, and deploy-managed credentials.') }}</p>
-                                    </div>
-                                    <div class="flex flex-wrap gap-2">
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                                            {{ trans_choice('{1} :count secret|[2,*] :count secrets', $secretEntries->count(), ['count' => $secretEntries->count()]) }}
-                                        </span>
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                                            {{ trans_choice('{1} :count config value|[2,*] :count config values', $configEntries->count(), ['count' => $configEntries->count()]) }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <p class="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">
-                                    {{ $secretDeliveryLabel }}
-                                </p>
-                                <div class="mt-4 grid gap-4 xl:grid-cols-2">
-                                    <div class="space-y-2">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Secrets') }}</p>
-                                        @forelse ($secretEntries as $entry)
-                                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                                    <div>
-                                                        <p class="font-mono text-sm font-medium text-slate-900">{{ $entry['key'] }}</p>
-                                                        <p class="mt-1 text-xs text-slate-500">
-                                                            {{ str($entry['scope'] ?? 'site')->headline() }} · {{ str_replace('_', ' ', (string) ($entry['source'] ?? 'managed')) }} · {{ str($entry['classification'] ?? 'config')->headline() }}
-                                                        </p>
-                                                    </div>
-                                                    <span class="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700">
-                                                        {{ __('Redacted') }}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        @empty
-                                            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                                                {{ __('No shared secrets are inventoried yet.') }}
-                                            </div>
-                                        @endforelse
-                                    </div>
-                                    <div class="space-y-2">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Config values') }}</p>
-                                        @forelse ($configEntries as $entry)
-                                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                                    <div>
-                                                        <p class="font-mono text-sm font-medium text-slate-900">{{ $entry['key'] }}</p>
-                                                        <p class="mt-1 text-xs text-slate-500">
-                                                            {{ str($entry['scope'] ?? 'site')->headline() }} · {{ str_replace('_', ' ', (string) ($entry['source'] ?? 'managed')) }}
-                                                        </p>
-                                                    </div>
-                                                    <p class="max-w-[16rem] break-all text-right font-mono text-xs text-slate-700">
-                                                        {{ \Illuminate\Support\Str::limit((string) ($entry['value'] ?? ''), 80) }}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        @empty
-                                            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                                                {{ __('No non-secret config values are inventoried yet.') }}
-                                            </div>
-                                        @endforelse
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                @foreach ($preflightChecks as $check)
-                                    <div class="rounded-xl border px-3 py-2 text-sm {{ ($check['level'] ?? 'ok') === 'error' ? 'border-red-200 bg-red-50 text-red-800' : (($check['level'] ?? 'ok') === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-sky-200 bg-sky-50 text-sky-800') }}">
-                                        <span class="font-medium">{{ str($check['key'] ?? 'check')->headline() }}</span>
-                                        <p class="mt-1 text-xs leading-5">{{ $check['message'] ?? '' }}</p>
-                                    </div>
-                                @endforeach
                             </div>
                         </section>
 
-                        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <section class="dply-card overflow-hidden">
                             <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                <div class="border-b border-slate-200 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ $detailsTitle }}</h2>
-                                    <p class="mt-3 text-sm leading-6 text-slate-600">
-                                            {{ $detailsDescription }}
-                                    </p>
+                                <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                                    <div class="flex items-start gap-3">
+                                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                            <x-heroicon-o-identification class="h-5 w-5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold text-brand-ink">{{ $detailsTitle }}</h2>
+                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                {{ $detailsDescription }}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="p-6 sm:p-8">
@@ -651,20 +590,20 @@
                                     @endphp
                                     <dl class="grid grid-cols-1 gap-5 text-sm sm:grid-cols-2">
                                         <div>
-                                            <dt class="text-slate-500">{{ __('Created at') }}</dt>
-                                            <dd class="mt-1 font-medium text-slate-900">{{ $site->created_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
+                                            <dt class="text-brand-mist">{{ __('Created at') }}</dt>
+                                            <dd class="mt-1 font-medium text-brand-ink">{{ $site->created_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
                                         </div>
                                         <div>
-                                            <dt class="text-slate-500">{{ __('Site ID') }}</dt>
-                                            <dd class="mt-1 font-medium text-slate-900">{{ $site->id }}</dd>
+                                            <dt class="text-brand-mist">{{ __('Site ID') }}</dt>
+                                            <dd class="mt-1 font-mono text-xs font-medium text-brand-ink">{{ $site->id }}</dd>
                                         </div>
                                         <div>
-                                            <dt class="text-slate-500">{{ __('Stack') }}</dt>
-                                            <dd class="mt-1 font-medium text-slate-900">{{ $site->type->label() }}</dd>
+                                            <dt class="text-brand-mist">{{ __('Stack') }}</dt>
+                                            <dd class="mt-1 font-medium text-brand-ink">{{ $site->type->label() }}</dd>
                                         </div>
                                         <div>
-                                            <dt class="text-slate-500">{{ __('Disk usage') }}</dt>
-                                            <dd class="mt-1 font-medium text-slate-900">
+                                            <dt class="text-brand-mist">{{ __('Disk usage') }}</dt>
+                                            <dd class="mt-1 font-medium text-brand-ink">
                                                 {{ is_numeric($diskUsageBytes) ? \Illuminate\Support\Number::fileSize((int) $diskUsageBytes) : __('Not recorded yet') }}
                                             </dd>
                                         </div>
@@ -673,176 +612,33 @@
                             </div>
                         </section>
 
-                        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
-                            <div class="flex flex-wrap items-start justify-between gap-4">
-                                <div>
-                                    <h2 class="text-lg font-semibold text-slate-900">{{ __('Operations summary') }}</h2>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Keep the most important deploy, runtime, and certificate context visible on General while deeper editing lives in focused sections.') }}</p>
-                                </div>
-                                <div class="flex flex-wrap gap-3 text-sm">
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Deploy') }}</a>
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Deployment log') }}</a>
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'certificates']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open certificate settings') }}</a>
-                                </div>
-                            </div>
-
-                            @if ($previewDomain || $site->certificates->isNotEmpty())
-                                <div class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <h3 class="text-base font-semibold text-slate-900">{{ __('Preview & SSL') }}</h3>
-                                            <p class="mt-1 text-sm text-slate-600">{{ __('Preview hostname reachability and the latest certificate state for this site.') }}</p>
-                                        </div>
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                                            {{ $site->currentSslSummary() }}
-                                        </span>
-                                    </div>
-
-                                    <dl class="grid gap-4 sm:grid-cols-2">
-                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Preview hostname') }}</dt>
-                                            <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $previewDomain?->hostname ?? __('No preview domain') }}</dd>
-                                        </div>
-                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Preview DNS') }}</dt>
-                                            <dd class="mt-2 text-sm text-slate-900">{{ $previewDomain?->dns_status ?? __('Not configured') }}</dd>
-                                        </div>
-                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Latest certificate') }}</dt>
-                                            <dd class="mt-2 text-sm text-slate-900">
-                                                @if ($latestCertificate)
-                                                    {{ ucfirst($latestCertificate->provider_type) }} · {{ $latestCertificate->status }}
-                                                @else
-                                                    {{ __('No certificates requested') }}
-                                                @endif
-                                            </dd>
-                                        </div>
-                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Certificate scope') }}</dt>
-                                            <dd class="mt-2 text-sm text-slate-900">{{ $latestCertificate ? ucfirst($latestCertificate->scope_type) : __('—') }}</dd>
-                                        </div>
-                                        @if ($latestCertificate)
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Certificate domains') }}</dt>
-                                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ implode(', ', $latestCertificate->domainHostnames()) }}</dd>
-                                            </div>
-                                            @if (! empty($latestCertificate->last_output))
-                                                <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Latest certificate output') }}</dt>
-                                                    <dd class="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-slate-900">{{ \Illuminate\Support\Str::limit($latestCertificate->last_output, 800) }}</dd>
-                                                </div>
-                                            @endif
-                                        @endif
-                                    </dl>
-
-                                    @if ($latestCertificate && in_array($latestCertificate->status, [
-                                        \App\Models\SiteCertificate::STATUS_FAILED,
-                                        \App\Models\SiteCertificate::STATUS_PENDING,
-                                        \App\Models\SiteCertificate::STATUS_ISSUED,
-                                    ], true))
-                                        <div class="flex flex-wrap gap-3">
-                                            <button
-                                                type="button"
-                                                wire:click="retryCertificate('{{ $latestCertificate->id }}')"
-                                                wire:loading.attr="disabled"
-                                                class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
-                                            >
-                                                <span wire:loading.remove wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retry certificate') }}</span>
-                                                <span wire:loading wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retrying...') }}</span>
-                                            </button>
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
-
-                            @if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime())
-                                <div class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <h3 class="text-base font-semibold text-slate-900">{{ __('Runtime target') }}</h3>
-                                            <p class="mt-1 text-sm text-slate-600">{{ __('The latest managed deploy details for this runtime target.') }}</p>
-                                        </div>
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                                            @if ($site->usesAwsLambdaRuntime())
-                                                {{ __('AWS Lambda') }}
-                                            @elseif ($site->usesFunctionsRuntime())
-                                                {{ __('DigitalOcean Functions') }}
-                                            @elseif ($site->usesDockerRuntime())
-                                                {{ __('Docker host') }}
-                                            @else
-                                                {{ __('Kubernetes cluster') }}
-                                            @endif
-                                        </span>
-                                    </div>
-
-                                    @if ($site->usesFunctionsRuntime())
-                                        <dl class="grid gap-4 sm:grid-cols-2">
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Runtime') }}</dt>
-                                                <dd class="mt-2 font-mono text-sm text-slate-900">{{ $serverlessRuntime['runtime'] ?? '—' }}</dd>
-                                            </div>
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Entrypoint') }}</dt>
-                                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['entrypoint'] ?? '—' }}</dd>
-                                            </div>
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Revision') }}</dt>
-                                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['last_revision_id'] ?? __('Not deployed yet') }}</dd>
-                                            </div>
-                                            @if (! empty($serverlessRuntime['function_arn']))
-                                                <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Function ARN') }}</dt>
-                                                    <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['function_arn'] }}</dd>
-                                                </div>
-                                            @endif
-                                        </dl>
-                                    @elseif ($site->usesDockerRuntime())
-                                        <div class="grid gap-4 sm:grid-cols-2">
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Last generated compose file') }}</p>
-                                                <pre class="mt-2 max-h-64 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['compose_yaml'] ?? __('Not generated yet') }}</pre>
-                                            </div>
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Managed Dockerfile') }}</p>
-                                                <pre class="mt-2 max-h-64 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['dockerfile'] ?? __('Not generated yet') }}</pre>
-                                            </div>
-                                        </div>
-                                    @else
-                                        <div class="grid gap-4 sm:grid-cols-2">
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Namespace') }}</p>
-                                                <p class="mt-2 text-sm font-medium text-slate-900">{{ $kubernetesRuntime['namespace'] ?? __('default') }}</p>
-                                            </div>
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Manifest') }}</p>
-                                                <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-violet-100">{{ $kubernetesRuntime['manifest_yaml'] ?? __('Not generated yet') }}</pre>
-                                            </div>
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
-                        </section>
-
-                        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <section class="dply-card overflow-hidden">
                             <form wire:submit="saveSiteNotes">
                                 <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                    <div class="border-b border-slate-200 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ __('Site notes') }}</h2>
-                                        <p class="mt-3 text-sm leading-6 text-slate-600">
-                                            {{ __('Keep operational notes here for details you want to save or hand off later. Avoid putting secrets or credentials in this field.') }}
-                                        </p>
+                                    <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                                        <div class="flex items-start gap-3">
+                                            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                                <x-heroicon-o-pencil-square class="h-5 w-5" />
+                                            </span>
+                                            <div class="min-w-0">
+                                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
+                                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                    {{ __('Keep operational notes here for details you want to save or hand off later. Avoid putting secrets or credentials in this field.') }}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="space-y-4 p-6 sm:p-8">
                                         <div>
                                             <x-input-label for="site_notes" value="Notes" />
-                                            <textarea id="site_notes" wire:model="site_notes" rows="5" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm"></textarea>
+                                            <textarea id="site_notes" wire:model="site_notes" rows="5" class="mt-2 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"></textarea>
                                             <x-input-error :messages="$errors->get('site_notes')" class="mt-2" />
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="flex justify-end border-t border-slate-200 bg-slate-50/40 px-6 py-4 sm:px-8">
+                                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
                                     <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
                                 </div>
                             </form>
@@ -1433,6 +1229,12 @@
                         @include('livewire.sites.settings.partials.repository')
                     @elseif ($section === 'runtime')
                         @include('livewire.sites.settings.partials.runtime')
+                    @elseif ($section === 'runtime-php')
+                        @include('livewire.sites.settings.partials.runtime.php')
+                    @elseif ($section === 'runtime-ruby')
+                        @include('livewire.sites.settings.partials.runtime.ruby')
+                    @elseif ($section === 'runtime-static')
+                        @include('livewire.sites.settings.partials.runtime.static')
                     @elseif ($section === 'system-user')
                         @include('livewire.sites.settings.partials.system-user')
                     @elseif ($section === 'laravel-stack')

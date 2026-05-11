@@ -57,8 +57,23 @@ final class SiteSettingsHeader
             ],
             'runtime' => [
                 'title' => __('Runtime'),
-                'description' => __('PHP version, Node version, runtime overrides, and per-:resource runtime parameters.', ['resource' => $resourceNoun]),
+                'description' => __('What this :resource runs and how — language, processes, detection, and container lifecycle.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-cube-transparent',
+            ],
+            'runtime-php' => [
+                'title' => __('PHP runtime'),
+                'description' => __('PHP version, memory and execution limits, FPM pool user, scheduler, and Octane settings for this :resource.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-cog',
+            ],
+            'runtime-ruby' => [
+                'title' => __('Ruby runtime'),
+                'description' => __('Ruby/Rails-specific runtime settings for this :resource.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-cog',
+            ],
+            'runtime-static' => [
+                'title' => __('Static runtime'),
+                'description' => __('Published path and static-site specific runtime settings for this :resource.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-cog',
             ],
             'system-user' => [
                 'title' => __('System user'),

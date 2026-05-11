@@ -306,6 +306,20 @@ class Site extends Model
     {
         $this->loadMissing('domains');
         $host = strtolower(trim((string) optional($this->primaryDomain())->hostname));
+
+        return self::apexGuessForHostname($host);
+    }
+
+    /**
+     * Apex extraction helper for an arbitrary hostname — same rule as
+     * {@see guessDnsZoneFromPrimaryHostname()} but doesn't read from the
+     * site's current domain. Used by the rename-cascade planner to decide
+     * whether the saved `dns_zone` was the operator's choice or matched
+     * what dply would have auto-suggested from the *old* hostname.
+     */
+    public static function apexGuessForHostname(string $hostname): ?string
+    {
+        $host = strtolower(trim($hostname));
         if ($host === '' || ! str_contains($host, '.')) {
             return null;
         }
@@ -316,6 +330,23 @@ class Site extends Model
         }
 
         return $parts[count($parts) - 2].'.'.$parts[count($parts) - 1];
+    }
+
+    /**
+     * True when the saved `dns_zone` equals the apex dply would auto-guess
+     * from the supplied hostname. Treats an empty saved zone as "no operator
+     * value" — also auto-derived for cascade purposes.
+     */
+    public function dnsZoneMatchesAutoGuessForHostname(string $hostname): bool
+    {
+        $saved = strtolower(trim((string) ($this->dns_zone ?? '')));
+        if ($saved === '') {
+            return true;
+        }
+
+        $guess = self::apexGuessForHostname($hostname);
+
+        return $guess !== null && strtolower($guess) === $saved;
     }
 
     public function domains(): HasMany

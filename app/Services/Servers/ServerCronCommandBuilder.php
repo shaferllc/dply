@@ -39,25 +39,59 @@ class ServerCronCommandBuilder
     }
 
     /**
-     * Command body before sudo/flock (env prefix, TZ, raw command).
+     * Command body before sudo/flock (env prefix, TZ, raw command). The output
+     * is guaranteed single-line — every crontab entry must fit on one line, so
+     * `env_prefix` (a multi-line `export …` block in the UI), `schedule_timezone`,
+     * and the command itself are flattened with `; ` separators. Blank lines and
+     * `#` shell comments inside env_prefix/command are dropped so they can't be
+     * mistaken for crontab directives once the synchronizer concatenates them
+     * after the five schedule fields.
      */
     public function buildInnerShellCommand(ServerCronJob $job): string
     {
-        $cmd = trim($job->command);
-        if ($cmd === '') {
-            return '';
-        }
-
-        $prefix = trim((string) ($job->env_prefix ?? ''));
-        if ($prefix !== '') {
-            $cmd = $prefix."\n".$cmd;
-        }
+        $parts = [];
 
         $tz = trim((string) ($job->schedule_timezone ?? ''));
         if ($tz !== '') {
-            $cmd = 'export TZ='.escapeshellarg($tz)."\n".$cmd;
+            $parts[] = 'export TZ='.escapeshellarg($tz);
         }
 
-        return $cmd;
+        $prefix = $this->flattenMultilineToShell((string) ($job->env_prefix ?? ''));
+        if ($prefix !== '') {
+            $parts[] = $prefix;
+        }
+
+        $cmd = $this->flattenMultilineToShell((string) $job->command);
+        if ($cmd === '') {
+            return '';
+        }
+        $parts[] = $cmd;
+
+        return implode('; ', $parts);
+    }
+
+    /**
+     * Multi-line text → single-line shell. Drops blank lines and shell comments,
+     * trims each statement, strips trailing `;` so the join doesn't double up.
+     * Returns '' for input that contains nothing but blanks/comments.
+     */
+    private function flattenMultilineToShell(string $body): string
+    {
+        $body = trim($body);
+        if ($body === '') {
+            return '';
+        }
+
+        $lines = preg_split('/\r?\n/', $body) ?: [];
+        $cleaned = [];
+        foreach ($lines as $line) {
+            $statement = rtrim(trim($line), ';');
+            if ($statement === '' || str_starts_with($statement, '#')) {
+                continue;
+            }
+            $cleaned[] = $statement;
+        }
+
+        return implode('; ', $cleaned);
     }
 }

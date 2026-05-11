@@ -3,10 +3,10 @@
 namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\ConfigRevision;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
-use App\Models\SiteWebserverConfigRevision;
 use App\Services\Sites\WebserverConfig\SiteWebserverConfigEditorService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -210,6 +210,19 @@ class WebserverConfig extends Component
     {
         Gate::authorize('update', $this->site);
         $profile = $editor->getOrCreateProfile($this->site);
+
+        // Baseline-on-first-save: capture whatever was persisted on the profile
+        // before this save so the user always has a "before" to roll back to.
+        if (! $editor->streamHasRevisions($this->site)) {
+            $editor->captureProfileSnapshot($this->site, [
+                'mode' => $profile->mode,
+                'before_body' => $profile->before_body,
+                'main_snippet_body' => $profile->main_snippet_body,
+                'after_body' => $profile->after_body,
+                'full_override_body' => $profile->full_override_body,
+            ], auth()->user(), __('Baseline (auto-captured)'));
+        }
+
         $profile->update([
             'mode' => $this->mode,
             'before_body' => $this->before_body,
@@ -217,7 +230,15 @@ class WebserverConfig extends Component
             'after_body' => $this->after_body,
             'full_override_body' => $this->full_override_body,
         ]);
-        $editor->saveRevision($this->site, $profile->fresh(), auth()->user(), __('Manual snapshot'));
+
+        $editor->captureProfileSnapshot($this->site, [
+            'mode' => $this->mode,
+            'before_body' => $this->before_body,
+            'main_snippet_body' => $this->main_snippet_body,
+            'after_body' => $this->after_body,
+            'full_override_body' => $this->full_override_body,
+        ], auth()->user(), __('Manual snapshot'));
+
         $this->toastSuccess(__('Revision saved.'));
     }
 
@@ -225,9 +246,9 @@ class WebserverConfig extends Component
     {
         Gate::authorize('update', $this->site);
         $profile = $editor->getOrCreateProfile($this->site);
-        $rev = SiteWebserverConfigRevision::query()
+        $rev = ConfigRevision::query()
             ->whereKey($revisionId)
-            ->where('site_webserver_config_profile_id', $profile->id)
+            ->where('stream_key', $editor->profileStreamKey($this->site))
             ->firstOrFail();
 
         $editor->restoreRevision($profile, $rev);
@@ -283,10 +304,10 @@ class WebserverConfig extends Component
         $coreChangedWarning = $profile && $profile->last_applied_core_hash !== null
             && $editor->coreChangedSinceApply($this->site, $profile);
 
-        $revisions = collect();
-        if ($profile) {
-            $revisions = $profile->revisions()->latest()->limit(25)->get();
-        }
+        $revisions = ConfigRevision::query()
+            ->forStream($editor->profileStreamKey($this->site))
+            ->limit(25)
+            ->get();
 
         return view('livewire.sites.webserver-config', [
             'revisions' => $revisions,

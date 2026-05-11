@@ -34,6 +34,7 @@ class ServerCronJob extends Model
         'description',
         'site_id',
         'is_synced',
+        'last_synced_enabled',
         'last_sync_error',
         'last_run_at',
         'last_run_output',
@@ -55,6 +56,7 @@ class ServerCronJob extends Model
     {
         return [
             'is_synced' => 'boolean',
+            'last_synced_enabled' => 'boolean',
             'enabled' => 'boolean',
             'last_run_at' => 'datetime',
             'alert_on_failure' => 'boolean',

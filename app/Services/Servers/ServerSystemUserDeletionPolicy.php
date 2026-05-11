@@ -17,22 +17,8 @@ final class ServerSystemUserDeletionPolicy
             return __('A username is required.');
         }
 
-        if ($normalized === 'root') {
-            return __('The root account cannot be removed.');
-        }
-
-        if ($normalized === 'dply') {
-            return __('The dply account cannot be removed.');
-        }
-
-        $configDeploy = $this->normalize((string) config('server_provision.deploy_ssh_user', 'dply'));
-        if ($configDeploy !== '' && $normalized === $configDeploy) {
-            return __('The configured deploy user cannot be removed.');
-        }
-
-        $sshUser = $this->normalize((string) $server->ssh_user);
-        if ($sshUser !== '' && $normalized === $sshUser) {
-            return __('The server’s deploy SSH user cannot be removed.');
+        if ($this->isProtected($server, $normalized)) {
+            return $this->protectedReason($server, $normalized);
         }
 
         $count = $this->sitesUsingUserCount($server, $normalized);
@@ -43,6 +29,50 @@ final class ServerSystemUserDeletionPolicy
         }
 
         return null;
+    }
+
+    /**
+     * Account-name protection check (no site-count signal). Used to label
+     * rows in the UI without re-running the full block-reason calculation.
+     */
+    public function isProtected(Server $server, string $username): bool
+    {
+        $normalized = $this->normalize($username);
+        if ($normalized === '') {
+            return false;
+        }
+
+        if ($normalized === 'root' || $normalized === 'dply') {
+            return true;
+        }
+
+        $configDeploy = $this->normalize((string) config('server_provision.deploy_ssh_user', 'dply'));
+        if ($configDeploy !== '' && $normalized === $configDeploy) {
+            return true;
+        }
+
+        $sshUser = $this->normalize((string) $server->ssh_user);
+        if ($sshUser !== '' && $normalized === $sshUser) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function protectedReason(Server $server, string $normalized): string
+    {
+        if ($normalized === 'root') {
+            return __('The root account cannot be removed.');
+        }
+        if ($normalized === 'dply') {
+            return __('The dply account cannot be removed.');
+        }
+        $configDeploy = $this->normalize((string) config('server_provision.deploy_ssh_user', 'dply'));
+        if ($configDeploy !== '' && $normalized === $configDeploy) {
+            return __('The configured deploy user cannot be removed.');
+        }
+
+        return __('The server’s deploy SSH user cannot be removed.');
     }
 
     /**

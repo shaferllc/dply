@@ -8,6 +8,24 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('users')) {
+            return;
+        }
+
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            try {
+                Schema::table('users', function (Blueprint $table) {
+                    $table->dropColumn('dply_auth_id');
+                });
+            } catch (Throwable) {
+                // Column absent (migrations-only DBs) or drop unsupported for this SQLite path.
+            }
+
+            return;
+        }
+
         if (! Schema::hasColumn('users', 'dply_auth_id')) {
             return;
         }

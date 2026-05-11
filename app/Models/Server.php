@@ -264,6 +264,11 @@ class Server extends Model
         return $this->hasMany(ServerAuthorizedKey::class);
     }
 
+    public function systemUsers(): HasMany
+    {
+        return $this->hasMany(ServerSystemUser::class)->orderBy('username');
+    }
+
     public function sshKeyAuditEvents(): HasMany
     {
         return $this->hasMany(ServerSshKeyAuditEvent::class)->orderByDesc('created_at');

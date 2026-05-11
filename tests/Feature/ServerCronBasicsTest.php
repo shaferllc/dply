@@ -46,10 +46,10 @@ class ServerCronBasicsTest extends TestCase
             ->get(route('servers.cron', $server))
             ->assertOk()
             ->assertSee('Schedule commands in the Dply-managed crontab block for this server.')
-            ->assertSee('Basics')
-            ->assertSee('Troubleshooting')
             ->assertSee('Scheduled jobs')
-            ->assertDontSee('Troubleshooting & advanced tools')
+            ->assertSee('Recent run history')
+            ->assertSee('Inspect crontab')
+            ->assertDontSee('Troubleshooting')
             ->assertDontSee('Organization templates')
             ->assertDontSee('Organization maintenance window');
     }
@@ -111,9 +111,10 @@ class ServerCronBasicsTest extends TestCase
         $server = $this->readyServer($user);
 
         $synchronizer = Mockery::mock(ServerCronSynchronizer::class);
+        $synchronizer->shouldReceive('invalidExpressions')->andReturn([]);
         $synchronizer->shouldReceive('sync')
             ->once()
-            ->andReturn('installed');
+            ->andReturn("installed\nDPLY_CRON_EXIT:0");
         $this->app->instance(ServerCronSynchronizer::class, $synchronizer);
 
         Livewire::actingAs($user)
@@ -178,7 +179,7 @@ class ServerCronBasicsTest extends TestCase
         $this->assertSame(0, ServerCronJob::query()->where('server_id', $server->id)->count());
     }
 
-    public function test_loading_crontab_keeps_user_on_troubleshooting_tab(): void
+    public function test_loading_crontab_populates_inspect_body(): void
     {
         $user = $this->userWithOrganization();
         $server = $this->readyServer($user);
@@ -194,10 +195,8 @@ class ServerCronBasicsTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(WorkspaceCron::class, ['server' => $server])
-            ->set('cron_workspace_tab', 'troubleshooting')
             ->set('inspect_crontab_user', 'deploy')
             ->call('loadInspectCrontab')
-            ->assertSet('cron_workspace_tab', 'troubleshooting')
             ->assertSet('inspect_crontab_body', '* * * * * php artisan schedule:run')
             ->assertSet('inspect_crontab_exit_code', 0);
     }

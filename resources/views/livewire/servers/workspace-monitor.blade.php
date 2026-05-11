@@ -95,9 +95,15 @@
     @endif
 
     @if ($opsReady && $probePending)
-        <div class="rounded-xl border border-sky-200/80 bg-sky-50/90 px-4 py-3 text-sm text-sky-950">
-            {{ __('Checking SSH and Python on the server in the background. This page will update when the check finishes.') }}
-        </div>
+        <x-workspace-console-banner
+            status="running"
+            :message="__('Checking SSH and Python on :host …', ['host' => $server->getSshConnectionString()])"
+            :subtitle="__('Running in the background — this page will update when the check finishes.')"
+            :busy="true"
+            poll-action="syncMonitoringProbeStatus"
+            poll-interval="{{ $pollProbeSeconds }}s"
+            :empty-message="__('No output yet — probe still running.')"
+        />
     @endif
     @if ($opsReady && ! $pyOk)
         <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
@@ -127,13 +133,22 @@
                     <p class="mt-1 text-xs text-sky-900/80">{{ __('You can leave this page; open Metrics again to see the result.') }}</p>
                 </div>
             @elseif ($sshUnreachable)
-                <div class="mt-6 rounded-xl border border-amber-200/90 bg-amber-50/80 p-4">
-                    <p class="text-sm font-semibold text-amber-950">{{ __('SSH check failed — install is blocked until Dply can reach the server') }}</p>
-                    <p class="mt-2 text-sm text-amber-900/90">{{ __('Fix SSH credentials and firewall, then Recheck. The same install is available under Services when SSH works.') }}</p>
-                    @if (! empty($m['monitoring_probe_error']))
-                        <pre class="mt-3 max-h-36 overflow-auto rounded-lg bg-white/80 p-3 text-xs text-brand-ink whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $m['monitoring_probe_error'] }}</pre>
-                    @endif
-                    <div class="mt-4 flex flex-wrap gap-3">
+                @php
+                    $probeErrorLines = ! empty($m['monitoring_probe_error'])
+                        ? explode("\n", (string) $m['monitoring_probe_error'])
+                        : [];
+                @endphp
+                <div class="mt-6 space-y-3">
+                    <x-workspace-console-banner
+                        status="failed"
+                        :message="__('SSH check failed — install is blocked until Dply can reach the server')"
+                        :subtitle="__('Fix SSH credentials and firewall, then Recheck. The same install is available under Services when SSH works.')"
+                        :output="$probeErrorLines"
+                        :busy="false"
+                        :default-expanded="count($probeErrorLines) > 0"
+                        :empty-message="__('No probe error captured.')"
+                    />
+                    <div class="flex flex-wrap gap-3">
                         <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}" wire:navigate class="{{ $btnSecondary }}">{{ __('Server connection settings') }}</a>
                         <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
                             <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck SSH') }}</span>
@@ -151,38 +166,62 @@
             @elseif ($servicesRemoteTaskId || $monitoringInstallInProgress)
                 {{-- Install task is in flight (SSH apt + script deploy).
                      Driven by either the in-memory $servicesRemoteTaskId
-                     or the persistent ServerManageAction row picked up
-                     in render(). The latter survives page reloads. --}}
+                     (live cache stream) or the persistent ServerManageAction
+                     row picked up in render(). The latter survives page
+                     reloads — the action row stays queued/running until
+                     the worker updates it. --}}
                 @php
-                    $installStatus = (string) ($monitoringInstallAction?->status ?? 'queued');
+                    $installActionStatus = (string) ($monitoringInstallAction?->status ?? 'queued');
+                    // Prefer the live cache status (queued/running/completed/failed)
+                    // when we still have the in-memory task id; otherwise fall
+                    // back to the action row status mapped onto banner copy.
+                    $installBannerStatus = $this->diagnosticsBannerStatus !== ''
+                        ? $this->diagnosticsBannerStatus
+                        : match ($installActionStatus) {
+                            'running' => 'running',
+                            'failed' => 'failed',
+                            'completed' => 'completed',
+                            default => 'queued',
+                        };
+                    $installBannerBusy = in_array($installBannerStatus, ['queued', 'running'], true);
                     $installStartedAt = $monitoringInstallAction?->started_at ?? $monitoringInstallAction?->created_at;
                     $installAgeMinutes = $installStartedAt?->diffInMinutes(now());
-                    $installLabel = match ($installStatus) {
+
+                    $installBannerHost = $server->getSshConnectionString();
+                    $installBannerMessage = match ($installBannerStatus) {
+                        'queued' => __('Install queued — waiting for a worker to pick it up…'),
+                        'running' => __('Installing monitor on :host …', ['host' => $installBannerHost]),
+                        'completed' => __('Monitor install finished.'),
+                        'failed' => __('Monitor install failed.'),
+                        default => __('Installing monitor on :host …', ['host' => $installBannerHost]),
+                    };
+                    $installBannerSubtitleParts = [];
+                    $installBannerSubtitleParts[] = match ($installBannerStatus) {
                         'queued' => __('Queued — waiting to start.'),
                         'running' => __('Running apt + deploying the metrics agent over SSH.'),
                         'failed' => __('Install failed. Check the queue worker output and try again.'),
+                        'completed' => __('Apt + agent deploy completed over SSH.'),
                         default => __('Install in progress.'),
                     };
+                    if ($installStartedAt) {
+                        $installBannerSubtitleParts[] = __('Started :time', ['time' => $installStartedAt->diffForHumans()]);
+                        if ($installAgeMinutes !== null && $installAgeMinutes >= 1) {
+                            $installBannerSubtitleParts[] = trans_choice(':count minute elapsed|:count minutes elapsed', (int) $installAgeMinutes, ['count' => (int) $installAgeMinutes]);
+                        }
+                    }
+                    $installBannerSubtitle = implode(' · ', array_filter($installBannerSubtitleParts));
                 @endphp
-                <div wire:poll.5s class="mt-6 rounded-xl border border-sky-200/80 bg-sky-50/70 p-4">
-                    <div class="flex items-start gap-3">
-                        <span class="mt-0.5 inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" aria-hidden="true"></span>
-                        <div class="min-w-0">
-                            <p class="text-sm font-semibold text-sky-950">
-                                {{ __('Installing monitor on this server…') }}
-                                <span class="ml-1 text-[10px] font-medium uppercase tracking-wide text-sky-700/80">{{ strtoupper($installStatus) }}</span>
-                            </p>
-                            <p class="mt-1 text-xs text-sky-900/85 leading-relaxed">{{ $installLabel }}</p>
-                            @if ($installStartedAt)
-                                <p class="mt-1 text-[11px] text-sky-900/70">
-                                    {{ __('Started') }}: {{ $installStartedAt->diffForHumans() }}
-                                    @if ($installAgeMinutes !== null && $installAgeMinutes >= 1)
-                                        · {{ trans_choice(':count minute elapsed|:count minutes elapsed', (int) $installAgeMinutes, ['count' => (int) $installAgeMinutes]) }}
-                                    @endif
-                                </p>
-                            @endif
-                        </div>
-                    </div>
+                <div class="mt-6">
+                    <x-workspace-console-banner
+                        :status="$installBannerStatus"
+                        :message="$installBannerMessage"
+                        :subtitle="$installBannerSubtitle"
+                        :output="$this->diagnosticsBannerOutputLines"
+                        :busy="$installBannerBusy"
+                        :poll-action="$installBannerBusy ? 'syncServicesRemoteTaskFromCache' : null"
+                        poll-interval="{{ $pollRemoteTaskSeconds }}s"
+                        :default-expanded="true"
+                    />
                 </div>
             @else
                 <div class="mt-6 flex flex-wrap items-center gap-3">

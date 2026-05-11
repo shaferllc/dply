@@ -163,7 +163,7 @@ class SiteCreationGateTest extends TestCase
 
         $this->actingInOrg($user, $org);
 
-        $response = $this->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']));
+        $response = $this->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php']));
 
         $response->assertOk()
             ->assertSee('PHP')

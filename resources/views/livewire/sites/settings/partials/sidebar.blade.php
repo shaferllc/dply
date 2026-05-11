@@ -69,6 +69,7 @@
         </div>
         <nav id="site-settings-sidebar" class="flex flex-col gap-0.5 p-2" aria-label="{{ __($resourceNoun.' settings sections') }}">
             @foreach ($settingsSidebarItems as $item)
+                @php($isChild = ! empty($item['parent'] ?? null))
                 <a
                     href="{{ $item['id'] === 'webserver-config'
                         ? route('sites.webserver-config', [$server, $site])
@@ -84,11 +85,16 @@
                     wire:navigate
                     @class([
                         $navLink,
+                        'pl-9' => $isChild,
                         'bg-brand-sand/60 text-brand-ink' => $section === $item['id'],
                         'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $section !== $item['id'],
                     ])
                 >
-                    <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
+                    @if ($isChild)
+                        <x-dynamic-component :component="$item['icon']" class="h-4 w-4 shrink-0 opacity-70" />
+                    @else
+                        <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
+                    @endif
                     {{ $item['label'] }}
                 </a>
             @endforeach

@@ -17,6 +17,7 @@ class SiteDomain extends Model
         'hostname',
         'is_primary',
         'www_redirect',
+        'comment',
     ];
 
     protected function casts(): array

@@ -22,6 +22,9 @@
         <x-heroicon-o-bolt {{ $iconAttrs }} />
         @break
     @case('cloudflare')
+    @case('gandi')
+    @case('namecheap')
+    @case('vercel_dns')
         <x-heroicon-o-globe-alt {{ $iconAttrs }} />
         @break
     @case('equinix_metal')

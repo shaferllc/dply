@@ -2,6 +2,13 @@
     $link = 'text-brand-sage hover:text-brand-ink underline underline-offset-2';
     $hint = 'mt-1 text-sm text-brand-moss leading-relaxed';
     $code = 'rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-xs font-mono text-brand-ink';
+    $capabilityChip = function (string $cap): array {
+        return match ($cap) {
+            'compute' => ['label' => __('compute'), 'class' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10'],
+            'dns' => ['label' => __('DNS'), 'class' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/30'],
+            default => ['label' => $cap, 'class' => 'bg-brand-sand/40 text-brand-mist ring-brand-ink/10'],
+        };
+    };
 @endphp
 
 @if ($credentials->isNotEmpty())
@@ -23,8 +30,14 @@
             @foreach ($credentials as $cred)
                 <li class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-5 py-4" wire:key="cred-{{ $cred->id }}">
                     <div class="min-w-0">
-                        <span class="font-medium text-brand-ink">{{ $cred->name }}</span>
-                        <span class="text-brand-mist ml-2 font-mono text-xs">{{ $cred->provider }}</span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-medium text-brand-ink">{{ $cred->name }}</span>
+                            <span class="text-brand-mist font-mono text-xs">{{ $cred->provider }}</span>
+                            @foreach ($cred->capabilities() as $cap)
+                                @php $chip = $capabilityChip($cap); @endphp
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $chip['class'] }}">{{ $chip['label'] }}</span>
+                            @endforeach
+                        </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-3 shrink-0">
                         @if ($this->canVerifyCredentialProvider($cred->provider))
@@ -654,6 +667,35 @@
                         <x-text-input id="oracle_api_token" wire:model="oracle_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
                     </div>
                     <x-primary-button type="button" wire:click="storeOracle" wire:loading.attr="disabled" wire:target="storeOracle">{{ __('Save') }}</x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('gandi')
+    @case('namecheap')
+    @case('vercel_dns')
+        @php
+            $comingSoonCopy = match ($active_provider) {
+                'gandi' => __('Gandi DNS support is on the roadmap. The DNS tab surfaces it so you can plan a switch — credentials are not stored yet.'),
+                'namecheap' => __('Namecheap DNS support is on the roadmap. The DNS tab surfaces it so you can plan a switch — credentials are not stored yet.'),
+                'vercel_dns' => __('Vercel DNS support is on the roadmap. The DNS tab surfaces it so you can plan a switch — credentials are not stored yet.'),
+                default => __('This provider is on the roadmap. Credentials are not stored yet.'),
+            };
+        @endphp
+        <div class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 p-6 sm:p-8">
+                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-mist ring-1 ring-brand-ink/10 sm:inline-flex">
+                    <x-heroicon-o-clock class="h-5 w-5" />
+                </span>
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="text-base font-semibold text-brand-ink">{{ $activeProviderLabel }}</h3>
+                        <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('coming soon') }}</span>
+                        <span class="inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/30">{{ __('DNS') }}</span>
+                    </div>
+                    <p class="{{ $hint }}">{{ $comingSoonCopy }}</p>
+                    <p class="mt-3 text-xs text-brand-mist">{{ __('Connect a supported DNS provider (DigitalOcean, Cloudflare, AWS Route53) in the meantime — site DNS settings already accept any of them.') }}</p>
                 </div>
             </div>
         </div>

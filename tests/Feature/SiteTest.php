@@ -78,7 +78,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
 
         $response->assertOk()
             ->assertSee('PHP')
@@ -188,7 +188,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
 
         $response->assertOk()
             ->assertSee('PHP version mismatch')
@@ -223,7 +223,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
 
         $response->assertOk()
             ->assertSee('PHP 8.4')
@@ -1373,7 +1373,7 @@ class SiteTest extends TestCase
             ->assertHasNoErrors()
             ->assertDispatched('notify', message: __('System user settings saved.'), type: 'success');
 
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 
         $site->refresh();
 
@@ -1903,7 +1903,6 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
 
         $response->assertOk()
-            ->assertSee('Container app workspace')
             ->assertSee('Back to apps')
             ->assertSee('Overview')
             ->assertSee('Deployments')
@@ -1911,8 +1910,7 @@ class SiteTest extends TestCase
             ->assertSee('Networking')
             ->assertDontSee('Certificates')
             ->assertSee('Docker discovery')
-            ->assertSee('Runtime management')
-            ->assertSee('Errors')
+            ->assertSee('Container lifecycle')
             ->assertSee('Refresh Docker details')
             ->assertSee('laravel.repo.orb.local')
             ->assertSee('192.168.107.2')
@@ -2347,7 +2345,7 @@ class SiteTest extends TestCase
             ->call('confirmActionModal');
 
         $this->assertDatabaseMissing('site_domains', ['id' => $domain->id]);
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_settings_aliases_section_can_add_alias(): void
@@ -2374,14 +2372,14 @@ class SiteTest extends TestCase
             ->set('new_alias_label', 'Marketing alias')
             ->call('addAlias')
             ->assertHasNoErrors()
-            ->assertDispatched('notify', message: 'Alias added. Webserver config reloaded.', type: 'success');
+            ->assertDispatched('notify', message: 'Alias added. Webserver config queued.', type: 'success');
 
         $this->assertDatabaseHas('site_domain_aliases', [
             'site_id' => $site->id,
             'hostname' => 'www.example.com',
             'label' => 'Marketing alias',
         ]);
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_settings_tenants_section_can_add_tenant_domain(): void
@@ -2407,10 +2405,10 @@ class SiteTest extends TestCase
             ->set('new_tenant_hostname', 'acme.example.com')
             ->set('new_tenant_key', 'acme')
             ->set('new_tenant_label', 'Acme')
-            ->set('new_tenant_notes', 'App resolver uses the hostname.')
+            ->set('new_tenant_comment', 'App resolver uses the hostname.')
             ->call('addTenantDomain')
             ->assertHasNoErrors()
-            ->assertDispatched('notify', message: 'Tenant domain added. Webserver config reloaded.', type: 'success');
+            ->assertDispatched('notify', message: 'Tenant domain added. Webserver config queued.', type: 'success');
 
         $this->assertDatabaseHas('site_tenant_domains', [
             'site_id' => $site->id,
@@ -2418,7 +2416,7 @@ class SiteTest extends TestCase
             'tenant_key' => 'acme',
             'label' => 'Acme',
         ]);
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_settings_redirects_section_renders_separately(): void
@@ -2438,10 +2436,13 @@ class SiteTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'redirects'], false));
 
+        // Manual "Apply webserver config now" button was removed when the
+        // Routing page adopted the env-page UX (auto-apply on every save).
+        // The page still renders the section header, the Add CTA, and the
+        // "Auto-applied to the webserver after save." note in the modal.
         $response->assertOk()
             ->assertSee('Redirects')
-            ->assertSee('Add redirect')
-            ->assertSee('Apply webserver config now');
+            ->assertSee('Add redirect');
     }
 
     public function test_site_show_can_add_internal_redirect(): void
@@ -2585,7 +2586,7 @@ class SiteTest extends TestCase
 
         $this->assertSame('/srv/new/public', $site->document_root);
         $this->assertSame('new.example.com', $domain->hostname);
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_project_settings_can_assign_workspace(): void
@@ -2790,7 +2791,7 @@ class SiteTest extends TestCase
         $this->assertSame('preview-new.dply.cc', $previewDomain->hostname);
         $this->assertTrue($previewDomain->is_primary);
         $this->assertSame('preview-new.dply.cc', $site->testingHostname());
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_settings_domains_section_shows_quick_ssl_action_only_for_uncovered_domains(): void
@@ -3173,7 +3174,7 @@ class SiteTest extends TestCase
         $this->actingAs($user)
             ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'dns'], false))
             ->assertOk()
-            ->assertSee('DNS settings', escape: false);
+            ->assertSee('DNS automation', escape: false);
 
         Livewire::actingAs($user)
             ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])

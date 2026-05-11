@@ -16,7 +16,7 @@ class SiteTenantDomain extends Model
         'hostname',
         'tenant_key',
         'label',
-        'notes',
+        'comment',
         'sort_order',
         'meta',
     ];

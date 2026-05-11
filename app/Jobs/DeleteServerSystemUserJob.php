@@ -2,18 +2,26 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
 use App\Services\Servers\ServerSystemUserService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class DeleteServerSystemUserJob implements ShouldQueue
+/**
+ * Server-scoped Linux account removal. Emits a console_actions run keyed to the
+ * Server so the workspace page-top banner reflects progress and failures in the
+ * same surface used by the create flow.
+ */
+class DeleteServerSystemUserJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
     public int $tries = 1;
 
@@ -22,7 +30,28 @@ class DeleteServerSystemUserJob implements ShouldQueue
     public function __construct(
         public string $serverId,
         public string $username,
+        public ?string $userId = null,
     ) {}
+
+    public function uniqueId(): string
+    {
+        return 'console-action:system_user:server:'.$this->serverId;
+    }
+
+    protected function consoleSubject(): Model
+    {
+        return Server::query()->findOrFail($this->serverId);
+    }
+
+    protected function consoleKind(): string
+    {
+        return 'system_user';
+    }
+
+    protected function triggeringUserId(): ?string
+    {
+        return $this->userId;
+    }
 
     public function handle(ServerSystemUserService $service): void
     {
@@ -31,9 +60,18 @@ class DeleteServerSystemUserJob implements ShouldQueue
             return;
         }
 
+        $emit = $this->beginConsoleAction();
+
         try {
+            $emit->step('system_user', 'removing '.$this->username);
             $service->deleteUserFromServer($server, $this->username);
+
+            $emit->success('system user '.$this->username.' removed', 'system_user');
+            $this->completeConsoleAction();
         } catch (\Throwable $e) {
+            $emit->error($e->getMessage(), 'system_user');
+            $this->failConsoleAction($e->getMessage());
+
             Log::warning('DeleteServerSystemUserJob failed', [
                 'server_id' => $server->id,
                 'username' => $this->username,

@@ -18,6 +18,7 @@ class SiteRedirect extends Model
         'to_url',
         'status_code',
         'response_headers',
+        'comment',
         'sort_order',
     ];
 
