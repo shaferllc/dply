@@ -299,6 +299,7 @@ BASH;
             $server = $this->server->fresh();
             $timeout = isset($def['timeout']) ? (int) $def['timeout'] : null;
             $flash = ($def['label'] ?? $key).' '.__('finished.');
+            $label = (string) ($def['label'] ?? $key);
 
             if ($this->shouldQueueManageRemoteTasks()) {
                 $this->dispatchQueuedManageScript(
@@ -307,26 +308,61 @@ BASH;
                     $script,
                     $timeout,
                     $flash,
-                    __('TaskRunner (SSH)').' — '.($def['label'] ?? $key),
+                    __('TaskRunner (SSH)').' — '.$label,
+                    $label,
                 );
 
                 return;
             }
 
+            // Sync path — seed the ConsoleAction row so the banner picks it up
+            // in real time, then stream output lines into it as they arrive
+            // alongside the existing remote_output buffer.
+            $consoleId = $this->seedManageConsoleAction($server, $label);
+            $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+                'started_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             $this->resetRemoteSshStreamTargets();
             $this->remoteSshStreamSetMeta(
-                __('TaskRunner (SSH)').' — '.($def['label'] ?? $key),
+                __('TaskRunner (SSH)').' — '.$label,
                 $this->manageSshConnectionLabel($server)."\n".__('Remote script').":\n".$script
             );
-            $out = $this->runManageInlineBash(
-                $server,
-                'manage-action:'.$key,
-                $script,
-                fn (string $type, string $buffer) => $this->remoteSshStreamAppendStdout($buffer),
-                $timeout,
-            );
-            $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
-            $this->toastSuccess($flash);
+            try {
+                $out = $this->runManageInlineBash(
+                    $server,
+                    'manage-action:'.$key,
+                    $script,
+                    function (string $type, string $buffer) use ($emitter): void {
+                        $this->remoteSshStreamAppendStdout($buffer);
+                        foreach (preg_split('/\R/', rtrim($buffer, "\n")) ?: [] as $line) {
+                            if ($line !== '') {
+                                $emitter($line);
+                            }
+                        }
+                    },
+                    $timeout,
+                );
+                $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
+                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                    'finished_at' => now(),
+                    'error' => null,
+                    'updated_at' => now(),
+                ]);
+                $this->toastSuccess($flash);
+            } catch (\Throwable $inner) {
+                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                    'finished_at' => now(),
+                    'error' => mb_substr($inner->getMessage(), 0, 2000),
+                    'updated_at' => now(),
+                ]);
+                throw $inner;
+            }
         } catch (\Throwable $e) {
             $this->remote_error = $e->getMessage();
         }
@@ -709,6 +745,7 @@ BASH;
         ?int $timeoutSeconds,
         ?string $flashSuccess,
         string $streamTitle,
+        ?string $consoleLabel = null,
     ): void {
         $this->manageRemoteTaskId = null;
 
@@ -734,6 +771,13 @@ BASH;
         // Persist a recent-activity row so Overview can show what's happened.
         $logId = $this->logManageActionStart($server, $taskName, $streamTitle);
 
+        // Seed a `manage_action` ConsoleAction row so workspaces that opt in to
+        // the streaming banner partial (currently: Webserver) show progress in
+        // the same banner-and-View-output UI the switch job uses. Other
+        // workspaces ignore the row and continue rendering the legacy
+        // "Command output" panel — no UX regression there.
+        $consoleId = $this->seedManageConsoleAction($server, $consoleLabel ?? $streamTitle);
+
         ServerManageRemoteSshJob::dispatch(
             $server->id,
             $id,
@@ -742,6 +786,8 @@ BASH;
             $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
             $flashSuccess,
             $logId,
+            null,
+            $consoleId,
         );
 
         $this->manageRemoteTaskId = $id;
@@ -753,6 +799,43 @@ BASH;
             $this->manageSshConnectionLabel($server)."\n".__('Remote script').":\n".$inlineBash."\n\n"
             .__('Runs in the background so the browser does not block on SSH.')
         );
+    }
+
+    /**
+     * Create a `manage_action` ConsoleAction row scoped to the given server so
+     * the streaming banner partial can render it. Auto-dismisses any prior
+     * terminal manage_action rows for this subject so the banner-getter (which
+     * picks the most recent non-dismissed run) doesn't get stuck showing an
+     * old completed action.
+     *
+     * Scoping dismissal to `kind = manage_action` is deliberate — the
+     * webserver_switch banner has its own lifecycle and we don't want one
+     * manage button press to wipe out a "switch failed" surface.
+     */
+    protected function seedManageConsoleAction(Server $server, string $label): string
+    {
+        \App\Models\ConsoleAction::query()
+            ->where('subject_type', $server->getMorphClass())
+            ->where('subject_id', $server->id)
+            ->where('kind', 'manage_action')
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [
+                \App\Models\ConsoleAction::STATUS_COMPLETED,
+                \App\Models\ConsoleAction::STATUS_FAILED,
+            ])
+            ->update(['dismissed_at' => now()]);
+
+        $row = \App\Models\ConsoleAction::query()->create([
+            'subject_type' => $server->getMorphClass(),
+            'subject_id' => $server->id,
+            'kind' => 'manage_action',
+            'status' => \App\Models\ConsoleAction::STATUS_QUEUED,
+            'user_id' => auth()->id(),
+            'label' => $label.' …',
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+
+        return (string) $row->id;
     }
 
     protected function manageSshConnectionLabel(Server $server): string

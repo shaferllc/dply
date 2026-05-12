@@ -341,7 +341,7 @@
                             @endswitch
                             <a
                                 href="#"
-                                wire:click.prevent="setWorkspaceTab('{{ $row->engine }}'); setActiveInstance('{{ $row->name }}')"
+                                wire:click.prevent="setWorkspaceTab('{{ $row->engine }}')"
                                 class="ml-auto text-xs font-medium text-brand-forest hover:underline"
                             >{{ __('Open :engine workspace →', ['engine' => $engineLabel]) }}</a>
                         </div>
@@ -401,14 +401,10 @@
              ============================================================================ --}}
         @foreach ($engines as $engine)
             @php
-                $engineInstances = $cacheInstancesByEngine->get($engine, collect());
-                // Multi-instance lookup: use the active-instance name first;
-                // fall back to default (legacy single-instance) if the active
-                // instance doesn't exist for this engine; fall back to any
-                // installed instance after that.
-                $row = $engineInstances->get($active_instance)
-                    ?? $engineInstances->get(\App\Models\ServerCacheService::DEFAULT_INSTANCE_NAME)
-                    ?? $engineInstances->first();
+                // One row per (server, engine) — `$cacheServicesByEngine` is the keyBy('engine')
+                // map produced by the component's render(). Null if this engine isn't installed
+                // on this server (the engine card then renders its install affordance instead).
+                $row = $cacheServicesByEngine->get($engine);
                 $info = \App\Support\Servers\CacheEngineInfo::for($engine);
                 $rowInFlight = $row && in_array($row->status, [
                     \App\Models\ServerCacheService::STATUS_PENDING,
@@ -548,135 +544,10 @@
                         $activeSubtab = in_array($engine_subtab, $availableSubtabs, true) ? $engine_subtab : 'overview';
                     @endphp
 
-                    {{-- Always-visible current-instance banner. The chip row below lets the
-                         operator switch instances, but the operator's mental model is "which
-                         instance is selected RIGHT NOW" — a glance-level indicator above the
-                         chips removes the guess-work. Memcached is single-instance so we
-                         skip the banner for it (the chip row also hides). --}}
-                    @if ($isRedisFamily)
-                        <div class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-brand-forest/30 bg-brand-sage/10 px-4 py-2.5 text-sm">
-                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-forest/15 text-brand-forest" aria-hidden="true">
-                                <x-heroicon-o-cursor-arrow-rays class="h-3.5 w-3.5" />
-                            </span>
-                            <span class="text-brand-moss">{{ __('Currently viewing instance') }}</span>
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-forest px-2.5 py-0.5 font-mono text-xs font-semibold text-white shadow-sm">
-                                {{ $active_instance }}
-                                <span class="font-mono text-[10px] text-white/80">:{{ $row->port }}</span>
-                            </span>
-                            <span class="text-xs text-brand-mist">{{ __('— actions on this page affect this instance only.') }}</span>
-                        </div>
-                    @endif
-
-                    {{-- Instance chip row — visible across all subtabs so switching instances doesn't
-                         require navigating back to Overview. Memcached is single-instance for v1, so
-                         the row is hidden for it. The default instance is pinned to the front; named
-                         instances follow. --}}
-                    @if ($isRedisFamily)
-                        <div class="mb-4 flex flex-wrap items-center gap-2">
-                            @foreach ($engineInstances as $inst)
-                                @php
-                                    $isActive = $inst->name === $active_instance;
-                                    $instInFlight = in_array($inst->status, [
-                                        \App\Models\ServerCacheService::STATUS_PENDING,
-                                        \App\Models\ServerCacheService::STATUS_INSTALLING,
-                                        \App\Models\ServerCacheService::STATUS_UNINSTALLING,
-                                    ], true);
-                                @endphp
-                                <button
-                                    type="button"
-                                    wire:click="setActiveInstance('{{ $inst->name }}')"
-                                    @class([
-                                        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                                        'border-brand-forest bg-brand-forest text-white shadow-sm' => $isActive,
-                                        'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $isActive,
-                                    ])
-                                    title="{{ __('Switch to instance :name on port :port', ['name' => $inst->name, 'port' => $inst->port]) }}"
-                                >
-                                    <span class="font-mono">{{ $inst->name }}</span>
-                                    <span @class([
-                                        'font-mono text-[10px]',
-                                        'text-white/80' => $isActive,
-                                        'text-brand-mist' => ! $isActive,
-                                    ])>:{{ $inst->port }}</span>
-                                    @if ($instInFlight)
-                                        <x-spinner variant="forest" />
-                                    @elseif ($inst->status === \App\Models\ServerCacheService::STATUS_RUNNING)
-                                        <span @class([
-                                            'h-1.5 w-1.5 rounded-full',
-                                            'bg-emerald-300' => $isActive,
-                                            'bg-emerald-500' => ! $isActive,
-                                        ])></span>
-                                    @elseif ($inst->status === \App\Models\ServerCacheService::STATUS_FAILED)
-                                        <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
-                                    @elseif ($inst->status === \App\Models\ServerCacheService::STATUS_STOPPED)
-                                        <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
-                                    @else
-                                        <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                                    @endif
-                                </button>
-                            @endforeach
-
-                            @if (! $cacheBusy)
-                                <button
-                                    type="button"
-                                    wire:click="openAddInstanceForm"
-                                    class="inline-flex items-center gap-1.5 rounded-full border border-dashed border-brand-ink/25 px-3 py-1.5 text-xs font-medium text-brand-moss hover:border-brand-forest hover:bg-brand-sand/40 hover:text-brand-ink"
-                                    title="{{ __('Install another instance of :engine on a different port', ['engine' => $engineLabels[$engine]]) }}"
-                                >
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
-                                    {{ __('Add instance') }}
-                                </button>
-                            @endif
-                        </div>
-
-                        @if ($showAddInstanceForm)
-                            <div class="{{ $card }} mb-4 p-5">
-                                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Add another :engine instance', ['engine' => $engineLabels[$engine]]) }}</h3>
-                                <x-explainer class="mt-2">
-                                    <p>{{ __('Installs a second :engine instance on a different port, leaving the existing instance untouched. The new instance gets its own systemd unit (templated), config file, and data directory. Apt is not re-run if the package is already installed.', ['engine' => $engineLabels[$engine]]) }}</p>
-                                    <p>{{ __('Pick a short name (lowercase letters, digits, hyphens; e.g. sessions, queue, cache) and a free port. Auth, memory limits, and config can all be tuned per-instance after the install completes.') }}</p>
-                                </x-explainer>
-
-                                <form wire:submit.prevent="submitAddInstanceForm" class="mt-4 grid gap-4 sm:grid-cols-3 sm:items-end">
-                                    <div>
-                                        <x-input-label for="newInstanceName" :value="__('Instance name')" />
-                                        <x-text-input
-                                            id="newInstanceName"
-                                            wire:model="newInstanceName"
-                                            type="text"
-                                            autocomplete="off"
-                                            spellcheck="false"
-                                            class="mt-1 block w-full font-mono text-sm"
-                                            placeholder="sessions"
-                                            wire:loading.attr="disabled"
-                                            wire:target="submitAddInstanceForm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <x-input-label for="newInstancePort" :value="__('Port')" />
-                                        <x-text-input
-                                            id="newInstancePort"
-                                            wire:model="newInstancePort"
-                                            type="number"
-                                            min="1"
-                                            max="65535"
-                                            class="mt-1 block w-full font-mono text-sm"
-                                            placeholder="6380"
-                                            wire:loading.attr="disabled"
-                                            wire:target="submitAddInstanceForm"
-                                        />
-                                    </div>
-                                    <div class="flex flex-wrap gap-2">
-                                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="submitAddInstanceForm">
-                                            <span wire:loading.remove wire:target="submitAddInstanceForm">{{ __('Install instance') }}</span>
-                                            <span wire:loading wire:target="submitAddInstanceForm">{{ __('Queueing…') }}</span>
-                                        </x-primary-button>
-                                        <x-secondary-button type="button" wire:click="closeAddInstanceForm">{{ __('Cancel') }}</x-secondary-button>
-                                    </div>
-                                </form>
-                            </div>
-                        @endif
-                    @endif
+                    {{-- Multi-instance UI retired in the family-collapse refactor: one row per
+                         (server, engine) means there's only ever one instance to view, so the
+                         banner / chip row / Add-instance form are gone. The per-engine port is
+                         still shown in the status grid below. --}}
 
                     {{-- Sub-tab strip — group the per-engine cards so the page isn't a 9-card scroll. --}}
                     <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])">
@@ -876,13 +747,6 @@
                                 ['engine' => $engineLabels[$engine] ?? $engine],
                             );
 
-                            // Repair-port surfaces only when the case it fixes is present:
-                            // default-instance + redis-style engine + port forced off the engine
-                            // default. Hidden when the daemon is already reachable.
-                            $needsPortRepair = $row->name === \App\Models\ServerCacheService::DEFAULT_INSTANCE_NAME
-                                && in_array($row->engine, ['redis', 'valkey', 'keydb'], true)
-                                && (int) $row->port !== \App\Models\ServerCacheService::defaultPortFor($row->engine);
-
                             // Lifecycle buttons are gated by terminal states; PENDING/INSTALLING/
                             // UNINSTALLING surface their own affordances via the busy banner up top.
                             $lifecycleAvailable = in_array($row->status, [
@@ -896,7 +760,6 @@
                             $btnDiagnose = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50';
                             $btnLifecycle = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50';
                             $btnDanger = 'inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50';
-                            $btnRepair = 'inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-900 hover:bg-rose-100 disabled:opacity-50';
                             $btnDebug = 'inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50';
                             $btnMuted = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-mist hover:bg-brand-sand/40';
                             $groupShell = 'rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3';
@@ -944,18 +807,6 @@
                                         <x-heroicon-o-document-text class="h-3.5 w-3.5" />
                                         {{ __('Logs') }}
                                     </button>
-                                    @if ($needsPortRepair && ! $probeRunning)
-                                        <button type="button" wire:click="repairDefaultInstancePort('{{ $engine }}')" wire:loading.attr="disabled" wire:target="repairDefaultInstancePort" class="{{ $btnRepair }}" title="{{ __('Rewrite :config to bind :port and restart — fixes default-instance rows whose apt config still points at the engine default.', ['config' => '/etc/'.$engine.'/'.$engine.'.conf', 'port' => $row->port]) }}">
-                                            <span wire:loading.remove wire:target="repairDefaultInstancePort" class="inline-flex items-center gap-1.5">
-                                                <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" />
-                                                {{ __('Repair port') }}
-                                            </span>
-                                            <span wire:loading wire:target="repairDefaultInstancePort" class="inline-flex items-center gap-1.5">
-                                                <x-spinner variant="forest" />
-                                                {{ __('Repairing…') }}
-                                            </span>
-                                        </button>
-                                    @endif
                                 </div>
                             </div>
 
@@ -1040,7 +891,7 @@
 
                         <x-explainer class="mt-6" tone="warn" :title="__('What do these actions do?')">
                             <ul>
-                                <li><strong>{{ __('Diagnose') }}.</strong> {{ __('Recheck re-runs the per-instance ping. Debug runs systemctl status + port listener + journal. Status / Logs open the per-instance modal. Repair port rewrites the apt-shipped config when a default-instance was bumped off its default port.') }}</li>
+                                <li><strong>{{ __('Diagnose') }}.</strong> {{ __('Recheck re-runs the per-instance ping. Debug runs systemctl status + port listener + journal. Status / Logs open the per-instance modal.') }}</li>
                                 <li><strong>{{ __('Lifecycle: Restart / Stop / Start') }}.</strong> {{ __('Acts on THIS instance\'s systemd unit only. Other instances on this engine are not affected.') }}</li>
                                 <li><strong>{{ __('Lifecycle: Disable / Enable') }}.</strong> {{ __('Disable = stop now AND remove boot auto-start. Enable = start now AND re-arm boot auto-start. Use these when you want the daemon off (or back on) across reboots without uninstalling.') }}</li>
                                 <li><strong>{{ __('Lifecycle: Flush all keys') }}.</strong> {{ __('Drops every key in this instance — sessions, cache, queued tags, rate-limit counters. Cannot be undone. Sibling instances keep their data.') }}</li>

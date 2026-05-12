@@ -33,11 +33,24 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @if ($contextSite)
+        <div class="mb-4 flex items-center justify-between rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm">
+            <p class="text-brand-ink">
+                <span class="font-semibold">{{ __('Filtered to site:') }}</span>
+                {{ $contextSite->name }}
+                <span class="text-brand-mist">·</span>
+                <span class="text-brand-moss">{{ __('database backups are hidden because databases are server-scoped, not site-scoped.') }}</span>
+            </p>
+            <a href="{{ route('servers.backups', $server) }}" wire:navigate class="text-xs font-semibold text-brand-ink underline">{{ __('Clear filter') }}</a>
+        </div>
+    @endif
+
     <x-explainer class="mb-4">
         <p>{{ __('“Run now” creates a pending backup row and queues the export job — progress shows up in the lists below as the job completes. Schedules add a managed cron entry that fires the same job on the cadence you set.') }}</p>
         @if ($backupConfigurations->isEmpty())
             <p class="mt-2">{{ __('Backups currently write to the local disk. To send them to S3 / Dropbox / Google Drive / SFTP, ') }}<a href="{{ route('profile.backup-configurations') }}" wire:navigate class="font-semibold text-brand-ink underline">{{ __('add a backup destination') }}</a>{{ __(' first.') }}</p>
         @endif
+        <p class="mt-2 text-xs"><a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="font-semibold text-brand-ink underline">{{ __('View background activity →') }}</a></p>
     </x-explainer>
 
     {{-- At-a-glance health strip — last 7 days for completed/failed counts. --}}
@@ -214,6 +227,14 @@
                                         @endif
                                         {{ __('alerts') }}
                                     </button>
+                                    @if ($schedule->notify_on_failure)
+                                        <button type="button" wire:click="sendTestAlert('{{ $schedule->id }}')"
+                                            wire:loading.attr="disabled" wire:target="sendTestAlert"
+                                            title="{{ __('Send a test alert email to org admins right now.') }}"
+                                            class="text-brand-mist underline-offset-2 hover:text-brand-ink hover:underline normal-case tracking-normal">
+                                            {{ __('test') }}
+                                        </button>
+                                    @endif
                                     @if ($schedule->last_run_at)
                                         <span>·</span>
                                         <span>{{ __('last :ts', ['ts' => $schedule->last_run_at->diffForHumans()]) }}</span>

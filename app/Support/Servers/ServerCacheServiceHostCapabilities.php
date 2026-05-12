@@ -64,10 +64,10 @@ class ServerCacheServiceHostCapabilities
             return $this->emptyResult();
         }
 
-        // Engine-level probe pings whatever default-port instance is running.
-        // Multi-instance + non-default-port servers should use {@see probeInstance()}
-        // instead — this is the legacy aggregate signal that powers the engine-
-        // tab "Active" badge for back-compat.
+        // One row per (server, engine), port is always the engine default — so this engine-level
+        // probe is enough for the tab-strip badges. `probeInstance()` is kept for callers that
+        // need a single bool per row (the per-card reachability badge) but is now functionally
+        // equivalent to a lookup into this map for any row with a default port.
         return [
             'redis' => $this->probeWith($server, $this->portPingCommand('redis', 6379), 'PONG'),
             'valkey' => $this->probeWith($server, $this->portPingCommand('valkey', 6379), 'PONG'),
@@ -78,11 +78,11 @@ class ServerCacheServiceHostCapabilities
     }
 
     /**
-     * Probe a single instance on its actual port — fixes the hardcoded-6379
-     * limitation of {@see probe()}, which assumes default ports and therefore
-     * misses non-default-port instances even when they're healthy. Memcached
-     * + Dragonfly fall back to `systemctl is-active` because their CLI tools
-     * aren't always present.
+     * Probe a single row on its actual port — kept for callers that want a single bool
+     * (the per-card reachability badge) rather than the per-engine map {@see probe()} returns.
+     * Post-collapse every row is on the engine default port, so `$port` typically matches
+     * `ServerCacheService::defaultPortFor($engine)`; the parameter survives only because the
+     * blade view passes `$row->port` literally.
      */
     public function probeInstance(Server $server, string $engine, int $port): bool
     {

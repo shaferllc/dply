@@ -854,6 +854,42 @@ class BackgroundWorkspacePagesTest extends TestCase
         $this->assertSame(4, $stats['total_processes']);
     }
 
+    public function test_send_test_alert_sends_notification_with_test_marker_and_audits(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+            'notify_on_failure' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('sendTestAlert', $schedule->id);
+
+        \Illuminate\Support\Facades\Notification::assertSentTo($user, \App\Notifications\BackupFailureNotification::class, function ($notification) {
+            return $notification->isTest === true;
+        });
+
+        $audit = \App\Models\AuditLog::query()
+            ->where('organization_id', $server->organization_id)
+            ->latest('created_at')
+            ->first();
+        $this->assertSame('backup.schedule.test_alert', $audit?->action);
+    }
+
     public function test_failed_backup_sends_notification_when_schedule_opted_in(): void
     {
         \Illuminate\Support\Facades\Notification::fake();
@@ -1126,6 +1162,277 @@ class BackgroundWorkspacePagesTest extends TestCase
             ->call('applySupervisorPreset', 'action-cable')
             ->assertSet('new_sv_slug', 'action-cable')
             ->assertSet('new_sv_command', 'bundle exec puma -p 28080 cable/config.ru');
+    }
+
+    public function test_backups_site_query_param_filters_schedules_and_hides_db_runs(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+        $otherSite = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+
+        // Schedule for site (should appear); schedule for other site (should NOT); db schedule (should NOT).
+        $siteSchedule = ServerBackupSchedule::create([
+            'server_id' => $server->id, 'target_type' => 'site_files', 'target_id' => $site->id,
+            'cron_expression' => '0 3 * * *', 'is_active' => true,
+        ]);
+        ServerBackupSchedule::create([
+            'server_id' => $server->id, 'target_type' => 'site_files', 'target_id' => $otherSite->id,
+            'cron_expression' => '0 4 * * *', 'is_active' => true,
+        ]);
+        ServerBackupSchedule::create([
+            'server_id' => $server->id, 'target_type' => 'database', 'target_id' => $database->id,
+            'cron_expression' => '0 5 * * *', 'is_active' => true,
+        ]);
+
+        // Database backup row (must NOT show under site filter).
+        ServerDatabaseBackup::create(['server_database_id' => $database->id, 'status' => 'completed']);
+        // Site file backup row for THIS site (should show).
+        SiteFileBackup::create(['site_id' => $site->id, 'status' => 'completed']);
+
+        $this->actingAs($user);
+        request()->query->set('site', $site->id);
+
+        $component = Livewire::actingAs($user)
+            ->withQueryParams(['site' => $site->id])
+            ->test(WorkspaceBackups::class, ['server' => $server]);
+
+        $this->assertSame($site->id, $component->get('context_site_id'));
+        $schedules = $component->viewData('schedules');
+        $this->assertSame([$siteSchedule->id], $schedules->pluck('id')->all());
+        $this->assertCount(0, $component->viewData('databaseBackups'), 'DB runs hidden under site filter.');
+        $this->assertCount(1, $component->viewData('fileBackups'));
+    }
+
+    public function test_backups_invalid_site_query_param_does_not_set_context(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+
+        $component = Livewire::actingAs($user)
+            ->withQueryParams(['site' => '01nonexistent00000000000000'])
+            ->test(WorkspaceBackups::class, ['server' => $server]);
+
+        $this->assertNull($component->get('context_site_id'));
+    }
+
+    public function test_schedule_site_query_param_filters_cron_and_daemon_lists(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+        $other = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+
+        $siteCron = ServerCronJob::create([
+            'server_id' => $server->id, 'site_id' => $site->id,
+            'cron_expression' => '* * * * *', 'command' => 'php artisan schedule:run', 'user' => 'dply', 'enabled' => true,
+        ]);
+        ServerCronJob::create([
+            'server_id' => $server->id, 'site_id' => $other->id,
+            'cron_expression' => '* * * * *', 'command' => 'php artisan schedule:run', 'user' => 'dply', 'enabled' => true,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->withQueryParams(['site' => $site->id])
+            ->test(WorkspaceSchedule::class, ['server' => $server]);
+
+        $this->assertSame($site->id, $component->get('context_site_id'));
+        $entries = $component->viewData('cronEntries');
+        $this->assertSame([$siteCron->id], $entries->pluck('id')->all());
+        $this->assertSame($site->id, $component->get('enable_site_id'), 'Enable scheduler form pre-fills site id.');
+    }
+
+    public function test_activity_mount_honors_category_query_param(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+
+        $component = Livewire::actingAs($user)
+            ->withQueryParams(['category' => 'background'])
+            ->test(\App\Livewire\Servers\WorkspaceActivity::class, ['server' => $server]);
+
+        $this->assertSame('background', $component->get('category'));
+    }
+
+    public function test_activity_mount_ignores_unknown_category_query_param(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+
+        $component = Livewire::actingAs($user)
+            ->withQueryParams(['category' => 'made-up-bucket'])
+            ->test(\App\Livewire\Servers\WorkspaceActivity::class, ['server' => $server]);
+
+        $this->assertSame('', $component->get('category'));
+    }
+
+    public function test_activity_categorize_routes_backup_and_worker_actions_to_background(): void
+    {
+        $this->assertSame('background', \App\Livewire\Servers\WorkspaceActivity::categorize('backup.schedule.created'));
+        $this->assertSame('background', \App\Livewire\Servers\WorkspaceActivity::categorize('backup.schedule.paused'));
+        $this->assertSame('background', \App\Livewire\Servers\WorkspaceActivity::categorize('queue_worker.restart'));
+        $this->assertSame('background', \App\Livewire\Servers\WorkspaceActivity::categorize('queue_worker.stop'));
+        // Sibling categories still route correctly.
+        $this->assertSame('insights', \App\Livewire\Servers\WorkspaceActivity::categorize('insight.opened'));
+        $this->assertSame('site', \App\Livewire\Servers\WorkspaceActivity::categorize('site.settings.updated'));
+        // 'other' bucket excludes my new prefixes.
+        $this->assertSame('other', \App\Livewire\Servers\WorkspaceActivity::categorize('unknown.thing.happened'));
+    }
+
+    public function test_overview_background_tile_summarizes_workers_and_schedules(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+
+        // 2 active workers, 1 inactive.
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'slug' => 'a', 'program_type' => 'queue',
+            'command' => 'x', 'directory' => '/', 'user' => 'dply', 'numprocs' => 1, 'is_active' => true,
+        ]);
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'slug' => 'b', 'program_type' => 'horizon',
+            'command' => 'x', 'directory' => '/', 'user' => 'dply', 'numprocs' => 1, 'is_active' => true,
+        ]);
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'slug' => 'c', 'program_type' => 'queue',
+            'command' => 'x', 'directory' => '/', 'user' => 'dply', 'numprocs' => 1, 'is_active' => false,
+        ]);
+
+        // 1 active schedule, 1 paused.
+        ServerBackupSchedule::create([
+            'server_id' => $server->id, 'target_type' => 'database', 'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *', 'is_active' => true,
+        ]);
+        ServerBackupSchedule::create([
+            'server_id' => $server->id, 'target_type' => 'database', 'target_id' => $database->id,
+            'cron_expression' => '0 4 * * *', 'is_active' => false,
+        ]);
+
+        // 1 recent failure, 1 ancient failure (excluded from the 7d window).
+        ServerDatabaseBackup::create([
+            'server_database_id' => $database->id, 'status' => 'failed',
+        ]);
+        $old = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id, 'status' => 'failed',
+        ]);
+        $old->created_at = now()->subDays(30);
+        $old->save();
+
+        $component = Livewire::actingAs($user)
+            ->test(\App\Livewire\Servers\WorkspaceOverview::class, ['server' => $server]);
+
+        $summary = $component->viewData('backgroundSummary');
+        $this->assertSame(2, $summary['active_workers']);
+        $this->assertSame(1, $summary['active_schedules']);
+        $this->assertSame(1, $summary['paused_schedules']);
+        $this->assertSame(1, $summary['failed_backups_7d'], '30-day-old failure must be excluded from 7d window.');
+    }
+
+    public function test_site_queue_workers_stop_dispatches_and_audits_with_site_id(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+        $program = SupervisorProgram::create([
+            'server_id' => $server->id,
+            'site_id' => $site->id,
+            'slug' => 'site-queue',
+            'program_type' => 'queue',
+            'command' => 'php artisan queue:work',
+            'directory' => '/srv/site/current',
+            'user' => 'dply',
+            'numprocs' => 1,
+            'is_active' => true,
+        ]);
+
+        $provisioner = \Mockery::mock(\App\Services\Servers\SupervisorProvisioner::class);
+        $provisioner->shouldReceive('stopProgramGroup')->once()->andReturn('ok');
+        app()->instance(\App\Services\Servers\SupervisorProvisioner::class, $provisioner);
+
+        Livewire::actingAs($user)
+            ->test(SiteQueueWorkers::class, ['server' => $server, 'site' => $site])
+            ->call('stopWorker', $program->id);
+
+        $audit = \App\Models\AuditLog::query()
+            ->where('organization_id', $server->organization_id)
+            ->latest('created_at')
+            ->first();
+        $this->assertSame('queue_worker.stop', $audit?->action);
+        $this->assertSame($site->id, $audit?->new_values['site_id'] ?? null);
+    }
+
+    public function test_site_queue_workers_stats_count_only_this_site_programs(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $siteA = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+        $siteB = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+
+        // Site A: 1 active (3 procs), 1 inactive (2 procs).
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'site_id' => $siteA->id,
+            'slug' => 'a1', 'program_type' => 'queue', 'command' => 'x',
+            'directory' => '/', 'user' => 'dply', 'numprocs' => 3, 'is_active' => true,
+        ]);
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'site_id' => $siteA->id,
+            'slug' => 'a2', 'program_type' => 'horizon', 'command' => 'x',
+            'directory' => '/', 'user' => 'dply', 'numprocs' => 2, 'is_active' => false,
+        ]);
+        // Site B noise — must NOT contribute to A's stats.
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'site_id' => $siteB->id,
+            'slug' => 'b1', 'program_type' => 'queue', 'command' => 'x',
+            'directory' => '/', 'user' => 'dply', 'numprocs' => 99, 'is_active' => true,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(SiteQueueWorkers::class, ['server' => $server, 'site' => $siteA]);
+        $stats = $component->viewData('stats');
+
+        $this->assertSame(1, $stats['active']);
+        $this->assertSame(1, $stats['inactive']);
+        $this->assertSame(3, $stats['total_processes']);
     }
 
     public function test_site_queue_workers_page_scopes_to_site(): void

@@ -60,9 +60,14 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         return 'webserver_switch_revert_'.$this->serverId;
     }
 
+    /**
+     * Short lock window. Same rationale as SwitchServerWebserverJob —
+     * the dispatch race is what we're guarding against, not the runtime
+     * duration. A SIGKILL'd worker shouldn't block dispatch for 10 min.
+     */
     public function uniqueFor(): int
     {
-        return $this->timeout;
+        return 60;
     }
 
     protected function consoleSubject(): Model
@@ -124,6 +129,12 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(\Throwable $e): void
     {
+        // Release the ShouldBeUnique lock explicitly so retries aren't
+        // blocked for the full uniqueFor() window when the worker was
+        // SIGKILL'd. See SwitchServerWebserverJob::failed() for the full
+        // rationale.
+        app(\Illuminate\Bus\UniqueLock::class)->release($this);
+
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;

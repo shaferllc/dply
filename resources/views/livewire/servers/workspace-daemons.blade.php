@@ -18,6 +18,27 @@
         <p>{{ __('State (running / stopped / fatal) is read live via supervisorctl status. Restart, stop, and start map to the matching supervisorctl verbs. The audit log records every change.') }}</p>
     </x-explainer>
 
+    {{-- At-a-glance counts. Match the Background-group convention used by Backups,
+         Schedule, and Queue workers. Numbers reflect the visible (filtered) program set. --}}
+    <section class="mb-4 grid gap-3 sm:grid-cols-4">
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Programs') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $daemonsStats['total'] }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Active') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-forest">{{ $daemonsStats['active'] }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inactive') }}</p>
+            <p class="mt-1 text-2xl font-semibold {{ $daemonsStats['inactive'] > 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $daemonsStats['inactive'] }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total processes') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $daemonsStats['total_processes'] }}</p>
+        </div>
+    </section>
+
     @if ($siteContextUnavailable)
         <div class="rounded-2xl border border-amber-300/80 bg-amber-50/90 px-5 py-6 text-sm text-amber-950">
             <p class="font-semibold">{{ __('Supervisor workers are not available for this site’s runtime') }}</p>

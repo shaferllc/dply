@@ -97,12 +97,17 @@ CADDY,
      * Block any path with a leading dot segment ( /.env, /.git, etc. ), but
      * still allow `/.well-known/` for ACME challenges and the like.
      * Mirrors the Nginx and Apache default deny rules.
+     *
+     * Caddy's regex engine is Go's RE2, which has no lookaround — so the
+     * `well-known` exclusion is expressed as a separate `not path` matcher
+     * AND'd with the dotfile regex.
      */
     protected function caddyDotfileDenyBlock(): string
     {
         return <<<'CADDY'
     @dply_dotfiles {
-        path_regexp dotfiles (?i)(^|/)\.(?!well-known)
+        path_regexp dotfiles (?i)(^|/)\.
+        not path */.well-known*
     }
     respond @dply_dotfiles 403
 
@@ -110,7 +115,7 @@ CADDY;
     }
 
     /**
-     * Emit one or more `basicauth` directives — site-wide and (when supported) per
+     * Emit one or more `basic_auth` directives — site-wide and (when supported) per
      * path prefix. Caddy v2 expects bcrypt hashes inline; rows whose `password_hash`
      * is not bcrypt are skipped with a config comment so the operator can rotate
      * them and re-apply.
@@ -151,7 +156,7 @@ CADDY;
     }
 
     /**
-     * Render a single `basicauth [matcher] { ... }` block. Bcrypt-only entries
+     * Render a single `basic_auth [matcher] { ... }` block. Bcrypt-only entries
      * are emitted inline; other algorithms (apr1, sha) are listed in a leading
      * comment because Caddy v2 cannot enforce them.
      */
@@ -175,7 +180,7 @@ CADDY;
             ->map(fn (SiteBasicAuthUser $u): string => '        '.$u->username.' '.$u->password_hash)
             ->implode("\n");
 
-        return $comment."    basicauth{$matcherText} {\n{$userLines}\n    }\n";
+        return $comment."    basic_auth{$matcherText} {\n{$userLines}\n    }\n";
     }
 
     private function caddyHashIsBcrypt(string $hash): bool

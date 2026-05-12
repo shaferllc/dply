@@ -31,7 +31,6 @@ final class WebserverSwitchPreflight
         'caddy',
         'apache',
         'openlitespeed',
-        'traefik',
     ];
 
     /**
@@ -41,6 +40,25 @@ final class WebserverSwitchPreflight
      * @var list<string>
      */
     private const FPM_COMPATIBLE = ['nginx', 'caddy', 'apache'];
+
+    /**
+     * Per-instance memo of plan() results keyed by `{server_id}|{target}`.
+     * Why: the webserver picker blade calls isBlocked()/plan() once per known
+     * webserver across multiple loops in a single render — without this each
+     * call re-issues the sites + profiles + certificates SELECTs.
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    private array $planCache = [];
+
+    /**
+     * Per-instance cache of the sites collection (with certificates + profiles
+     * eager-loaded) keyed by server_id. Shared across all target evaluations
+     * for the same server since the underlying rows don't depend on target.
+     *
+     * @var array<string, \Illuminate\Database\Eloquent\Collection<int, Site>>
+     */
+    private array $sitesCache = [];
 
     /**
      * Compute the cascade preview for switching {old} → {new}. Returns the
@@ -61,12 +79,15 @@ final class WebserverSwitchPreflight
      */
     public function plan(Server $server, string $target): array
     {
+        $cacheKey = $server->id.'|'.strtolower(trim($target));
+        if (isset($this->planCache[$cacheKey])) {
+            return $this->planCache[$cacheKey];
+        }
+
         $from = strtolower(trim((string) ($server->meta['webserver'] ?? 'nginx')));
         $to = strtolower(trim($target));
 
-        $sites = Site::query()
-            ->where('server_id', $server->id)
-            ->get(['id', 'name', 'runtime', 'status', 'type']);
+        $sites = $this->sitesFor($server);
         $sitesAffected = $sites->count();
         $driftSites = $this->detectCustomConfigDrift($sites);
 
@@ -115,7 +136,7 @@ final class WebserverSwitchPreflight
 
         $downtime = $this->downtimeBreakdown($sitesAffected, $to);
 
-        return [
+        return $this->planCache[$cacheKey] = [
             'from' => $from,
             'to' => $to,
             'blocker' => $blocker,
@@ -144,14 +165,9 @@ final class WebserverSwitchPreflight
      */
     private function detectCustomConfigDrift($sites): array
     {
-        $profiles = SiteWebserverConfigProfile::query()
-            ->whereIn('site_id', $sites->pluck('id'))
-            ->get()
-            ->keyBy('site_id');
-
         $drift = [];
         foreach ($sites as $site) {
-            $profile = $profiles->get($site->id);
+            $profile = $site->webserverConfigProfile;
             if ($profile === null) {
                 continue;
             }
@@ -197,44 +213,31 @@ final class WebserverSwitchPreflight
             ];
         }
 
-        $phpSites = $sites->filter(fn (Site $s) => $this->siteUsesPhp($s));
-        $nonStaticOrNodeSites = $sites->filter(
-            fn (Site $s) => ! in_array(strtolower((string) ($s->runtime ?? '')), ['static', 'node'], true)
-        );
-
-        if ($to === 'openlitespeed' && $phpSites->isNotEmpty()) {
-            return [
-                'key' => 'ols_needs_lsphp',
-                'label' => __('OpenLiteSpeed needs `lsphpXX` packages — dply does not install these yet. :n PHP site(s) would 500 on every request.', ['n' => $phpSites->count()]),
-                'detail' => ['site_ids' => $phpSites->pluck('id')->all()],
-            ];
-        }
-
-        if ($to === 'traefik' && $nonStaticOrNodeSites->isNotEmpty()) {
-            return [
-                'key' => 'traefik_needs_static',
-                'label' => __('Traefik is a reverse proxy and cannot serve PHP/Ruby directly. :n site(s) require an application-server upstream that dply does not configure yet.', ['n' => $nonStaticOrNodeSites->count()]),
-                'detail' => ['site_ids' => $nonStaticOrNodeSites->pluck('id')->all()],
-            ];
-        }
-
-        // Even when the runtime mix is compatible, OLS + Traefik per-site
-        // config writing isn't wired in v1. The installers run cleanly; the
-        // provisioning step would fail. Block here so operators see the
-        // honest "coming soon" message instead of a half-completed switch.
-        if (in_array($to, ['openlitespeed', 'traefik'], true)) {
-            return [
-                'key' => $to.'_provisioning_not_wired',
-                'label' => __(':target installs cleanly in v1, but per-site config provisioning is on the v1.1 roadmap. The switch surface and installer are in place; site-runtime-aware vhost generation is the remaining piece.', ['target' => ucfirst($to)]),
-            ];
-        }
+        // Traefik (and HAProxy) are L7 edge proxies that don't serve PHP /
+        // static content directly. dply installs Caddy as the per-site
+        // backend (on ephemeral high ports) and routes through the edge
+        // proxy at :80. All runtimes Caddy supports work through this path.
 
         return null;
     }
 
-    private function siteUsesPhp(Site $site): bool
+    /**
+     * Load the server's sites once per instance with the relations every code
+     * path here ultimately reads (config profile for drift, certificates for
+     * the caddy TLS opt-in). Shared across all target evaluations.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, Site>
+     */
+    private function sitesFor(Server $server): \Illuminate\Database\Eloquent\Collection
     {
-        return strtolower((string) ($site->runtime ?? '')) === 'php';
+        if (isset($this->sitesCache[$server->id])) {
+            return $this->sitesCache[$server->id];
+        }
+
+        return $this->sitesCache[$server->id] = Site::query()
+            ->where('server_id', $server->id)
+            ->with(['webserverConfigProfile', 'certificates'])
+            ->get(['id', 'name', 'runtime', 'status', 'type']);
     }
 
     /**
@@ -244,9 +247,7 @@ final class WebserverSwitchPreflight
     {
         // Conservative heuristic: any site with an issued certificate qualifies.
         // The job's TLS-handover step does the precise per-site dance.
-        return $sites->load('certificates')->contains(
-            fn (Site $s) => $s->certificates->isNotEmpty()
-        );
+        return $sites->contains(fn (Site $s) => $s->certificates->isNotEmpty());
     }
 
     /**

@@ -78,6 +78,17 @@ return [
             'failed' => 'Webserver switch failed.',
             'stale' => 'Webserver switch did not finish.',
         ],
+        // Generic "operator pressed a button" surface for the runAllowlistedAction
+        // path (restart-nginx, caddy fmt, certbot renew, etc.). The per-action
+        // label comes from the service_actions allowlist and is passed to the
+        // banner via the run's `label` field, so this default copy is rarely
+        // shown — it's a fallback when a caller omits the label.
+        'manage_action' => [
+            'running' => 'Running action on :host …',
+            'completed' => 'Action complete.',
+            'failed' => 'Action failed.',
+            'stale' => 'Action did not finish.',
+        ],
     ],
 
     /*

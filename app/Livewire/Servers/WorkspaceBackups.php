@@ -53,9 +53,27 @@ class WorkspaceBackups extends Component
 
     public ?string $new_backup_configuration_id = null;
 
+    /** When set (?site=…), all queries on this page narrow to backups/sites for that site only. */
+    public ?string $context_site_id = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+
+        // Site sidebar's "Backups" entry navigates here with ?site={id}; honoring it pre-filters
+        // the page so operators don't see noise from other sites on the same server.
+        $siteId = request()->query('site');
+        if (is_string($siteId) && $siteId !== '') {
+            $exists = Site::query()
+                ->where('server_id', $server->id)
+                ->whereKey($siteId)
+                ->exists();
+            if ($exists) {
+                $this->context_site_id = $siteId;
+                $this->new_target_type = ServerBackupSchedule::TARGET_SITE_FILES;
+                $this->new_target_id = $siteId;
+            }
+        }
     }
 
     public function runDatabaseBackup(): void
@@ -325,6 +343,49 @@ class WorkspaceBackups extends Component
      * cron tick takes. Useful for testing a freshly-added schedule or after fixing
      * destination credentials.
      */
+    /**
+     * Fire a one-shot {@see \App\Notifications\BackupFailureNotification} with the
+     * test marker so operators can validate their email/recipient setup without
+     * inducing an actual backup failure.
+     */
+    public function sendTestAlert(string $scheduleId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $schedule = ServerBackupSchedule::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($scheduleId)
+            ->first();
+        if ($schedule === null) {
+            return;
+        }
+
+        $org = $this->server->organization;
+        if ($org === null) {
+            $this->toastError(__('No organization for this server.'));
+
+            return;
+        }
+
+        $admins = $org->users()->wherePivotIn('role', ['owner', 'admin'])->get();
+        if ($admins->isEmpty()) {
+            $this->toastError(__('No org admins to send to.'));
+
+            return;
+        }
+
+        \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\BackupFailureNotification(
+            schedule: $schedule,
+            errorMessage: __('Test alert triggered by :user.', ['user' => auth()->user()?->email ?? 'operator']),
+            serverName: (string) ($this->server->name ?? ''),
+            isTest: true,
+        ));
+
+        audit_log($org, auth()->user(), 'backup.schedule.test_alert', $schedule);
+
+        $this->toastSuccess(__('Test alert sent to :n admin(s).', ['n' => $admins->count()]));
+    }
+
     public function toggleNotifyOnFailure(string $scheduleId): void
     {
         $this->authorize('update', $this->server);
@@ -496,6 +557,9 @@ class WorkspaceBackups extends Component
     {
         $this->server->refresh();
 
+        // Note: $databases/$sites are NOT narrowed by context_site_id — the new-schedule form
+        // still needs them all to pick from. The query collections below DO narrow so the
+        // operator only sees runs / schedules / stats for the focused site.
         $databases = ServerDatabase::query()
             ->where('server_id', $this->server->id)
             ->orderBy('name')
@@ -506,8 +570,13 @@ class WorkspaceBackups extends Component
             ->orderBy('name')
             ->get();
 
-        $databaseIds = $databases->pluck('id')->all();
-        $siteIds = $sites->pluck('id')->all();
+        // When filtered to a single site, database backups go away entirely (databases are
+        // server-scoped, not site-scoped) — we narrow $databaseIds to an empty list so the
+        // DB run list reads as "none for this site" rather than the full server fleet.
+        $databaseIds = $this->context_site_id !== null ? [] : $databases->pluck('id')->all();
+        $siteIds = $this->context_site_id !== null
+            ? [$this->context_site_id]
+            : $sites->pluck('id')->all();
 
         $databaseBackups = ServerDatabaseBackup::query()
             ->whereIn('server_database_id', $databaseIds)
@@ -523,8 +592,15 @@ class WorkspaceBackups extends Component
             ->limit(20)
             ->get();
 
+        // Schedules narrow to those targeting this site (site_files target_type with matching
+        // target_id). Database schedules don't surface in site-context because databases
+        // belong to the server, not to any one site.
         $schedules = ServerBackupSchedule::query()
             ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, function ($q): void {
+                $q->where('target_type', ServerBackupSchedule::TARGET_SITE_FILES)
+                    ->where('target_id', $this->context_site_id);
+            })
             ->orderBy('created_at')
             ->get();
 
@@ -615,8 +691,13 @@ class WorkspaceBackups extends Component
                     ->sum('bytes'),
         ];
 
+        $contextSite = $this->context_site_id !== null
+            ? $sites->firstWhere('id', $this->context_site_id)
+            : null;
+
         return view('livewire.servers.workspace-backups', [
             'opsReady' => $this->serverOpsReady(),
+            'contextSite' => $contextSite,
             'databases' => $databases,
             'sites' => $sites,
             'databaseBackups' => $databaseBackups,

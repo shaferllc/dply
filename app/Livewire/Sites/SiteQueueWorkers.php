@@ -39,6 +39,25 @@ class SiteQueueWorkers extends Component
 
     public function restartWorker(SupervisorProvisioner $provisioner, string $programId): void
     {
+        $this->workerAction($provisioner, $programId, 'restart');
+    }
+
+    public function stopWorker(SupervisorProvisioner $provisioner, string $programId): void
+    {
+        $this->workerAction($provisioner, $programId, 'stop');
+    }
+
+    public function startWorker(SupervisorProvisioner $provisioner, string $programId): void
+    {
+        $this->workerAction($provisioner, $programId, 'start');
+    }
+
+    /**
+     * Shared verb dispatcher — same shape as {@see WorkspaceQueueWorkers::workerAction()}
+     * but scoped to this site (programs filtered by site_id, audit row records site).
+     */
+    private function workerAction(SupervisorProvisioner $provisioner, string $programId, string $verb): void
+    {
         Gate::authorize('update', $this->server);
 
         $program = SupervisorProgram::query()
@@ -49,8 +68,19 @@ class SiteQueueWorkers extends Component
             ->firstOrFail();
 
         try {
-            $provisioner->restartProgramGroup($this->server->fresh(), $program->id);
-            session()->flash('toast.success', __('Restart sent to :slug.', ['slug' => $program->slug]));
+            match ($verb) {
+                'restart' => $provisioner->restartProgramGroup($this->server->fresh(), $program->id),
+                'stop' => $provisioner->stopProgramGroup($this->server->fresh(), $program->id),
+                'start' => $provisioner->startProgramGroup($this->server->fresh(), $program->id),
+            };
+            if ($org = $this->server->organization) {
+                audit_log($org, auth()->user(), 'queue_worker.'.$verb, $program, null, [
+                    'slug' => $program->slug,
+                    'program_type' => $program->program_type,
+                    'site_id' => $this->site->id,
+                ]);
+            }
+            session()->flash('toast.success', __(':verb sent to :slug.', ['verb' => ucfirst($verb), 'slug' => $program->slug]));
         } catch (\Throwable $e) {
             session()->flash('toast.error', $e->getMessage());
         }
@@ -68,12 +98,19 @@ class SiteQueueWorkers extends Component
         // Same preset deck as the server-level page; the route changes per click.
         $presets = WorkspaceQueueWorkers::PRESETS;
 
+        $stats = [
+            'active' => $programs->where('is_active', true)->count(),
+            'inactive' => $programs->where('is_active', false)->count(),
+            'total_processes' => (int) $programs->where('is_active', true)->sum('numprocs'),
+        ];
+
         // Section IDs the site sidebar uses for active highlighting + tab state preservation.
         return view('livewire.sites.site-queue-workers', [
             'site' => $this->site,
             'server' => $this->server,
             'programs' => $programs,
             'presets' => $presets,
+            'stats' => $stats,
             'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
             'section' => 'queue-workers',
             'resourceNoun' => __('Site'),

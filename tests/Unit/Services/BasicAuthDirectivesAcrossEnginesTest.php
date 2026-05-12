@@ -82,14 +82,14 @@ class BasicAuthDirectivesAcrossEnginesTest extends TestCase
         $this->assertStringNotContainsString('AuthType Basic', $apache);
     }
 
-    public function test_caddy_emits_basicauth_block_with_bcrypt_hash(): void
+    public function test_caddy_emits_basic_auth_block_with_bcrypt_hash(): void
     {
         $site = $this->siteWithBasicAuth();
         $hash = $site->basicAuthUsers->first()->password_hash;
 
         $caddy = app(CaddySiteConfigBuilder::class)->build($site);
 
-        $this->assertStringContainsString('basicauth {', $caddy);
+        $this->assertStringContainsString('basic_auth {', $caddy);
         $this->assertStringContainsString('preview '.$hash, $caddy);
     }
 
@@ -101,7 +101,7 @@ class BasicAuthDirectivesAcrossEnginesTest extends TestCase
         $caddy = app(CaddySiteConfigBuilder::class)->build($site);
 
         $this->assertStringContainsString('# dply: skipped non-bcrypt', $caddy);
-        $this->assertStringNotContainsString('basicauth {', $caddy);
+        $this->assertStringNotContainsString('basic_auth {', $caddy);
     }
 
     public function test_traefik_emits_basicauth_middleware_with_users_file(): void

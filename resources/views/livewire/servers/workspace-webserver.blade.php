@@ -31,6 +31,7 @@
         'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
         'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
         'traefik' => ['label' => 'Traefik', 'icon' => 'heroicon-o-arrow-path-rounded-square', 'systemd' => 'traefik'],
+        'haproxy' => ['label' => 'HAProxy', 'icon' => 'heroicon-o-scale', 'systemd' => 'haproxy'],
     ];
 
     // Parse certbot output for the Advanced tab table (regex best-effort).
@@ -76,9 +77,201 @@
             'nginx' => [['nginx_test_config', false], ['reload_nginx', false], ['restart_nginx', true]],
             'caddy' => [['caddy_test_config', false], ['reload_caddy', false], ['restart_caddy', true]],
             'apache' => [['apache_test_config', false], ['reload_apache', false], ['restart_apache', true]],
+            'openlitespeed' => [['openlitespeed_test_config', false], ['reload_openlitespeed', false], ['restart_openlitespeed', true]],
+            'traefik' => [['traefik_test_config', false], ['reload_traefik', true], ['restart_traefik', true]],
+            'haproxy' => [['haproxy_test_config', false], ['reload_haproxy', false], ['restart_haproxy', true]],
             default => [],
         };
     };
+
+    /**
+     * Per-engine lifecycle button groups, rendered on the engine Overview
+     * sub-tab. Each group becomes its own row in the action grid with a
+     * short label, so start/stop/enable/disable don't visually merge with
+     * the test/reload/restart "health" actions.
+     *
+     * Tuple shape: [action_key, dangerous?]
+     */
+    $lifecycleGroupsFor = function (string $key): array {
+        return match ($key) {
+            'nginx' => [
+                'health' => [
+                    'label' => __('Health'),
+                    'rows' => [['nginx_test_config', false]],
+                ],
+                'service' => [
+                    'label' => __('Service'),
+                    'rows' => [
+                        ['start_nginx', false],
+                        ['reload_nginx', false],
+                        ['restart_nginx', true],
+                        ['stop_nginx', true],
+                    ],
+                ],
+                'boot' => [
+                    'label' => __('Boot'),
+                    'rows' => [
+                        ['enable_nginx', false],
+                        ['disable_nginx', true],
+                    ],
+                ],
+            ],
+            'caddy' => [
+                'health' => [
+                    'label' => __('Health'),
+                    'rows' => [['caddy_test_config', false]],
+                ],
+                'service' => [
+                    'label' => __('Service'),
+                    'rows' => [
+                        ['start_caddy', false],
+                        ['reload_caddy', false],
+                        ['restart_caddy', true],
+                        ['stop_caddy', true],
+                    ],
+                ],
+                'boot' => [
+                    'label' => __('Boot'),
+                    'rows' => [
+                        ['enable_caddy', false],
+                        ['disable_caddy', true],
+                    ],
+                ],
+            ],
+            'apache' => [
+                'health' => [
+                    'label' => __('Health'),
+                    'rows' => [['apache_test_config', false]],
+                ],
+                'service' => [
+                    'label' => __('Service'),
+                    'rows' => [
+                        ['start_apache', false],
+                        ['reload_apache', false],
+                        ['restart_apache', true],
+                        ['stop_apache', true],
+                    ],
+                ],
+                'boot' => [
+                    'label' => __('Boot'),
+                    'rows' => [
+                        ['enable_apache', false],
+                        ['disable_apache', true],
+                    ],
+                ],
+            ],
+            'openlitespeed' => [
+                'health' => [
+                    'label' => __('Health'),
+                    'rows' => [['openlitespeed_test_config', false]],
+                ],
+                'service' => [
+                    'label' => __('Service'),
+                    'rows' => [
+                        ['start_openlitespeed', false],
+                        ['reload_openlitespeed', false],
+                        ['restart_openlitespeed', true],
+                        ['stop_openlitespeed', true],
+                    ],
+                ],
+                'boot' => [
+                    'label' => __('Boot'),
+                    'rows' => [
+                        ['enable_openlitespeed', false],
+                        ['disable_openlitespeed', true],
+                    ],
+                ],
+            ],
+            'traefik' => [
+                'health' => [
+                    'label' => __('Health'),
+                    'rows' => [['traefik_test_config', false]],
+                ],
+                'service' => [
+                    'label' => __('Service'),
+                    'rows' => [
+                        ['start_traefik', false],
+                        ['reload_traefik', true],
+                        ['restart_traefik', true],
+                        ['stop_traefik', true],
+                    ],
+                ],
+                'boot' => [
+                    'label' => __('Boot'),
+                    'rows' => [
+                        ['enable_traefik', false],
+                        ['disable_traefik', true],
+                    ],
+                ],
+            ],
+            'haproxy' => [
+                'health' => [
+                    'label' => __('Health'),
+                    'rows' => [['haproxy_test_config', false]],
+                ],
+                'service' => [
+                    'label' => __('Service'),
+                    'rows' => [
+                        ['start_haproxy', false],
+                        ['reload_haproxy', false],
+                        ['restart_haproxy', true],
+                        ['stop_haproxy', true],
+                    ],
+                ],
+                'boot' => [
+                    'label' => __('Boot'),
+                    'rows' => [
+                        ['enable_haproxy', false],
+                        ['disable_haproxy', true],
+                    ],
+                ],
+            ],
+            default => [],
+        };
+    };
+
+    /** Per-engine CLI / diagnostic buttons rendered on the Tools sub-tab. */
+    $cliToolsFor = function (string $key): array {
+        return match ($key) {
+            'nginx' => [
+                ['nginx_build_info', false],
+                ['nginx_effective_config', false],
+                ['nginx_reopen_logs', false],
+            ],
+            'caddy' => [
+                ['caddy_version', false],
+                ['caddy_environ', false],
+                ['caddy_list_modules', false],
+                ['caddy_adapt', false],
+                ['caddy_fmt_preview', false],
+                ['caddy_fmt_overwrite', true],
+            ],
+            'apache' => [
+                ['apache_build_info', false],
+                ['apache_modules', false],
+                ['apache_vhosts', false],
+            ],
+            'openlitespeed' => [
+                ['openlitespeed_version', false],
+                ['openlitespeed_modules', false],
+                ['openlitespeed_status', false],
+            ],
+            'traefik' => [
+                ['traefik_version', false],
+                ['traefik_show_static_config', false],
+                ['traefik_list_dynamic_configs', false],
+            ],
+            'haproxy' => [
+                ['haproxy_version', false],
+                ['haproxy_show_config', false],
+                ['haproxy_show_runtime_info', false],
+            ],
+            default => [],
+        };
+    };
+
+    /** True when the engine has its own config editor / logs / tools surface. */
+    $engineHasFullControls = fn (string $key): bool => in_array($key, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'], true);
 
     $versionFor = function (string $key) use ($nginxVersion): string {
         return match ($key) {
@@ -90,6 +283,7 @@
     $inflightSwitch = $this->hasInflightWebserverSwitch();
     $preflight = app(\App\Services\Servers\WebserverSwitchPreflight::class);
     $recentSwitches = \App\Models\ServerWebserverAuditEvent::query()
+        ->with('user:id,name')
         ->where('server_id', $server->id)
         ->orderByDesc('created_at')
         ->limit(5)
@@ -102,7 +296,11 @@
     :title="__('Webserver')"
     :description="__('Pick which webserver runs on this box. Switching reprovisions all sites under the new daemon, then service-swaps to :80.')"
 >
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
+    {{-- The legacy "Command output" block (workspace-flashes with `command_output`)
+         is deliberately omitted on this workspace — output for runAllowlistedAction
+         calls now lands in the manage_action ConsoleAction banner rendered below
+         (same partial the webserver_switch flow uses). --}}
+    @include('livewire.servers.partials.workspace-flashes', ['command_output' => null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if ($manageRemoteTaskId)
@@ -122,16 +320,35 @@
     @endif
 
     @php
-        $webserverSwitchRun = \App\Models\ConsoleAction::query()
+        // Single banner across both kinds — an in-flight run always wins (so a
+        // fresh action's progress isn't hidden behind a stale completed row),
+        // otherwise the most-recently-created non-dismissed row shows. Once
+        // the operator dismisses it, the next-most-recent surfaces on the
+        // next render.
+        $webserverBannerRun = \App\Models\ConsoleAction::query()
             ->where('subject_type', $server->getMorphClass())
             ->where('subject_id', $server->id)
-            ->where('kind', 'webserver_switch')
+            ->whereIn('kind', ['webserver_switch', 'manage_action'])
             ->whereNull('dismissed_at')
+            ->orderByRaw("CASE WHEN status IN ('queued','running') THEN 0 ELSE 1 END")
             ->orderByDesc('created_at')
             ->first();
+        // Stop-and-revert affordance below only fires for the switch flow.
+        // Reuse the unified row when it happens to be the switch, otherwise
+        // do a small targeted lookup so the revert button stays available
+        // even if a non-switch manage_action is currently in the banner slot.
+        $webserverSwitchRun = ($webserverBannerRun !== null && $webserverBannerRun->kind === 'webserver_switch')
+            ? $webserverBannerRun
+            : \App\Models\ConsoleAction::query()
+                ->where('subject_type', $server->getMorphClass())
+                ->where('subject_id', $server->id)
+                ->where('kind', 'webserver_switch')
+                ->whereNull('dismissed_at')
+                ->orderByDesc('created_at')
+                ->first();
     @endphp
     @include('livewire.partials.console-action-banner-static', [
-        'run' => $webserverSwitchRun,
+        'run' => $webserverBannerRun,
         'kindLabels' => (array) config('console_actions.kinds', []),
     ])
 
@@ -217,7 +434,8 @@
             $activeUnit = $activeInfo !== null ? $unitFor($activeInfo['systemd']) : null;
             $activePill = $statePill($activeUnit['active_state'] ?? null);
             $activeVersion = $versionFor($activeWebserver);
-            $activeActionTriad = $actionTriadFor($activeWebserver);
+            $activeLifecycleGroups = $lifecycleGroupsFor($activeWebserver);
+            $activeCliTools = $cliToolsFor($activeWebserver);
         @endphp
 
         @if ($activeInfo !== null)
@@ -240,24 +458,71 @@
                     @endif
                 </div>
 
-                @if ($opsReady && ! $isDeployer && $activeActionTriad !== [])
-                    <div class="mt-5 flex flex-wrap gap-2">
-                        @foreach ($activeActionTriad as [$actionKey, $dangerous])
-                            @if (! empty($serviceActions[$actionKey]))
-                                @php $action = $serviceActions[$actionKey]; @endphp
-                                <button
-                                    type="button"
-                                    wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="openConfirmActionModal,runAllowlistedAction"
-                                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
-                                >
-                                    <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
-                                    {{ $action['label'] }}
-                                </button>
-                            @endif
+                @if ($opsReady && ! $isDeployer && ! empty($activeLifecycleGroups))
+                    {{-- Grouped lifecycle controls (Health / Service / Boot) so
+                         start/stop/enable/disable don't visually merge with the
+                         test/reload/restart "health" row. Mirrors the layout on
+                         the per-engine Overview sub-tab. --}}
+                    <div class="mt-6 space-y-3">
+                        @foreach ($activeLifecycleGroups as $groupKey => $group)
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $group['label'] }}</span>
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach ($group['rows'] as [$actionKey, $dangerous])
+                                        @if (! empty($serviceActions[$actionKey]))
+                                            @php $action = $serviceActions[$actionKey]; @endphp
+                                            <button
+                                                type="button"
+                                                wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="openConfirmActionModal,runAllowlistedAction"
+                                                @class([
+                                                    'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40 disabled:opacity-60',
+                                                    'border-brand-ink/15 bg-white text-brand-ink' => ! $dangerous,
+                                                    'border-rose-200 bg-white text-rose-800 hover:bg-rose-50' => $dangerous,
+                                                ])
+                                            >
+                                                <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
+                                                {{ $action['label'] }}
+                                            </button>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
                         @endforeach
                     </div>
+
+                    @if (! empty($activeCliTools))
+                        {{-- Tools row — read-only per-engine CLI helpers. Same
+                             buttons that live on the engine Tools sub-tab, kept
+                             here so the operator doesn't have to navigate away
+                             for a one-shot `caddy version` or `nginx -T`. --}}
+                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                            <span class="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Tools') }}</span>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach ($activeCliTools as [$actionKey, $dangerous])
+                                    @if (! empty($serviceActions[$actionKey]))
+                                        @php $action = $serviceActions[$actionKey]; @endphp
+                                        <button
+                                            type="button"
+                                            wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="openConfirmActionModal,runAllowlistedAction"
+                                            @class([
+                                                'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40 disabled:opacity-60',
+                                                'border-brand-ink/15 bg-white text-brand-ink' => ! $dangerous,
+                                                'border-rose-200 bg-white text-rose-800 hover:bg-rose-50' => $dangerous,
+                                            ])
+                                            title="{{ $action['description'] ?? '' }}"
+                                        >
+                                            <x-heroicon-o-command-line class="h-4 w-4 opacity-80" aria-hidden="true" />
+                                            {{ $action['label'] }}
+                                        </button>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
                 @endif
             </div>
         @endif
@@ -276,7 +541,7 @@
                 </div>
             @endif
 
-            <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="mt-5 grid gap-3 sm:grid-cols-2">
                 @foreach ($webserverCatalog as $key => $info)
                     @continue($key === $activeWebserver)
                     @php $isBlocked = $preflight->isBlocked($server, $key); @endphp
@@ -349,9 +614,14 @@
             :hidden="$workspace_tab !== $key"
             panel-class="space-y-6"
         >
-            {{-- Per-engine sub-tab strip — Overview (actions / switch) and Info
-                 (description, license, links). Same pattern used by Caches and
-                 Databases so operators learn one navigation idiom. --}}
+            {{-- Per-engine sub-tab strip — Overview (state + lifecycle buttons),
+                 Tools (CLI diagnostics like `caddy fmt`/`nginx -T`/`apachectl -M`),
+                 Logs (live tail of access + error), Config (in-app editor with
+                 validate / save / backup / restore), Info (description, license,
+                 docs links). Tools/Logs/Config are only shown for active engines
+                 with full controls (nginx / caddy / apache) since the others
+                 don't yet have backing config layouts. --}}
+            @php $hasControls = $isActive && $engineHasFullControls($key); @endphp
             <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])">
                 <x-server-workspace-tab
                     :id="'ws-subtab-'.$key.'-overview'"
@@ -363,6 +633,38 @@
                         {{ __('Overview') }}
                     </span>
                 </x-server-workspace-tab>
+                @if ($hasControls)
+                    <x-server-workspace-tab
+                        :id="'ws-subtab-'.$key.'-tools'"
+                        :active="$engine_subtab === 'tools'"
+                        wire:click="setEngineSubtab('tools')"
+                    >
+                        <span class="inline-flex items-center gap-2">
+                            <x-heroicon-o-command-line class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Tools') }}
+                        </span>
+                    </x-server-workspace-tab>
+                    <x-server-workspace-tab
+                        :id="'ws-subtab-'.$key.'-logs'"
+                        :active="$engine_subtab === 'logs'"
+                        wire:click="setEngineSubtab('logs')"
+                    >
+                        <span class="inline-flex items-center gap-2">
+                            <x-heroicon-o-document-text class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Logs') }}
+                        </span>
+                    </x-server-workspace-tab>
+                    <x-server-workspace-tab
+                        :id="'ws-subtab-'.$key.'-config'"
+                        :active="$engine_subtab === 'config'"
+                        wire:click="setEngineSubtab('config')"
+                    >
+                        <span class="inline-flex items-center gap-2">
+                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Config') }}
+                        </span>
+                    </x-server-workspace-tab>
+                @endif
                 <x-server-workspace-tab
                     :id="'ws-subtab-'.$key.'-info'"
                     :active="$engine_subtab === 'info'"
@@ -401,24 +703,38 @@
                 </div>
 
                 @if ($isActive)
-                    @if ($opsReady && ! $isDeployer && $actionTriad !== [])
-                        <div class="mt-5 flex flex-wrap gap-2">
-                            @foreach ($actionTriad as [$actionKey, $dangerous])
-                                @if (! empty($serviceActions[$actionKey]))
-                                    @php $action = $serviceActions[$actionKey]; @endphp
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
-                                        wire:loading.attr="disabled"
-                                        wire:target="openConfirmActionModal,runAllowlistedAction"
-                                        class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
-                                    >
-                                        <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
-                                        {{ $action['label'] }}
-                                    </button>
-                                @endif
-                            @endforeach
-                        </div>
+                    @if ($opsReady && ! $isDeployer)
+                        @php $lifecycleGroups = $lifecycleGroupsFor($key); @endphp
+                        @if (! empty($lifecycleGroups))
+                            <div class="mt-6 space-y-3">
+                                @foreach ($lifecycleGroups as $groupKey => $group)
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <span class="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $group['label'] }}</span>
+                                        <div class="flex flex-wrap gap-2">
+                                            @foreach ($group['rows'] as [$actionKey, $dangerous])
+                                                @if (! empty($serviceActions[$actionKey]))
+                                                    @php $action = $serviceActions[$actionKey]; @endphp
+                                                    <button
+                                                        type="button"
+                                                        wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="openConfirmActionModal,runAllowlistedAction"
+                                                        @class([
+                                                            'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40 disabled:opacity-60',
+                                                            'border-brand-ink/15 bg-white text-brand-ink' => ! $dangerous,
+                                                            'border-rose-200 bg-white text-rose-800 hover:bg-rose-50' => $dangerous,
+                                                        ])
+                                                    >
+                                                        <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
+                                                        {{ $action['label'] }}
+                                                    </button>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     @endif
                 @else
                     @if ($isBlocked && $blockerReason)
@@ -466,6 +782,279 @@
                 @endif
             </div>
 
+            @endif
+
+            {{-- =============================================================
+                 TOOLS — per-engine CLI commands (e.g. caddy fmt / nginx -T /
+                 apachectl -M). Output lands in the existing remote_output
+                 surface near the bottom of the page.
+                 ============================================================= --}}
+            @if ($engine_subtab === 'tools' && $isActive && $engineHasFullControls($key))
+                <div class="{{ $card }} p-6 sm:p-8">
+                    <div class="max-w-2xl">
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — diagnostics & tools', ['engine' => $info['label']]) }}</h3>
+                        <p class="mt-1 text-sm text-brand-moss">
+                            {{ __('Read-only CLI helpers for inspecting how :engine is built and configured. Output appears below the page in the action result panel.', ['engine' => $info['label']]) }}
+                        </p>
+                    </div>
+
+                    @if (! $opsReady || $isDeployer)
+                        <p class="mt-4 text-sm text-brand-moss">{{ __('Tools require ready ops access and a non-deployer role.') }}</p>
+                    @else
+                        @php $tools = $cliToolsFor($key); @endphp
+                        <div class="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach ($tools as [$actionKey, $dangerous])
+                                @if (! empty($serviceActions[$actionKey]))
+                                    @php $action = $serviceActions[$actionKey]; @endphp
+                                    <button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="openConfirmActionModal,runAllowlistedAction"
+                                        @class([
+                                            'flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-brand-sand/40 disabled:opacity-60',
+                                            'border-brand-ink/15 bg-white text-brand-ink' => ! $dangerous,
+                                            'border-rose-200 bg-white text-rose-800 hover:bg-rose-50' => $dangerous,
+                                        ])
+                                    >
+                                        <x-heroicon-o-command-line class="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block font-medium">{{ $action['label'] }}</span>
+                                            <span class="mt-0.5 block text-[11px] {{ $dangerous ? 'text-rose-700' : 'text-brand-moss' }}">{{ $action['description'] ?? '' }}</span>
+                                        </span>
+                                    </button>
+                                @endif
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @endif
+
+            {{-- =============================================================
+                 LOGS — last N lines of access / error / journal for the active
+                 engine. Live toggle wires a poll so the buffer refreshes every
+                 4s while the operator watches a request flow through.
+                 ============================================================= --}}
+            @if ($engine_subtab === 'logs' && $isActive && $engineHasFullControls($key))
+                @php
+                    $layout = $webserverConfigLayout[$key] ?? [];
+                    $hasAccessLog = ! empty($layout['access_log']);
+                    $hasErrorLog = ! empty($layout['error_log']);
+                    $hasJournal = ! empty($layout['journal_unit']);
+                @endphp
+                <div class="{{ $card }} p-6 sm:p-8">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="max-w-2xl">
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine logs', ['engine' => $info['label']]) }}</h3>
+                            <p class="mt-1 text-sm text-brand-moss">{{ __('Tail the last N lines of the access / error log. Toggle Live to poll every 4 s.') }}</p>
+                        </div>
+                        @if ($log_live)
+                            <div wire:poll.4s="refreshWebserverLog" class="hidden" aria-hidden="true"></div>
+                        @endif
+                    </div>
+
+                    @if (! $opsReady || $isDeployer)
+                        <p class="mt-4 text-sm text-brand-moss">{{ __('Logs require ready ops access and a non-deployer role.') }}</p>
+                    @else
+                        <div class="mt-5 flex flex-wrap items-center gap-2">
+                            @if ($hasAccessLog)
+                                <button type="button" wire:click="refreshWebserverLog('access')" @class([
+                                    'rounded-md border px-3 py-1.5 text-xs font-medium',
+                                    'border-brand-forest bg-brand-forest text-brand-cream' => $log_kind === 'access',
+                                    'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $log_kind !== 'access',
+                                ])>{{ __('Access') }}</button>
+                            @endif
+                            @if ($hasErrorLog)
+                                <button type="button" wire:click="refreshWebserverLog('error')" @class([
+                                    'rounded-md border px-3 py-1.5 text-xs font-medium',
+                                    'border-brand-forest bg-brand-forest text-brand-cream' => $log_kind === 'error',
+                                    'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $log_kind !== 'error',
+                                ])>{{ __('Error') }}</button>
+                            @endif
+                            @if ($hasJournal)
+                                <button type="button" wire:click="refreshWebserverLog('journal')" @class([
+                                    'rounded-md border px-3 py-1.5 text-xs font-medium',
+                                    'border-brand-forest bg-brand-forest text-brand-cream' => $log_kind === 'journal',
+                                    'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $log_kind !== 'journal',
+                                ])>{{ __('journalctl') }}</button>
+                            @endif
+
+                            <span class="mx-2 hidden h-5 w-px bg-brand-ink/10 sm:inline-block" aria-hidden="true"></span>
+
+                            <button type="button" wire:click="refreshWebserverLog" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                {{ __('Refresh') }}
+                            </button>
+                            <button type="button" wire:click="toggleWebserverLogLive" @class([
+                                'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium',
+                                'border-emerald-300 bg-emerald-50 text-emerald-900' => $log_live,
+                                'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $log_live,
+                            ])>
+                                @if ($log_live)
+                                    <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-600" aria-hidden="true"></span>
+                                    {{ __('Live') }}
+                                @else
+                                    <x-heroicon-o-play class="h-3.5 w-3.5" />
+                                    {{ __('Live') }}
+                                @endif
+                            </button>
+                            <span class="ml-auto inline-flex items-center gap-1 text-[11px] text-brand-moss">
+                                {{ __('Lines:') }}
+                                <select wire:change="refreshWebserverLog(null, $event.target.value)" class="rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 text-[11px] font-medium text-brand-ink">
+                                    @foreach ([100, 300, 500, 1000, 2000] as $n)
+                                        <option value="{{ $n }}" @selected($log_lines === $n)>{{ $n }}</option>
+                                    @endforeach
+                                </select>
+                            </span>
+                        </div>
+
+                        <pre class="mt-4 max-h-[60vh] overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-4 font-mono text-xs leading-relaxed text-emerald-100" x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">{{ $log_output !== '' ? $log_output : __('Click Refresh (or toggle Live) to fetch the log.') }}</pre>
+                    @endif
+                </div>
+            @endif
+
+            {{-- =============================================================
+                 CONFIG — file picker (left) + editor (right) with validate /
+                 save / restore. Save is atomic on the server side (snapshot
+                 to `_dply_backups/`, then `install -m 0644`), so a bad save
+                 can always be undone by restoring the most recent backup.
+                 ============================================================= --}}
+            @if ($engine_subtab === 'config' && $isActive && $engineHasFullControls($key))
+                <div class="{{ $card }} p-6 sm:p-8">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="max-w-2xl">
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine config editor', ['engine' => $info['label']]) }}</h3>
+                            <p class="mt-1 text-sm text-brand-moss">{{ __('Edit the main config or any per-site fragment. Saving snapshots the live file to _dply_backups/ first, then atomically replaces it and runs the engine validator.') }}</p>
+                        </div>
+                        <button type="button" wire:click="validateWebserverConfig" class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
+                            <x-heroicon-o-shield-check class="h-3.5 w-3.5" />
+                            {{ __('Validate on-disk config') }}
+                        </button>
+                    </div>
+
+                    @if (! $opsReady || $isDeployer)
+                        <p class="mt-4 text-sm text-brand-moss">{{ __('Editing config requires ready ops access and a non-deployer role.') }}</p>
+                    @else
+                        <div class="mt-5 grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+                            {{-- File picker --}}
+                            <div class="rounded-xl border border-brand-ink/10 bg-white">
+                                <div class="border-b border-brand-ink/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Files') }}</div>
+                                @if (empty($webserverConfigFiles))
+                                    <p class="px-3 py-3 text-xs text-brand-moss">{{ __('No config files discovered. Confirm the server is reachable.') }}</p>
+                                @else
+                                    <ul class="max-h-[55vh] divide-y divide-brand-ink/5 overflow-auto text-sm">
+                                        @foreach ($webserverConfigFiles as $f)
+                                            @php $isSel = $config_selected_path === $f['path']; @endphp
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    wire:click="loadWebserverConfig(@js($f['path']))"
+                                                    @class([
+                                                        'flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-brand-sand/40',
+                                                        'bg-brand-sand/50' => $isSel,
+                                                    ])
+                                                >
+                                                    <x-heroicon-o-document class="mt-0.5 h-4 w-4 shrink-0 text-brand-moss" />
+                                                    <span class="min-w-0 flex-1">
+                                                        <span class="block truncate font-medium text-brand-ink">{{ $f['label'] }}</span>
+                                                        <span class="block truncate font-mono text-[10px] text-brand-mist">{{ $f['path'] }}</span>
+                                                    </span>
+                                                    <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ number_format($f['size']) }}b</span>
+                                                </button>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+
+                            {{-- Editor --}}
+                            <div class="min-w-0">
+                                @if ($config_selected_path === null)
+                                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-12 text-center text-sm text-brand-moss">
+                                        <x-heroicon-o-arrow-left class="mx-auto h-5 w-5 text-brand-mist" />
+                                        <p class="mt-2">{{ __('Pick a file on the left to start editing.') }}</p>
+                                    </div>
+                                @else
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <p class="truncate font-mono text-xs text-brand-moss">{{ $config_selected_path }}</p>
+                                            @if ($config_truncated_on_load)
+                                                <p class="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-amber-200">
+                                                    <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
+                                                    {{ __('Truncated on load — saving is disabled') }}
+                                                </p>
+                                            @endif
+                                        </div>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <button type="button" wire:click="loadWebserverConfig(@js($config_selected_path))" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
+                                                <x-heroicon-o-arrow-path class="h-3 w-3" />
+                                                {{ __('Reload') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                wire:click="saveWebserverConfig"
+                                                @disabled($config_truncated_on_load)
+                                                class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-50"
+                                            >
+                                                <x-heroicon-o-cloud-arrow-up class="h-3 w-3" />
+                                                {{ __('Save + validate') }}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <textarea
+                                        wire:model.live.debounce.500ms="config_contents"
+                                        rows="22"
+                                        spellcheck="false"
+                                        class="mt-2 block w-full rounded-lg border border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"
+                                    >{{ $config_contents }}</textarea>
+
+                                    {{-- Validate output --}}
+                                    @if ($config_validate_output !== null)
+                                        <div @class([
+                                            'mt-3 rounded-xl border px-3 py-2 text-xs',
+                                            'border-emerald-200 bg-emerald-50/70 text-emerald-900' => $config_validate_ok,
+                                            'border-rose-200 bg-rose-50/70 text-rose-900' => ! $config_validate_ok,
+                                        ])>
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                                                {{ $config_validate_ok ? __('Validation passed') : __('Validation reported problems') }}
+                                            </p>
+                                            <pre class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px]">{{ $config_validate_output }}</pre>
+                                        </div>
+                                    @endif
+
+                                    {{-- Backups --}}
+                                    @if (! empty($config_backups))
+                                        <div class="mt-3 rounded-xl border border-brand-ink/10 bg-white">
+                                            <div class="flex items-center justify-between border-b border-brand-ink/10 px-3 py-2">
+                                                <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Backups') }}</span>
+                                                <span class="text-[10px] text-brand-mist">{{ __(':n kept — newest first', ['n' => count($config_backups)]) }}</span>
+                                            </div>
+                                            <ul class="max-h-48 divide-y divide-brand-ink/5 overflow-auto text-xs">
+                                                @foreach ($config_backups as $b)
+                                                    <li class="flex items-center justify-between gap-3 px-3 py-1.5">
+                                                        <div class="min-w-0">
+                                                            <p class="truncate font-mono text-[11px] text-brand-moss">{{ basename($b['path']) }}</p>
+                                                            <p class="text-[10px] text-brand-mist">{{ \Illuminate\Support\Carbon::createFromTimestamp($b['mtime'])->diffForHumans() }} — {{ number_format($b['size']) }} bytes</p>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="openConfirmActionModal('restoreWebserverConfigBackup', [@js($b['path'])], @js(__('Restore backup?')), @js(__('Overwrite the live file with this backup? A snapshot of the current contents is taken first.')), @js(__('Restore')), true)"
+                                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                        >
+                                                            <x-heroicon-o-arrow-uturn-left class="inline h-3 w-3" />
+                                                            {{ __('Restore') }}
+                                                        </button>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                </div>
             @endif
 
             @if ($engine_subtab === 'info')

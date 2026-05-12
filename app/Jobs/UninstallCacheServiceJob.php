@@ -43,18 +43,9 @@ class UninstallCacheServiceJob implements ShouldQueue
         $engine = $row->engine;
         $instanceName = $row->name;
 
-        // Multi-instance detection: if there's at least one other instance of
-        // this engine on the same server, we tear down JUST this instance —
-        // disable + remove the templated systemd unit, the per-instance config
-        // file, and the per-instance data dir — and leave the apt package +
-        // sibling instances intact. The `uninstallInstanceScript` builder
-        // already handles both modes via `isLastInstance`.
-        $isLastInstance = ! ServerCacheService::query()
-            ->where('server_id', $row->server_id)
-            ->where('engine', $engine)
-            ->where('id', '!=', $row->id)
-            ->exists();
-
+        // One row per (server, engine) — uninstall is always a full `apt purge`. The legacy
+        // sibling-instance branching is gone; if a future operator wants the package retained
+        // they'd use the engine-switch flow rather than uninstall + reinstall.
         $row->update([
             'status' => ServerCacheService::STATUS_UNINSTALLING,
             'error_message' => null,
@@ -64,7 +55,7 @@ class UninstallCacheServiceJob implements ShouldQueue
             $output = $executor->runInlineBash(
                 $row->server,
                 'cache-service:uninstall:'.$engine.':'.$instanceName,
-                CacheServiceInstallScripts::uninstallInstanceScript($engine, $instanceName, $isLastInstance),
+                CacheServiceInstallScripts::uninstallScript($engine),
                 timeoutSeconds: 600,
                 asRoot: true,
             );
@@ -75,19 +66,14 @@ class UninstallCacheServiceJob implements ShouldQueue
                 );
             }
 
-            // Capability cache invalidation is only needed when the package is
-            // actually gone — sibling instances still expose the same engine.
-            if ($isLastInstance) {
-                $capabilities->forget($row->server);
-            }
+            $capabilities->forget($row->server);
 
-            // Audit BEFORE delete so the row id and engine are still resolvable on the audit
-            // record (we capture the engine in meta).
+            // Audit BEFORE delete so the server reference + engine name are still resolvable —
+            // post-delete the relation reload would 404.
             $serverForAudit = $row->server;
             $auditMeta = [
                 'engine' => $engine,
                 'instance' => $instanceName,
-                'last_instance' => $isLastInstance,
             ];
             $row->delete();
 
@@ -101,7 +87,6 @@ class UninstallCacheServiceJob implements ShouldQueue
             $audit->record($row->server, ServerCacheServiceAuditEvent::EVENT_UNINSTALL_FAILED, [
                 'engine' => $engine,
                 'instance' => $instanceName,
-                'last_instance' => $isLastInstance,
                 'error' => Str::limit($e->getMessage(), 800),
             ]);
         }

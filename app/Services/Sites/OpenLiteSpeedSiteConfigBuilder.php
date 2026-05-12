@@ -11,7 +11,15 @@ use Illuminate\Support\Collection;
 
 class OpenLiteSpeedSiteConfigBuilder
 {
-    public function build(Site $site): string
+    /**
+     * Per-vhost config (vhconf.conf contents). For signature symmetry with the
+     * other engine builders we accept a `$listenPort` argument, but OLS routes
+     * port handling through the listener block in httpd_config.conf — the
+     * per-vhost file itself is portless. So the parameter is intentionally
+     * unused here; callers in the switch-flow path get a port mismatch via the
+     * httpd_config the OpenLiteSpeedHttpdConfigBuilder emits instead.
+     */
+    public function build(Site $site, ?int $listenPort = null): string
     {
         $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
 

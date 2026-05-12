@@ -49,6 +49,7 @@ class WorkspaceActivity extends Component
         'caches' => 'Caches',
         'databases' => 'Databases',
         'deploys' => 'Deploys',
+        'background' => 'Background',
         'server' => 'Server',
         'site' => 'Site',
         'other' => 'Other',
@@ -57,6 +58,18 @@ class WorkspaceActivity extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+
+        // Deep links from sibling workspace pages can pre-apply category / range filters
+        // via the query string (e.g. servers.activity?category=background) so operators
+        // land on a focused view without an extra click.
+        $category = request()->query('category');
+        if (is_string($category) && array_key_exists($category, self::CATEGORIES)) {
+            $this->category = $category;
+        }
+        $range = request()->query('range');
+        if (is_string($range) && in_array($range, ['24h', '7d', '30d', '90d'], true)) {
+            $this->range = $range;
+        }
     }
 
     public function setTab(string $tab): void
@@ -104,6 +117,8 @@ class WorkspaceActivity extends Component
             str_starts_with($action, 'server.databases.') => 'databases',
             str_starts_with($action, 'site.deploy.'),
             str_starts_with($action, 'project.deploy.') => 'deploys',
+            str_starts_with($action, 'backup.schedule.'),
+            str_starts_with($action, 'queue_worker.') => 'background',
             str_starts_with($action, 'server.') => 'server',
             str_starts_with($action, 'site.') => 'site',
             default => 'other',
@@ -127,6 +142,10 @@ class WorkspaceActivity extends Component
                 $q->where('action', 'like', 'site.deploy.%')
                     ->orWhere('action', 'like', 'project.deploy.%');
             }),
+            'background' => $query->where(function (Builder $q): void {
+                $q->where('action', 'like', 'backup.schedule.%')
+                    ->orWhere('action', 'like', 'queue_worker.%');
+            }),
             // 'server' is the leftover server.* bucket — exclude its
             // already-categorized siblings so chips are mutually exclusive.
             'server' => $query
@@ -142,7 +161,9 @@ class WorkspaceActivity extends Component
                 ->where('action', 'not like', 'insight.%')
                 ->where('action', 'not like', 'server.%')
                 ->where('action', 'not like', 'site.%')
-                ->where('action', 'not like', 'project.deploy.%'),
+                ->where('action', 'not like', 'project.deploy.%')
+                ->where('action', 'not like', 'backup.schedule.%')
+                ->where('action', 'not like', 'queue_worker.%'),
             default => $query,
         };
     }

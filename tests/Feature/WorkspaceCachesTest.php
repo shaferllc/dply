@@ -121,17 +121,19 @@ class WorkspaceCachesTest extends TestCase
         ]);
     }
 
-    public function test_install_allows_a_second_engine_alongside_an_existing_one(): void
+    public function test_install_allows_memcached_alongside_a_redis_family_engine(): void
     {
-        // Multi-engine support: Redis + Memcached side-by-side is a legit pattern
-        // (Redis for queues/Horizon, Memcached for app cache). Installing a second
-        // engine while another is already running should queue a job and create the row.
+        // The coexistence rule allows one redis-family engine PLUS one memcached. Different wire
+        // protocols, different ports, no resource overlap — common pattern is Redis for queues
+        // and Memcached for sessions. The install action must queue a job and create the row
+        // without touching the existing redis row.
         Queue::fake();
         [$user, $server] = $this->actingOwnerWithServer();
 
         ServerCacheService::query()->create([
             'server_id' => $server->id,
             'engine' => 'redis',
+            'name' => ServerCacheService::DEFAULT_INSTANCE_NAME,
             'status' => ServerCacheService::STATUS_RUNNING,
             'port' => 6379,
         ]);
@@ -139,6 +141,7 @@ class WorkspaceCachesTest extends TestCase
         $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
             $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
             $mock->shouldReceive('forget')->zeroOrMoreTimes();
+            $mock->shouldReceive('engineUnsupportedReason')->andReturn(null);
         });
 
         Livewire::actingAs($user)
@@ -153,11 +156,43 @@ class WorkspaceCachesTest extends TestCase
             'status' => ServerCacheService::STATUS_PENDING,
             'port' => 11211,
         ]);
-        // The pre-existing Redis row is unaffected.
         $this->assertDatabaseHas('server_cache_services', [
             'server_id' => $server->id,
             'engine' => 'redis',
             'status' => ServerCacheService::STATUS_RUNNING,
+        ]);
+    }
+
+    public function test_install_refuses_second_redis_family_engine_on_same_server(): void
+    {
+        // Coexistence rule: at most one redis-family engine per server. With Redis already
+        // installed, attempting to install Valkey must be refused before any job is queued —
+        // the operator's path forward is Uninstall on Redis or use the engine-switch flow.
+        Queue::fake();
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'name' => ServerCacheService::DEFAULT_INSTANCE_NAME,
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+            $mock->shouldReceive('engineUnsupportedReason')->andReturn(null);
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->call('installCacheService', 'valkey');
+
+        Queue::assertNotPushed(InstallCacheServiceJob::class);
+        $this->assertDatabaseMissing('server_cache_services', [
+            'server_id' => $server->id,
+            'engine' => 'valkey',
         ]);
     }
 

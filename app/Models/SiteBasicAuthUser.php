@@ -81,7 +81,7 @@ class SiteBasicAuthUser extends Model
     }
 
     /**
-     * Caddy v2's `basicauth` directive only accepts bcrypt hashes inline. Other
+     * Caddy v2's `basic_auth` directive only accepts bcrypt hashes inline. Other
      * htpasswd formats (apr1, sha) can land here via Sync from server but Caddy
      * will refuse to parse them — the operator needs to rotate the password to
      * regenerate a bcrypt hash before Caddy can enforce the credential.

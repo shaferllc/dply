@@ -14,8 +14,19 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @if ($contextSite)
+        <div class="mb-4 flex items-center justify-between rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm">
+            <p class="text-brand-ink">
+                <span class="font-semibold">{{ __('Filtered to site:') }}</span>
+                {{ $contextSite->name }}
+            </p>
+            <a href="{{ route('servers.schedule', $server) }}" wire:navigate class="text-xs font-semibold text-brand-ink underline">{{ __('Clear filter') }}</a>
+        </div>
+    @endif
+
     <x-explainer class="mb-4">
         <p>{{ __('Anything that looks like a framework scheduler is listed below — both cron entries (the usual setup) and supervisor daemons (the schedule:work pattern). Edit them on their owning page; this is just a focused index.') }}</p>
+        <p class="mt-2 text-xs"><a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="font-semibold text-brand-ink underline">{{ __('View background activity →') }}</a></p>
     </x-explainer>
 
     {{-- At-a-glance counts --}}

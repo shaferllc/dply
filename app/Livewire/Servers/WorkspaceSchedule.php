@@ -46,9 +46,26 @@ class WorkspaceSchedule extends Component
     /** @var 'laravel'|'rails' Framework hint that picks the right scheduler command. */
     public string $enable_framework = 'laravel';
 
+    /** When set (?site=…), filters the lists to that site's cron entries / daemons. */
+    public ?string $context_site_id = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+
+        $siteId = request()->query('site');
+        if (is_string($siteId) && $siteId !== '') {
+            $exists = Site::query()
+                ->where('server_id', $server->id)
+                ->whereKey($siteId)
+                ->exists();
+            if ($exists) {
+                $this->context_site_id = $siteId;
+                // Pre-fill the "Enable scheduler" form so the operator can flip the framework
+                // and click without re-picking the site.
+                $this->enable_site_id = $siteId;
+            }
+        }
     }
 
     public function enableSchedulerForSite(): void
@@ -108,12 +125,14 @@ class WorkspaceSchedule extends Component
 
         $cronEntries = ServerCronJob::query()
             ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, fn ($q) => $q->where('site_id', $this->context_site_id))
             ->get()
             ->filter(fn (ServerCronJob $job): bool => $this->commandLooksLikeScheduler((string) $job->command))
             ->values();
 
         $schedulerDaemons = SupervisorProgram::query()
             ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, fn ($q) => $q->where('site_id', $this->context_site_id))
             ->where(function ($q) {
                 foreach (self::SCHEDULER_PATTERNS as $needle) {
                     $q->orWhere('command', 'like', '%'.$needle.'%');
@@ -127,8 +146,13 @@ class WorkspaceSchedule extends Component
             ->orderBy('name')
             ->get();
 
+        $contextSite = $this->context_site_id !== null
+            ? $sites->firstWhere('id', $this->context_site_id)
+            : null;
+
         return view('livewire.servers.workspace-schedule', [
             'opsReady' => $this->serverOpsReady(),
+            'contextSite' => $contextSite,
             'cronEntries' => $cronEntries,
             'schedulerDaemons' => $schedulerDaemons,
             'sites' => $sites,

@@ -22,6 +22,7 @@ class BackupFailureNotification extends Notification implements ShouldQueue
         public ServerBackupSchedule $schedule,
         public string $errorMessage = '',
         public string $serverName = '',
+        public bool $isTest = false,
     ) {}
 
     /**
@@ -37,20 +38,30 @@ class BackupFailureNotification extends Notification implements ShouldQueue
         $target = $this->schedule->targetLabel();
         $url = route('servers.backups', $this->schedule->server_id, absolute: true);
 
+        $subjectPrefix = $this->isTest ? '[TEST] ' : '';
         $mail = (new MailMessage)
-            ->subject('['.config('app.name').'] Backup failed: '.$target)
-            ->line(__('A scheduled backup for :target on :server just failed.', [
+            ->subject($subjectPrefix.'['.config('app.name').'] Backup failed: '.$target);
+
+        if ($this->isTest) {
+            $mail->line(__('This is a test alert — no backup has failed. You triggered this from the Backups page to verify your email setup.'));
+        } else {
+            $mail->line(__('A scheduled backup for :target on :server just failed.', [
                 'target' => $target,
                 'server' => $this->serverName ?: __('your server'),
-            ]))
-            ->line(__('Cadence: :cron', ['cron' => $this->schedule->cron_expression]));
+            ]));
+        }
+
+        $mail->line(__('Cadence: :cron', ['cron' => $this->schedule->cron_expression]));
 
         if (filled($this->errorMessage)) {
             $mail->line(__('Error: :err', ['err' => $this->errorMessage]));
         }
 
         $mail->action(__('Open Backups'), $url);
-        $mail->line(__('After 3 consecutive failures the schedule auto-pauses to stop alert spam. Hit "Run now" once you fix the underlying issue and the schedule will resume on success.'));
+
+        if (! $this->isTest) {
+            $mail->line(__('After 3 consecutive failures the schedule auto-pauses to stop alert spam. Hit "Run now" once you fix the underlying issue and the schedule will resume on success.'));
+        }
 
         return $mail;
     }

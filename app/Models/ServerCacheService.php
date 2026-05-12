@@ -9,9 +9,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * The single cache service (redis / valkey / memcached / keydb / dragonfly)
- * installed on a server. Backed by `server_cache_services`; one row per
- * server (the table enforces it via a unique index).
+ * One row per (server, engine). Coexistence rules: at most one row from the redis-family
+ * ({@see ServerCacheService::FAMILY_REDIS_ENGINES}) per server, plus optionally one Memcached
+ * row. Enforced at three layers:
+ *
+ *   1. DB: `unique(server_id, engine)` + a Postgres partial unique index keyed on `server_id`
+ *      where `engine IN (redis,valkey,keydb,dragonfly)`. See the
+ *      `collapse_cache_services_to_one_per_family` migration.
+ *   2. Model: {@see ServerCacheService::familyOf()} centralises the family check the install
+ *      action consumes.
+ *   3. Livewire action: `installCacheService()` refuses a second redis-family install on the
+ *      same server, pointing the operator at Uninstall or the engine-switch flow instead.
+ *
+ * The `name` column survives only for legacy data (always `'default'` going forward) and is not
+ * exposed in the UI — multi-instance support was removed once it became clear most operators
+ * never used it and the templated systemd-unit machinery was producing more bugs than value.
  */
 class ServerCacheService extends Model
 {
@@ -33,10 +45,26 @@ class ServerCacheService extends Model
     public const ENGINES = ['redis', 'valkey', 'memcached', 'keydb', 'dragonfly'];
 
     /**
-     * Reserved instance name used by single-instance-per-engine rows. Install
-     * scripts route this name to the engine's legacy systemd unit + legacy
-     * config path so existing servers (provisioned before multi-instance) keep
-     * working with no on-box changes.
+     * Engines that speak the Redis wire protocol on port 6379. dply allows at most one of these
+     * to be installed on a given server — operators who want Valkey instead of Redis use the
+     * engine-switch flow ({@see \App\Jobs\SwitchCacheServiceJob}), not parallel installs.
+     *
+     * @var list<string>
+     */
+    public const FAMILY_REDIS_ENGINES = ['redis', 'valkey', 'keydb', 'dragonfly'];
+
+    /**
+     * Family identifier the coexistence rule keys on. `redis-family` covers Redis / Valkey /
+     * KeyDB / Dragonfly (all RESP-on-6379); `memcached` is its own family because the protocol
+     * + port are different and the two can legitimately coexist on one server.
+     */
+    public const FAMILY_REDIS = 'redis-family';
+
+    public const FAMILY_MEMCACHED = 'memcached';
+
+    /**
+     * Legacy single-instance name kept only so historical rows compare equal under the new
+     * one-row-per-engine rule. New rows are always inserted with `name = 'default'`.
      */
     public const DEFAULT_INSTANCE_NAME = 'default';
 
@@ -93,50 +121,20 @@ class ServerCacheService extends Model
     }
 
     /**
-     * The next free TCP port for an engine on a given server. Walks upward from
-     * the engine's default until it finds a port not in use by any cache service
-     * on this server (any engine, any instance) — `unique(server_id, port)`
-     * enforces per-server port uniqueness so two services can never share a port.
+     * Family identifier for the coexistence rule — `'redis-family'` for Redis / Valkey / KeyDB /
+     * Dragonfly (all wire-compatible on port 6379, so at most one can run), `'memcached'` for
+     * Memcached (different protocol + port, can coexist with a redis-family engine).
      *
-     * Used at install time so the operator's first Valkey install doesn't try to
-     * land on 6379 when Redis is already there. The actual collision case
-     * (which port did we end up on?) is reported via a toast at the call site.
+     * Centralised here so the install action, the migration, and the engine-switch trigger all
+     * compute the family the same way. Throws for unknown engines because a silent fall-through
+     * would let an arbitrary new engine through the install gate.
      */
-    public static function nextFreePortFor(string $serverId, string $engine): int
+    public static function familyOf(string $engine): string
     {
-        $usedPorts = self::query()
-            ->where('server_id', $serverId)
-            ->pluck('port')
-            ->all();
-
-        $candidate = self::defaultPortFor($engine);
-        while (in_array($candidate, $usedPorts, true)) {
-            $candidate++;
-        }
-
-        return $candidate;
-    }
-
-    /**
-     * True when this row is the legacy single-instance install for its engine.
-     * Install/uninstall scripts use this to pick legacy paths (e.g.
-     * `/etc/redis/redis.conf` + `redis-server.service`) over templated paths
-     * (`/etc/redis/redis-<name>.conf` + `redis-server@<name>.service`). Letting
-     * the existing single-instance servers keep their unmoved files is the
-     * point of the `default` reservation.
-     */
-    public function isDefaultInstance(): bool
-    {
-        return $this->name === self::DEFAULT_INSTANCE_NAME;
-    }
-
-    /**
-     * Allowed instance-name shape for operator input. Lowercase, digits, and
-     * hyphens; up to 32 chars. Used for systemd unit names and config file
-     * paths so we keep it conservative (no underscores, no dots, no @).
-     */
-    public static function isValidInstanceName(string $name): bool
-    {
-        return preg_match('/^[a-z0-9][a-z0-9-]{0,31}$/', $name) === 1;
+        return match ($engine) {
+            'redis', 'valkey', 'keydb', 'dragonfly' => self::FAMILY_REDIS,
+            'memcached' => self::FAMILY_MEMCACHED,
+            default => throw new \InvalidArgumentException("Unknown cache engine: {$engine}"),
+        };
     }
 }

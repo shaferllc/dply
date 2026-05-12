@@ -1165,6 +1165,16 @@ class WorkspaceDaemons extends Component
             ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
             : null;
 
+        // Header at-a-glance counts. Computed against the visible (filtered) set so the
+        // numbers match what the operator sees in the program list below — switching the
+        // programs_list_scope (site vs all) flips the stats too.
+        $stats = [
+            'total' => $filteredSupervisorPrograms->count(),
+            'active' => $filteredSupervisorPrograms->where('is_active', true)->count(),
+            'inactive' => $filteredSupervisorPrograms->where('is_active', false)->count(),
+            'total_processes' => (int) $filteredSupervisorPrograms->where('is_active', true)->sum('numprocs'),
+        ];
+
         return view('livewire.servers.workspace-daemons', [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
@@ -1176,6 +1186,7 @@ class WorkspaceDaemons extends Component
             'filteredSupervisorPrograms' => $filteredSupervisorPrograms,
             'contextSiteModel' => $contextSiteModel,
             'restartAllConfirmMessage' => $this->disruptiveConfirmMessage(__('Restart all programs')),
+            'daemonsStats' => $stats,
         ]);
     }
 }

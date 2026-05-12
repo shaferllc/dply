@@ -72,6 +72,25 @@ class SwitchCacheServiceJob implements ShouldQueue
             return;
         }
 
+        // Defensive cross-family check. Switch is meaningful only inside a wire-compatible
+        // family (Redis ↔ Valkey ↔ KeyDB ↔ Dragonfly) — flipping from Redis to Memcached or
+        // vice versa would silently strip auth, change the port, and break every client. The
+        // Livewire trigger should refuse cross-family switches before dispatching, but the job
+        // re-checks so a stale payload can't slip past.
+        if (ServerCacheService::familyOf($row->engine) !== ServerCacheService::familyOf($this->targetEngine)) {
+            $row->update([
+                'status' => ServerCacheService::STATUS_FAILED,
+                'target_engine' => null,
+                'error_message' => sprintf(
+                    'Refusing cross-family switch from %s to %s — engines must share a wire protocol.',
+                    $row->engine,
+                    $this->targetEngine,
+                ),
+            ]);
+
+            return;
+        }
+
         $oldEngine = $row->engine;
         $newEngine = $this->targetEngine;
 

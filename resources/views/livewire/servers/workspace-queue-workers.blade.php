@@ -16,6 +16,7 @@
 
     <x-explainer class="mb-4">
         <p>{{ __('Queue workers are Supervisor programs whose program_type matches a known queue framework (Laravel queue/Horizon/Octane/Reverb, Sidekiq, Solid Queue, Celery, BullMQ, generic Node). Programs added here also appear on the Daemons page since they share the same model.') }}</p>
+        <p class="mt-2 text-xs"><a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="font-semibold text-brand-ink underline">{{ __('View background activity →') }}</a></p>
     </x-explainer>
 
     {{-- At-a-glance counts. --}}

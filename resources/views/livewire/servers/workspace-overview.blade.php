@@ -313,6 +313,29 @@
                     <p class="mt-1 truncate text-xs text-brand-moss">{{ $latestDeployMeta }}</p>
                     <p class="mt-3 text-[11px] font-medium text-brand-sage opacity-0 transition group-hover:opacity-100">{{ __('Open Deploys →') }}</p>
                 </a>
+
+                {{-- Background health — surfaces queue workers + schedules + recent backup failures
+                     to the high-traffic Overview page. Click-through lands on Backups, which is
+                     where operators typically need to act when this tile shows anything red. --}}
+                <a href="{{ route('servers.backups', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm transition hover:border-brand-sage hover:shadow-md">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Background') }}</p>
+                    <p class="mt-2 flex items-baseline gap-2">
+                        <span class="text-xl font-semibold text-brand-ink">{{ $backgroundSummary['active_workers'] }}</span>
+                        <span class="text-xs text-brand-moss">{{ __('workers') }}</span>
+                    </p>
+                    <p class="mt-1 truncate text-xs text-brand-moss">
+                        @if ($backgroundSummary['failed_backups_7d'] > 0)
+                            <span class="font-semibold text-red-700">{{ trans_choice('{1} :count failed backup (7d)|[2,*] :count failed backups (7d)', $backgroundSummary['failed_backups_7d'], ['count' => $backgroundSummary['failed_backups_7d']]) }}</span>
+                        @elseif ($backgroundSummary['paused_schedules'] > 0)
+                            <span class="text-amber-700">{{ trans_choice('{1} :count paused schedule|[2,*] :count paused schedules', $backgroundSummary['paused_schedules'], ['count' => $backgroundSummary['paused_schedules']]) }}</span>
+                        @elseif ($backgroundSummary['active_schedules'] > 0)
+                            {{ trans_choice('{1} :count active schedule|[2,*] :count active schedules', $backgroundSummary['active_schedules'], ['count' => $backgroundSummary['active_schedules']]) }}
+                        @else
+                            {{ __('No schedules yet') }}
+                        @endif
+                    </p>
+                    <p class="mt-3 text-[11px] font-medium text-brand-sage opacity-0 transition group-hover:opacity-100">{{ __('Open Backups →') }}</p>
+                </a>
             </section>
 
             {{-- Stack summary card. One line of installed-runtime

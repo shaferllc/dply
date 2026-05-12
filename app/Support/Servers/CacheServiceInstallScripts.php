@@ -7,24 +7,24 @@ namespace App\Support\Servers;
 use App\Models\ServerCacheService;
 
 /**
- * Install / uninstall bash + systemd-unit + config-path helpers for each
- * supported cache engine, factored so multi-instance workspaces (multiple
- * instances of the same engine on different ports) can compose them. The
- * surface is split into three layers:
+ * Install / uninstall bash + systemd-unit + config-path helpers for each supported cache engine.
  *
- *   1. Package install  — idempotent apt step that runs once per engine on
- *      a server, regardless of how many instances run on it.
- *   2. Instance install — systemd enable + version probe per instance. For
- *      the reserved `default` name, this routes to the engine's legacy
- *      systemd unit + legacy config path so existing servers (provisioned
- *      before multi-instance) keep working with no on-box changes.
- *   3. Instance uninstall — disable + (optionally) `apt purge` when this
- *      was the last instance of the engine on the server.
+ * dply allows at most one row per (server, engine) and at most one redis-family engine per server
+ * — the multi-instance machinery (templated systemd units, per-instance configs, port-autopick)
+ * was removed in the `collapse_cache_services_to_one_per_family` migration once it became clear
+ * the bugs it created (default-on-non-default-port config drift, repair-port helpers, orphan
+ * rows) outweighed the rare workloads it served. Every cache row is the engine's apt-shipped
+ * single-instance install on its default port.
  *
- * Mirror methods exist for the legacy `installScript($engine)` /
- * `uninstallScript($engine)` shape used by the existing single-instance
- * jobs — those route through `default` and are kept as thin wrappers so
- * the call sites don't have to change.
+ * Method surface kept compact: `installPackageScript` for the apt step, the legacy
+ * `installScript` / `uninstallScript` wrappers, and per-engine path helpers
+ * (`systemdServiceFor`, `configFilePathFor`) that other support classes
+ * (`CacheServiceNetworkExposure`, `CacheServicePort`) consume.
+ *
+ * The `instanceConfigPath` / `instanceServiceUnit` aliases are kept as thin wrappers around
+ * `configFilePathFor` / `systemdServiceFor` so legacy callers in `CacheServiceNetworkExposure`,
+ * `CacheServicePort`, and the workspace component don't have to be rewritten — they always
+ * return the default-instance path/unit regardless of any `$name` argument.
  */
 final class CacheServiceInstallScripts
 {
@@ -38,9 +38,7 @@ final class CacheServiceInstallScripts
 
     /**
      * Idempotent apt-install step for an engine. Each script first checks whether the engine's
-     * binary is already on PATH and skips the apt step entirely if so — this matters for
-     * "Add instance" which re-runs the install pipeline against an already-provisioned host;
-     * the apt step itself reports "already newest" but `apt-get update` still costs 20–60 s.
+     * binary is already on PATH and skips the apt step entirely if so — keeps re-runs fast.
      *
      * Each script ends with an explicit `command -v` verification. That's a backstop against
      * `||`-chained apt failures slipping past `set -e` — if the package isn't actually
@@ -88,16 +86,15 @@ BASH,
     /**
      * Codenames the auto-bootstrap install path supports for each engine. Returned as a list of
      * `/etc/os-release` $VERSION_CODENAME values; `null` means "universally available, no
-     * distro-specific bootstrap needed" (redis, memcached). The bash scripts that consume this
-     * (keydb, dragonfly) emit the same whitelist inline — keep the two in sync so the UI gate and
-     * the install script tell the operator the same story.
+     * distro-specific bootstrap needed" (redis, memcached, valkey). The bash scripts that
+     * consume this (keydb, dragonfly) emit the same whitelist inline — keep the two in sync so
+     * the UI gate and the install script tell the operator the same story.
      *
-     * KeyDB: upstream apt repo at download.keydb.dev only publishes through Ubuntu jammy / Debian
-     * bookworm; noble (Ubuntu 24.04) and trixie are not in their dists/ tree as of writing. Project
-     * has effectively been frozen since the team got acquired, so don't expect newer codenames.
+     * KeyDB: upstream apt repo at download.keydb.dev only publishes through Ubuntu jammy /
+     * Debian bookworm; noble (Ubuntu 24.04) and trixie are not in their dists/ tree.
      *
-     * Dragonfly: GitHub-release .debs link against a recent enough glibc that focal/bullseye reject
-     * them; jammy/noble/bookworm work in practice.
+     * Dragonfly: GitHub-release .debs link against a recent enough glibc that focal/bullseye
+     * reject them; jammy/noble/bookworm work in practice.
      *
      * @return list<string>|null
      */
@@ -120,7 +117,6 @@ BASH,
      */
     private static function keydbInstallPackageScript(): string
     {
-        // Heredoc-quoted (BASH) so PHP doesn't interpolate `$` — every `$` below is shell.
         return <<<'BASH'
 if ! command -v keydb-server >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
@@ -183,9 +179,7 @@ BASH;
      */
     private static function dragonflyInstallPackageScript(string $version): string
     {
-        // Tag conventionally prefixed with `v` (e.g. `v1.38.1`); accept either form from config.
         $tag = str_starts_with($version, 'v') ? $version : 'v'.$version;
-        // No risk of '/' / spaces in a release tag, but escape for the URL anyway.
         $tagShell = escapeshellarg($tag);
 
         return <<<BASH
@@ -243,15 +237,10 @@ BASH;
     }
 
     /**
-     * Per-instance install step: systemctl enable + verify. For the reserved
-     * `default` name, uses the engine's legacy systemd unit (the apt
-     * package's default service). For named instances, uses a templated
-     * unit (`<engine>-server@<name>.service`) and a per-instance config
-     * file.
-     *
-     * Note: the templated path requires the template unit + per-instance
-     * config to already exist on the box. Phase 3 (add-instance flow) is
-     * where that scaffolding gets dropped; this method is the consumer.
+     * Per-instance install step. Signature retained from the multi-instance era so the install
+     * job's call site doesn't have to change — the `$name`, `$port`, and `$authPassword`
+     * arguments are now ignored and the script always installs the engine's default unit on its
+     * default port.
      */
     public static function installInstanceScript(
         string $engine,
@@ -259,347 +248,43 @@ BASH;
         ?int $port = null,
         ?string $authPassword = null,
     ): string {
-        if ($name === ServerCacheService::DEFAULT_INSTANCE_NAME) {
-            return self::legacyDefaultInstanceInstallScript($engine);
-        }
-
-        return self::templatedInstanceInstallScript($engine, $name, $port ?? ServerCacheService::defaultPortFor($engine));
+        return self::legacyDefaultInstanceInstallScript($engine);
     }
 
     /**
-     * Per-instance uninstall step. When `$isLastInstance` is true, the
-     * package itself is `apt purge`d; otherwise only this instance's unit
-     * is disabled and its config file is removed (the package and other
-     * instances stay intact).
+     * Per-instance uninstall step. `$name` and `$isLastInstance` are accepted but ignored — every
+     * row is now the only row of its engine on the server, so uninstall is always a full
+     * `apt purge`.
      */
     public static function uninstallInstanceScript(
         string $engine,
         string $name = ServerCacheService::DEFAULT_INSTANCE_NAME,
         bool $isLastInstance = true,
     ): string {
-        if ($name === ServerCacheService::DEFAULT_INSTANCE_NAME) {
-            return $isLastInstance
-                ? self::legacyDefaultInstanceUninstallScriptWithApt($engine)
-                : self::legacyDefaultInstanceUninstallScriptDisableOnly($engine);
-        }
-
-        return self::templatedInstanceUninstallScript($engine, $name, $isLastInstance);
+        return self::legacyDefaultInstanceUninstallScriptWithApt($engine);
     }
 
     /**
-     * Legacy single-instance install wrapper. Composes package install +
-     * default-instance install so existing call sites (the single-instance
-     * install/switch jobs) keep working without touching the multi-instance
-     * surface.
+     * Legacy single-instance install wrapper. Composes the apt-install step + the systemd
+     * enable + ping verification.
      */
     public static function installScript(string $engine): string
     {
         return self::installPackageScript($engine)
             ."\n"
-            .self::installInstanceScript($engine, ServerCacheService::DEFAULT_INSTANCE_NAME);
+            .self::legacyDefaultInstanceInstallScript($engine);
     }
 
     /**
-     * Full install script for a `ServerCacheService` row, accounting for the
-     * instance's name. For `default`, the result is identical to the legacy
-     * `installScript($engine)` — apt + legacy unit + ping. For named
-     * instances, the script also writes (a) the engine's templated systemd
-     * unit if missing and (b) the instance's per-instance config file +
-     * state directory before enabling and pinging the templated unit.
-     *
-     * One exception inside the default-instance branch: when the row's port differs from the
-     * engine's stock default (because another redis-family service already occupied 6379), we
-     * splice in {@see defaultInstancePortRewriteScript()} between apt-install and systemctl-start.
-     * Without that step the apt-shipped config still binds to the engine default and the daemon
-     * collides on first start → exits 1 → systemd restart-loops until it gives up and the row
-     * shows as "Running" while nothing's actually listening on the assigned port.
+     * Full install script for a `ServerCacheService` row. Used by `InstallCacheServiceJob`.
+     * One row per (server, engine), one engine per family, so the path is always
+     * apt-install + systemctl enable + ping — no per-instance scaffolding to splice in.
      */
     public static function installScriptForRow(ServerCacheService $row): string
     {
-        $parts = [self::installPackageScript($row->engine)];
-
-        if (! $row->isDefaultInstance()) {
-            $parts[] = self::scaffoldTemplateUnitScript($row->engine);
-            $parts[] = self::scaffoldInstanceConfigScript($row->engine, $row->name, $row->port, $row->auth_password);
-            $parts[] = 'systemctl daemon-reload';
-        } elseif ($row->port !== ServerCacheService::defaultPortFor($row->engine)) {
-            $rewrite = self::defaultInstancePortRewriteScript($row->engine, $row->port);
-            if ($rewrite !== '') {
-                $parts[] = $rewrite;
-            }
-        }
-
-        $parts[] = self::installInstanceScript(
-            $row->engine,
-            $row->name,
-            $row->port,
-            $row->auth_password,
-        );
-
-        return implode("\n", $parts);
-    }
-
-    /**
-     * Rewrite the apt-shipped main config so the daemon's `port` directive matches the row's port.
-     * Used only for default-instance rows whose port was bumped off the engine's stock default —
-     * named instances already get their own per-instance config from
-     * {@see scaffoldInstanceConfigScript()}.
-     *
-     * Idempotent (re-running on an already-correct config is a no-op) and safe (only matches an
-     * uncommented `port <n>` line; commented-out `# port` is left alone, and trailing comments
-     * after the number are preserved). Returns an empty string for engines whose stock config
-     * doesn't use Redis-style `port <n>` syntax — for those, default-instance + non-default port
-     * is currently out of scope and the operator should use a named instance instead.
-     */
-    public static function defaultInstancePortRewriteScript(string $engine, int $port): string
-    {
-        $configPath = match ($engine) {
-            'redis' => '/etc/redis/redis.conf',
-            'valkey' => '/etc/valkey/valkey.conf',
-            'keydb' => '/etc/keydb/keydb.conf',
-            // memcached uses -p <port> flags in /etc/memcached.conf; dragonfly's apt-style config
-            // is rare and tends to live alongside CLI flags in the unit. Neither sees the
-            // multi-instance default-off-default scenario in practice today.
-            default => null,
-        };
-        if ($configPath === null) {
-            return '';
-        }
-
-        // Numeric port → safe to interpolate without escapeshellarg.
-        return <<<BASH
-config_file={$configPath}
-if [ ! -f "\$config_file" ]; then
-    echo "ERROR: \$config_file missing — apt install did not complete." >&2
-    exit 1
-fi
-# Match an uncommented `port <n>` line (leading whitespace OK; commented `# port ...` ignored).
-# Preserve any trailing comment after the number — operators sometimes annotate the line.
-if grep -qE '^[[:space:]]*port[[:space:]]+[0-9]+' "\$config_file"; then
-    sed -i -E 's/^([[:space:]]*)port[[:space:]]+[0-9]+/\\1port {$port}/' "\$config_file"
-else
-    {
-        echo ""
-        echo "# Added by dply — default-instance assigned to non-default port."
-        echo "port {$port}"
-    } >> "\$config_file"
-fi
-BASH;
-    }
-
-    /**
-     * Bash that writes the engine's templated systemd unit
-     * (`/etc/systemd/system/<engine>-server@.service`) only if it doesn't
-     * already exist. Idempotent — re-running on a server that already has
-     * the template is a no-op.
-     */
-    public static function scaffoldTemplateUnitScript(string $engine): string
-    {
-        $unitPath = '/etc/systemd/system/'.self::systemdServiceFor($engine).'@.service';
-        $content = self::templateUnitContent($engine);
-
-        // heredoc-quoted so PHP-side interpolation doesn't alter the shell-side delimiter
-        return <<<BASH
-if [ ! -f {$unitPath} ]; then
-    cat > {$unitPath} <<'DPLY_UNIT_EOF'
-{$content}
-DPLY_UNIT_EOF
-    chmod 0644 {$unitPath}
-fi
-BASH;
-    }
-
-    /**
-     * Bash that writes a per-instance config file and ensures the state
-     * directory exists. Engine-specific (Redis, Valkey, KeyDB, Dragonfly all
-     * have different config syntax conventions, but share the same shape).
-     */
-    public static function scaffoldInstanceConfigScript(string $engine, string $name, int $port, ?string $authPassword): string
-    {
-        $configPath = self::instanceConfigPath($engine, $name);
-        $content = self::instanceConfigContent($engine, $name, $port, $authPassword);
-        $stateDir = self::instanceStateDir($engine, $name);
-        $owner = self::engineSystemUser($engine);
-
-        return <<<BASH
-mkdir -p {$stateDir}
-chown -R {$owner}:{$owner} {$stateDir}
-mkdir -p $(dirname {$configPath})
-cat > {$configPath} <<'DPLY_CONFIG_EOF'
-{$content}
-DPLY_CONFIG_EOF
-chown {$owner}:{$owner} {$configPath}
-chmod 0640 {$configPath}
-BASH;
-    }
-
-    /**
-     * Per-engine state directory for non-default instances. The path is also
-     * referenced inside the per-instance config (`dir`/`dbfilename` for
-     * Redis-family) so dply must keep these two consistent.
-     */
-    public static function instanceStateDir(string $engine, string $name): string
-    {
-        if ($name === ServerCacheService::DEFAULT_INSTANCE_NAME) {
-            // The legacy single-instance install uses the apt package's default
-            // state dir; we don't try to relocate it.
-            return match ($engine) {
-                'redis' => '/var/lib/redis',
-                'valkey' => '/var/lib/valkey',
-                'keydb' => '/var/lib/keydb',
-                'dragonfly' => '/var/lib/dragonfly',
-                'memcached' => '/var/lib/memcached',
-                default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
-            };
-        }
-
-        return match ($engine) {
-            'redis' => "/var/lib/redis/{$name}",
-            'valkey' => "/var/lib/valkey/{$name}",
-            'keydb' => "/var/lib/keydb/{$name}",
-            'dragonfly' => "/var/lib/dragonfly/{$name}",
-            'memcached' => throw new \InvalidArgumentException('Memcached multi-instance is not supported.'),
-            default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
-        };
-    }
-
-    /**
-     * UNIX user the engine's systemd unit runs as. The package install
-     * creates this user, so for the templated unit we just reuse it for the
-     * non-default instance's process and file ownership.
-     */
-    public static function engineSystemUser(string $engine): string
-    {
-        return match ($engine) {
-            'redis' => 'redis',
-            'valkey' => 'valkey',
-            'keydb' => 'keydb',
-            'dragonfly' => 'dragonfly',
-            'memcached' => 'memcache',
-            default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
-        };
-    }
-
-    /**
-     * Templated systemd unit content for an engine. Written once per server
-     * (idempotent) at `/etc/systemd/system/<engine>-server@.service` when the
-     * first non-default instance is installed.
-     */
-    public static function templateUnitContent(string $engine): string
-    {
-        return match ($engine) {
-            'redis' => <<<'UNIT'
-[Unit]
-Description=Redis instance %i (dply-managed)
-After=network.target
-
-[Service]
-Type=notify
-ExecStart=/usr/bin/redis-server /etc/redis/redis-%i.conf --supervised systemd
-TimeoutStopSec=20
-Restart=on-failure
-User=redis
-Group=redis
-RuntimeDirectory=redis
-RuntimeDirectoryMode=2755
-
-[Install]
-WantedBy=multi-user.target
-UNIT,
-            'valkey' => <<<'UNIT'
-[Unit]
-Description=Valkey instance %i (dply-managed)
-After=network.target
-
-[Service]
-Type=notify
-ExecStart=/usr/bin/valkey-server /etc/valkey/valkey-%i.conf --supervised systemd
-TimeoutStopSec=20
-Restart=on-failure
-User=valkey
-Group=valkey
-RuntimeDirectory=valkey
-RuntimeDirectoryMode=2755
-
-[Install]
-WantedBy=multi-user.target
-UNIT,
-            'keydb' => <<<'UNIT'
-[Unit]
-Description=KeyDB instance %i (dply-managed)
-After=network.target
-
-[Service]
-Type=notify
-ExecStart=/usr/bin/keydb-server /etc/keydb/keydb-%i.conf --supervised systemd
-TimeoutStopSec=20
-Restart=on-failure
-User=keydb
-Group=keydb
-RuntimeDirectory=keydb
-RuntimeDirectoryMode=2755
-
-[Install]
-WantedBy=multi-user.target
-UNIT,
-            'dragonfly' => <<<'UNIT'
-[Unit]
-Description=Dragonfly instance %i (dply-managed)
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/dragonfly --conf=/etc/dragonfly/dragonfly-%i.conf
-TimeoutStopSec=20
-Restart=on-failure
-User=dragonfly
-Group=dragonfly
-
-[Install]
-WantedBy=multi-user.target
-UNIT,
-            default => throw new \InvalidArgumentException("Unsupported cache engine for template unit: {$engine}"),
-        };
-    }
-
-    /**
-     * Per-instance config file content. Minimum-viable: enough to start the
-     * engine, bind to loopback only, write data into the per-instance state
-     * dir, and (optionally) require AUTH. Operators can edit this through the
-     * existing config viewer once the instance is running.
-     */
-    public static function instanceConfigContent(string $engine, string $name, int $port, ?string $authPassword): string
-    {
-        $stateDir = self::instanceStateDir($engine, $name);
-        $auth = $authPassword !== null && $authPassword !== ''
-            ? 'requirepass '.$authPassword."\n"
-            : '';
-
-        return match ($engine) {
-            'redis', 'valkey', 'keydb' => <<<CONF
-# dply-managed instance config for {$name}
-port {$port}
-bind 127.0.0.1 -::1
-protected-mode yes
-dir {$stateDir}
-dbfilename {$name}.rdb
-appendfilename "{$name}.aof"
-appendonly no
-pidfile /var/run/{$engine}/{$engine}-{$name}.pid
-logfile ""
-loglevel notice
-{$auth}
-CONF,
-            'dragonfly' => <<<CONF
-# dply-managed instance config for {$name}
---port={$port}
---bind=127.0.0.1
---dir={$stateDir}
---dbfilename={$name}
-{$auth}
-CONF,
-            default => throw new \InvalidArgumentException("Unsupported cache engine for instance config: {$engine}"),
-        };
+        return self::installPackageScript($row->engine)
+            ."\n"
+            .self::legacyDefaultInstanceInstallScript($row->engine);
     }
 
     /**
@@ -607,42 +292,25 @@ CONF,
      */
     public static function uninstallScript(string $engine): string
     {
-        return self::uninstallInstanceScript($engine, ServerCacheService::DEFAULT_INSTANCE_NAME, isLastInstance: true);
+        return self::legacyDefaultInstanceUninstallScriptWithApt($engine);
     }
 
     /**
-     * Path to the engine's main config file for a given instance. The
-     * `default` name routes to the legacy path the apt package writes; named
-     * instances route to a templated path under the engine's config dir.
+     * Path to the engine's main config file. The `$name` argument is accepted for legacy
+     * call-site compatibility but is ignored — every row uses the apt-shipped default config.
      */
     public static function instanceConfigPath(string $engine, string $name = ServerCacheService::DEFAULT_INSTANCE_NAME): string
     {
-        if ($name === ServerCacheService::DEFAULT_INSTANCE_NAME) {
-            return self::configFilePathFor($engine);
-        }
-
-        return match ($engine) {
-            'redis' => "/etc/redis/redis-{$name}.conf",
-            'valkey' => "/etc/valkey/valkey-{$name}.conf",
-            'memcached' => "/etc/memcached.conf.d/{$name}.conf",
-            'keydb' => "/etc/keydb/keydb-{$name}.conf",
-            'dragonfly' => "/etc/dragonfly/dragonfly-{$name}.conf",
-            default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
-        };
+        return self::configFilePathFor($engine);
     }
 
     /**
-     * Systemd service unit for a given instance. The `default` name routes
-     * to the legacy unit (e.g. `redis-server.service`); named instances
-     * route to the templated form (`redis-server@<name>.service`).
+     * Systemd service unit for a given instance. Like `instanceConfigPath`, `$name` is ignored;
+     * every row maps to the engine's legacy unit (e.g. `redis-server.service`).
      */
     public static function instanceServiceUnit(string $engine, string $name = ServerCacheService::DEFAULT_INSTANCE_NAME): string
     {
-        if ($name === ServerCacheService::DEFAULT_INSTANCE_NAME) {
-            return self::systemdServiceFor($engine);
-        }
-
-        return self::systemdServiceFor($engine)."@{$name}";
+        return self::systemdServiceFor($engine);
     }
 
     /**
@@ -699,10 +367,8 @@ CONF,
     }
 
     /**
-     * Legacy single-instance systemd unit name. Equivalent to
-     * `instanceServiceUnit($engine, 'default')`; kept as a separate
-     * top-level method because callers that don't (yet) carry an instance
-     * name (the AUTH/memory/config writers) read this.
+     * Legacy single-instance systemd unit name. Read by the AUTH / memory / config writers and
+     * by `instanceServiceUnit`.
      */
     public static function systemdServiceFor(string $engine): string
     {
@@ -717,11 +383,8 @@ CONF,
     }
 
     /**
-     * Path to the engine's main config file for the legacy (single-instance)
-     * install. Equivalent to `instanceConfigPath($engine, 'default')`; kept
-     * separate so the AUTH/memory/config writers (which today operate on a
-     * single ServerCacheService row without an instance dimension) can read
-     * it directly.
+     * Path to the engine's main config file. Read by the AUTH / memory / config writers and by
+     * `instanceConfigPath`.
      */
     public static function configFilePathFor(string $engine): string
     {
@@ -797,61 +460,5 @@ apt-get autoremove -y
 BASH,
             default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
         };
-    }
-
-    /**
-     * Disable + stop the legacy unit but leave the package installed because
-     * other instances of the same engine are still running on this server.
-     * Without this branch, uninstalling `default` would `apt purge` the
-     * binary out from under the other instances.
-     */
-    private static function legacyDefaultInstanceUninstallScriptDisableOnly(string $engine): string
-    {
-        $unit = self::systemdServiceFor($engine);
-
-        return <<<BASH
-systemctl disable --now {$unit} || true
-BASH;
-    }
-
-    /**
-     * Install a non-default instance via the templated systemd unit. The
-     * template unit + per-instance config file must already exist on the
-     * box — Phase 3's add-instance flow is where they get dropped.
-     */
-    private static function templatedInstanceInstallScript(string $engine, string $name, int $port): string
-    {
-        $unit = self::systemdServiceFor($engine)."@{$name}";
-
-        return match ($engine) {
-            'redis' => 'systemctl enable --now '.escapeshellarg($unit)."\nredis-cli -p {$port} ping",
-            'valkey' => 'systemctl enable --now '.escapeshellarg($unit)."\n(valkey-cli -p {$port} ping || redis-cli -p {$port} ping) 2>/dev/null",
-            'keydb' => 'systemctl enable --now '.escapeshellarg($unit)."\n(keydb-cli -p {$port} ping || redis-cli -p {$port} ping) 2>/dev/null",
-            'dragonfly' => 'systemctl enable --now '.escapeshellarg($unit)."\nredis-cli -p {$port} ping",
-            // Memcached multi-instance is out of scope for v1 of multi-port; reject loudly.
-            'memcached' => throw new \InvalidArgumentException('Memcached multi-instance is not supported. Use the default instance only.'),
-            default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
-        };
-    }
-
-    private static function templatedInstanceUninstallScript(string $engine, string $name, bool $isLastInstance): string
-    {
-        $unit = self::systemdServiceFor($engine)."@{$name}";
-        $configPath = self::instanceConfigPath($engine, $name);
-
-        $head = <<<BASH
-systemctl disable --now {$unit} || true
-rm -f {$configPath} || true
-BASH;
-
-        if (! $isLastInstance) {
-            // Keep the package; another instance still uses it.
-            return $head;
-        }
-
-        // Last instance of this engine — also purge the package. We delegate
-        // to the legacy script since the package-removal commands are the
-        // same regardless of which instances existed.
-        return $head."\n".self::legacyDefaultInstanceUninstallScriptWithApt($engine);
     }
 }

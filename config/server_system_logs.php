@@ -81,6 +81,8 @@ return [
         'caddy.service',
         'traefik',
         'traefik.service',
+        'haproxy',
+        'haproxy.service',
         'mysql',
         'mysql.service',
         'mariadb',
@@ -172,6 +174,20 @@ return [
             'label' => 'Journal: traefik',
             'unit' => 'traefik.service',
             'group' => 'traefik',
+        ],
+
+        'haproxy_log' => [
+            'type' => 'file',
+            'label' => 'HAProxy log',
+            'path' => '/var/log/haproxy.log',
+            'group' => 'haproxy',
+        ],
+
+        'journal_haproxy' => [
+            'type' => 'journal',
+            'label' => 'Journal: haproxy',
+            'unit' => 'haproxy.service',
+            'group' => 'haproxy',
         ],
 
         'journal_php_fpm' => [

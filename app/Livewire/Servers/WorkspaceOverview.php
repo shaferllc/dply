@@ -122,6 +122,36 @@ class WorkspaceOverview extends Component
                 : null,
         ];
 
+        // Background tile: surface active worker + schedule + backup health on the high-traffic
+        // Overview page so operators see drift (failed backups, paused schedules, stopped workers)
+        // without having to drill into the Background subpages individually.
+        $weekAgo = now()->subDays(7);
+        $backgroundSummary = [
+            'active_workers' => \App\Models\SupervisorProgram::query()
+                ->where('server_id', $this->server->id)
+                ->whereIn('program_type', \App\Livewire\Servers\WorkspaceQueueWorkers::QUEUE_TYPES)
+                ->where('is_active', true)
+                ->count(),
+            'active_schedules' => \App\Models\ServerBackupSchedule::query()
+                ->where('server_id', $this->server->id)
+                ->where('is_active', true)
+                ->count(),
+            'paused_schedules' => \App\Models\ServerBackupSchedule::query()
+                ->where('server_id', $this->server->id)
+                ->where('is_active', false)
+                ->count(),
+            'failed_backups_7d' => (int) \App\Models\ServerDatabaseBackup::query()
+                ->whereIn('server_database_id', $this->server->serverDatabases()->pluck('id'))
+                ->where('status', 'failed')
+                ->where('created_at', '>=', $weekAgo)
+                ->count()
+                + (int) \App\Models\SiteFileBackup::query()
+                    ->whereIn('site_id', $this->server->sites()->pluck('id'))
+                    ->where('status', 'failed')
+                    ->where('created_at', '>=', $weekAgo)
+                    ->count(),
+        ];
+
         return view('livewire.servers.workspace-overview', [
             'siteCount' => $sites->count(),
             'deployingCount' => $deployingCount,
@@ -136,6 +166,7 @@ class WorkspaceOverview extends Component
             'openInsightsCount' => $openInsightsCount,
             'criticalInsightsCount' => $criticalInsightsCount,
             'notificationSummary' => $notificationSummary,
+            'backgroundSummary' => $backgroundSummary,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

@@ -223,3 +223,122 @@ window.addEventListener('dply:region-map-open', () => {
         window.dispatchEvent(new Event('resize'));
     }, 50);
 });
+
+// ============================================================================
+// Global "button busy" feedback for any element with `wire:click`.
+//
+// Why this exists: a Livewire round-trip is fast but not instant, and a typical
+// dply action button (Test Caddy, Restart NGINX, Save config, …) shows no
+// visual change between click and the network response. Operators end up
+// clicking twice because they're unsure the first click registered.
+//
+// What it does: on click, mark the target element as busy (disabled + CSS
+// hook), then clear that state on the next Livewire commit. Buttons that don't
+// trigger a round-trip (e.g. Alpine-only `$dispatch('open-modal', …)`) are
+// ignored because they don't have `wire:click`; the spinner only renders for
+// elements that actually talk to the server.
+//
+// A safety timeout clears the busy class after 8 s so a misconfigured handler
+// that never commits doesn't leave a button stuck.
+// ============================================================================
+
+const DPLY_BUTTON_BUSY_CLASS = 'dply-btn-busy';
+const DPLY_BUTTON_BUSY_TIMEOUT_MS = 8000;
+
+function dplyClearBusyButtons() {
+    document
+        .querySelectorAll(`[data-dply-busy="1"]`)
+        .forEach((el) => {
+            el.classList.remove(DPLY_BUTTON_BUSY_CLASS);
+            el.removeAttribute('data-dply-busy');
+            el.style.removeProperty('--dply-btn-spinner-color');
+            // Only remove disabled if WE set it (data-dply-busy-set-disabled
+            // marker) so we don't trample an explicitly disabled button.
+            if (el.dataset.dplyBusySetDisabled === '1') {
+                el.removeAttribute('disabled');
+                delete el.dataset.dplyBusySetDisabled;
+            }
+        });
+}
+
+document.addEventListener(
+    'click',
+    (event) => {
+        // Walk up from the click target until we hit something with a
+        // wire:click* attribute (Livewire 3 uses the bare attribute name).
+        let el = event.target;
+        let trigger = null;
+        while (el && el !== document.body) {
+            if (el.nodeType === 1) {
+                for (const attr of el.attributes) {
+                    if (attr.name === 'wire:click' || attr.name.startsWith('wire:click.')) {
+                        trigger = el;
+                        break;
+                    }
+                }
+                if (trigger) break;
+            }
+            el = el.parentElement;
+        }
+        if (! trigger) return;
+        // Opt-out: callers can set data-skip-busy to disable the affordance
+        // (e.g. tabs that re-render the page on click — a stuck-looking
+        // button is worse than no spinner).
+        if (trigger.dataset.skipBusy === '1' || trigger.dataset.skipBusy === 'true') return;
+        if (trigger.dataset.dplyBusy === '1') return; // already busy
+        if (trigger.disabled || trigger.getAttribute('aria-disabled') === 'true') return;
+
+        // Capture the button's current text colour BEFORE we apply the busy
+        // class (which sets color: transparent). The CSS spinner reads this
+        // variable so a rose-tinted destructive button gets a rose spinner,
+        // an emerald primary gets an emerald spinner, etc. Falls back to a
+        // neutral ink if computed-style is unavailable.
+        try {
+            const computed = window.getComputedStyle(trigger).color;
+            if (computed && computed !== 'rgba(0, 0, 0, 0)' && computed !== 'transparent') {
+                trigger.style.setProperty('--dply-btn-spinner-color', computed);
+            }
+        } catch (_) { /* getComputedStyle can throw in detached trees — ignore */ }
+
+        trigger.classList.add(DPLY_BUTTON_BUSY_CLASS);
+        trigger.dataset.dplyBusy = '1';
+        if (! trigger.hasAttribute('disabled')) {
+            trigger.setAttribute('disabled', 'disabled');
+            trigger.dataset.dplyBusySetDisabled = '1';
+        }
+
+        // Safety: if no commit ever fires, clear after a hard timeout.
+        window.setTimeout(() => {
+            if (trigger.dataset.dplyBusy === '1') {
+                trigger.classList.remove(DPLY_BUTTON_BUSY_CLASS);
+                delete trigger.dataset.dplyBusy;
+                trigger.style.removeProperty('--dply-btn-spinner-color');
+                if (trigger.dataset.dplyBusySetDisabled === '1') {
+                    trigger.removeAttribute('disabled');
+                    delete trigger.dataset.dplyBusySetDisabled;
+                }
+            }
+        }, DPLY_BUTTON_BUSY_TIMEOUT_MS);
+    },
+    true, // capture phase: run before Livewire's own click handler kicks in
+);
+
+document.addEventListener('livewire:init', () => {
+    if (! window.Livewire || typeof window.Livewire.hook !== 'function') return;
+
+    // Clear busy state after every successful or failed commit. Multiple
+    // commits in one round-trip just trigger this hook multiple times — the
+    // selector finds nothing on subsequent calls, which is a no-op.
+    window.Livewire.hook('commit', ({ succeed, fail }) => {
+        if (typeof succeed === 'function') {
+            succeed(() => dplyClearBusyButtons());
+        }
+        if (typeof fail === 'function') {
+            fail(() => dplyClearBusyButtons());
+        }
+    });
+});
+
+// Navigations (wire:navigate links + redirects) replace the page DOM; any
+// busy state from before the nav is now meaningless.
+document.addEventListener('livewire:navigated', dplyClearBusyButtons);

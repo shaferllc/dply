@@ -61,20 +61,12 @@ class WorkspaceCaches extends Component
     public const ENGINE_SUBTABS = ['overview', 'info', 'console', 'stats', 'configure'];
 
     /**
-     * Active instance name within the current per-engine tab. URL-bound so
-     * deep links work. Defaults to `default` so existing single-instance
-     * servers (and any first-time install) continue to operate on the
-     * legacy single-instance row without code changes elsewhere.
+     * Active instance name within the current per-engine tab. Historically URL-bound so deep
+     * links to a named instance worked; with multi-instance retired (one row per engine, name
+     * always `'default'`) this stays as a const-shaped property so legacy reads
+     * (`$row->name === $this->active_instance`) keep working without rewriting every call site.
      */
-    #[Url(as: 'instance', except: ServerCacheService::DEFAULT_INSTANCE_NAME, history: true)]
     public string $active_instance = ServerCacheService::DEFAULT_INSTANCE_NAME;
-
-    /** Show/hide the "Add another instance" inline form. */
-    public bool $showAddInstanceForm = false;
-
-    public string $newInstanceName = '';
-
-    public ?int $newInstancePort = null;
 
     /**
      * Lazy-loaded snapshot of the engine's main config file. Set by `loadCacheConfig()`,
@@ -235,88 +227,9 @@ class WorkspaceCaches extends Component
         // carrying redis config to the keydb tab would be confusing at best.
         if ($next !== $this->workspace_tab) {
             $this->resetPerEngineUiState();
-            // Switching engines means the previously-selected instance name
-            // probably doesn't exist on the new engine. Reset to `default` so
-            // the per-engine actions land on the legacy single-instance row.
-            $this->active_instance = ServerCacheService::DEFAULT_INSTANCE_NAME;
-            $this->showAddInstanceForm = false;
         }
 
         $this->workspace_tab = $next;
-    }
-
-    /**
-     * Switch the active instance within the current engine tab. Resets the
-     * lazy-loaded per-instance UI buffers (config viewer / clients list / REPL
-     * history / keyspace samples) so they don't carry state from the previous
-     * instance into the next one.
-     *
-     * Validates against the actual instances on the server — passing a name
-     * that doesn't exist on this server falls back to `default` to keep the
-     * URL well-formed.
-     */
-    public function setActiveInstance(string $name): void
-    {
-        $this->authorize('update', $this->server);
-
-        $engine = $this->currentEngineTab();
-        if ($engine === null) {
-            return;
-        }
-
-        $exists = ServerCacheService::query()
-            ->where('server_id', $this->server->id)
-            ->where('engine', $engine)
-            ->where('name', $name)
-            ->exists();
-
-        $this->active_instance = $exists ? $name : ServerCacheService::DEFAULT_INSTANCE_NAME;
-
-        $this->resetPerEngineUiState();
-    }
-
-    public function openAddInstanceForm(): void
-    {
-        $this->authorize('update', $this->server);
-
-        $engine = $this->currentEngineTab();
-        if ($engine === null || ! ServerCacheService::engineSupportsAuth($engine)) {
-            return;
-        }
-
-        $this->newInstanceName = '';
-        $this->newInstancePort = ServerCacheService::nextFreePortFor($this->server->id, $engine);
-        $this->showAddInstanceForm = true;
-    }
-
-    public function closeAddInstanceForm(): void
-    {
-        $this->showAddInstanceForm = false;
-        $this->newInstanceName = '';
-        $this->newInstancePort = null;
-    }
-
-    public function submitAddInstanceForm(): void
-    {
-        $engine = $this->currentEngineTab();
-        if ($engine === null) {
-            return;
-        }
-
-        $this->addInstance($engine, trim($this->newInstanceName), (int) ($this->newInstancePort ?? 0));
-
-        // Only collapse the form if the call actually succeeded — toasts on
-        // failure leave the form open so the operator can fix and retry.
-        $exists = ServerCacheService::query()
-            ->where('server_id', $this->server->id)
-            ->where('engine', $engine)
-            ->where('name', trim($this->newInstanceName))
-            ->exists();
-
-        if ($exists) {
-            $this->active_instance = trim($this->newInstanceName);
-            $this->closeAddInstanceForm();
-        }
     }
 
     public function setEngineSubtab(string $subtab): void
@@ -548,121 +461,6 @@ BASH,
     }
 
     /**
-     * One-shot repair for default-instance rows whose apt-shipped config still binds to the
-     * engine's stock default port even though dply assigned a different one. Earlier installs of
-     * a default instance forced off its engine default (e.g. Redis on 6381 because Valkey was
-     * already on 6379) skipped the config-rewrite step, so the daemon collides on first start and
-     * systemd restart-loops until it gives up. The forward-fix is in
-     * {@see CacheServiceInstallScripts::installScriptForRow()}; this action is for boxes that
-     * already have a broken row from before the fix was deployed.
-     *
-     * Refuses for engines where the rewrite helper returns empty (memcached / dragonfly),
-     * non-default-instance rows (they already get a per-instance config), and rows whose port
-     * already matches the engine default (nothing to fix).
-     */
-    public function repairDefaultInstancePort(
-        string $engine,
-        ExecuteRemoteTaskOnServer $executor,
-        CacheServiceAuditLogger $audit,
-        ServerCacheServiceHostCapabilities $capabilities,
-    ): void {
-        $this->authorize('update', $this->server);
-        if (! $this->validateEngine($engine)) {
-            return;
-        }
-        if ($this->rejectIfCacheBusy()) {
-            return;
-        }
-
-        $row = $this->cacheServiceFor($engine);
-        if (! $row) {
-            $this->toastError(__('No :engine instance to repair.', ['engine' => $engine]));
-
-            return;
-        }
-        if (! $row->isDefaultInstance()) {
-            $this->toastError(__('Repair only applies to the default instance — named instances already have a per-instance config.'));
-
-            return;
-        }
-        if ($row->port === ServerCacheService::defaultPortFor($row->engine)) {
-            $this->toastError(__(':engine is already on its default port — nothing to repair.', ['engine' => $row->engine]));
-
-            return;
-        }
-
-        $rewrite = CacheServiceInstallScripts::defaultInstancePortRewriteScript($row->engine, (int) $row->port);
-        if ($rewrite === '') {
-            $this->toastError(__(':engine doesn\'t use a Redis-style port directive — uninstall and re-create as a named instance instead.', ['engine' => $row->engine]));
-
-            return;
-        }
-
-        if (! $this->serverOpsReady()) {
-            $this->toastError(__('SSH must be ready before running the repair.'));
-
-            return;
-        }
-
-        $unit = CacheServiceInstallScripts::instanceServiceUnit($row->engine, $row->name);
-        $unitShell = escapeshellarg($unit);
-        // Wrap the rewrite + restart + post-restart status check in echo'd section headers so
-        // the operator can read the output panel like a log and see exactly which step
-        // succeeded or failed. The trailing `systemctl status` runs with `|| true` so a still-
-        // failing daemon doesn't abort the script — its output is what the operator needs to
-        // see most. Rewrite is idempotent so re-running is safe.
-        $script = <<<BASH
-echo "═══ Rewrite config to port {$row->port} ═══"
-{$rewrite}
-echo
-echo "═══ systemctl restart {$unit} ═══"
-systemctl restart {$unitShell}
-echo
-echo "═══ systemctl status (post-restart) ═══"
-systemctl status --no-pager --lines=15 {$unitShell} 2>&1 || true
-BASH;
-
-        $buffer = '';
-        try {
-            $output = $executor->runInlineBash(
-                $row->server,
-                'cache-service:repair-port:'.$row->engine.':'.$row->name,
-                $script,
-                timeoutSeconds: 120,
-                asRoot: true,
-            );
-            $buffer = $output->buffer;
-
-            if ($output->exitCode !== 0) {
-                $this->recordCommandOutput($engine, __('Repair port'), $buffer);
-                $this->toastError(__('Repair failed — see the console panel below for the full output.'));
-
-                return;
-            }
-
-            $capabilities->forget($row->server);
-            $audit->record(
-                $row->server,
-                ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
-                [
-                    'engine' => $row->engine,
-                    'name' => $row->name,
-                    'port' => $row->port,
-                    'reason' => 'config_repair',
-                ],
-                auth()->user(),
-            );
-
-            $this->recordCommandOutput($engine, __('Repair port'), $buffer);
-            $this->toastSuccess(__('Repair done — see the console panel below for the rewrite + restart output.'));
-        } catch (\Throwable $e) {
-            // Capture whatever ran before the exception so the operator can see the partial state.
-            $this->recordCommandOutput($engine, __('Repair port'), $buffer !== '' ? $buffer : $e->getMessage());
-            $this->toastError(__('Repair failed — see the console panel below.'));
-        }
-    }
-
-    /**
      * Open the per-instance Status/Logs modal on its `systemctl status` view.
      * The modal scope is the engine + currently-active instance: `cacheServiceFor()`
      * already filters by `$active_instance`, so operators switch instances via
@@ -816,10 +614,8 @@ BASH;
             return;
         }
 
-        // Server-side mirror of the UI gate. The Install button is also visually disabled when
-        // this returns non-null, but a stale Livewire payload (or a manually-replayed action)
-        // would otherwise queue a job that's guaranteed to fail at apt time — surface the same
-        // reason here so the operator never sees a doomed install in flight.
+        // Distro gate — surface the same message the Install button's UI gate uses so a stale
+        // payload can't slip past and queue a job that's guaranteed to fail at apt time.
         $reason = $capabilities->engineUnsupportedReason($this->server, $engine);
         if ($reason !== null) {
             $this->toastError($reason);
@@ -829,30 +625,32 @@ BASH;
 
         $existing = $this->cacheServiceFor($engine);
 
-        // For first-time installs, walk up from the engine's default port until
-        // we find one free on this server. `unique(server_id, port)` means two
-        // services can never share a port; without this autopicking the second
-        // redis-family install (Valkey on top of Redis) would crash at the DB
-        // layer with an ugly unique-violation.
-        $port = ServerCacheService::defaultPortFor($engine);
+        // Coexistence rule: at most one row per family (redis-family + memcached). Reject before
+        // creating a new row when a sibling already occupies this family's slot. The operator's
+        // path forward is Uninstall on the existing one, or the engine-switch flow for in-family
+        // moves (Redis → Valkey etc.).
         if ($existing === null) {
-            $port = ServerCacheService::nextFreePortFor($this->server->id, $engine);
+            $sameFamily = ServerCacheService::query()
+                ->where('server_id', $this->server->id)
+                ->whereIn('engine', $this->engineFamilyEngines($engine))
+                ->first();
+            if ($sameFamily !== null) {
+                $this->toastError(__(
+                    'This server already has :existing installed. Uninstall it first, or use Switch to move within the redis family.',
+                    ['existing' => $sameFamily->engine],
+                ));
+
+                return;
+            }
         }
 
         $row = $existing ?? ServerCacheService::query()->create([
             'server_id' => $this->server->id,
             'engine' => $engine,
+            'name' => ServerCacheService::DEFAULT_INSTANCE_NAME,
             'status' => ServerCacheService::STATUS_PENDING,
-            'port' => $port,
+            'port' => ServerCacheService::defaultPortFor($engine),
         ]);
-
-        $portMessage = '';
-        if ($existing === null && $port !== ServerCacheService::defaultPortFor($engine)) {
-            $portMessage = ' '.__('Default port :default is in use; this instance will run on :port instead.', [
-                'default' => ServerCacheService::defaultPortFor($engine),
-                'port' => $port,
-            ]);
-        }
 
         // Re-run install on an existing row only when it's in failed/stopped — otherwise the row
         // is already installing or running and we'd just queue redundant work.
@@ -873,118 +671,22 @@ BASH;
 
         InstallCacheServiceJob::dispatch($row->id);
         $this->forgetStats($row);
-        $this->toastSuccess(__('Installing :engine — refresh in a moment to see status.', ['engine' => $engine]).$portMessage);
+        $this->toastSuccess(__('Installing :engine — refresh in a moment to see status.', ['engine' => $engine]));
         $this->workspace_tab = $engine;
     }
 
     /**
-     * Queue an install for an additional instance of the given engine. The
-     * default instance (legacy single-instance) is created via
-     * `installCacheService`; this method is for second/third/Nth instances on
-     * different ports. Memcached is rejected because its multi-instance
-     * setup is out of scope for v1.
+     * Which engines belong to the same family as `$engine` for the coexistence rule. Mirrors
+     * {@see ServerCacheService::familyOf()} — kept here as a small helper so the install action
+     * doesn't have to import the family constants directly.
      *
-     * @param  string  $engine  Engine slug
-     * @param  string  $name  Operator-supplied instance name
-     *                        ([a-z0-9][a-z0-9-]{0,31}); 'default' is reserved
-     * @param  int  $port  TCP port for the new instance
+     * @return list<string>
      */
-    public function addInstance(string $engine, string $name, int $port, ServerCacheServiceHostCapabilities $capabilities): void
+    private function engineFamilyEngines(string $engine): array
     {
-        $this->authorize('update', $this->server);
-
-        if (! $this->validateEngine($engine)) {
-            return;
-        }
-
-        if (! ServerCacheService::engineSupportsAuth($engine)) {
-            $this->toastError(__('Memcached multi-instance is not supported. Use the default instance only.'));
-
-            return;
-        }
-
-        // Same distro gate as installCacheService — adding a second instance of an engine that
-        // can't run on this distro is doomed identically. Surface the reason here too.
-        $reason = $capabilities->engineUnsupportedReason($this->server, $engine);
-        if ($reason !== null) {
-            $this->toastError($reason);
-
-            return;
-        }
-
-        if ($name === ServerCacheService::DEFAULT_INSTANCE_NAME) {
-            $this->toastError(__("'default' is reserved — pick a different name (e.g. sessions, queue, cache)."));
-
-            return;
-        }
-
-        if (! ServerCacheService::isValidInstanceName($name)) {
-            $this->toastError(__('Instance name must be lowercase letters/digits/hyphens, starting with a letter or digit, max 32 chars.'));
-
-            return;
-        }
-
-        if ($port < 1 || $port > 65535) {
-            $this->toastError(__('Port must be between 1 and 65535.'));
-
-            return;
-        }
-
-        // Reject reserved port ranges that the OS or other dply features need —
-        // operators almost never want to bind a cache to e.g. 22 (SSH), 80
-        // (HTTP), or the well-known DB ports.
-        if (in_array($port, [22, 25, 80, 443, 3306, 5432, 6443, 8080, 11211], true)) {
-            $this->toastError(__('Port :port is reserved for another service. Pick a different port (e.g. :suggested).', [
-                'port' => $port,
-                'suggested' => $port === 11211 ? 11212 : ServerCacheService::defaultPortFor($engine) + 1,
-            ]));
-
-            return;
-        }
-
-        if ($this->rejectIfCacheBusy()) {
-            return;
-        }
-
-        // Per-server uniqueness on (server_id, port) and (server_id, engine, name)
-        // is enforced at the DB layer, but a friendly toast beats a 500 page
-        // when the operator picks a name or port that already exists.
-        $portTaken = ServerCacheService::query()
-            ->where('server_id', $this->server->id)
-            ->where('port', $port)
-            ->exists();
-        if ($portTaken) {
-            $this->toastError(__('Port :port is already used by another cache service on this server.', ['port' => $port]));
-
-            return;
-        }
-
-        $nameTaken = ServerCacheService::query()
-            ->where('server_id', $this->server->id)
-            ->where('engine', $engine)
-            ->where('name', $name)
-            ->exists();
-        if ($nameTaken) {
-            $this->toastError(__("An :engine instance named ':name' already exists on this server.", ['engine' => $engine, 'name' => $name]));
-
-            return;
-        }
-
-        $row = ServerCacheService::query()->create([
-            'server_id' => $this->server->id,
-            'engine' => $engine,
-            'name' => $name,
-            'status' => ServerCacheService::STATUS_PENDING,
-            'port' => $port,
-        ]);
-
-        InstallCacheServiceJob::dispatch($row->id);
-        $this->toastSuccess(__('Installing :engine instance ":name" on :port — refresh in a moment to see status.', [
-            'engine' => $engine,
-            'name' => $name,
-            'port' => $port,
-        ]));
-        $this->workspace_tab = $engine;
+        return ServerCacheService::familyOf($engine) === ServerCacheService::FAMILY_REDIS
+            ? ServerCacheService::FAMILY_REDIS_ENGINES
+            : ['memcached'];
     }
 
     /**
@@ -2677,23 +2379,10 @@ BASH;
             }
         }
 
-        // Group instances under (engine, name) so the per-engine panel can find the
-        // row for the currently-active instance and the chip row can iterate over
-        // all installed instances of an engine. The legacy `cacheServicesByEngine`
-        // keyed map is preserved for the engine-level tab badge ("Running"/"Failed")
-        // — it picks any running instance, which is what we want for that badge.
-        $instancesByEngine = $services->groupBy('engine')->map(fn ($group) => $group->keyBy('name'));
-
-        // For tab-strip badges: prefer a running instance, fall back to any.
-        $primaryByEngine = collect();
-        foreach (CacheServiceInstallScripts::supportedEngines() as $engine) {
-            $group = $instancesByEngine->get($engine, collect());
-            if ($group->isEmpty()) {
-                continue;
-            }
-            $running = $group->first(fn ($r) => $r->status === ServerCacheService::STATUS_RUNNING);
-            $primaryByEngine[$engine] = $running ?? $group->first();
-        }
+        // One row per (server, engine) post-collapse — keyBy gives the per-engine row directly
+        // so the view's foreach can grab `$cacheServicesByEngine->get($engine)` without the
+        // legacy (engine, name) double-grouping the multi-instance era required.
+        $primaryByEngine = $services->keyBy('engine');
 
         $auditEvents = ServerCacheServiceAuditEvent::query()
             ->where('server_id', $this->server->id)
@@ -2706,7 +2395,6 @@ BASH;
             'capabilities' => $capabilities,
             'engineUnsupportedReasons' => $engineUnsupportedReasons,
             'cacheServices' => $services,
-            'cacheInstancesByEngine' => $instancesByEngine,
             'cacheServicesByEngine' => $primaryByEngine,
             'cacheStatsByInstance' => $statsByInstance,
             'cacheAuditEvents' => $auditEvents,
@@ -2738,33 +2426,17 @@ BASH;
     }
 
     /**
-     * Look up the engine row for the current `$active_instance`. With multi-
-     * instance, this is the row every per-engine action operates on. The
-     * default value (`'default'`) means existing single-instance servers
-     * continue to behave exactly as before.
+     * Look up the engine row on this server. With one-row-per-engine, this is the row every
+     * per-engine action operates on. The `name` filter survives only to ignore any historical
+     * non-default rows that the collapse migration somehow missed.
      */
     protected function cacheServiceFor(string $engine): ?ServerCacheService
     {
         return ServerCacheService::query()
             ->where('server_id', $this->server->id)
             ->where('engine', $engine)
-            ->where('name', $this->active_instance)
+            ->where('name', ServerCacheService::DEFAULT_INSTANCE_NAME)
             ->first();
-    }
-
-    /**
-     * All instances of an engine on this server, ordered with the legacy
-     * `default` first and the rest by name. Used by the per-engine tab to
-     * render the chip row that lets the operator switch between instances.
-     */
-    protected function instancesFor(string $engine): Collection
-    {
-        return ServerCacheService::query()
-            ->where('server_id', $this->server->id)
-            ->where('engine', $engine)
-            ->orderByRaw("CASE WHEN name = '".ServerCacheService::DEFAULT_INSTANCE_NAME."' THEN 0 ELSE 1 END")
-            ->orderBy('name')
-            ->get();
     }
 
     /** The engine name when the operator is on a per-engine tab; null otherwise. */

@@ -104,9 +104,30 @@
         @php
             $cronJobCount = $server->cronJobs->count();
             $enabledCronJobCount = $server->cronJobs->where('enabled', true)->count();
+            $disabledCronJobCount = $cronJobCount - $enabledCronJobCount;
             $unsyncedCronCount = $server->cronJobs->where('is_synced', false)->count();
             $latestCronSync = $server->cronJobs->where('synced_at')->max('synced_at');
         @endphp
+
+        {{-- At-a-glance counts. Pure addition above the existing cron card; no behaviour change. --}}
+        <section class="grid gap-3 sm:grid-cols-4">
+            <div class="dply-card p-4">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cron jobs') }}</p>
+                <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $cronJobCount }}</p>
+            </div>
+            <div class="dply-card p-4">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Enabled') }}</p>
+                <p class="mt-1 text-2xl font-semibold text-brand-forest">{{ $enabledCronJobCount }}</p>
+            </div>
+            <div class="dply-card p-4">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Disabled') }}</p>
+                <p class="mt-1 text-2xl font-semibold {{ $disabledCronJobCount > 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $disabledCronJobCount }}</p>
+            </div>
+            <div class="dply-card p-4">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Unsynced') }}</p>
+                <p class="mt-1 text-2xl font-semibold {{ $unsyncedCronCount > 0 ? 'text-red-700' : 'text-brand-ink' }}">{{ $unsyncedCronCount }}</p>
+            </div>
+        </section>
 
         {{-- Slim trigger card — primary "Add cron job" + "Sync crontab" actions, status meta-row.
              The big add/edit form is now in a modal triggered by the button below. --}}

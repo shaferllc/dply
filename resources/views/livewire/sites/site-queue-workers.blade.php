@@ -31,6 +31,22 @@
                 compact
             />
 
+            {{-- At-a-glance counts (matches the server-level page). --}}
+            <section class="grid gap-3 sm:grid-cols-3">
+                <div class="dply-card p-4">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Active workers') }}</p>
+                    <p class="mt-1 text-2xl font-semibold text-brand-forest">{{ $stats['active'] }}</p>
+                </div>
+                <div class="dply-card p-4">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inactive') }}</p>
+                    <p class="mt-1 text-2xl font-semibold {{ $stats['inactive'] > 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $stats['inactive'] }}</p>
+                </div>
+                <div class="dply-card p-4">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total processes') }}</p>
+                    <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $stats['total_processes'] }}</p>
+                </div>
+            </section>
+
             <section class="{{ $card }}">
                 <header class="flex items-center justify-between border-b border-brand-ink/10 px-5 py-4">
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-ink">{{ __('Active workers') }}</h2>
@@ -62,10 +78,21 @@
                                     </p>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-2">
-                                    <button type="button" wire:click="restartWorker('{{ $program->id }}')" wire:loading.attr="disabled" wire:target="restartWorker" class="{{ $btnSecondary }}" @disabled(! $program->is_active)>
-                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
-                                        {{ __('Restart') }}
-                                    </button>
+                                    @if ($program->is_active)
+                                        <button type="button" wire:click="restartWorker('{{ $program->id }}')" wire:loading.attr="disabled" wire:target="restartWorker" class="{{ $btnSecondary }}">
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                            {{ __('Restart') }}
+                                        </button>
+                                        <button type="button" wire:click="stopWorker('{{ $program->id }}')" wire:loading.attr="disabled" wire:target="stopWorker" wire:confirm="{{ __('Stop :slug?', ['slug' => $program->slug]) }}" class="{{ $btnSecondary }}">
+                                            <x-heroicon-o-stop class="h-4 w-4" />
+                                            {{ __('Stop') }}
+                                        </button>
+                                    @else
+                                        <button type="button" wire:click="startWorker('{{ $program->id }}')" wire:loading.attr="disabled" wire:target="startWorker" class="{{ $btnSecondary }}">
+                                            <x-heroicon-o-play class="h-4 w-4" />
+                                            {{ __('Start') }}
+                                        </button>
+                                    @endif
                                     <a href="{{ $siteDaemonsRoute }}#program-{{ $program->id }}" wire:navigate class="{{ $btnSecondary }}">
                                         {{ __('Manage') }}
                                     </a>

@@ -51,8 +51,11 @@ class WebserverSwitchTest extends TestCase
         ]);
     }
 
-    public function test_planner_blocks_traefik_when_php_sites_present(): void
+    public function test_planner_allows_traefik_for_php_sites(): void
     {
+        // Traefik with Caddy backend handles PHP-FPM, static, node, etc.
+        // The edge is Traefik on :80; per-site Caddy serves the runtime on
+        // an ephemeral high port and Traefik routes hosts to it.
         $user = $this->makeUser();
         $server = $this->makeServer($user);
         Site::factory()->create([
@@ -64,12 +67,14 @@ class WebserverSwitchTest extends TestCase
 
         $plan = app(WebserverSwitchPreflight::class)->plan($server, 'traefik');
 
-        $this->assertNotNull($plan['blocker']);
-        $this->assertSame('traefik_needs_static', $plan['blocker']['key']);
+        $this->assertNull($plan['blocker']);
     }
 
-    public function test_planner_blocks_openlitespeed_when_php_sites_present(): void
+    public function test_planner_allows_openlitespeed_for_php_sites(): void
     {
+        // OLS switch flow now installs lsphpXX matched to site PHP versions,
+        // writes per-vhost vhconf.conf files, and renders a dply-owned
+        // httpd_config.conf — preflight no longer blocks.
         $user = $this->makeUser();
         $server = $this->makeServer($user);
         Site::factory()->create([
@@ -81,11 +86,10 @@ class WebserverSwitchTest extends TestCase
 
         $plan = app(WebserverSwitchPreflight::class)->plan($server, 'openlitespeed');
 
-        $this->assertNotNull($plan['blocker']);
-        $this->assertSame('ols_needs_lsphp', $plan['blocker']['key']);
+        $this->assertNull($plan['blocker']);
     }
 
-    public function test_planner_blocks_ols_for_static_only_server_pending_v11_provisioning(): void
+    public function test_planner_allows_openlitespeed_for_static_only_server(): void
     {
         $user = $this->makeUser();
         $server = $this->makeServer($user);
@@ -98,11 +102,10 @@ class WebserverSwitchTest extends TestCase
 
         $plan = app(WebserverSwitchPreflight::class)->plan($server, 'openlitespeed');
 
-        $this->assertNotNull($plan['blocker']);
-        $this->assertSame('openlitespeed_provisioning_not_wired', $plan['blocker']['key']);
+        $this->assertNull($plan['blocker']);
     }
 
-    public function test_planner_blocks_traefik_for_static_only_server_pending_v11_provisioning(): void
+    public function test_planner_allows_traefik_for_static_only_server(): void
     {
         $user = $this->makeUser();
         $server = $this->makeServer($user);
@@ -115,8 +118,7 @@ class WebserverSwitchTest extends TestCase
 
         $plan = app(WebserverSwitchPreflight::class)->plan($server, 'traefik');
 
-        $this->assertNotNull($plan['blocker']);
-        $this->assertSame('traefik_provisioning_not_wired', $plan['blocker']['key']);
+        $this->assertNull($plan['blocker']);
     }
 
     public function test_planner_blocks_switching_to_same_webserver(): void
@@ -546,5 +548,192 @@ class WebserverSwitchTest extends TestCase
             ->call('stopAndRevertWebserverSwitch', (string) $row->id);
 
         Queue::assertNotPushed(RevertServerWebserverSwitchJob::class);
+    }
+
+    public function test_ols_installer_includes_lsphp_packages_for_site_php_versions(): void
+    {
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'runtime' => 'php',
+            'runtime_version' => '8.3',
+        ]);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'runtime' => 'php',
+            'runtime_version' => '8.2',
+        ]);
+        // Static site shouldn't pull in any lsphp packages.
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'runtime' => 'static',
+        ]);
+
+        $job = new SwitchServerWebserverJob($server->id, $user->id, 'openlitespeed', false);
+        $script = $this->invokePrivate($job, 'installerScriptFor', ['openlitespeed', $server]);
+
+        $this->assertStringContainsString('lsphp83', $script);
+        $this->assertStringContainsString('lsphp83-common', $script);
+        $this->assertStringContainsString('lsphp82', $script);
+        // No PHP 8.1 site → no lsphp81 install.
+        $this->assertStringNotContainsString('lsphp81', $script);
+        // Core install always present.
+        $this->assertStringContainsString('openlitespeed', $script);
+    }
+
+    public function test_ols_installer_skips_lsphp_when_no_php_sites(): void
+    {
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'runtime' => 'static',
+        ]);
+
+        $job = new SwitchServerWebserverJob($server->id, $user->id, 'openlitespeed', false);
+        $script = $this->invokePrivate($job, 'installerScriptFor', ['openlitespeed', $server]);
+
+        $this->assertStringNotContainsString('lsphp', $script);
+    }
+
+    public function test_ols_site_config_path_targets_vhconf(): void
+    {
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'name' => 'app-one',
+            'runtime' => 'php',
+        ]);
+
+        $job = new SwitchServerWebserverJob($server->id, $user->id, 'openlitespeed', false);
+        $path = $this->invokePrivate($job, 'siteConfigPathFor', [$site, 'openlitespeed']);
+
+        $this->assertStringStartsWith('/usr/local/lsws/conf/vhosts/', $path);
+        $this->assertStringEndsWith('/vhconf.conf', $path);
+    }
+
+    public function test_traefik_installer_chains_caddy_install(): void
+    {
+        // Caddy is the per-site backend behind Traefik; the install stage
+        // must drop both binaries on the box. The Caddy install script is
+        // identifiable by the cloudsmith repo line; the Traefik install
+        // script by the GitHub releases URL.
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        $job = new SwitchServerWebserverJob($server->id, $user->id, 'traefik', false);
+        $script = $this->invokePrivate($job, 'installerScriptFor', ['traefik', $server]);
+
+        $this->assertStringContainsString('cloudsmith.io/public/caddy/stable', $script);
+        $this->assertStringContainsString('github.com/traefik/traefik/releases/download', $script);
+        $this->assertStringContainsString('/etc/systemd/system/traefik.service', $script);
+    }
+
+    public function test_traefik_site_config_path_targets_dynamic_dir(): void
+    {
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'name' => 'app-two',
+            'runtime' => 'node',
+        ]);
+
+        $job = new SwitchServerWebserverJob($server->id, $user->id, 'traefik', false);
+        $path = $this->invokePrivate($job, 'siteConfigPathFor', [$site, 'traefik']);
+
+        $this->assertStringStartsWith('/etc/traefik/dynamic/', $path);
+        $this->assertStringEndsWith('.yml', $path);
+    }
+
+    public function test_traefik_backend_port_is_stable_and_in_range(): void
+    {
+        // Same site should always get the same backend port so a re-run
+        // doesn't shift Caddy upstreams under live traffic. Range 20000-40000
+        // keeps it out of the standard ephemeral port range and well away
+        // from low-numbered service ports.
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'runtime' => 'php',
+        ]);
+
+        $job = new SwitchServerWebserverJob($server->id, $user->id, 'traefik', false);
+
+        $p1 = $this->invokePrivate($job, 'traefikBackendPort', [$site]);
+        $p2 = $this->invokePrivate($job, 'traefikBackendPort', [$site]);
+
+        $this->assertSame($p1, $p2);
+        $this->assertGreaterThanOrEqual(20000, $p1);
+        $this->assertLessThan(40000, $p1);
+    }
+
+    public function test_planner_allows_haproxy_for_php_sites(): void
+    {
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'runtime' => 'php',
+        ]);
+
+        $plan = app(WebserverSwitchPreflight::class)->plan($server, 'haproxy');
+
+        $this->assertNull($plan['blocker']);
+    }
+
+    public function test_haproxy_installer_chains_caddy_install(): void
+    {
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        $job = new SwitchServerWebserverJob($server->id, $user->id, 'haproxy', false);
+        $script = $this->invokePrivate($job, 'installerScriptFor', ['haproxy', $server]);
+
+        $this->assertStringContainsString('cloudsmith.io/public/caddy/stable', $script);
+        $this->assertStringContainsString('apt-get install -y --no-install-recommends haproxy', $script);
+    }
+
+    public function test_haproxy_site_config_path_lands_on_caddy_backend(): void
+    {
+        $user = $this->makeUser();
+        $server = $this->makeServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'name' => 'hap-site',
+            'runtime' => 'php',
+        ]);
+
+        $job = new SwitchServerWebserverJob($server->id, $user->id, 'haproxy', false);
+        $path = $this->invokePrivate($job, 'siteConfigPathFor', [$site, 'haproxy']);
+
+        $this->assertStringStartsWith('/etc/caddy/sites-enabled/', $path);
+        $this->assertStringEndsWith('-backend.caddy', $path);
+    }
+
+    private function invokePrivate(object $obj, string $method, array $args = []): mixed
+    {
+        $ref = new \ReflectionMethod($obj, $method);
+
+        return $ref->invokeArgs($obj, $args);
     }
 }
