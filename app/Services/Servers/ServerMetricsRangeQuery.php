@@ -128,6 +128,182 @@ final class ServerMetricsRangeQuery
     }
 
     /**
+     * Per-engine health time-series for a single webserver / edge proxy.
+     * Returns the same shape as fetch() but with metrics scoped to one
+     * engine's health block inside payload.webserver_health[].
+     *
+     * Counters (requests_total, errors_5xx_total) are converted to rates
+     * (req/sec, errors/min) by taking the delta between consecutive
+     * buckets. Gauges (active_connections) are bucketed raw.
+     *
+     * @return array{
+     *     engine: string,
+     *     range: string,
+     *     bucket_seconds: int,
+     *     from: Carbon,
+     *     to: Carbon,
+     *     sample_count: int,
+     *     latest_block: ?array<string, mixed>,
+     *     latest_at: ?Carbon,
+     *     metrics: array<string, list<array{at: int, min: float, avg: float, max: float}>>
+     * }
+     */
+    public function fetchEngineHealth(Server $server, string $engine, string $range): array
+    {
+        $range = self::isValidRange($range) ? $range : self::defaultRange();
+        $bucketSeconds = self::RANGES[$range];
+        $windowSeconds = self::WINDOW_SECONDS[$range];
+
+        $to = now();
+        $from = $to->copy()->subSeconds($windowSeconds);
+
+        $snapshots = ServerMetricSnapshot::query()
+            ->where('server_id', $server->id)
+            ->where('captured_at', '>=', $from)
+            ->orderBy('captured_at')
+            ->get(['captured_at', 'payload']);
+
+        $latest = ServerMetricSnapshot::query()
+            ->where('server_id', $server->id)
+            ->orderByDesc('captured_at')
+            ->first();
+
+        $activeSeries = $this->bucketEngineGauge($snapshots, $engine, 'active_connections', $bucketSeconds);
+        $requestsRateSeries = $this->bucketEngineCounterRate($snapshots, $engine, 'requests_total', $bucketSeconds, perSecond: true);
+        $errorsRateSeries = $this->bucketEngineCounterRate($snapshots, $engine, 'errors_5xx_total', $bucketSeconds, perSecond: false);
+
+        return [
+            'engine' => $engine,
+            'range' => $range,
+            'bucket_seconds' => $bucketSeconds,
+            'from' => $from,
+            'to' => $to,
+            'sample_count' => $snapshots->count(),
+            'latest_block' => $this->engineBlockFromPayload($latest?->payload ?? [], $engine),
+            'latest_at' => $latest?->captured_at,
+            'metrics' => [
+                'active_connections' => $activeSeries,
+                'requests_per_sec' => $requestsRateSeries,
+                'errors_5xx_per_min' => $errorsRateSeries,
+            ],
+        ];
+    }
+
+    /**
+     * Find the health block for the given engine inside a payload's
+     * webserver_health array. Returns null when the engine wasn't running
+     * at capture time or scrape failed.
+     *
+     * @param  mixed  $payload
+     * @return array<string, mixed>|null
+     */
+    private function engineBlockFromPayload($payload, string $engine): ?array
+    {
+        $payload = is_array($payload) ? $payload : [];
+        $list = $payload['webserver_health'] ?? [];
+        if (! is_array($list)) {
+            return null;
+        }
+        foreach ($list as $block) {
+            if (is_array($block) && ($block['engine'] ?? null) === $engine) {
+                return $block;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Bucket a gauge metric (current-value-only, like active_connections)
+     * from a specific engine's health block.
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection<int, ServerMetricSnapshot>  $snapshots
+     * @return list<array{at: int, min: float, avg: float, max: float}>
+     */
+    private function bucketEngineGauge($snapshots, string $engine, string $metric, int $bucketSeconds): array
+    {
+        $buckets = [];
+        foreach ($snapshots as $snap) {
+            $block = $this->engineBlockFromPayload($snap->payload, $engine);
+            if ($block === null || ! array_key_exists($metric, $block)) {
+                continue;
+            }
+            $value = $block[$metric];
+            if (! is_numeric($value)) {
+                continue;
+            }
+            $value = (float) $value;
+            $ts = $snap->captured_at->getTimestamp();
+            $bucketAt = $ts - ($ts % $bucketSeconds);
+            $buckets[$bucketAt] ??= ['min' => $value, 'max' => $value, 'sum' => 0.0, 'count' => 0];
+            $buckets[$bucketAt]['min'] = min($buckets[$bucketAt]['min'], $value);
+            $buckets[$bucketAt]['max'] = max($buckets[$bucketAt]['max'], $value);
+            $buckets[$bucketAt]['sum'] += $value;
+            $buckets[$bucketAt]['count']++;
+        }
+        ksort($buckets);
+
+        return array_map(
+            static fn (int $at, array $b): array => [
+                'at' => $at,
+                'min' => round($b['min'], 3),
+                'avg' => round($b['sum'] / max(1, $b['count']), 3),
+                'max' => round($b['max'], 3),
+            ],
+            array_keys($buckets),
+            $buckets,
+        );
+    }
+
+    /**
+     * Bucket a counter metric (cumulative, like requests_total) into a
+     * RATE series. Each bucket's value is (max - min) of the counter
+     * within the bucket, divided by either bucket seconds (for req/sec)
+     * or by minute equivalents (for errors/min). Gaps in the source
+     * snapshots produce gaps in the output.
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection<int, ServerMetricSnapshot>  $snapshots
+     * @return list<array{at: int, min: float, avg: float, max: float}>
+     */
+    private function bucketEngineCounterRate($snapshots, string $engine, string $metric, int $bucketSeconds, bool $perSecond): array
+    {
+        $perBucketSamples = [];
+        foreach ($snapshots as $snap) {
+            $block = $this->engineBlockFromPayload($snap->payload, $engine);
+            if ($block === null || ! array_key_exists($metric, $block)) {
+                continue;
+            }
+            $value = $block[$metric];
+            if (! is_numeric($value)) {
+                continue;
+            }
+            $ts = $snap->captured_at->getTimestamp();
+            $bucketAt = $ts - ($ts % $bucketSeconds);
+            $perBucketSamples[$bucketAt][] = (float) $value;
+        }
+        ksort($perBucketSamples);
+
+        $divisor = $perSecond ? $bucketSeconds : ($bucketSeconds / 60.0);
+        if ($divisor <= 0) {
+            $divisor = 1.0;
+        }
+
+        $out = [];
+        foreach ($perBucketSamples as $at => $samples) {
+            $delta = max(0.0, max($samples) - min($samples));
+            $rate = $delta / $divisor;
+            $out[] = [
+                'at' => $at,
+                'min' => round($rate, 3),
+                'avg' => round($rate, 3),
+                'max' => round($rate, 3),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Group snapshots by floor(timestamp / bucketSeconds) and emit min/avg/max
      * per bucket. Buckets with no samples are skipped — the chart treats gaps
      * as gaps rather than zeros.

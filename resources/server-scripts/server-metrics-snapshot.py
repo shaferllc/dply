@@ -405,6 +405,342 @@ def _parse_ps_line(line: str) -> dict | None:
     }
 
 
+# ---------------------------------------------------------------------------
+# Webserver / edge-proxy health collectors
+# ---------------------------------------------------------------------------
+#
+# Each collector returns a normalized health block for a single engine, or
+# None when the engine isn't running / isn't reachable. Output shape:
+#
+#   {
+#     "engine": "<engine-key>",
+#     "active_connections": <int>,        # current concurrent connections
+#     "requests_total": <int|null>,       # cumulative since daemon start
+#     "requests_per_sec": <float|null>,   # rate (if exposed natively)
+#     "errors_5xx_total": <int|null>,     # cumulative; rate is derived later
+#     "uptime_sec": <int|null>,           # daemon uptime (best-effort)
+#     "backends": [...optional, edge proxies only]
+#   }
+#
+# All values are best-effort; missing fields are simply omitted. The dply
+# server-side computes deltas across snapshots to derive 5xx-rate, etc.
+# Scrapes never raise — every collector wraps its body in try/except and
+# returns None on any error.
+
+
+def _http_get(url: str, timeout: float = 2.5) -> str | None:
+    """Tiny stdlib HTTP GET. Returns the body as text, or None on any error."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "dply-metrics/1"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def _systemctl_active(unit: str) -> bool:
+    try:
+        rc = subprocess.run(
+            ["systemctl", "is-active", "--quiet", unit],
+            check=False,
+            timeout=2.0,
+        ).returncode
+        return rc == 0
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
+def _collect_nginx() -> dict | None:
+    # dply writes a localhost-only stub_status block on :9091.
+    # Format (plain text):
+    #   Active connections: 12
+    #   server accepts handled requests
+    #    30 30 100
+    #   Reading: 1 Writing: 2 Waiting: 9
+    if not _systemctl_active("nginx"):
+        return None
+    body = _http_get("http://127.0.0.1:9091/nginx_status")
+    if not body:
+        return None
+    try:
+        lines = body.strip().splitlines()
+        active = int(lines[0].split(":")[1].strip())
+        accepts, handled, requests = (int(x) for x in lines[2].split())
+        last = lines[3].split()
+        reading = int(last[1])
+        writing = int(last[3])
+        waiting = int(last[5])
+        return {
+            "engine": "nginx",
+            "active_connections": active,
+            "requests_total": requests,
+            "accepts_total": accepts,
+            "handled_total": handled,
+            "reading": reading,
+            "writing": writing,
+            "waiting": waiting,
+        }
+    except (IndexError, ValueError):
+        return None
+
+
+def _collect_apache() -> dict | None:
+    # mod_status ?auto endpoint on :9092 (dply-managed).
+    # Plain key:value text. Keys of interest: BusyWorkers, IdleWorkers,
+    # Total Accesses, Total kBytes, Uptime, ReqPerSec.
+    if not _systemctl_active("apache2"):
+        return None
+    body = _http_get("http://127.0.0.1:9092/server-status?auto")
+    if not body:
+        return None
+    kv: dict[str, str] = {}
+    for line in body.splitlines():
+        if ":" not in line:
+            continue
+        k, _, v = line.partition(":")
+        kv[k.strip()] = v.strip()
+    try:
+        return {
+            "engine": "apache",
+            "active_connections": int(kv.get("BusyWorkers", "0")),
+            "idle_workers": int(kv.get("IdleWorkers", "0")),
+            "requests_total": int(kv.get("Total Accesses", "0")),
+            "requests_per_sec": float(kv.get("ReqPerSec", "0")) if "ReqPerSec" in kv else None,
+            "uptime_sec": int(kv.get("Uptime", "0")) if "Uptime" in kv else None,
+        }
+    except ValueError:
+        return None
+
+
+def _collect_caddy() -> dict | None:
+    # Caddy admin API on :2019 exposes Prometheus exposition at /metrics.
+    # We parse only a tiny subset: caddy_http_requests_total (sum) and the
+    # current process uptime. Full Prom parser would be overkill here.
+    if not _systemctl_active("caddy"):
+        return None
+    body = _http_get("http://127.0.0.1:2019/metrics")
+    if not body:
+        return None
+    requests_total = 0
+    errors_5xx_total = 0
+    saw_anything = False
+    for line in body.splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        # caddy_http_requests_total{code="200",method="GET",...} 42
+        if line.startswith("caddy_http_requests_total"):
+            saw_anything = True
+            try:
+                value = float(line.rsplit(" ", 1)[1])
+            except (IndexError, ValueError):
+                continue
+            requests_total += int(value)
+            if 'code="5' in line:
+                errors_5xx_total += int(value)
+    if not saw_anything:
+        return None
+    return {
+        "engine": "caddy",
+        "requests_total": requests_total,
+        "errors_5xx_total": errors_5xx_total,
+    }
+
+
+def _collect_openlitespeed() -> dict | None:
+    # OLS writes real-time stats to /tmp/lshttpd/.rtreport{,.1,.2,...}.
+    # Format is plain key: value lines. One file per worker; sum across.
+    if not _systemctl_active("lshttpd"):
+        return None
+    paths = [p for p in Path("/tmp/lshttpd").glob(".rtreport*") if p.is_file()] if Path("/tmp/lshttpd").exists() else []
+    if not paths:
+        return None
+    total_plain = 0
+    total_ssl = 0
+    total_reqs = 0
+    req_per_sec = 0.0
+    uptime_sec = None
+    for path in paths:
+        try:
+            content = path.read_text(errors="replace")
+        except OSError:
+            continue
+        for line in content.splitlines():
+            # Lines like:
+            #   PLAINCONN: 0, AVAILCONN: 10000, IDLECONN: 0, SSLCONN: 0
+            #   REQ_RATE []: REQ_PROCESSING: 0, REQ_PER_SEC: 0.0, TOT_REQS: 0
+            for chunk in line.replace(",", " ").split():
+                if ":" not in chunk:
+                    continue
+                k, _, v = chunk.partition(":")
+                k = k.strip().rstrip("[]")
+                v = v.strip()
+                if not v:
+                    continue
+                try:
+                    if k == "PLAINCONN":
+                        total_plain += int(v)
+                    elif k == "SSLCONN":
+                        total_ssl += int(v)
+                    elif k == "TOT_REQS":
+                        total_reqs += int(v)
+                    elif k == "REQ_PER_SEC":
+                        req_per_sec += float(v)
+                    elif k == "UPTIME" and uptime_sec is None:
+                        # OLS UPTIME is like "12s" or "1h:23m" — parse loosely.
+                        uptime_sec = _parse_ols_uptime(v)
+                except ValueError:
+                    continue
+    return {
+        "engine": "openlitespeed",
+        "active_connections": total_plain + total_ssl,
+        "plain_connections": total_plain,
+        "ssl_connections": total_ssl,
+        "requests_total": total_reqs,
+        "requests_per_sec": round(req_per_sec, 2),
+        "uptime_sec": uptime_sec,
+    }
+
+
+def _parse_ols_uptime(value: str) -> int | None:
+    # OLS UPTIME formats observed: "12s", "1h:23m:45s", "2d:3h:4m:5s".
+    total = 0
+    units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+    for piece in value.replace(":", " ").split():
+        if not piece or piece[-1] not in units:
+            try:
+                return int(piece)  # bare seconds
+            except ValueError:
+                return None
+        try:
+            total += int(piece[:-1]) * units[piece[-1]]
+        except ValueError:
+            return None
+    return total or None
+
+
+def _collect_traefik() -> dict | None:
+    # Traefik's prometheus metrics endpoint, bound by dply on 127.0.0.1:9093.
+    if not _systemctl_active("traefik"):
+        return None
+    body = _http_get("http://127.0.0.1:9093/metrics")
+    if not body:
+        return None
+    requests_total = 0
+    errors_5xx_total = 0
+    open_conns = 0
+    saw = False
+    for line in body.splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        # traefik_service_requests_total{code="200",...} 42
+        if line.startswith("traefik_service_requests_total") or line.startswith("traefik_entrypoint_requests_total"):
+            saw = True
+            try:
+                value = float(line.rsplit(" ", 1)[1])
+            except (IndexError, ValueError):
+                continue
+            requests_total += int(value)
+            if 'code="5' in line:
+                errors_5xx_total += int(value)
+        elif line.startswith("traefik_entrypoint_open_connections"):
+            try:
+                open_conns += int(float(line.rsplit(" ", 1)[1]))
+            except (IndexError, ValueError):
+                pass
+    if not saw:
+        return None
+    return {
+        "engine": "traefik",
+        "active_connections": open_conns,
+        "requests_total": requests_total,
+        "errors_5xx_total": errors_5xx_total,
+    }
+
+
+def _collect_haproxy() -> dict | None:
+    # HAProxy stats socket. The dply haproxy.cfg writes it to
+    # /run/haproxy/admin.sock; "show stat" returns CSV.
+    if not _systemctl_active("haproxy"):
+        return None
+    sock_path = "/run/haproxy/admin.sock"
+    if not Path(sock_path).exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["socat", "-", f"UNIX-CONNECT:{sock_path}"],
+            input="show stat\n",
+            capture_output=True,
+            text=True,
+            timeout=3.0,
+            check=False,
+        )
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return None
+    if result.returncode != 0 or not result.stdout:
+        return None
+
+    lines = result.stdout.strip().splitlines()
+    if not lines:
+        return None
+    # First line is a CSV header starting with `# pxname,svname,...`.
+    header = [c.strip().lstrip("#").strip() for c in lines[0].split(",")]
+    try:
+        idx_pxname = header.index("pxname")
+        idx_svname = header.index("svname")
+        idx_status = header.index("status")
+        idx_scur = header.index("scur")
+        idx_stot = header.index("stot")
+        idx_hrsp_5xx = header.index("hrsp_5xx")
+    except ValueError:
+        return None
+    active = 0
+    requests_total = 0
+    errors_5xx_total = 0
+    backends: list[dict] = []
+    for raw in lines[1:]:
+        cells = raw.split(",")
+        if len(cells) <= max(idx_pxname, idx_svname, idx_status, idx_scur, idx_stot):
+            continue
+        sv = cells[idx_svname]
+        if sv == "FRONTEND":
+            try:
+                active += int(cells[idx_scur] or 0)
+                requests_total += int(cells[idx_stot] or 0)
+                errors_5xx_total += int(cells[idx_hrsp_5xx] or 0)
+            except ValueError:
+                pass
+        elif sv not in ("BACKEND", ""):
+            # Per-server backend row.
+            backends.append({
+                "backend": cells[idx_pxname],
+                "name": sv,
+                "status": cells[idx_status],
+            })
+    return {
+        "engine": "haproxy",
+        "active_connections": active,
+        "requests_total": requests_total,
+        "errors_5xx_total": errors_5xx_total,
+        "backends": backends,
+    }
+
+
+def _collect_webserver_health() -> list[dict]:
+    """Run all per-engine collectors. Returns a list of health blocks for
+    every engine that's running + reachable. dply server side reads the
+    whole list and renders one chart panel per engine on the workspace."""
+    out: list[dict] = []
+    for fn in (_collect_nginx, _collect_apache, _collect_caddy,
+               _collect_openlitespeed, _collect_traefik, _collect_haproxy):
+        try:
+            block = fn()
+        except Exception:
+            block = None
+        if block is not None:
+            out.append(block)
+    return out
+
+
 def main() -> None:
     t1, i1 = _jiffies()
     time.sleep(0.25)
@@ -477,6 +813,11 @@ def main() -> None:
         "disks": disks,
         "top_cpu": top_procs.get("by_cpu", []),
         "top_mem": top_procs.get("by_mem", []),
+        # Per-engine health blocks for whichever webservers / edge proxies
+        # are running and have stats endpoints reachable. The dply server
+        # iterates this list to render the per-engine Overview charts.
+        # Empty list when no engines are running or no scrapes succeed.
+        "webserver_health": _collect_webserver_health(),
     }
     print(json.dumps(out))
     _post_metrics_callback(out)

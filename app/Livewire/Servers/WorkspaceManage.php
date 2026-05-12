@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\AddEdgeProxyJob;
+use App\Jobs\RemoveEdgeProxyJob;
 use App\Jobs\RevertServerWebserverSwitchJob;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\SwitchServerWebserverJob;
@@ -616,6 +618,132 @@ BASH;
             ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
             ->whereNull('dismissed_at')
             ->exists();
+    }
+
+    /**
+     * Inflight check for edge-proxy add/remove. Same shape as
+     * {@see hasInflightWebserverSwitch()} but scoped to the `edge_proxy`
+     * console-action kind so the two banners don't shadow each other.
+     */
+    public function hasInflightEdgeProxyAction(): bool
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'edge_proxy')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->whereNull('dismissed_at')
+            ->exists();
+    }
+
+    /**
+     * Dispatch {@see AddEdgeProxyJob}. Seeds a queued ConsoleAction so the
+     * banner shows immediately rather than blanking until the worker picks
+     * the job up.
+     */
+    public function addEdgeProxy(string $target): void
+    {
+        $this->authorize('update', $this->server);
+
+        $target = strtolower(trim($target));
+        if (! in_array($target, ['traefik', 'haproxy'], true)) {
+            $this->toastError(__('Unknown edge proxy: :t.', ['t' => $target]));
+
+            return;
+        }
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $this->seedQueuedEdgeProxyAction(
+            label: __('Adding edge proxy: :target …', ['target' => $target]),
+            meta: ['op' => 'add', 'target' => $target],
+        );
+
+        AddEdgeProxyJob::dispatch(
+            serverId: $this->server->id,
+            target: $target,
+            userId: auth()->id(),
+        );
+
+        $this->toastSuccess(__('Edge proxy queued. Progress shows in the banner above.'));
+    }
+
+    /**
+     * Dispatch {@see RemoveEdgeProxyJob}. Caddy takes over :80 again once
+     * the job lands; meta.webserver lands as 'caddy' since that's what's
+     * actually serving content post-remove.
+     */
+    public function removeEdgeProxy(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $edge = $this->server->edgeProxy();
+        if ($edge === null) {
+            $this->toastError(__('No edge proxy is active on this server.'));
+
+            return;
+        }
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $this->seedQueuedEdgeProxyAction(
+            label: __('Removing edge proxy: :target …', ['target' => $edge]),
+            meta: ['op' => 'remove', 'target' => $edge],
+        );
+
+        RemoveEdgeProxyJob::dispatch(
+            serverId: $this->server->id,
+            userId: auth()->id(),
+        );
+
+        $this->toastSuccess(__('Edge proxy removal queued. Progress shows in the banner above.'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    protected function seedQueuedEdgeProxyAction(?string $label, array $meta = []): ConsoleAction
+    {
+        $subjectType = $this->server->getMorphClass();
+        $subjectId = $this->server->id;
+
+        ConsoleAction::query()
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED])
+            ->update(['dismissed_at' => now()]);
+
+        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        ConsoleAction::query()
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->where('created_at', '<', now()->subSeconds($staleSeconds))
+            ->update(['dismissed_at' => now()]);
+
+        $output = [
+            'v' => (int) config('console_actions.current_version', 1),
+            'lines' => [],
+            'meta' => $meta,
+        ];
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'kind' => 'edge_proxy',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => request()->user()?->id,
+            'output' => $output,
+        ]);
     }
 
     public function syncManageRemoteTaskFromCache(): void

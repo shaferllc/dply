@@ -2,6 +2,7 @@
 
 namespace App\Services\Servers;
 
+use App\Jobs\DetectWebserverHealthTransitionsJob;
 use App\Jobs\PushServerMetricSnapshotToIngestJob;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
@@ -30,6 +31,13 @@ class ServerMetricsRecorder
             }
         }
 
+        // Fire-and-forget transition detection. The job reads the latest
+        // snapshot + previous trip state from server.meta and notifies on
+        // edges only — sustained alarms don't re-notify every minute.
+        if (is_array($normalizedPayload['webserver_health'] ?? null)) {
+            DetectWebserverHealthTransitionsJob::dispatch($server->id);
+        }
+
         return $snapshot;
     }
 
@@ -48,7 +56,7 @@ class ServerMetricsRecorder
             ->where('captured_at', '<', now()->subDays(30))
             ->delete();
 
-        $keep = 800;
+        $keep = (int) config('server_metrics.retention.rows_per_server', 10080);
         $overflow = ServerMetricSnapshot::query()
             ->where('server_id', $serverId)
             ->orderByDesc('captured_at')

@@ -75,6 +75,47 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Retention
+    |--------------------------------------------------------------------------
+    |
+    | Per-server row-count cap on ServerMetricSnapshot. At 1-min ingest cadence,
+    | 10080 ≈ 7 days. Bumped from 800 (~13h) when we added the webserver/edge
+    | health charts whose range picker goes out to 7 days. Time-based deletion
+    | (anything older than 30 days) is a separate hard cap.
+    |
+    */
+    'retention' => [
+        'rows_per_server' => max(100, (int) env('DPLY_METRICS_RETENTION_ROWS', 10080)),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Webserver / edge-proxy health alert thresholds
+    |--------------------------------------------------------------------------
+    |
+    | Hardcoded fallbacks for the alerting layer. Resolution order in
+    | WebserverHealthThresholdResolver is:
+    |   server+engine override → server override → org+engine → org → these fallbacks.
+    |
+    | `comparator` is one of {gt, gte, lt, lte}. `value` is compared against
+    | the relevant field in the latest webserver_health block:
+    |   - daemon_silent_seconds: how long with no successful scrape before
+    |     we consider the engine down. Read from time-since-last-snapshot.
+    |   - errors_5xx_per_min: rate from the most recent two-snapshot delta.
+    |   - active_connections: gauge.
+    |
+    */
+    'health_thresholds' => [
+        // Critical: engine is silent (no scrape success) for more than 2 minutes.
+        'daemon_silent_seconds' => ['comparator' => 'gt', 'value' => 120, 'severity' => 'critical'],
+        // Warn: 5xx error rate exceeds 10/min in the latest sample window.
+        'errors_5xx_per_min' => ['comparator' => 'gt', 'value' => 10, 'severity' => 'warning'],
+        // Warn: active connections > 5000 (likely saturation; engine-specific tune).
+        'active_connections' => ['comparator' => 'gt', 'value' => 5000, 'severity' => 'warning'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SSH probe (Metrics page — background)
     |--------------------------------------------------------------------------
     */

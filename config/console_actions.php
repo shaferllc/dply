@@ -89,6 +89,12 @@ return [
             'failed' => 'Action failed.',
             'stale' => 'Action did not finish.',
         ],
+        'edge_proxy' => [
+            'running' => 'Edge proxy action running on :host …',
+            'completed' => 'Edge proxy update complete.',
+            'failed' => 'Edge proxy action failed.',
+            'stale' => 'Edge proxy action did not finish.',
+        ],
     ],
 
     /*

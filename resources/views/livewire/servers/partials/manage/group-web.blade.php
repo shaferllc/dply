@@ -28,8 +28,6 @@
         'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy'],
         'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
         'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
-        'traefik' => ['label' => 'Traefik', 'icon' => 'heroicon-o-arrow-path-rounded-square', 'systemd' => 'traefik'],
-        'haproxy' => ['label' => 'HAProxy', 'icon' => 'heroicon-o-scale', 'systemd' => 'haproxy'],
     ];
 
     // Parse certbot output into a structured table (best-effort regex).
@@ -100,8 +98,6 @@
             'caddy' => [['caddy_test_config', false], ['reload_caddy', false], ['restart_caddy', true]],
             'apache' => [['apache_test_config', false], ['reload_apache', false], ['restart_apache', true]],
             'openlitespeed' => [['openlitespeed_test_config', false], ['reload_openlitespeed', false], ['restart_openlitespeed', true]],
-            'traefik' => [['traefik_test_config', false], ['reload_traefik', true], ['restart_traefik', true]],
-            'haproxy' => [['haproxy_test_config', false], ['reload_haproxy', false], ['restart_haproxy', true]],
             default => [],
         };
     @endphp

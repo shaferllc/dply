@@ -92,6 +92,14 @@ class WorkspaceWebserver extends WorkspaceManage
     /** When true, the Logs tab adds a wire:poll so the buffer refreshes every few seconds. */
     public bool $log_live = false;
 
+    /**
+     * Time range for the per-engine Overview health charts. One of the
+     * ServerMetricsRangeQuery::RANGES keys: '1h', '6h', '24h', '7d'.
+     * Persisted in localStorage on the client (keyed per server) so the
+     * operator's preference survives reloads.
+     */
+    public string $engine_metrics_range = '1h';
+
     public function mount(Server $server, ?string $section = null): void
     {
         // Force the inherited 'web' section state — the parent's render share
@@ -110,6 +118,16 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->engine_subtab = 'overview';
         $this->resetConfigEditorState();
         $this->resetLogViewerState();
+    }
+
+    /**
+     * Range setter for the per-engine Overview health charts. Validates
+     * against ServerMetricsRangeQuery's known ranges; falls back to '1h'.
+     */
+    public function setEngineMetricsRange(string $range): void
+    {
+        $allowed = array_keys(\App\Services\Servers\ServerMetricsRangeQuery::RANGES);
+        $this->engine_metrics_range = in_array($range, $allowed, true) ? $range : '1h';
     }
 
     public function setEngineSubtab(string $subtab): void

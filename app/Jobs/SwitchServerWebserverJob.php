@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\RemoteCli\RiskLevel;
-use App\Services\Servers\HAProxyEdgeConfigBuilder;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
-use App\Services\Sites\TraefikSiteConfigBuilder;
 use App\Services\SshConnection;
 use Illuminate\Support\Str;
 use Illuminate\Bus\Queueable;
@@ -56,6 +55,7 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
+    use PrivilegedRemoteFileWrites;
     use Queueable;
     use SerializesModels;
     use WritesConsoleAction;
@@ -349,7 +349,7 @@ BASH;
     private function installerScriptFor(string $target, Server $server): string
     {
         return match ($target) {
-            'nginx' => $this->aptInstallIdempotent('nginx'),
+            'nginx' => $this->aptInstallIdempotent('nginx').'; '.$this->nginxStatsEndpointPatch(),
             // proxy + proxy_http + proxy_fcgi cover ProxyPass / ProxyPreserveHost /
             // SetHandler "proxy:unix:..."; rewrite covers RewriteRule redirects;
             // headers covers RequestHeader and "Header always set". A fresh
@@ -365,10 +365,24 @@ BASH;
             // global identity. We source from `hostname -f`, falling back
             // through `hostname` to `localhost` for systems without a FQDN.
             'apache' => $this->aptInstallIdempotent('apache2').'; '.<<<'BASH'
-a2enmod proxy proxy_http proxy_fcgi rewrite headers >/dev/null
+a2enmod proxy proxy_http proxy_fcgi rewrite headers status >/dev/null
 DPLY_FQDN="$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo localhost)"
 printf 'ServerName %s\n' "$DPLY_FQDN" > /etc/apache2/conf-available/dply-servername.conf
 a2enconf dply-servername >/dev/null
+# Localhost-only mod_status endpoint at :9092 used by the dply metrics
+# agent to scrape Active connections / Total Accesses / etc. Bound to
+# 127.0.0.1 so it never reaches the public network.
+cat > /etc/apache2/conf-available/dply-server-status.conf <<'CONF'
+Listen 127.0.0.1:9092
+<VirtualHost 127.0.0.1:9092>
+    ServerName dply-status
+    <Location /server-status>
+        SetHandler server-status
+        Require ip 127.0.0.1
+    </Location>
+</VirtualHost>
+CONF
+a2enconf dply-server-status >/dev/null
 BASH,
             // Caddy ships in the official cloudsmith / cloudflare-managed apt repo.
             // `command -v` (not dpkg) drives the skip check: a half-installed
@@ -403,6 +417,31 @@ BASH,
                 $target,
             )),
         };
+    }
+
+    /**
+     * Localhost-only nginx stub_status endpoint on :9091. Used by the dply
+     * metrics agent to scrape connection counts and request totals. Bound
+     * to 127.0.0.1 so it never reaches the public network. nginx_status
+     * relies on ngx_http_stub_status_module which is compiled into the
+     * Debian/Ubuntu nginx package by default — no module install needed.
+     */
+    private function nginxStatsEndpointPatch(): string
+    {
+        return <<<'BASH'
+cat > /etc/nginx/conf.d/dply-stub-status.conf <<'CONF'
+server {
+    listen 127.0.0.1:9091 default_server;
+    server_name _;
+    access_log off;
+    location = /nginx_status {
+        stub_status on;
+        allow 127.0.0.1;
+        deny all;
+    }
+}
+CONF
+BASH;
     }
 
     /**
@@ -470,15 +509,35 @@ BASH;
     {
         return <<<'BASH'
 set -euo pipefail
+DPLY_ARCH=$(uname -m)
+case "$DPLY_ARCH" in
+  x86_64|amd64) DPLY_ARCH=amd64 ;;
+  aarch64|arm64) DPLY_ARCH=arm64 ;;
+  armv7l) DPLY_ARCH=armv7 ;;
+  *) echo "[dply] unsupported arch: $DPLY_ARCH" >&2; exit 127 ;;
+esac
+
 if [ -x /usr/local/bin/traefik ] && systemctl list-unit-files | grep -q '^traefik\.service'; then
   echo "[dply] traefik already installed; skipping."
 else
   apt-get install -y --no-install-recommends curl ca-certificates
   TRAEFIK_VERSION="${TRAEFIK_VERSION:-v3.1.0}"
-  curl -fsSL "https://github.com/traefik/traefik/releases/download/${TRAEFIK_VERSION}/traefik_${TRAEFIK_VERSION}_linux_amd64.tar.gz" -o /tmp/traefik.tgz
-  tar -xzf /tmp/traefik.tgz -C /tmp traefik
-  install -m 0755 /tmp/traefik /usr/local/bin/traefik
-  rm -f /tmp/traefik.tgz /tmp/traefik
+  TRAEFIK_URL="https://github.com/traefik/traefik/releases/download/${TRAEFIK_VERSION}/traefik_${TRAEFIK_VERSION}_linux_${DPLY_ARCH}.tar.gz"
+  echo "[dply] downloading traefik ${TRAEFIK_VERSION} (linux/${DPLY_ARCH})…"
+  curl -fSL "$TRAEFIK_URL" -o /tmp/traefik.tgz
+  echo "[dply] extracting traefik binary…"
+  rm -rf /tmp/traefik-extract
+  mkdir -p /tmp/traefik-extract
+  tar -xzf /tmp/traefik.tgz -C /tmp/traefik-extract
+  TRAEFIK_BIN=$(find /tmp/traefik-extract -type f -name traefik | head -n 1)
+  if [ -z "$TRAEFIK_BIN" ] || [ ! -f "$TRAEFIK_BIN" ]; then
+    echo "[dply] traefik binary not found in tarball; archive contents:" >&2
+    find /tmp/traefik-extract -maxdepth 3 -ls >&2
+    exit 127
+  fi
+  install -m 0755 "$TRAEFIK_BIN" /usr/local/bin/traefik
+  rm -rf /tmp/traefik.tgz /tmp/traefik-extract
+  echo "[dply] traefik installed at /usr/local/bin/traefik"
 fi
 mkdir -p /etc/traefik /etc/traefik/dynamic
 # Always (re)write the systemd unit so changes to ExecStart/Restart land on
@@ -493,6 +552,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/traefik --configFile=/etc/traefik/traefik.yml
+# Traefik reloads dynamic provider configs (file/Docker/Consul/etc.) on
+# SIGHUP — that covers /etc/traefik/dynamic/*.yml edits without dropping
+# active connections. Static-config (traefik.yml) changes still require
+# a full restart since the binary parses it once at startup.
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5s
 
@@ -500,7 +564,9 @@ RestartSec=5s
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-[ -x /usr/local/bin/traefik ] && systemctl list-unit-files | grep -q '^traefik\.service' || { echo "[dply] traefik binary or unit file missing after install" >&2; exit 127; }
+[ -x /usr/local/bin/traefik ] || { echo "[dply] traefik binary missing at /usr/local/bin/traefik" >&2; exit 127; }
+[ -f /etc/systemd/system/traefik.service ] || { echo "[dply] traefik.service file missing at /etc/systemd/system/traefik.service" >&2; exit 127; }
+systemctl cat traefik.service >/dev/null 2>&1 || { echo "[dply] traefik.service not picked up by systemd; daemon-reload + cat failed" >&2; systemctl cat traefik.service >&2 || true; exit 127; }
 BASH;
     }
 
@@ -611,14 +677,6 @@ BASH;
             $path = $this->siteConfigPathFor($site, $this->target);
             $this->writeRemoteFile($server, $ssh, $path, $config);
 
-            // Traefik per-site provisioning needs a second file written: the
-            // Caddy backend config bound to the per-site ephemeral port that
-            // the Traefik router targets. The dynamic YAML written above only
-            // routes — it doesn't serve.
-            if ($this->target === 'traefik') {
-                $this->writeTraefikCaddyBackend($server, $ssh, $site);
-            }
-
             // For nginx/apache, ensure sites-enabled is symlinked to sites-available.
             $this->ensureSiteEnabled($server, $ssh, $site, $this->target);
         }
@@ -628,20 +686,6 @@ BASH;
         // overwrites it with the :80-bound version.
         if ($this->target === 'openlitespeed') {
             $this->writeOlsHttpdConfig($server, $ssh, $sites, listenPort: 8080);
-        }
-
-        // Traefik's static config (entry-point bind port) is independent of
-        // the per-site dynamic YAMLs. Write it now bound to :8080; cutover
-        // overwrites with :80 to land the production listener.
-        if ($this->target === 'traefik') {
-            $this->writeTraefikStaticConfig($server, $ssh, listenPort: 8080);
-        }
-
-        // HAProxy uses a monolithic haproxy.cfg with frontend ACLs + backends
-        // for all sites. Render once now bound to :8080 (validate-safe);
-        // cutover regenerates with :80.
-        if ($this->target === 'haproxy') {
-            $this->writeHAProxyEdgeConfig($server, $ssh, $sites, listenPort: 8080);
         }
     }
 
@@ -659,19 +703,8 @@ BASH;
             // configs in dry-run mode (no port binding) — same model as
             // apachectl configtest / nginx -t.
             'openlitespeed' => '/usr/local/lsws/bin/lshttpd -t',
-            // Traefik has no native parse-only flag. The dynamic YAMLs are
-            // simple and well-formed by construction; the meatier validation
-            // is the per-site Caddy backend (PHP-FPM handlers, redirects,
-            // basic auth — all the actual web-serving logic). `caddy
-            // validate` catches everything that matters in practice.
-            'traefik' => 'caddy validate --config /etc/caddy/Caddyfile',
-            // HAProxy parses its config with `haproxy -c -f <file>`. Returns
-            // exit 0 + "Configuration file is valid" on success. Run this
-            // AND caddy validate because both layers must be syntactically
-            // sound for the cutover to succeed.
-            'haproxy' => 'haproxy -c -f /etc/haproxy/haproxy.cfg && caddy validate --config /etc/caddy/Caddyfile',
             default => throw new \RuntimeException(sprintf(
-                'No config-test command for "%s" — supported in v1: nginx, caddy, apache, openlitespeed, traefik, haproxy.',
+                'No config-test command for "%s" — supported in v1: nginx, caddy, apache, openlitespeed.',
                 $this->target,
             )),
         };
@@ -721,65 +754,10 @@ BASH;
             $this->writeOlsHttpdConfig($server, $ssh, $sites, listenPort: 80);
         }
 
-        // HAProxy: rewrite the monolithic haproxy.cfg with the production
-        // bind port (:80). Per-site Caddy backends already written by the
-        // loop above stay on their high ports. Same caddy-handover dance
-        // as Traefik below.
-        if ($this->target === 'haproxy') {
-            if ($from === 'caddy') {
-                foreach ($sites as $site) {
-                    $basename = method_exists($site, 'webserverConfigBasename')
-                        ? (string) $site->webserverConfigBasename()
-                        : (string) $site->slug;
-                    $oldPath = '/etc/caddy/sites-enabled/'.$basename.'.caddy';
-                    $ssh->exec($this->privilegedCommand($server, 'rm -f '.escapeshellarg($oldPath)), 15);
-                }
-            }
-            $this->writeHAProxyEdgeConfig($server, $ssh, $sites, listenPort: 80);
-            $ssh->exec($this->privilegedCommand($server, '(systemctl is-active --quiet caddy && systemctl reload caddy) || systemctl enable --now caddy'), 30);
-        }
-
-        // Traefik: per-site dynamic YAMLs don't carry a listen port (the
-        // router rules are host-keyed, traffic always lands on the static
-        // entry-point bind). Cutover only needs to rewrite traefik.yml to
-        // bind :80. Caddy backend configs stay on their high ports through
-        // both phases.
-        if ($this->target === 'traefik') {
-            // If switching FROM caddy, the legacy per-site :80 configs at
-            // /etc/caddy/sites-enabled/<basename>.caddy collide with the
-            // new -backend.caddy on high ports (both would try to bind :80
-            // on caddy reload). Remove them now — the new backend configs
-            // are already written, so caddy reload moves cleanly to high
-            // ports only.
-            if ($from === 'caddy') {
-                foreach ($sites as $site) {
-                    $basename = method_exists($site, 'webserverConfigBasename')
-                        ? (string) $site->webserverConfigBasename()
-                        : (string) $site->slug;
-                    $oldPath = '/etc/caddy/sites-enabled/'.$basename.'.caddy';
-                    $ssh->exec($this->privilegedCommand($server, 'rm -f '.escapeshellarg($oldPath)), 15);
-                }
-            }
-            $this->writeTraefikStaticConfig($server, $ssh, listenPort: 80);
-            // Caddy must be running (as the backend) before Traefik comes
-            // up — Traefik's routes target Caddy on high ports. Reload if
-            // already up so it picks up new -backend.caddy configs; start
-            // if it isn't running yet (fresh switch from nginx/apache/OLS).
-            $ssh->exec($this->privilegedCommand($server, '(systemctl is-active --quiet caddy && systemctl reload caddy) || systemctl enable --now caddy'), 30);
-        }
-
         // Atomic-ish service swap: stop old, enable+start new. The gap between
         // these is the operator-visible downtime window (typically <1s).
         $fromUnit = $this->systemdUnitFor($from);
         $toUnit = $this->systemdUnitFor($this->target);
-        // Switching to traefik or haproxy with from=caddy: do NOT stop caddy.
-        // It's now the per-site backend (on ephemeral high ports). Stopping
-        // it would take all the upstreams offline and the edge proxy would
-        // 502 every request. The :80 release happened above via the per-site
-        // config cleanup + caddy reload.
-        if (in_array($this->target, ['traefik', 'haproxy'], true) && $from === 'caddy') {
-            $fromUnit = null;
-        }
         if ($fromUnit !== null) {
             $ssh->exec($this->privilegedCommand($server, sprintf('systemctl stop %s', escapeshellarg($fromUnit))), 30);
         }
@@ -851,8 +829,6 @@ BASH;
             'nginx' => ['/etc/nginx/nginx.conf', '/etc/nginx/sites-enabled/*'],
             'apache' => ['/etc/apache2/apache2.conf', '/etc/apache2/sites-enabled/*.conf'],
             'openlitespeed' => ['/usr/local/lsws/conf/httpd_config.conf', '/usr/local/lsws/conf/vhosts/*/vhconf.conf'],
-            'traefik' => ['/etc/traefik/traefik.yml', '/etc/traefik/dynamic/*.yml', '/etc/caddy/Caddyfile', '/etc/caddy/sites-enabled/*-backend.caddy'],
-            'haproxy' => ['/etc/haproxy/haproxy.cfg', '/etc/caddy/Caddyfile', '/etc/caddy/sites-enabled/*-backend.caddy'],
             default => [],
         };
     }
@@ -973,125 +949,11 @@ BASH;
     }
 
     /**
-     * Write the dply-owned `/etc/traefik/traefik.yml` static config bound to
-     * `$listenPort`. The file provider watches /etc/traefik/dynamic and
-     * picks up router/service definitions automatically, so this file only
-     * needs to declare the entry point and provider path. Backed-up first
-     * time to .dply-bak so any prior hand-edits survive.
-     */
-    private function writeTraefikStaticConfig(Server $server, SshConnection $ssh, int $listenPort): void
-    {
-        $path = '/etc/traefik/traefik.yml';
-        $backupCmd = sprintf(
-            '[ -f %1$s ] && [ ! -f %1$s.dply-bak ] && cp %1$s %1$s.dply-bak || true',
-            escapeshellarg($path),
-        );
-        $ssh->exec($this->privilegedCommand($server, $backupCmd), 15);
-
-        $contents = <<<YAML
-# Managed by Dply — do NOT hand-edit. Regenerated on every webserver switch.
-entryPoints:
-  web:
-    address: ":{$listenPort}"
-providers:
-  file:
-    directory: /etc/traefik/dynamic
-    watch: true
-YAML;
-        $this->writeRemoteFile($server, $ssh, $path, $contents);
-    }
-
-    /**
-     * Write the dply-owned `/etc/haproxy/haproxy.cfg` bound to `$listenPort`,
-     * covering all sites on the server with one frontend + per-site backends
-     * pointing at the Caddy upstream. Stage 2 calls this with :8080 (safe
-     * to validate while the old webserver is still on :80); cutover calls
-     * with :80 to land the production listener.
-     *
-     * Backs up the original (apt-installed) /etc/haproxy/haproxy.cfg to
-     * .dply-bak first time so the operator can restore manually if needed.
-     *
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
-     */
-    private function writeHAProxyEdgeConfig(
-        Server $server,
-        SshConnection $ssh,
-        \Illuminate\Database\Eloquent\Collection $sites,
-        int $listenPort
-    ): void {
-        $path = '/etc/haproxy/haproxy.cfg';
-        $backupCmd = sprintf(
-            '[ -f %1$s ] && [ ! -f %1$s.dply-bak ] && cp %1$s %1$s.dply-bak || true',
-            escapeshellarg($path),
-        );
-        $ssh->exec($this->privilegedCommand($server, $backupCmd), 15);
-
-        $contents = app(HAProxyEdgeConfigBuilder::class)->build(
-            $sites,
-            $listenPort,
-            fn (Site $s): int => $this->traefikBackendPort($s),
-        );
-        $this->writeRemoteFile($server, $ssh, $path, $contents);
-    }
-
-    /**
-     * For a Traefik-edged server, write the per-site Caddy backend config
-     * bound to the site's ephemeral high port. Traefik's router targets
-     * `http://127.0.0.1:<backend_port>`; this is the daemon listening
-     * there. We re-use CaddySiteConfigBuilder so basic-auth / redirects /
-     * PHP-FPM upstream / static serving all behave identically to the
-     * caddy-edge case — only the listener port differs.
-     */
-    private function writeTraefikCaddyBackend(Server $server, SshConnection $ssh, Site $site): void
-    {
-        $basename = method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
-        $port = $this->traefikBackendPort($site);
-        $config = app(CaddySiteConfigBuilder::class)->build($site, $port);
-        $path = '/etc/caddy/sites-enabled/'.$basename.'-backend.caddy';
-        $this->writeRemoteFile($server, $ssh, $path, $config);
-    }
-
-    /**
-     * Write `$contents` to `$remotePath` on the server. Mirrors the pattern
-     * from {@see \App\Services\Sites\AbstractSiteWebserverProvisioner::writeSystemFile}:
-     * putFile to /tmp then sudo-mv into place + chown root:root + chmod 644.
-     */
-    private function writeRemoteFile(Server $server, SshConnection $ssh, string $remotePath, string $contents): void
-    {
-        $tmp = '/tmp/'.basename($remotePath).'.'.Str::random(8);
-        $ssh->putFile($tmp, $contents);
-        $cmd = sprintf(
-            'sudo -n mkdir -p %1$s && sudo -n mv %2$s %3$s && sudo -n chown root:root %3$s && sudo -n chmod 644 %3$s',
-            escapeshellarg(dirname($remotePath)),
-            escapeshellarg($tmp),
-            escapeshellarg($remotePath),
-        );
-        $ssh->exec($cmd.' 2>&1', 30);
-        $exit = $ssh->lastExecExitCode();
-        if ($exit !== null && $exit !== 0) {
-            throw new \RuntimeException(sprintf(
-                'Failed to write %s on remote host (exit %d).',
-                $remotePath,
-                $exit,
-            ));
-        }
-    }
-
-    /**
      * Stage 5: stop+disable old webserver. Binary + configs stay on disk so the
      * operator can manually revert via systemctl re-enable if needed.
      */
     protected function executeStageDisableOld(Server $server, string $from): void
     {
-        // Switching to traefik/haproxy with from=caddy: skip the disable.
-        // Caddy is the per-site backend now — disabling it would take every
-        // site upstream offline on the next reboot.
-        if (in_array($this->target, ['traefik', 'haproxy'], true) && $from === 'caddy') {
-            return;
-        }
-
         $unit = $this->systemdUnitFor($from);
         if ($unit === null) {
             return; // Unknown webserver — no-op rather than fail. Operator can clean up manually.
@@ -1105,17 +967,6 @@ YAML;
         // No exit-code check: best-effort cleanup. The new webserver is already
         // serving traffic by this stage; failing to disable the old one is a
         // warning, not a hard error.
-    }
-
-    /**
-     * Run a command as root via sudo on the server. Mirrors the pattern from
-     * AbstractSiteWebserverProvisioner — switches need root for apt + systemctl.
-     */
-    private function privilegedCommand(Server $server, string $command): string
-    {
-        // dply provisions a deploy user with passwordless sudo for the operational
-        // commands it runs. The simplest correct form here:
-        return 'sudo -n bash -lc '.escapeshellarg($command);
     }
 
     /**

@@ -69,10 +69,15 @@
                     // web tab. The static banner partial self-polls every 4s
                     // while the run is in_flight, so a queued/running row turns
                     // into completed/failed without a page refresh.
+                    // The banner surfaces BOTH webserver_switch and edge_proxy
+                    // kinds — they're mutually exclusive in practice (the UI
+                    // gates dispatch on both), and treating them as one banner
+                    // keeps the UX coherent. Picks the most recent non-dismissed
+                    // row across both kinds.
                     $webserverSwitchRun = \App\Models\ConsoleAction::query()
                         ->where('subject_type', $server->getMorphClass())
                         ->where('subject_id', $server->id)
-                        ->where('kind', 'webserver_switch')
+                        ->whereIn('kind', ['webserver_switch', 'edge_proxy'])
                         ->whereNull('dismissed_at')
                         ->orderByDesc('created_at')
                         ->first();

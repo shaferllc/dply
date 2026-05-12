@@ -51,6 +51,12 @@ class ServerWebserverAuditEvent extends Model
 
     public const ACTION_ROLLBACK = 'server_webserver_rollback';
 
+    public const ACTION_EDGE_PROXY_ADDED = 'server_edge_proxy_added';
+
+    public const ACTION_EDGE_PROXY_REMOVED = 'server_edge_proxy_removed';
+
+    public const ACTION_EDGE_PROXY_FAILED = 'server_edge_proxy_failed';
+
     protected $fillable = [
         'server_id',
         'user_id',

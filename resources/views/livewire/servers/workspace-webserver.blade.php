@@ -30,9 +30,26 @@
         'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy'],
         'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
         'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
+    ];
+
+    // L7 edge proxies are a separate concept — they sit IN FRONT of the
+    // active webserver (with Caddy as per-site backend). Picker lives in
+    // its own section below the webserver picker; the management tab
+    // (Overview/Tools/Logs/Config/Info) for the ACTIVE edge proxy only
+    // shows up in the top tab strip when one is set.
+    $edgeProxyCatalog = [
         'traefik' => ['label' => 'Traefik', 'icon' => 'heroicon-o-arrow-path-rounded-square', 'systemd' => 'traefik'],
         'haproxy' => ['label' => 'HAProxy', 'icon' => 'heroicon-o-scale', 'systemd' => 'haproxy'],
     ];
+    $activeEdgeProxy = $server->edgeProxy();
+    // Combined list driving the top tab strip + per-engine panel loop.
+    // Webservers always render their tab; the active edge proxy (if any)
+    // also gets a tab so the operator can manage it. is_edge_proxy steers
+    // the panel renderer to skip the Switch CTA and use Add/Remove copy.
+    $engineTabCatalog = $webserverCatalog;
+    if ($activeEdgeProxy !== null && isset($edgeProxyCatalog[$activeEdgeProxy])) {
+        $engineTabCatalog[$activeEdgeProxy] = $edgeProxyCatalog[$activeEdgeProxy] + ['is_edge_proxy' => true];
+    }
 
     // Parse certbot output for the Advanced tab table (regex best-effort).
     $certs = [];
@@ -328,7 +345,7 @@
         $webserverBannerRun = \App\Models\ConsoleAction::query()
             ->where('subject_type', $server->getMorphClass())
             ->where('subject_id', $server->id)
-            ->whereIn('kind', ['webserver_switch', 'manage_action'])
+            ->whereIn('kind', ['webserver_switch', 'edge_proxy', 'manage_action'])
             ->whereNull('dismissed_at')
             ->orderByRaw("CASE WHEN status IN ('queued','running') THEN 0 ELSE 1 END")
             ->orderByDesc('created_at')
@@ -389,7 +406,13 @@
                 {{ __('Overview') }}
             </span>
         </x-server-workspace-tab>
-        @foreach ($webserverCatalog as $key => $info)
+        @foreach ($engineTabCatalog as $key => $info)
+            @php
+                $isEdgeProxyTab = ! empty($info['is_edge_proxy']);
+                $isActiveEngine = $isEdgeProxyTab
+                    ? $key === $activeEdgeProxy
+                    : $key === $activeWebserver;
+            @endphp
             <x-server-workspace-tab
                 :id="'ws-tab-'.$key"
                 :active="$workspace_tab === $key"
@@ -398,9 +421,9 @@
                 <span class="inline-flex items-center gap-2">
                     <x-dynamic-component :component="$info['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ $info['label'] }}
-                    @if ($key === $activeWebserver)
-                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Active') }}</span>
-                    @elseif ($preflight->isBlocked($server, $key))
+                    @if ($isActiveEngine)
+                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ $isEdgeProxyTab ? __('Edge') : __('Active') }}</span>
+                    @elseif (! $isEdgeProxyTab && $preflight->isBlocked($server, $key))
                         <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('Unavailable') }}</span>
                     @endif
                 </span>
@@ -589,6 +612,89 @@
                 @endforeach
             </div>
         </div>
+
+        {{-- =====================================================================
+             EDGE PROXY — separate concept from the webserver. Lives IN FRONT
+             of whatever's serving :80, with Caddy as the per-site backend on
+             ephemeral high ports. Mutually exclusive with caddy/nginx/apache/
+             OLS serving :80 directly. Only one edge proxy can be active.
+             ===================================================================== --}}
+        <div class="{{ $card }} mt-6 p-6 sm:p-8">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="max-w-2xl">
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge proxy') }}</h3>
+                    <p class="mt-1 text-sm text-brand-moss">
+                        {{ __('Optional L7 reverse proxy in front of your webserver. Caddy serves each site on an ephemeral high port; the edge proxy routes hosts to those backends on :80. Pick this when you want host-based load balancing, ACL routing, or sit-on-top of an existing webserver pattern.') }}
+                    </p>
+                </div>
+                @if ($activeEdgeProxy !== null)
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-medium text-brand-forest">
+                        <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                        {{ $edgeProxyCatalog[$activeEdgeProxy]['label'] }} {{ __('active') }}
+                    </span>
+                @endif
+            </div>
+
+            @php $inflightEdge = $this->hasInflightEdgeProxyAction(); @endphp
+            @if ($inflightEdge)
+                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
+                    {{ __('An edge proxy action is currently running. Buttons are disabled until it settles — watch the progress banner at the top of this page.') }}
+                </div>
+            @endif
+
+            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                @foreach ($edgeProxyCatalog as $key => $info)
+                    @php $isActiveEdge = $key === $activeEdgeProxy; @endphp
+                    <div @class([
+                        'rounded-xl border bg-white p-4',
+                        'border-brand-forest/30 ring-1 ring-brand-forest/20' => $isActiveEdge,
+                        'border-brand-ink/10' => ! $isActiveEdge,
+                    ])>
+                        <div class="flex items-start gap-2">
+                            <x-dynamic-component :component="$info['icon']" class="mt-0.5 h-5 w-5 shrink-0 text-brand-forest" />
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-brand-ink">{{ $info['label'] }}</p>
+                                @if ($isActiveEdge)
+                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Routing traffic on :80') }}</p>
+                                @endif
+                            </div>
+                        </div>
+
+                        @if ($isActiveEdge)
+                            <button
+                                type="button"
+                                wire:click="openConfirmActionModal('removeEdgeProxy', [], @js(__('Remove edge proxy')), @js(__('Remove the :name edge proxy? Caddy will resume serving :80 directly.', ['name' => $info['label']])), @js(__('Remove')), true)"
+                                @disabled($isDeployer || ! $opsReady || $inflightEdge)
+                                class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
+                            >
+                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                {{ __('Remove :name', ['name' => $info['label']]) }}
+                            </button>
+                        @elseif ($activeEdgeProxy !== null)
+                            <button
+                                type="button"
+                                @disabled(true)
+                                class="mt-3 inline-flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-brand-sand/40 px-3 py-1.5 text-xs font-semibold text-brand-mist"
+                                title="{{ __('Remove the active edge proxy before switching to another.') }}"
+                            >
+                                <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
+                                {{ __('Unavailable — remove :other first', ['other' => $edgeProxyCatalog[$activeEdgeProxy]['label']]) }}
+                            </button>
+                        @else
+                            <button
+                                type="button"
+                                wire:click="openConfirmActionModal('addEdgeProxy', ['{{ $key }}'], @js(__('Add :name edge proxy', ['name' => $info['label']])), @js(__('Install :name in front of the webserver? Caddy will be installed as the per-site backend; your current webserver (:active) will be stopped.', ['name' => $info['label'], 'active' => $activeWebserver])), @js(__('Add :name', ['name' => $info['label']])), false)"
+                                @disabled($isDeployer || ! $opsReady || $inflightEdge || $inflightSwitch)
+                                class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition hover:bg-brand-forest/90 disabled:opacity-60"
+                            >
+                                <x-heroicon-o-arrow-up-tray class="h-3.5 w-3.5" />
+                                {{ __('Add :name', ['name' => $info['label']]) }}
+                            </button>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
     </x-server-workspace-tab-panel>
 
     {{-- =====================================================================
@@ -597,14 +703,20 @@
          non-active tabs show a brief "not installed / not in use" panel and a
          Switch CTA (with preflight-blocker reason if applicable).
          ===================================================================== --}}
-    @foreach ($webserverCatalog as $key => $info)
+    @foreach ($engineTabCatalog as $key => $info)
         @php
-            $isActive = $key === $activeWebserver;
+            $isEdgeProxyPanel = ! empty($info['is_edge_proxy']);
+            $isActive = $isEdgeProxyPanel
+                ? $key === $activeEdgeProxy
+                : $key === $activeWebserver;
             $unit = $unitFor($info['systemd']);
             $pill = $statePill($unit['active_state'] ?? null);
             $version = $versionFor($key);
             $actionTriad = $actionTriadFor($key);
-            $isBlocked = ! $isActive && $preflight->isBlocked($server, $key);
+            // Edge proxies don't appear in the preflight blocker matrix
+            // (that's webserver-switch concept). Skip the blocker resolve
+            // for them so we don't try to "switch to" an edge proxy.
+            $isBlocked = ! $isEdgeProxyPanel && ! $isActive && $preflight->isBlocked($server, $key);
             $blockerReason = $isBlocked ? $preflight->plan($server, $key)['blocker']['label'] ?? null : null;
         @endphp
 
@@ -781,6 +893,183 @@
                     </div>
                 @endif
             </div>
+
+            {{-- =============================================================
+                 HEALTH CHARTS — per-engine time-series from the dply metrics
+                 agent (server-metrics-snapshot.py). Three line charts: active
+                 connections (gauge), requests/sec (counter-derived rate), 5xx
+                 errors per minute. Edge proxies additionally render a backend
+                 health table below. Empty state when the agent hasn't pushed
+                 a webserver_health block yet (existing servers pre-backfill).
+                 ============================================================= --}}
+            @if ($isActive)
+                @php
+                    $engineHealth = app(\App\Services\Servers\ServerMetricsRangeQuery::class)
+                        ->fetchEngineHealth($server, $key, $engine_metrics_range);
+                    $latestBlock = $engineHealth['latest_block'] ?? null;
+                    $rangeOptions = array_keys(\App\Services\Servers\ServerMetricsRangeQuery::RANGES);
+                    $rangeLabels = [
+                        '1h' => __('1h'),
+                        '6h' => __('6h'),
+                        '24h' => __('24h'),
+                        '7d' => __('7d'),
+                    ];
+                @endphp
+                <div class="{{ $card }} p-6 sm:p-8" wire:key="health-{{ $key }}-{{ $engine_metrics_range }}">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — recent health', ['engine' => $info['label']]) }}</h3>
+                            <p class="mt-1 text-sm text-brand-moss">{{ __('Live counters from the dply metrics agent. Charts show min/max band, line is the bucket average.') }}</p>
+                        </div>
+                        <div
+                            x-data="{
+                                range: @js($engine_metrics_range),
+                                storageKey: @js('dply.engine-metrics-range:'.$server->id.':'.$key),
+                                init() {
+                                    try {
+                                        const saved = window.localStorage?.getItem(this.storageKey);
+                                        if (saved && saved !== this.range && @js($rangeOptions).includes(saved)) {
+                                            this.range = saved;
+                                            this.$wire.setEngineMetricsRange(saved);
+                                        }
+                                    } catch (e) {}
+                                },
+                                pick(r) {
+                                    this.range = r;
+                                    try { window.localStorage?.setItem(this.storageKey, r); } catch (e) {}
+                                    this.$wire.setEngineMetricsRange(r);
+                                },
+                            }"
+                            x-init="init()"
+                            class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-1 shadow-sm"
+                            role="group"
+                            aria-label="{{ __('Time range') }}"
+                        >
+                            @foreach ($rangeOptions as $opt)
+                                <button
+                                    type="button"
+                                    @click="pick(@js($opt))"
+                                    :class="range === @js($opt) ? 'bg-brand-ink text-brand-cream' : 'bg-transparent text-brand-moss hover:bg-brand-sand/40'"
+                                    class="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors"
+                                >
+                                    {{ $rangeLabels[$opt] ?? $opt }}
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    @if ($latestBlock === null)
+                        <div class="mt-5 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-10 text-center text-sm text-brand-moss">
+                            <x-heroicon-o-signal-slash class="mx-auto h-5 w-5 text-brand-mist" />
+                            <p class="mt-2">{{ __('No health data yet. The agent will start posting :engine metrics on the next push.', ['engine' => $info['label']]) }}</p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Existing servers may need a one-shot config backfill before the stats endpoint is reachable.') }}</p>
+                        </div>
+                    @else
+                        <div class="mt-5 grid gap-4 sm:grid-cols-3">
+                            {{-- Active connections (gauge) --}}
+                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-4">
+                                <header class="flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <x-heroicon-o-link class="h-5 w-5 text-brand-forest" />
+                                        <h4 class="text-sm font-semibold text-brand-ink">{{ __('Active connections') }}</h4>
+                                    </div>
+                                    <p class="text-lg font-semibold tabular-nums text-brand-ink">
+                                        {{ number_format((int) ($latestBlock['active_connections'] ?? 0)) }}
+                                    </p>
+                                </header>
+                                <div class="mt-3">
+                                    <x-metrics-line-chart
+                                        :series="$engineHealth['metrics']['active_connections'] ?? []"
+                                        :y-min="0"
+                                        color-class="text-brand-forest"
+                                        format="count"
+                                    />
+                                </div>
+                            </section>
+
+                            {{-- Requests / sec (counter→rate) --}}
+                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-4">
+                                <header class="flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <x-heroicon-o-bolt class="h-5 w-5 text-brand-forest" />
+                                        <h4 class="text-sm font-semibold text-brand-ink">{{ __('Requests / sec') }}</h4>
+                                    </div>
+                                    <p class="text-lg font-semibold tabular-nums text-brand-ink">
+                                        {{ number_format((float) ($latestBlock['requests_per_sec'] ?? 0), 2) }}
+                                    </p>
+                                </header>
+                                <div class="mt-3">
+                                    <x-metrics-line-chart
+                                        :series="$engineHealth['metrics']['requests_per_sec'] ?? []"
+                                        :y-min="0"
+                                        color-class="text-brand-forest"
+                                        format="rate"
+                                    />
+                                </div>
+                            </section>
+
+                            {{-- 5xx errors / min (counter→rate) --}}
+                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-4">
+                                <header class="flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <x-heroicon-o-exclamation-triangle class="h-5 w-5 text-rose-600" />
+                                        <h4 class="text-sm font-semibold text-brand-ink">{{ __('5xx / min') }}</h4>
+                                    </div>
+                                    <p class="text-lg font-semibold tabular-nums text-rose-700">
+                                        {{ number_format((int) ($latestBlock['errors_5xx_total'] ?? 0)) }}
+                                    </p>
+                                </header>
+                                <div class="mt-3">
+                                    <x-metrics-line-chart
+                                        :series="$engineHealth['metrics']['errors_5xx_per_min'] ?? []"
+                                        :y-min="0"
+                                        color-class="text-rose-600"
+                                        format="rate"
+                                    />
+                                </div>
+                            </section>
+                        </div>
+
+                        @if (! empty($latestBlock['backends']))
+                            {{-- Edge-proxy-only backend health table. HAProxy emits
+                                 per-backend status via the stats socket; Traefik emits
+                                 it via /metrics labels (not yet parsed but will land
+                                 here when the agent learns to extract them). --}}
+                            <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-white">
+                                <div class="border-b border-brand-ink/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Backends') }}</div>
+                                <table class="w-full text-left text-sm">
+                                    <thead class="text-[11px] uppercase tracking-wide text-brand-mist">
+                                        <tr>
+                                            <th class="px-4 py-2 font-medium">{{ __('Backend') }}</th>
+                                            <th class="px-4 py-2 font-medium">{{ __('Server') }}</th>
+                                            <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-brand-ink/5">
+                                        @foreach ($latestBlock['backends'] as $backend)
+                                            @php
+                                                $status = strtoupper((string) ($backend['status'] ?? '?'));
+                                                $statusClass = match (true) {
+                                                    str_contains($status, 'UP') => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+                                                    str_contains($status, 'DOWN') => 'bg-rose-50 text-rose-800 ring-rose-200',
+                                                    default => 'bg-brand-sand/40 text-brand-moss ring-brand-ink/10',
+                                                };
+                                            @endphp
+                                            <tr>
+                                                <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $backend['backend'] ?? '—' }}</td>
+                                                <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $backend['name'] ?? '—' }}</td>
+                                                <td class="px-4 py-2">
+                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $statusClass }}">{{ $status }}</span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    @endif
+                </div>
+            @endif
 
             @endif
 
