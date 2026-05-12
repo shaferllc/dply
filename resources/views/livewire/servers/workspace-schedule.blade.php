@@ -104,26 +104,36 @@
         @endif
     </section>
 
-    {{-- Add scheduler for a site --------------------------------------------------- --}}
+    {{-- Enable scheduler for a site (creates a managed cron entry directly) ----- --}}
     @if ($sites->isNotEmpty())
         <section class="{{ $card }}">
             <header class="border-b border-brand-ink/10 px-5 py-4">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-ink">{{ __('Enable scheduler for a site') }}</h2>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Quick links to the per-site Cron / Daemons pages with the scheduler preset.') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Creates a cron entry under the site\'s system user that calls the framework scheduler. Edit it on the Cron jobs page if you need to tweak the cadence or command.') }}</p>
             </header>
-            <ul class="divide-y divide-brand-ink/10">
-                @foreach ($sites as $site)
-                    <li class="flex items-center gap-4 px-5 py-3">
-                        <p class="min-w-0 flex-1 truncate text-sm font-medium text-brand-ink">{{ $site->name }}</p>
-                        <a href="{{ route('sites.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $btnSecondary }}">
-                            {{ __('Add scheduler cron') }}
-                        </a>
-                        <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}?preset=laravel-schedule" wire:navigate class="{{ $btnSecondary }}">
-                            {{ __('Add schedule:work daemon') }}
-                        </a>
-                    </li>
-                @endforeach
-            </ul>
+            @php
+                $input = 'block w-full rounded-lg border border-brand-ink/20 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-2 focus:ring-brand-forest/30';
+                $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+            @endphp
+            <form wire:submit="enableSchedulerForSite" class="grid gap-3 p-5 sm:grid-cols-4">
+                <select wire:model="enable_site_id" class="{{ $input }} sm:col-span-2">
+                    <option value="">{{ __('Pick a site…') }}</option>
+                    @foreach ($sites as $site)
+                        <option value="{{ $site->id }}">{{ $site->name }}</option>
+                    @endforeach
+                </select>
+                <select wire:model="enable_framework" class="{{ $input }} sm:col-span-1">
+                    <option value="laravel">{{ __('Laravel (schedule:run)') }}</option>
+                    <option value="rails">{{ __('Rails (whenever)') }}</option>
+                </select>
+                <input type="text" wire:model="enable_cron_expression" class="{{ $input }} font-mono sm:col-span-1" placeholder="* * * * *" />
+                <button type="submit" class="{{ $btnPrimary }} sm:col-span-4 sm:justify-self-start" @disabled(! $opsReady)>
+                    {{ __('Enable scheduler') }}
+                </button>
+            </form>
+            <div class="border-t border-brand-ink/10 px-5 py-3 text-xs text-brand-moss">
+                <p>{{ __('Prefer a long-running daemon? ') }}<a href="{{ route('servers.daemons', $server) }}?preset=laravel-schedule" wire:navigate class="font-semibold text-brand-ink underline">{{ __('Add a schedule:work supervisor program') }}</a>{{ __(' instead.') }}</p>
+            </div>
         </section>
     @endif
 </x-server-workspace-layout>

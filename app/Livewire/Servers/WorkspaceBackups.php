@@ -15,6 +15,7 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Services\Servers\ServerRemovalAdvisor;
+use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
@@ -242,6 +243,56 @@ class WorkspaceBackups extends Component
         $this->toastSuccess(__('Backup schedule removed.'));
     }
 
+    /** Inline-edit form state: schedule id → new cron expression. Empty = not editing. */
+    public array $editing_schedules = [];
+
+    public function startEditSchedule(string $scheduleId): void
+    {
+        $schedule = ServerBackupSchedule::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($scheduleId)
+            ->first();
+        if ($schedule === null) {
+            return;
+        }
+        $this->editing_schedules[$scheduleId] = $schedule->cron_expression;
+    }
+
+    public function cancelEditSchedule(string $scheduleId): void
+    {
+        unset($this->editing_schedules[$scheduleId]);
+    }
+
+    public function saveScheduleCadence(string $scheduleId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $newCron = trim((string) ($this->editing_schedules[$scheduleId] ?? ''));
+        if ($newCron === '' || strlen($newCron) > 64) {
+            $this->toastError(__('Invalid cron expression.'));
+
+            return;
+        }
+
+        $schedule = ServerBackupSchedule::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($scheduleId)
+            ->first();
+        if ($schedule === null) {
+            return;
+        }
+
+        $schedule->update(['cron_expression' => $newCron]);
+        if ($schedule->server_cron_job_id) {
+            ServerCronJob::query()
+                ->whereKey($schedule->server_cron_job_id)
+                ->update(['cron_expression' => $newCron]);
+        }
+
+        unset($this->editing_schedules[$scheduleId]);
+        $this->toastSuccess(__('Schedule updated.'));
+    }
+
     /**
      * Pause/resume a schedule by flipping is_active on both the schedule row and the
      * backing cron entry. The cron line stays in place so resume is one click.
@@ -344,9 +395,77 @@ class WorkspaceBackups extends Component
             ->orderBy('created_at')
             ->get();
 
+        // Per-schedule "next run" + most recent status, computed once and passed by id.
+        // Next-run parsing uses the same dragonmantank/cron-expression library Laravel
+        // ships with; an unparseable expression silently degrades to null (the schedule
+        // form rejects garbage at save time, so this is just defensive).
+        $scheduleMeta = [];
+        foreach ($schedules as $schedule) {
+            $next = null;
+            try {
+                if ($schedule->is_active) {
+                    $next = (new CronExpression($schedule->cron_expression))->getNextRunDate('now');
+                }
+            } catch (\Throwable) {
+                $next = null;
+            }
+
+            $latestStatus = match ($schedule->target_type) {
+                'database' => ServerDatabaseBackup::query()
+                    ->where('server_database_id', $schedule->target_id)
+                    ->orderByDesc('created_at')
+                    ->value('status'),
+                'site_files' => SiteFileBackup::query()
+                    ->where('site_id', $schedule->target_id)
+                    ->orderByDesc('created_at')
+                    ->value('status'),
+                default => null,
+            };
+
+            $scheduleMeta[$schedule->id] = [
+                'next_run_at' => $next,
+                'latest_status' => $latestStatus,
+            ];
+        }
+
         $backupConfigurations = auth()->user()
             ? BackupConfiguration::query()->where('user_id', auth()->id())->orderBy('name')->get()
             : collect();
+
+        // 7-day at-a-glance counts to help operators spot drift without scrolling. Pulled
+        // separately from the recent-runs lists (which are capped at 20) so the metrics are
+        // accurate even when there's a heavy backup cadence.
+        $weekAgo = now()->subDays(7);
+        $stats = [
+            'db_completed_7d' => ServerDatabaseBackup::query()
+                ->whereIn('server_database_id', $databaseIds)
+                ->where('status', 'completed')
+                ->where('created_at', '>=', $weekAgo)
+                ->count(),
+            'db_failed_7d' => ServerDatabaseBackup::query()
+                ->whereIn('server_database_id', $databaseIds)
+                ->where('status', 'failed')
+                ->where('created_at', '>=', $weekAgo)
+                ->count(),
+            'files_completed_7d' => SiteFileBackup::query()
+                ->whereIn('site_id', $siteIds)
+                ->where('status', 'completed')
+                ->where('created_at', '>=', $weekAgo)
+                ->count(),
+            'files_failed_7d' => SiteFileBackup::query()
+                ->whereIn('site_id', $siteIds)
+                ->where('status', 'failed')
+                ->where('created_at', '>=', $weekAgo)
+                ->count(),
+            'total_bytes' => (int) ServerDatabaseBackup::query()
+                ->whereIn('server_database_id', $databaseIds)
+                ->where('status', 'completed')
+                ->sum('bytes')
+                + (int) SiteFileBackup::query()
+                    ->whereIn('site_id', $siteIds)
+                    ->where('status', 'completed')
+                    ->sum('bytes'),
+        ];
 
         return view('livewire.servers.workspace-backups', [
             'opsReady' => $this->serverOpsReady(),
@@ -355,7 +474,9 @@ class WorkspaceBackups extends Component
             'databaseBackups' => $databaseBackups,
             'fileBackups' => $fileBackups,
             'schedules' => $schedules,
+            'scheduleMeta' => $scheduleMeta,
             'backupConfigurations' => $backupConfigurations,
+            'stats' => $stats,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

@@ -490,6 +490,288 @@ class BackgroundWorkspacePagesTest extends TestCase
         $this->assertFalse(Storage::disk('local')->exists('site-files.tar.gz'));
     }
 
+    public function test_backups_stats_count_completed_and_failed_in_last_7_days(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+
+        // 2 completed in window, 1 failed in window, 1 completed older (excluded).
+        ServerDatabaseBackup::create(['server_database_id' => $database->id, 'status' => 'completed', 'bytes' => 1024]);
+        ServerDatabaseBackup::create(['server_database_id' => $database->id, 'status' => 'completed', 'bytes' => 2048]);
+        ServerDatabaseBackup::create(['server_database_id' => $database->id, 'status' => 'failed']);
+        $old = ServerDatabaseBackup::create(['server_database_id' => $database->id, 'status' => 'completed', 'bytes' => 999]);
+        $old->created_at = now()->subDays(30);
+        $old->save();
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server]);
+
+        $stats = $component->viewData('stats');
+        $this->assertSame(2, $stats['db_completed_7d']);
+        $this->assertSame(1, $stats['db_failed_7d']);
+        // total_bytes counts ALL completed backups (not just 7d window).
+        $this->assertSame(1024 + 2048 + 999, $stats['total_bytes']);
+    }
+
+    public function test_schedule_meta_includes_next_run_and_latest_status(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+        ]);
+        // Latest backup is failed — meta should surface this.
+        ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'status' => 'failed',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server]);
+
+        $meta = $component->viewData('scheduleMeta');
+        $this->assertArrayHasKey($schedule->id, $meta);
+        $this->assertSame('failed', $meta[$schedule->id]['latest_status']);
+        $this->assertNotNull($meta[$schedule->id]['next_run_at'], 'Active schedules with valid cron must compute a next-run time.');
+        $this->assertGreaterThan(now()->timestamp, $meta[$schedule->id]['next_run_at']->getTimestamp());
+    }
+
+    public function test_enable_scheduler_for_site_creates_laravel_cron_entry(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSchedule::class, ['server' => $server])
+            ->set('enable_site_id', $site->id)
+            ->set('enable_framework', 'laravel')
+            ->set('enable_cron_expression', '* * * * *')
+            ->call('enableSchedulerForSite');
+
+        $entry = ServerCronJob::query()
+            ->where('server_id', $server->id)
+            ->where('site_id', $site->id)
+            ->first();
+        $this->assertNotNull($entry);
+        $this->assertStringContainsString('schedule:run', $entry->command);
+        $this->assertSame('* * * * *', $entry->cron_expression);
+    }
+
+    public function test_enable_scheduler_for_site_creates_rails_whenever_entry(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSchedule::class, ['server' => $server])
+            ->set('enable_site_id', $site->id)
+            ->set('enable_framework', 'rails')
+            ->set('enable_cron_expression', '0 * * * *')
+            ->call('enableSchedulerForSite');
+
+        $entry = ServerCronJob::query()
+            ->where('server_id', $server->id)
+            ->where('site_id', $site->id)
+            ->first();
+        $this->assertNotNull($entry);
+        $this->assertStringContainsString('whenever', $entry->command);
+    }
+
+    public function test_enable_scheduler_rejects_missing_site(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSchedule::class, ['server' => $server])
+            ->set('enable_site_id', '')
+            ->call('enableSchedulerForSite');
+
+        $this->assertSame(0, ServerCronJob::query()->where('server_id', $server->id)->count());
+    }
+
+    public function test_completed_backup_auto_resumes_paused_schedule(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $cronJob = ServerCronJob::create([
+            'server_id' => $server->id,
+            'cron_expression' => '0 3 * * *',
+            'command' => 'php artisan dply:run-backup-schedule X',
+            'user' => 'root',
+            'enabled' => false,
+            'system_managed' => true,
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => false,
+            'server_cron_job_id' => $cronJob->id,
+        ]);
+
+        $backup = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'status' => ServerDatabaseBackup::STATUS_PENDING,
+        ]);
+
+        // Status flip from pending → completed should re-enable both schedule and cron.
+        $backup->update(['status' => ServerDatabaseBackup::STATUS_COMPLETED, 'disk_path' => 'x.sql']);
+
+        $this->assertTrue(ServerBackupSchedule::find($schedule->id)->is_active);
+        $this->assertTrue(ServerCronJob::find($cronJob->id)->enabled);
+    }
+
+    public function test_failed_backup_does_not_auto_resume_paused_schedule(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => false,
+        ]);
+
+        $backup = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'status' => ServerDatabaseBackup::STATUS_PENDING,
+        ]);
+        $backup->update(['status' => 'failed']);
+
+        $this->assertFalse(ServerBackupSchedule::find($schedule->id)->is_active);
+    }
+
+    public function test_paused_schedule_has_null_next_run(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => false,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server]);
+
+        $meta = $component->viewData('scheduleMeta');
+        $this->assertNull($meta[$schedule->id]['next_run_at']);
+    }
+
+    public function test_save_schedule_cadence_updates_both_schedule_and_cron(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $cronJob = ServerCronJob::create([
+            'server_id' => $server->id,
+            'cron_expression' => '0 3 * * *',
+            'command' => 'php artisan dply:run-backup-schedule X',
+            'user' => 'root',
+            'enabled' => true,
+            'system_managed' => true,
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+            'server_cron_job_id' => $cronJob->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('startEditSchedule', $schedule->id)
+            ->set('editing_schedules.'.$schedule->id, '30 4 * * 0')
+            ->call('saveScheduleCadence', $schedule->id);
+
+        $this->assertSame('30 4 * * 0', ServerBackupSchedule::find($schedule->id)->cron_expression);
+        $this->assertSame('30 4 * * 0', ServerCronJob::find($cronJob->id)->cron_expression);
+    }
+
+    public function test_save_schedule_cadence_rejects_empty_cron(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('startEditSchedule', $schedule->id)
+            ->set('editing_schedules.'.$schedule->id, '   ')
+            ->call('saveScheduleCadence', $schedule->id);
+
+        // Original cadence preserved.
+        $this->assertSame('0 3 * * *', ServerBackupSchedule::find($schedule->id)->cron_expression);
+    }
+
     public function test_solid_queue_preset_fills_daemons_form(): void
     {
         $user = $this->actingOrgUser();

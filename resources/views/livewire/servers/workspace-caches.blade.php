@@ -814,6 +814,34 @@
                                                 {{ __('Running…') }}
                                             </span>
                                         </button>
+                                        @php
+                                            // Surface the port-repair affordance only for the case it
+                                            // actually fixes: default-instance, redis-style engine, port
+                                            // bumped off the engine default (because another service
+                                            // occupied 6379) and the daemon's currently unreachable.
+                                            $needsPortRepair = $row->name === \App\Models\ServerCacheService::DEFAULT_INSTANCE_NAME
+                                                && in_array($row->engine, ['redis', 'valkey', 'keydb'], true)
+                                                && (int) $row->port !== \App\Models\ServerCacheService::defaultPortFor($row->engine);
+                                        @endphp
+                                        @if ($needsPortRepair)
+                                            <button
+                                                type="button"
+                                                wire:click="repairDefaultInstancePort('{{ $engine }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="repairDefaultInstancePort"
+                                                class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 font-sans text-[11px] font-medium text-rose-900 hover:bg-rose-100 disabled:opacity-50"
+                                                title="{{ __('Rewrite :config to bind :port and restart — fixes default-instance rows whose apt config still points at the engine default.', ['config' => '/etc/'.$engine.'/'.$engine.'.conf', 'port' => $row->port]) }}"
+                                            >
+                                                <span wire:loading.remove wire:target="repairDefaultInstancePort" class="inline-flex items-center gap-1">
+                                                    <x-heroicon-o-wrench-screwdriver class="h-3 w-3" />
+                                                    {{ __('Repair port') }}
+                                                </span>
+                                                <span wire:loading wire:target="repairDefaultInstancePort" class="inline-flex items-center gap-1">
+                                                    <x-spinner variant="forest" />
+                                                    {{ __('Repairing…') }}
+                                                </span>
+                                            </button>
+                                        @endif
                                     @endif
                                     {{-- Status / Logs — open the per-instance modal that shows
                                          systemctl status and journalctl -u for THIS instance's
@@ -887,16 +915,19 @@
                             </p>
                         @endif
 
-                        {{-- Debug-output panel — appears when the operator clicks Debug.
-                             Shows systemctl status, port listener, ping probe, and recent
-                             journal lines so the operator can diagnose why an instance is
-                             marked Not reachable. Dismiss clears the buffer. --}}
+                        {{-- Command-output panel — Debug, Repair, Restart/Stop/Start all land here
+                             so the operator can read the actual shell output instead of guessing
+                             what a one-line success/failure toast meant. The label tracks the
+                             action that most recently wrote into this buffer. Dismiss clears it. --}}
                         @if (! empty($debug_output_by_engine[$engine]))
+                            @php
+                                $consoleLabel = $debug_output_label_by_engine[$engine] ?? __('Debug');
+                            @endphp
                             <div class="mt-4 overflow-hidden rounded-xl border border-amber-300 bg-amber-50">
                                 <div class="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-100/60 px-4 py-2.5">
                                     <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-900">
-                                        <x-heroicon-o-bug-ant class="h-3.5 w-3.5" />
-                                        {{ __('Debug — :engine instance :name', ['engine' => $engineLabels[$engine] ?? $engine, 'name' => $row->name]) }}
+                                        <x-heroicon-o-command-line class="h-3.5 w-3.5" />
+                                        {{ __(':label — :engine instance :name', ['label' => $consoleLabel, 'engine' => $engineLabels[$engine] ?? $engine, 'name' => $row->name]) }}
                                     </p>
                                     <button
                                         type="button"

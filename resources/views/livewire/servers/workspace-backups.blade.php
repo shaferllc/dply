@@ -9,6 +9,19 @@
         'failed' => 'text-red-700',
         default => 'text-brand-moss',
     };
+    $formatBytes = function (?int $bytes): string {
+        if ($bytes === null || $bytes <= 0) {
+            return '—';
+        }
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $value = (float) $bytes;
+        $i = 0;
+        while ($value >= 1024 && $i < count($units) - 1) {
+            $value /= 1024;
+            $i++;
+        }
+        return number_format($value, $i === 0 ? 0 : 1).' '.$units[$i];
+    };
 @endphp
 
 <x-server-workspace-layout
@@ -26,6 +39,36 @@
             <p class="mt-2">{{ __('Backups currently write to the local disk. To send them to S3 / Dropbox / Google Drive / SFTP, ') }}<a href="{{ route('profile.backup-configurations') }}" wire:navigate class="font-semibold text-brand-ink underline">{{ __('add a backup destination') }}</a>{{ __(' first.') }}</p>
         @endif
     </x-explainer>
+
+    {{-- At-a-glance health strip — last 7 days for completed/failed counts. --}}
+    <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database backups (7d)') }}</p>
+            <p class="mt-1 flex items-baseline gap-2">
+                <span class="text-2xl font-semibold text-brand-forest">{{ $stats['db_completed_7d'] }}</span>
+                @if ($stats['db_failed_7d'] > 0)
+                    <span class="text-sm font-semibold text-red-700">{{ $stats['db_failed_7d'] }} {{ __('failed') }}</span>
+                @endif
+            </p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Site file backups (7d)') }}</p>
+            <p class="mt-1 flex items-baseline gap-2">
+                <span class="text-2xl font-semibold text-brand-forest">{{ $stats['files_completed_7d'] }}</span>
+                @if ($stats['files_failed_7d'] > 0)
+                    <span class="text-sm font-semibold text-red-700">{{ $stats['files_failed_7d'] }} {{ __('failed') }}</span>
+                @endif
+            </p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total stored') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $formatBytes($stats['total_bytes']) }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Active schedules') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $schedules->where('is_active', true)->count() }}</p>
+        </div>
+    </section>
 
     {{-- Run now -------------------------------------------------------------------- --}}
     <section class="grid gap-4 lg:grid-cols-2">
@@ -116,13 +159,36 @@
             @else
                 <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
                     @foreach ($schedules as $schedule)
+                        @php
+                            $isEditing = array_key_exists($schedule->id, $editing_schedules);
+                            $meta = $scheduleMeta[$schedule->id] ?? ['next_run_at' => null, 'latest_status' => null];
+                        @endphp
                         <li class="flex items-center gap-4 px-4 py-3">
                             <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm font-semibold text-brand-ink">{{ $schedule->targetLabel() }}</p>
-                                <p class="mt-0.5 flex items-center gap-3 text-[11px] uppercase tracking-wide text-brand-mist">
+                                <div class="flex items-center gap-2">
+                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $schedule->targetLabel() }}</p>
+                                    @if ($meta['latest_status'] === 'completed')
+                                        <span class="inline-flex items-center rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('healthy') }}</span>
+                                    @elseif ($meta['latest_status'] === 'failed')
+                                        <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">{{ __('last failed') }}</span>
+                                    @elseif ($meta['latest_status'] === 'pending')
+                                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">{{ __('running') }}</span>
+                                    @endif
+                                </div>
+                                <p class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] uppercase tracking-wide text-brand-mist">
                                     <span>{{ $schedule->target_type }}</span>
                                     <span>·</span>
-                                    <span class="font-mono normal-case tracking-normal">{{ $schedule->cron_expression }}</span>
+                                    @if ($isEditing)
+                                        <input
+                                            type="text"
+                                            wire:model="editing_schedules.{{ $schedule->id }}"
+                                            wire:keydown.enter="saveScheduleCadence('{{ $schedule->id }}')"
+                                            class="rounded border border-brand-ink/20 bg-white px-1.5 py-0.5 font-mono text-[11px] normal-case tracking-normal text-brand-ink"
+                                            placeholder="0 3 * * *"
+                                        />
+                                    @else
+                                        <span class="font-mono normal-case tracking-normal">{{ $schedule->cron_expression }}</span>
+                                    @endif
                                     @if (! $schedule->is_active)
                                         <span>·</span>
                                         <span class="text-amber-700">{{ __('paused') }}</span>
@@ -131,15 +197,31 @@
                                         <span>·</span>
                                         <span>{{ __('last :ts', ['ts' => $schedule->last_run_at->diffForHumans()]) }}</span>
                                     @endif
+                                    @if ($meta['next_run_at'] !== null)
+                                        <span>·</span>
+                                        <span>{{ __('next :ts', ['ts' => \Illuminate\Support\Carbon::instance($meta['next_run_at'])->diffForHumans()]) }}</span>
+                                    @endif
                                 </p>
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
-                                <button type="button" wire:click="toggleSchedule('{{ $schedule->id }}')" class="{{ $btnSecondary }}">
-                                    {{ $schedule->is_active ? __('Pause') : __('Resume') }}
-                                </button>
-                                <button type="button" wire:click="deleteSchedule('{{ $schedule->id }}')" wire:confirm="{{ __('Remove this backup schedule?') }}" class="{{ $btnDangerSm }}">
-                                    {{ __('Remove') }}
-                                </button>
+                                @if ($isEditing)
+                                    <button type="button" wire:click="saveScheduleCadence('{{ $schedule->id }}')" class="{{ $btnPrimary }}">
+                                        {{ __('Save') }}
+                                    </button>
+                                    <button type="button" wire:click="cancelEditSchedule('{{ $schedule->id }}')" class="{{ $btnSecondary }}">
+                                        {{ __('Cancel') }}
+                                    </button>
+                                @else
+                                    <button type="button" wire:click="startEditSchedule('{{ $schedule->id }}')" class="{{ $btnSecondary }}">
+                                        {{ __('Edit') }}
+                                    </button>
+                                    <button type="button" wire:click="toggleSchedule('{{ $schedule->id }}')" class="{{ $btnSecondary }}">
+                                        {{ $schedule->is_active ? __('Pause') : __('Resume') }}
+                                    </button>
+                                    <button type="button" wire:click="deleteSchedule('{{ $schedule->id }}')" wire:confirm="{{ __('Remove this backup schedule?') }}" class="{{ $btnDangerSm }}">
+                                        {{ __('Remove') }}
+                                    </button>
+                                @endif
                             </div>
                         </li>
                     @endforeach
@@ -162,7 +244,13 @@
                         <li class="flex items-center gap-4 px-5 py-3">
                             <div class="min-w-0 flex-1">
                                 <p class="truncate text-sm font-medium text-brand-ink">{{ optional($backup->serverDatabase)->name ?? '(deleted)' }}</p>
-                                <p class="mt-0.5 text-[11px] uppercase tracking-wide {{ $statusClass($backup->status) }}">{{ $backup->status }}</p>
+                                <p class="mt-0.5 flex items-center gap-2 text-[11px] uppercase tracking-wide">
+                                    <span class="{{ $statusClass($backup->status) }}">{{ $backup->status }}</span>
+                                    @if ($backup->bytes)
+                                        <span class="text-brand-mist">·</span>
+                                        <span class="text-brand-mist">{{ $formatBytes((int) $backup->bytes) }}</span>
+                                    @endif
+                                </p>
                                 @if ($backup->error_message)
                                     <p class="mt-1 truncate text-xs text-red-700">{{ $backup->error_message }}</p>
                                 @endif
@@ -196,7 +284,13 @@
                         <li class="flex items-center gap-4 px-5 py-3">
                             <div class="min-w-0 flex-1">
                                 <p class="truncate text-sm font-medium text-brand-ink">{{ optional($backup->site)->name ?? '(deleted)' }}</p>
-                                <p class="mt-0.5 text-[11px] uppercase tracking-wide {{ $statusClass($backup->status) }}">{{ $backup->status }}</p>
+                                <p class="mt-0.5 flex items-center gap-2 text-[11px] uppercase tracking-wide">
+                                    <span class="{{ $statusClass($backup->status) }}">{{ $backup->status }}</span>
+                                    @if ($backup->bytes)
+                                        <span class="text-brand-mist">·</span>
+                                        <span class="text-brand-mist">{{ $formatBytes((int) $backup->bytes) }}</span>
+                                    @endif
+                                </p>
                                 @if ($backup->error_message)
                                     <p class="mt-1 truncate text-xs text-red-700">{{ $backup->error_message }}</p>
                                 @endif
@@ -223,4 +317,11 @@
     @if ($databaseBackups->where('status', 'pending')->isNotEmpty() || $fileBackups->where('status', 'pending')->isNotEmpty())
         <div wire:poll.10s="$refresh" class="hidden" aria-hidden="true"></div>
     @endif
+
+    {{-- CLI equivalents — same idea as Cron / Daemons pages. Lets operators script the same flows. --}}
+    <x-cli-snippet :commands="[
+        ['label' => __('Run all due backup schedules now'), 'command' => 'dply:run-backup-schedule {schedule_id}'],
+        ['label' => __('Prune old backups (dry-run)'), 'command' => 'dply:prune-backups --dry-run'],
+        ['label' => __('Prune old backups for real'), 'command' => 'dply:prune-backups'],
+    ]" />
 </x-server-workspace-layout>

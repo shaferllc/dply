@@ -68,6 +68,13 @@ return [
      */
     'backup_retention_per_database' => (int) env('SERVER_DATABASE_BACKUP_RETENTION_PER_DATABASE', 10),
 
+    /**
+     * Time-based retention for {@see App\Console\Commands\PruneBackupsCommand} (days).
+     * Complements the per-database count limit above — anything older than this is pruned
+     * regardless of how many newer backups exist. Floor of 7 days enforced in code.
+     */
+    'run_retention_days' => (int) env('SERVER_DATABASE_BACKUP_RETENTION_DAYS', 90),
+
     /** Default expiry for credential share links (hours). */
     'credential_share_expires_hours' => (int) env('SERVER_DATABASE_SHARE_EXPIRES_HOURS', 72),
 

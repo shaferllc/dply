@@ -169,13 +169,98 @@ class CacheServiceInstallScriptsInstanceTest extends TestCase
         $row->port = 6379;
         $row->auth_password = null;
 
-        // For a default-named row, the row-aware composer must produce the
-        // same script as the legacy single-instance installScript() wrapper.
-        // This is the contract that keeps existing servers untouched.
+        // For a default-named row whose port matches the engine's stock default, the row-aware
+        // composer must produce the same script as the legacy single-instance installScript()
+        // wrapper. This is the contract that keeps existing servers untouched.
         $this->assertSame(
             CacheServiceInstallScripts::installScript('redis'),
             CacheServiceInstallScripts::installScriptForRow($row),
         );
+    }
+
+    public function test_default_instance_port_rewrite_script_redis_family(): void
+    {
+        foreach (['redis' => '/etc/redis/redis.conf', 'valkey' => '/etc/valkey/valkey.conf', 'keydb' => '/etc/keydb/keydb.conf'] as $engine => $expectedPath) {
+            $script = CacheServiceInstallScripts::defaultInstancePortRewriteScript($engine, 6381);
+
+            $this->assertStringContainsString("config_file={$expectedPath}", $script, "Engine {$engine} rewrite must target its stock config path.");
+
+            // Anchored regex that only matches an uncommented `port <n>` line — commented
+            // `# port 6379` must be left alone. Pattern is duplicated between grep and sed
+            // (idempotency check + actual rewrite); the test asserts both.
+            $this->assertStringContainsString("grep -qE '^[[:space:]]*port[[:space:]]+[0-9]+'", $script);
+            $this->assertStringContainsString("sed -i -E 's/^([[:space:]]*)port[[:space:]]+[0-9]+/\\1port 6381/'", $script);
+
+            // Append-as-fallback path for stripped configs that don't already have a port line.
+            $this->assertStringContainsString('port 6381', $script);
+        }
+    }
+
+    public function test_default_instance_port_rewrite_script_returns_empty_for_other_engines(): void
+    {
+        // Memcached and dragonfly don't use Redis-style `port <n>` lines, so the rewrite is a
+        // no-op for them — operators wanting a non-default port on those should use a named
+        // instance (or single-instance on the default port).
+        $this->assertSame('', CacheServiceInstallScripts::defaultInstancePortRewriteScript('memcached', 11212));
+        $this->assertSame('', CacheServiceInstallScripts::defaultInstancePortRewriteScript('dragonfly', 6380));
+    }
+
+    public function test_install_script_for_default_row_off_default_port_splices_port_rewrite(): void
+    {
+        $row = new ServerCacheService;
+        $row->engine = 'redis';
+        $row->name = ServerCacheService::DEFAULT_INSTANCE_NAME;
+        $row->port = 6381;
+        $row->auth_password = null;
+
+        $script = CacheServiceInstallScripts::installScriptForRow($row);
+
+        // The rewrite is spliced AFTER the apt install and BEFORE the systemctl-enable — so the
+        // daemon's first start picks up the right port and doesn't restart-loop on a port
+        // collision with whatever's already on 6379.
+        $aptPos = strpos($script, 'apt-get install -y redis-server');
+        $rewritePos = strpos($script, 'config_file=/etc/redis/redis.conf');
+        $enablePos = strpos($script, 'systemctl enable --now redis-server');
+
+        $this->assertNotFalse($aptPos, 'Install script must run apt install.');
+        $this->assertNotFalse($rewritePos, 'Default instance off default port must include the port rewrite.');
+        $this->assertNotFalse($enablePos, 'Install script must enable the unit.');
+        $this->assertGreaterThan($aptPos, $rewritePos, 'Port rewrite must come AFTER apt install (so the config file exists).');
+        $this->assertGreaterThan($rewritePos, $enablePos, 'Port rewrite must come BEFORE systemctl enable (so the first start uses the right port).');
+        $this->assertStringContainsString('port 6381', $script);
+    }
+
+    public function test_install_script_for_default_row_on_default_port_omits_port_rewrite(): void
+    {
+        $row = new ServerCacheService;
+        $row->engine = 'redis';
+        $row->name = ServerCacheService::DEFAULT_INSTANCE_NAME;
+        $row->port = 6379;
+        $row->auth_password = null;
+
+        $script = CacheServiceInstallScripts::installScriptForRow($row);
+
+        // On the engine's default port the apt-shipped config is already correct, so the rewrite
+        // step is unnecessary work. Asserting its absence catches a regression where the rewrite
+        // gets unconditionally spliced in (would double-write the config on a happy-path install).
+        $this->assertStringNotContainsString('config_file=/etc/redis/redis.conf', $script);
+    }
+
+    public function test_install_script_for_named_row_off_default_port_uses_per_instance_config_not_rewrite(): void
+    {
+        $row = new ServerCacheService;
+        $row->engine = 'redis';
+        $row->name = 'sessions';
+        $row->port = 6381;
+        $row->auth_password = null;
+
+        $script = CacheServiceInstallScripts::installScriptForRow($row);
+
+        // Named instances get their own per-instance config (redis-sessions.conf) so they NEVER
+        // need the legacy-config rewrite. Asserting both shapes here catches a regression where
+        // a named-instance install accidentally also touches the stock config.
+        $this->assertStringContainsString('/etc/redis/redis-sessions.conf', $script);
+        $this->assertStringNotContainsString('config_file=/etc/redis/redis.conf', $script);
     }
 
     public function test_install_script_for_named_row_includes_template_unit_and_config(): void

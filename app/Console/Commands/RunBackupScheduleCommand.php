@@ -23,6 +23,9 @@ class RunBackupScheduleCommand extends Command
 
     protected $description = 'Create a pending backup row and dispatch the export job for the given ServerBackupSchedule.';
 
+    /** Auto-disable a schedule after this many consecutive failures (last N backups all failed). */
+    private const FAILURE_AUTO_PAUSE_THRESHOLD = 3;
+
     public function handle(): int
     {
         $schedule = ServerBackupSchedule::query()->find((string) $this->argument('schedule'));
@@ -38,6 +41,18 @@ class RunBackupScheduleCommand extends Command
             return self::SUCCESS;
         }
 
+        if ($this->shouldAutoPause($schedule)) {
+            $schedule->update(['is_active' => false]);
+            if ($schedule->server_cron_job_id) {
+                \App\Models\ServerCronJob::query()
+                    ->whereKey($schedule->server_cron_job_id)
+                    ->update(['enabled' => false]);
+            }
+            $this->warn('Schedule auto-paused after '.self::FAILURE_AUTO_PAUSE_THRESHOLD.' consecutive failures.');
+
+            return self::SUCCESS;
+        }
+
         match ($schedule->target_type) {
             ServerBackupSchedule::TARGET_DATABASE => $this->dispatchDatabaseBackup($schedule),
             ServerBackupSchedule::TARGET_SITE_FILES => $this->dispatchSiteFilesBackup($schedule),
@@ -47,6 +62,32 @@ class RunBackupScheduleCommand extends Command
         $schedule->update(['last_run_at' => now()]);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * True when the last N backups for this schedule's target are ALL failed.
+     * Operators get a clean signal that the destination/credentials are broken
+     * instead of the queue spamming dead jobs forever.
+     */
+    private function shouldAutoPause(ServerBackupSchedule $schedule): bool
+    {
+        $threshold = self::FAILURE_AUTO_PAUSE_THRESHOLD;
+
+        $recent = match ($schedule->target_type) {
+            ServerBackupSchedule::TARGET_DATABASE => \App\Models\ServerDatabaseBackup::query()
+                ->where('server_database_id', $schedule->target_id)
+                ->orderByDesc('created_at')
+                ->limit($threshold)
+                ->pluck('status'),
+            ServerBackupSchedule::TARGET_SITE_FILES => \App\Models\SiteFileBackup::query()
+                ->where('site_id', $schedule->target_id)
+                ->orderByDesc('created_at')
+                ->limit($threshold)
+                ->pluck('status'),
+            default => collect(),
+        };
+
+        return $recent->count() >= $threshold && $recent->every(fn ($s) => $s === 'failed');
     }
 
     private function dispatchDatabaseBackup(ServerBackupSchedule $schedule): void

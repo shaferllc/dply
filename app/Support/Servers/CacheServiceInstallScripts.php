@@ -306,6 +306,13 @@ BASH;
      * instances, the script also writes (a) the engine's templated systemd
      * unit if missing and (b) the instance's per-instance config file +
      * state directory before enabling and pinging the templated unit.
+     *
+     * One exception inside the default-instance branch: when the row's port differs from the
+     * engine's stock default (because another redis-family service already occupied 6379), we
+     * splice in {@see defaultInstancePortRewriteScript()} between apt-install and systemctl-start.
+     * Without that step the apt-shipped config still binds to the engine default and the daemon
+     * collides on first start → exits 1 → systemd restart-loops until it gives up and the row
+     * shows as "Running" while nothing's actually listening on the assigned port.
      */
     public static function installScriptForRow(ServerCacheService $row): string
     {
@@ -315,6 +322,11 @@ BASH;
             $parts[] = self::scaffoldTemplateUnitScript($row->engine);
             $parts[] = self::scaffoldInstanceConfigScript($row->engine, $row->name, $row->port, $row->auth_password);
             $parts[] = 'systemctl daemon-reload';
+        } elseif ($row->port !== ServerCacheService::defaultPortFor($row->engine)) {
+            $rewrite = self::defaultInstancePortRewriteScript($row->engine, $row->port);
+            if ($rewrite !== '') {
+                $parts[] = $rewrite;
+            }
         }
 
         $parts[] = self::installInstanceScript(
@@ -325,6 +337,54 @@ BASH;
         );
 
         return implode("\n", $parts);
+    }
+
+    /**
+     * Rewrite the apt-shipped main config so the daemon's `port` directive matches the row's port.
+     * Used only for default-instance rows whose port was bumped off the engine's stock default —
+     * named instances already get their own per-instance config from
+     * {@see scaffoldInstanceConfigScript()}.
+     *
+     * Idempotent (re-running on an already-correct config is a no-op) and safe (only matches an
+     * uncommented `port <n>` line; commented-out `# port` is left alone, and trailing comments
+     * after the number are preserved). Returns an empty string for engines whose stock config
+     * doesn't use Redis-style `port <n>` syntax — for those, default-instance + non-default port
+     * is currently out of scope and the operator should use a named instance instead.
+     */
+    public static function defaultInstancePortRewriteScript(string $engine, int $port): string
+    {
+        $configPath = match ($engine) {
+            'redis' => '/etc/redis/redis.conf',
+            'valkey' => '/etc/valkey/valkey.conf',
+            'keydb' => '/etc/keydb/keydb.conf',
+            // memcached uses -p <port> flags in /etc/memcached.conf; dragonfly's apt-style config
+            // is rare and tends to live alongside CLI flags in the unit. Neither sees the
+            // multi-instance default-off-default scenario in practice today.
+            default => null,
+        };
+        if ($configPath === null) {
+            return '';
+        }
+
+        // Numeric port → safe to interpolate without escapeshellarg.
+        return <<<BASH
+config_file={$configPath}
+if [ ! -f "\$config_file" ]; then
+    echo "ERROR: \$config_file missing — apt install did not complete." >&2
+    exit 1
+fi
+# Match an uncommented `port <n>` line (leading whitespace OK; commented `# port ...` ignored).
+# Preserve any trailing comment after the number — operators sometimes annotate the line.
+if grep -qE '^[[:space:]]*port[[:space:]]+[0-9]+' "\$config_file"; then
+    sed -i -E 's/^([[:space:]]*)port[[:space:]]+[0-9]+/\\1port {$port}/' "\$config_file"
+else
+    {
+        echo ""
+        echo "# Added by dply — default-instance assigned to non-default port."
+        echo "port {$port}"
+    } >> "\$config_file"
+fi
+BASH;
     }
 
     /**

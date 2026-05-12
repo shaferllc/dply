@@ -109,4 +109,51 @@ class RunBackupScheduleCommandTest extends TestCase
         $this->artisan('dply:run-backup-schedule', ['schedule' => '01nonexistent00000000000000'])
             ->assertFailed();
     }
+
+    public function test_schedule_auto_pauses_after_three_consecutive_failures(): void
+    {
+        Bus::fake();
+        $server = $this->makeServer();
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+
+        // Materialize a cron entry like the real schedule path does.
+        $cronJob = \App\Models\ServerCronJob::create([
+            'server_id' => $server->id,
+            'cron_expression' => '0 3 * * *',
+            'command' => 'php artisan dply:run-backup-schedule X',
+            'user' => 'root',
+            'enabled' => true,
+            'system_managed' => true,
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => ServerBackupSchedule::TARGET_DATABASE,
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+            'server_cron_job_id' => $cronJob->id,
+        ]);
+
+        // Three failed backups for the target.
+        for ($i = 0; $i < 3; $i++) {
+            \App\Models\ServerDatabaseBackup::create([
+                'server_database_id' => $database->id,
+                'user_id' => null,
+                'status' => 'failed',
+            ]);
+        }
+
+        $this->artisan('dply:run-backup-schedule', ['schedule' => $schedule->id])
+            ->assertSuccessful();
+
+        // Schedule + cron should be auto-paused, no new backup dispatched.
+        $this->assertFalse($schedule->fresh()->is_active);
+        $this->assertFalse($cronJob->fresh()->enabled);
+        Bus::assertNotDispatched(ExportServerDatabaseBackupJob::class);
+    }
 }

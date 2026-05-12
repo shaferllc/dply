@@ -393,14 +393,39 @@ class WorkspaceCaches extends Component
     }
 
     /**
-     * Per-instance debug-output buffer. Set by debugCacheServiceInstance() to
-     * surface the systemctl status + port listener + ping probe output below
-     * the action row when reachability is in question. Keyed by `engine` so
-     * each engine's debug panel is independent.
+     * Per-instance command-output buffer. Originally fed only by debugCacheServiceInstance() —
+     * now also fed by repair/restart/stop/start so every one-shot SSH script lands in the same
+     * console panel below the action row. Keyed by `engine` so each engine's panel is independent.
      *
      * @var array<string, string>
      */
     public array $debug_output_by_engine = [];
+
+    /**
+     * Human label for whichever action last wrote to {@see $debug_output_by_engine}. Used by the
+     * blade view to render the panel header ("Debug — output", "Repair port — output", etc.) so
+     * the operator can attribute the buffer to the command that produced it. Keyed by `engine`.
+     *
+     * @var array<string, string>
+     */
+    public array $debug_output_label_by_engine = [];
+
+    /**
+     * Capture a one-shot command's stdout+stderr into the per-engine console panel so the
+     * operator can see exactly what ran and what came back. Truncates to the last 8KB to keep
+     * the wire payload bounded; `$label` becomes the panel header. Centralised so every action
+     * (debug, repair, restart, stop, start, ...) surfaces in the same place with consistent
+     * shape — silently toasting "succeeded"/"failed" without showing the buffer was the previous
+     * footgun.
+     */
+    protected function recordCommandOutput(string $engine, string $label, string $buffer): void
+    {
+        $trimmed = trim($buffer);
+        $this->debug_output_by_engine[$engine] = $trimmed === ''
+            ? __('No output.')
+            : mb_substr($buffer, -8_000);
+        $this->debug_output_label_by_engine[$engine] = $label;
+    }
 
     /**
      * Re-probe THIS instance with the correct port and refresh the cached
@@ -508,19 +533,133 @@ BASH,
                 timeoutSeconds: 30,
                 asRoot: true,
             );
-            $this->debug_output_by_engine[$engine] = trim($output->buffer) !== ''
-                ? mb_substr($output->buffer, -8_000)
-                : __('No output.');
-            $this->toastSuccess(__('Diagnostics captured. See the debug panel below.'));
+            $this->recordCommandOutput($engine, __('Debug'), $output->buffer);
+            $this->toastSuccess(__('Diagnostics captured. See the console panel below.'));
         } catch (\Throwable $e) {
-            $this->debug_output_by_engine[$engine] = __('SSH diagnostic failed: :err', ['err' => $e->getMessage()]);
-            $this->toastError(__('Diagnostic run failed — see the debug panel below for details.'));
+            $this->recordCommandOutput($engine, __('Debug'), __('SSH diagnostic failed: :err', ['err' => $e->getMessage()]));
+            $this->toastError(__('Diagnostic run failed — see the console panel below for details.'));
         }
     }
 
     public function clearCacheServiceDebugOutput(string $engine): void
     {
         unset($this->debug_output_by_engine[$engine]);
+        unset($this->debug_output_label_by_engine[$engine]);
+    }
+
+    /**
+     * One-shot repair for default-instance rows whose apt-shipped config still binds to the
+     * engine's stock default port even though dply assigned a different one. Earlier installs of
+     * a default instance forced off its engine default (e.g. Redis on 6381 because Valkey was
+     * already on 6379) skipped the config-rewrite step, so the daemon collides on first start and
+     * systemd restart-loops until it gives up. The forward-fix is in
+     * {@see CacheServiceInstallScripts::installScriptForRow()}; this action is for boxes that
+     * already have a broken row from before the fix was deployed.
+     *
+     * Refuses for engines where the rewrite helper returns empty (memcached / dragonfly),
+     * non-default-instance rows (they already get a per-instance config), and rows whose port
+     * already matches the engine default (nothing to fix).
+     */
+    public function repairDefaultInstancePort(
+        string $engine,
+        ExecuteRemoteTaskOnServer $executor,
+        CacheServiceAuditLogger $audit,
+        ServerCacheServiceHostCapabilities $capabilities,
+    ): void {
+        $this->authorize('update', $this->server);
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->toastError(__('No :engine instance to repair.', ['engine' => $engine]));
+
+            return;
+        }
+        if (! $row->isDefaultInstance()) {
+            $this->toastError(__('Repair only applies to the default instance — named instances already have a per-instance config.'));
+
+            return;
+        }
+        if ($row->port === ServerCacheService::defaultPortFor($row->engine)) {
+            $this->toastError(__(':engine is already on its default port — nothing to repair.', ['engine' => $row->engine]));
+
+            return;
+        }
+
+        $rewrite = CacheServiceInstallScripts::defaultInstancePortRewriteScript($row->engine, (int) $row->port);
+        if ($rewrite === '') {
+            $this->toastError(__(':engine doesn\'t use a Redis-style port directive — uninstall and re-create as a named instance instead.', ['engine' => $row->engine]));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('SSH must be ready before running the repair.'));
+
+            return;
+        }
+
+        $unit = CacheServiceInstallScripts::instanceServiceUnit($row->engine, $row->name);
+        $unitShell = escapeshellarg($unit);
+        // Wrap the rewrite + restart + post-restart status check in echo'd section headers so
+        // the operator can read the output panel like a log and see exactly which step
+        // succeeded or failed. The trailing `systemctl status` runs with `|| true` so a still-
+        // failing daemon doesn't abort the script — its output is what the operator needs to
+        // see most. Rewrite is idempotent so re-running is safe.
+        $script = <<<BASH
+echo "═══ Rewrite config to port {$row->port} ═══"
+{$rewrite}
+echo
+echo "═══ systemctl restart {$unit} ═══"
+systemctl restart {$unitShell}
+echo
+echo "═══ systemctl status (post-restart) ═══"
+systemctl status --no-pager --lines=15 {$unitShell} 2>&1 || true
+BASH;
+
+        $buffer = '';
+        try {
+            $output = $executor->runInlineBash(
+                $row->server,
+                'cache-service:repair-port:'.$row->engine.':'.$row->name,
+                $script,
+                timeoutSeconds: 120,
+                asRoot: true,
+            );
+            $buffer = $output->buffer;
+
+            if ($output->exitCode !== 0) {
+                $this->recordCommandOutput($engine, __('Repair port'), $buffer);
+                $this->toastError(__('Repair failed — see the console panel below for the full output.'));
+
+                return;
+            }
+
+            $capabilities->forget($row->server);
+            $audit->record(
+                $row->server,
+                ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
+                [
+                    'engine' => $row->engine,
+                    'name' => $row->name,
+                    'port' => $row->port,
+                    'reason' => 'config_repair',
+                ],
+                auth()->user(),
+            );
+
+            $this->recordCommandOutput($engine, __('Repair port'), $buffer);
+            $this->toastSuccess(__('Repair done — see the console panel below for the rewrite + restart output.'));
+        } catch (\Throwable $e) {
+            // Capture whatever ran before the exception so the operator can see the partial state.
+            $this->recordCommandOutput($engine, __('Repair port'), $buffer !== '' ? $buffer : $e->getMessage());
+            $this->toastError(__('Repair failed — see the console panel below.'));
+        }
     }
 
     /**
@@ -2322,17 +2461,39 @@ BASH,
         // systemdServiceFor() alone was a bug — Stop on a named instance
         // would silently target the default unit and stop the wrong instance.
         $service = CacheServiceInstallScripts::instanceServiceUnit($row->engine, $row->name);
+        $serviceShell = escapeshellarg($service);
+        // Wrap the bare `systemctl <verb>` with a follow-up status print so the console panel
+        // shows what actually happened. `systemctl <verb>` is silent on success and only stderrs
+        // on failure; the trailing status (always run via `|| true`) gives the operator real-time
+        // confirmation without a second click.
+        $script = <<<BASH
+echo "═══ systemctl {$verb} {$service} ═══"
+systemctl {$verb} {$serviceShell}
+verb_exit=\$?
+echo
+echo "═══ systemctl status (post-{$verb}) ═══"
+systemctl status --no-pager --lines=15 {$serviceShell} 2>&1 || true
+exit \$verb_exit
+BASH;
+        $label = __(ucfirst($verb));
+        $buffer = '';
         try {
             $output = $executor->runInlineBash(
                 $row->server,
                 'cache-service:'.$verb.':'.$row->engine.':'.$row->name,
-                'systemctl '.$verb.' '.escapeshellarg($service),
+                $script,
                 timeoutSeconds: 60,
                 asRoot: true,
             );
+            $buffer = $output->buffer;
 
             if ($output->exitCode !== 0) {
-                throw new \RuntimeException(trim($output->buffer) ?: 'systemctl '.$verb.' failed.');
+                $this->recordCommandOutput($engine, $label, $buffer);
+                $this->toastError(__(':verb failed for :engine — see the console panel below.', [
+                    'verb' => ucfirst($verb), 'engine' => $row->engine,
+                ]));
+
+                return;
             }
 
             if ($newStatus) {
@@ -2341,13 +2502,16 @@ BASH,
 
             $audit->record($row->server, $event, ['engine' => $row->engine, 'name' => $row->name], auth()->user());
             $this->forgetStats($row);
-
-            $this->toastSuccess(__(':verb succeeded for :engine.', [
+            $this->recordCommandOutput($engine, $label, $buffer);
+            $this->toastSuccess(__(':verb succeeded for :engine — see the console panel below.', [
                 'verb' => ucfirst($verb),
                 'engine' => $row->engine, 'name' => $row->name,
             ]));
         } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+            $this->recordCommandOutput($engine, $label, $buffer !== '' ? $buffer : $e->getMessage());
+            $this->toastError(__(':verb failed for :engine — see the console panel below.', [
+                'verb' => ucfirst($verb), 'engine' => $row->engine,
+            ]));
         }
     }
 

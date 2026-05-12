@@ -11,6 +11,8 @@ use App\Listeners\RecordLivewireDispatchedJob;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
 use App\Listeners\UpdateDispatchedJobLifecycle;
 use App\Models\BackupConfiguration;
+use App\Models\ServerDatabaseBackup;
+use App\Models\SiteFileBackup;
 use App\Models\Incident;
 use App\Models\NotificationChannel;
 use App\Models\Organization;
@@ -28,6 +30,7 @@ use App\Models\UserSshKey;
 use App\Models\Workspace;
 use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
+use App\Observers\BackupAutoResumeObserver;
 use App\Observers\ServerObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
@@ -304,6 +307,8 @@ class AppServiceProvider extends ServiceProvider
         Server::observe(ServerObserver::class);
         SupervisorProgram::observe(SupervisorProgramObserver::class);
         TaskRunnerTask::observe(TaskRunnerTaskObserver::class);
+        ServerDatabaseBackup::observe(BackupAutoResumeObserver::class);
+        SiteFileBackup::observe(BackupAutoResumeObserver::class);
 
         Server::created(function (Server $server): void {
             if ($server->status === Server::STATUS_READY && ! empty($server->ssh_private_key)) {

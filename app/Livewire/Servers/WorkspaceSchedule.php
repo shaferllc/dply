@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -37,9 +38,68 @@ class WorkspaceSchedule extends Component
         'rake schedule',
     ];
 
+    /** Form state for "Enable scheduler for site". */
+    public string $enable_site_id = '';
+
+    public string $enable_cron_expression = '* * * * *';
+
+    /** @var 'laravel'|'rails' Framework hint that picks the right scheduler command. */
+    public string $enable_framework = 'laravel';
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+    }
+
+    public function enableSchedulerForSite(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $site = Site::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($this->enable_site_id)
+            ->first();
+        if ($site === null) {
+            $this->toastError(__('Pick a site.'));
+
+            return;
+        }
+
+        $cron = trim($this->enable_cron_expression);
+        if ($cron === '' || strlen($cron) > 64) {
+            $this->toastError(__('Invalid cron expression.'));
+
+            return;
+        }
+
+        $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+        $command = match ($this->enable_framework) {
+            'laravel' => 'cd '.$directory.' && php artisan schedule:run >> /dev/null 2>&1',
+            'rails' => 'cd '.$directory.' && bundle exec whenever --update-crontab',
+            default => null,
+        };
+
+        if ($command === null) {
+            $this->toastError(__('Unknown framework.'));
+
+            return;
+        }
+
+        // Same shape that the Cron page produces — uses the existing model so this entry
+        // is editable from the Cron page like any other.
+        ServerCronJob::create([
+            'server_id' => $this->server->id,
+            'site_id' => $site->id,
+            'cron_expression' => $cron,
+            'command' => $command,
+            'user' => $site->effectiveSystemUser($this->server),
+            'enabled' => true,
+            'description' => ucfirst($this->enable_framework).' scheduler — '.$site->name,
+        ]);
+
+        $this->reset(['enable_site_id', 'enable_framework']);
+        $this->enable_cron_expression = '* * * * *';
+        $this->toastSuccess(__('Scheduler enabled for :site.', ['site' => $site->name]));
     }
 
     public function render(): View
