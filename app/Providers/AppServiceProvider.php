@@ -31,6 +31,7 @@ use App\Models\Workspace;
 use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
 use App\Observers\BackupAutoResumeObserver;
+use App\Observers\BackupFailureNotifyObserver;
 use App\Observers\ServerObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
@@ -309,6 +310,8 @@ class AppServiceProvider extends ServiceProvider
         TaskRunnerTask::observe(TaskRunnerTaskObserver::class);
         ServerDatabaseBackup::observe(BackupAutoResumeObserver::class);
         SiteFileBackup::observe(BackupAutoResumeObserver::class);
+        ServerDatabaseBackup::observe(BackupFailureNotifyObserver::class);
+        SiteFileBackup::observe(BackupFailureNotifyObserver::class);
 
         Server::created(function (Server $server): void {
             if ($server->status === Server::STATUS_READY && ! empty($server->ssh_private_key)) {

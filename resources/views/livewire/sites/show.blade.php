@@ -203,6 +203,10 @@
                     </x-outline-link>
                 @endif
                 @if ($readyForWorkspace)
+                    <x-outline-link :href="route('sites.files', [$server, $site])" wire:navigate>
+                        <x-heroicon-o-folder class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('Files') }}
+                    </x-outline-link>
                     <x-outline-link :href="route('sites.insights', [$server, $site])" wire:navigate>
                         <x-heroicon-o-light-bulb class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Insights') }}

@@ -123,6 +123,14 @@
         </header>
 
         <div class="space-y-4 p-5">
+            {{-- Cadence presets — fill the cron field with one click. --}}
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-semibold uppercase tracking-wide text-brand-mist">{{ __('Quick presets:') }}</span>
+                <button type="button" wire:click="$set('new_cron_expression', '0 3 * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Nightly 3am') }}</button>
+                <button type="button" wire:click="$set('new_cron_expression', '0 4 * * 0')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Weekly Sun 4am') }}</button>
+                <button type="button" wire:click="$set('new_cron_expression', '0 * * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Hourly') }}</button>
+                <button type="button" wire:click="$set('new_cron_expression', '*/15 * * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Every 15 min') }}</button>
+            </div>
             <form wire:submit="addSchedule" class="grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:grid-cols-5">
                 <select wire:model.live="new_target_type" class="{{ $input }} sm:col-span-1">
                     <option value="database">{{ __('Database') }}</option>
@@ -161,9 +169,11 @@
                     @foreach ($schedules as $schedule)
                         @php
                             $isEditing = array_key_exists($schedule->id, $editing_schedules);
-                            $meta = $scheduleMeta[$schedule->id] ?? ['next_run_at' => null, 'latest_status' => null];
+                            $meta = $scheduleMeta[$schedule->id] ?? ['next_run_at' => null, 'latest_status' => null, 'recent_runs' => collect()];
+                            $recentRuns = $meta['recent_runs'] ?? collect();
                         @endphp
-                        <li class="flex items-center gap-4 px-4 py-3">
+                        <li x-data="{ historyOpen: false }" class="flex flex-col gap-2 px-4 py-3">
+                          <div class="flex items-center gap-4">
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ $schedule->targetLabel() }}</p>
@@ -193,6 +203,17 @@
                                         <span>·</span>
                                         <span class="text-amber-700">{{ __('paused') }}</span>
                                     @endif
+                                    <span>·</span>
+                                    <button type="button" wire:click="toggleNotifyOnFailure('{{ $schedule->id }}')"
+                                        title="{{ $schedule->notify_on_failure ? __('Email alerts on failure are ON. Click to disable.') : __('Email alerts on failure are OFF. Click to enable.') }}"
+                                        class="inline-flex items-center gap-1 normal-case tracking-normal {{ $schedule->notify_on_failure ? 'text-brand-ink' : 'text-brand-mist line-through' }}">
+                                        @if ($schedule->notify_on_failure)
+                                            <x-heroicon-m-bell class="h-3 w-3" />
+                                        @else
+                                            <x-heroicon-m-bell-slash class="h-3 w-3" />
+                                        @endif
+                                        {{ __('alerts') }}
+                                    </button>
                                     @if ($schedule->last_run_at)
                                         <span>·</span>
                                         <span>{{ __('last :ts', ['ts' => $schedule->last_run_at->diffForHumans()]) }}</span>
@@ -212,6 +233,12 @@
                                         {{ __('Cancel') }}
                                     </button>
                                 @else
+                                    <button type="button" wire:click="runScheduleNow('{{ $schedule->id }}')" wire:loading.attr="disabled" wire:target="runScheduleNow" class="{{ $btnSecondary }}">
+                                        {{ __('Run now') }}
+                                    </button>
+                                    <button type="button" @click="historyOpen = !historyOpen" class="{{ $btnSecondary }}">
+                                        <span x-text="historyOpen ? '{{ __('Hide history') }}' : '{{ __('History') }}'"></span>
+                                    </button>
                                     <button type="button" wire:click="startEditSchedule('{{ $schedule->id }}')" class="{{ $btnSecondary }}">
                                         {{ __('Edit') }}
                                     </button>
@@ -223,6 +250,28 @@
                                     </button>
                                 @endif
                             </div>
+                          </div>
+                          {{-- Inline history panel — last 5 backup runs against the same target. --}}
+                          <div x-show="historyOpen" x-cloak class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
+                              @if ($recentRuns->isEmpty())
+                                  <p class="text-center text-xs text-brand-moss">{{ __('No runs yet for this target.') }}</p>
+                              @else
+                                  <ul class="divide-y divide-brand-ink/10">
+                                      @foreach ($recentRuns as $run)
+                                          <li class="flex items-center gap-3 py-2 text-xs">
+                                              <span class="w-20 {{ $statusClass($run->status) }}">{{ $run->status }}</span>
+                                              <span class="w-20 text-brand-mist">{{ $run->bytes ? $formatBytes((int) $run->bytes) : '—' }}</span>
+                                              <span class="flex-1 truncate text-brand-mist">
+                                                  @if ($run->error_message)
+                                                      <span class="text-red-700">{{ $run->error_message }}</span>
+                                                  @endif
+                                              </span>
+                                              <span class="text-brand-mist">{{ $run->created_at?->diffForHumans() }}</span>
+                                          </li>
+                                      @endforeach
+                                  </ul>
+                              @endif
+                          </div>
                         </li>
                     @endforeach
                 </ul>

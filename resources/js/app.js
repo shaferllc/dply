@@ -1,6 +1,7 @@
 import './bootstrap';
 
 import './dply-passkeys.js';
+import './file-browser-editor.js';
 
 import { registerDplyThemeListeners } from './theme.js';
 

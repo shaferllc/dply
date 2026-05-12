@@ -255,6 +255,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/queue-workers', \App\Livewire\Sites\SiteQueueWorkers::class)->name('sites.queue-workers');
+    Route::livewire('servers/{server}/sites/{site}/files', \App\Livewire\Sites\Files::class)->name('sites.files');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
     // {section} is required — without it the bare /sites/{site}/settings URL collides
     // with the new "Settings" tab on the wildcard route below, which sends you back to
@@ -308,6 +309,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // design — clean break, no redirect shim.
     Route::livewire('servers/{server}/run', WorkspaceRun::class)->name('servers.run');
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
+    Route::livewire('servers/{server}/files', \App\Livewire\Servers\WorkspaceFiles::class)->name('servers.files');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');

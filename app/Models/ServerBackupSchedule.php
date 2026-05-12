@@ -23,6 +23,7 @@ class ServerBackupSchedule extends Model
         'backup_configuration_id',
         'cron_expression',
         'is_active',
+        'notify_on_failure',
         'server_cron_job_id',
         'last_run_at',
     ];
@@ -31,6 +32,7 @@ class ServerBackupSchedule extends Model
     {
         return [
             'is_active' => 'boolean',
+            'notify_on_failure' => 'boolean',
             'last_run_at' => 'datetime',
         ];
     }

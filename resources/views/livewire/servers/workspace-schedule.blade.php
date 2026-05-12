@@ -18,6 +18,25 @@
         <p>{{ __('Anything that looks like a framework scheduler is listed below — both cron entries (the usual setup) and supervisor daemons (the schedule:work pattern). Edit them on their owning page; this is just a focused index.') }}</p>
     </x-explainer>
 
+    {{-- At-a-glance counts --}}
+    @php
+        $sitesWithScheduler = $cronEntries->pluck('site_id')->merge($schedulerDaemons->pluck('site_id'))->filter()->unique()->count();
+    @endphp
+    <section class="grid gap-3 sm:grid-cols-3">
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cron schedulers') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $cronEntries->count() }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Daemon schedulers') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $schedulerDaemons->count() }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sites covered') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $sitesWithScheduler }} <span class="text-sm font-normal text-brand-mist">/ {{ $sites->count() }}</span></p>
+        </div>
+    </section>
+
     {{-- Cron-driven schedulers ----------------------------------------------------- --}}
     <section class="{{ $card }}">
         <header class="flex items-center justify-between border-b border-brand-ink/10 px-5 py-4">
@@ -136,4 +155,10 @@
             </div>
         </section>
     @endif
+
+    {{-- CLI equivalents — same idea as Cron / Daemons / Backups pages. --}}
+    <x-cli-snippet :commands="[
+        ['label' => __('List all cron jobs (server)'), 'command' => 'dply:server:cron:list '.$server->id],
+        ['label' => __('Add a schedule:run cron entry for a site'), 'command' => 'dply:site:cron:add {site_slug} \'* * * * *\' \'php artisan schedule:run\''],
+    ]" />
 </x-server-workspace-layout>

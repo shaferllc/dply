@@ -1065,6 +1065,77 @@ BASH;
      * tab. Using the active-instance filter would silently return null and
      * leave the row stuck forever.
      */
+    /**
+     * Break-glass for an orphaned row: the operator has decided the dply DB row no longer
+     * reflects reality and just wants it gone. Deletes the row outright, audits the previous
+     * state, and does NOT touch the server. Use this when:
+     *  - Uninstall has failed repeatedly (apt purge can't find the package, etc.)
+     *  - The install never produced anything on the box (e.g. KeyDB row on Ubuntu noble — there
+     *    is no package to clean up)
+     *  - The row is in some terminal state the existing affordances refuse to clean up
+     *
+     * Unlike {@see forceCancelCacheServiceChange()} this is operator-initiated *from the row's
+     * own card* (not from the busy banner) and is available for any state, so it's the right
+     * affordance for a stuck RUNNING/STOPPED row whose box-side state diverged.
+     *
+     * Targets the row that matches `engine` + `active_instance` (just like the rest of the
+     * per-instance actions on this card) — distinct from forceCancelCacheServiceChange's
+     * busy-priority lookup, because the operator's intent here is clearly "this specific
+     * instance I'm looking at".
+     */
+    public function forceRemoveCacheServiceRow(string $engine, CacheServiceAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if ($row === null) {
+            $this->toastError(__('No :engine instance to remove.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $previousStatus = $row->status;
+        $instanceName = $row->name;
+        $port = $row->port;
+
+        // Drop the per-engine stats cache BEFORE the delete — after delete the model's relations
+        // can re-query and we'd rather avoid a stray select(servers) for a deleted row.
+        app(CacheServiceStats::class)->forget($this->server, $row->engine);
+
+        // Delete the row outright. We do NOT call $capabilities->forget() here because the
+        // capability probe reads from the box (not the DB) — if KeyDB really isn't installed,
+        // the cache invalidation doesn't help; if it IS installed and the operator just wants
+        // dply to forget about it, that's their choice and a stale "true" badge will clear on
+        // its own 120s TTL.
+        $row->delete();
+
+        $audit->record(
+            $this->server,
+            'force_removed',
+            [
+                'engine' => $engine,
+                'instance' => $instanceName,
+                'port' => $port,
+                'previous_status' => $previousStatus,
+                'reason' => 'operator_orphan_cleanup',
+            ],
+            auth()->user(),
+        );
+
+        // Drop any debug-panel buffer for this engine since the row it belonged to is gone.
+        unset($this->debug_output_by_engine[$engine]);
+        unset($this->debug_output_label_by_engine[$engine]);
+
+        $this->toastSuccess(__(':engine instance ":name" removed from dply. Server-side state (binaries, config files, data dirs) was NOT touched — run apt purge / systemctl disable / rm manually if anything needs cleaning up on the box.', [
+            'engine' => $engine,
+            'name' => $instanceName,
+        ]));
+    }
+
     public function forceCancelCacheServiceChange(string $engine, CacheServiceAuditLogger $audit): void
     {
         $this->authorize('update', $this->server);
@@ -1182,6 +1253,48 @@ BASH;
     public function startCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
     {
         $this->runSystemctl($engine, $executor, $audit, 'start', ServerCacheService::STATUS_RUNNING, ServerCacheServiceAuditEvent::EVENT_STARTED);
+    }
+
+    /**
+     * Disable + stop the engine's systemd unit in one shot — equivalent to `systemctl disable --now`.
+     * Differs from {@see stopCacheService()} in that it also clears the unit's boot-time enablement,
+     * so the daemon won't come back on the next reboot. Use this when the operator wants the
+     * service off for the long haul without uninstalling the package (data dirs + config stay).
+     *
+     * Reuses runSystemctl's plumbing — same console-output routing, same audit/toast shape. The
+     * verb is `disable --now` so the rendered script is `systemctl disable --now <unit>`; runs
+     * fine under `set -euo pipefail` because the trailing `systemctl status` short-circuit
+     * captures the post-stop state and is `|| true`-guarded.
+     */
+    public function disableCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
+    {
+        $this->runSystemctl(
+            $engine,
+            $executor,
+            $audit,
+            'disable --now',
+            ServerCacheService::STATUS_STOPPED,
+            ServerCacheServiceAuditEvent::EVENT_STOPPED,
+            label: __('Disable'),
+        );
+    }
+
+    /**
+     * Enable + start the engine's systemd unit in one shot — equivalent to `systemctl enable --now`.
+     * Companion to {@see disableCacheService()}: re-arms boot-time auto-start AND starts the daemon
+     * immediately, so the operator gets one click instead of "Enable, then Start".
+     */
+    public function enableCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
+    {
+        $this->runSystemctl(
+            $engine,
+            $executor,
+            $audit,
+            'enable --now',
+            ServerCacheService::STATUS_RUNNING,
+            ServerCacheServiceAuditEvent::EVENT_STARTED,
+            label: __('Enable'),
+        );
     }
 
     /**
@@ -2438,6 +2551,7 @@ BASH;
         string $verb,
         ?string $newStatus,
         string $event,
+        ?string $label = null,
     ): void {
         $this->authorize('update', $this->server);
 
@@ -2475,7 +2589,10 @@ echo "═══ systemctl status (post-{$verb}) ═══"
 systemctl status --no-pager --lines=15 {$serviceShell} 2>&1 || true
 exit \$verb_exit
 BASH;
-        $label = __(ucfirst($verb));
+        // Caller-provided label (e.g. "Disable" for `disable --now`) takes precedence so the
+        // console panel header doesn't read "Disable --now". Fall back to titlecased verb for
+        // the simple restart/stop/start cases.
+        $label = $label ?? __(ucfirst($verb));
         $buffer = '';
         try {
             $output = $executor->runInlineBash(

@@ -251,6 +251,9 @@
                                 @case('archive-box')
                                     <x-heroicon-o-archive-box class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('folder')
+                                    <x-heroicon-o-folder class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                             @endswitch
                             {{ $label }}
                         </a>

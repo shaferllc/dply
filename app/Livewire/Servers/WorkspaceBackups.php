@@ -164,6 +164,14 @@ class WorkspaceBackups extends Component
 
         $schedule->update(['server_cron_job_id' => $cronJob->id]);
 
+        if ($org = $this->server->organization) {
+            audit_log($org, auth()->user(), 'backup.schedule.created', $schedule, null, [
+                'target_type' => $schedule->target_type,
+                'target_id' => $schedule->target_id,
+                'cron_expression' => $schedule->cron_expression,
+            ]);
+        }
+
         $this->reset(['new_target_id', 'new_backup_configuration_id']);
         $this->new_cron_expression = '0 3 * * *';
         $this->toastSuccess(__('Backup schedule added.'));
@@ -239,6 +247,13 @@ class WorkspaceBackups extends Component
         if ($schedule->server_cron_job_id) {
             ServerCronJob::query()->whereKey($schedule->server_cron_job_id)->delete();
         }
+
+        if ($org = $this->server->organization) {
+            audit_log($org, auth()->user(), 'backup.schedule.deleted', $schedule, [
+                'cron_expression' => $schedule->cron_expression,
+            ], null);
+        }
+
         $schedule->delete();
         $this->toastSuccess(__('Backup schedule removed.'));
     }
@@ -282,6 +297,7 @@ class WorkspaceBackups extends Component
             return;
         }
 
+        $oldCron = $schedule->cron_expression;
         $schedule->update(['cron_expression' => $newCron]);
         if ($schedule->server_cron_job_id) {
             ServerCronJob::query()
@@ -289,8 +305,116 @@ class WorkspaceBackups extends Component
                 ->update(['cron_expression' => $newCron]);
         }
 
+        if ($org = $this->server->organization) {
+            audit_log(
+                $org,
+                auth()->user(),
+                'backup.schedule.cadence_updated',
+                $schedule,
+                ['cron_expression' => $oldCron],
+                ['cron_expression' => $newCron],
+            );
+        }
+
         unset($this->editing_schedules[$scheduleId]);
         $this->toastSuccess(__('Schedule updated.'));
+    }
+
+    /**
+     * Kick off the export job for a schedule's target immediately — same path the
+     * cron tick takes. Useful for testing a freshly-added schedule or after fixing
+     * destination credentials.
+     */
+    public function toggleNotifyOnFailure(string $scheduleId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $schedule = ServerBackupSchedule::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($scheduleId)
+            ->first();
+        if ($schedule === null) {
+            return;
+        }
+
+        $newValue = ! $schedule->notify_on_failure;
+        $schedule->update(['notify_on_failure' => $newValue]);
+
+        if ($org = $this->server->organization) {
+            audit_log(
+                $org,
+                auth()->user(),
+                $newValue ? 'backup.schedule.notify_enabled' : 'backup.schedule.notify_disabled',
+                $schedule,
+            );
+        }
+
+        $this->toastSuccess($newValue ? __('Failure alerts enabled.') : __('Failure alerts disabled.'));
+    }
+
+    public function runScheduleNow(string $scheduleId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $schedule = ServerBackupSchedule::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($scheduleId)
+            ->first();
+        if ($schedule === null) {
+            return;
+        }
+
+        match ($schedule->target_type) {
+            ServerBackupSchedule::TARGET_DATABASE => $this->dispatchScheduleDatabase($schedule),
+            ServerBackupSchedule::TARGET_SITE_FILES => $this->dispatchScheduleSiteFiles($schedule),
+            default => $this->toastError(__('Unknown target type.')),
+        };
+
+        if ($org = $this->server->organization) {
+            audit_log($org, auth()->user(), 'backup.schedule.run_now', $schedule);
+        }
+    }
+
+    private function dispatchScheduleDatabase(ServerBackupSchedule $schedule): void
+    {
+        $database = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($schedule->target_id)
+            ->first();
+        if ($database === null) {
+            $this->toastError(__('Schedule target database is missing.'));
+
+            return;
+        }
+
+        $backup = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'user_id' => auth()->id(),
+            'status' => ServerDatabaseBackup::STATUS_PENDING,
+        ]);
+        ExportServerDatabaseBackupJob::dispatch($backup->id);
+        $this->toastSuccess(__('Backup queued for :name.', ['name' => $database->name]));
+    }
+
+    private function dispatchScheduleSiteFiles(ServerBackupSchedule $schedule): void
+    {
+        $site = Site::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($schedule->target_id)
+            ->first();
+        if ($site === null) {
+            $this->toastError(__('Schedule target site is missing.'));
+
+            return;
+        }
+
+        $backup = SiteFileBackup::create([
+            'site_id' => $site->id,
+            'user_id' => auth()->id(),
+            'status' => SiteFileBackup::STATUS_PENDING,
+        ]);
+        ExportSiteFileBackupJob::dispatch($backup->id);
+        $this->toastSuccess(__('Backup queued for :name.', ['name' => $site->name]));
     }
 
     /**
@@ -313,6 +437,15 @@ class WorkspaceBackups extends Component
         $schedule->update(['is_active' => $newActive]);
         if ($schedule->server_cron_job_id) {
             ServerCronJob::query()->whereKey($schedule->server_cron_job_id)->update(['enabled' => $newActive]);
+        }
+
+        if ($org = $this->server->organization) {
+            audit_log(
+                $org,
+                auth()->user(),
+                $newActive ? 'backup.schedule.resumed' : 'backup.schedule.paused',
+                $schedule,
+            );
         }
 
         $this->toastSuccess($newActive ? __('Schedule resumed.') : __('Schedule paused.'));
@@ -422,9 +555,24 @@ class WorkspaceBackups extends Component
                 default => null,
             };
 
+            $recentRuns = match ($schedule->target_type) {
+                'database' => ServerDatabaseBackup::query()
+                    ->where('server_database_id', $schedule->target_id)
+                    ->orderByDesc('created_at')
+                    ->limit(5)
+                    ->get(['id', 'status', 'bytes', 'created_at', 'error_message']),
+                'site_files' => SiteFileBackup::query()
+                    ->where('site_id', $schedule->target_id)
+                    ->orderByDesc('created_at')
+                    ->limit(5)
+                    ->get(['id', 'status', 'bytes', 'created_at', 'error_message']),
+                default => collect(),
+            };
+
             $scheduleMeta[$schedule->id] = [
                 'next_run_at' => $next,
                 'latest_status' => $latestStatus,
+                'recent_runs' => $recentRuns,
             ];
         }
 

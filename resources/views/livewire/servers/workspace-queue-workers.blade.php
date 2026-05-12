@@ -18,6 +18,22 @@
         <p>{{ __('Queue workers are Supervisor programs whose program_type matches a known queue framework (Laravel queue/Horizon/Octane/Reverb, Sidekiq, Solid Queue, Celery, BullMQ, generic Node). Programs added here also appear on the Daemons page since they share the same model.') }}</p>
     </x-explainer>
 
+    {{-- At-a-glance counts. --}}
+    <section class="grid gap-3 sm:grid-cols-3">
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Active workers') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-forest">{{ $stats['active'] }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inactive') }}</p>
+            <p class="mt-1 text-2xl font-semibold {{ $stats['inactive'] > 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $stats['inactive'] }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total processes') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $stats['total_processes'] }}</p>
+        </div>
+    </section>
+
     {{-- Existing queue workers ----------------------------------------------------- --}}
     <section class="{{ $card }}">
         <header class="flex items-center justify-between border-b border-brand-ink/10 px-5 py-4">
@@ -54,17 +70,43 @@
                             </p>
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
-                            <button
-                                type="button"
-                                wire:click="restartWorker('{{ $program->id }}')"
-                                wire:loading.attr="disabled"
-                                wire:target="restartWorker"
-                                class="{{ $btnSecondary }}"
-                                @disabled(! $opsReady || ! $program->is_active)
-                            >
-                                <x-heroicon-o-arrow-path class="h-4 w-4" />
-                                {{ __('Restart') }}
-                            </button>
+                            @if ($program->is_active)
+                                <button
+                                    type="button"
+                                    wire:click="restartWorker('{{ $program->id }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="restartWorker"
+                                    class="{{ $btnSecondary }}"
+                                    @disabled(! $opsReady)
+                                >
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                    {{ __('Restart') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="stopWorker('{{ $program->id }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="stopWorker"
+                                    wire:confirm="{{ __('Stop :slug?', ['slug' => $program->slug]) }}"
+                                    class="{{ $btnSecondary }}"
+                                    @disabled(! $opsReady)
+                                >
+                                    <x-heroicon-o-stop class="h-4 w-4" />
+                                    {{ __('Stop') }}
+                                </button>
+                            @else
+                                <button
+                                    type="button"
+                                    wire:click="startWorker('{{ $program->id }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="startWorker"
+                                    class="{{ $btnSecondary }}"
+                                    @disabled(! $opsReady)
+                                >
+                                    <x-heroicon-o-play class="h-4 w-4" />
+                                    {{ __('Start') }}
+                                </button>
+                            @endif
                             <a
                                 href="{{ $daemonsRoute }}#program-{{ $program->id }}"
                                 wire:navigate

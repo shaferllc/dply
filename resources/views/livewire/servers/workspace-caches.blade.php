@@ -770,117 +770,16 @@
                             </div>
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
-                                <dd class="mt-1 flex flex-wrap items-center gap-2">
+                                <dd class="mt-1">
+                                    {{-- Compact reachability badge only. The probe-related action
+                                         buttons (Recheck, Debug, Status, Logs, Repair port) live in
+                                         the Diagnose toolbar group below so the status grid stays
+                                         scannable. --}}
                                     @if ($probeRunning)
                                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Reachable') }}</span>
                                     @else
                                         <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{{ __('Not reachable') }}</span>
                                     @endif
-                                    {{-- Re-probe THIS instance on its actual port. Cheap; runs a
-                                         single `*-cli ping` (or systemctl is-active for memcached
-                                         / dragonfly) and toasts the result. --}}
-                                    <button
-                                        type="button"
-                                        wire:click="recheckCacheServiceInstance('{{ $engine }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="recheckCacheServiceInstance"
-                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
-                                        title="{{ __('Re-run the reachability probe against this instance\'s port') }}"
-                                    >
-                                        <span wire:loading.remove wire:target="recheckCacheServiceInstance" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-arrow-path class="h-3 w-3" />
-                                            {{ __('Recheck') }}
-                                        </span>
-                                        <span wire:loading wire:target="recheckCacheServiceInstance" class="inline-flex items-center gap-1">
-                                            <x-spinner variant="forest" />
-                                            {{ __('Checking…') }}
-                                        </span>
-                                    </button>
-                                    @if (! $probeRunning)
-                                        <button
-                                            type="button"
-                                            wire:click="debugCacheServiceInstance('{{ $engine }}')"
-                                            wire:loading.attr="disabled"
-                                            wire:target="debugCacheServiceInstance"
-                                            class="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 font-sans text-[11px] font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                                            title="{{ __('Run systemctl status + port-listener + ping diagnostics and surface the output below') }}"
-                                        >
-                                            <span wire:loading.remove wire:target="debugCacheServiceInstance" class="inline-flex items-center gap-1">
-                                                <x-heroicon-o-bug-ant class="h-3 w-3" />
-                                                {{ __('Debug') }}
-                                            </span>
-                                            <span wire:loading wire:target="debugCacheServiceInstance" class="inline-flex items-center gap-1">
-                                                <x-spinner variant="forest" />
-                                                {{ __('Running…') }}
-                                            </span>
-                                        </button>
-                                        @php
-                                            // Surface the port-repair affordance only for the case it
-                                            // actually fixes: default-instance, redis-style engine, port
-                                            // bumped off the engine default (because another service
-                                            // occupied 6379) and the daemon's currently unreachable.
-                                            $needsPortRepair = $row->name === \App\Models\ServerCacheService::DEFAULT_INSTANCE_NAME
-                                                && in_array($row->engine, ['redis', 'valkey', 'keydb'], true)
-                                                && (int) $row->port !== \App\Models\ServerCacheService::defaultPortFor($row->engine);
-                                        @endphp
-                                        @if ($needsPortRepair)
-                                            <button
-                                                type="button"
-                                                wire:click="repairDefaultInstancePort('{{ $engine }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="repairDefaultInstancePort"
-                                                class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 font-sans text-[11px] font-medium text-rose-900 hover:bg-rose-100 disabled:opacity-50"
-                                                title="{{ __('Rewrite :config to bind :port and restart — fixes default-instance rows whose apt config still points at the engine default.', ['config' => '/etc/'.$engine.'/'.$engine.'.conf', 'port' => $row->port]) }}"
-                                            >
-                                                <span wire:loading.remove wire:target="repairDefaultInstancePort" class="inline-flex items-center gap-1">
-                                                    <x-heroicon-o-wrench-screwdriver class="h-3 w-3" />
-                                                    {{ __('Repair port') }}
-                                                </span>
-                                                <span wire:loading wire:target="repairDefaultInstancePort" class="inline-flex items-center gap-1">
-                                                    <x-spinner variant="forest" />
-                                                    {{ __('Repairing…') }}
-                                                </span>
-                                            </button>
-                                        @endif
-                                    @endif
-                                    {{-- Status / Logs — open the per-instance modal that shows
-                                         systemctl status and journalctl -u for THIS instance's
-                                         unit. Always available regardless of reachability so the
-                                         operator can inspect a stopped or failed instance too. --}}
-                                    <button
-                                        type="button"
-                                        wire:click="showCacheInstanceStatus('{{ $engine }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="showCacheInstanceStatus,showCacheInstanceLogs"
-                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
-                                        title="{{ __('Open systemctl status for this instance') }}"
-                                    >
-                                        <span wire:loading.remove wire:target="showCacheInstanceStatus" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-information-circle class="h-3 w-3" />
-                                            {{ __('Status') }}
-                                        </span>
-                                        <span wire:loading wire:target="showCacheInstanceStatus" class="inline-flex items-center gap-1">
-                                            <x-spinner variant="forest" />
-                                            {{ __('Loading…') }}
-                                        </span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        wire:click="showCacheInstanceLogs('{{ $engine }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="showCacheInstanceStatus,showCacheInstanceLogs"
-                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
-                                        title="{{ __('Open journalctl tail for this instance') }}"
-                                    >
-                                        <span wire:loading.remove wire:target="showCacheInstanceLogs" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-document-text class="h-3 w-3" />
-                                            {{ __('Logs') }}
-                                        </span>
-                                        <span wire:loading wire:target="showCacheInstanceLogs" class="inline-flex items-center gap-1">
-                                            <x-spinner variant="forest" />
-                                            {{ __('Loading…') }}
-                                        </span>
-                                    </button>
                                 </dd>
                             </div>
                             <div>
@@ -947,6 +846,8 @@
                                 <x-spinner variant="forest" class="mt-0.5 shrink-0" />
                                 <span>{{ __('Restart, stop, start, flush, and uninstall are paused while another cache service is changing on this server.') }}</span>
                             </p>
+                        @endif
+
                         @php
                             // Multi-instance awareness: stop/restart act on this instance's
                             // systemd unit (or templated unit) only. Uninstall removes this
@@ -966,58 +867,191 @@
                                 ? __('apt purge will remove the package and its data dirs. Cached entries will be lost. Other engines on this server are not affected.')
                                 : __('Removes only this instance — its systemd unit, config, and data dir. The apt package stays because :n other :engine instance(s) still use it. Cached entries on this instance will be lost; sibling instances are unaffected.', ['n' => $siblingInstanceCount, 'engine' => $engineLabels[$engine]]);
                             $uninstallLabel = $isLastInstanceOfEngine ? __('Uninstall') : __('Remove instance');
+
+                            // Always-visible escape hatch — clears the dply row only without
+                            // touching the server. Use when uninstall is stuck or the install
+                            // never landed on the box.
+                            $forceRemoveConfirm = __(
+                                'Removes this :engine row from dply only. The server\'s package, config, and data dirs are NOT touched — if the daemon is actually installed, run apt purge / systemctl disable manually after. Use this when the install never landed or uninstall keeps failing. Continue?',
+                                ['engine' => $engineLabels[$engine] ?? $engine],
+                            );
+
+                            // Repair-port surfaces only when the case it fixes is present:
+                            // default-instance + redis-style engine + port forced off the engine
+                            // default. Hidden when the daemon is already reachable.
+                            $needsPortRepair = $row->name === \App\Models\ServerCacheService::DEFAULT_INSTANCE_NAME
+                                && in_array($row->engine, ['redis', 'valkey', 'keydb'], true)
+                                && (int) $row->port !== \App\Models\ServerCacheService::defaultPortFor($row->engine);
+
+                            // Lifecycle buttons are gated by terminal states; PENDING/INSTALLING/
+                            // UNINSTALLING surface their own affordances via the busy banner up top.
+                            $lifecycleAvailable = in_array($row->status, [
+                                \App\Models\ServerCacheService::STATUS_RUNNING,
+                                \App\Models\ServerCacheService::STATUS_STOPPED,
+                                \App\Models\ServerCacheService::STATUS_FAILED,
+                            ], true);
+
+                            // Centralise button-class strings so the three groups stay visually
+                            // consistent without copy-pasting the same Tailwind soup five times.
+                            $btnDiagnose = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50';
+                            $btnLifecycle = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50';
+                            $btnDanger = 'inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50';
+                            $btnRepair = 'inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-900 hover:bg-rose-100 disabled:opacity-50';
+                            $btnDebug = 'inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50';
+                            $btnMuted = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-mist hover:bg-brand-sand/40';
+                            $groupShell = 'rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3';
+                            $groupLabel = 'mb-2 text-[10px] font-semibold uppercase tracking-wide text-brand-mist';
+                            $groupButtons = 'flex flex-wrap gap-1.5';
                         @endphp
-                        <x-explainer class="mt-6" tone="warn" :title="__('What do these actions do?')">
-                            <ul>
-                                <li><strong>{{ __('Restart / Stop / Start') }}.</strong> {{ __('Acts on THIS instance\'s systemd unit only. Other instances on this engine are not affected.') }}</li>
-                                <li><strong>{{ __('Flush all keys') }}.</strong> {{ __('Drops every key in this instance — sessions, cache, queued tags, rate-limit counters. Cannot be undone. Sibling instances keep their data.') }}</li>
-                                @if ($isLastInstanceOfEngine)
-                                    <li><strong>{{ __('Uninstall') }}.</strong> {{ __('Last instance of :engine on this server — runs apt purge for the package + data dirs. Other engines on this server are not affected.', ['engine' => $engineLabels[$engine]]) }}</li>
-                                @else
-                                    <li><strong>{{ __('Remove instance') }}.</strong> {{ __(':n other :engine instance(s) still use the package, so apt purge would break them. This affordance only removes the systemd unit + config + data dir for THIS instance.', ['n' => $siblingInstanceCount, 'engine' => $engineLabels[$engine]]) }}</li>
-                                @endif
-                            </ul>
-                        </x-explainer>
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                @if (in_array($row->status, [\App\Models\ServerCacheService::STATUS_RUNNING, \App\Models\ServerCacheService::STATUS_STOPPED, \App\Models\ServerCacheService::STATUS_FAILED], true))
-                                    <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
-                                        <span wire:loading.remove wire:target="restartCacheService">{{ __('Restart') }}</span>
-                                        <span wire:loading wire:target="restartCacheService">{{ __('Restarting…') }}</span>
+
+                        {{-- Three-group toolbar: Diagnose / Lifecycle / Cleanup. Same visual
+                             treatment per group, semantic grouping by intent. Lifecycle renders a
+                             muted explanation when the row's state can't take those actions
+                             (PENDING/INSTALLING/UNINSTALLING — see the busy banner up top for
+                             those). Force remove row is always visible in Cleanup so orphaned
+                             rows can be cleared without an SSH round-trip. --}}
+                        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+                            <div class="{{ $groupShell }}">
+                                <p class="{{ $groupLabel }}">{{ __('Diagnose') }}</p>
+                                <div class="{{ $groupButtons }}">
+                                    <button type="button" wire:click="recheckCacheServiceInstance('{{ $engine }}')" wire:loading.attr="disabled" wire:target="recheckCacheServiceInstance" class="{{ $btnDiagnose }}" title="{{ __('Re-run the reachability probe against this instance\'s port') }}">
+                                        <span wire:loading.remove wire:target="recheckCacheServiceInstance" class="inline-flex items-center gap-1.5">
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                            {{ __('Recheck') }}
+                                        </span>
+                                        <span wire:loading wire:target="recheckCacheServiceInstance" class="inline-flex items-center gap-1.5">
+                                            <x-spinner variant="forest" />
+                                            {{ __('Checking…') }}
+                                        </span>
                                     </button>
-                                    @if ($row->status !== \App\Models\ServerCacheService::STATUS_STOPPED)
-                                        <button type="button" wire:click="stopCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="stopCacheService" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-stop-circle class="h-3.5 w-3.5" aria-hidden="true" />
-                                            {{ __('Stop') }}
-                                        </button>
-                                    @else
-                                        <button type="button" wire:click="startCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="startCacheService" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-play-circle class="h-3.5 w-3.5" aria-hidden="true" />
-                                            {{ __('Start') }}
+                                    @if (! $probeRunning)
+                                        <button type="button" wire:click="debugCacheServiceInstance('{{ $engine }}')" wire:loading.attr="disabled" wire:target="debugCacheServiceInstance" class="{{ $btnDebug }}" title="{{ __('Run systemctl status + port-listener + ping diagnostics and surface the output below') }}">
+                                            <span wire:loading.remove wire:target="debugCacheServiceInstance" class="inline-flex items-center gap-1.5">
+                                                <x-heroicon-o-bug-ant class="h-3.5 w-3.5" />
+                                                {{ __('Debug') }}
+                                            </span>
+                                            <span wire:loading wire:target="debugCacheServiceInstance" class="inline-flex items-center gap-1.5">
+                                                <x-spinner variant="forest" />
+                                                {{ __('Running…') }}
+                                            </span>
                                         </button>
                                     @endif
-                                    @if ($row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
+                                    <button type="button" wire:click="showCacheInstanceStatus('{{ $engine }}')" wire:loading.attr="disabled" wire:target="showCacheInstanceStatus,showCacheInstanceLogs" class="{{ $btnDiagnose }}" title="{{ __('Open systemctl status for this instance') }}">
+                                        <x-heroicon-o-information-circle class="h-3.5 w-3.5" />
+                                        {{ __('Status') }}
+                                    </button>
+                                    <button type="button" wire:click="showCacheInstanceLogs('{{ $engine }}')" wire:loading.attr="disabled" wire:target="showCacheInstanceStatus,showCacheInstanceLogs" class="{{ $btnDiagnose }}" title="{{ __('Open journalctl tail for this instance') }}">
+                                        <x-heroicon-o-document-text class="h-3.5 w-3.5" />
+                                        {{ __('Logs') }}
+                                    </button>
+                                    @if ($needsPortRepair && ! $probeRunning)
+                                        <button type="button" wire:click="repairDefaultInstancePort('{{ $engine }}')" wire:loading.attr="disabled" wire:target="repairDefaultInstancePort" class="{{ $btnRepair }}" title="{{ __('Rewrite :config to bind :port and restart — fixes default-instance rows whose apt config still points at the engine default.', ['config' => '/etc/'.$engine.'/'.$engine.'.conf', 'port' => $row->port]) }}">
+                                            <span wire:loading.remove wire:target="repairDefaultInstancePort" class="inline-flex items-center gap-1.5">
+                                                <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" />
+                                                {{ __('Repair port') }}
+                                            </span>
+                                            <span wire:loading wire:target="repairDefaultInstancePort" class="inline-flex items-center gap-1.5">
+                                                <x-spinner variant="forest" />
+                                                {{ __('Repairing…') }}
+                                            </span>
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="{{ $groupShell }}">
+                                <p class="{{ $groupLabel }}">{{ __('Lifecycle') }}</p>
+                                <div class="{{ $groupButtons }}">
+                                    @if ($lifecycleAvailable)
+                                        <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="{{ $btnLifecycle }}">
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <span wire:loading.remove wire:target="restartCacheService">{{ __('Restart') }}</span>
+                                            <span wire:loading wire:target="restartCacheService">{{ __('Restarting…') }}</span>
+                                        </button>
+                                        @if ($row->status !== \App\Models\ServerCacheService::STATUS_STOPPED)
+                                            <button type="button" wire:click="stopCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="stopCacheService" class="{{ $btnLifecycle }}" title="{{ __('Stop the daemon now. Boot-time auto-start is unchanged — it will come back on reboot.') }}">
+                                                <x-heroicon-o-stop-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                                {{ __('Stop') }}
+                                            </button>
+                                            {{-- Disable: stronger than Stop. `systemctl disable --now`
+                                                 halts the daemon AND removes its boot-time enablement
+                                                 so it won't auto-start on reboot. Use when the
+                                                 operator wants the service off for the long haul
+                                                 without uninstalling. --}}
+                                            <button type="button" wire:click="disableCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="disableCacheService" class="{{ $btnLifecycle }}" title="{{ __('Stop the daemon AND prevent it from starting at boot. Package + data dirs stay; re-enable later when you need it back.') }}">
+                                                <x-heroicon-o-no-symbol class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <span wire:loading.remove wire:target="disableCacheService">{{ __('Disable') }}</span>
+                                                <span wire:loading wire:target="disableCacheService">{{ __('Disabling…') }}</span>
+                                            </button>
+                                        @else
+                                            <button type="button" wire:click="startCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="startCacheService" class="{{ $btnLifecycle }}" title="{{ __('Start the daemon now. Boot-time enablement is unchanged.') }}">
+                                                <x-heroicon-o-play-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                                {{ __('Start') }}
+                                            </button>
+                                            {{-- Enable: counterpart to Disable. `systemctl enable --now`
+                                                 re-arms boot auto-start AND starts the daemon
+                                                 immediately, so one click instead of two. --}}
+                                            <button type="button" wire:click="enableCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="enableCacheService" class="{{ $btnLifecycle }}" title="{{ __('Start the daemon AND re-arm boot-time auto-start. Use this when bringing the service back after a Disable.') }}">
+                                                <x-heroicon-o-check-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <span wire:loading.remove wire:target="enableCacheService">{{ __('Enable') }}</span>
+                                                <span wire:loading wire:target="enableCacheService">{{ __('Enabling…') }}</span>
+                                            </button>
+                                        @endif
+                                        @if ($row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
+                                            <button type="button" wire:click="openConfirmActionModal('flushCacheService', ['{{ $engine }}'], @js(__('Flush all keys')), @js(__('Drop every key in :engine. App sessions, queued tags, and rate-limit counters in this engine will all be reset. Cannot be undone.', ['engine' => $engineLabels[$engine]])), @js(__('Flush all keys')), true)" class="{{ $btnDanger }}">
+                                                <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                                {{ __('Flush all keys') }}
+                                            </button>
+                                        @endif
+                                    @else
+                                        <p class="text-xs italic text-brand-mist">
+                                            {{ __('Not available — row is :status. The busy banner above offers cancel/force-cancel for in-flight installs.', ['status' => $row->status]) }}
+                                        </p>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="{{ $groupShell }}">
+                                <p class="{{ $groupLabel }}">{{ __('Cleanup') }}</p>
+                                <div class="{{ $groupButtons }}">
+                                    @if ($lifecycleAvailable)
                                         <button
                                             type="button"
-                                            wire:click="openConfirmActionModal('flushCacheService', ['{{ $engine }}'], @js(__('Flush all keys')), @js(__('Drop every key in :engine. App sessions, queued tags, and rate-limit counters in this engine will all be reset. Cannot be undone.', ['engine' => $engineLabels[$engine]])), @js(__('Flush all keys')), true)"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                            wire:click="openConfirmActionModal('uninstallCacheService', ['{{ $engine }}'], @js($uninstallTitle), @js($uninstallConfirm), @js($uninstallLabel), true)"
+                                            class="{{ $btnDanger }}"
+                                            title="{{ $isLastInstanceOfEngine ? __('apt purge — removes the package') : __('Removes this instance only — package stays for the other instances') }}"
                                         >
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
-                                            {{ __('Flush all keys') }}
+                                            <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ $uninstallLabel }}
                                         </button>
                                     @endif
                                     <button
                                         type="button"
-                                        wire:click="openConfirmActionModal('uninstallCacheService', ['{{ $engine }}'], @js($uninstallTitle), @js($uninstallConfirm), @js($uninstallLabel), true)"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                                        title="{{ $isLastInstanceOfEngine ? __('apt purge — removes the package') : __('Removes this instance only — package stays for the other instances') }}"
+                                        wire:click="openConfirmActionModal('forceRemoveCacheServiceRow', ['{{ $engine }}'], @js(__('Force remove dply row?')), @js($forceRemoveConfirm), @js(__('Force remove')), true)"
+                                        class="{{ $btnMuted }}"
+                                        title="{{ __('Delete this row from dply without touching the server. Use when uninstall is stuck or the install never landed.') }}"
                                     >
-                                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
-                                        {{ $uninstallLabel }}
+                                        <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('Force remove row') }}
                                     </button>
-                                @endif
+                                </div>
                             </div>
-                        @endif
+                        </div>
+
+                        <x-explainer class="mt-6" tone="warn" :title="__('What do these actions do?')">
+                            <ul>
+                                <li><strong>{{ __('Diagnose') }}.</strong> {{ __('Recheck re-runs the per-instance ping. Debug runs systemctl status + port listener + journal. Status / Logs open the per-instance modal. Repair port rewrites the apt-shipped config when a default-instance was bumped off its default port.') }}</li>
+                                <li><strong>{{ __('Lifecycle: Restart / Stop / Start') }}.</strong> {{ __('Acts on THIS instance\'s systemd unit only. Other instances on this engine are not affected.') }}</li>
+                                <li><strong>{{ __('Lifecycle: Disable / Enable') }}.</strong> {{ __('Disable = stop now AND remove boot auto-start. Enable = start now AND re-arm boot auto-start. Use these when you want the daemon off (or back on) across reboots without uninstalling.') }}</li>
+                                <li><strong>{{ __('Lifecycle: Flush all keys') }}.</strong> {{ __('Drops every key in this instance — sessions, cache, queued tags, rate-limit counters. Cannot be undone. Sibling instances keep their data.') }}</li>
+                                @if ($isLastInstanceOfEngine)
+                                    <li><strong>{{ __('Cleanup: Uninstall') }}.</strong> {{ __('Last instance of :engine on this server — runs apt purge for the package + data dirs. Other engines on this server are not affected.', ['engine' => $engineLabels[$engine]]) }}</li>
+                                @else
+                                    <li><strong>{{ __('Cleanup: Remove instance') }}.</strong> {{ __(':n other :engine instance(s) still use the package, so apt purge would break them. This affordance only removes the systemd unit + config + data dir for THIS instance.', ['n' => $siblingInstanceCount, 'engine' => $engineLabels[$engine]]) }}</li>
+                                @endif
+                                <li><strong>{{ __('Cleanup: Force remove row') }}.</strong> {{ __('Deletes the dply row only. Does NOT touch the server. Use when uninstall keeps failing or the install never landed on the box.') }}</li>
+                            </ul>
+                        </x-explainer>
                     </div>
 
                     {{-- Connection snippet for this engine. --}}

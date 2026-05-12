@@ -616,6 +616,336 @@ class BackgroundWorkspacePagesTest extends TestCase
         $this->assertSame(0, ServerCronJob::query()->where('server_id', $server->id)->count());
     }
 
+    public function test_run_schedule_now_dispatches_database_export_job(): void
+    {
+        Bus::fake();
+
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('runScheduleNow', $schedule->id);
+
+        Bus::assertDispatched(ExportServerDatabaseBackupJob::class);
+    }
+
+    public function test_run_schedule_now_dispatches_site_files_export_job(): void
+    {
+        Bus::fake();
+
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'site_files',
+            'target_id' => $site->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('runScheduleNow', $schedule->id);
+
+        Bus::assertDispatched(ExportSiteFileBackupJob::class);
+    }
+
+    public function test_schedule_mutations_emit_audit_log_rows(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+
+        // Create
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->set('new_target_type', 'database')
+            ->set('new_target_id', $database->id)
+            ->set('new_cron_expression', '0 3 * * *')
+            ->call('addSchedule');
+
+        $schedule = ServerBackupSchedule::query()->where('server_id', $server->id)->first();
+        $this->assertNotNull($schedule);
+
+        // Pause
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('toggleSchedule', $schedule->id);
+
+        // Resume
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('toggleSchedule', $schedule->id);
+
+        // Edit cadence
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('startEditSchedule', $schedule->id)
+            ->set('editing_schedules.'.$schedule->id, '15 * * * *')
+            ->call('saveScheduleCadence', $schedule->id);
+
+        // Run now
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('runScheduleNow', $schedule->id);
+
+        $actions = \App\Models\AuditLog::query()
+            ->where('organization_id', $server->organization_id)
+            ->orderBy('created_at')
+            ->pluck('action')
+            ->all();
+
+        $this->assertContains('backup.schedule.created', $actions);
+        $this->assertContains('backup.schedule.paused', $actions);
+        $this->assertContains('backup.schedule.resumed', $actions);
+        $this->assertContains('backup.schedule.cadence_updated', $actions);
+        $this->assertContains('backup.schedule.run_now', $actions);
+    }
+
+    public function test_schedule_meta_includes_recent_runs_for_target(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+        ]);
+
+        for ($i = 0; $i < 7; $i++) {
+            ServerDatabaseBackup::create([
+                'server_database_id' => $database->id,
+                'status' => $i % 2 === 0 ? 'completed' : 'failed',
+                'bytes' => 100 * ($i + 1),
+            ]);
+        }
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server]);
+
+        $meta = $component->viewData('scheduleMeta');
+        $recent = $meta[$schedule->id]['recent_runs'];
+        $this->assertCount(5, $recent, 'History should be capped at 5 entries.');
+    }
+
+    public function test_queue_workers_stop_action_calls_stop_program_group(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+
+        $program = SupervisorProgram::create([
+            'server_id' => $server->id,
+            'slug' => 'app-queue',
+            'program_type' => 'queue',
+            'command' => 'php artisan queue:work',
+            'directory' => '/srv/app/current',
+            'user' => 'dply',
+            'numprocs' => 2,
+            'is_active' => true,
+        ]);
+
+        $provisioner = \Mockery::mock(\App\Services\Servers\SupervisorProvisioner::class);
+        $provisioner->shouldReceive('stopProgramGroup')->once()->andReturn('ok');
+        app()->instance(\App\Services\Servers\SupervisorProvisioner::class, $provisioner);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceQueueWorkers::class, ['server' => $server])
+            ->call('stopWorker', $program->id);
+
+        // Audit row emitted.
+        $audit = \App\Models\AuditLog::query()
+            ->where('organization_id', $server->organization_id)
+            ->latest('created_at')
+            ->first();
+        $this->assertSame('queue_worker.stop', $audit?->action);
+    }
+
+    public function test_queue_workers_start_action_calls_start_program_group(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+
+        $program = SupervisorProgram::create([
+            'server_id' => $server->id,
+            'slug' => 'idle-queue',
+            'program_type' => 'queue',
+            'command' => 'php artisan queue:work',
+            'directory' => '/srv/app/current',
+            'user' => 'dply',
+            'numprocs' => 1,
+            'is_active' => false,
+        ]);
+
+        $provisioner = \Mockery::mock(\App\Services\Servers\SupervisorProvisioner::class);
+        $provisioner->shouldReceive('startProgramGroup')->once()->andReturn('ok');
+        app()->instance(\App\Services\Servers\SupervisorProvisioner::class, $provisioner);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceQueueWorkers::class, ['server' => $server])
+            ->call('startWorker', $program->id);
+
+        $audit = \App\Models\AuditLog::query()
+            ->where('organization_id', $server->organization_id)
+            ->latest('created_at')
+            ->first();
+        $this->assertSame('queue_worker.start', $audit?->action);
+    }
+
+    public function test_queue_workers_stats_count_active_inactive_and_total_processes(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'slug' => 'a', 'program_type' => 'queue',
+            'command' => 'x', 'directory' => '/', 'user' => 'dply', 'numprocs' => 3, 'is_active' => true,
+        ]);
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'slug' => 'b', 'program_type' => 'horizon',
+            'command' => 'x', 'directory' => '/', 'user' => 'dply', 'numprocs' => 1, 'is_active' => true,
+        ]);
+        SupervisorProgram::create([
+            'server_id' => $server->id, 'slug' => 'c', 'program_type' => 'sidekiq',
+            'command' => 'x', 'directory' => '/', 'user' => 'dply', 'numprocs' => 5, 'is_active' => false,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceQueueWorkers::class, ['server' => $server]);
+        $stats = $component->viewData('stats');
+
+        $this->assertSame(2, $stats['active']);
+        $this->assertSame(1, $stats['inactive']);
+        // Inactive workers don't count toward total_processes.
+        $this->assertSame(4, $stats['total_processes']);
+    }
+
+    public function test_failed_backup_sends_notification_when_schedule_opted_in(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+            'notify_on_failure' => true,
+        ]);
+
+        $backup = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'status' => 'pending',
+        ]);
+        $backup->update(['status' => 'failed', 'error_message' => 'connection refused']);
+
+        \Illuminate\Support\Facades\Notification::assertSentTo($user, \App\Notifications\BackupFailureNotification::class);
+    }
+
+    public function test_failed_backup_does_not_notify_when_schedule_opted_out(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+            'notify_on_failure' => false,
+        ]);
+
+        $backup = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'status' => 'pending',
+        ]);
+        $backup->update(['status' => 'failed']);
+
+        \Illuminate\Support\Facades\Notification::assertNothingSent();
+    }
+
+    public function test_toggle_notify_on_failure_flips_flag_and_audits(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+            'notify_on_failure' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('toggleNotifyOnFailure', $schedule->id);
+
+        $this->assertFalse(ServerBackupSchedule::find($schedule->id)->notify_on_failure);
+
+        $latestAudit = \App\Models\AuditLog::query()
+            ->where('organization_id', $server->organization_id)
+            ->orderByDesc('created_at')
+            ->first();
+        $this->assertSame('backup.schedule.notify_disabled', $latestAudit?->action);
+    }
+
     public function test_completed_backup_auto_resumes_paused_schedule(): void
     {
         $user = $this->actingOrgUser();

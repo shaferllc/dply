@@ -63,6 +63,25 @@ class WorkspaceQueueWorkers extends Component
 
     public function restartWorker(SupervisorProvisioner $provisioner, string $programId): void
     {
+        $this->workerAction($provisioner, $programId, 'restart');
+    }
+
+    public function stopWorker(SupervisorProvisioner $provisioner, string $programId): void
+    {
+        $this->workerAction($provisioner, $programId, 'stop');
+    }
+
+    public function startWorker(SupervisorProvisioner $provisioner, string $programId): void
+    {
+        $this->workerAction($provisioner, $programId, 'start');
+    }
+
+    /**
+     * Shared verb dispatcher — keeps the three public actions thin and ensures
+     * every supervisor lifecycle change goes through the same auth + audit path.
+     */
+    private function workerAction(SupervisorProvisioner $provisioner, string $programId, string $verb): void
+    {
         $this->authorize('update', $this->server);
 
         $program = SupervisorProgram::query()
@@ -72,8 +91,18 @@ class WorkspaceQueueWorkers extends Component
             ->firstOrFail();
 
         try {
-            $provisioner->restartProgramGroup($this->server->fresh(), $program->id);
-            $this->toastSuccess(__('Restart sent to :slug.', ['slug' => $program->slug]));
+            match ($verb) {
+                'restart' => $provisioner->restartProgramGroup($this->server->fresh(), $program->id),
+                'stop' => $provisioner->stopProgramGroup($this->server->fresh(), $program->id),
+                'start' => $provisioner->startProgramGroup($this->server->fresh(), $program->id),
+            };
+            if ($org = $this->server->organization) {
+                audit_log($org, auth()->user(), 'queue_worker.'.$verb, $program, null, [
+                    'slug' => $program->slug,
+                    'program_type' => $program->program_type,
+                ]);
+            }
+            $this->toastSuccess(__(':verb sent to :slug.', ['verb' => ucfirst($verb), 'slug' => $program->slug]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
@@ -89,10 +118,18 @@ class WorkspaceQueueWorkers extends Component
             ->orderBy('slug')
             ->get();
 
+        // At-a-glance counts surfaced in the page header.
+        $stats = [
+            'active' => $programs->where('is_active', true)->count(),
+            'inactive' => $programs->where('is_active', false)->count(),
+            'total_processes' => (int) $programs->where('is_active', true)->sum('numprocs'),
+        ];
+
         return view('livewire.servers.workspace-queue-workers', [
             'opsReady' => $this->serverOpsReady(),
             'programs' => $programs,
             'presets' => self::PRESETS,
+            'stats' => $stats,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
