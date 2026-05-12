@@ -954,6 +954,11 @@ class Site extends Model
         return strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'laravel';
     }
 
+    public function isRailsFrameworkDetected(): bool
+    {
+        return strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'rails';
+    }
+
     /**
      * True when the site's detected runtime app is WordPress (per
      * {@see PhpRuntimeDetector}),

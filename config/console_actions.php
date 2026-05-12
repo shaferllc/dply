@@ -72,6 +72,12 @@ return [
             'failed' => 'Uptime check failed.',
             'stale' => 'Uptime check did not finish.',
         ],
+        'webserver_switch' => [
+            'running' => 'Switching webserver on :host …',
+            'completed' => 'Webserver switched.',
+            'failed' => 'Webserver switch failed.',
+            'stale' => 'Webserver switch did not finish.',
+        ],
     ],
 
     /*

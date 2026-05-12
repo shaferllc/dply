@@ -539,4 +539,60 @@ class WorkspaceDatabasesTest extends TestCase
 
         Queue::assertPushed(UninstallDatabaseEngineJob::class);
     }
+
+    public function test_stop_and_revert_marks_row_failed_and_dispatches_uninstall(): void
+    {
+        Queue::fake();
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $row = ServerDatabaseEngine::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'mysql',
+            'is_default' => true,
+            'status' => ServerDatabaseEngine::STATUS_INSTALLING,
+            'port' => 3306,
+        ]);
+
+        $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => false, 'sqlite' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceDatabases::class, ['server' => $server])
+            ->call('stopAndRevertDatabaseEngineInstall', 'mysql')
+            ->assertHasNoErrors();
+
+        $row->refresh();
+        $this->assertSame(ServerDatabaseEngine::STATUS_FAILED, $row->status);
+        $this->assertStringContainsString('Stopped by operator', (string) $row->error_message);
+
+        Queue::assertPushed(UninstallDatabaseEngineJob::class);
+    }
+
+    public function test_stop_and_revert_refuses_running_engine(): void
+    {
+        Queue::fake();
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        $row = ServerDatabaseEngine::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'postgres',
+            'is_default' => true,
+            'status' => ServerDatabaseEngine::STATUS_RUNNING,
+            'port' => 5432,
+        ]);
+
+        $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => true, 'sqlite' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceDatabases::class, ['server' => $server])
+            ->call('stopAndRevertDatabaseEngineInstall', 'postgres');
+
+        $this->assertSame(ServerDatabaseEngine::STATUS_RUNNING, $row->fresh()->status);
+        Queue::assertNotPushed(UninstallDatabaseEngineJob::class);
+    }
 }

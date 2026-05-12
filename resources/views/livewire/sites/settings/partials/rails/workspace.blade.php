@@ -1,0 +1,59 @@
+@php
+    $cronUrl = route('sites.cron', ['server' => $server, 'site' => $site]);
+    $daemonsUrl = route('sites.daemons', ['server' => $server, 'site' => $site]);
+    $queueWorkersUrl = route('sites.queue-workers', ['server' => $server, 'site' => $site]);
+    $sidekiqPresetUrl = $daemonsUrl.'?preset=sidekiq';
+    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors';
+    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
+@endphp
+
+@if (! $site->isRailsFrameworkDetected())
+    <section class="space-y-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
+        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Rails') }}</h2>
+        <p class="text-sm text-brand-moss">{{ __('This section appears when your site is detected as a Ruby on Rails application from repository inspection.') }}</p>
+    </section>
+@else
+    <section class="space-y-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
+        <header>
+            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Rails') }}</h2>
+            <p class="mt-1 text-sm text-brand-moss">{{ __('Background workers, scheduled jobs, and real-time channels for this Rails site.') }}</p>
+        </header>
+
+        {{-- Sidekiq quick-add (the only one with a built-in supervisor preset today) --}}
+        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Sidekiq') }}</h3>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Redis-backed background worker for Rails. Launches a managed Supervisor program running bundle exec sidekiq.') }}</p>
+                </div>
+                <a href="{{ $sidekiqPresetUrl }}" wire:navigate class="{{ $btnPrimary }}">
+                    {{ __('Add Sidekiq worker') }}
+                </a>
+            </div>
+        </div>
+
+        {{-- Solid Queue / Action Cable / whenever notes --}}
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="rounded-xl border border-brand-ink/10 bg-white p-5">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Solid Queue') }}</h3>
+                <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Database-backed job queue (Rails 8 default). Run as a custom Supervisor program — bin/jobs is the typical command.') }}</p>
+                <a href="{{ $daemonsUrl }}" wire:navigate class="mt-3 inline-flex text-xs font-semibold text-brand-ink underline">{{ __('Add a custom daemon') }} →</a>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-white p-5">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Action Cable') }}</h3>
+                <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('In-process WebSocket server. For production deployments behind nginx you typically run a separate Puma instance — add it as a custom Supervisor program.') }}</p>
+                <a href="{{ $daemonsUrl }}" wire:navigate class="mt-3 inline-flex text-xs font-semibold text-brand-ink underline">{{ __('Add a custom daemon') }} →</a>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-white p-5">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('whenever / scheduled tasks') }}</h3>
+                <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('whenever generates a crontab from config/schedule.rb. Add the cron entries on the per-site Cron jobs page.') }}</p>
+                <a href="{{ $cronUrl }}" wire:navigate class="mt-3 inline-flex text-xs font-semibold text-brand-ink underline">{{ __('Open Cron jobs') }} →</a>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-white p-5">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('All workers for this site') }}</h3>
+                <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('See and manage every queue / background worker scoped to this site.') }}</p>
+                <a href="{{ $queueWorkersUrl }}" wire:navigate class="mt-3 inline-flex text-xs font-semibold text-brand-ink underline">{{ __('Open Queue workers') }} →</a>
+            </div>
+        </div>
+    </section>
+@endif

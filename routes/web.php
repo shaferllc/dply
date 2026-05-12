@@ -254,13 +254,18 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/commits', SitesCommits::class)->name('sites.commits');
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
-    Route::get('servers/{server}/sites/{site}/settings/{section?}', function (Server $server, Site $site, ?string $section = null) {
+    Route::livewire('servers/{server}/sites/{site}/queue-workers', \App\Livewire\Sites\SiteQueueWorkers::class)->name('sites.queue-workers');
+    // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
+    // {section} is required — without it the bare /sites/{site}/settings URL collides
+    // with the new "Settings" tab on the wildcard route below, which sends you back to
+    // General. Operators who bookmarked the bare /settings URL now land on the new
+    // Settings tab (Site identity, Web directory, Project, Notes), which is the
+    // intended behavior after the General → Settings IA split.
+    Route::get('servers/{server}/sites/{site}/settings/{section}', function (Server $server, Site $site, string $section) {
         $targetSection = $section;
         $query = request()->query();
 
-        if ($targetSection === null) {
-            $targetSection = 'general';
-        } elseif ($targetSection === 'webhooks') {
+        if ($targetSection === 'webhooks') {
             $targetSection = 'notifications';
         } elseif (in_array($targetSection, ['domains', 'aliases', 'redirects', 'preview', 'tenants'], true)) {
             $query['tab'] = $targetSection;
@@ -286,10 +291,14 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/activity', WorkspaceActivity::class)->name('servers.activity');
     Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
+    Route::livewire('servers/{server}/webserver', \App\Livewire\Servers\WorkspaceWebserver::class)->name('servers.webserver');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
+    Route::livewire('servers/{server}/queue-workers', \App\Livewire\Servers\WorkspaceQueueWorkers::class)->middleware('server.service.installed')->name('servers.queue-workers');
+    Route::livewire('servers/{server}/schedule', \App\Livewire\Servers\WorkspaceSchedule::class)->name('servers.schedule');
+    Route::livewire('servers/{server}/backups', \App\Livewire\Servers\WorkspaceBackups::class)->middleware('server.service.installed')->name('servers.backups');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
     Route::livewire('servers/{server}/system-users', WorkspaceSystemUsers::class)->name('servers.system-users');

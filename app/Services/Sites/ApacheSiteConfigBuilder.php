@@ -11,7 +11,13 @@ use Illuminate\Support\Collection;
 
 class ApacheSiteConfigBuilder
 {
-    public function build(Site $site): string
+    /**
+     * Full vhost config. `$listenPort` produces an HTTP-only variant bound to the supplied port —
+     * used by the webserver-switch flow to validate Apache on :8080 alongside the production
+     * webserver on :80. TLS plumbing isn't templated in this builder (certbot manages 443 vhosts
+     * via `--apache` in a separate file), so the rewrite only needs to change the `*:80` bind.
+     */
+    public function build(Site $site, ?int $listenPort = null): string
     {
         $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
 
@@ -21,7 +27,7 @@ class ApacheSiteConfigBuilder
         }
 
         if ($site->isSuspended()) {
-            return $this->suspendedVirtualHost($site, $hostnames);
+            return $this->applyListenPort($this->suspendedVirtualHost($site, $hostnames), $listenPort);
         }
 
         $primary = $hostnames->first();
@@ -43,7 +49,7 @@ class ApacheSiteConfigBuilder
             $reverb = $this->reverbProxyDirectives($site);
             $octBa = $this->apacheRootLocationBasicAuth($site);
 
-            return <<<APACHE
+            return $this->applyListenPort(<<<APACHE
 # Managed by Dply — {$basename} (Laravel Octane)
 <VirtualHost *:80>
     ServerName {$primary}
@@ -55,7 +61,7 @@ class ApacheSiteConfigBuilder
 {$redirectLines}{$reverb}{$octBa}    ProxyPass / http://127.0.0.1:{$port}/
     ProxyPassReverse / http://127.0.0.1:{$port}/
 </VirtualHost>
-APACHE;
+APACHE, $listenPort);
         }
 
         $reverbPhp = $site->type === SiteType::Php ? $this->reverbProxyDirectives($site) : '';
@@ -65,7 +71,7 @@ APACHE;
         $nodeBa = $this->apacheRootLocationBasicAuth($site);
         $dotfileDeny = $this->apacheDotfileDenyBlock();
 
-        return match ($site->type) {
+        $config = match ($site->type) {
             SiteType::Php => <<<APACHE
 # Managed by Dply — {$basename}
 <VirtualHost *:80>
@@ -117,6 +123,22 @@ APACHE,
 </VirtualHost>
 APACHE,
         };
+
+        return $this->applyListenPort($config, $listenPort);
+    }
+
+    /**
+     * Rewrite a built Apache vhost to bind a non-:80 port for the switch
+     * validation phase. Returns $config unchanged when $listenPort is null —
+     * production paths through this helper are no-ops.
+     */
+    private function applyListenPort(string $config, ?int $listenPort): string
+    {
+        if ($listenPort === null) {
+            return $config;
+        }
+
+        return preg_replace('/<VirtualHost \*:80>/', '<VirtualHost *:'.$listenPort.'>', $config);
     }
 
     /**

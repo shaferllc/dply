@@ -38,6 +38,7 @@ $maxWidth = [
         prevFocusable() { return this.focusables()[this.prevFocusableIndex()] || this.lastFocusable() },
         nextFocusableIndex() { return (this.focusables().indexOf(document.activeElement) + 1) % (this.focusables().length + 1) },
         prevFocusableIndex() { return Math.max(0, this.focusables().indexOf(document.activeElement)) -1 },
+        destroy() { document.body.classList.remove('overflow-y-hidden') },
     }"
     x-init="$watch('show', value => {
         if (value) {

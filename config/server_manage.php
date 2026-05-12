@@ -189,6 +189,78 @@ BASH,
             'script' => '(sudo -n nginx -t 2>&1 || nginx -t 2>&1)',
         ],
 
+        // Caddy service actions — mirror the nginx triad. Registered so the
+        // active "Caddy" card on /manage/web has working controls once an
+        // operator switches to caddy.
+        'restart_caddy' => [
+            'label' => 'Restart Caddy',
+            'description' => 'systemctl restart caddy. Sites may briefly show errors.',
+            'confirm' => 'Restart Caddy now? Sites may briefly show errors.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl restart caddy || systemctl restart caddy) 2>&1
+else
+  (sudo -n service caddy restart || service caddy restart) 2>&1
+fi
+BASH
+        ],
+        'reload_caddy' => [
+            'label' => 'Reload Caddy',
+            'description' => 'Graceful reload of Caddyfile.',
+            'confirm' => 'Reload Caddy configuration?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl reload caddy || systemctl reload caddy) 2>&1
+else
+  (sudo -n service caddy reload || service caddy reload) 2>&1
+fi
+BASH
+        ],
+        'caddy_test_config' => [
+            'label' => 'Test Caddy config',
+            'description' => 'Runs caddy validate to check Caddyfile syntax.',
+            'confirm' => 'Test the Caddy configuration now?',
+            'timeout' => 60,
+            'script' => '(sudo -n caddy validate --config /etc/caddy/Caddyfile 2>&1 || caddy validate --config /etc/caddy/Caddyfile 2>&1)',
+        ],
+
+        // Apache service actions — analogous to nginx + caddy.
+        'restart_apache' => [
+            'label' => 'Restart Apache',
+            'description' => 'systemctl restart apache2.',
+            'confirm' => 'Restart Apache now? Sites may briefly show errors.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl restart apache2 || systemctl restart apache2) 2>&1
+else
+  (sudo -n service apache2 restart || service apache2 restart) 2>&1
+fi
+BASH
+        ],
+        'reload_apache' => [
+            'label' => 'Reload Apache',
+            'description' => 'Graceful reload of Apache configuration.',
+            'confirm' => 'Reload Apache configuration?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl reload apache2 || systemctl reload apache2) 2>&1
+else
+  (sudo -n service apache2 reload || service apache2 reload) 2>&1
+fi
+BASH
+        ],
+        'apache_test_config' => [
+            'label' => 'Test Apache config',
+            'description' => 'Runs apachectl configtest to validate without reloading.',
+            'confirm' => 'Test the Apache configuration now?',
+            'timeout' => 60,
+            'script' => '(sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1)',
+        ],
+
         'apt_upgrade' => [
             'label' => 'Install all upgrades',
             'description' => 'apt-get -y upgrade. Long-running; may restart services.',
@@ -337,10 +409,11 @@ BASH
     'workspace_tabs' => [
         'overview' => ['label' => 'Overview', 'icon' => 'squares-2x2'],
         // 'services' sub-tab retired: it duplicated the standalone /servers/{id}/services
-        // page (workspace top-nav). Manage stays focused on host-level admin (web,
-        // data, updates, configuration, danger); systemd units + listening ports
-        // live on the Services page and the Firewall page respectively.
-        'web' => ['label' => 'Web', 'icon' => 'globe-alt'],
+        // page (workspace top-nav). Manage stays focused on host-level admin (data,
+        // updates, configuration, danger); systemd units + listening ports live on
+        // the Services page and the Firewall page respectively.
+        // 'web' sub-tab retired: promoted to /servers/{id}/webserver as a peer of
+        // PHP / Caches / Cron — mount() redirects /manage/web for back-compat.
         'data' => ['label' => 'Data', 'icon' => 'circle-stack'],
         'updates' => ['label' => 'Updates', 'icon' => 'arrow-path'],
         'configuration' => ['label' => 'Configuration', 'icon' => 'document-text'],

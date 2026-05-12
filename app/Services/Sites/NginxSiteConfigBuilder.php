@@ -13,8 +13,14 @@ class NginxSiteConfigBuilder
 {
     /**
      * Full vhost config. Pass a profile for layered includes and main snippet; omit for legacy nginx_extra_raw-only behavior.
+     *
+     * `$listenPort` produces a minimal HTTP-only vhost bound to that port instead of :80/:443 — used by the
+     * webserver-switch flow to validate the new daemon on :8080 alongside the production webserver on :80.
+     * In listen-port mode TLS plumbing (`listen 443 ssl`, `ssl_certificate*`, HSTS) is stripped because the
+     * test port has no real certificate; the test only proves the daemon parses + serves on the alternate
+     * port, not that it can negotiate TLS.
      */
-    public function build(Site $site, ?SiteWebserverConfigProfile $profile = null): string
+    public function build(Site $site, ?SiteWebserverConfigProfile $profile = null, ?int $listenPort = null): string
     {
         $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
         $hostnames = collect($site->webserverHostnames());
@@ -99,11 +105,42 @@ class NginxSiteConfigBuilder
             ? "\n    # php-fpm pool user (configure pool on server): {$poolUser}\n"
             : '';
 
-        return match ($site->type) {
+        $config = match ($site->type) {
             SiteType::Php => $this->phpBlock($basename, $names, $root, $phpSock, $redirectBlock, $layerPrefix, $extraBlock, $poolNote, $site),
             SiteType::Static => $this->staticBlock($basename, $names, $root, $redirectBlock, $layerPrefix, $extraBlock, $site),
             SiteType::Node => $this->nodeBlock($basename, $names, $this->resolveUpstreamPort($site), $redirectBlock, $layerPrefix, $extraBlock, $site),
         };
+
+        return $listenPort === null ? $config : $this->rewriteForListenPort($config, $listenPort);
+    }
+
+    /**
+     * Mutate a built vhost into a port-test variant:
+     *   - `listen 80` and `listen [::]:80` → single `listen <port>` (drop IPv6 dual bind)
+     *   - Remove TLS bind lines (`listen 443 ssl`, `listen [::]:443 ssl`, http2/http3 variants)
+     *   - Remove `ssl_certificate` / `ssl_certificate_key` / `ssl_*` directives so the rewritten config
+     *     loads without requiring cert paths the test daemon won't have.
+     *   - Remove HSTS / TLS-only headers since the test port serves HTTP.
+     *
+     * Idempotent and best-effort. Operates only on directive patterns nginx writes in its standard
+     * Debian/Ubuntu layout; sites with handwritten weird directives may need post-cutover cleanup.
+     */
+    private function rewriteForListenPort(string $config, int $listenPort): string
+    {
+        // Collapse the IPv4 + IPv6 listen pair into a single port-only listen.
+        $config = preg_replace('/^\s*listen\s+80\s*;.*$/m', '    listen '.$listenPort.';', $config);
+        $config = preg_replace('/^\s*listen\s+\[::\]:80\s*;.*$/m', '', $config);
+
+        // Strip TLS binds (443 + http2/http3 + reuseport + ssl).
+        $config = preg_replace('/^\s*listen\s+\[?::\]?:?443[^\n]*;.*$/m', '', $config);
+        $config = preg_replace('/^\s*listen\s+443[^\n]*;.*$/m', '', $config);
+
+        // Strip SSL plumbing — every directive starting with ssl_, plus the well-known HSTS add_header.
+        $config = preg_replace('/^\s*ssl_[a-z_]+\s+[^;]+;\s*$/m', '', $config);
+        $config = preg_replace('/^\s*add_header\s+Strict-Transport-Security[^;]+;\s*$/m', '', $config);
+
+        // Collapse runs of blank lines the stripping leaves behind so the result still reads cleanly.
+        return preg_replace("/\n{3,}/", "\n\n", $config);
     }
 
     /**

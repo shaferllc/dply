@@ -221,6 +221,102 @@
             panel-class="space-y-6"
         >
 
+    {{-- Managed services — higher-level dply abstractions (caches, databases,
+         webserver, PHP, daemons) surfaced alongside the systemd inventory.
+         Each card links to its dedicated workspace; the unit-level view stays
+         below for operators who need to drill into a specific systemd unit. --}}
+    @php
+        $installedTags = \App\Support\Servers\ServerInstalledServices::tagsFor($server);
+        $cacheRows = \App\Models\ServerCacheService::query()
+            ->where('server_id', $server->id)
+            ->get(['engine', 'name', 'status']);
+        $cacheCounts = $cacheRows->groupBy('engine')->map->count();
+        $databaseRows = class_exists(\App\Models\ServerDatabase::class)
+            ? \App\Models\ServerDatabase::query()->where('server_id', $server->id)->count()
+            : 0;
+        $webserverActive = strtolower((string) (($server->meta ?? [])['webserver'] ?? 'nginx'));
+        $phpInventory = is_array(($server->meta ?? [])['php_inventory'] ?? null) ? $server->meta['php_inventory'] : [];
+        $phpVersionsInstalled = is_array($phpInventory['installed_versions'] ?? null) ? $phpInventory['installed_versions'] : [];
+        $managedTiles = collect([
+            [
+                'key' => 'webserver',
+                'label' => __('Webserver'),
+                'icon' => 'heroicon-o-globe-alt',
+                'href' => route('servers.webserver', $server),
+                'detail' => ucfirst($webserverActive).' — '.__('switch + service actions'),
+                'shown' => true,
+            ],
+            [
+                'key' => 'php',
+                'label' => __('PHP'),
+                'icon' => 'heroicon-o-command-line',
+                'href' => route('servers.php', $server),
+                'detail' => $phpVersionsInstalled !== []
+                    ? trans_choice(':n version|:n versions', count($phpVersionsInstalled), ['n' => count($phpVersionsInstalled)])
+                    : __('Not installed'),
+                'shown' => array_key_exists('php', $installedTags),
+            ],
+            [
+                'key' => 'caches',
+                'label' => __('Caches'),
+                'icon' => 'heroicon-o-bolt',
+                'href' => route('servers.caches', $server),
+                'detail' => $cacheRows->isNotEmpty()
+                    ? $cacheCounts->map(fn ($n, $engine) => trans_choice(':n :engine instance|:n :engine instances', $n, ['n' => $n, 'engine' => $engine]))->implode(' · ')
+                    : __('No instances yet'),
+                'shown' => true,
+            ],
+            [
+                'key' => 'databases',
+                'label' => __('Databases'),
+                'icon' => 'heroicon-o-circle-stack',
+                'href' => route('servers.databases', $server),
+                'detail' => $databaseRows > 0
+                    ? trans_choice(':n database|:n databases', $databaseRows, ['n' => $databaseRows])
+                    : __('No databases yet'),
+                'shown' => array_key_exists('postgres', $installedTags) || array_key_exists('mysql', $installedTags),
+            ],
+            [
+                'key' => 'daemons',
+                'label' => __('Daemons'),
+                'icon' => 'heroicon-o-server-stack',
+                'href' => route('servers.daemons', $server),
+                'detail' => __('Supervisor-managed processes'),
+                'shown' => array_key_exists('supervisor', $installedTags),
+            ],
+            [
+                'key' => 'cron',
+                'label' => __('Cron jobs'),
+                'icon' => 'heroicon-o-clock',
+                'href' => route('servers.cron', $server),
+                'detail' => __('Scheduled tasks'),
+                'shown' => true,
+            ],
+        ])->filter(fn ($t) => $t['shown'])->values();
+    @endphp
+    @if ($managedTiles->isNotEmpty())
+        <div class="{{ $card }} p-6 sm:p-8">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Managed services') }}</h2>
+                <p class="text-xs text-brand-mist">{{ __('dply-managed abstractions on this server. Jump to their dedicated workspaces.') }}</p>
+            </div>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($managedTiles as $tile)
+                    <a href="{{ $tile['href'] }}" wire:navigate class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white p-4 transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/10">
+                        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10">
+                            <x-dynamic-component :component="$tile['icon']" class="h-4 w-4" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-brand-ink">{{ $tile['label'] }}</p>
+                            <p class="mt-0.5 break-words text-xs text-brand-moss">{{ $tile['detail'] }}</p>
+                        </div>
+                        <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0 text-brand-mist transition-colors group-hover:text-brand-forest" />
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <div class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div>

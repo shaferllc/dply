@@ -2,16 +2,21 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\RevertServerWebserverSwitchJob;
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Jobs\SwitchServerWebserverJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\Servers\WebserverSwitchPreflight;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -22,6 +27,7 @@ use Livewire\Component;
 class WorkspaceManage extends Component
 {
     use ConfirmsActionWithModal;
+    use DismissesConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RunsServerInventoryProbe;
@@ -36,6 +42,19 @@ class WorkspaceManage extends Component
     public string $manage_db_password = '';
 
     public string $manage_auto_updates_interval = 'off';
+
+    /**
+     * Cascade preview for a pending webserver switch — set by openSwitchWebserver()
+     * when the operator clicks "Switch to <target>" on the web tab. Consumed by
+     * the confirmation modal in group-web.blade.php. Null when no switch is pending.
+     * Shape matches {@see WebserverSwitchPreflight::plan()}.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $switch_plan = null;
+
+    /** Opt-in: hand TLS to caddy auto-HTTPS at cutover. Greyed out for apache. */
+    public bool $switch_tls_to_caddy = false;
 
     public ?string $remote_output = null;
 
@@ -54,6 +73,19 @@ class WorkspaceManage extends Component
             return;
         }
 
+        // 'web' was promoted to its own top-level sidebar entry (servers.webserver) so
+        // operators get to the picker / cascade modal / switch history without
+        // drilling through Manage. Old deep links + bookmarks redirect.
+        // Note: this redirect runs only when WorkspaceWebserver inherits via parent::mount();
+        // since WorkspaceWebserver's mount() passes 'web' explicitly, the check below
+        // is the back-compat path for direct /manage/web URLs only — by the time the
+        // child class is mounted, the route has already routed to /webserver.
+        if ($section === 'web' && static::class === self::class) {
+            $this->redirect(route('servers.webserver', ['server' => $server]), navigate: true);
+
+            return;
+        }
+
         // 'services' was retired from the Manage workspace_tabs because the
         // standalone /services page is the canonical surface. Redirect deep
         // links instead of 404-ing — bookmarks and any cached external URLs
@@ -64,7 +96,15 @@ class WorkspaceManage extends Component
             return;
         }
 
+        // Subclasses (currently WorkspaceWebserver) get a small section allowlist
+        // extension so their inherited mount() can pass a logical section name
+        // ('web') that's no longer in workspace_tabs config — the tab strip in the
+        // Manage view doesn't render 'web' anymore but the inherited state still
+        // needs a non-null $section for the rest of the flow.
         $allowed = array_keys(config('server_manage.workspace_tabs', []));
+        if (static::class !== self::class) {
+            $allowed[] = 'web';
+        }
         if (! in_array($section, $allowed, true)) {
             abort(404);
         }
@@ -290,6 +330,256 @@ BASH;
         } catch (\Throwable $e) {
             $this->remote_error = $e->getMessage();
         }
+    }
+
+    /**
+     * Open the webserver-switch cascade modal. Computes the preflight server-side
+     * (PHP-compat hard block, drift warnings, computed downtime breakdown, opt-in
+     * TLS cascade) and stashes the result on the component for the modal to render.
+     *
+     * Refuses to open if there's already an in-flight switch ConsoleAction —
+     * the live progress banner is the canonical UI while a switch is running.
+     */
+    public function openSwitchWebserver(string $target): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('A webserver switch is already in flight — wait for it to finish before starting another.'));
+
+            return;
+        }
+
+        $target = strtolower(trim($target));
+        if (! in_array($target, WebserverSwitchPreflight::KNOWN_WEBSERVERS, true)) {
+            $this->toastError(__('Unknown webserver target: :t.', ['t' => $target]));
+
+            return;
+        }
+
+        $this->switch_plan = app(WebserverSwitchPreflight::class)->plan($this->server, $target);
+        $this->switch_tls_to_caddy = false;
+        $this->dispatch('open-modal', 'webserver-switch-modal');
+    }
+
+    /**
+     * Dispatch the SwitchServerWebserverJob with the operator's opt-in selections.
+     * The job seeds its own ConsoleAction row inside handle(), and the banner
+     * picks it up from there. We just need to fire and forget; UI updates via
+     * the banner poll.
+     */
+    public function confirmSwitchWebserver(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->switch_plan === null) {
+            return;
+        }
+        if (($this->switch_plan['blocker'] ?? null) !== null) {
+            // Modal shouldn't have allowed confirm with a blocker, but be defensive.
+            $this->toastError(__('Cannot switch: :reason', ['reason' => $this->switch_plan['blocker']['label']]));
+
+            return;
+        }
+        if ($this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('A webserver switch is already in flight.'));
+
+            return;
+        }
+
+        $from = (string) ($this->switch_plan['from'] ?? '—');
+        $target = (string) $this->switch_plan['to'];
+
+        // Seed a queued ConsoleAction row BEFORE dispatch so the banner shows
+        // immediately — without this the row only gets created when the worker
+        // picks the job up, leaving operators staring at a button that "did
+        // nothing." Mirrors the seedQueuedConsoleAction pattern from Sites\Show
+        // for ApplySiteWebserverConfigJob.
+        $this->seedQueuedWebserverSwitchAction(
+            label: __('Switching webserver: :from → :to …', ['from' => $from, 'to' => $target]),
+            from: $from,
+            to: $target,
+        );
+
+        SwitchServerWebserverJob::dispatch(
+            serverId: $this->server->id,
+            target: $target,
+            tlsToCaddy: $this->switch_tls_to_caddy,
+            userId: auth()->id(),
+        );
+
+        $this->switch_plan = null;
+        $this->switch_tls_to_caddy = false;
+        $this->dispatch('close-modal', 'webserver-switch-modal');
+        $this->toastSuccess(__('Webserver switch queued. Progress shows in the banner above.'));
+    }
+
+    /**
+     * Seed a queued `ConsoleAction` row for the upcoming `webserver_switch` job
+     * so the banner-static partial picks it up on the next render — without
+     * waiting for the worker to claim the job. Auto-dismisses prior terminal +
+     * stale-running rows so the operator sees only the run they just started.
+     * Mirrors {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()} but
+     * scoped to a Server subject instead of a Site.
+     *
+     * `from`/`to` are persisted in `output['meta']` so {@see stopAndRevertWebserverSwitch()}
+     * can recover them without label parsing if the operator aborts a stuck
+     * switch later. The banner's {@see ConsoleAction::lines()} reader ignores
+     * non-`lines` keys, so this extra metadata is safe to carry alongside.
+     */
+    protected function seedQueuedWebserverSwitchAction(
+        ?string $label = null,
+        ?string $from = null,
+        ?string $to = null,
+    ): ConsoleAction {
+        $subjectType = $this->server->getMorphClass();
+        $subjectId = $this->server->id;
+
+        ConsoleAction::query()
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED])
+            ->update(['dismissed_at' => now()]);
+
+        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        ConsoleAction::query()
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->where('created_at', '<', now()->subSeconds($staleSeconds))
+            ->update(['dismissed_at' => now()]);
+
+        $output = ['v' => (int) config('console_actions.current_version', 1), 'lines' => []];
+        if ($from !== null || $to !== null) {
+            $output['meta'] = array_filter([
+                'from' => $from,
+                'to' => $to,
+            ], static fn ($v) => $v !== null);
+        }
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'kind' => 'webserver_switch',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => request()->user()?->id,
+            'output' => $output,
+        ]);
+    }
+
+    /**
+     * Discard the pending switch — closes the modal, leaves the server untouched.
+     */
+    public function cancelSwitchWebserver(): void
+    {
+        $this->switch_plan = null;
+        $this->switch_tls_to_caddy = false;
+        $this->dispatch('close-modal', 'webserver-switch-modal');
+    }
+
+    /**
+     * Operator escape hatch for a stuck switch: marks the in-flight (or stale)
+     * webserver_switch ConsoleAction as failed + dismissed and dispatches a
+     * {@see RevertServerWebserverSwitchJob} that best-effort uninstalls the
+     * partial target and brings the original webserver back on :80.
+     *
+     * Triggered from the "Stop & revert" button rendered alongside the banner
+     * when {@see hasInflightWebserverSwitch()} is true. The from/to pair comes
+     * from the seeded ConsoleAction's `output['meta']` (set by
+     * {@see seedQueuedWebserverSwitchAction()}); we fall back to label parsing
+     * for older rows that predate that field.
+     */
+    public function stopAndRevertWebserverSwitch(string $runId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ConsoleAction::query()
+            ->where('id', $runId)
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'webserver_switch')
+            ->whereNull('dismissed_at')
+            ->first();
+
+        if ($row === null || ! $row->isInFlight()) {
+            $this->toastError(__('No in-flight webserver switch to revert.'));
+
+            return;
+        }
+
+        $output = is_array($row->output) ? $row->output : [];
+        $meta = is_array($output['meta'] ?? null) ? $output['meta'] : [];
+        $serverWebserver = strtolower((string) ($this->server->meta['webserver'] ?? 'nginx'));
+        $from = strtolower((string) ($meta['from'] ?? $serverWebserver));
+        $to = strtolower((string) ($meta['to'] ?? ''));
+
+        if ($to === '' && is_string($row->label) && preg_match('/→\s*(\S+)/u', $row->label, $m)) {
+            $to = strtolower((string) $m[1]);
+        }
+
+        if ($to === '' || $to === $from) {
+            $this->toastError(__('Cannot determine the revert target from the failed switch.'));
+
+            return;
+        }
+
+        // Mark the stuck row failed + dismissed so hasInflightWebserverSwitch()
+        // releases and the seed below isn't auto-dismissed by its own pre-clean.
+        $row->forceFill([
+            'status' => ConsoleAction::STATUS_FAILED,
+            'finished_at' => now(),
+            'error' => 'Aborted by operator',
+            'dismissed_at' => now(),
+        ])->save();
+
+        // Seed a fresh row so the banner immediately switches to the revert
+        // progress view rather than going blank between dispatch and worker
+        // pickup. Same kind so the banner partial transparently picks it up.
+        $this->seedQueuedWebserverSwitchAction(
+            label: __('Reverting webserver switch: :to → :from …', ['to' => $to, 'from' => $from]),
+            from: $to,
+            to: $from,
+        );
+
+        RevertServerWebserverSwitchJob::dispatch(
+            serverId: $this->server->id,
+            target: $to,
+            from: $from,
+            userId: auth()->id(),
+        );
+
+        $this->toastSuccess(__('Stopping the switch and reverting :to → :from. Progress shows in the banner.', [
+            'to' => $to,
+            'from' => $from,
+        ]));
+    }
+
+    /**
+     * Required by {@see DismissesConsoleActionRun}: identifies which model the
+     * banner is scoped to. WorkspaceManage's banner shows server-level runs
+     * (webserver_switch, etc.), so the subject is the server.
+     */
+    protected function consoleActionSubject(): \Illuminate\Database\Eloquent\Model
+    {
+        return $this->server;
+    }
+
+    /**
+     * True when there's a queued/running webserver_switch ConsoleAction for this
+     * server. Used to disable the switch CTAs and short-circuit re-entry.
+     */
+    public function hasInflightWebserverSwitch(): bool
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'webserver_switch')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->whereNull('dismissed_at')
+            ->exists();
     }
 
     public function syncManageRemoteTaskFromCache(): void

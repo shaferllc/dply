@@ -4,8 +4,6 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
 use App\Jobs\AssignSystemUserToSiteJob;
-use App\Jobs\AttachEdgeDomainJob;
-use App\Jobs\DetachEdgeDomainJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Jobs\SiteResetPermissionsJob;
@@ -20,7 +18,6 @@ use App\Models\NotificationWebhookDestination;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteAuditEvent;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
@@ -38,15 +35,12 @@ use App\Services\DigitalOceanService;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\RemoteCli\Artisan;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerSystemUserService;
 use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
-use App\Services\Sites\PrimaryHostnameRenamePlanner;
 use App\Services\Sites\SiteDeploySyncGroupManager;
 use App\Services\Sites\SiteScopedCommandWrapper;
 use App\Services\Sites\SiteSystemdProvisioner;
@@ -99,21 +93,9 @@ class Settings extends Show
 
     public string $settings_document_root = '';
 
-    /**
-     * Cascade preview for a primary-hostname rename. Set by saveGeneralSettings()
-     * when the change is non-trivial (existing cert / container backend / etc.)
-     * and consumed by the confirmation modal in `livewire.sites.settings`. Null
-     * when no rename is pending. Shape matches {@see PrimaryHostnameRenamePlanner::plan()}.
-     *
-     * @var array{old: string, new: string, auto: list<array{key: string, label: string}>, optIn: list<array{key: string, label: string, detail?: array<string, mixed>}>, manual: list<string>}|null
-     */
-    public ?array $rename_plan = null;
+    public string $settings_site_name = '';
 
-    /** Opt-in: re-issue SSL cert covering the new hostname during rename confirmation. */
-    public bool $rename_reissue_cert = false;
-
-    /** Opt-in: detach old + attach new on the site's container backend during rename confirmation. */
-    public bool $rename_cycle_backend = false;
+    public string $settings_site_slug = '';
 
     public ?string $project_workspace_id = null;
 
@@ -1392,6 +1374,8 @@ class Settings extends Show
         }
         $this->settings_primary_domain = (string) optional($this->site->primaryDomain())->hostname;
         $this->settings_document_root = (string) ($this->site->document_root ?? '');
+        $this->settings_site_name = (string) $this->site->name;
+        $this->settings_site_slug = (string) $this->site->slug;
         $this->project_workspace_id = $this->site->workspace_id;
         $this->site_notes = (string) data_get($this->site->meta, 'notes', '');
     }
@@ -1516,229 +1500,55 @@ class Settings extends Show
         $this->toastSuccess(__('DNS settings saved.'));
     }
 
-    public function saveGeneralSettings(): void
+    /**
+     * Update the site's web directory (document_root). The primary hostname is
+     * intentionally edited from Routing > Domains now — keeping the cascade
+     * (cert re-issue, container backend cycle) next to its trigger.
+     */
+    public function saveWebDirectory(): void
     {
         $this->authorize('update', $this->site);
 
-        $primaryDomain = $this->site->primaryDomain();
-
         $validated = $this->validate([
-            'settings_primary_domain' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('site_domains', 'hostname')->ignore($primaryDomain?->id),
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
-                        $fail('Enter a valid domain name like app.example.com.');
-                    }
-                },
-            ],
             'settings_document_root' => ['required', 'string', 'max:500'],
         ]);
 
-        // document_root has no cascade and is independent of the primary hostname,
-        // so it always commits inline regardless of whether the rename branch
-        // opens the modal below.
         $this->site->update([
             'document_root' => trim($validated['settings_document_root']),
         ]);
 
-        $old = strtolower(trim((string) optional($primaryDomain)->hostname));
-        $new = strtolower(trim($validated['settings_primary_domain']));
-
-        // Greenfield path: no prior primary domain → first-time set. Or no actual
-        // change → noop on the hostname row. Either way, skip the modal.
-        if ($primaryDomain === null || $old === $new) {
-            $this->commitPrimaryDomainHostname($primaryDomain, $new);
-            $this->site->load('domains');
-            $this->syncGeneralSettingsForm();
-            $this->finalizeRoutingMutation('Site settings saved.');
-
-            return;
-        }
-
-        // Real rename: ask the planner what would cascade. If only the always-auto
-        // rows fire, commit inline with a lightweight audit event; otherwise open
-        // the confirmation modal so the operator picks the opt-in cascades.
-        $planner = app(PrimaryHostnameRenamePlanner::class);
-        $plan = $planner->plan($this->site, $new);
-
-        if ($planner->isTrivial($plan)) {
-            $this->commitPrimaryDomainHostname($primaryDomain, $new);
-            $this->recordRenameAudit($old, $new, [], false);
-            $this->site->load('domains');
-            $this->syncGeneralSettingsForm();
-            $this->finalizeRoutingMutation('Site settings saved.');
-
-            return;
-        }
-
-        $this->rename_plan = $plan;
-        $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
-        $this->dispatch('open-modal', name: 'primary-hostname-rename-modal');
+        $this->syncGeneralSettingsForm();
+        $this->finalizeRoutingMutation('Web directory saved.');
     }
 
     /**
-     * Commit the primary-hostname rename selected in the confirmation modal,
-     * applying the opt-in cascades the operator checked. Mutates only when
-     * `$rename_plan` is set (defensive — the modal can't fire otherwise).
+     * Update the site display name and slug. Mirrors `dply:site:rename` semantics
+     * (the CLI command at app/Console/Commands/RenameSiteCommand.php): updates
+     * the row only — the on-disk path under `/var/www/<slug>` is intentionally
+     * left untouched, since that affects deployments mid-flight.
      */
-    public function confirmPrimaryHostnameRename(): void
+    public function saveSiteIdentity(): void
     {
         $this->authorize('update', $this->site);
 
-        if ($this->rename_plan === null) {
-            return;
-        }
-
-        $primaryDomain = $this->site->primaryDomain();
-        if ($primaryDomain === null) {
-            // Defensive: planner only sets `rename_plan` when there was a prior
-            // primary domain. If the row got deleted between save and confirm,
-            // fall back to the greenfield path.
-            $this->rename_plan = null;
-
-            return;
-        }
-
-        $old = strtolower(trim((string) $primaryDomain->hostname));
-        $new = strtolower(trim((string) $this->rename_plan['new']));
-
-        // Re-plan defensively in case the site changed under us (modal could
-        // have been open while another tab issued a cert, etc.). Use the fresh
-        // plan to decide which opt-ins are still applicable.
-        $planner = app(PrimaryHostnameRenamePlanner::class);
-        $freshPlan = $planner->plan($this->site, $new);
-        $optInKeys = array_map(fn (array $row) => $row['key'], $freshPlan['optIn']);
-
-        $reissueCert = $this->rename_reissue_cert && in_array('reissue_cert', $optInKeys, true);
-        $cycleBackend = $this->rename_cycle_backend && in_array('cycle_backend', $optInKeys, true);
-        $rewriteDnsZone = collect($freshPlan['auto'])->contains(fn (array $row) => $row['key'] === 'dns_zone');
-
-        $this->commitPrimaryDomainHostname($primaryDomain, $new);
-
-        if ($rewriteDnsZone) {
-            $this->site->update([
-                'dns_zone' => Site::apexGuessForHostname($new),
-            ]);
-        }
-
-        $cascadeKeys = [];
-        if ($reissueCert) {
-            $cascadeKeys[] = 'reissue_cert';
-            $this->dispatchCertReissue($freshPlan);
-        }
-        if ($cycleBackend) {
-            $cascadeKeys[] = 'cycle_backend';
-            DetachEdgeDomainJob::dispatch($this->site->id, $old);
-            AttachEdgeDomainJob::dispatch($this->site->id, $new);
-        }
-
-        $this->recordRenameAudit($old, $new, $cascadeKeys, $rewriteDnsZone);
-
-        $this->rename_plan = null;
-        $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
-        $this->dispatch('close-modal', name: 'primary-hostname-rename-modal');
-
-        $this->site->load('domains');
-        $this->syncGeneralSettingsForm();
-        $this->finalizeRoutingMutation('Primary hostname renamed.');
-    }
-
-    /**
-     * Discard the pending rename — leaves the form's edited (unsaved) value
-     * in place so the operator can keep editing or revert manually.
-     */
-    public function cancelPrimaryHostnameRename(): void
-    {
-        $this->rename_plan = null;
-        $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
-        $this->dispatch('close-modal', name: 'primary-hostname-rename-modal');
-    }
-
-    /**
-     * Persist the primary hostname — extracted from saveGeneralSettings so both
-     * the inline-commit path and the modal-confirm path stay in sync.
-     */
-    private function commitPrimaryDomainHostname(?SiteDomain $primaryDomain, string $hostname): void
-    {
-        if ($primaryDomain) {
-            $primaryDomain->update(['hostname' => $hostname]);
-        } else {
-            SiteDomain::query()->create([
-                'site_id' => $this->site->id,
-                'hostname' => $hostname,
-                'is_primary' => true,
-                'www_redirect' => false,
-            ]);
-        }
-    }
-
-    /**
-     * Clone the customer-scope certs that covered the old hostname and queue
-     * issuance against the now-current `sslIssuanceHostnames()`. Mirrors the
-     * pattern at {@see saveQuickDomainSslModal()} (Settings.php quick-issue flow):
-     * create a SiteCertificate row + dispatch ExecuteSiteCertificateJob.
-     *
-     * @param  array{optIn: list<array{key: string, label: string, detail?: array<string, mixed>}>}  $plan
-     */
-    private function dispatchCertReissue(array $plan): void
-    {
-        $row = collect($plan['optIn'] ?? [])->firstWhere('key', 'reissue_cert');
-        $certIds = is_array($row) ? ($row['detail']['cert_ids'] ?? []) : [];
-        if (! is_array($certIds) || $certIds === []) {
-            return;
-        }
-
-        $certificateRequestService = app(CertificateRequestService::class);
-        $sourceCerts = SiteCertificate::query()
-            ->where('site_id', $this->site->id)
-            ->whereIn('id', $certIds)
-            ->get();
-        $newHostnames = $this->site->sslIssuanceHostnames();
-
-        foreach ($sourceCerts as $source) {
-            $certificate = $certificateRequestService->create([
-                'site_id' => $this->site->id,
-                'scope_type' => $source->scope_type ?? SiteCertificate::SCOPE_CUSTOMER,
-                'provider_type' => $source->provider_type ?? SiteCertificate::PROVIDER_LETSENCRYPT,
-                'challenge_type' => $source->challenge_type ?? SiteCertificate::CHALLENGE_HTTP,
-                'domains_json' => $newHostnames,
-                'status' => SiteCertificate::STATUS_PENDING,
-                'requested_settings' => [
-                    'source' => 'primary_hostname_rename',
-                    'replaced_certificate_id' => (string) $source->id,
-                ],
-            ]);
-
-            ExecuteSiteCertificateJob::dispatch($certificate->id);
-        }
-    }
-
-    /**
-     * @param  list<string>  $cascades  Opt-in cascade keys the operator selected
-     *                                  (used to make audit payload self-describing).
-     */
-    private function recordRenameAudit(string $old, string $new, array $cascades, bool $dnsZoneRewritten): void
-    {
-        app(SiteAuditWriter::class)->record(
-            site: $this->site,
-            user: auth()->user(),
-            action: 'site_primary_hostname_renamed',
-            risk: RiskLevel::MutatingRecoverable,
-            transport: SiteAuditEvent::TRANSPORT_WEB,
-            summary: __('Primary hostname changed from :old to :new', ['old' => $old !== '' ? $old : '(none)', 'new' => $new]),
-            payload: [
-                'old_hostname' => $old,
-                'new_hostname' => $new,
-                'cascades' => $cascades,
-                'dns_zone_rewritten' => $dnsZoneRewritten,
+        $validated = $this->validate([
+            'settings_site_name' => ['required', 'string', 'max:255'],
+            'settings_site_slug' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/',
+                Rule::unique('sites', 'slug')->ignore($this->site->id),
             ],
-        );
+        ]);
+
+        $this->site->update([
+            'name' => trim($validated['settings_site_name']),
+            'slug' => strtolower(trim($validated['settings_site_slug'])),
+        ]);
+
+        $this->syncGeneralSettingsForm();
+        $this->toastSuccess(__('Site identity saved.'));
     }
 
     public function saveProjectSettings(): void

@@ -58,7 +58,7 @@ class WorkspaceCaches extends Component
     public string $engine_subtab = 'overview';
 
     /** @var list<string> */
-    public const ENGINE_SUBTABS = ['overview', 'console', 'stats', 'configure'];
+    public const ENGINE_SUBTABS = ['overview', 'info', 'console', 'stats', 'configure'];
 
     /**
      * Active instance name within the current per-engine tab. URL-bound so
@@ -369,6 +369,137 @@ class WorkspaceCaches extends Component
     }
 
     /**
+     * Per-instance debug-output buffer. Set by debugCacheServiceInstance() to
+     * surface the systemctl status + port listener + ping probe output below
+     * the action row when reachability is in question. Keyed by `engine` so
+     * each engine's debug panel is independent.
+     *
+     * @var array<string, string>
+     */
+    public array $debug_output_by_engine = [];
+
+    /**
+     * Re-probe THIS instance with the correct port and refresh the cached
+     * capability bitmap. Surfaces a toast with the result so the operator
+     * doesn't have to chase the badge to verify. Cheaper than installing /
+     * uninstalling something to bust the cache.
+     */
+    public function recheckCacheServiceInstance(
+        string $engine,
+        ServerCacheServiceHostCapabilities $capabilities,
+    ): void {
+        $this->authorize('update', $this->server);
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if ($row === null) {
+            $this->toastError(__('No :engine instance to recheck.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $reachable = $capabilities->probeInstance($this->server, $engine, (int) $row->port);
+        $capabilities->forget($this->server);
+
+        if ($reachable) {
+            $this->toastSuccess(__(':engine instance :name on port :port is reachable.', [
+                'engine' => $engine, 'name' => $row->name, 'port' => $row->port,
+            ]));
+        } else {
+            $this->toastError(__(':engine instance :name on port :port is NOT reachable. Click Debug to see why.', [
+                'engine' => $engine, 'name' => $row->name, 'port' => $row->port,
+            ]));
+        }
+    }
+
+    /**
+     * Run a small diagnostic script on the server and surface the output on
+     * the page so the operator can see *why* the instance isn't reachable.
+     * Three pieces, all best-effort (each `|| true` so one missing tool doesn't
+     * abort the others):
+     *   1. `systemctl status <unit>` — is the daemon actually up?
+     *   2. `ss -tlnp | grep :<port>` — is something listening on that port?
+     *   3. `<engine>-cli -p <port> ping` — does it respond to RESP / proto?
+     * Output is truncated server-side so a long log doesn't bloat the wire.
+     */
+    public function debugCacheServiceInstance(
+        string $engine,
+        ExecuteRemoteTaskOnServer $executor,
+    ): void {
+        $this->authorize('update', $this->server);
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if ($row === null) {
+            $this->toastError(__('No :engine instance to debug.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('SSH must be ready before running diagnostics.'));
+
+            return;
+        }
+
+        $unit = CacheServiceInstallScripts::instanceServiceUnit($engine, $row->name);
+        $port = (int) $row->port;
+        // CLI tool: each engine's own cli first; redis-cli as the RESP fallback.
+        $cli = match ($engine) {
+            'redis' => 'redis-cli',
+            'valkey' => 'valkey-cli',
+            'keydb' => 'keydb-cli',
+            default => '',
+        };
+
+        $script = sprintf(
+            <<<'BASH'
+echo "═══ systemctl status %1$s ═══"
+systemctl status --no-pager --lines=20 %1$s 2>&1 || true
+echo
+echo "═══ Listening on :%2$d? ═══"
+(ss -tlnp 2>/dev/null | grep ":%2$d " || netstat -tlnp 2>/dev/null | grep ":%2$d " || echo "Nothing listening on :%2$d (or ss/netstat unavailable).") || true
+echo
+%3$s
+echo "═══ Recent journal (last 30 lines) ═══"
+journalctl -u %1$s --no-pager -n 30 2>&1 || true
+BASH,
+            escapeshellarg($unit),
+            $port,
+            $cli !== ''
+                ? sprintf("echo \"═══ %1\$s -p %2\$d ping ═══\"\n(command -v %1\$s >/dev/null && %1\$s -p %2\$d ping 2>&1 || (command -v redis-cli >/dev/null && redis-cli -p %2\$d ping 2>&1) || echo \"%1\$s and redis-cli not on PATH\") || true\necho",
+                    $cli, $port)
+                : '',
+        );
+
+        try {
+            $output = $executor->runInlineBash(
+                $this->server,
+                'cache-service:debug:'.$engine.':'.$row->name,
+                $script,
+                timeoutSeconds: 30,
+                asRoot: true,
+            );
+            $this->debug_output_by_engine[$engine] = trim($output->buffer) !== ''
+                ? mb_substr($output->buffer, -8_000)
+                : __('No output.');
+            $this->toastSuccess(__('Diagnostics captured. See the debug panel below.'));
+        } catch (\Throwable $e) {
+            $this->debug_output_by_engine[$engine] = __('SSH diagnostic failed: :err', ['err' => $e->getMessage()]);
+            $this->toastError(__('Diagnostic run failed — see the debug panel below for details.'));
+        }
+    }
+
+    public function clearCacheServiceDebugOutput(string $engine): void
+    {
+        unset($this->debug_output_by_engine[$engine]);
+    }
+
+    /**
      * Queue an install for the requested engine. Multi-engine is now allowed: Redis + Memcached
      * side-by-side is a legit pattern (Redis for queues/Horizon, Memcached for app cache).
      */
@@ -591,6 +722,100 @@ class WorkspaceCaches extends Component
         $this->toastError(__('Nothing to cancel: the row is :status.', ['status' => $row->status]));
     }
 
+    /**
+     * Hard exit from a stuck "Cancelling — reverting…" state. The standard cancel
+     * (above) just flips `cancel_requested_at` and waits for the install job to
+     * notice on its next chunk flush — but the check only fires when there's
+     * output, so an apt-get install hung on a dpkg lock or an SSH session that
+     * stops streaming will never observe the flag.
+     *
+     * This bypasses the job entirely: marks the row FAILED with a "force-
+     * cancelled" reason, records the audit event, and lets the operator move on.
+     * The actual on-server state may be partial — the operator runs the engine's
+     * uninstall path (apt purge / systemctl disable) themselves if they want a
+     * clean revert. UI surfaces this caveat in the button copy + confirm.
+     *
+     * Available in the UI only after a staleness threshold (60s since cancel
+     * was requested) so the normal soft-cancel path gets its chance first.
+     *
+     * Looks up the row by `engine` + busy-status (not `cacheServiceFor()` which
+     * filters by `$active_instance`) — the busy banner is global, so the row to
+     * force-cancel may not match the operator's currently-selected per-engine
+     * tab. Using the active-instance filter would silently return null and
+     * leave the row stuck forever.
+     */
+    public function forceCancelCacheServiceChange(string $engine, CacheServiceAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        // Match whichever instance is actually busy — there's at most one per
+        // engine in practice because the install/uninstall jobs hold the dpkg
+        // lock serially. If somehow there isn't a busy row, fall back to any
+        // row for the engine so the break-glass still cleans up a leftover.
+        $row = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->orderByRaw(
+                "CASE status "
+                ."WHEN 'installing' THEN 0 "
+                ."WHEN 'uninstalling' THEN 1 "
+                ."WHEN 'pending' THEN 2 "
+                ."WHEN 'failed' THEN 3 "
+                ."ELSE 9 END"
+            )
+            ->first();
+        if ($row === null) {
+            $this->toastError(__('No :engine row found to force-remove.', ['engine' => $engine]));
+
+            return;
+        }
+
+        // Refuse only the cleanly-running terminal states — RUNNING/STOPPED
+        // have proper affordances (uninstall) and clobbering them via force-
+        // cancel would surprise the operator. Everything else (PENDING,
+        // INSTALLING, UNINSTALLING, FAILED) can be force-removed; FAILED
+        // explicitly included so a leftover row from a prior failed install
+        // can be cleared without going through uninstall.
+        $protectedStatuses = [
+            ServerCacheService::STATUS_RUNNING,
+            ServerCacheService::STATUS_STOPPED,
+        ];
+        if (in_array($row->status, $protectedStatuses, true)) {
+            $this->toastError(__('Force-cancel refuses healthy rows (current status: :status). Use Uninstall instead.', ['status' => $row->status]));
+
+            return;
+        }
+
+        $previousStatus = $row->status;
+        $instanceName = $row->name;
+
+        // Delete the row outright — break-glass means the operator wants a clean
+        // slate. We don't keep a FAILED tombstone because the busy-check on
+        // other operations would still see the row and the "Cancelling — reverting…"
+        // banner would re-render until manually dismissed. Clean break is the right
+        // call here; audit captures the previous state for forensics.
+        $row->delete();
+
+        $audit->record(
+            $this->server,
+            'force_cancelled',
+            [
+                'engine' => $engine,
+                'instance' => $instanceName,
+                'reason' => 'operator_break_glass',
+                'previous_status' => $previousStatus,
+            ],
+            auth()->user(),
+        );
+
+        $this->forgetStats($row);
+        $this->toastSuccess(__(':engine row removed. Server-side state may be partial — verify with `dpkg -l | grep :engine` and clean up manually if needed.', ['engine' => $engine]));
+    }
+
     public function uninstallCacheService(string $engine): void
     {
         $this->authorize('update', $this->server);
@@ -610,9 +835,17 @@ class WorkspaceCaches extends Component
             return;
         }
 
+        $hasSibling = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->where('id', '!=', $row->id)
+            ->exists();
+
         UninstallCacheServiceJob::dispatch($row->id);
         $this->forgetStats($row);
-        $this->toastSuccess(__('Uninstall queued for :engine.', ['engine' => $engine]));
+        $this->toastSuccess($hasSibling
+            ? __('Removing instance :name (:engine) — the package stays for the other instances.', ['name' => $row->name, 'engine' => $engine])
+            : __('Uninstall queued for :engine — last instance, apt purge is included.', ['engine' => $engine]));
     }
 
     public function restartCacheService(string $engine, ExecuteRemoteTaskOnServer $executor, CacheServiceAuditLogger $audit): void
@@ -1902,11 +2135,15 @@ class WorkspaceCaches extends Component
             return;
         }
 
-        $service = CacheServiceInstallScripts::systemdServiceFor($row->engine);
+        // Per-instance systemd unit: `valkey-server` for the legacy `default`
+        // instance, `valkey-server@<name>` for templated instances. Using
+        // systemdServiceFor() alone was a bug — Stop on a named instance
+        // would silently target the default unit and stop the wrong instance.
+        $service = CacheServiceInstallScripts::instanceServiceUnit($row->engine, $row->name);
         try {
             $output = $executor->runInlineBash(
                 $row->server,
-                'cache-service:'.$verb.':'.$row->engine,
+                'cache-service:'.$verb.':'.$row->engine.':'.$row->name,
                 'systemctl '.$verb.' '.escapeshellarg($service),
                 timeoutSeconds: 60,
                 asRoot: true,

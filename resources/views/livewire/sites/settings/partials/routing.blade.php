@@ -985,3 +985,87 @@
     ]" />
 
 @endif
+
+{{-- Primary-hostname rename confirmation modal. Opens when saveEditedDomain()
+     detects a non-trivial rename on the primary domain row (existing cert,
+     container backend, or auto-derived dns_zone). Lives in the routing partial
+     because that's where the edit trigger is (the pencil icon on the primary
+     row). Cascade preview is computed by PrimaryHostnameRenamePlanner. --}}
+@if ($rename_plan !== null)
+    <x-modal name="primary-hostname-rename-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
+        <div class="border-b border-brand-ink/10 px-6 py-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Confirm rename') }}</p>
+            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Rename primary hostname?') }}</h2>
+            <div class="mt-3 inline-flex flex-wrap items-center gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-3 py-2 font-mono text-sm text-brand-ink">
+                <span class="break-all">{{ $rename_plan['old'] !== '' ? $rename_plan['old'] : __('(none)') }}</span>
+                <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
+                <span class="break-all">{{ $rename_plan['new'] }}</span>
+            </div>
+        </div>
+
+        <div class="space-y-5 px-6 py-6">
+            {{-- Auto cascades — always-on, read-only checks --}}
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Always applied') }}</p>
+                <ul class="mt-2 space-y-1.5">
+                    @foreach ($rename_plan['auto'] as $row)
+                        <li class="flex items-start gap-2 text-sm text-brand-ink">
+                            <x-heroicon-m-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                            <span>{{ $row['label'] }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+
+            {{-- Opt-in cascades — operator selects which heavier cleanups to run --}}
+            @if (! empty($rename_plan['optIn']))
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Opt in') }}</p>
+                    <ul class="mt-2 space-y-2">
+                        @foreach ($rename_plan['optIn'] as $row)
+                            @php
+                                $wireModel = match ($row['key']) {
+                                    'reissue_cert' => 'rename_reissue_cert',
+                                    'cycle_backend' => 'rename_cycle_backend',
+                                    default => null,
+                                };
+                            @endphp
+                            @if ($wireModel)
+                                <li class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5">
+                                    <input id="rename-optin-{{ $row['key'] }}" type="checkbox" wire:model="{{ $wireModel }}" class="mt-0.5 h-4 w-4 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage/30" />
+                                    <label for="rename-optin-{{ $row['key'] }}" class="text-sm leading-relaxed text-brand-ink">{{ $row['label'] }}</label>
+                                </li>
+                            @endif
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            {{-- Manual / external — informational; dply cannot fix these from here --}}
+            @if (! empty($rename_plan['manual']))
+                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+                    <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
+                        <x-heroicon-m-information-circle class="h-3.5 w-3.5" />
+                        {{ __('Cannot be fixed from here') }}
+                    </p>
+                    <ul class="mt-2 space-y-1 text-sm text-amber-900">
+                        @foreach ($rename_plan['manual'] as $line)
+                            <li class="flex items-start gap-2">
+                                <span class="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-amber-700"></span>
+                                <span>{{ $line }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+            <x-secondary-button type="button" wire:click="cancelPrimaryHostnameRename">{{ __('Cancel') }}</x-secondary-button>
+            <x-primary-button type="button" wire:click="confirmPrimaryHostnameRename" wire:loading.attr="disabled" wire:target="confirmPrimaryHostnameRename">
+                <span wire:loading.remove wire:target="confirmPrimaryHostnameRename">{{ __('Save & apply selected') }}</span>
+                <span wire:loading wire:target="confirmPrimaryHostnameRename">{{ __('Saving…') }}</span>
+            </x-primary-button>
+        </div>
+    </x-modal>
+@endif

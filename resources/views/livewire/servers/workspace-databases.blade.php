@@ -373,7 +373,47 @@
                     $engineRow = $engineRows[$engine] ?? null;
                     $engineRunning = $capabilities[$engine] ?? false;
                     $isManageable = in_array($engine, ['mysql', 'postgres'], true);
+                    $dbEngineInfoForTab = \App\Support\Servers\DatabaseEngineInfo::for($engine);
+                    $hasDbInfo = ! empty($dbEngineInfoForTab['description']);
                 @endphp
+
+                {{-- Per-engine sub-tab strip — Overview (engine status, databases, users)
+                     and Info (license, maintainer, wire protocol, links). Mirrors the
+                     pattern in WorkspaceCaches + WorkspaceWebserver. Info hidden when
+                     the engine has no catalog entry (sqlite). --}}
+                @if ($hasDbInfo)
+                    <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $engineLabels[$engine] ?? $engine])">
+                        <x-server-workspace-tab
+                            :id="'db-subtab-'.$engine.'-overview'"
+                            :active="$engine_subtab === 'overview'"
+                            wire:click="setEngineSubtab('overview')"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                <x-heroicon-o-presentation-chart-line class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Overview') }}
+                            </span>
+                        </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            :id="'db-subtab-'.$engine.'-info'"
+                            :active="$engine_subtab === 'info'"
+                            wire:click="setEngineSubtab('info')"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                <x-heroicon-o-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Info') }}
+                            </span>
+                        </x-server-workspace-tab>
+                    </x-server-workspace-tablist>
+                @endif
+
+                @if ($engine_subtab === 'info' && $hasDbInfo)
+                    {{-- Info subtab: engine description, license, links, best-for. --}}
+                    @include('livewire.servers.partials.cache-engine-info-card', [
+                        'info' => $dbEngineInfoForTab,
+                        'row' => $engineRow,
+                        'card' => $card,
+                    ])
+                @else
 
                 @if ($isManageable)
                     {{-- Engine status / install card. Always present for mysql/postgres so the
@@ -452,6 +492,22 @@
                                             {{ $engineRow ? __('Retry install') : __('Install :engine', ['engine' => $engineLabels[$engine]]) }}
                                         </span>
                                         <span wire:loading wire:target="installDatabaseEngine">{{ __('Queueing…') }}</span>
+                                    </button>
+                                @elseif ($engineRow && in_array($engineRow->status, [
+                                    \App\Models\ServerDatabaseEngine::STATUS_PENDING,
+                                    \App\Models\ServerDatabaseEngine::STATUS_INSTALLING,
+                                ], true))
+                                    {{-- Operator escape hatch when the install has stalled.
+                                         Mirrors the webserver-switch "Stop & revert" affordance:
+                                         marks the row FAILED and dispatches the uninstall job
+                                         to apt-purge any partial state. --}}
+                                    <button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('stopAndRevertDatabaseEngineInstall', ['{{ $engine }}'], @js(__('Stop and revert :engine install?', ['engine' => $engineLabels[$engine]])), @js(__('Marks the install as failed and runs apt purge on the server to clean up any partial state. Use this when the install has stalled.')), @js(__('Stop & revert')), true)"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-50"
+                                    >
+                                        <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
+                                        {{ __('Stop & revert') }}
                                     </button>
                                 @elseif ($engineRow && in_array($engineRow->status, [
                                     \App\Models\ServerDatabaseEngine::STATUS_RUNNING,
@@ -578,6 +634,7 @@
                         'card' => $card,
                     ])
                 @endif
+                @endif {{-- close $engine_subtab === 'info' / @else --}}
             </x-server-workspace-tab-panel>
         @endforeach
 

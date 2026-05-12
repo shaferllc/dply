@@ -142,7 +142,36 @@
                     </div>
                 </div>
                 <nav class="flex flex-col gap-0.5 p-2" aria-label="{{ __('Server sections') }}">
-                    @foreach ($workspaceNav as $item)
+                    @php
+                        // Cluster the flat nav into groups by their `group` key. Items
+                        // without a group end up in `_ungrouped` and render headerless
+                        // (back-compat for any nav entries that haven't been tagged yet).
+                        $navGroups = collect($workspaceNav)
+                            ->groupBy(fn ($i) => $i['group'] ?? '_ungrouped')
+                            ->all();
+                        $groupLabels = (array) config('server_workspace.nav_groups', []);
+                        // Render groups in the order they first appear in the flat config,
+                        // so a future config rearrangement reorders the sidebar with no
+                        // additional code change.
+                        $orderedGroupKeys = [];
+                        foreach ($workspaceNav as $i) {
+                            $gk = $i['group'] ?? '_ungrouped';
+                            if (! in_array($gk, $orderedGroupKeys, true)) {
+                                $orderedGroupKeys[] = $gk;
+                            }
+                        }
+                    @endphp
+                    @foreach ($orderedGroupKeys as $groupKey)
+                        @php $itemsInGroup = $navGroups[$groupKey] ?? collect(); @endphp
+                        @if ($itemsInGroup->isEmpty())
+                            @continue
+                        @endif
+                        @if ($groupKey !== '_ungrouped' && isset($groupLabels[$groupKey]))
+                            <p class="{{ ! $loop->first ? 'mt-3 ' : '' }}px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
+                                {{ __($groupLabels[$groupKey]) }}
+                            </p>
+                        @endif
+                        @foreach ($itemsInGroup as $item)
                         @php
                             $key = $item['key'];
                             $icon = $item['icon'];
@@ -216,9 +245,16 @@
                                 @case('user-group')
                                     <x-heroicon-o-user-group class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('calendar-days')
+                                    <x-heroicon-o-calendar-days class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('archive-box')
+                                    <x-heroicon-o-archive-box class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                             @endswitch
                             {{ $label }}
                         </a>
+                        @endforeach
                     @endforeach
                 </nav>
                 <div class="border-t border-brand-ink/10 p-3">

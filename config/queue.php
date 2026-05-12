@@ -68,7 +68,14 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            // Must exceed the Horizon worker `timeout` (see config/horizon.php —
+            // currently 720s). retry_after governs when Redis considers a
+            // reserved job "lost" and re-dispatches it; if it fires before the
+            // worker's own timeout, the job gets picked up by a second worker
+            // and the next attempts++ trips MaxAttemptsExceededException. The
+            // 90s Laravel default is far too low for the SSH-driven jobs in
+            // this app (webserver switch, insight-fix, etc).
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 900),
             'block_for' => null,
             'after_commit' => false,
         ],

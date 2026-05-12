@@ -158,10 +158,28 @@ class WorkspaceDatabases extends Component
         }
     }
 
+    /**
+     * Per-engine sub-tab — flips between the management surface (`overview`) and
+     * the engine information card (`info`) inside each per-engine tab panel.
+     * Mirrors the same pattern used by WorkspaceCaches + WorkspaceWebserver so
+     * operators learn one navigation idiom across workspaces.
+     */
+    public string $engine_subtab = 'overview';
+
     public function setWorkspaceTab(string $tab): void
     {
         $allowed = ['databases', 'advanced', 'notifications', 'mysql', 'postgres', 'sqlite'];
         $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'databases';
+        // Reset sub-tab on every top-level switch so engines always open on the
+        // actionable view — without this the operator clicking from MySQL→Info
+        // then Postgres would land on Postgres→Info, hiding the actions.
+        $this->engine_subtab = 'overview';
+    }
+
+    public function setEngineSubtab(string $subtab): void
+    {
+        $allowed = ['overview', 'info'];
+        $this->engine_subtab = in_array($subtab, $allowed, true) ? $subtab : 'overview';
     }
 
     /**
@@ -215,6 +233,65 @@ class WorkspaceDatabases extends Component
         InstallDatabaseEngineJob::dispatch($row->id);
         $this->toastSuccess(__('Installing :engine — refresh in a moment to see status.', ['engine' => $engine]));
         $this->workspace_tab = $engine;
+    }
+
+    /**
+     * Operator escape hatch when a database-engine install has stalled. Mirrors
+     * the webserver-switch and cache-install Stop & revert patterns: marks the
+     * pending/installing row FAILED with an "operator-aborted" reason, then
+     * dispatches {@see UninstallDatabaseEngineJob} to apt-purge whatever the
+     * install partially landed (idempotent — the uninstall script tolerates
+     * "not actually installed" too).
+     *
+     * The install job's success-path update (`status = running`) is keyed by
+     * row id; once it finishes its long SSH bash it'll find the row in FAILED
+     * state and the uninstall will already be queued behind it on the
+     * server_database.install_queue, so the two serialise rather than race.
+     */
+    public function stopAndRevertDatabaseEngineInstall(string $engine): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = strtolower(trim($engine));
+        if (! in_array($engine, DatabaseEngineInstallScripts::supportedEngines(), true)) {
+            $this->toastError(__('Unsupported database engine.'));
+
+            return;
+        }
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if ($row === null) {
+            $this->toastError(__('No :engine install to stop.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! in_array($row->status, [
+            ServerDatabaseEngine::STATUS_PENDING,
+            ServerDatabaseEngine::STATUS_INSTALLING,
+        ], true)) {
+            $this->toastError(__(':engine is not currently installing (status: :status).', [
+                'engine' => $engine,
+                'status' => $row->status,
+            ]));
+
+            return;
+        }
+
+        $row->update([
+            'status' => ServerDatabaseEngine::STATUS_FAILED,
+            'error_message' => __('Stopped by operator — reverting partial install.'),
+        ]);
+
+        UninstallDatabaseEngineJob::dispatch($row->id);
+
+        $this->toastSuccess(__('Stopping :engine install and reverting. Apt purge runs in the background.', [
+            'engine' => $engine,
+        ]));
     }
 
     /**

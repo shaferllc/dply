@@ -94,18 +94,53 @@
                             @endphp
                             <button
                                 type="button"
-                                wire:click="openConfirmActionModal('cancelCacheServiceChange', ['{{ $busyService->engine }}'], @js(__('Cancel install and revert?')), @js($cancelMessage), @js(__('Cancel and revert')), true)"
+                                wire:click="openConfirmActionModal('cancelCacheServiceChange', ['{{ $busyService->engine }}'], @js(__('Stop install and revert?')), @js($cancelMessage), @js(__('Stop and revert')), true)"
                                 class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-300/70 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 shadow-sm hover:bg-rose-50"
                                 title="{{ __('Stop the install and revert this instance.') }}"
                             >
-                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
-                                {{ __('Cancel & revert') }}
+                                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
+                                {{ __('Stop & revert') }}
                             </button>
-                        @elseif ($busyService->status === \App\Models\ServerCacheService::STATUS_INSTALLING && $busyService->cancel_requested_at !== null)
+                        @elseif (($busyService->status === \App\Models\ServerCacheService::STATUS_INSTALLING && $busyService->cancel_requested_at !== null) || $busyService->status === \App\Models\ServerCacheService::STATUS_UNINSTALLING)
+                            @php
+                                // After 60s of "Cancelling — reverting…" / "Uninstalling…" with no
+                                // progress, surface a break-glass "Force cancel" affordance. The
+                                // soft-cancel path only observes the flag when the install/uninstall
+                                // job emits output; an apt-get hung on a dpkg lock, an SSH session
+                                // that stopped streaming, or a dead queue worker will never trip
+                                // the check. Force-cancel marks the row failed without consulting
+                                // the job — operator confirms in a modal with the caveat that
+                                // server-side state may be partial.
+                                //
+                                // The staleness clock is `cancel_requested_at` when set (install
+                                // being cancelled), otherwise the row's `updated_at` (uninstall
+                                // that's stopped streaming). Either way, 60s without progress is
+                                // long enough to give the soft path a fair chance to exit first.
+                                $stalenessRef = $busyService->cancel_requested_at ?? $busyService->updated_at;
+                                $cancelStale = $stalenessRef !== null
+                                    && $stalenessRef->diffInSeconds(now()) >= 60;
+                                $forceConfirmCopy = __(
+                                    'This operation hasn\'t made progress for over a minute. Force remove deletes the row outright so you can start fresh — server-side state may be partial. Run apt purge / systemctl disable manually if anything was already installed. Continue?'
+                                );
+                                $busyPillCopy = $busyService->status === \App\Models\ServerCacheService::STATUS_UNINSTALLING
+                                    ? __('Uninstalling…')
+                                    : __('Cancelling — reverting…');
+                            @endphp
                             <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-300/70 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700">
                                 <x-spinner variant="forest" />
-                                {{ __('Cancelling — reverting…') }}
+                                {{ $busyPillCopy }}
                             </span>
+                            @if ($cancelStale)
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('forceCancelCacheServiceChange', ['{{ $busyService->engine }}'], @js(__('Force remove row?')), @js($forceConfirmCopy), @js(__('Force remove')), true)"
+                                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-400 bg-rose-100 px-2.5 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-200"
+                                    title="{{ __('No progress observed for over 60s — remove the row and clean up the server manually.') }}"
+                                >
+                                    <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                    {{ __('Force remove') }}
+                                </button>
+                            @endif
                         @endif
                         <button
                             type="button"
@@ -380,7 +415,14 @@
                     \App\Models\ServerCacheService::STATUS_INSTALLING,
                     \App\Models\ServerCacheService::STATUS_UNINSTALLING,
                 ], true);
-                $probeRunning = (bool) ($capabilities[$engine] ?? false);
+                // Per-instance probe — uses the row's actual port instead of the
+                // engine-level aggregate which hardcoded 6379 and produced
+                // false-negatives on non-default-port instances (e.g. KeyDB on 6382).
+                // Falls back to the engine-level signal when there's no row yet.
+                $probeRunning = $row
+                    ? app(\App\Support\Servers\ServerCacheServiceHostCapabilities::class)
+                        ->probeInstance($server, $engine, (int) $row->port)
+                    : (bool) ($capabilities[$engine] ?? false);
             @endphp
             <x-server-workspace-tab-panel
                 :id="'cache-panel-'.$engine"
@@ -388,62 +430,118 @@
                 :hidden="$workspace_tab !== $engine"
                 panel-class="space-y-8"
             >
-                {{-- Install / status / action card. State-dependent. --}}
-                @if (! $row)
-                    {{-- Not installed: show engine info, then offer Install. --}}
-                    @include('livewire.servers.partials.cache-engine-info-card', [
-                        'info' => $info,
-                        'row' => $row,
-                        'card' => $card,
-                    ])
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
-                        <p class="mt-2 text-sm text-brand-moss">{{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.') }}</p>
-                        @if ($cacheBusy)
-                            <div class="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
-                                <p class="flex items-start gap-2">
-                                    <x-spinner variant="forest" class="mt-0.5 shrink-0" />
-                                    <span>{{ __('Apt is busy with another cache change — wait for the running operation to finish before installing :new.', ['new' => $info['label']]) }}</span>
-                                </p>
-                            </div>
-                        @else
-                            <div class="mt-4 flex flex-wrap items-center gap-3">
-                                <button
-                                    type="button"
-                                    wire:click="installCacheService('{{ $engine }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="installCacheService"
-                                    class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
-                                >
-                                    <x-heroicon-o-cloud-arrow-down class="h-4 w-4" />
-                                    <span wire:loading.remove wire:target="installCacheService">{{ __('Install :engine', ['engine' => $info['label']]) }}</span>
-                                    <span wire:loading wire:target="installCacheService">{{ __('Queueing install…') }}</span>
-                                </button>
-                            </div>
-                        @endif
-                    </div>
-                @elseif ($rowInFlight)
-                    {{-- In flight on this engine: show engine info, then small status note —
-                         the global banner up top has live details. --}}
-                    @include('livewire.servers.partials.cache-engine-info-card', [
-                        'info' => $info,
-                        'row' => $row,
-                        'card' => $card,
-                    ])
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <h3 class="text-lg font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
-                        <p class="mt-2 text-sm text-brand-moss">
-                            {{ __(':engine is changing — see the progress banner above for live status and output.', ['engine' => $engineLabels[$engine]]) }}
-                        </p>
-                    </div>
+                {{-- Sub-tab strip + content. Three top-level states share one tab structure:
+                     - Not installed → Overview = install affordance, Info = description.
+                     - In flight on this engine → Overview = status note, Info = description.
+                     - Installed → Overview / Info / Console / Stats / Configure.
+                     Same allowlist + fallback logic used in every branch so `engine_subtab`
+                     never lands the operator on a hidden panel. --}}
+                @if (! $row || $rowInFlight)
+                    @php
+                        // Pre-install / in-flight: only Overview + Info make sense — there's
+                        // no daemon to console-into, no stats to compute, no config file to
+                        // edit. Caches's installed branch picks up the longer list below.
+                        $availableSubtabs = ['overview', 'info'];
+                        $activeSubtab = in_array($engine_subtab, $availableSubtabs, true) ? $engine_subtab : 'overview';
+                    @endphp
+
+                    <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])">
+                        <x-server-workspace-tab
+                            :id="'cache-subtab-'.$engine.'-overview'"
+                            :active="$activeSubtab === 'overview'"
+                            wire:click="setEngineSubtab('overview')"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                <x-heroicon-o-presentation-chart-line class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Overview') }}
+                            </span>
+                        </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            :id="'cache-subtab-'.$engine.'-info'"
+                            :active="$activeSubtab === 'info'"
+                            wire:click="setEngineSubtab('info')"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                <x-heroicon-o-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Info') }}
+                            </span>
+                        </x-server-workspace-tab>
+                    </x-server-workspace-tablist>
+
+                    @if ($activeSubtab === 'info')
+                        @include('livewire.servers.partials.cache-engine-info-card', [
+                            'info' => $info,
+                            'row' => $row,
+                            'card' => $card,
+                        ])
+                    @elseif (! $row)
+                        {{-- Overview when not installed: the install affordance. --}}
+                        <div class="{{ $card }} p-6 sm:p-8">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss">{{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.') }}</p>
+                            @if ($cacheBusy)
+                                <div class="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                                    <p class="flex items-start gap-2">
+                                        <x-spinner variant="forest" class="mt-0.5 shrink-0" />
+                                        <span>{{ __('Apt is busy with another cache change — wait for the running operation to finish before installing :new.', ['new' => $info['label']]) }}</span>
+                                    </p>
+                                </div>
+                            @else
+                                <div class="mt-4 flex flex-wrap items-center gap-3">
+                                    <button
+                                        type="button"
+                                        wire:click="installCacheService('{{ $engine }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="installCacheService"
+                                        class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                                    >
+                                        <x-heroicon-o-cloud-arrow-down class="h-4 w-4" />
+                                        <span wire:loading.remove wire:target="installCacheService">{{ __('Install :engine', ['engine' => $info['label']]) }}</span>
+                                        <span wire:loading wire:target="installCacheService">{{ __('Queueing install…') }}</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @else
+                        {{-- Overview when in-flight: small status note pointing at the
+                             top-of-page console banner for live details. --}}
+                        <div class="{{ $card }} p-6 sm:p-8">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss">
+                                {{ __(':engine is changing — see the progress banner above for live status and output.', ['engine' => $engineLabels[$engine]]) }}
+                            </p>
+                        </div>
+                    @endif
                 @else
                     @php
                         $isRedisFamily = \App\Models\ServerCacheService::engineSupportsAuth($row->engine);
+                        // 'info' tab is universal — every engine has a catalog entry. Subtab order
+                        // reads left-to-right: Overview (status/actions), Info (license/wire
+                        // protocol/links), Console + Stats (Redis-family only), Configure.
                         $availableSubtabs = $isRedisFamily
-                            ? ['overview', 'console', 'stats', 'configure']
-                            : ['overview', 'configure'];
+                            ? ['overview', 'info', 'console', 'stats', 'configure']
+                            : ['overview', 'info', 'configure'];
                         $activeSubtab = in_array($engine_subtab, $availableSubtabs, true) ? $engine_subtab : 'overview';
                     @endphp
+
+                    {{-- Always-visible current-instance banner. The chip row below lets the
+                         operator switch instances, but the operator's mental model is "which
+                         instance is selected RIGHT NOW" — a glance-level indicator above the
+                         chips removes the guess-work. Memcached is single-instance so we
+                         skip the banner for it (the chip row also hides). --}}
+                    @if ($isRedisFamily)
+                        <div class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-brand-forest/30 bg-brand-sage/10 px-4 py-2.5 text-sm">
+                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-forest/15 text-brand-forest" aria-hidden="true">
+                                <x-heroicon-o-cursor-arrow-rays class="h-3.5 w-3.5" />
+                            </span>
+                            <span class="text-brand-moss">{{ __('Currently viewing instance') }}</span>
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-forest px-2.5 py-0.5 font-mono text-xs font-semibold text-white shadow-sm">
+                                {{ $active_instance }}
+                                <span class="font-mono text-[10px] text-white/80">:{{ $row->port }}</span>
+                            </span>
+                            <span class="text-xs text-brand-mist">{{ __('— actions on this page affect this instance only.') }}</span>
+                        </div>
+                    @endif
 
                     {{-- Instance chip row — visible across all subtabs so switching instances doesn't
                          require navigating back to Overview. Memcached is single-instance for v1, so
@@ -566,6 +664,16 @@
                                 {{ __('Overview') }}
                             </span>
                         </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            :id="'cache-subtab-'.$engine.'-info'"
+                            :active="$activeSubtab === 'info'"
+                            wire:click="setEngineSubtab('info')"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                <x-heroicon-o-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Info') }}
+                            </span>
+                        </x-server-workspace-tab>
                         @if ($isRedisFamily)
                             <x-server-workspace-tab
                                 :id="'cache-subtab-'.$engine.'-console'"
@@ -600,14 +708,18 @@
                         </x-server-workspace-tab>
                     </x-server-workspace-tablist>
 
-                    @if ($activeSubtab === 'overview')
-                    {{-- Engine info — what this engine is, license, links, "best for". --}}
+                    @if ($activeSubtab === 'info')
+                    {{-- Engine info — what this engine is, license, links, "best for".
+                         Lives in its own tab so the Overview stays focused on operational
+                         signal (status, port, actions). --}}
                     @include('livewire.servers.partials.cache-engine-info-card', [
                         'info' => $info,
                         'row' => $row,
                         'card' => $card,
                     ])
+                    @endif
 
+                    @if ($activeSubtab === 'overview')
                     {{-- Installed and idle: status grid + action row. --}}
                     <div class="{{ $card }} p-6 sm:p-8">
                         <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine status', ['engine' => $engineLabels[$engine]]) }}</h3>
@@ -632,11 +744,50 @@
                             </div>
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
-                                <dd class="mt-1">
+                                <dd class="mt-1 flex flex-wrap items-center gap-2">
                                     @if ($probeRunning)
                                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Reachable') }}</span>
                                     @else
                                         <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{{ __('Not reachable') }}</span>
+                                    @endif
+                                    {{-- Re-probe THIS instance on its actual port. Cheap; runs a
+                                         single `*-cli ping` (or systemctl is-active for memcached
+                                         / dragonfly) and toasts the result. --}}
+                                    <button
+                                        type="button"
+                                        wire:click="recheckCacheServiceInstance('{{ $engine }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="recheckCacheServiceInstance"
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
+                                        title="{{ __('Re-run the reachability probe against this instance\'s port') }}"
+                                    >
+                                        <span wire:loading.remove wire:target="recheckCacheServiceInstance" class="inline-flex items-center gap-1">
+                                            <x-heroicon-o-arrow-path class="h-3 w-3" />
+                                            {{ __('Recheck') }}
+                                        </span>
+                                        <span wire:loading wire:target="recheckCacheServiceInstance" class="inline-flex items-center gap-1">
+                                            <x-spinner variant="forest" />
+                                            {{ __('Checking…') }}
+                                        </span>
+                                    </button>
+                                    @if (! $probeRunning)
+                                        <button
+                                            type="button"
+                                            wire:click="debugCacheServiceInstance('{{ $engine }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="debugCacheServiceInstance"
+                                            class="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 font-sans text-[11px] font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                                            title="{{ __('Run systemctl status + port-listener + ping diagnostics and surface the output below') }}"
+                                        >
+                                            <span wire:loading.remove wire:target="debugCacheServiceInstance" class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-bug-ant class="h-3 w-3" />
+                                                {{ __('Debug') }}
+                                            </span>
+                                            <span wire:loading wire:target="debugCacheServiceInstance" class="inline-flex items-center gap-1">
+                                                <x-spinner variant="forest" />
+                                                {{ __('Running…') }}
+                                            </span>
+                                        </button>
                                     @endif
                                 </dd>
                             </div>
@@ -672,20 +823,66 @@
                             </p>
                         @endif
 
+                        {{-- Debug-output panel — appears when the operator clicks Debug.
+                             Shows systemctl status, port listener, ping probe, and recent
+                             journal lines so the operator can diagnose why an instance is
+                             marked Not reachable. Dismiss clears the buffer. --}}
+                        @if (! empty($debug_output_by_engine[$engine]))
+                            <div class="mt-4 overflow-hidden rounded-xl border border-amber-300 bg-amber-50">
+                                <div class="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-100/60 px-4 py-2.5">
+                                    <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-900">
+                                        <x-heroicon-o-bug-ant class="h-3.5 w-3.5" />
+                                        {{ __('Debug — :engine instance :name', ['engine' => $engineLabels[$engine] ?? $engine, 'name' => $row->name]) }}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        wire:click="clearCacheServiceDebugOutput('{{ $engine }}')"
+                                        class="inline-flex items-center gap-1 rounded-md text-[11px] font-medium text-amber-900 hover:bg-amber-200/60 px-1.5 py-0.5"
+                                    >
+                                        <x-heroicon-o-x-mark class="h-3 w-3" />
+                                        {{ __('Dismiss') }}
+                                    </button>
+                                </div>
+                                <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-words bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-emerald-100">{{ $debug_output_by_engine[$engine] }}</pre>
+                            </div>
+                        @endif
+
                         @if ($cacheBusy)
                             <p class="mt-6 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 flex items-start gap-2">
                                 <x-spinner variant="forest" class="mt-0.5 shrink-0" />
                                 <span>{{ __('Restart, stop, start, flush, and uninstall are paused while another cache service is changing on this server.') }}</span>
                             </p>
-                        @else
-                            <x-explainer class="mt-6" tone="warn" :title="__('What do these actions do?')">
-                                <ul>
-                                    <li><strong>{{ __('Restart') }}.</strong> {{ __('Issues systemctl restart. Briefly drops connections; clients reconnect on next command.') }}</li>
-                                    <li><strong>{{ __('Stop / Start') }}.</strong> {{ __('Halts or resumes the systemd unit. Stopped engines do not survive a reboot in the running state.') }}</li>
-                                    <li><strong>{{ __('Flush all keys') }}.</strong> {{ __('Drops every key in this engine — sessions, cache, queued tags, rate-limit counters. Cannot be undone.') }}</li>
-                                    <li><strong>{{ __('Uninstall') }}.</strong> {{ __('Runs apt purge for the package + data dirs. Other engines on this server are not affected.') }}</li>
-                                </ul>
-                            </x-explainer>
+                        @php
+                            // Multi-instance awareness: stop/restart act on this instance's
+                            // systemd unit (or templated unit) only. Uninstall removes this
+                            // instance only when there's a sibling instance of the same engine
+                            // — package + sibling stay intact. When this IS the last instance,
+                            // Uninstall apt-purges the engine.
+                            $siblingInstanceCount = \App\Models\ServerCacheService::query()
+                                ->where('server_id', $server->id)
+                                ->where('engine', $engine)
+                                ->where('id', '!=', $row->id)
+                                ->count();
+                            $isLastInstanceOfEngine = $siblingInstanceCount === 0;
+                            $uninstallTitle = $isLastInstanceOfEngine
+                                ? __('Uninstall :engine', ['engine' => $engineLabels[$engine]])
+                                : __('Uninstall instance :name (:engine)', ['name' => $row->name, 'engine' => $engineLabels[$engine]]);
+                            $uninstallConfirm = $isLastInstanceOfEngine
+                                ? __('apt purge will remove the package and its data dirs. Cached entries will be lost. Other engines on this server are not affected.')
+                                : __('Removes only this instance — its systemd unit, config, and data dir. The apt package stays because :n other :engine instance(s) still use it. Cached entries on this instance will be lost; sibling instances are unaffected.', ['n' => $siblingInstanceCount, 'engine' => $engineLabels[$engine]]);
+                            $uninstallLabel = $isLastInstanceOfEngine ? __('Uninstall') : __('Remove instance');
+                        @endphp
+                        <x-explainer class="mt-6" tone="warn" :title="__('What do these actions do?')">
+                            <ul>
+                                <li><strong>{{ __('Restart / Stop / Start') }}.</strong> {{ __('Acts on THIS instance\'s systemd unit only. Other instances on this engine are not affected.') }}</li>
+                                <li><strong>{{ __('Flush all keys') }}.</strong> {{ __('Drops every key in this instance — sessions, cache, queued tags, rate-limit counters. Cannot be undone. Sibling instances keep their data.') }}</li>
+                                @if ($isLastInstanceOfEngine)
+                                    <li><strong>{{ __('Uninstall') }}.</strong> {{ __('Last instance of :engine on this server — runs apt purge for the package + data dirs. Other engines on this server are not affected.', ['engine' => $engineLabels[$engine]]) }}</li>
+                                @else
+                                    <li><strong>{{ __('Remove instance') }}.</strong> {{ __(':n other :engine instance(s) still use the package, so apt purge would break them. This affordance only removes the systemd unit + config + data dir for THIS instance.', ['n' => $siblingInstanceCount, 'engine' => $engineLabels[$engine]]) }}</li>
+                                @endif
+                            </ul>
+                        </x-explainer>
                             <div class="mt-4 flex flex-wrap gap-2">
                                 @if (in_array($row->status, [\App\Models\ServerCacheService::STATUS_RUNNING, \App\Models\ServerCacheService::STATUS_STOPPED, \App\Models\ServerCacheService::STATUS_FAILED], true))
                                     <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
@@ -716,11 +913,12 @@
                                     @endif
                                     <button
                                         type="button"
-                                        wire:click="openConfirmActionModal('uninstallCacheService', ['{{ $engine }}'], @js(__('Uninstall :engine', ['engine' => $engineLabels[$engine]])), @js(__('apt purge will remove the package and its data dirs. Cached entries will be lost. Other engines on this server are not affected.')), @js(__('Uninstall')), true)"
+                                        wire:click="openConfirmActionModal('uninstallCacheService', ['{{ $engine }}'], @js($uninstallTitle), @js($uninstallConfirm), @js($uninstallLabel), true)"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                        title="{{ $isLastInstanceOfEngine ? __('apt purge — removes the package') : __('Removes this instance only — package stays for the other instances') }}"
                                     >
                                         <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
-                                        {{ __('Uninstall') }}
+                                        {{ $uninstallLabel }}
                                     </button>
                                 @endif
                             </div>

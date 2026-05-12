@@ -64,6 +64,23 @@
                  stale ?section=services URLs to the standalone Services
                  page so deep links don't 404. --}}
             @case ('web')
+                @php
+                    // Surface in-flight webserver_switch runs at the top of the
+                    // web tab. The static banner partial self-polls every 4s
+                    // while the run is in_flight, so a queued/running row turns
+                    // into completed/failed without a page refresh.
+                    $webserverSwitchRun = \App\Models\ConsoleAction::query()
+                        ->where('subject_type', $server->getMorphClass())
+                        ->where('subject_id', $server->id)
+                        ->where('kind', 'webserver_switch')
+                        ->whereNull('dismissed_at')
+                        ->orderByDesc('created_at')
+                        ->first();
+                @endphp
+                @include('livewire.partials.console-action-banner-static', [
+                    'run' => $webserverSwitchRun,
+                    'kindLabels' => (array) config('console_actions.kinds', []),
+                ])
                 @include('livewire.servers.partials.manage.group-web', $manageShare)
                 @break
             @case ('data')

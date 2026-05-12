@@ -267,4 +267,31 @@ class NginxSiteConfigBuilderTest extends TestCase
 
         $this->assertStringNotContainsString('fastcgi_cache', $nginx);
     }
+
+    public function test_listen_port_mode_rewrites_listens_and_strips_tls(): void
+    {
+        $site = Site::factory()->create([
+            'slug' => 'switch-target',
+            'type' => SiteType::Static,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'app.example.test',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $site->refresh()->load('domains', 'redirects');
+
+        $production = app(NginxSiteConfigBuilder::class)->build($site);
+        $this->assertStringContainsString('listen 80;', $production);
+
+        $testPort = app(NginxSiteConfigBuilder::class)->build($site, null, 8080);
+        $this->assertStringContainsString('listen 8080;', $testPort);
+        $this->assertStringNotContainsString('listen 80;', $testPort);
+        $this->assertStringNotContainsString('listen [::]:80;', $testPort);
+        // No TLS plumbing should remain at the test port.
+        $this->assertStringNotContainsString('listen 443', $testPort);
+        $this->assertStringNotContainsString('ssl_certificate', $testPort);
+    }
 }

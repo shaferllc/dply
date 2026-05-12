@@ -68,35 +68,58 @@
             </div>
         </div>
         <nav id="site-settings-sidebar" class="flex flex-col gap-0.5 p-2" aria-label="{{ __($resourceNoun.' settings sections') }}">
-            @foreach ($settingsSidebarItems as $item)
-                @php($isChild = ! empty($item['parent'] ?? null))
-                <a
-                    href="{{ $item['id'] === 'webserver-config'
-                        ? route('sites.webserver-config', [$server, $site])
-                        : ($item['id'] === 'monitor'
-                            ? route('sites.monitor', [$server, $site])
-                            : ($item['id'] === 'commits'
-                                ? route('sites.commits', [$server, $site])
-                                : route('sites.show', array_merge([
+            @php
+                $groupLabels = (array) config('site_settings.nav_groups', []);
+                $orderedGroupKeys = [];
+                foreach ($settingsSidebarItems as $i) {
+                    $gk = $i['group'] ?? '_ungrouped';
+                    if (! in_array($gk, $orderedGroupKeys, true)) {
+                        $orderedGroupKeys[] = $gk;
+                    }
+                }
+                $itemsByGroup = collect($settingsSidebarItems)->groupBy(fn ($i) => $i['group'] ?? '_ungrouped');
+            @endphp
+            @foreach ($orderedGroupKeys as $groupKey)
+                @php $itemsInGroup = $itemsByGroup[$groupKey] ?? collect(); @endphp
+                @if ($itemsInGroup->isEmpty())
+                    @continue
+                @endif
+                @if ($groupKey !== '_ungrouped' && isset($groupLabels[$groupKey]))
+                    <p class="{{ ! $loop->first ? 'mt-3 ' : '' }}px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
+                        {{ __($groupLabels[$groupKey]) }}
+                    </p>
+                @endif
+                @foreach ($itemsInGroup as $item)
+                    @php
+                        $isChild = ! empty($item['parent'] ?? null);
+                        if (! empty($item['route'] ?? null)) {
+                            $href = route($item['route'], ['server' => $server, 'site' => $site]);
+                        } else {
+                            $href = route('sites.show', array_merge([
                                 'server' => $server,
                                 'site' => $site,
                                 'section' => $item['id'],
-                            ], $item['id'] === 'routing' ? ['tab' => $routingTab] : [], $item['id'] === 'laravel-stack' ? ['laravel_tab' => $laravel_tab ?? 'commands'] : [])))) }}"
-                    wire:navigate
-                    @class([
-                        $navLink,
-                        'pl-9' => $isChild,
-                        'bg-brand-sand/60 text-brand-ink' => $section === $item['id'],
-                        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $section !== $item['id'],
-                    ])
-                >
-                    @if ($isChild)
-                        <x-dynamic-component :component="$item['icon']" class="h-4 w-4 shrink-0 opacity-70" />
-                    @else
-                        <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
-                    @endif
-                    {{ $item['label'] }}
-                </a>
+                            ], $item['id'] === 'routing' ? ['tab' => $routingTab] : [], $item['id'] === 'laravel-stack' ? ['laravel_tab' => $laravel_tab ?? 'commands'] : []));
+                        }
+                    @endphp
+                    <a
+                        href="{{ $href }}"
+                        wire:navigate
+                        @class([
+                            $navLink,
+                            'pl-9' => $isChild,
+                            'bg-brand-sand/60 text-brand-ink' => $section === $item['id'],
+                            'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $section !== $item['id'],
+                        ])
+                    >
+                        @if ($isChild)
+                            <x-dynamic-component :component="$item['icon']" class="h-4 w-4 shrink-0 opacity-70" />
+                        @else
+                            <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
+                        @endif
+                        {{ $item['label'] }}
+                    </a>
+                @endforeach
             @endforeach
         </nav>
         <div class="border-t border-brand-ink/10 p-3">

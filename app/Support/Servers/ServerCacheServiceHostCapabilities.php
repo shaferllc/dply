@@ -64,13 +64,60 @@ class ServerCacheServiceHostCapabilities
             return $this->emptyResult();
         }
 
+        // Engine-level probe pings whatever default-port instance is running.
+        // Multi-instance + non-default-port servers should use {@see probeInstance()}
+        // instead — this is the legacy aggregate signal that powers the engine-
+        // tab "Active" badge for back-compat.
         return [
-            'redis' => $this->probeWith($server, 'command -v redis-cli >/dev/null && redis-cli -p 6379 ping 2>/dev/null', 'PONG'),
-            'valkey' => $this->probeWith($server, 'command -v valkey-cli >/dev/null && valkey-cli -p 6379 ping 2>/dev/null || (command -v redis-cli >/dev/null && redis-cli -p 6379 ping 2>/dev/null)', 'PONG'),
+            'redis' => $this->probeWith($server, $this->portPingCommand('redis', 6379), 'PONG'),
+            'valkey' => $this->probeWith($server, $this->portPingCommand('valkey', 6379), 'PONG'),
             'memcached' => $this->probeWith($server, 'systemctl is-active memcached 2>/dev/null', 'active'),
-            'keydb' => $this->probeWith($server, 'command -v keydb-cli >/dev/null && keydb-cli -p 6379 ping 2>/dev/null', 'PONG'),
+            'keydb' => $this->probeWith($server, $this->portPingCommand('keydb', 6379), 'PONG'),
             'dragonfly' => $this->probeWith($server, 'systemctl is-active dragonfly 2>/dev/null', 'active'),
         ];
+    }
+
+    /**
+     * Probe a single instance on its actual port — fixes the hardcoded-6379
+     * limitation of {@see probe()}, which assumes default ports and therefore
+     * misses non-default-port instances even when they're healthy. Memcached
+     * + Dragonfly fall back to `systemctl is-active` because their CLI tools
+     * aren't always present.
+     */
+    public function probeInstance(Server $server, string $engine, int $port): bool
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return false;
+        }
+
+        return match ($engine) {
+            'redis', 'valkey', 'keydb' => $this->probeWith($server, $this->portPingCommand($engine, $port), 'PONG'),
+            'memcached' => $this->probeWith($server, 'systemctl is-active memcached 2>/dev/null', 'active'),
+            'dragonfly' => $this->probeWith($server, 'systemctl is-active dragonfly 2>/dev/null', 'active'),
+            default => false,
+        };
+    }
+
+    /**
+     * Resolve the right `*-cli -p <port> ping` command for a Redis-family engine.
+     * Each engine's cli is preferred; redis-cli is the universal fallback because
+     * all three (Redis, Valkey, KeyDB) speak RESP.
+     */
+    private function portPingCommand(string $engine, int $port): string
+    {
+        $primary = match ($engine) {
+            'redis' => 'redis-cli',
+            'valkey' => 'valkey-cli',
+            'keydb' => 'keydb-cli',
+            default => 'redis-cli',
+        };
+
+        return sprintf(
+            '(command -v %1$s >/dev/null && %1$s -p %2$d ping 2>/dev/null) '
+            .'|| (command -v redis-cli >/dev/null && redis-cli -p %2$d ping 2>/dev/null)',
+            $primary,
+            $port,
+        );
     }
 
     /**

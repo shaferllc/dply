@@ -277,195 +277,66 @@
                     @endif
 
                     @if ($section === 'general')
+                        {{-- Read-only overview. Edit affordances live elsewhere:
+                             primary hostname → Routing > Domains (pencil on the row);
+                             everything else → Settings tab. --}}
                         <section class="dply-card overflow-hidden">
-                            <form wire:submit="saveGeneralSettings">
-                                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                    <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
-                                        <div class="flex items-start gap-3">
-                                            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                                                <x-heroicon-o-globe-alt class="h-5 w-5" />
-                                            </span>
-                                            <div class="min-w-0">
-                                                <h2 class="text-lg font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
-                                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                                    {{ $generalOverviewDescription }}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        @if ($testingHostname !== '')
-                                            <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white p-4">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
-                                                <p class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $testingHostname }}</p>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    <div class="p-6 sm:p-8">
-                                        <div class="grid gap-5">
-                                            <div>
-                                                <x-input-label for="settings_primary_domain" :value="$primaryHostnameLabel" />
-                                                <x-text-input id="settings_primary_domain" wire:model="settings_primary_domain" class="mt-2 block w-full font-mono text-sm" placeholder="app.example.com" />
-                                                <x-input-error :messages="$errors->get('settings_primary_domain')" class="mt-2" />
-                                            </div>
-
-                                            <div>
-                                                <x-input-label for="settings_document_root" :value="$documentRootLabel" />
-                                                <x-text-input id="settings_document_root" wire:model="settings_document_root" class="mt-2 block w-full font-mono text-sm" :placeholder="$documentRootPlaceholder" />
-                                                <x-input-error :messages="$errors->get('settings_document_root')" class="mt-2" />
-                                            </div>
-
-                                            <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-2">
-                                                @foreach ($summaryCards as $card)
-                                                    <div>
-                                                        <dt class="text-brand-mist">{{ $card['label'] }}</dt>
-                                                        <dd class="mt-1 break-all font-medium text-brand-ink">{{ $card['value'] }}</dd>
-                                                    </div>
-                                                @endforeach
-                                            </dl>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
-                                    <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
-                                </div>
-                            </form>
-                        </section>
-
-                        {{-- Primary-hostname rename confirmation modal. Opens when saveGeneralSettings()
-                             detects a non-trivial rename (cert, container backend, or auto-derived
-                             dns_zone). Renders the cascade preview computed by PrimaryHostnameRenamePlanner. --}}
-                        @if ($rename_plan !== null)
-                            <x-modal name="primary-hostname-rename-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
-                                <div class="border-b border-brand-ink/10 px-6 py-5">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Confirm rename') }}</p>
-                                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Rename primary hostname?') }}</h2>
-                                    <div class="mt-3 inline-flex flex-wrap items-center gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-3 py-2 font-mono text-sm text-brand-ink">
-                                        <span class="break-all">{{ $rename_plan['old'] !== '' ? $rename_plan['old'] : __('(none)') }}</span>
-                                        <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
-                                        <span class="break-all">{{ $rename_plan['new'] }}</span>
-                                    </div>
-                                </div>
-
-                                <div class="space-y-5 px-6 py-6">
-                                    {{-- Auto cascades — always-on, read-only checks --}}
-                                    <div>
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Always applied') }}</p>
-                                        <ul class="mt-2 space-y-1.5">
-                                            @foreach ($rename_plan['auto'] as $row)
-                                                <li class="flex items-start gap-2 text-sm text-brand-ink">
-                                                    <x-heroicon-m-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                                                    <span>{{ $row['label'] }}</span>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-
-                                    {{-- Opt-in cascades — operator selects which heavier cleanups to run --}}
-                                    @if (! empty($rename_plan['optIn']))
-                                        <div>
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Opt in') }}</p>
-                                            <ul class="mt-2 space-y-2">
-                                                @foreach ($rename_plan['optIn'] as $row)
-                                                    @php
-                                                        $wireModel = match ($row['key']) {
-                                                            'reissue_cert' => 'rename_reissue_cert',
-                                                            'cycle_backend' => 'rename_cycle_backend',
-                                                            default => null,
-                                                        };
-                                                    @endphp
-                                                    @if ($wireModel)
-                                                        <li class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5">
-                                                            <input id="rename-optin-{{ $row['key'] }}" type="checkbox" wire:model="{{ $wireModel }}" class="mt-0.5 h-4 w-4 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage/30" />
-                                                            <label for="rename-optin-{{ $row['key'] }}" class="text-sm leading-relaxed text-brand-ink">{{ $row['label'] }}</label>
-                                                        </li>
-                                                    @endif
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    @endif
-
-                                    {{-- Manual / external — informational; dply cannot fix these from here --}}
-                                    @if (! empty($rename_plan['manual']))
-                                        <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
-                                            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
-                                                <x-heroicon-m-information-circle class="h-3.5 w-3.5" />
-                                                {{ __('Cannot be fixed from here') }}
+                            <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+                                <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                                    <div class="flex items-start gap-3">
+                                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                            <x-heroicon-o-globe-alt class="h-5 w-5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
+                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                {{ __('At-a-glance summary. Edit the primary hostname from Routing > Domains; everything else lives in Settings.') }}
                                             </p>
-                                            <ul class="mt-2 space-y-1 text-sm text-amber-900">
-                                                @foreach ($rename_plan['manual'] as $line)
-                                                    <li class="flex items-start gap-2">
-                                                        <span class="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-amber-700"></span>
-                                                        <span>{{ $line }}</span>
-                                                    </li>
-                                                @endforeach
-                                            </ul>
+                                        </div>
+                                    </div>
+                                    @if ($testingHostname !== '')
+                                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white p-4">
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
+                                            <p class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $testingHostname }}</p>
                                         </div>
                                     @endif
                                 </div>
 
-                                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
-                                    <x-secondary-button type="button" wire:click="cancelPrimaryHostnameRename">{{ __('Cancel') }}</x-secondary-button>
-                                    <x-primary-button type="button" wire:click="confirmPrimaryHostnameRename" wire:loading.attr="disabled" wire:target="confirmPrimaryHostnameRename">
-                                        <span wire:loading.remove wire:target="confirmPrimaryHostnameRename">{{ __('Save & apply selected') }}</span>
-                                        <span wire:loading wire:target="confirmPrimaryHostnameRename">{{ __('Saving…') }}</span>
-                                    </x-primary-button>
-                                </div>
-                            </x-modal>
-                        @endif
-
-                        <section class="dply-card overflow-hidden">
-                            <form wire:submit="saveProjectSettings">
-                                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                    <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
-                                        <div class="flex items-start gap-3">
-                                            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                                                <x-heroicon-o-folder-open class="h-5 w-5" />
-                                            </span>
-                                            <div class="min-w-0">
-                                                <h2 class="text-lg font-semibold text-brand-ink">{{ $projectSettingsTitle }}</h2>
-                                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                                    {{ $projectSettingsDescription }}
-                                                </p>
+                                <div class="p-6 sm:p-8">
+                                    <div class="grid gap-5">
+                                        <div>
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $primaryHostnameLabel }}</p>
+                                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                                <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_primary_domain !== '' ? $settings_primary_domain : '—' }}</span>
+                                                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
+                                                    <x-heroicon-o-pencil-square class="h-3 w-3" />
+                                                    {{ __('Edit in Routing') }}
+                                                </a>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div class="space-y-5 p-6 sm:p-8">
                                         <div>
-                                            <x-input-label for="project_workspace_id" value="Project" />
-                                            <select id="project_workspace_id" wire:model="project_workspace_id" class="dply-input">
-                                                <option value="">{{ __('No project') }}</option>
-                                                @foreach ($availableWorkspaces as $workspace)
-                                                    <option value="{{ $workspace->id }}">{{ $workspace->name }}</option>
-                                                @endforeach
-                                            </select>
-                                            <x-input-error :messages="$errors->get('project_workspace_id')" class="mt-2" />
-                                            <p class="mt-2 text-sm text-brand-moss">
-                                                {{ __('Project membership can be managed here or from the project resources page.') }}
-                                            </p>
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $documentRootLabel }}</p>
+                                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                                <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_document_root !== '' ? $settings_document_root : '—' }}</span>
+                                                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
+                                                    <x-heroicon-o-pencil-square class="h-3 w-3" />
+                                                    {{ __('Edit in Settings') }}
+                                                </a>
+                                            </div>
                                         </div>
 
-                                        @if ($site->workspace)
-                                            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                                <p class="text-sm font-semibold text-brand-ink">{{ __('Current project') }}</p>
-                                                <p class="mt-1 text-sm text-brand-moss">
-                                                    {{ __('This site currently rolls up into :project.', ['project' => $site->workspace->name]) }}
-                                                </p>
-                                                <div class="mt-3 flex flex-wrap gap-3 text-sm">
-                                                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project resources') }}</a>
-                                                    <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project operations') }}</a>
-                                                    <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project delivery') }}</a>
+                                        <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-2">
+                                            @foreach ($summaryCards as $card)
+                                                <div>
+                                                    <dt class="text-brand-mist">{{ $card['label'] }}</dt>
+                                                    <dd class="mt-1 break-all font-medium text-brand-ink">{{ $card['value'] }}</dd>
                                                 </div>
-                                            </div>
-                                        @endif
+                                            @endforeach
+                                        </dl>
                                     </div>
                                 </div>
-
-                                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
-                                    <x-primary-button type="submit">{{ __('Save project settings') }}</x-primary-button>
-                                </div>
-                            </form>
+                            </div>
                         </section>
 
                         <section class="dply-card overflow-hidden">
@@ -612,8 +483,8 @@
                             </div>
                         </section>
 
-                        <section class="dply-card overflow-hidden">
-                            <form wire:submit="saveSiteNotes">
+                        @if (data_get($site->meta, 'notes'))
+                            <section class="dply-card overflow-hidden">
                                 <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
                                     <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
                                         <div class="flex items-start gap-3">
@@ -623,26 +494,18 @@
                                             <div class="min-w-0">
                                                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
                                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                                    {{ __('Keep operational notes here for details you want to save or hand off later. Avoid putting secrets or credentials in this field.') }}
+                                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Edit in Settings') }}</a>
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div class="space-y-4 p-6 sm:p-8">
-                                        <div>
-                                            <x-input-label for="site_notes" value="Notes" />
-                                            <textarea id="site_notes" wire:model="site_notes" rows="5" class="mt-2 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"></textarea>
-                                            <x-input-error :messages="$errors->get('site_notes')" class="mt-2" />
-                                        </div>
+                                    <div class="p-6 sm:p-8">
+                                        <p class="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{{ data_get($site->meta, 'notes') }}</p>
                                     </div>
                                 </div>
-
-                                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
-                                    <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
-                                </div>
-                            </form>
-                        </section>
+                            </section>
+                        @endif
 
                         <x-cli-snippet :commands="[
                             ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
@@ -652,6 +515,8 @@
                             ['label' => __('Export deploy manifest'), 'command' => 'dply:site:export-manifest '.$site->slug.' --to=manifest.json'],
                             ['label' => __('List all sites'), 'command' => 'dply:site:list'],
                         ]" />
+                    @elseif ($section === 'settings')
+                        @include('livewire.sites.settings.partials.settings-tab')
                     @elseif ($section === 'routing')
                         @include('livewire.sites.settings.partials.routing')
                     @elseif ($section === 'dns')
@@ -1239,6 +1104,8 @@
                         @include('livewire.sites.settings.partials.system-user')
                     @elseif ($section === 'laravel-stack')
                         @include('livewire.sites.settings.partials.laravel-stack')
+                    @elseif ($section === 'rails-stack')
+                        @include('livewire.sites.settings.partials.rails.workspace')
                     @elseif ($section === 'wordpress')
                         @livewire('sites.wordpress.wordpress-section', ['site' => $site], key('wordpress-section-'.$site->id))
                     @elseif ($section === 'environment')
