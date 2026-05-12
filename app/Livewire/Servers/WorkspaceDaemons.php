@@ -194,6 +194,8 @@ class WorkspaceDaemons extends Component
                 'laravel-octane',
                 'nodejs',
                 'sidekiq',
+                'solid-queue',
+                'action-cable',
             ], true)) {
             $this->applySupervisorPreset($preset);
         }
@@ -279,6 +281,18 @@ class WorkspaceDaemons extends Component
                 'sidekiq',
                 'custom',
                 'bundle exec sidekiq -C config/sidekiq.yml',
+                $this->defaultAppDirectory()
+            ),
+            'solid-queue' => $this->applySupervisorPresetValues(
+                'solid-queue',
+                'custom',
+                'bin/jobs',
+                $this->defaultAppDirectory()
+            ),
+            'action-cable' => $this->applySupervisorPresetValues(
+                'action-cable',
+                'custom',
+                'bundle exec puma -p 28080 cable/config.ru',
                 $this->defaultAppDirectory()
             ),
             default => null,

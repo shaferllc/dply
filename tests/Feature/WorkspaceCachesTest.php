@@ -1036,4 +1036,131 @@ class WorkspaceCachesTest extends TestCase
             'event' => ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
         ]);
     }
+
+    public function test_show_cache_instance_status_runs_systemctl_for_default_instance(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+            $mock->shouldReceive('probeInstance')->andReturn(true);
+        });
+
+        $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
+            $mock->shouldReceive('runInlineBash')
+                ->once()
+                ->withArgs(function ($server, $name, $cmd): bool {
+                    return $name === 'cache-service:status:redis:default'
+                        && str_contains($cmd, 'systemctl status')
+                        && str_contains($cmd, "'redis-server'");
+                })
+                ->andReturn(new \App\Modules\TaskRunner\ProcessOutput("● redis-server.service — active (running)\n", 0, false));
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
+            ->call('showCacheInstanceStatus', 'redis')
+            ->assertHasNoErrors()
+            ->assertSet('showCacheStatusModal', true)
+            ->assertSet('cacheStatusModalEngine', 'redis')
+            ->assertSet('cacheStatusModalInstance', 'default')
+            ->assertSet('cacheStatusModalUnit', 'redis-server')
+            ->assertSet('cacheStatusModalView', 'status')
+            ->assertSet('cacheStatusModalLoading', false)
+            ->assertSee('active (running)');
+    }
+
+    public function test_show_cache_instance_logs_runs_journalctl_for_named_instance(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'name' => 'queue',
+            'port' => 6380,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+            $mock->shouldReceive('probeInstance')->andReturn(true);
+        });
+
+        $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
+            $mock->shouldReceive('runInlineBash')
+                ->once()
+                ->withArgs(function ($server, $name, $cmd): bool {
+                    return $name === 'cache-service:logs:redis:queue'
+                        && str_contains($cmd, 'journalctl --no-pager --output=short-iso')
+                        && str_contains($cmd, "'redis-server@queue'")
+                        && str_contains($cmd, '-n 200');
+                })
+                ->andReturn(new \App\Modules\TaskRunner\ProcessOutput("2026-05-11T10:00:00+0000 redis-server: Ready to accept connections\n", 0, false));
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
+            ->set('active_instance', 'queue')
+            ->call('showCacheInstanceLogs', 'redis')
+            ->assertHasNoErrors()
+            ->assertSet('showCacheStatusModal', true)
+            ->assertSet('cacheStatusModalInstance', 'queue')
+            ->assertSet('cacheStatusModalUnit', 'redis-server@queue')
+            ->assertSet('cacheStatusModalView', 'logs')
+            ->assertSee('Ready to accept connections');
+    }
+
+    public function test_set_cache_status_modal_view_reprobes_with_logs_script(): void
+    {
+        [$user, $server] = $this->actingOwnerWithServer();
+
+        ServerCacheService::query()->create([
+            'server_id' => $server->id,
+            'engine' => 'redis',
+            'status' => ServerCacheService::STATUS_RUNNING,
+            'port' => 6379,
+        ]);
+
+        $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+            $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forget')->zeroOrMoreTimes();
+            $mock->shouldReceive('probeInstance')->andReturn(true);
+        });
+
+        // First call (Status open) returns systemctl output; second call
+        // (after the view switches to Logs) returns journalctl output.
+        $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
+            $mock->shouldReceive('runInlineBash')
+                ->once()
+                ->withArgs(fn ($server, $name, $cmd): bool => str_contains($cmd, 'systemctl status'))
+                ->andReturn(new \App\Modules\TaskRunner\ProcessOutput('initial status output', 0, false));
+
+            $mock->shouldReceive('runInlineBash')
+                ->once()
+                ->withArgs(fn ($server, $name, $cmd): bool => str_contains($cmd, 'journalctl --no-pager --output=short-iso'))
+                ->andReturn(new \App\Modules\TaskRunner\ProcessOutput('switched logs output', 0, false));
+        });
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceCaches::class, ['server' => $server])
+            ->set('workspace_tab', 'redis')
+            ->call('showCacheInstanceStatus', 'redis')
+            ->assertSet('cacheStatusModalView', 'status')
+            ->assertSee('initial status output')
+            ->call('setCacheStatusModalView', 'logs')
+            ->assertSet('cacheStatusModalView', 'logs')
+            ->assertSee('switched logs output');
+    }
 }

@@ -584,6 +584,8 @@
                                         ])></span>
                                     @elseif ($inst->status === \App\Models\ServerCacheService::STATUS_FAILED)
                                         <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                    @elseif ($inst->status === \App\Models\ServerCacheService::STATUS_STOPPED)
+                                        <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
                                     @else
                                         <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                                     @endif
@@ -789,6 +791,44 @@
                                             </span>
                                         </button>
                                     @endif
+                                    {{-- Status / Logs — open the per-instance modal that shows
+                                         systemctl status and journalctl -u for THIS instance's
+                                         unit. Always available regardless of reachability so the
+                                         operator can inspect a stopped or failed instance too. --}}
+                                    <button
+                                        type="button"
+                                        wire:click="showCacheInstanceStatus('{{ $engine }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="showCacheInstanceStatus,showCacheInstanceLogs"
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
+                                        title="{{ __('Open systemctl status for this instance') }}"
+                                    >
+                                        <span wire:loading.remove wire:target="showCacheInstanceStatus" class="inline-flex items-center gap-1">
+                                            <x-heroicon-o-information-circle class="h-3 w-3" />
+                                            {{ __('Status') }}
+                                        </span>
+                                        <span wire:loading wire:target="showCacheInstanceStatus" class="inline-flex items-center gap-1">
+                                            <x-spinner variant="forest" />
+                                            {{ __('Loading…') }}
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="showCacheInstanceLogs('{{ $engine }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="showCacheInstanceStatus,showCacheInstanceLogs"
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
+                                        title="{{ __('Open journalctl tail for this instance') }}"
+                                    >
+                                        <span wire:loading.remove wire:target="showCacheInstanceLogs" class="inline-flex items-center gap-1">
+                                            <x-heroicon-o-document-text class="h-3 w-3" />
+                                            {{ __('Logs') }}
+                                        </span>
+                                        <span wire:loading wire:target="showCacheInstanceLogs" class="inline-flex items-center gap-1">
+                                            <x-spinner variant="forest" />
+                                            {{ __('Loading…') }}
+                                        </span>
+                                    </button>
                                 </dd>
                             </div>
                             <div>
@@ -1467,6 +1507,119 @@
             </div>
         </x-server-workspace-tab-panel>
         </div>
+
+        {{-- Per-instance Status / Logs modal. Shows `systemctl status <unit>` or
+             `journalctl -u <unit> -n 200` for the currently-active instance
+             without leaving the workspace. The unit name is resolved server-
+             side by CacheServiceInstallScripts::instanceServiceUnit() so
+             default and named instances both target the right systemd unit. --}}
+        @if ($showCacheStatusModal)
+            <div
+                class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center sm:p-6"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cache-status-modal-heading"
+            >
+                <div class="fixed inset-0 bg-brand-ink/40 backdrop-blur-[1px]" wire:click="closeCacheStatusModal"></div>
+                <div class="relative z-10 max-h-[min(92vh,52rem)] w-full max-w-[min(96vw,72rem)] overflow-y-auto overscroll-contain dply-modal-panel [-webkit-overflow-scrolling:touch]">
+                    <div class="sticky top-0 z-[1] flex flex-col gap-3 border-b border-brand-ink/10 bg-white px-4 py-4 sm:px-6 sm:py-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex min-w-0 items-start gap-3">
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10">
+                                    @if ($cacheStatusModalView === 'logs')
+                                        <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
+                                    @else
+                                        <x-heroicon-o-information-circle class="h-4 w-4" aria-hidden="true" />
+                                    @endif
+                                </span>
+                                <div class="min-w-0">
+                                    <h2 id="cache-status-modal-heading" class="text-base font-semibold text-brand-ink">
+                                        {{ $cacheStatusModalView === 'logs'
+                                            ? __(':engine instance logs', ['engine' => $engineLabels[$cacheStatusModalEngine] ?? $cacheStatusModalEngine])
+                                            : __(':engine instance status', ['engine' => $engineLabels[$cacheStatusModalEngine] ?? $cacheStatusModalEngine]) }}
+                                    </h2>
+                                    <p class="mt-0.5 font-mono text-xs text-brand-moss break-all">
+                                        {{ $cacheStatusModalInstance }} · {{ $cacheStatusModalUnit }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    wire:click="refreshCacheStatusModal"
+                                    wire:loading.attr="disabled"
+                                    wire:target="refreshCacheStatusModal,setCacheStatusModalView"
+                                    @disabled($cacheStatusModalLoading)
+                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-2 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
+                                >
+                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="refreshCacheStatusModal,setCacheStatusModalView" />
+                                    <span wire:loading.remove wire:target="refreshCacheStatusModal,setCacheStatusModalView">{{ __('Refresh') }}</span>
+                                    <span wire:loading wire:target="refreshCacheStatusModal,setCacheStatusModalView">{{ __('Working…') }}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="closeCacheStatusModal"
+                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-2 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                >
+                                    {{ __('Close') }}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 text-[11px] font-medium">
+                            <button
+                                type="button"
+                                wire:click="setCacheStatusModalView('status')"
+                                @disabled($cacheStatusModalLoading)
+                                @class([
+                                    'inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 disabled:opacity-50',
+                                    'bg-brand-forest text-white' => $cacheStatusModalView === 'status',
+                                    'bg-white text-brand-moss border border-brand-ink/15 hover:bg-brand-sand/40' => $cacheStatusModalView !== 'status',
+                                ])
+                            >
+                                <x-heroicon-o-information-circle class="h-3 w-3" />
+                                {{ __('Status') }}
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="setCacheStatusModalView('logs')"
+                                @disabled($cacheStatusModalLoading)
+                                @class([
+                                    'inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 disabled:opacity-50',
+                                    'bg-brand-forest text-white' => $cacheStatusModalView === 'logs',
+                                    'bg-white text-brand-moss border border-brand-ink/15 hover:bg-brand-sand/40' => $cacheStatusModalView !== 'logs',
+                                ])
+                            >
+                                <x-heroicon-o-document-text class="h-3 w-3" />
+                                {{ __('Logs') }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="px-4 py-4 sm:px-6 sm:py-5">
+                        @if ($cacheStatusModalLoading)
+                            <p class="text-xs font-medium text-brand-ink">
+                                {{ $cacheStatusModalView === 'logs' ? __('Fetching journalctl logs…') : __('Fetching systemctl status…') }}
+                            </p>
+                            <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('This can take a few seconds over SSH.') }}</p>
+                        @endif
+                        @if ($cacheStatusModalError)
+                            <div class="mb-3 rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs text-red-900 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $cacheStatusModalError }}</div>
+                        @endif
+                        @if ($cacheStatusModalOutput !== '')
+                            <div class="rounded-xl border border-brand-ink/15 bg-zinc-50 p-3 shadow-inner">
+                                <div class="mb-2 flex items-center justify-between gap-3">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-ink">
+                                        {{ $cacheStatusModalView === 'logs' ? __('journalctl -u') : __('systemctl status') }}
+                                    </p>
+                                </div>
+                                <pre class="font-mono text-[11px] leading-snug whitespace-pre-wrap break-words text-zinc-900 [overflow-wrap:anywhere]">{{ $cacheStatusModalOutput }}</pre>
+                            </div>
+                        @elseif (! $cacheStatusModalLoading && $cacheStatusModalError === null)
+                            <p class="text-xs text-brand-moss">{{ __('No output yet. Choose Refresh.') }}</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
     @else
         <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
             {{ __('Provisioning and SSH must be ready before you can use this section.') }}

@@ -130,6 +130,8 @@
                                 <option value="laravel-octane">{{ __('Laravel Octane') }}</option>
                                 <option value="nodejs">{{ __('Node.js process') }}</option>
                                 <option value="sidekiq">{{ __('Sidekiq (Ruby)') }}</option>
+                                <option value="solid-queue">{{ __('Solid Queue (Rails 8)') }}</option>
+                                <option value="action-cable">{{ __('Action Cable (Rails websockets)') }}</option>
                             </select>
                         </div>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Selecting a preset fills the form below — you can still tweak anything before saving.') }}</p>
@@ -558,7 +560,7 @@
                                     default => 'bg-brand-sand text-brand-moss ring-brand-ink/10',
                                 };
                             @endphp
-                            <li class="relative flex flex-col sm:flex-row">
+                            <li id="program-{{ $sp->id }}" class="relative flex flex-col scroll-mt-24 sm:flex-row">
                                 <span
                                     @class([
                                         'absolute bottom-0 left-0 top-0 w-1',

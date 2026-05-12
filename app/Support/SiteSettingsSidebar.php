@@ -133,10 +133,15 @@ final class SiteSettingsSidebar
      */
     private static function insertBackgroundGroup(array $items): array
     {
+        // The Schedule and Backups items navigate to the server-level pages — they're
+        // provided here as a convenience entry point. The cron / daemons / queue-workers
+        // items above use site-scoped routes (same component, site context bound).
         $background = [
             ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
+            ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'servers.schedule', 'route_params' => 'server_only'],
             ['id' => 'daemons', 'label' => __('Daemons'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             ['id' => 'queue-workers', 'label' => __('Queue workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.queue-workers'],
+            ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'servers.backups', 'route_params' => 'server_only'],
         ];
 
         $insertIndex = null;

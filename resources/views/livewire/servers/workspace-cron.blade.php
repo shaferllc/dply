@@ -586,7 +586,7 @@
                             $iconBtn = 'inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-ink/70 transition-colors hover:bg-brand-sand/60 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-40';
                             $hasInvalidExpression = isset($invalidIds[$cj->id]);
                         @endphp
-                        <li class="group relative flex items-start gap-3 py-3 pl-5 pr-3 transition-colors hover:bg-brand-sand/15 sm:gap-4 sm:pl-6 sm:pr-4">
+                        <li id="cron-{{ $cj->id }}" class="group relative flex scroll-mt-24 items-start gap-3 py-3 pl-5 pr-3 transition-colors hover:bg-brand-sand/15 sm:gap-4 sm:pl-6 sm:pr-4">
                             <span
                                 @class([
                                     'absolute bottom-0 left-0 top-0 w-1',

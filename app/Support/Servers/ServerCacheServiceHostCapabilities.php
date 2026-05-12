@@ -143,6 +143,109 @@ class ServerCacheServiceHostCapabilities
     }
 
     /**
+     * Probe and cache the host's distro ID + codename from `/etc/os-release`. Used by the
+     * workspace to gate the Install button for engines whose upstream package isn't published
+     * for the host's distro (e.g. KeyDB on noble, Dragonfly on focal).
+     *
+     * Cached for a full day — codename doesn't change for the lifetime of a server. The probe
+     * uses one cheap SSH round-trip; failure returns null (no gating, fall back to the install
+     * script's own distro check which produces an actionable error if anything sneaks through).
+     *
+     * @return array{id: string, codename: string}|null
+     */
+    public function distroInfo(Server $server): ?array
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return null;
+        }
+
+        $ttl = max(0, (int) config('server_cache.distro_cache_ttl_seconds', 86_400));
+        $key = 'server.'.$server->id.'.cache_service_distro_v1';
+
+        $resolve = function () use ($server): ?array {
+            try {
+                $out = $this->runner->run(
+                    $server,
+                    fn ($ssh): string => $ssh->exec(
+                        "bash -lc '. /etc/os-release && echo \"\${ID:-}|\${VERSION_CODENAME:-}\"'",
+                        30,
+                    ),
+                    useRoot: (bool) config('server_database.use_root_ssh', true),
+                    fallbackToDeploy: (bool) config('server_database.fallback_to_deploy_user_ssh', true),
+                );
+            } catch (\Throwable) {
+                return null;
+            }
+
+            $parts = explode('|', trim($out), 2);
+            $id = strtolower(trim($parts[0] ?? ''));
+            $codename = strtolower(trim($parts[1] ?? ''));
+
+            // Treat empty fields as failure — caching `['id' => '', 'codename' => '']` for a day
+            // would lock us into "unknown distro" until forget() runs.
+            if ($id === '' || $codename === '') {
+                return null;
+            }
+
+            return ['id' => $id, 'codename' => $codename];
+        };
+
+        if ($ttl === 0) {
+            return $resolve();
+        }
+
+        return Cache::remember($key, $ttl, $resolve);
+    }
+
+    public function forgetDistro(Server $server): void
+    {
+        Cache::forget('server.'.$server->id.'.cache_service_distro_v1');
+    }
+
+    /**
+     * Return a human-readable reason why an engine can't be auto-installed on this server, or
+     * null when it's fine. The whitelist comes from
+     * {@see CacheServiceInstallScripts::supportedDistroCodenames()} so the UI gate and the
+     * install script speak the same vocabulary. Returns null on probe failure so the UI doesn't
+     * grey out everything when SSH is flaky — the install script's own check is the final word.
+     */
+    public function engineUnsupportedReason(Server $server, string $engine): ?string
+    {
+        $whitelist = CacheServiceInstallScripts::supportedDistroCodenames($engine);
+        if ($whitelist === null) {
+            return null;
+        }
+
+        $info = $this->distroInfo($server);
+        if ($info === null) {
+            return null;
+        }
+
+        if (in_array($info['codename'], $whitelist, true)) {
+            return null;
+        }
+
+        return match ($engine) {
+            'keydb' => sprintf(
+                'KeyDB upstream doesn\'t ship for %s %s. Use Ubuntu 20.04/22.04 or Debian 11/12, or pick Valkey/Redis on this host.',
+                $info['id'],
+                $info['codename'],
+            ),
+            'dragonfly' => sprintf(
+                'Dragonfly\'s .deb doesn\'t resolve on %s %s. Use Ubuntu 22.04/24.04 or Debian 12.',
+                $info['id'],
+                $info['codename'],
+            ),
+            default => sprintf(
+                '%s isn\'t supported on %s %s.',
+                $engine,
+                $info['id'],
+                $info['codename'],
+            ),
+        };
+    }
+
+    /**
      * @return array{redis: bool, valkey: bool, memcached: bool, keydb: bool, dragonfly: bool}
      */
     protected function emptyResult(): array

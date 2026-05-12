@@ -77,33 +77,169 @@ if ! command -v memcached >/dev/null 2>&1; then
 fi
 command -v memcached >/dev/null 2>&1 || { echo "ERROR: memcached binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
 BASH,
-            'keydb' => <<<'BASH'
+            'keydb' => self::keydbInstallPackageScript(),
+            'dragonfly' => self::dragonflyInstallPackageScript(
+                (string) config('server_cache.dragonfly_version', 'v1.38.1')
+            ),
+            default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
+        };
+    }
+
+    /**
+     * Codenames the auto-bootstrap install path supports for each engine. Returned as a list of
+     * `/etc/os-release` $VERSION_CODENAME values; `null` means "universally available, no
+     * distro-specific bootstrap needed" (redis, memcached). The bash scripts that consume this
+     * (keydb, dragonfly) emit the same whitelist inline — keep the two in sync so the UI gate and
+     * the install script tell the operator the same story.
+     *
+     * KeyDB: upstream apt repo at download.keydb.dev only publishes through Ubuntu jammy / Debian
+     * bookworm; noble (Ubuntu 24.04) and trixie are not in their dists/ tree as of writing. Project
+     * has effectively been frozen since the team got acquired, so don't expect newer codenames.
+     *
+     * Dragonfly: GitHub-release .debs link against a recent enough glibc that focal/bullseye reject
+     * them; jammy/noble/bookworm work in practice.
+     *
+     * @return list<string>|null
+     */
+    public static function supportedDistroCodenames(string $engine): ?array
+    {
+        return match ($engine) {
+            'redis', 'memcached', 'valkey' => null,
+            'keydb' => ['focal', 'jammy', 'bullseye', 'bookworm'],
+            'dragonfly' => ['jammy', 'noble', 'bookworm'],
+            default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
+        };
+    }
+
+    /**
+     * Idempotent KeyDB install: source the host's /etc/os-release, refuse on codenames KeyDB
+     * upstream doesn't ship for (no auto-install on noble/trixie — there's literally no package),
+     * drop the upstream keyring under /etc/apt/keyrings/ with a signed-by= sources line, then
+     * apt install. Repeat-runs are no-ops because of the `command -v keydb-server` short-circuit
+     * + the keyring/sources file existence checks.
+     */
+    private static function keydbInstallPackageScript(): string
+    {
+        // Heredoc-quoted (BASH) so PHP doesn't interpolate `$` — every `$` below is shell.
+        return <<<'BASH'
 if ! command -v keydb-server >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
+
+    # Distro whitelist — KeyDB's repo (download.keydb.dev/open-source-dist) only publishes for
+    # focal/jammy/bullseye/bookworm. On anything else (notably Ubuntu 24.04 noble) there is no
+    # upstream package, so bail with a message the operator can act on instead of running apt
+    # against a 404'd dist tree.
+    . /etc/os-release
+    codename="${VERSION_CODENAME:-}"
+    case "$codename" in
+        focal|jammy|bullseye|bookworm) ;;
+        *)
+            echo "ERROR: KeyDB upstream doesn't ship for ${ID:-unknown} ${codename:-unknown}. Supported: Ubuntu 20.04/22.04 or Debian 11/12. Pick Valkey or Redis on this host, or use an older base image." >&2
+            exit 1
+            ;;
+    esac
+
+    # Tooling we need to add the upstream APT source. ca-certificates handles the https hop.
+    need_install=""
+    command -v curl >/dev/null 2>&1 || need_install="$need_install curl"
+    dpkg -s ca-certificates >/dev/null 2>&1 || need_install="$need_install ca-certificates"
+    if [ -n "$need_install" ]; then
+        apt-get update -y
+        apt-get install -y $need_install
+    fi
+
+    # Drop the upstream keyring. KeyDB ships it as binary-format OpenPGP already, so no `gpg
+    # --dearmor` step — write it straight under /etc/apt/keyrings/ (modern signed-by location).
+    install -m 0755 -d /etc/apt/keyrings
+    if [ ! -s /etc/apt/keyrings/keydb.gpg ]; then
+        curl -fsSL https://download.keydb.dev/open-source-dist/keyring.gpg \
+            -o /etc/apt/keyrings/keydb.gpg
+        chmod 0644 /etc/apt/keyrings/keydb.gpg
+    fi
+
+    # signed-by= pins the source to THIS keyring only (so a compromised separate key can't sign
+    # packages for this repo). Codename is whatever the host actually runs.
+    if [ ! -f /etc/apt/sources.list.d/keydb.list ]; then
+        echo "deb [signed-by=/etc/apt/keyrings/keydb.gpg] https://download.keydb.dev/open-source-dist $codename main" \
+            > /etc/apt/sources.list.d/keydb.list
+    fi
+
     apt-get update -y
     if ! { apt-get install -y keydb-server || apt-get install -y keydb; }; then
-        echo "ERROR: Could not install KeyDB — neither 'keydb-server' nor 'keydb' is in the configured APT repositories. Add the upstream KeyDB APT source per https://docs.keydb.dev/docs/build/ (or 'add-apt-repository ppa:eq-alpha-technology/keydb' on Ubuntu) and retry." >&2
+        echo "ERROR: apt couldn't install KeyDB after adding the upstream APT source. Check 'apt-cache policy keydb-server keydb' on the host." >&2
         exit 1
     fi
 fi
 command -v keydb-server >/dev/null 2>&1 || { echo "ERROR: keydb-server binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
-BASH,
-            'dragonfly' => <<<'BASH'
-export DEBIAN_FRONTEND=noninteractive
-# Dragonfly ships its own .deb; install via the upstream APT source if present, else fail loudly.
+BASH;
+    }
+
+    /**
+     * Idempotent Dragonfly install: Dragonfly has no upstream apt repo, just `.deb` artifacts on
+     * each GitHub release. Distro-gate first (the binaries link against a recent-enough glibc that
+     * older distros reject them), arch-gate (only amd64/arm64 are published), then download the
+     * pinned-version .deb and `dpkg -i` it. Version is supplied at script-build time so callers
+     * can pin via config — defaulting to a tag we've validated against the supported codenames.
+     */
+    private static function dragonflyInstallPackageScript(string $version): string
+    {
+        // Tag conventionally prefixed with `v` (e.g. `v1.38.1`); accept either form from config.
+        $tag = str_starts_with($version, 'v') ? $version : 'v'.$version;
+        // No risk of '/' / spaces in a release tag, but escape for the URL anyway.
+        $tagShell = escapeshellarg($tag);
+
+        return <<<BASH
 if ! command -v dragonfly >/dev/null 2>&1; then
-    if [ -f /etc/apt/sources.list.d/dragonflydb.list ]; then
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Distro whitelist — Dragonfly's .deb is built against a glibc/openssl that resolves on
+    # jammy/noble/bookworm. focal/bullseye reject the deps. Newer codenames not yet validated.
+    . /etc/os-release
+    codename="\${VERSION_CODENAME:-}"
+    case "\$codename" in
+        jammy|noble|bookworm) ;;
+        *)
+            echo "ERROR: Dragonfly doesn't ship a .deb that resolves on \${ID:-unknown} \${codename:-unknown}. Supported: Ubuntu 22.04/24.04 or Debian 12." >&2
+            exit 1
+            ;;
+    esac
+
+    arch="\$(dpkg --print-architecture)"
+    case "\$arch" in
+        amd64|arm64) ;;
+        *)
+            echo "ERROR: Dragonfly only publishes .deb for amd64/arm64; this host is \$arch." >&2
+            exit 1
+            ;;
+    esac
+
+    need_install=""
+    command -v curl >/dev/null 2>&1 || need_install="\$need_install curl"
+    dpkg -s ca-certificates >/dev/null 2>&1 || need_install="\$need_install ca-certificates"
+    if [ -n "\$need_install" ]; then
         apt-get update -y
-        apt-get install -y dragonfly
-    else
-        echo "Dragonfly APT source not configured (/etc/apt/sources.list.d/dragonflydb.list missing). Add the upstream repo per https://www.dragonflydb.io/docs/getting-started/install#debianubuntu and retry." >&2
+        apt-get install -y \$need_install
+    fi
+
+    tag={$tagShell}
+    url="https://github.com/dragonflydb/dragonfly/releases/download/\${tag}/dragonfly_\${arch}.deb"
+    tmp="\$(mktemp --suffix=.deb)"
+    trap 'rm -f "\$tmp"' EXIT
+
+    if ! curl -fsSL "\$url" -o "\$tmp"; then
+        echo "ERROR: Dragonfly .deb download failed: \$url" >&2
         exit 1
     fi
+
+    # dpkg -i often fails the first time on missing deps; `apt-get install -f` resolves them, then
+    # a second dpkg -i finishes the install. This is the standard pattern for github-released .debs.
+    if ! dpkg -i "\$tmp"; then
+        apt-get install -f -y
+        dpkg -i "\$tmp"
+    fi
 fi
-command -v dragonfly >/dev/null 2>&1 || { echo "ERROR: dragonfly binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
-BASH,
-            default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
-        };
+command -v dragonfly >/dev/null 2>&1 || { echo "ERROR: dragonfly binary not on PATH after install — the .deb may have rejected this host's dependencies." >&2; exit 1; }
+BASH;
     }
 
     /**

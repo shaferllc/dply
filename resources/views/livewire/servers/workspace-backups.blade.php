@@ -22,6 +22,9 @@
 
     <x-explainer class="mb-4">
         <p>{{ __('“Run now” creates a pending backup row and queues the export job — progress shows up in the lists below as the job completes. Schedules add a managed cron entry that fires the same job on the cadence you set.') }}</p>
+        @if ($backupConfigurations->isEmpty())
+            <p class="mt-2">{{ __('Backups currently write to the local disk. To send them to S3 / Dropbox / Google Drive / SFTP, ') }}<a href="{{ route('profile.backup-configurations') }}" wire:navigate class="font-semibold text-brand-ink underline">{{ __('add a backup destination') }}</a>{{ __(' first.') }}</p>
+        @endif
     </x-explainer>
 
     {{-- Run now -------------------------------------------------------------------- --}}
@@ -122,7 +125,7 @@
                                     <span class="font-mono normal-case tracking-normal">{{ $schedule->cron_expression }}</span>
                                     @if (! $schedule->is_active)
                                         <span>·</span>
-                                        <span class="text-amber-700">{{ __('inactive') }}</span>
+                                        <span class="text-amber-700">{{ __('paused') }}</span>
                                     @endif
                                     @if ($schedule->last_run_at)
                                         <span>·</span>
@@ -130,9 +133,14 @@
                                     @endif
                                 </p>
                             </div>
-                            <button type="button" wire:click="deleteSchedule('{{ $schedule->id }}')" wire:confirm="{{ __('Remove this backup schedule?') }}" class="{{ $btnDangerSm }}">
-                                {{ __('Remove') }}
-                            </button>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <button type="button" wire:click="toggleSchedule('{{ $schedule->id }}')" class="{{ $btnSecondary }}">
+                                    {{ $schedule->is_active ? __('Pause') : __('Resume') }}
+                                </button>
+                                <button type="button" wire:click="deleteSchedule('{{ $schedule->id }}')" wire:confirm="{{ __('Remove this backup schedule?') }}" class="{{ $btnDangerSm }}">
+                                    {{ __('Remove') }}
+                                </button>
+                            </div>
                         </li>
                     @endforeach
                 </ul>
@@ -159,7 +167,17 @@
                                     <p class="mt-1 truncate text-xs text-red-700">{{ $backup->error_message }}</p>
                                 @endif
                             </div>
-                            <p class="shrink-0 text-xs text-brand-mist">{{ $backup->created_at?->diffForHumans() }}</p>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <p class="text-xs text-brand-mist">{{ $backup->created_at?->diffForHumans() }}</p>
+                                @if ($backup->status === 'completed' && ! empty($backup->disk_path))
+                                    <button type="button" wire:click="downloadDatabaseBackup('{{ $backup->id }}')" class="{{ $btnSecondary }}">
+                                        {{ __('Download') }}
+                                    </button>
+                                @endif
+                                <button type="button" wire:click="deleteDatabaseBackup('{{ $backup->id }}')" wire:confirm="{{ __('Delete this backup?') }}" class="{{ $btnDangerSm }}">
+                                    {{ __('Delete') }}
+                                </button>
+                            </div>
                         </li>
                     @endforeach
                 </ul>
@@ -183,11 +201,26 @@
                                     <p class="mt-1 truncate text-xs text-red-700">{{ $backup->error_message }}</p>
                                 @endif
                             </div>
-                            <p class="shrink-0 text-xs text-brand-mist">{{ $backup->created_at?->diffForHumans() }}</p>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <p class="text-xs text-brand-mist">{{ $backup->created_at?->diffForHumans() }}</p>
+                                @if ($backup->status === 'completed' && ! empty($backup->disk_path))
+                                    <button type="button" wire:click="downloadFileBackup('{{ $backup->id }}')" class="{{ $btnSecondary }}">
+                                        {{ __('Download') }}
+                                    </button>
+                                @endif
+                                <button type="button" wire:click="deleteFileBackup('{{ $backup->id }}')" wire:confirm="{{ __('Delete this backup?') }}" class="{{ $btnDangerSm }}">
+                                    {{ __('Delete') }}
+                                </button>
+                            </div>
                         </li>
                     @endforeach
                 </ul>
             @endif
         </div>
     </section>
+
+    {{-- Lightweight refresh so pending → completed transitions show without manual reload. --}}
+    @if ($databaseBackups->where('status', 'pending')->isNotEmpty() || $fileBackups->where('status', 'pending')->isNotEmpty())
+        <div wire:poll.10s="$refresh" class="hidden" aria-hidden="true"></div>
+    @endif
 </x-server-workspace-layout>

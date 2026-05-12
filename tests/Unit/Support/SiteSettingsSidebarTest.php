@@ -108,5 +108,50 @@ class SiteSettingsSidebarTest extends TestCase
 
         $this->assertSame('sites.cron', $items['cron']['route'] ?? null);
         $this->assertSame('sites.daemons', $items['daemons']['route'] ?? null);
+        $this->assertSame('sites.queue-workers', $items['queue-workers']['route'] ?? null);
+    }
+
+    public function test_background_includes_schedule_and_backups_pointing_to_server_routes(): void
+    {
+        $server = $this->makeVmServer();
+        $site = $this->makeSite($server);
+
+        $items = collect(SiteSettingsSidebar::items($site, $server))->keyBy('id');
+
+        $this->assertSame('servers.schedule', $items['schedule']['route'] ?? null);
+        $this->assertSame('server_only', $items['schedule']['route_params'] ?? null);
+        $this->assertSame('servers.backups', $items['backups']['route'] ?? null);
+        $this->assertSame('server_only', $items['backups']['route_params'] ?? null);
+    }
+
+    public function test_rails_stack_item_is_hidden_when_rails_not_detected(): void
+    {
+        $server = $this->makeVmServer();
+        $site = $this->makeSite($server);
+
+        $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+        $this->assertNotContains('rails-stack', $ids);
+    }
+
+    public function test_rails_stack_item_appears_when_rails_detected(): void
+    {
+        $server = $this->makeVmServer();
+        $site = $this->makeSite($server);
+        // Inject the runtime detection blob the helper reads from. resolvedRuntimeAppDetection()
+        // looks at the site's `meta` for a cached detection — simplest path is to override the
+        // method via an anonymous-class subclass that returns a Rails framework signal.
+        $site = new class extends \App\Models\Site
+        {
+            public function isRailsFrameworkDetected(): bool
+            {
+                return true;
+            }
+        };
+        $site->setRelation('server', $server);
+        $site->server_id = $server->id;
+        $site->runtime = 'ruby';
+
+        $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+        $this->assertContains('rails-stack', $ids);
     }
 }

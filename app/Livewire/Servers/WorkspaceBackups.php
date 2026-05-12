@@ -16,8 +16,11 @@ use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Server-scoped backups workspace: surfaces existing {@see ServerDatabaseBackup}
@@ -145,11 +148,14 @@ class WorkspaceBackups extends Component
             'is_active' => true,
         ]);
 
+        // The cron entry runs the dply control-plane artisan command (this dply install),
+        // not anything on the remote server — so user defaults to root and host is irrelevant
+        // for execution. We just need a stable record so the schedule can be edited/disabled.
         $cronJob = ServerCronJob::create([
             'server_id' => $this->server->id,
             'cron_expression' => $this->new_cron_expression,
             'command' => 'php '.base_path('artisan').' dply:run-backup-schedule '.$schedule->id,
-            'user' => 'dply',
+            'user' => 'root',
             'enabled' => true,
             'description' => 'Backup schedule '.$schedule->id,
             'system_managed' => true,
@@ -160,6 +166,61 @@ class WorkspaceBackups extends Component
         $this->reset(['new_target_id', 'new_backup_configuration_id']);
         $this->new_cron_expression = '0 3 * * *';
         $this->toastSuccess(__('Backup schedule added.'));
+    }
+
+    public function downloadDatabaseBackup(string $backupId): StreamedResponse|Response|null
+    {
+        $this->authorize('update', $this->server);
+        $backup = ServerDatabaseBackup::query()
+            ->whereKey($backupId)
+            ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
+            ->with('serverDatabase')
+            ->firstOrFail();
+
+        if ($backup->status !== ServerDatabaseBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
+            $this->toastError(__('Backup is not ready yet.'));
+
+            return null;
+        }
+
+        $disk = Storage::disk(config('server_database.backup_disk', 'local'));
+        if (! $disk->exists($backup->disk_path)) {
+            $this->toastError(__('Backup file is missing from storage.'));
+
+            return null;
+        }
+
+        $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
+        $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
+
+        return $disk->download($backup->disk_path, $filename);
+    }
+
+    public function downloadFileBackup(string $backupId): StreamedResponse|Response|null
+    {
+        $this->authorize('update', $this->server);
+        $backup = SiteFileBackup::query()
+            ->whereKey($backupId)
+            ->whereHas('site', fn ($q) => $q->where('server_id', $this->server->id))
+            ->with('site')
+            ->firstOrFail();
+
+        if ($backup->status !== SiteFileBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
+            $this->toastError(__('Backup is not ready yet.'));
+
+            return null;
+        }
+
+        if (! Storage::disk('local')->exists($backup->disk_path)) {
+            $this->toastError(__('Backup file is missing from storage.'));
+
+            return null;
+        }
+
+        $slug = $backup->site?->slug;
+        $name = 'site-files-'.(($slug !== null && $slug !== '') ? $slug : 'site').'-'.$backup->id.'.tar.gz';
+
+        return Storage::disk('local')->download($backup->disk_path, $name);
     }
 
     public function deleteSchedule(string $scheduleId): void
@@ -179,6 +240,72 @@ class WorkspaceBackups extends Component
         }
         $schedule->delete();
         $this->toastSuccess(__('Backup schedule removed.'));
+    }
+
+    /**
+     * Pause/resume a schedule by flipping is_active on both the schedule row and the
+     * backing cron entry. The cron line stays in place so resume is one click.
+     */
+    public function toggleSchedule(string $scheduleId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $schedule = ServerBackupSchedule::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($scheduleId)
+            ->first();
+        if ($schedule === null) {
+            return;
+        }
+
+        $newActive = ! $schedule->is_active;
+        $schedule->update(['is_active' => $newActive]);
+        if ($schedule->server_cron_job_id) {
+            ServerCronJob::query()->whereKey($schedule->server_cron_job_id)->update(['enabled' => $newActive]);
+        }
+
+        $this->toastSuccess($newActive ? __('Schedule resumed.') : __('Schedule paused.'));
+    }
+
+    public function deleteDatabaseBackup(string $backupId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $backup = ServerDatabaseBackup::query()
+            ->whereKey($backupId)
+            ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
+            ->first();
+        if ($backup === null) {
+            return;
+        }
+
+        if (! empty($backup->disk_path)) {
+            $disk = Storage::disk(config('server_database.backup_disk', 'local'));
+            if ($disk->exists($backup->disk_path)) {
+                $disk->delete($backup->disk_path);
+            }
+        }
+        $backup->delete();
+        $this->toastSuccess(__('Backup deleted.'));
+    }
+
+    public function deleteFileBackup(string $backupId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $backup = SiteFileBackup::query()
+            ->whereKey($backupId)
+            ->whereHas('site', fn ($q) => $q->where('server_id', $this->server->id))
+            ->first();
+        if ($backup === null) {
+            return;
+        }
+
+        if (! empty($backup->disk_path) && Storage::disk('local')->exists($backup->disk_path)) {
+            Storage::disk('local')->delete($backup->disk_path);
+        }
+        $backup->delete();
+        $this->toastSuccess(__('Backup deleted.'));
     }
 
     public function render(): View

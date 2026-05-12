@@ -7,6 +7,7 @@ namespace Tests\Feature\Servers;
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Servers\WorkspaceBackups;
+use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceSchedule;
 use App\Livewire\Sites\SiteQueueWorkers;
@@ -14,11 +15,17 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
+use App\Models\ServerProvisionArtifact;
+use App\Models\ServerProvisionRun;
+use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
+use App\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
+use App\Support\Servers\ServerInstalledServices;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -150,6 +157,8 @@ class BackgroundWorkspacePagesTest extends TestCase
         $database = $server->serverDatabases()->create([
             'name' => 'app',
             'engine' => 'postgres',
+            'username' => '',
+            'password' => '',
         ]);
 
         Livewire::actingAs($user)
@@ -200,6 +209,214 @@ class BackgroundWorkspacePagesTest extends TestCase
 
         $this->assertNull(ServerBackupSchedule::find($schedule->id));
         $this->assertNull(ServerCronJob::find($cronId));
+    }
+
+    public function test_queue_workers_route_renders_via_http(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        // Mark supervisor as installed so the `requires_any_tags: ['supervisor']` middleware lets us through.
+        $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+
+        $this->actingAs($user)
+            ->get(route('servers.queue-workers', $server))
+            ->assertOk()
+            ->assertSee('Queue workers', false)
+            ->assertSee('Active workers', false)
+            ->assertSee('Add a worker', false);
+    }
+
+    public function test_schedule_route_renders_via_http(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+
+        $this->actingAs($user)
+            ->get(route('servers.schedule', $server))
+            ->assertOk()
+            ->assertSee('Schedule', false)
+            ->assertSee('Cron-driven schedulers', false);
+    }
+
+    public function test_backups_route_renders_via_http(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+
+        $this->actingAs($user)
+            ->get(route('servers.backups', $server))
+            ->assertOk()
+            ->assertSee('Backups', false)
+            ->assertSee('Recent database backups', false);
+    }
+
+    public function test_site_queue_workers_route_renders_via_http(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sites.queue-workers', ['server' => $server, 'site' => $site]))
+            ->assertOk()
+            ->assertSee('Queue workers', false)
+            ->assertSee($site->name, false);
+    }
+
+    /** Helper: install a stack_summary artifact so ServerInstalledServices stops failing-open. */
+    private function setExpectedServices(Server $server, array $services): void
+    {
+        $run = ServerProvisionRun::create([
+            'server_id' => $server->id,
+            'attempt' => 1,
+            'status' => 'completed',
+        ]);
+        ServerProvisionArtifact::create([
+            'server_provision_run_id' => $run->id,
+            'type' => 'stack_summary',
+            'key' => 'stack_summary',
+            'label' => 'stack summary',
+            'metadata' => ['expected_services' => $services],
+        ]);
+        ServerInstalledServices::flushCaches();
+    }
+
+    public function test_backups_route_404s_when_no_database_tag_present(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        // Stack summary explicitly says no database service is installed — gating should fire.
+        $this->setExpectedServices($server, ['nginx', 'php-fpm']);
+
+        $this->actingAs($user)
+            ->get(route('servers.backups', $server))
+            ->assertNotFound();
+    }
+
+    public function test_queue_workers_route_404s_when_supervisor_missing(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $this->setExpectedServices($server, ['nginx', 'php-fpm']);
+
+        $this->actingAs($user)
+            ->get(route('servers.queue-workers', $server))
+            ->assertNotFound();
+    }
+
+    public function test_backups_route_denied_for_user_outside_organization(): void
+    {
+        $owner = $this->actingOrgUser();
+        $server = $this->readyServer($owner);
+
+        // Outsider has their own org and isn't a member of $owner's org.
+        $outsider = User::factory()->create();
+        $outsiderOrg = Organization::factory()->create();
+        $outsiderOrg->users()->attach($outsider->id, ['role' => 'owner']);
+        session(['current_organization_id' => $outsiderOrg->id]);
+
+        // mount() authorizes 'view' on the server — outsider can't even render.
+        $this->actingAs($outsider)
+            ->get(route('servers.backups', $server))
+            ->assertForbidden();
+    }
+
+    public function test_download_database_backup_returns_file_response_when_completed(): void
+    {
+        Storage::fake('local');
+
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        Storage::disk('local')->put('backup.sql', "-- dump --\n");
+        $backup = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'user_id' => $user->id,
+            'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+            'disk_path' => 'backup.sql',
+        ]);
+
+        // Drive the action directly so we can assert on the returned Symfony response.
+        $this->actingAs($user);
+        $component = new WorkspaceBackups;
+        $component->mount($server);
+        $response = $component->downloadDatabaseBackup($backup->id);
+
+        $this->assertNotNull($response);
+        $this->assertSame(200, $response->getStatusCode());
+        $disposition = $response->headers->get('Content-Disposition') ?? '';
+        $this->assertStringContainsString('app-'.$backup->id.'.sql', $disposition);
+    }
+
+    public function test_download_database_backup_short_circuits_when_pending(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $backup = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'user_id' => $user->id,
+            'status' => ServerDatabaseBackup::STATUS_PENDING,
+        ]);
+
+        // Pending → toast error, no download response.
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('downloadDatabaseBackup', $backup->id);
+
+        $this->assertNull(ServerDatabaseBackup::find($backup->id)->disk_path);
+    }
+
+    public function test_empty_state_explainer_links_to_backup_configurations(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+
+        $this->actingAs($user)
+            ->get(route('servers.backups', $server))
+            ->assertOk()
+            ->assertSee('add a backup destination', false)
+            ->assertSee(route('profile.backup-configurations'), false);
+    }
+
+    public function test_solid_queue_preset_fills_daemons_form(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceDaemons::class, ['server' => $server])
+            ->call('applySupervisorPreset', 'solid-queue')
+            ->assertSet('new_sv_slug', 'solid-queue')
+            ->assertSet('new_sv_command', 'bin/jobs');
+    }
+
+    public function test_action_cable_preset_fills_daemons_form(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceDaemons::class, ['server' => $server])
+            ->call('applySupervisorPreset', 'action-cable')
+            ->assertSet('new_sv_slug', 'action-cable')
+            ->assertSet('new_sv_command', 'bundle exec puma -p 28080 cable/config.ru');
     }
 
     public function test_site_queue_workers_page_scopes_to_site(): void

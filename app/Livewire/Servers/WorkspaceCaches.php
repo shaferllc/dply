@@ -196,6 +196,30 @@ class WorkspaceCaches extends Component
      */
     public ?array $monitorPayload = null;
 
+    /**
+     * Status/Logs modal for the active cache instance. Lets operators inspect a
+     * specific instance's systemd state without dropping to SSH. Mirrors the
+     * shape of the Services workspace status modal, but scoped to caches so we
+     * don't drag in the unrelated state of `ManagesServerSystemdServices`.
+     * Properties are cache-prefixed in case both concerns ever co-exist.
+     */
+    public bool $showCacheStatusModal = false;
+
+    public string $cacheStatusModalEngine = '';
+
+    public string $cacheStatusModalInstance = '';
+
+    public string $cacheStatusModalUnit = '';
+
+    /** Either 'status' (systemctl status) or 'logs' (journalctl -u …). */
+    public string $cacheStatusModalView = 'status';
+
+    public string $cacheStatusModalOutput = '';
+
+    public bool $cacheStatusModalLoading = false;
+
+    public ?string $cacheStatusModalError = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -497,6 +521,144 @@ BASH,
     public function clearCacheServiceDebugOutput(string $engine): void
     {
         unset($this->debug_output_by_engine[$engine]);
+    }
+
+    /**
+     * Open the per-instance Status/Logs modal on its `systemctl status` view.
+     * The modal scope is the engine + currently-active instance: `cacheServiceFor()`
+     * already filters by `$active_instance`, so operators switch instances via
+     * the chip row and then click Status/Logs on the toolbar.
+     */
+    public function showCacheInstanceStatus(string $engine, ExecuteRemoteTaskOnServer $executor): void
+    {
+        $this->openCacheStatusModal($engine, 'status', $executor);
+    }
+
+    /**
+     * Open the per-instance Status/Logs modal on its `journalctl -u` view.
+     * Same scope as `showCacheInstanceStatus` — operates on the active instance.
+     */
+    public function showCacheInstanceLogs(string $engine, ExecuteRemoteTaskOnServer $executor): void
+    {
+        $this->openCacheStatusModal($engine, 'logs', $executor);
+    }
+
+    /**
+     * Switch between the Status and Logs tabs inside the open modal. Only
+     * re-probes when the view actually changes — clicking the active tab is a
+     * no-op (Refresh is for re-running the same probe).
+     */
+    public function setCacheStatusModalView(string $view, ExecuteRemoteTaskOnServer $executor): void
+    {
+        if (! in_array($view, ['status', 'logs'], true)) {
+            return;
+        }
+        if ($view === $this->cacheStatusModalView) {
+            return;
+        }
+
+        $this->cacheStatusModalView = $view;
+        $this->runCacheStatusProbe($executor);
+    }
+
+    /** Re-run the probe for whichever view (status/logs) the modal currently shows. */
+    public function refreshCacheStatusModal(ExecuteRemoteTaskOnServer $executor): void
+    {
+        if (! $this->showCacheStatusModal) {
+            return;
+        }
+        $this->runCacheStatusProbe($executor);
+    }
+
+    public function closeCacheStatusModal(): void
+    {
+        $this->showCacheStatusModal = false;
+        $this->cacheStatusModalEngine = '';
+        $this->cacheStatusModalInstance = '';
+        $this->cacheStatusModalUnit = '';
+        $this->cacheStatusModalView = 'status';
+        $this->cacheStatusModalOutput = '';
+        $this->cacheStatusModalLoading = false;
+        $this->cacheStatusModalError = null;
+    }
+
+    /**
+     * Shared open path for the Status and Logs buttons. Authorizes, resolves
+     * the active instance row, then triggers the SSH probe. Modal stays open
+     * on probe failure so the operator can read the error and hit Refresh.
+     */
+    protected function openCacheStatusModal(string $engine, string $view, ExecuteRemoteTaskOnServer $executor): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if ($row === null) {
+            $this->toastError(__('No :engine instance to inspect.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('SSH must be ready before viewing status or logs.'));
+
+            return;
+        }
+
+        $this->showCacheStatusModal = true;
+        $this->cacheStatusModalEngine = $row->engine;
+        $this->cacheStatusModalInstance = $row->name;
+        $this->cacheStatusModalUnit = CacheServiceInstallScripts::instanceServiceUnit($row->engine, $row->name);
+        $this->cacheStatusModalView = $view === 'logs' ? 'logs' : 'status';
+
+        $this->runCacheStatusProbe($executor);
+    }
+
+    /**
+     * Inline SSH probe shared by Status and Logs. Uses the same shape as
+     * `debugCacheServiceInstance` — 30s timeout, root, 8KB tail cap on the
+     * wire payload. Read-only by design, so no audit event (matches the
+     * Services workspace status modal).
+     */
+    protected function runCacheStatusProbe(ExecuteRemoteTaskOnServer $executor): void
+    {
+        if ($this->cacheStatusModalUnit === '') {
+            return;
+        }
+
+        $unit = escapeshellarg($this->cacheStatusModalUnit);
+        $view = $this->cacheStatusModalView;
+
+        // Same command shape used by the Services status modal — wrapping in
+        // `(...); exit 0` so a non-zero systemctl/journalctl exit code (e.g.
+        // unit not loaded yet) still surfaces output instead of throwing.
+        $script = $view === 'logs'
+            ? '(journalctl --no-pager --output=short-iso -u '.$unit.' -n 200 2>&1); exit 0'
+            : '(systemctl status '.$unit.' --no-pager -l 2>&1); exit 0';
+
+        $this->cacheStatusModalLoading = true;
+        $this->cacheStatusModalError = null;
+        $this->cacheStatusModalOutput = '';
+
+        try {
+            $output = $executor->runInlineBash(
+                $this->server,
+                'cache-service:'.$view.':'.$this->cacheStatusModalEngine.':'.$this->cacheStatusModalInstance,
+                $script,
+                timeoutSeconds: 30,
+                asRoot: true,
+            );
+            $this->cacheStatusModalOutput = trim($output->buffer) !== ''
+                ? mb_substr($output->buffer, -8_000)
+                : __('No output.');
+        } catch (\Throwable $e) {
+            $this->cacheStatusModalError = $e->getMessage();
+        } finally {
+            $this->cacheStatusModalLoading = false;
+        }
     }
 
     /**

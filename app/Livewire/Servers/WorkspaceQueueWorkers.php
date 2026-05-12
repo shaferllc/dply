@@ -51,6 +51,8 @@ class WorkspaceQueueWorkers extends Component
         ['key' => 'laravel-octane', 'label' => 'Laravel Octane', 'description' => 'High-performance app server (Swoole / RoadRunner / FrankenPHP).', 'framework' => 'laravel'],
         ['key' => 'reverb', 'label' => 'Laravel Reverb', 'description' => 'php artisan reverb:start — first-party WebSocket server.', 'framework' => 'laravel'],
         ['key' => 'sidekiq', 'label' => 'Sidekiq', 'description' => 'bundle exec sidekiq — Redis-backed Ruby/Rails worker.', 'framework' => 'rails'],
+        ['key' => 'solid-queue', 'label' => 'Solid Queue', 'description' => 'bin/jobs — Rails 8 default database-backed worker.', 'framework' => 'rails'],
+        ['key' => 'action-cable', 'label' => 'Action Cable', 'description' => 'Standalone Puma serving cable/config.ru for Rails websockets.', 'framework' => 'rails'],
         ['key' => 'nodejs', 'label' => 'Node.js worker', 'description' => 'Generic node server.js — bring your own command.', 'framework' => 'node'],
     ];
 
