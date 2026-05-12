@@ -393,6 +393,103 @@ class BackgroundWorkspacePagesTest extends TestCase
             ->assertSee(route('profile.backup-configurations'), false);
     }
 
+    public function test_toggle_schedule_pauses_and_resumes_managed_cron(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        $cronJob = ServerCronJob::create([
+            'server_id' => $server->id,
+            'cron_expression' => '0 3 * * *',
+            'command' => 'php artisan dply:run-backup-schedule X',
+            'user' => 'root',
+            'enabled' => true,
+            'system_managed' => true,
+        ]);
+        $schedule = ServerBackupSchedule::create([
+            'server_id' => $server->id,
+            'target_type' => 'database',
+            'target_id' => $database->id,
+            'cron_expression' => '0 3 * * *',
+            'is_active' => true,
+            'server_cron_job_id' => $cronJob->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('toggleSchedule', $schedule->id);
+
+        $this->assertFalse(ServerBackupSchedule::find($schedule->id)->is_active);
+        $this->assertFalse(ServerCronJob::find($cronJob->id)->enabled);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('toggleSchedule', $schedule->id);
+
+        $this->assertTrue(ServerBackupSchedule::find($schedule->id)->is_active);
+        $this->assertTrue(ServerCronJob::find($cronJob->id)->enabled);
+    }
+
+    public function test_delete_database_backup_removes_row_and_disk_file(): void
+    {
+        Storage::fake('local');
+
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $database = $server->serverDatabases()->create([
+            'name' => 'app',
+            'engine' => 'mysql',
+            'username' => '',
+            'password' => '',
+        ]);
+        Storage::disk('local')->put('to-delete.sql', 'data');
+        $backup = ServerDatabaseBackup::create([
+            'server_database_id' => $database->id,
+            'user_id' => $user->id,
+            'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+            'disk_path' => 'to-delete.sql',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('deleteDatabaseBackup', $backup->id);
+
+        $this->assertNull(ServerDatabaseBackup::find($backup->id));
+        $this->assertFalse(Storage::disk('local')->exists('to-delete.sql'));
+    }
+
+    public function test_delete_file_backup_removes_row_and_disk_file(): void
+    {
+        Storage::fake('local');
+
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+        Storage::disk('local')->put('site-files.tar.gz', 'data');
+        $backup = SiteFileBackup::create([
+            'site_id' => $site->id,
+            'user_id' => $user->id,
+            'status' => SiteFileBackup::STATUS_COMPLETED,
+            'disk_path' => 'site-files.tar.gz',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceBackups::class, ['server' => $server])
+            ->call('deleteFileBackup', $backup->id);
+
+        $this->assertNull(SiteFileBackup::find($backup->id));
+        $this->assertFalse(Storage::disk('local')->exists('site-files.tar.gz'));
+    }
+
     public function test_solid_queue_preset_fills_daemons_form(): void
     {
         $user = $this->actingOrgUser();

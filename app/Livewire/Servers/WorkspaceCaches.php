@@ -665,7 +665,7 @@ BASH,
      * Queue an install for the requested engine. Multi-engine is now allowed: Redis + Memcached
      * side-by-side is a legit pattern (Redis for queues/Horizon, Memcached for app cache).
      */
-    public function installCacheService(string $engine): void
+    public function installCacheService(string $engine, ServerCacheServiceHostCapabilities $capabilities): void
     {
         $this->authorize('update', $this->server);
 
@@ -674,6 +674,17 @@ BASH,
         }
 
         if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        // Server-side mirror of the UI gate. The Install button is also visually disabled when
+        // this returns non-null, but a stale Livewire payload (or a manually-replayed action)
+        // would otherwise queue a job that's guaranteed to fail at apt time — surface the same
+        // reason here so the operator never sees a doomed install in flight.
+        $reason = $capabilities->engineUnsupportedReason($this->server, $engine);
+        if ($reason !== null) {
+            $this->toastError($reason);
+
             return;
         }
 
@@ -739,7 +750,7 @@ BASH,
      *                        ([a-z0-9][a-z0-9-]{0,31}); 'default' is reserved
      * @param  int  $port  TCP port for the new instance
      */
-    public function addInstance(string $engine, string $name, int $port): void
+    public function addInstance(string $engine, string $name, int $port, ServerCacheServiceHostCapabilities $capabilities): void
     {
         $this->authorize('update', $this->server);
 
@@ -749,6 +760,15 @@ BASH,
 
         if (! ServerCacheService::engineSupportsAuth($engine)) {
             $this->toastError(__('Memcached multi-instance is not supported. Use the default instance only.'));
+
+            return;
+        }
+
+        // Same distro gate as installCacheService — adding a second instance of an engine that
+        // can't run on this distro is doomed identically. Surface the reason here too.
+        $reason = $capabilities->engineUnsupportedReason($this->server, $engine);
+        if ($reason !== null) {
+            $this->toastError($reason);
 
             return;
         }
@@ -2342,6 +2362,20 @@ BASH,
             // Probe failures (SSH timeout, key issues) leave the per-engine "running" badges off.
         }
 
+        // Per-engine distro-support gate. Null means "supported / unknown — let the operator
+        // proceed"; a string means "Install is disabled, here's why". Driven by
+        // CacheServiceInstallScripts::supportedDistroCodenames() so the UI and the install
+        // script agree on which combinations work. Swallowing exceptions matches the
+        // capabilities probe shape above — flaky SSH shouldn't grey out the whole page.
+        $engineUnsupportedReasons = ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null];
+        try {
+            foreach (CacheServiceInstallScripts::supportedEngines() as $engine) {
+                $engineUnsupportedReasons[$engine] = $capabilitiesService->engineUnsupportedReason($this->server, $engine);
+            }
+        } catch (\Throwable) {
+            // Same posture as the capabilities probe — fall back to "no gating" on probe error.
+        }
+
         $allowed = array_merge(['overview', 'advanced'], CacheServiceInstallScripts::supportedEngines());
         if (! in_array($this->workspace_tab, $allowed, true)) {
             $this->workspace_tab = 'overview';
@@ -2389,6 +2423,7 @@ BASH,
 
         return view('livewire.servers.workspace-caches', [
             'capabilities' => $capabilities,
+            'engineUnsupportedReasons' => $engineUnsupportedReasons,
             'cacheServices' => $services,
             'cacheInstancesByEngine' => $instancesByEngine,
             'cacheServicesByEngine' => $primaryByEngine,

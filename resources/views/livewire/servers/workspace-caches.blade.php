@@ -475,11 +475,35 @@
                             'card' => $card,
                         ])
                     @elseif (! $row)
+                        @php
+                            $unsupportedReason = $engineUnsupportedReasons[$engine] ?? null;
+                        @endphp
                         {{-- Overview when not installed: the install affordance. --}}
                         <div class="{{ $card }} p-6 sm:p-8">
                             <h3 class="text-lg font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">{{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.') }}</p>
-                            @if ($cacheBusy)
+                            @if ($unsupportedReason)
+                                {{-- Distro gate: the host's /etc/os-release codename isn't in the engine's
+                                     supported list (e.g. KeyDB on Ubuntu 24.04 — upstream doesn't ship
+                                     for noble). Disable the button instead of letting apt fail later. --}}
+                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                    <p class="flex items-start gap-2">
+                                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                                        <span>{{ $unsupportedReason }}</span>
+                                    </p>
+                                </div>
+                                <div class="mt-4 flex flex-wrap items-center gap-3">
+                                    <button
+                                        type="button"
+                                        disabled
+                                        title="{{ $unsupportedReason }}"
+                                        class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-brand-forest/40 px-4 py-2 text-sm font-medium text-white opacity-60"
+                                    >
+                                        <x-heroicon-o-no-symbol class="h-4 w-4" />
+                                        {{ __('Install :engine', ['engine' => $info['label']]) }}
+                                    </button>
+                                </div>
+                            @elseif ($cacheBusy)
                                 <div class="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
                                     <p class="flex items-start gap-2">
                                         <x-spinner variant="forest" class="mt-0.5 shrink-0" />
