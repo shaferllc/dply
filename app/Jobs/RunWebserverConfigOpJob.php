@@ -64,10 +64,27 @@ class RunWebserverConfigOpJob implements ShouldQueue
                 'write' => $service->write($server, $this->engine, $this->path, $this->contents, $emitter),
                 'validate' => $service->validateContent($server, $this->engine, $this->path, $this->contents, $emitter),
                 'restore' => $service->restoreBackup($server, $this->engine, $this->backupPath, $this->path, $emitter),
+                'read' => $service->read($server, $this->engine, $this->path, $emitter),
                 default => throw new \InvalidArgumentException('Unknown op: '.$this->op),
             };
         } catch (\Throwable $e) {
             $this->markConsole(ConsoleAction::STATUS_FAILED, error: $e->getMessage());
+
+            return;
+        }
+
+        // 'read' returns ['contents', 'truncated', 'size'] — there's no
+        // "ok" boolean since a cat either ran (success) or threw. Stash
+        // the payload in cache keyed off the ConsoleAction id so the
+        // Livewire component can pick it up on its next poll-driven
+        // render and drop it into the editor buffer.
+        if ($this->op === 'read') {
+            \Illuminate\Support\Facades\Cache::put(
+                self::readResultCacheKey($this->consoleActionId),
+                $result,
+                now()->addMinutes(5),
+            );
+            $this->markConsole(ConsoleAction::STATUS_COMPLETED, error: null);
 
             return;
         }
@@ -82,6 +99,11 @@ class RunWebserverConfigOpJob implements ShouldQueue
             $ok ? ConsoleAction::STATUS_COMPLETED : ConsoleAction::STATUS_FAILED,
             error: $errBlob,
         );
+    }
+
+    public static function readResultCacheKey(string $consoleActionId): string
+    {
+        return 'dply.webserver-config-read:'.$consoleActionId;
     }
 
     public function failed(?\Throwable $e): void

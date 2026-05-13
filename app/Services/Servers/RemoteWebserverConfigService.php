@@ -57,7 +57,12 @@ class RemoteWebserverConfigService
         }
         $script = '{ '.implode('; ', $cmds).'; } 2>/dev/null || true';
 
-        $output = $this->runScript($server, 'webserver-config:list', $script, 30);
+        // Tight timeout: this is called inline from render() on every wire:poll,
+        // and a hanging SSH burns the PHP request's 30s execution budget. If
+        // the box is unresponsive we'd rather show an empty picker (the
+        // catch in render() handles RuntimeException from runInlineBash) than
+        // 503 the whole workspace.
+        $output = $this->runScript($server, 'webserver-config:list', $script, 10);
         $lines = preg_split('/\R+/', trim($output)) ?: [];
 
         $main = (string) $layout['main'];

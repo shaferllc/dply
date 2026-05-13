@@ -110,6 +110,15 @@ class WorkspaceWebserver extends WorkspaceManage
      */
     public string $engine_metrics_range = '1h';
 
+    /**
+     * Set while a queued file-load is in flight. The render loop watches
+     * the matching ConsoleAction row and, once it goes to completed,
+     * pulls the cached read result and drops it into the editor buffer.
+     */
+    public ?string $pending_load_console_id = null;
+
+    public ?string $pending_load_path = null;
+
     // ---- OLS cache module form (Cache sub-tab on the OpenLiteSpeed engine).
     /** Form values keyed by `OpenLiteSpeedCacheModuleConfig::PARAMS` keys. */
     public array $ols_cache_form = [];
@@ -186,6 +195,221 @@ class WorkspaceWebserver extends WorkspaceManage
         'certFile' => '',
     ];
 
+    // ---- Caddy Global Options form (Admin sub-tab on the Caddy engine).
+    /** @var array<string, string> */
+    public array $caddy_globals_form = [];
+
+    public bool $caddy_globals_loaded = false;
+
+    public ?string $caddy_globals_flash = null;
+
+    public ?string $caddy_globals_error = null;
+
+    // ---- Caddy Snippets form (Snippets sub-tab on the Caddy engine).
+    /** @var array<string, string> Snippet name → body text */
+    public array $caddy_snippets_form = [];
+
+    public bool $caddy_snippets_loaded = false;
+
+    public ?string $caddy_snippets_flash = null;
+
+    public ?string $caddy_snippets_error = null;
+
+    public bool $caddy_snippets_show_add = false;
+
+    /** @var array<string, string> */
+    public array $caddy_snippets_new = ['name' => '', 'body' => ''];
+
+    // ---- nginx Global Options form (Workers sub-tab on the nginx engine).
+    /** @var array<string, string> */
+    public array $nginx_globals_form = [];
+
+    public bool $nginx_globals_loaded = false;
+
+    public ?string $nginx_globals_flash = null;
+
+    public ?string $nginx_globals_error = null;
+
+    // ---- Apache Global Options form (Workers sub-tab on the Apache engine).
+    /** @var array<string, string> */
+    public array $apache_globals_form = [];
+
+    public bool $apache_globals_loaded = false;
+
+    public ?string $apache_globals_flash = null;
+
+    public ?string $apache_globals_error = null;
+
+    /** Resolved MPM block name (mpm_event_module / mpm_worker_module / mpm_prefork_module). */
+    public string $apache_globals_mpm = 'mpm_event_module';
+
+    // ---- Apache Modules toggle (Modules sub-tab on the Apache engine).
+    /**
+     * Per-module: ['name', 'enabled', 'protected', 'type']
+     *
+     * @var list<array{name: string, enabled: bool, protected: bool, type: string}>
+     */
+    public array $apache_modules_list = [];
+
+    public bool $apache_modules_loaded = false;
+
+    public ?string $apache_modules_flash = null;
+
+    public ?string $apache_modules_error = null;
+
+    /** Active type filter on the modules table: 'all' or one of the classify() outputs. */
+    public string $apache_modules_filter = 'all';
+
+    // ---- HAProxy Global Options form (Runtime sub-tab on the HAProxy edge proxy).
+    /** @var array<string, string> */
+    public array $haproxy_globals_form = [];
+
+    public bool $haproxy_globals_loaded = false;
+
+    public ?string $haproxy_globals_flash = null;
+
+    public ?string $haproxy_globals_error = null;
+
+    // ---- HAProxy Frontends editor (Frontends sub-tab on the HAProxy edge proxy).
+    /**
+     * Per-frontend: ['binds' => list<string>, 'values' => array<string,string>]
+     *
+     * @var array<string, array{binds: list<string>, values: array<string, string>}>
+     */
+    public array $haproxy_frontends_form = [];
+
+    /** Textarea-friendly mirror of `binds` per frontend (newline-separated). */
+    /** @var array<string, string> */
+    public array $haproxy_frontends_binds_text = [];
+
+    public bool $haproxy_frontends_loaded = false;
+
+    public ?string $haproxy_frontends_flash = null;
+
+    public ?string $haproxy_frontends_error = null;
+
+    public bool $haproxy_frontends_show_add = false;
+
+    /** @var array<string, string> */
+    public array $haproxy_frontends_new = ['name' => '', 'binds' => '', 'default_backend' => ''];
+
+    // ---- HAProxy Backends editor (Backends sub-tab).
+    /**
+     * Per-backend: ['servers' => list<string>, 'values' => array<string,string>]
+     *
+     * @var array<string, array{servers: list<string>, values: array<string, string>}>
+     */
+    public array $haproxy_backends_form = [];
+
+    /** @var array<string, string>  Textarea-friendly mirror of `servers` per backend. */
+    public array $haproxy_backends_servers_text = [];
+
+    public bool $haproxy_backends_loaded = false;
+
+    public ?string $haproxy_backends_flash = null;
+
+    public ?string $haproxy_backends_error = null;
+
+    public bool $haproxy_backends_show_add = false;
+
+    /** @var array<string, string> */
+    public array $haproxy_backends_new = ['name' => '', 'servers' => '', 'balance' => 'roundrobin'];
+
+    // ---- Cross-engine TLS certificates dashboard (Overview tab card).
+    /**
+     * The aggregated list. Each entry: path / subject / issuer / not_after /
+     * expires_at / days_until_expiry / urgency / engine_hint / error.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $tls_certs = [];
+
+    public ?string $tls_certs_scanned_at_iso = null;
+
+    public bool $tls_certs_unreadable = false;
+
+    public bool $tls_certs_loaded = false;
+
+    public ?string $tls_certs_error = null;
+
+    // ---- Site smoke-test results (Overview tab card).
+    /**
+     * Per-site smoke test result entries from {@see WebserverSmokeTestRunner}.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $smoke_results = [];
+
+    public ?string $smoke_scanned_at_iso = null;
+
+    public int $smoke_total_sites = 0;
+
+    public int $smoke_probed = 0;
+
+    public bool $smoke_truncated = false;
+
+    public bool $smoke_loaded = false;
+
+    public ?string $smoke_error = null;
+
+    // ---- Config drift detector (Overview tab card).
+    /** @var list<array<string, mixed>> */
+    public array $drift_results = [];
+
+    public ?string $drift_engine = null;
+
+    public ?string $drift_scanned_at_iso = null;
+
+    public int $drift_total_sites = 0;
+
+    public int $drift_count = 0;
+
+    public bool $drift_truncated = false;
+
+    public bool $drift_unsupported = false;
+
+    public bool $drift_loaded = false;
+
+    public ?string $drift_error = null;
+
+    // ---- Traefik Static Config form (Providers sub-tab on the Traefik edge proxy).
+    /** @var array<string, string> */
+    public array $traefik_static_form = [];
+
+    public bool $traefik_static_loaded = false;
+
+    public ?string $traefik_static_flash = null;
+
+    public ?string $traefik_static_error = null;
+
+    // ---- nginx Upstreams editor (Upstreams sub-tab on the nginx engine).
+    /**
+     * Per-upstream: ['servers' => list<string>, 'values' => array<string,string>]
+     *
+     * @var array<string, array{servers: list<string>, values: array<string, string>}>
+     */
+    public array $nginx_upstreams_form = [];
+
+    /**
+     * Textarea-friendly mirror of `servers` per upstream (newline-separated).
+     * Livewire binds the textarea to this; submitNginxUpstreams() splits on
+     * newlines and writes the list back to `nginx_upstreams_form`.
+     *
+     * @var array<string, string>
+     */
+    public array $nginx_upstreams_servers_text = [];
+
+    public bool $nginx_upstreams_loaded = false;
+
+    public ?string $nginx_upstreams_flash = null;
+
+    public ?string $nginx_upstreams_error = null;
+
+    public bool $nginx_upstreams_show_add = false;
+
+    /** @var array<string, string> */
+    public array $nginx_upstreams_new = ['name' => '', 'servers' => ''];
+
     // ---- OLS Vhosts form (Vhosts sub-tab on the OpenLiteSpeed engine).
     /**
      * Per-vhost identity (name → ['conf_path','vh_root','domains','unreadable']).
@@ -220,6 +444,14 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'cache') {
             $this->loadOlsCacheConfig();
         }
+
+        // Eager-load the Overview cards (TLS certs + drift detector) so
+        // they paint with data on first render. Services cache for 60s so
+        // subsequent navigations are cheap.
+        if ($this->workspace_tab === 'overview' && $this->serverOpsReady()) {
+            $this->loadTlsCertsDashboard();
+            $this->loadDriftDetector();
+        }
         if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'extapps') {
             $this->loadOlsExtAppsConfig();
         }
@@ -228,6 +460,36 @@ class WorkspaceWebserver extends WorkspaceManage
         }
         if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'vhosts') {
             $this->loadOlsVhostsConfig();
+        }
+        if ($this->workspace_tab === 'caddy' && $this->engine_subtab === 'admin') {
+            $this->loadCaddyGlobalsConfig();
+        }
+        if ($this->workspace_tab === 'caddy' && $this->engine_subtab === 'snippets') {
+            $this->loadCaddySnippetsConfig();
+        }
+        if ($this->workspace_tab === 'nginx' && $this->engine_subtab === 'workers') {
+            $this->loadNginxGlobalsConfig();
+        }
+        if ($this->workspace_tab === 'apache' && $this->engine_subtab === 'workers') {
+            $this->loadApacheGlobalsConfig();
+        }
+        if ($this->workspace_tab === 'nginx' && $this->engine_subtab === 'upstreams') {
+            $this->loadNginxUpstreamsConfig();
+        }
+        if ($this->workspace_tab === 'apache' && $this->engine_subtab === 'modules') {
+            $this->loadApacheModulesConfig();
+        }
+        if ($this->workspace_tab === 'haproxy' && $this->engine_subtab === 'runtime') {
+            $this->loadHaproxyGlobalsConfig();
+        }
+        if ($this->workspace_tab === 'traefik' && $this->engine_subtab === 'providers') {
+            $this->loadTraefikStaticConfig();
+        }
+        if ($this->workspace_tab === 'haproxy' && $this->engine_subtab === 'frontends') {
+            $this->loadHaproxyFrontendsConfig();
+        }
+        if ($this->workspace_tab === 'haproxy' && $this->engine_subtab === 'backends') {
+            $this->loadHaproxyBackendsConfig();
         }
     }
 
@@ -241,6 +503,23 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->engine_subtab = 'overview';
         $this->resetConfigEditorState();
         $this->resetLogViewerState();
+
+        // Eager-load the TLS dashboard + drift detector when landing on
+        // Overview so the cards paint with data on first render rather
+        // than blanking until the operator clicks "Rescan".
+        if ($this->workspace_tab === 'overview' && $this->serverOpsReady()) {
+            $this->loadTlsCertsDashboard();
+            $this->loadDriftDetector();
+        }
+    }
+
+    /**
+     * Force a fresh SSH scan (bypassing the 60s cache) — wired to the
+     * "Rescan" button on the Overview TLS card.
+     */
+    public function refreshTlsCertsDashboard(): void
+    {
+        $this->loadTlsCertsDashboard(forceFresh: true);
     }
 
     /**
@@ -266,8 +545,8 @@ class WorkspaceWebserver extends WorkspaceManage
             'vhosts', 'listeners', 'extapps', 'cache',
             // nginx
             'hosts', 'upstreams', 'certs', 'workers',
-            // caddy (routes/upstreams/certs share with nginx; admin is unique)
-            'routes', 'admin',
+            // caddy (routes/upstreams/certs share with nginx; admin + snippets are unique)
+            'routes', 'admin', 'snippets',
             // apache (vhosts/workers/certs shared; modules unique)
             'modules',
             // traefik
@@ -324,6 +603,110 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_vhosts_error = null;
         } elseif ($this->workspace_tab === 'openlitespeed') {
             $this->loadOlsVhostsConfig();
+        }
+
+        // Caddy global options live on the Admin sub-tab (alongside the
+        // version/admin endpoint live-state we already render there).
+        if ($this->engine_subtab !== 'admin') {
+            $this->caddy_globals_loaded = false;
+            $this->caddy_globals_form = [];
+            $this->caddy_globals_flash = null;
+            $this->caddy_globals_error = null;
+        } elseif ($this->workspace_tab === 'caddy') {
+            $this->loadCaddyGlobalsConfig();
+        }
+
+        if ($this->engine_subtab !== 'snippets') {
+            $this->caddy_snippets_loaded = false;
+            $this->caddy_snippets_form = [];
+            $this->caddy_snippets_flash = null;
+            $this->caddy_snippets_error = null;
+            $this->caddy_snippets_show_add = false;
+        } elseif ($this->workspace_tab === 'caddy') {
+            $this->loadCaddySnippetsConfig();
+        }
+
+        if ($this->engine_subtab !== 'upstreams') {
+            $this->nginx_upstreams_loaded = false;
+            $this->nginx_upstreams_form = [];
+            $this->nginx_upstreams_servers_text = [];
+            $this->nginx_upstreams_flash = null;
+            $this->nginx_upstreams_error = null;
+            $this->nginx_upstreams_show_add = false;
+        } elseif ($this->workspace_tab === 'nginx') {
+            $this->loadNginxUpstreamsConfig();
+        }
+
+        if ($this->engine_subtab !== 'modules') {
+            $this->apache_modules_loaded = false;
+            $this->apache_modules_list = [];
+            $this->apache_modules_flash = null;
+            $this->apache_modules_error = null;
+        } elseif ($this->workspace_tab === 'apache') {
+            $this->loadApacheModulesConfig();
+        }
+
+        if ($this->engine_subtab !== 'runtime') {
+            $this->haproxy_globals_loaded = false;
+            $this->haproxy_globals_form = [];
+            $this->haproxy_globals_flash = null;
+            $this->haproxy_globals_error = null;
+        } elseif ($this->workspace_tab === 'haproxy') {
+            $this->loadHaproxyGlobalsConfig();
+        }
+
+        if ($this->engine_subtab !== 'frontends') {
+            $this->haproxy_frontends_loaded = false;
+            $this->haproxy_frontends_form = [];
+            $this->haproxy_frontends_binds_text = [];
+            $this->haproxy_frontends_flash = null;
+            $this->haproxy_frontends_error = null;
+            $this->haproxy_frontends_show_add = false;
+        } elseif ($this->workspace_tab === 'haproxy') {
+            $this->loadHaproxyFrontendsConfig();
+        }
+
+        if ($this->engine_subtab !== 'backends') {
+            $this->haproxy_backends_loaded = false;
+            $this->haproxy_backends_form = [];
+            $this->haproxy_backends_servers_text = [];
+            $this->haproxy_backends_flash = null;
+            $this->haproxy_backends_error = null;
+            $this->haproxy_backends_show_add = false;
+        } elseif ($this->workspace_tab === 'haproxy') {
+            $this->loadHaproxyBackendsConfig();
+        }
+
+        // Traefik static config lives on the Providers sub-tab (since that's
+        // where the file-provider that loads /etc/traefik/dynamic/* is
+        // declared — natural home for the rest of the static settings).
+        if ($this->engine_subtab !== 'providers') {
+            $this->traefik_static_loaded = false;
+            $this->traefik_static_form = [];
+            $this->traefik_static_flash = null;
+            $this->traefik_static_error = null;
+        } elseif ($this->workspace_tab === 'traefik') {
+            $this->loadTraefikStaticConfig();
+        }
+
+        // nginx global options live on the Workers sub-tab (same row as
+        // the runtime worker counters from stub_status). Apache reuses the
+        // same Workers sub-tab for its global options + MPM tuning.
+        if ($this->engine_subtab !== 'workers') {
+            $this->nginx_globals_loaded = false;
+            $this->nginx_globals_form = [];
+            $this->nginx_globals_flash = null;
+            $this->nginx_globals_error = null;
+            $this->apache_globals_loaded = false;
+            $this->apache_globals_form = [];
+            $this->apache_globals_flash = null;
+            $this->apache_globals_error = null;
+        } else {
+            if ($this->workspace_tab === 'nginx') {
+                $this->loadNginxGlobalsConfig();
+            } elseif ($this->workspace_tab === 'apache') {
+                $this->loadApacheGlobalsConfig();
+            }
         }
     }
 
@@ -583,6 +966,1475 @@ class WorkspaceWebserver extends WorkspaceManage
                 'updated_at' => now(),
             ]);
             $this->ols_extapps_error = $e->getMessage();
+        }
+    }
+
+    public function loadCaddyGlobalsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_globals_error = __('Provisioning and SSH must be ready before reading the Caddyfile.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\CaddyGlobalOptionsConfig::class)->read($this->server);
+            $this->caddy_globals_form = $result['values'];
+            $this->caddy_globals_loaded = true;
+            $this->caddy_globals_flash = null;
+            $this->caddy_globals_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->caddy_globals_error = __('Could not read /etc/caddy/Caddyfile — check sudo permissions for the deploy user.');
+            } elseif (! $result['exists']) {
+                $this->caddy_globals_flash = __('No global options block found — defaults shown. Save to inject one at the top of the Caddyfile.');
+            }
+        } catch (\Throwable $e) {
+            $this->caddy_globals_error = __('Failed to read Caddy globals: :msg', ['msg' => $e->getMessage()]);
+            $this->caddy_globals_loaded = false;
+        }
+    }
+
+    public function saveCaddyGlobalsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_globals_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_globals_error = __('Provisioning and SSH must be ready before saving the Caddyfile.');
+
+            return;
+        }
+
+        $this->caddy_globals_flash = null;
+        $this->caddy_globals_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Caddy global options'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\CaddyGlobalOptionsConfig::class)
+                ->save($this->server, $this->caddy_globals_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->caddy_globals_flash = __('Caddy global options saved and Caddy reloaded.');
+            $this->loadCaddyGlobalsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_globals_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * Run the smoke test for every Site on this server through the active
+     * webserver via localhost. Banner-streamed because this can take a few
+     * seconds on servers with lots of sites — queueing via a job would be
+     * overkill here since each curl is capped at 4s and the total is
+     * bounded.
+     */
+    public function runSmokeTest(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->smoke_error = __('Provisioning and SSH must be ready before running the smoke test.');
+
+            return;
+        }
+
+        $this->smoke_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Site smoke test'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            $result = app(\App\Services\Servers\WebserverSmokeTestRunner::class)->run($this->server, $emitter);
+            // Serialize Carbon to ISO string for Livewire state.
+            $this->smoke_results = array_map(function (array $row): array {
+                return $row;
+            }, $result['results']);
+            $this->smoke_scanned_at_iso = $result['scanned_at']->toIso8601String();
+            $this->smoke_total_sites = (int) $result['total_sites'];
+            $this->smoke_probed = (int) $result['probed'];
+            $this->smoke_truncated = (bool) $result['truncated'];
+            $this->smoke_loaded = true;
+
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->smoke_error = $e->getMessage();
+        }
+    }
+
+    public function loadDriftDetector(bool $forceFresh = false): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->drift_error = __('Provisioning and SSH must be ready before checking config drift.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\WebserverConfigDriftDetector::class)->detect($this->server, $forceFresh);
+            $this->drift_results = $result['results'];
+            $this->drift_engine = $result['engine'];
+            $this->drift_scanned_at_iso = $result['scanned_at']->toIso8601String();
+            $this->drift_total_sites = (int) $result['total_sites'];
+            $this->drift_count = (int) $result['drifted_count'];
+            $this->drift_truncated = (bool) $result['truncated'];
+            $this->drift_unsupported = (bool) $result['unsupported'];
+            $this->drift_loaded = true;
+            $this->drift_error = null;
+        } catch (\Throwable $e) {
+            $this->drift_error = __('Failed to detect drift: :msg', ['msg' => $e->getMessage()]);
+            $this->drift_loaded = false;
+        }
+    }
+
+    public function refreshDriftDetector(): void
+    {
+        $this->loadDriftDetector(forceFresh: true);
+    }
+
+    public function loadTlsCertsDashboard(bool $forceFresh = false): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->tls_certs_error = __('Provisioning and SSH must be ready before scanning TLS certs.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\WebserverCertsAggregator::class)->aggregate($this->server, $forceFresh);
+            $this->tls_certs = array_map(function (array $row): array {
+                $row['expires_at'] = $row['expires_at'] instanceof \Carbon\CarbonImmutable
+                    ? $row['expires_at']->toIso8601String()
+                    : null;
+
+                return $row;
+            }, $result['certs']);
+            $this->tls_certs_scanned_at_iso = $result['scanned_at'] instanceof \Carbon\CarbonImmutable
+                ? $result['scanned_at']->toIso8601String()
+                : null;
+            $this->tls_certs_unreadable = $result['unreadable'];
+            $this->tls_certs_loaded = true;
+            $this->tls_certs_error = null;
+        } catch (\Throwable $e) {
+            $this->tls_certs_error = __('Failed to scan TLS certs: :msg', ['msg' => $e->getMessage()]);
+            $this->tls_certs_loaded = false;
+        }
+    }
+
+    public function loadHaproxyBackendsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_backends_error = __('Provisioning and SSH must be ready before reading haproxy.cfg.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\HaproxyBackendsConfig::class)->read($this->server);
+            $form = [];
+            $serversText = [];
+            foreach ($result['backends'] as $b) {
+                $form[$b['name']] = ['servers' => $b['servers'], 'values' => $b['values']];
+                $serversText[$b['name']] = implode("\n", $b['servers']);
+            }
+            $this->haproxy_backends_form = $form;
+            $this->haproxy_backends_servers_text = $serversText;
+            $this->haproxy_backends_loaded = true;
+            $this->haproxy_backends_flash = null;
+            $this->haproxy_backends_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->haproxy_backends_error = __('Could not read /etc/haproxy/haproxy.cfg — check sudo permissions for the deploy user.');
+            } elseif (empty($result['backends'])) {
+                $this->haproxy_backends_flash = __('No `backend <name>` blocks found in haproxy.cfg yet.');
+            }
+        } catch (\Throwable $e) {
+            $this->haproxy_backends_error = __('Failed to read backends: :msg', ['msg' => $e->getMessage()]);
+            $this->haproxy_backends_loaded = false;
+        }
+    }
+
+    public function saveHaproxyBackendsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->haproxy_backends_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_backends_error = __('Provisioning and SSH must be ready before saving haproxy.cfg.');
+
+            return;
+        }
+
+        $this->haproxy_backends_flash = null;
+        $this->haproxy_backends_error = null;
+
+        foreach ($this->haproxy_backends_servers_text as $name => $text) {
+            if (! isset($this->haproxy_backends_form[$name])) {
+                continue;
+            }
+            $lines = array_values(array_filter(array_map('trim', preg_split('/\R/', (string) $text) ?: []), fn (string $l) => $l !== ''));
+            $this->haproxy_backends_form[$name]['servers'] = $lines;
+        }
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save HAProxy backends'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+                ->save($this->server, $this->haproxy_backends_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_backends_flash = __('Backends saved and HAProxy reloaded.');
+            $this->loadHaproxyBackendsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_backends_error = $e->getMessage();
+        }
+    }
+
+    public function openAddHaproxyBackendForm(): void
+    {
+        $this->haproxy_backends_show_add = true;
+        $this->haproxy_backends_new = ['name' => '', 'servers' => '', 'balance' => 'roundrobin'];
+        $this->haproxy_backends_error = null;
+        $this->haproxy_backends_flash = null;
+    }
+
+    public function cancelAddHaproxyBackendForm(): void
+    {
+        $this->haproxy_backends_show_add = false;
+        $this->haproxy_backends_new = ['name' => '', 'servers' => '', 'balance' => 'roundrobin'];
+    }
+
+    public function submitAddHaproxyBackend(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->haproxy_backends_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_backends_error = __('Provisioning and SSH must be ready before adding a backend.');
+
+            return;
+        }
+
+        $this->haproxy_backends_flash = null;
+        $this->haproxy_backends_error = null;
+
+        $name = (string) ($this->haproxy_backends_new['name'] ?? '');
+        $servers = array_values(array_filter(
+            array_map('trim', preg_split('/\R/', (string) ($this->haproxy_backends_new['servers'] ?? '')) ?: []),
+            fn (string $l) => $l !== '',
+        ));
+        $balance = trim((string) ($this->haproxy_backends_new['balance'] ?? 'roundrobin'));
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add HAProxy backend: :name', ['name' => trim($name)]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            $values = ['balance' => $balance];
+            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+                ->addBackend($this->server, $name, $servers, $values, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_backends_flash = __('Backend :name added and HAProxy reloaded.', ['name' => $name]);
+            $this->haproxy_backends_show_add = false;
+            $this->haproxy_backends_new = ['name' => '', 'servers' => '', 'balance' => 'roundrobin'];
+            $this->loadHaproxyBackendsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_backends_error = $e->getMessage();
+        }
+    }
+
+    public function removeHaproxyBackend(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->haproxy_backends_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_backends_error = __('Provisioning and SSH must be ready before removing a backend.');
+
+            return;
+        }
+
+        $this->haproxy_backends_flash = null;
+        $this->haproxy_backends_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove HAProxy backend: :name', ['name' => $name]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+                ->removeBackend($this->server, $name, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_backends_flash = __('Backend :name removed and HAProxy reloaded.', ['name' => $name]);
+            $this->loadHaproxyBackendsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_backends_error = $e->getMessage();
+        }
+    }
+
+    public function loadHaproxyFrontendsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_frontends_error = __('Provisioning and SSH must be ready before reading haproxy.cfg.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\HaproxyFrontendsConfig::class)->read($this->server);
+            $form = [];
+            $bindsText = [];
+            foreach ($result['frontends'] as $f) {
+                $form[$f['name']] = ['binds' => $f['binds'], 'values' => $f['values']];
+                $bindsText[$f['name']] = implode("\n", $f['binds']);
+            }
+            $this->haproxy_frontends_form = $form;
+            $this->haproxy_frontends_binds_text = $bindsText;
+            $this->haproxy_frontends_loaded = true;
+            $this->haproxy_frontends_flash = null;
+            $this->haproxy_frontends_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->haproxy_frontends_error = __('Could not read /etc/haproxy/haproxy.cfg — check sudo permissions for the deploy user.');
+            } elseif (empty($result['frontends'])) {
+                $this->haproxy_frontends_flash = __('No `frontend <name>` blocks found in haproxy.cfg yet.');
+            }
+        } catch (\Throwable $e) {
+            $this->haproxy_frontends_error = __('Failed to read frontends: :msg', ['msg' => $e->getMessage()]);
+            $this->haproxy_frontends_loaded = false;
+        }
+    }
+
+    public function saveHaproxyFrontendsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->haproxy_frontends_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_frontends_error = __('Provisioning and SSH must be ready before saving haproxy.cfg.');
+
+            return;
+        }
+
+        $this->haproxy_frontends_flash = null;
+        $this->haproxy_frontends_error = null;
+
+        // Sync binds from textarea mirror back into the form payload.
+        foreach ($this->haproxy_frontends_binds_text as $name => $text) {
+            if (! isset($this->haproxy_frontends_form[$name])) {
+                continue;
+            }
+            $lines = array_values(array_filter(array_map('trim', preg_split('/\R/', (string) $text) ?: []), fn (string $l) => $l !== ''));
+            $this->haproxy_frontends_form[$name]['binds'] = $lines;
+        }
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save HAProxy frontends'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+                ->save($this->server, $this->haproxy_frontends_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_frontends_flash = __('Frontends saved and HAProxy reloaded.');
+            $this->loadHaproxyFrontendsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_frontends_error = $e->getMessage();
+        }
+    }
+
+    public function openAddHaproxyFrontendForm(): void
+    {
+        $this->haproxy_frontends_show_add = true;
+        $this->haproxy_frontends_new = ['name' => '', 'binds' => '', 'default_backend' => ''];
+        $this->haproxy_frontends_error = null;
+        $this->haproxy_frontends_flash = null;
+    }
+
+    public function cancelAddHaproxyFrontendForm(): void
+    {
+        $this->haproxy_frontends_show_add = false;
+        $this->haproxy_frontends_new = ['name' => '', 'binds' => '', 'default_backend' => ''];
+    }
+
+    public function submitAddHaproxyFrontend(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->haproxy_frontends_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_frontends_error = __('Provisioning and SSH must be ready before adding a frontend.');
+
+            return;
+        }
+
+        $this->haproxy_frontends_flash = null;
+        $this->haproxy_frontends_error = null;
+
+        $name = (string) ($this->haproxy_frontends_new['name'] ?? '');
+        $binds = array_values(array_filter(
+            array_map('trim', preg_split('/\R/', (string) ($this->haproxy_frontends_new['binds'] ?? '')) ?: []),
+            fn (string $l) => $l !== '',
+        ));
+        $defaultBackend = trim((string) ($this->haproxy_frontends_new['default_backend'] ?? ''));
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add HAProxy frontend: :name', ['name' => trim($name)]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            $values = [];
+            if ($defaultBackend !== '') {
+                $values['default_backend'] = $defaultBackend;
+            }
+            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+                ->addFrontend($this->server, $name, $binds, $values, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_frontends_flash = __('Frontend :name added and HAProxy reloaded.', ['name' => $name]);
+            $this->haproxy_frontends_show_add = false;
+            $this->haproxy_frontends_new = ['name' => '', 'binds' => '', 'default_backend' => ''];
+            $this->loadHaproxyFrontendsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_frontends_error = $e->getMessage();
+        }
+    }
+
+    public function removeHaproxyFrontend(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->haproxy_frontends_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_frontends_error = __('Provisioning and SSH must be ready before removing a frontend.');
+
+            return;
+        }
+
+        $this->haproxy_frontends_flash = null;
+        $this->haproxy_frontends_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove HAProxy frontend: :name', ['name' => $name]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+                ->removeFrontend($this->server, $name, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_frontends_flash = __('Frontend :name removed and HAProxy reloaded.', ['name' => $name]);
+            $this->loadHaproxyFrontendsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_frontends_error = $e->getMessage();
+        }
+    }
+
+    public function loadTraefikStaticConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->traefik_static_error = __('Provisioning and SSH must be ready before reading traefik.yml.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\TraefikStaticConfigOptions::class)->read($this->server);
+            $this->traefik_static_form = $result['values'];
+            $this->traefik_static_loaded = true;
+            $this->traefik_static_flash = null;
+            $this->traefik_static_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->traefik_static_error = __('Could not read /etc/traefik/traefik.yml — check sudo permissions or that the YAML is valid.');
+            }
+        } catch (\Throwable $e) {
+            $this->traefik_static_error = __('Failed to read Traefik static config: :msg', ['msg' => $e->getMessage()]);
+            $this->traefik_static_loaded = false;
+        }
+    }
+
+    public function saveTraefikStaticConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->traefik_static_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->traefik_static_error = __('Provisioning and SSH must be ready before saving traefik.yml.');
+
+            return;
+        }
+
+        $this->traefik_static_flash = null;
+        $this->traefik_static_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Traefik static config (restart required)'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\TraefikStaticConfigOptions::class)
+                ->save($this->server, $this->traefik_static_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->traefik_static_flash = __('Traefik static config saved and Traefik restarted.');
+            $this->loadTraefikStaticConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->traefik_static_error = $e->getMessage();
+        }
+    }
+
+    public function loadHaproxyGlobalsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_globals_error = __('Provisioning and SSH must be ready before reading haproxy.cfg.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\HaproxyGlobalOptionsConfig::class)->read($this->server);
+            $this->haproxy_globals_form = $result['values'];
+            $this->haproxy_globals_loaded = true;
+            $this->haproxy_globals_flash = null;
+            $this->haproxy_globals_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->haproxy_globals_error = __('Could not read /etc/haproxy/haproxy.cfg — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->haproxy_globals_error = __('Failed to read HAProxy globals: :msg', ['msg' => $e->getMessage()]);
+            $this->haproxy_globals_loaded = false;
+        }
+    }
+
+    public function saveHaproxyGlobalsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->haproxy_globals_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->haproxy_globals_error = __('Provisioning and SSH must be ready before saving haproxy.cfg.');
+
+            return;
+        }
+
+        $this->haproxy_globals_flash = null;
+        $this->haproxy_globals_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save HAProxy global options'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\HaproxyGlobalOptionsConfig::class)
+                ->save($this->server, $this->haproxy_globals_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_globals_flash = __('HAProxy global options saved and HAProxy reloaded.');
+            $this->loadHaproxyGlobalsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->haproxy_globals_error = $e->getMessage();
+        }
+    }
+
+    public function loadApacheModulesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_modules_error = __('Provisioning and SSH must be ready before listing modules.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\ApacheModulesConfig::class)->read($this->server);
+            $this->apache_modules_list = $result['modules'];
+            $this->apache_modules_loaded = true;
+            $this->apache_modules_flash = null;
+            $this->apache_modules_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->apache_modules_error = __('Could not list /etc/apache2/mods-available/ — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->apache_modules_error = __('Failed to read modules: :msg', ['msg' => $e->getMessage()]);
+            $this->apache_modules_loaded = false;
+        }
+    }
+
+    public function toggleApacheModule(string $name, bool $enable): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_modules_error = __('Deployers cannot toggle Apache modules.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_modules_error = __('Provisioning and SSH must be ready before toggling modules.');
+
+            return;
+        }
+
+        $this->apache_modules_flash = null;
+        $this->apache_modules_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __(':verb Apache module: :name', ['verb' => $enable ? 'Enable' : 'Disable', 'name' => $name]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\ApacheModulesConfig::class)
+                ->toggle($this->server, $name, $enable, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->apache_modules_flash = __('Module :name :state and Apache reloaded.', ['name' => $name, 'state' => $enable ? 'enabled' : 'disabled']);
+            $this->loadApacheModulesConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->apache_modules_error = $e->getMessage();
+        }
+    }
+
+    public function setApacheModulesFilter(string $filter): void
+    {
+        $this->apache_modules_filter = in_array($filter, ['all', 'mpm', 'tls', 'auth', 'proxy', 'perf', 'observability', 'core', 'other'], true) ? $filter : 'all';
+    }
+
+    public function loadNginxUpstreamsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_upstreams_error = __('Provisioning and SSH must be ready before reading nginx.conf.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\NginxUpstreamsConfig::class)->read($this->server);
+            $form = [];
+            $serversText = [];
+            foreach ($result['upstreams'] as $u) {
+                $form[$u['name']] = ['servers' => $u['servers'], 'values' => $u['values']];
+                $serversText[$u['name']] = implode("\n", $u['servers']);
+            }
+            $this->nginx_upstreams_form = $form;
+            $this->nginx_upstreams_servers_text = $serversText;
+            $this->nginx_upstreams_loaded = true;
+            $this->nginx_upstreams_flash = null;
+            $this->nginx_upstreams_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->nginx_upstreams_error = __('Could not read /etc/nginx/nginx.conf — check sudo permissions for the deploy user.');
+            } elseif (empty($result['upstreams'])) {
+                $this->nginx_upstreams_flash = __('No `upstream { ... }` blocks at the http level. Per-site upstreams (in sites-enabled/*) are managed by the per-site provisioner.');
+            }
+        } catch (\Throwable $e) {
+            $this->nginx_upstreams_error = __('Failed to read upstreams: :msg', ['msg' => $e->getMessage()]);
+            $this->nginx_upstreams_loaded = false;
+        }
+    }
+
+    public function saveNginxUpstreamsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_upstreams_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_upstreams_error = __('Provisioning and SSH must be ready before saving nginx.conf.');
+
+            return;
+        }
+
+        $this->nginx_upstreams_flash = null;
+        $this->nginx_upstreams_error = null;
+
+        // Pull servers from the textarea mirror back into the form payload.
+        foreach ($this->nginx_upstreams_servers_text as $name => $text) {
+            if (! isset($this->nginx_upstreams_form[$name])) {
+                continue;
+            }
+            $lines = array_values(array_filter(array_map('trim', preg_split('/\R/', (string) $text) ?: []), fn (string $l) => $l !== ''));
+            $this->nginx_upstreams_form[$name]['servers'] = $lines;
+        }
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save nginx upstreams'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+                ->save($this->server, $this->nginx_upstreams_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->nginx_upstreams_flash = __('Upstreams saved and nginx reloaded.');
+            $this->loadNginxUpstreamsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function openAddNginxUpstreamForm(): void
+    {
+        $this->nginx_upstreams_show_add = true;
+        $this->nginx_upstreams_new = ['name' => '', 'servers' => ''];
+        $this->nginx_upstreams_error = null;
+        $this->nginx_upstreams_flash = null;
+    }
+
+    public function cancelAddNginxUpstreamForm(): void
+    {
+        $this->nginx_upstreams_show_add = false;
+        $this->nginx_upstreams_new = ['name' => '', 'servers' => ''];
+    }
+
+    public function submitAddNginxUpstream(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_upstreams_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_upstreams_error = __('Provisioning and SSH must be ready before adding an upstream.');
+
+            return;
+        }
+
+        $this->nginx_upstreams_flash = null;
+        $this->nginx_upstreams_error = null;
+
+        $name = (string) ($this->nginx_upstreams_new['name'] ?? '');
+        $servers = array_values(array_filter(
+            array_map('trim', preg_split('/\R/', (string) ($this->nginx_upstreams_new['servers'] ?? '')) ?: []),
+            fn (string $l) => $l !== '',
+        ));
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add nginx upstream: :name', ['name' => trim($name)]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+                ->addUpstream($this->server, $name, $servers, [], $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->nginx_upstreams_flash = __('Upstream :name added and nginx reloaded.', ['name' => $name]);
+            $this->nginx_upstreams_show_add = false;
+            $this->nginx_upstreams_new = ['name' => '', 'servers' => ''];
+            $this->loadNginxUpstreamsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function removeNginxUpstream(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_upstreams_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_upstreams_error = __('Provisioning and SSH must be ready before removing an upstream.');
+
+            return;
+        }
+
+        $this->nginx_upstreams_flash = null;
+        $this->nginx_upstreams_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove nginx upstream: :name', ['name' => $name]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+                ->removeUpstream($this->server, $name, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->nginx_upstreams_flash = __('Upstream :name removed and nginx reloaded.', ['name' => $name]);
+            $this->loadNginxUpstreamsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function loadApacheGlobalsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_globals_error = __('Provisioning and SSH must be ready before reading apache2.conf.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\ApacheGlobalOptionsConfig::class)->read($this->server);
+            $this->apache_globals_form = $result['values'];
+            $this->apache_globals_mpm = $result['mpm'];
+            $this->apache_globals_loaded = true;
+            $this->apache_globals_flash = null;
+            $this->apache_globals_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->apache_globals_error = __('Could not read /etc/apache2/apache2.conf — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->apache_globals_error = __('Failed to read Apache globals: :msg', ['msg' => $e->getMessage()]);
+            $this->apache_globals_loaded = false;
+        }
+    }
+
+    public function saveApacheGlobalsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_globals_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_globals_error = __('Provisioning and SSH must be ready before saving apache2.conf.');
+
+            return;
+        }
+
+        $this->apache_globals_flash = null;
+        $this->apache_globals_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Apache global options'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\ApacheGlobalOptionsConfig::class)
+                ->save($this->server, $this->apache_globals_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->apache_globals_flash = __('Apache global options saved and apache2 reloaded.');
+            $this->loadApacheGlobalsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->apache_globals_error = $e->getMessage();
+        }
+    }
+
+    public function loadNginxGlobalsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_globals_error = __('Provisioning and SSH must be ready before reading nginx.conf.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\NginxGlobalOptionsConfig::class)->read($this->server);
+            $this->nginx_globals_form = $result['values'];
+            $this->nginx_globals_loaded = true;
+            $this->nginx_globals_flash = null;
+            $this->nginx_globals_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->nginx_globals_error = __('Could not read /etc/nginx/nginx.conf — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->nginx_globals_error = __('Failed to read nginx globals: :msg', ['msg' => $e->getMessage()]);
+            $this->nginx_globals_loaded = false;
+        }
+    }
+
+    public function saveNginxGlobalsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_globals_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_globals_error = __('Provisioning and SSH must be ready before saving nginx.conf.');
+
+            return;
+        }
+
+        $this->nginx_globals_flash = null;
+        $this->nginx_globals_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save nginx global options'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\NginxGlobalOptionsConfig::class)
+                ->save($this->server, $this->nginx_globals_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->nginx_globals_flash = __('nginx global options saved and nginx reloaded.');
+            $this->loadNginxGlobalsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_globals_error = $e->getMessage();
+        }
+    }
+
+    public function loadCaddySnippetsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_snippets_error = __('Provisioning and SSH must be ready before reading the Caddyfile.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\CaddySnippetsConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['snippets'] as $snippet) {
+                $form[$snippet['name']] = $snippet['body'];
+            }
+            $this->caddy_snippets_form = $form;
+            $this->caddy_snippets_loaded = true;
+            $this->caddy_snippets_flash = null;
+            $this->caddy_snippets_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->caddy_snippets_error = __('Could not read /etc/caddy/Caddyfile — check sudo permissions for the deploy user.');
+            } elseif (empty($result['snippets'])) {
+                $this->caddy_snippets_flash = __('No snippet blocks found in the Caddyfile yet.');
+            }
+        } catch (\Throwable $e) {
+            $this->caddy_snippets_error = __('Failed to read snippets: :msg', ['msg' => $e->getMessage()]);
+            $this->caddy_snippets_loaded = false;
+        }
+    }
+
+    public function saveCaddySnippetsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_snippets_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_snippets_error = __('Provisioning and SSH must be ready before saving the Caddyfile.');
+
+            return;
+        }
+
+        $this->caddy_snippets_flash = null;
+        $this->caddy_snippets_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Caddy snippets'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\CaddySnippetsConfig::class)
+                ->save($this->server, $this->caddy_snippets_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->caddy_snippets_flash = __('Snippets saved and Caddy reloaded.');
+            $this->loadCaddySnippetsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_snippets_error = $e->getMessage();
+        }
+    }
+
+    public function openAddCaddySnippetForm(): void
+    {
+        $this->caddy_snippets_show_add = true;
+        $this->caddy_snippets_new = ['name' => '', 'body' => ''];
+        $this->caddy_snippets_error = null;
+        $this->caddy_snippets_flash = null;
+    }
+
+    public function cancelAddCaddySnippetForm(): void
+    {
+        $this->caddy_snippets_show_add = false;
+        $this->caddy_snippets_new = ['name' => '', 'body' => ''];
+    }
+
+    public function submitAddCaddySnippet(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_snippets_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_snippets_error = __('Provisioning and SSH must be ready before adding a snippet.');
+
+            return;
+        }
+
+        $this->caddy_snippets_flash = null;
+        $this->caddy_snippets_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add Caddy snippet: :name', ['name' => trim($this->caddy_snippets_new['name'] ?? '')]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\CaddySnippetsConfig::class)
+                ->addSnippet(
+                    $this->server,
+                    (string) ($this->caddy_snippets_new['name'] ?? ''),
+                    (string) ($this->caddy_snippets_new['body'] ?? ''),
+                    $emitter,
+                );
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->caddy_snippets_flash = __('Snippet (:name) added and Caddy reloaded.', ['name' => $this->caddy_snippets_new['name']]);
+            $this->caddy_snippets_show_add = false;
+            $this->caddy_snippets_new = ['name' => '', 'body' => ''];
+            $this->loadCaddySnippetsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_snippets_error = $e->getMessage();
+        }
+    }
+
+    public function removeCaddySnippet(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_snippets_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_snippets_error = __('Provisioning and SSH must be ready before removing a snippet.');
+
+            return;
+        }
+
+        $this->caddy_snippets_flash = null;
+        $this->caddy_snippets_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove Caddy snippet: :name', ['name' => $name]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\CaddySnippetsConfig::class)
+                ->removeSnippet($this->server, $name, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->caddy_snippets_flash = __('Snippet (:name) removed and Caddy reloaded.', ['name' => $name]);
+            $this->loadCaddySnippetsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_snippets_error = $e->getMessage();
         }
     }
 
@@ -988,6 +2840,9 @@ class WorkspaceWebserver extends WorkspaceManage
     {
         return match ($engine) {
             'openlitespeed' => app(\App\Services\Servers\LiveState\OlsLiveStateProbe::class),
+            'caddy' => app(\App\Services\Servers\LiveState\CaddyLiveStateProbe::class),
+            'nginx' => app(\App\Services\Servers\LiveState\NginxLiveStateProbe::class),
+            'apache' => app(\App\Services\Servers\LiveState\ApacheLiveStateProbe::class),
             'traefik' => app(\App\Services\Servers\LiveState\TraefikLiveStateProbe::class),
             'haproxy' => app(\App\Services\Servers\LiveState\HaproxyLiveStateProbe::class),
             default => null,
@@ -1010,26 +2865,73 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
-        // File reads are sub-second cats. Running them through a banner row
-        // would mean every click flashes a queued→completed banner before
-        // the buffer even paints — noisier than helpful. Stay sync, no
-        // banner. The actual mutating actions (save/validate/restore) get
-        // queued so their banner appears immediately and progresses.
-        try {
-            $result = app(RemoteWebserverConfigService::class)->read($this->server, $this->workspace_tab, $path);
-        } catch (\Throwable $e) {
-            $this->toastError(__('Could not load config: :msg', ['msg' => $e->getMessage()]));
-
-            return;
-        }
-
-        $this->config_selected_path = $path;
-        $this->config_contents = $result['contents'];
-        $this->config_truncated_on_load = $result['truncated'];
+        // Queue the load so the banner shows queued→running→completed
+        // exactly like the mutating ops. The worker stashes the file
+        // contents in a cache key; pickupQueuedConfigLoad() (called from
+        // render()) drops them into the editor buffer on the next poll
+        // cycle once the row goes to completed.
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Load webserver config: :path', ['path' => basename($path)]),
+        );
+        $this->pending_load_console_id = $consoleId;
+        $this->pending_load_path = $path;
+        // Clear stale buffer state so the textarea doesn't keep showing the
+        // previous file while the new one loads on the worker.
+        $this->config_selected_path = null;
+        $this->config_contents = '';
+        $this->config_truncated_on_load = false;
         $this->config_validate_output = null;
         $this->config_validate_ok = null;
         $this->config_last_backup = null;
-        $this->refreshConfigBackups();
+        $this->config_backups = [];
+
+        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+            $this->server->id,
+            $consoleId,
+            'read',
+            $this->workspace_tab,
+            $path,
+        );
+    }
+
+    /**
+     * Watch for a pending queued file-load and, once the worker has
+     * stashed the read result in cache, drop it into the editor buffer.
+     * Called from render() each tick (the banner's wire:poll drives this).
+     */
+    protected function pickupQueuedConfigLoad(): void
+    {
+        if ($this->pending_load_console_id === null) {
+            return;
+        }
+        $row = \App\Models\ConsoleAction::query()->find($this->pending_load_console_id);
+        if ($row === null) {
+            $this->pending_load_console_id = null;
+            $this->pending_load_path = null;
+
+            return;
+        }
+        if (! in_array($row->status, [\App\Models\ConsoleAction::STATUS_COMPLETED, \App\Models\ConsoleAction::STATUS_FAILED], true)) {
+            return; // still queued / running
+        }
+
+        if ($row->status === \App\Models\ConsoleAction::STATUS_COMPLETED) {
+            $cached = \Illuminate\Support\Facades\Cache::pull(
+                \App\Jobs\RunWebserverConfigOpJob::readResultCacheKey($this->pending_load_console_id),
+            );
+            if (is_array($cached)) {
+                $this->config_selected_path = $this->pending_load_path;
+                $this->config_contents = (string) ($cached['contents'] ?? '');
+                $this->config_truncated_on_load = (bool) ($cached['truncated'] ?? false);
+                // Bust the cached picker listing so the next render reflects
+                // the freshly-read file size + mtime accurately.
+                \Illuminate\Support\Facades\Cache::forget('dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab);
+                $this->refreshConfigBackups();
+            }
+        }
+        $this->pending_load_console_id = null;
+        $this->pending_load_path = null;
     }
 
     /**
@@ -1274,11 +3176,25 @@ class WorkspaceWebserver extends WorkspaceManage
     public function render(): View
     {
         $this->server->refresh();
+        $this->pickupQueuedConfigLoad();
 
+        // listFiles does an SSH call. render() runs on every Livewire commit,
+        // including every banner wire:poll tick — so without caching it,
+        // every 4s poll fires a fresh SSH connection. Cache for 10s per
+        // (server, engine) keeps the picker fresh enough but lets the polls
+        // re-use the result. Also gate on the Config sub-tab so other sub-
+        // tabs (Overview / Live-state) skip the SSH entirely.
         $configFiles = [];
-        if (in_array($this->workspace_tab, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'], true) && $this->serverOpsReady()) {
+        if ($this->engine_subtab === 'config'
+            && in_array($this->workspace_tab, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'], true)
+            && $this->serverOpsReady()) {
+            $cacheKey = 'dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab;
             try {
-                $configFiles = app(RemoteWebserverConfigService::class)->listFiles($this->server, $this->workspace_tab);
+                $configFiles = \Illuminate\Support\Facades\Cache::remember(
+                    $cacheKey,
+                    10,
+                    fn () => app(RemoteWebserverConfigService::class)->listFiles($this->server, $this->workspace_tab),
+                );
             } catch (\Throwable) {
                 $configFiles = [];
             }

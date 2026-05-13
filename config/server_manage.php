@@ -138,6 +138,7 @@ return [
                 '/etc/apache2/sites-available/*.conf',
                 '/etc/apache2/conf-available/*.conf',
                 '/etc/apache2/mods-available/*.conf',
+                '/etc/apache2/ports.conf',
             ],
             'validate' => '(sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1)',
             'reload' => '(sudo -n systemctl reload apache2 || systemctl reload apache2) 2>&1',
@@ -150,6 +151,8 @@ return [
             'globs' => [
                 '/usr/local/lsws/conf/vhosts/*/vhconf.conf',
                 '/usr/local/lsws/conf/templates/*.conf',
+                '/usr/local/lsws/conf/admin/admin_config.conf',
+                '/usr/local/lsws/conf/mime.properties',
             ],
             'validate' => '(sudo -n /usr/local/lsws/bin/lshttpd -t 2>&1 || /usr/local/lsws/bin/lshttpd -t 2>&1)',
             'reload' => '(sudo -n systemctl reload lshttpd || systemctl reload lshttpd) 2>&1',

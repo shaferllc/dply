@@ -761,12 +761,21 @@ BASH;
             $this->writeOlsHttpdConfig($server, $ssh, $sites, listenPort: 80);
         }
 
-        // Atomic-ish service swap: stop old, enable+start new. The gap between
-        // these is the operator-visible downtime window (typically <1s).
+        // Atomic-ish service swap: stop old, wait for :80 to actually be free,
+        // then enable+start new. The gap between stop and start is the
+        // operator-visible downtime window (typically <1s).
+        //
+        // Why the wait: `systemctl stop` returns once the unit hits inactive,
+        // but the kernel can hold the socket in TIME_WAIT or the daemon's
+        // child workers (OLS lsphpXX, Apache children) may linger fractionally
+        // longer. Caddy/nginx/Apache then refuse to start with
+        // `bind: address already in use`. Polling for the port to drop is
+        // cheap insurance — we only loop while a listener is there.
         $fromUnit = $this->systemdUnitFor($from);
         $toUnit = $this->systemdUnitFor($this->target);
         if ($fromUnit !== null) {
             $ssh->exec($this->privilegedCommand($server, sprintf('systemctl stop %s', escapeshellarg($fromUnit))), 30);
+            $this->waitForPortFree($server, $ssh, 80, $fromUnit);
         }
         if ($toUnit !== null) {
             $cmd = sprintf('systemctl enable --now %1$s && systemctl reload %1$s', escapeshellarg($toUnit));
@@ -783,6 +792,38 @@ BASH;
                 ));
             }
         }
+    }
+
+    /**
+     * Block (up to ~10s) until the given TCP port has no listener — used
+     * after `systemctl stop <old>` to make sure the kernel has released
+     * the socket before we start the new webserver, otherwise the new
+     * daemon refuses to bind with `address already in use`.
+     *
+     * Uses `ss -ltn` (one-shot, no DNS, IPv4+IPv6). If the loop times out
+     * we fall through silently — the start attempt will surface its own
+     * error via captureUnitDiagnostics() which is the user-friendly path.
+     * As a last resort, kill any process still holding the port — this
+     * covers detached child workers (OLS lsphpXX, Apache children) that
+     * systemd didn't reap when the parent went inactive.
+     */
+    private function waitForPortFree(Server $server, SshConnection $ssh, int $port, string $stoppedUnit): void
+    {
+        $check = sprintf('ss -ltn -H "sport = :%d" 2>/dev/null | head -n 1', $port);
+        $deadline = microtime(true) + 10.0;
+        do {
+            $out = trim($ssh->exec($check, 5));
+            if ($out === '') {
+                return; // socket is free
+            }
+            usleep(250_000);
+        } while (microtime(true) < $deadline);
+
+        // Still holding the port. Try to SIGTERM whatever owns it; sleep
+        // one more beat. If even that fails the start will report the
+        // bind error with full diagnostics so the operator can intervene.
+        $ssh->exec($this->privilegedCommand($server, sprintf('fuser -k -TERM %d/tcp 2>/dev/null || true', $port)), 5);
+        usleep(500_000);
     }
 
     /**
