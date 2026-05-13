@@ -22,6 +22,18 @@
         <p>{{ __('Adding/removing PHP versions runs apt against the upstream Sury/Ondrej PPA. Existing sites pin to a specific version in their FPM pool, so changing the server default doesn\'t move sites — that\'s a per-site setting on the Sites workspace.') }}</p>
     </x-explainer>
 
+    {{-- Console banner — install/uninstall/patch/refresh-inventory + set-default actions
+         all stream into the shared ConsoleAction partial. Subject is the Server (no per-
+         version model); kind family `php_` keeps unrelated runs off this banner. --}}
+    @if ($phpRun)
+        <div class="mb-4">
+            @include('livewire.partials.console-action-banner-static', [
+                'run' => $phpRun,
+                'kindLabels' => [],
+            ])
+        </div>
+    @endif
+
     <div class="space-y-6">
         {{-- Slim trigger card — icon + inline summary + compact actions, like SSH keys --}}
         <div class="{{ $card }}">
@@ -655,7 +667,7 @@
                                     <div class="border-b border-brand-ink/10 px-5 py-3 text-sm font-medium text-brand-ink">
                                         {{ __('Verification output') }}
                                     </div>
-                                    <pre class="max-h-80 overflow-x-auto bg-brand-ink p-4 text-sm text-emerald-400/95">{{ $phpConfigEditorValidationOutput }}</pre>
+                                    <pre class="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-brand-ink/95 p-4 font-mono text-xs leading-relaxed text-emerald-100">{{ $phpConfigEditorValidationOutput }}</pre>
                                 </div>
                             @endif
 

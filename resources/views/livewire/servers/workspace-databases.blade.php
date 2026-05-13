@@ -406,6 +406,20 @@
                     </x-server-workspace-tablist>
                 @endif
 
+                {{-- Per-engine console-action banner. Surfaces create/drop SSH output via the
+                     shared ConsoleAction partial — tone-coded lines, copy-output, open-in-modal,
+                     stale detection, grace-window polling. Subject is the ServerDatabaseEngine
+                     row (or Server for sqlite); kind filter is `db_*`. --}}
+                @php $dbRun = $dbRunsByEngine[$engine] ?? null; @endphp
+                @if ($dbRun)
+                    <div class="mb-4">
+                        @include('livewire.partials.console-action-banner-static', [
+                            'run' => $dbRun,
+                            'kindLabels' => [],
+                        ])
+                    </div>
+                @endif
+
                 @if ($engine_subtab === 'info' && $hasDbInfo)
                     {{-- Info subtab: engine description, license, links, best-for. --}}
                     @include('livewire.servers.partials.cache-engine-info-card', [
@@ -998,7 +1012,7 @@
                                         </span>
                                     @endif
                                 </div>
-                                <pre class="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-brand-ink/10 bg-slate-950 px-4 py-3 font-mono text-[12px] leading-5 text-slate-200">{{ $sqlite_console_output ?: __('No output.') }}</pre>
+                                <pre class="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-emerald-100">{{ $sqlite_console_output ?: __('No output.') }}</pre>
                             </div>
                         @endif
                     </div>

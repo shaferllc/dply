@@ -6,8 +6,10 @@ use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\InstallDatabaseEngineJob;
 use App\Jobs\UninstallDatabaseEngineJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAdminCredential;
@@ -39,8 +41,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class WorkspaceDatabases extends Component
 {
     use ConfirmsActionWithModal;
+    use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RunsServerConsoleActions;
     use WithFileUploads;
 
     #[Url(as: 'tab', except: 'databases', history: true)]
@@ -1031,15 +1035,45 @@ class WorkspaceDatabases extends Component
                 'mysql_charset' => $this->new_mysql_charset ?: null,
                 'mysql_collation' => $this->new_mysql_collation ?: null,
             ]);
-            $out = $existingMysqlUser
-                ? $provisioner->createMysqlDatabaseForExistingUser($db, $existingMysqlUser['grant_host'])
-                : $provisioner->createOnServer($db);
-            $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DATABASE_CREATED, [
-                'server_database_id' => $db->id,
-                'engine' => $db->engine,
-                'name' => $db->name,
-                'used_existing_user' => $existingMysqlUser !== null,
-            ], auth()->user());
+
+            // Subject for the per-engine banner. SQLite has no engine row, so we fall
+            // back to the Server itself — the banner will appear on the SQLite subtab
+            // (filtered by db_create_sqlite kind) rather than on a non-existent row.
+            $bannerSubject = ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->where('engine', $db->engine)
+                ->first()
+                ?? $this->server;
+
+            $out = $this->runConsoleAction(
+                $bannerSubject,
+                'db_create',
+                __('Create :engine database :name on :host', [
+                    'engine' => $db->engine, 'name' => $db->name, 'host' => $this->server->name,
+                ]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($provisioner, $db, $existingMysqlUser, $auditLogger): string {
+                    $emit->step('db', sprintf('CREATE %s DATABASE %s', strtoupper($db->engine), $db->name));
+                    $out = $existingMysqlUser
+                        ? $provisioner->createMysqlDatabaseForExistingUser($db, $existingMysqlUser['grant_host'])
+                        : $provisioner->createOnServer($db);
+                    foreach (preg_split("/\r?\n/", (string) $out) ?: [] as $line) {
+                        if ($line !== '') {
+                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'db');
+                        }
+                    }
+                    $emit->success('db', sprintf('Database %s ready.', $db->name));
+
+                    $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DATABASE_CREATED, [
+                        'server_database_id' => $db->id,
+                        'engine' => $db->engine,
+                        'name' => $db->name,
+                        'used_existing_user' => $existingMysqlUser !== null,
+                    ], auth()->user());
+
+                    return (string) $out;
+                },
+            );
+
             $notificationDispatcher->notifyIfSubscribed($this->server, 'created', $db, auth()->user());
             $this->toastSuccess(__('Database provisioned on the server.').' '.Str::limit($out, 500));
             $this->generated_database_credentials = [
@@ -1094,11 +1128,40 @@ class WorkspaceDatabases extends Component
         $db = ServerDatabase::query()->where('server_id', $this->server->id)->findOrFail($id);
 
         try {
-            $out = $provisioner->dropFromServer($db);
-            $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DATABASE_DROPPED_REMOTE, [
-                'server_database_id' => $db->id,
-                'name' => $db->name,
-            ], auth()->user());
+            // Subject the banner on the engine row so it surfaces on the engine's subtab.
+            // SQLite has no engine row; fall back to the Server for that case so the banner
+            // still renders somewhere reachable.
+            $bannerSubject = ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->where('engine', $db->engine)
+                ->first()
+                ?? $this->server;
+
+            $out = $this->runConsoleAction(
+                $bannerSubject,
+                'db_drop',
+                __('Drop :engine database :name on :host', [
+                    'engine' => $db->engine, 'name' => $db->name, 'host' => $this->server->name,
+                ]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($provisioner, $db, $auditLogger): string {
+                    $emit->step('db', sprintf('DROP %s DATABASE %s', strtoupper($db->engine), $db->name));
+                    $out = $provisioner->dropFromServer($db);
+                    foreach (preg_split("/\r?\n/", (string) $out) ?: [] as $line) {
+                        if ($line !== '') {
+                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'db');
+                        }
+                    }
+                    $emit->success('db', sprintf('Database %s dropped on server.', $db->name));
+
+                    $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DATABASE_DROPPED_REMOTE, [
+                        'server_database_id' => $db->id,
+                        'name' => $db->name,
+                    ], auth()->user());
+
+                    return (string) $out;
+                },
+            );
+
             $notificationDispatcher->notifyIfSubscribed($this->server, 'removed', $db, auth()->user(), true);
             $db->delete();
             $this->toastSuccess(__('Database and user were dropped on the server and the entry was removed from Dply.').' '.Str::limit($out, 400));
@@ -1200,6 +1263,18 @@ class WorkspaceDatabases extends Component
             ->get()
             ->keyBy('engine');
 
+        // Per-engine console-action runs (db_create/db_drop/etc). Engines that have an
+        // actual row get the per-row banner; sqlite (no row) falls back to a server-scoped
+        // lookup so its create/drop banners still surface on the sqlite subtab.
+        $dbRunsByEngine = [];
+        foreach (['mysql', 'postgres'] as $engine) {
+            $row = $engineRows->get($engine);
+            if ($row !== null) {
+                $dbRunsByEngine[$engine] = $this->latestConsoleActionFor($row, 'db_');
+            }
+        }
+        $dbRunsByEngine['sqlite'] = $this->latestConsoleActionFor($this->server, 'db_');
+
         return view('livewire.servers.workspace-databases', [
             'capabilities' => $capabilities,
             'credentialsModalDatabase' => $credentialsModalDatabase,
@@ -1210,6 +1285,7 @@ class WorkspaceDatabases extends Component
             'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
             'databaseImportMaxBytes' => $databaseImportMaxBytes,
             'engineRows' => $engineRows,
+            'dbRunsByEngine' => array_filter($dbRunsByEngine),
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

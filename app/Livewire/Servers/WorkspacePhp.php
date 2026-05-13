@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\ConfigRevision;
 use App\Models\Server;
 use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
@@ -16,7 +18,9 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspacePhp extends Component
 {
+    use DismissesServerConsoleActionRun;
     use InteractsWithServerWorkspace;
+    use RunsServerConsoleActions;
 
     public ?string $remote_output = null;
 
@@ -71,35 +75,48 @@ class WorkspacePhp extends Component
         $this->authorize('update', $this->server);
 
         $this->remote_error = null;
-        $this->remote_output = __('Running PHP :action for version :version on the server…', [
-            'action' => str_replace('_', ' ', $action),
-            'version' => $version,
-        ]);
+        $this->remote_output = null;
 
         if (! $this->serverOpsReady()) {
             $msg = __('Provisioning and SSH must be ready before managing PHP packages.');
             $this->remote_error = $msg;
             $this->toastError($msg);
-            $this->remote_output = null;
 
             return;
         }
 
+        $actionVerb = str_replace('_', ' ', $action);
+
         try {
-            $result = app(ServerPhpManager::class)->applyPackageAction($this->server, $action, $version);
+            $result = $this->runConsoleAction(
+                $this->server,
+                'php_'.$action,
+                __(':verb PHP :version on :host', [
+                    'verb' => ucfirst($actionVerb), 'version' => $version, 'host' => $this->server->name,
+                ]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($action, $version, $actionVerb): array {
+                    $emit->step('php', sprintf('apt %s php%s', $actionVerb, $version));
+                    $result = app(ServerPhpManager::class)->applyPackageAction($this->server, $action, $version);
+                    foreach (preg_split("/\r?\n/", (string) ($result['output'] ?? '')) ?: [] as $line) {
+                        if ($line !== '') {
+                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'php');
+                        }
+                    }
+                    // The manager surfaces a `stale` status when inventory readback diverges
+                    // from the cached snapshot — bubble that up as a failure so the banner
+                    // reflects it; the calling Livewire branch reads $result and toasts.
+                    if (($result['status'] ?? null) === 'stale') {
+                        throw new \RuntimeException((string) ($result['message'] ?? __('PHP inventory may be stale.')));
+                    }
+                    $emit->success('php', (string) ($result['message'] ?? __('PHP action completed.')));
+
+                    return $result;
+                },
+            );
+
             $this->server->refresh();
-
-            if (($result['status'] ?? null) === 'stale') {
-                $msg = $result['message'] ?? __('PHP inventory may be stale.');
-                $this->remote_error = $msg;
-                $this->toastError($msg);
-                $this->remote_output = $result['output'] ?? $this->remote_output;
-
-                return;
-            }
-
             $this->toastSuccess($result['message'] ?? __('PHP action completed.'));
-            $this->remote_output = $result['output'] ?? $this->remote_output;
+            $this->remote_output = $result['output'] ?? null;
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
@@ -113,32 +130,41 @@ class WorkspacePhp extends Component
         $this->authorize('update', $this->server);
 
         $this->remote_error = null;
-        $this->remote_output = __('Refreshing PHP inventory on the server…');
+        $this->remote_output = null;
 
         if (! $this->serverOpsReady()) {
             $msg = __('Provisioning and SSH must be ready before refreshing PHP inventory.');
             $this->remote_error = $msg;
             $this->toastError($msg);
-            $this->remote_output = null;
 
             return;
         }
 
         try {
-            $result = app(ServerPhpManager::class)->refreshInventory($this->server);
+            $result = $this->runConsoleAction(
+                $this->server,
+                'php_refresh_inventory',
+                __('Refresh PHP inventory on :host', ['host' => $this->server->name]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit): array {
+                    $emit->step('php', 'Probing installed PHP versions');
+                    $result = app(ServerPhpManager::class)->refreshInventory($this->server);
+                    foreach (preg_split("/\r?\n/", (string) ($result['output'] ?? '')) ?: [] as $line) {
+                        if ($line !== '') {
+                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'php');
+                        }
+                    }
+                    if (($result['status'] ?? null) === 'stale') {
+                        throw new \RuntimeException((string) ($result['message'] ?? __('PHP inventory may be stale.')));
+                    }
+                    $emit->success('php', (string) ($result['message'] ?? __('PHP inventory refreshed.')));
+
+                    return $result;
+                },
+            );
+
             $this->server->refresh();
-
-            if (($result['status'] ?? null) === 'stale') {
-                $msg = $result['message'] ?? __('PHP inventory may be stale.');
-                $this->remote_error = $msg;
-                $this->toastError($msg);
-                $this->remote_output = $result['output'] ?? $this->remote_output;
-
-                return;
-            }
-
             $this->toastSuccess($result['message'] ?? __('PHP inventory refreshed.'));
-            $this->remote_output = $result['output'] ?? $this->remote_output;
+            $this->remote_output = $result['output'] ?? null;
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
@@ -509,6 +535,7 @@ class WorkspacePhp extends Component
 
         return view('livewire.servers.workspace-php', [
             'opsReady' => $opsReady,
+            'phpRun' => $this->latestConsoleActionFor($this->server, 'php_'),
             'phpSummary' => $phpData['summary'],
             'phpVersionRows' => $phpData['version_rows'],
             'sshUnavailable' => $sshUnavailable,

@@ -1168,26 +1168,32 @@ BASH,
         ]);
 
         try {
-            $writer->write($row->server, $row, $this->cacheConfigDraft);
+            $draft = $this->cacheConfigDraft;
+            $this->runConsoleAction(
+                $row,
+                'cache_save_config',
+                __('Save :engine config on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($writer, $row, $draft, $audit): void {
+                    $emit->step('cache', sprintf('Writing %d bytes to %s config', strlen($draft), $row->engine));
+                    $writer->write($row->server, $row, $draft);
+                    $emit->success('cache', 'Config written and engine restarted.');
+
+                    $audit->record(
+                        $row->server,
+                        ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
+                        ['engine' => $row->engine, 'name' => $row->name, 'bytes' => strlen($draft)],
+                        auth()->user(),
+                    );
+                    $this->forgetStats($row);
+                },
+            );
+            $this->cacheConfigContent = $draft;
+            $this->cacheConfigEditing = false;
+            $this->cacheConfigDraft = '';
+            $this->toastSuccess(__('Config saved and :engine restarted.', ['engine' => $row->engine, 'name' => $row->name]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-
-            return;
         }
-
-        $this->cacheConfigContent = $this->cacheConfigDraft;
-        $this->cacheConfigEditing = false;
-        $this->cacheConfigDraft = '';
-
-        $audit->record(
-            $row->server,
-            ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
-            ['engine' => $row->engine, 'name' => $row->name, 'bytes' => strlen((string) $this->cacheConfigContent)],
-            auth()->user(),
-        );
-        $this->forgetStats($row);
-
-        $this->toastSuccess(__('Config saved and :engine restarted.', ['engine' => $row->engine, 'name' => $row->name]));
     }
 
     public function loadCacheClients(CacheServiceStats $stats): void
@@ -1311,31 +1317,34 @@ BASH,
         $policy = trim($this->cache_maxmemory_policy);
 
         try {
-            $memory->write(
-                $row->server,
+            $maxNorm = $maxmemory === '' ? null : strtolower($maxmemory);
+            $policyNorm = $policy === '' ? null : strtolower($policy);
+            $this->runConsoleAction(
                 $row,
-                $maxmemory === '' ? null : strtolower($maxmemory),
-                $policy === '' ? null : strtolower($policy),
+                'cache_save_memory',
+                __('Apply memory settings to :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($memory, $row, $maxNorm, $policyNorm, $audit, $maxmemory, $policy): void {
+                    $emit->step('cache', sprintf('maxmemory=%s policy=%s', $maxNorm ?? 'unset', $policyNorm ?? 'unset'));
+                    $memory->write($row->server, $row, $maxNorm, $policyNorm);
+                    $emit->success('cache', 'Memory directives applied.');
+
+                    $audit->record(
+                        $row->server,
+                        ServerCacheServiceAuditEvent::EVENT_MEMORY_UPDATED,
+                        [
+                            'engine' => $row->engine, 'name' => $row->name,
+                            'maxmemory' => $maxmemory ?: null,
+                            'maxmemory_policy' => $policy ?: null,
+                        ],
+                        auth()->user(),
+                    );
+                    $this->forgetStats($row);
+                },
             );
+            $this->toastSuccess(__('Memory settings applied to :engine.', ['engine' => $row->engine, 'name' => $row->name]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-
-            return;
         }
-
-        $audit->record(
-            $row->server,
-            ServerCacheServiceAuditEvent::EVENT_MEMORY_UPDATED,
-            [
-                'engine' => $row->engine, 'name' => $row->name,
-                'maxmemory' => $maxmemory ?: null,
-                'maxmemory_policy' => $policy ?: null,
-            ],
-            auth()->user(),
-        );
-        $this->forgetStats($row);
-
-        $this->toastSuccess(__('Memory settings applied to :engine.', ['engine' => $row->engine, 'name' => $row->name]));
     }
 
     public function generateAuthPassword(): void
@@ -1378,25 +1387,31 @@ BASH,
         ]);
 
         try {
-            $auth->setRequirePass($row->server, $row, $this->new_auth_password);
+            $newAuth = $this->new_auth_password;
+            $this->runConsoleAction(
+                $row,
+                'cache_set_auth',
+                __('Set AUTH password on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($auth, $row, $newAuth, $audits): void {
+                    $emit->step('cache', sprintf('Setting requirepass on %s', $row->engine));
+                    $auth->setRequirePass($row->server, $row, $newAuth);
+                    $emit->success('cache', 'AUTH password active.');
+
+                    $row->update(['auth_password' => $newAuth]);
+                    $audits->record(
+                        $row->server,
+                        ServerCacheServiceAuditEvent::EVENT_AUTH_SET,
+                        ['engine' => $row->engine, 'name' => $row->name],
+                        auth()->user(),
+                    );
+                    $this->forgetStats($row);
+                },
+            );
+            $this->new_auth_password = '';
+            $this->toastSuccess(__('AUTH password set on :engine.', ['engine' => $row->engine, 'name' => $row->name]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-
-            return;
         }
-
-        $row->update(['auth_password' => $this->new_auth_password]);
-        $this->new_auth_password = '';
-
-        $audits->record(
-            $row->server,
-            ServerCacheServiceAuditEvent::EVENT_AUTH_SET,
-            ['engine' => $row->engine, 'name' => $row->name],
-            auth()->user(),
-        );
-        $this->forgetStats($row);
-
-        $this->toastSuccess(__('AUTH password set on :engine.', ['engine' => $row->engine, 'name' => $row->name]));
     }
 
     public function clearAuthPassword(CacheServiceAuth $auth, CacheServiceAuditLogger $audits): void
@@ -1428,24 +1443,29 @@ BASH,
         }
 
         try {
-            $auth->clearRequirePass($row->server, $row);
+            $this->runConsoleAction(
+                $row,
+                'cache_clear_auth',
+                __('Clear AUTH password on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($auth, $row, $audits): void {
+                    $emit->step('cache', sprintf('Clearing requirepass on %s', $row->engine));
+                    $auth->clearRequirePass($row->server, $row);
+                    $emit->success('cache', 'AUTH password cleared.');
+
+                    $row->update(['auth_password' => null]);
+                    $audits->record(
+                        $row->server,
+                        ServerCacheServiceAuditEvent::EVENT_AUTH_CLEARED,
+                        ['engine' => $row->engine, 'name' => $row->name],
+                        auth()->user(),
+                    );
+                    $this->forgetStats($row);
+                },
+            );
+            $this->toastSuccess(__('Cleared AUTH password on :engine.', ['engine' => $row->engine, 'name' => $row->name]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-
-            return;
         }
-
-        $row->update(['auth_password' => null]);
-
-        $audits->record(
-            $row->server,
-            ServerCacheServiceAuditEvent::EVENT_AUTH_CLEARED,
-            ['engine' => $row->engine, 'name' => $row->name],
-            auth()->user(),
-        );
-        $this->forgetStats($row);
-
-        $this->toastSuccess(__('Cleared AUTH password on :engine.', ['engine' => $row->engine, 'name' => $row->name]));
     }
 
     /**
@@ -1509,25 +1529,32 @@ BASH,
         $oldPort = $row->port;
 
         try {
-            $portChanger->changePort($row->server, $row, $newPort);
+            $this->runConsoleAction(
+                $row,
+                'cache_change_port',
+                __('Change :engine port :old → :new on :host', [
+                    'engine' => $row->engine, 'old' => $oldPort, 'new' => $newPort, 'host' => $this->server->name,
+                ]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($portChanger, $row, $newPort, $oldPort, $audits): void {
+                    $emit->step('cache', sprintf('Rewriting %s config to listen on :%d', $row->engine, $newPort));
+                    $portChanger->changePort($row->server, $row, $newPort);
+                    $emit->success('cache', sprintf('%s now listening on :%d', $row->engine, $newPort));
+
+                    $row->update(['port' => $newPort]);
+                    $audits->record(
+                        $row->server,
+                        ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
+                        ['engine' => $row->engine, 'name' => $row->name, 'old_port' => $oldPort, 'new_port' => $newPort],
+                        auth()->user(),
+                    );
+                    $this->forgetStats($row);
+                },
+            );
+            $this->new_port = null;
+            $this->toastSuccess(__(':engine moved to port :port.', ['engine' => $row->engine, 'port' => $newPort]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-
-            return;
         }
-
-        $row->update(['port' => $newPort]);
-        $this->new_port = null;
-
-        $audits->record(
-            $row->server,
-            ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
-            ['engine' => $row->engine, 'name' => $row->name, 'old_port' => $oldPort, 'new_port' => $newPort],
-            auth()->user(),
-        );
-        $this->forgetStats($row);
-
-        $this->toastSuccess(__(':engine moved to port :port.', ['engine' => $row->engine, 'port' => $newPort]));
     }
 
     /**
@@ -1578,27 +1605,36 @@ BASH,
         ]);
 
         try {
-            $exposure->expose($row->server, $row, $this->expose_source_cidr, auth()->id());
+            $cidr = $this->expose_source_cidr;
+            $this->runConsoleAction(
+                $row,
+                'cache_expose',
+                __('Expose :engine on :host to :cidr', [
+                    'engine' => $row->engine, 'host' => $this->server->name, 'cidr' => $cidr,
+                ]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($exposure, $row, $cidr, $audits): void {
+                    $emit->step('cache', sprintf('Rewriting bind to 0.0.0.0; firewall rule for %s', $cidr));
+                    $exposure->expose($row->server, $row, $cidr, auth()->id());
+                    $emit->success('cache', 'Exposed; firewall apply queued.');
+
+                    $audits->record(
+                        $row->server,
+                        ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
+                        ['engine' => $row->engine, 'name' => $row->name, 'change' => 'exposed', 'source' => $cidr],
+                        auth()->user(),
+                    );
+                    $this->forgetStats($row);
+                },
+            );
+            $this->expose_source_cidr = '';
+            $this->toastSuccess(__(':engine exposed on :port from :cidr — firewall apply queued.', [
+                'engine' => $row->engine,
+                'port' => $row->port,
+                'cidr' => $cidr,
+            ]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-
-            return;
         }
-
-        $audits->record(
-            $row->server,
-            ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
-            ['engine' => $row->engine, 'name' => $row->name, 'change' => 'exposed', 'source' => $this->expose_source_cidr],
-            auth()->user(),
-        );
-        $this->forgetStats($row);
-        $this->expose_source_cidr = '';
-
-        $this->toastSuccess(__(':engine exposed on :port from :cidr — firewall apply queued.', [
-            'engine' => $row->engine,
-            'port' => $row->port,
-            'cidr' => $this->expose_source_cidr,
-        ]));
     }
 
     /**
@@ -1624,22 +1660,28 @@ BASH,
         }
 
         try {
-            $exposure->lockdown($row->server, $row, auth()->id());
+            $this->runConsoleAction(
+                $row,
+                'cache_lockdown',
+                __('Lock :engine on :host to loopback', ['engine' => $row->engine, 'host' => $this->server->name]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($exposure, $row, $audits): void {
+                    $emit->step('cache', 'Rewriting bind to 127.0.0.1; removing firewall rule');
+                    $exposure->lockdown($row->server, $row, auth()->id());
+                    $emit->success('cache', 'Locked down; firewall apply queued.');
+
+                    $audits->record(
+                        $row->server,
+                        ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
+                        ['engine' => $row->engine, 'name' => $row->name, 'change' => 'locked_down'],
+                        auth()->user(),
+                    );
+                    $this->forgetStats($row);
+                },
+            );
+            $this->toastSuccess(__(':engine locked down to loopback — firewall apply queued.', ['engine' => $row->engine]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-
-            return;
         }
-
-        $audits->record(
-            $row->server,
-            ServerCacheServiceAuditEvent::EVENT_CONFIG_EDITED,
-            ['engine' => $row->engine, 'name' => $row->name, 'change' => 'locked_down'],
-            auth()->user(),
-        );
-        $this->forgetStats($row);
-
-        $this->toastSuccess(__(':engine locked down to loopback — firewall apply queued.', ['engine' => $row->engine]));
     }
 
     /**
@@ -2228,26 +2270,29 @@ BASH,
         };
 
         try {
-            $output = $executor->runInlineBash(
-                $row->server,
-                'cache-service:flush:'.$row->engine,
-                $cmd,
-                timeoutSeconds: 30,
-                asRoot: false,
+            $this->runConsoleAction(
+                $row,
+                'cache_flush',
+                __('Flush all keys on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $row, $cmd, $audit): void {
+                    $output = $executor->runInlineBash(
+                        $row->server,
+                        'cache-service:flush:'.$row->engine,
+                        $cmd,
+                        timeoutSeconds: 30,
+                        asRoot: false,
+                    );
+                    $this->emitExecutorBuffer($emit, $output->buffer, $output->exitCode, 'flush');
+
+                    $audit->record(
+                        $row->server,
+                        ServerCacheServiceAuditEvent::EVENT_FLUSHED,
+                        ['engine' => $row->engine, 'name' => $row->name],
+                        auth()->user(),
+                    );
+                    $this->forgetStats($row);
+                },
             );
-
-            if ($output->exitCode !== 0) {
-                throw new \RuntimeException(trim($output->buffer) ?: 'Flush command failed.');
-            }
-
-            $audit->record(
-                $row->server,
-                ServerCacheServiceAuditEvent::EVENT_FLUSHED,
-                ['engine' => $row->engine, 'name' => $row->name],
-                auth()->user(),
-            );
-            $this->forgetStats($row);
-
             $this->toastSuccess(__('Flushed all keys on :engine.', ['engine' => $row->engine, 'name' => $row->name]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
