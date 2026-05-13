@@ -30,12 +30,12 @@
     >
         @if ($icon)
             <span class="inline-flex items-center gap-2">
-                <span class="inline-flex" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
-                    <x-dynamic-component :component="$icon" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
+                    <x-dynamic-component :component="$icon" class="h-4 w-4" aria-hidden="true" />
                 </span>
                 @if ($wireTarget)
-                    <span class="inline-flex" wire:loading wire:target="{{ $wireTarget }}">
-                        <x-spinner size="sm" />
+                    <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
+                        <x-spinner class="h-4 w-4" />
                     </span>
                 @endif
                 <span>{{ $slot }}</span>
@@ -55,12 +55,12 @@
     >
         @if ($icon)
             <span class="inline-flex items-center gap-2">
-                <span class="inline-flex" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
-                    <x-dynamic-component :component="$icon" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
+                    <x-dynamic-component :component="$icon" class="h-4 w-4" aria-hidden="true" />
                 </span>
                 @if ($wireTarget)
-                    <span class="inline-flex" wire:loading wire:target="{{ $wireTarget }}">
-                        <x-spinner size="sm" />
+                    <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
+                        <x-spinner class="h-4 w-4" />
                     </span>
                 @endif
                 <span>{{ $slot }}</span>

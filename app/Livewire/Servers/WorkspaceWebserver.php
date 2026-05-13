@@ -9,6 +9,7 @@ use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageSshExecutor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 
 /**
  * Top-level "Webserver" workspace — gives the per-server webserver picker grid +
@@ -44,15 +45,24 @@ class WorkspaceWebserver extends WorkspaceManage
      *
      * Allowed values are validated in {@see setWorkspaceTab()}; an unknown
      * value falls back to 'overview' rather than throwing.
+     *
+     * Bound to ?tab= so an operator can deep-link / share the URL and the
+     * tab they were on restores on load.
      */
+    #[Url(as: 'tab', except: 'overview')]
     public string $workspace_tab = 'overview';
 
     /**
      * Per-engine sub-tab. Originally just `overview` / `info`; now also
-     * `tools` (per-engine CLI commands), `logs` (live access + error tail),
-     * and `config` (file editor). Validated in {@see setEngineSubtab()};
-     * unknown values fall back to `overview`.
+     * `logs` (live access + error tail) and `config` (file editor) plus the
+     * per-engine live-state sub-tabs (vhosts / listeners / routers / etc.).
+     * Validated in {@see setEngineSubtab()}; unknown values fall back to
+     * `overview`.
+     *
+     * Bound to ?sub= so deep-linking to e.g. ?tab=openlitespeed&sub=cache
+     * lands the operator directly on that sub-tab.
      */
+    #[Url(as: 'sub', except: 'overview')]
     public string $engine_subtab = 'overview';
 
     // ---- Config editor state -----------------------------------------
@@ -99,6 +109,18 @@ class WorkspaceWebserver extends WorkspaceManage
      * operator's preference survives reloads.
      */
     public string $engine_metrics_range = '1h';
+
+    // ---- OLS cache module form (Cache sub-tab on the OpenLiteSpeed engine).
+    /** Form values keyed by `OpenLiteSpeedCacheModuleConfig::PARAMS` keys. */
+    public array $ols_cache_form = [];
+
+    /** True once we've fetched server values into the form. */
+    public bool $ols_cache_loaded = false;
+
+    /** Banner state for the save action ("Saved.", "Validation failed: …"). */
+    public ?string $ols_cache_flash = null;
+
+    public ?string $ols_cache_error = null;
 
     public function mount(Server $server, ?string $section = null): void
     {
