@@ -122,12 +122,113 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public ?string $ols_cache_error = null;
 
+    // ---- OLS ExtApps form (ExtApps sub-tab on the OpenLiteSpeed engine).
+    /**
+     * Read-only identity per app (name → ['type','address','path']).
+     * Shown in the card header so the operator knows which worker pool.
+     *
+     * @var array<string, array<string, string>>
+     */
+    public array $ols_extapps_identity = [];
+
+    /**
+     * Editable values per app (app-name → directive-key → value string).
+     *
+     * @var array<string, array<string, string>>
+     */
+    public array $ols_extapps_form = [];
+
+    public bool $ols_extapps_loaded = false;
+
+    public ?string $ols_extapps_flash = null;
+
+    public ?string $ols_extapps_error = null;
+
+    /** Toggles the inline "+ Add ExtApp" form. */
+    public bool $ols_extapps_show_add = false;
+
+    /**
+     * Backing state for the add-form inputs.
+     *
+     * @var array<string, string>
+     */
+    public array $ols_extapps_new_app = [
+        'name' => '',
+        'type' => 'lsapi',
+        'address' => '',
+        'path' => '',
+    ];
+
+    // ---- OLS Listeners form (Listeners sub-tab on the OpenLiteSpeed engine).
+    /** @var array<string, array<string, string>> */
+    public array $ols_listeners_identity = [];
+
+    /** @var array<string, array<string, string>> */
+    public array $ols_listeners_form = [];
+
+    /** @var array<string, list<string>>  Per-listener map-directive entries (read-only). */
+    public array $ols_listeners_maps = [];
+
+    public bool $ols_listeners_loaded = false;
+
+    public ?string $ols_listeners_flash = null;
+
+    public ?string $ols_listeners_error = null;
+
+    public bool $ols_listeners_show_add = false;
+
+    /** @var array<string, string> */
+    public array $ols_listeners_new = [
+        'name' => '',
+        'address' => '',
+        'secure' => '0',
+        'keyFile' => '',
+        'certFile' => '',
+    ];
+
+    // ---- OLS Vhosts form (Vhosts sub-tab on the OpenLiteSpeed engine).
+    /**
+     * Per-vhost identity (name → ['conf_path','vh_root','domains','unreadable']).
+     *
+     * @var array<string, array{conf_path: string, vh_root: ?string, domains: list<string>, unreadable: bool}>
+     */
+    public array $ols_vhosts_identity = [];
+
+    /**
+     * Per-vhost form values keyed by vhost-name → directive-key → value.
+     *
+     * @var array<string, array<string, string>>
+     */
+    public array $ols_vhosts_form = [];
+
+    public bool $ols_vhosts_loaded = false;
+
+    public ?string $ols_vhosts_flash = null;
+
+    public ?string $ols_vhosts_error = null;
+
     public function mount(Server $server, ?string $section = null): void
     {
         // Force the inherited 'web' section state — the parent's render share
         // and any internal asserts on $section still resolve correctly without
         // requiring the operator to type `?section=web` on the URL.
         parent::mount($server, 'web');
+
+        // If the URL restored a deep-link straight to the OLS Cache sub-tab,
+        // populate the form so it renders with current server values on the
+        // first paint instead of waiting for an extra round-trip.
+        if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'cache') {
+            $this->loadOlsCacheConfig();
+        }
+        if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'extapps') {
+            $this->loadOlsExtAppsConfig();
+        }
+        if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'listeners') {
+            $this->loadOlsListenersConfig();
+        }
+        if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'vhosts') {
+            $this->loadOlsVhostsConfig();
+        }
     }
 
     public function setWorkspaceTab(string $tab): void
@@ -183,6 +284,673 @@ class WorkspaceWebserver extends WorkspaceManage
         }
         if ($this->engine_subtab !== 'logs') {
             $this->resetLogViewerState();
+        }
+        if ($this->engine_subtab !== 'cache') {
+            $this->ols_cache_loaded = false;
+            $this->ols_cache_form = [];
+            $this->ols_cache_flash = null;
+            $this->ols_cache_error = null;
+        } elseif ($this->workspace_tab === 'openlitespeed') {
+            $this->loadOlsCacheConfig();
+        }
+
+        if ($this->engine_subtab !== 'extapps') {
+            $this->ols_extapps_loaded = false;
+            $this->ols_extapps_form = [];
+            $this->ols_extapps_identity = [];
+            $this->ols_extapps_flash = null;
+            $this->ols_extapps_error = null;
+        } elseif ($this->workspace_tab === 'openlitespeed') {
+            $this->loadOlsExtAppsConfig();
+        }
+
+        if ($this->engine_subtab !== 'listeners') {
+            $this->ols_listeners_loaded = false;
+            $this->ols_listeners_form = [];
+            $this->ols_listeners_identity = [];
+            $this->ols_listeners_maps = [];
+            $this->ols_listeners_flash = null;
+            $this->ols_listeners_error = null;
+            $this->ols_listeners_show_add = false;
+        } elseif ($this->workspace_tab === 'openlitespeed') {
+            $this->loadOlsListenersConfig();
+        }
+
+        if ($this->engine_subtab !== 'vhosts') {
+            $this->ols_vhosts_loaded = false;
+            $this->ols_vhosts_form = [];
+            $this->ols_vhosts_identity = [];
+            $this->ols_vhosts_flash = null;
+            $this->ols_vhosts_error = null;
+        } elseif ($this->workspace_tab === 'openlitespeed') {
+            $this->loadOlsVhostsConfig();
+        }
+    }
+
+    /**
+     * Lazy-load the LSCache module values from the server so the form on the
+     * OLS Cache sub-tab can render populated. Called on first navigation to
+     * the sub-tab (via {@see setEngineSubtab}) and on the explicit refresh
+     * button.
+     */
+    public function loadOlsCacheConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_cache_error = __('Provisioning and SSH must be ready before reading the cache config.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\OpenLiteSpeedCacheModuleConfig::class)->read($this->server);
+            $this->ols_cache_form = $result['values'];
+            $this->ols_cache_loaded = true;
+            $this->ols_cache_error = null;
+            $this->ols_cache_flash = null;
+            if (! empty($result['unreadable'])) {
+                $this->ols_cache_error = __('Could not read /usr/local/lsws/conf/httpd_config.conf — check sudo permissions for the deploy user. Defaults shown.');
+            } elseif (! $result['exists']) {
+                $this->ols_cache_flash = __('No cache module block found — defaults shown. Save to inject one into httpd_config.conf.');
+            }
+        } catch (\Throwable $e) {
+            $this->ols_cache_error = __('Failed to read cache config: :msg', ['msg' => $e->getMessage()]);
+            $this->ols_cache_loaded = false;
+        }
+    }
+
+    /**
+     * Persist the form values back to httpd_config.conf, validate, and
+     * reload OLS. The service handles snapshot/restore on validation
+     * failure; we surface the outcome via flash + error strings.
+     */
+    public function saveOlsCacheConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_cache_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_cache_error = __('Provisioning and SSH must be ready before saving the cache config.');
+
+            return;
+        }
+
+        $this->ols_cache_flash = null;
+        $this->ols_cache_error = null;
+
+        // Seed a manage_action ConsoleAction row so the banner streams the
+        // save's progress (snapshot → install → validate → reload) the same
+        // way it does for other manage actions. We're running the save
+        // synchronously inside the Livewire request — the row tracks status
+        // so a refresh / second tab still sees the outcome.
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save OpenLiteSpeed cache config'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\OpenLiteSpeedCacheModuleConfig::class)
+                ->save($this->server, $this->ols_cache_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_cache_flash = __('Cache config saved and OpenLiteSpeed reloaded.');
+            // Re-read to catch any directive the parser normalized (e.g. 1/0
+            // round-tripped from on/off) so the form reflects what's on disk.
+            $this->loadOlsCacheConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_cache_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * Load ExtApp blocks from httpd_config.conf into the form.
+     */
+    public function loadOlsExtAppsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_extapps_error = __('Provisioning and SSH must be ready before reading ExtApp config.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)->read($this->server);
+            $form = [];
+            $identity = [];
+            foreach ($result['apps'] as $app) {
+                $form[$app['name']] = $app['values'];
+                $identity[$app['name']] = $app['identity'];
+            }
+            $this->ols_extapps_form = $form;
+            $this->ols_extapps_identity = $identity;
+            $this->ols_extapps_loaded = true;
+            $this->ols_extapps_flash = null;
+            $this->ols_extapps_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->ols_extapps_error = __('Could not read /usr/local/lsws/conf/httpd_config.conf — check sudo permissions for the deploy user.');
+            } elseif (empty($result['apps'])) {
+                $this->ols_extapps_flash = __('No extprocessor blocks found in httpd_config.conf yet.');
+            }
+        } catch (\Throwable $e) {
+            $this->ols_extapps_error = __('Failed to read ExtApp config: :msg', ['msg' => $e->getMessage()]);
+            $this->ols_extapps_loaded = false;
+        }
+    }
+
+    /**
+     * Persist the ExtApp form back to httpd_config.conf, validate, reload.
+     * Streams each step into a manage_action ConsoleAction so the banner
+     * shows the same per-step progress as the cache-module save.
+     */
+    public function saveOlsExtAppsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_extapps_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_extapps_error = __('Provisioning and SSH must be ready before saving ExtApp config.');
+
+            return;
+        }
+
+        $this->ols_extapps_flash = null;
+        $this->ols_extapps_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save OpenLiteSpeed ExtApp config'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+                ->save($this->server, $this->ols_extapps_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_extapps_flash = __('ExtApp config saved and OpenLiteSpeed reloaded.');
+            $this->loadOlsExtAppsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_extapps_error = $e->getMessage();
+        }
+    }
+
+    public function openAddOlsExtAppForm(): void
+    {
+        $this->ols_extapps_show_add = true;
+        $this->ols_extapps_new_app = ['name' => '', 'type' => 'lsapi', 'address' => '', 'path' => ''];
+        $this->ols_extapps_error = null;
+        $this->ols_extapps_flash = null;
+    }
+
+    public function cancelAddOlsExtAppForm(): void
+    {
+        $this->ols_extapps_show_add = false;
+        $this->ols_extapps_new_app = ['name' => '', 'type' => 'lsapi', 'address' => '', 'path' => ''];
+    }
+
+    public function submitAddOlsExtApp(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_extapps_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_extapps_error = __('Provisioning and SSH must be ready before adding an ExtApp.');
+
+            return;
+        }
+
+        $this->ols_extapps_flash = null;
+        $this->ols_extapps_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add OpenLiteSpeed ExtApp: :name', ['name' => trim($this->ols_extapps_new_app['name'] ?? '')]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+                ->addApp($this->server, $this->ols_extapps_new_app, [], $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_extapps_flash = __('ExtApp :name added and OpenLiteSpeed reloaded.', ['name' => $this->ols_extapps_new_app['name']]);
+            $this->ols_extapps_show_add = false;
+            $this->ols_extapps_new_app = ['name' => '', 'type' => 'lsapi', 'address' => '', 'path' => ''];
+            $this->loadOlsExtAppsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_extapps_error = $e->getMessage();
+        }
+    }
+
+    public function loadOlsVhostsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_vhosts_error = __('Provisioning and SSH must be ready before reading vhost config.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\OpenLiteSpeedVhostsConfig::class)->read($this->server);
+            $form = [];
+            $identity = [];
+            foreach ($result['vhosts'] as $vh) {
+                $form[$vh['name']] = $vh['values'];
+                $identity[$vh['name']] = [
+                    'conf_path' => $vh['conf_path'],
+                    'vh_root' => $vh['vh_root'],
+                    'domains' => $vh['domains'],
+                    'unreadable' => $vh['unreadable'],
+                ];
+            }
+            $this->ols_vhosts_form = $form;
+            $this->ols_vhosts_identity = $identity;
+            $this->ols_vhosts_loaded = true;
+            $this->ols_vhosts_flash = null;
+            $this->ols_vhosts_error = null;
+            if (! empty($result['unreadable_httpd'])) {
+                $this->ols_vhosts_error = __('Could not read /usr/local/lsws/conf/httpd_config.conf — check sudo permissions for the deploy user.');
+            } elseif (empty($result['vhosts'])) {
+                $this->ols_vhosts_flash = __('No vhTemplate blocks found in httpd_config.conf — add a site to populate this list.');
+            }
+        } catch (\Throwable $e) {
+            $this->ols_vhosts_error = __('Failed to read vhost config: :msg', ['msg' => $e->getMessage()]);
+            $this->ols_vhosts_loaded = false;
+        }
+    }
+
+    public function saveOlsVhostsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_vhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_vhosts_error = __('Provisioning and SSH must be ready before saving vhost config.');
+
+            return;
+        }
+
+        $this->ols_vhosts_flash = null;
+        $this->ols_vhosts_error = null;
+
+        // Build the per-vhost updates payload from the form, attaching the
+        // per-vhost conf_path so the service can write to the right file.
+        $updates = [];
+        foreach ($this->ols_vhosts_form as $vhostName => $values) {
+            $confPath = $this->ols_vhosts_identity[$vhostName]['conf_path'] ?? null;
+            if ($confPath === null) {
+                continue;
+            }
+            $updates[$vhostName] = ['conf_path' => $confPath, 'values' => $values];
+        }
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save OpenLiteSpeed vhost config'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\OpenLiteSpeedVhostsConfig::class)
+                ->save($this->server, $updates, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_vhosts_flash = __('Vhost config saved and OpenLiteSpeed reloaded.');
+            $this->loadOlsVhostsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_vhosts_error = $e->getMessage();
+        }
+    }
+
+    public function loadOlsListenersConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_listeners_error = __('Provisioning and SSH must be ready before reading listener config.');
+
+            return;
+        }
+
+        try {
+            $result = app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)->read($this->server);
+            $form = [];
+            $identity = [];
+            $maps = [];
+            foreach ($result['listeners'] as $listener) {
+                $form[$listener['name']] = $listener['values'];
+                $identity[$listener['name']] = $listener['identity'];
+                $maps[$listener['name']] = $listener['maps'];
+            }
+            $this->ols_listeners_form = $form;
+            $this->ols_listeners_identity = $identity;
+            $this->ols_listeners_maps = $maps;
+            $this->ols_listeners_loaded = true;
+            $this->ols_listeners_flash = null;
+            $this->ols_listeners_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->ols_listeners_error = __('Could not read /usr/local/lsws/conf/httpd_config.conf — check sudo permissions for the deploy user.');
+            } elseif (empty($result['listeners'])) {
+                $this->ols_listeners_flash = __('No listener blocks found in httpd_config.conf yet.');
+            }
+        } catch (\Throwable $e) {
+            $this->ols_listeners_error = __('Failed to read listener config: :msg', ['msg' => $e->getMessage()]);
+            $this->ols_listeners_loaded = false;
+        }
+    }
+
+    public function saveOlsListenersConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_listeners_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_listeners_error = __('Provisioning and SSH must be ready before saving listener config.');
+
+            return;
+        }
+
+        $this->ols_listeners_flash = null;
+        $this->ols_listeners_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save OpenLiteSpeed listener config'),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+                ->save($this->server, $this->ols_listeners_form, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_listeners_flash = __('Listener config saved and OpenLiteSpeed reloaded.');
+            $this->loadOlsListenersConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_listeners_error = $e->getMessage();
+        }
+    }
+
+    public function openAddOlsListenerForm(): void
+    {
+        $this->ols_listeners_show_add = true;
+        $this->ols_listeners_new = ['name' => '', 'address' => '', 'secure' => '0', 'keyFile' => '', 'certFile' => ''];
+        $this->ols_listeners_error = null;
+        $this->ols_listeners_flash = null;
+    }
+
+    public function cancelAddOlsListenerForm(): void
+    {
+        $this->ols_listeners_show_add = false;
+        $this->ols_listeners_new = ['name' => '', 'address' => '', 'secure' => '0', 'keyFile' => '', 'certFile' => ''];
+    }
+
+    public function submitAddOlsListener(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_listeners_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_listeners_error = __('Provisioning and SSH must be ready before adding a listener.');
+
+            return;
+        }
+
+        $this->ols_listeners_flash = null;
+        $this->ols_listeners_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add OpenLiteSpeed listener: :name', ['name' => trim($this->ols_listeners_new['name'] ?? '')]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+                ->addListener($this->server, $this->ols_listeners_new, [], $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_listeners_flash = __('Listener :name added and OpenLiteSpeed reloaded.', ['name' => $this->ols_listeners_new['name']]);
+            $this->ols_listeners_show_add = false;
+            $this->ols_listeners_new = ['name' => '', 'address' => '', 'secure' => '0', 'keyFile' => '', 'certFile' => ''];
+            $this->loadOlsListenersConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_listeners_error = $e->getMessage();
+        }
+    }
+
+    public function removeOlsListener(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_listeners_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_listeners_error = __('Provisioning and SSH must be ready before removing a listener.');
+
+            return;
+        }
+
+        $this->ols_listeners_flash = null;
+        $this->ols_listeners_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove OpenLiteSpeed listener: :name', ['name' => $name]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+                ->removeListener($this->server, $name, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_listeners_flash = __('Listener :name removed and OpenLiteSpeed reloaded.', ['name' => $name]);
+            $this->loadOlsListenersConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_listeners_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * Strip an ExtApp from httpd_config.conf. dply-managed lsphp* names are
+     * blocked at the service layer so this can't accidentally delete a
+     * PHP backend the provisioner owns.
+     */
+    public function removeOlsExtApp(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_extapps_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_extapps_error = __('Provisioning and SSH must be ready before removing an ExtApp.');
+
+            return;
+        }
+
+        $this->ols_extapps_flash = null;
+        $this->ols_extapps_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove OpenLiteSpeed ExtApp: :name', ['name' => $name]),
+        );
+        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+
+        try {
+            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+                ->removeApp($this->server, $name, $emitter);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_extapps_flash = __('ExtApp :name removed and OpenLiteSpeed reloaded.', ['name' => $name]);
+            $this->loadOlsExtAppsConfig();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_extapps_error = $e->getMessage();
         }
     }
 
@@ -242,6 +1010,11 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
+        // File reads are sub-second cats. Running them through a banner row
+        // would mean every click flashes a queued→completed banner before
+        // the buffer even paints — noisier than helpful. Stay sync, no
+        // banner. The actual mutating actions (save/validate/restore) get
+        // queued so their banner appears immediately and progresses.
         try {
             $result = app(RemoteWebserverConfigService::class)->read($this->server, $this->workspace_tab, $path);
         } catch (\Throwable $e) {
@@ -317,29 +1090,91 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
-        try {
-            $result = app(RemoteWebserverConfigService::class)->write(
-                $this->server,
-                $this->workspace_tab,
-                $this->config_selected_path,
-                $this->config_contents,
-            );
-        } catch (\Throwable $e) {
-            $this->toastError(__('Save failed: :msg', ['msg' => $e->getMessage()]));
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save webserver config: :path', ['path' => basename((string) $this->config_selected_path)]),
+        );
+        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+            $this->server->id,
+            $consoleId,
+            'write',
+            $this->workspace_tab,
+            $this->config_selected_path,
+            $this->config_contents,
+        );
+        $this->toastSuccess(__('Save queued — progress shows in the banner above.'));
+    }
+
+    /**
+     * Dry-run the current buffer against the engine validator without
+     * committing. The service stages the proposed content, swaps it into
+     * the live path, runs the validator, and ALWAYS restores. Lets the
+     * operator confirm syntax before clicking Save.
+     */
+    public function validateWebserverConfigBuffer(): void
+    {
+        if (! $this->guardConfigAction()) {
+            return;
+        }
+        if ($this->config_selected_path === null) {
+            $this->toastError(__('No config file loaded.'));
+
+            return;
+        }
+        if ($this->config_truncated_on_load) {
+            $this->toastError(__('Buffer is truncated — validation would chop the file.'));
 
             return;
         }
 
-        $this->config_validate_output = $result['validate_output'];
-        $this->config_validate_ok = $result['validate_ok'];
-        $this->config_last_backup = $result['backup'];
-        $this->refreshConfigBackups();
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Validate webserver config buffer: :path', ['path' => basename((string) $this->config_selected_path)]),
+        );
+        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+            $this->server->id,
+            $consoleId,
+            'validate',
+            $this->workspace_tab,
+            $this->config_selected_path,
+            $this->config_contents,
+        );
+        $this->toastSuccess(__('Validation queued — progress shows in the banner above.'));
+    }
 
-        if ($result['validate_ok']) {
-            $this->toastSuccess(__('Config saved and validated.'));
-        } else {
-            $this->toastError(__('Config saved, but validation reported problems — review the output before reloading.'));
+    /**
+     * Drop the dply-canonical content for the currently-loaded path into the
+     * editor buffer. Doesn't write — the operator still has to click Save.
+     * Limited to engines/paths dply owns a builder for (OLS httpd_config.conf
+     * and per-site vhconf.conf for v1).
+     */
+    public function resetWebserverConfigToDefault(): void
+    {
+        if (! $this->guardConfigAction()) {
+            return;
         }
+        if ($this->config_selected_path === null) {
+            $this->toastError(__('No config file loaded.'));
+
+            return;
+        }
+
+        try {
+            $contents = app(RemoteWebserverConfigService::class)->defaultContent(
+                $this->server,
+                $this->workspace_tab,
+                $this->config_selected_path,
+            );
+        } catch (\Throwable $e) {
+            $this->toastError(__('Reset failed: :msg', ['msg' => $e->getMessage()]));
+
+            return;
+        }
+
+        $this->config_contents = $contents;
+        $this->config_validate_output = null;
+        $this->config_validate_ok = null;
+        $this->toastSuccess(__('Loaded the dply-canonical content. Review and click Save to commit.'));
     }
 
     /**
@@ -358,30 +1193,20 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
-        try {
-            $result = app(RemoteWebserverConfigService::class)->restoreBackup(
-                $this->server,
-                $this->workspace_tab,
-                $backup_path,
-                $this->config_selected_path,
-            );
-        } catch (\Throwable $e) {
-            $this->toastError(__('Restore failed: :msg', ['msg' => $e->getMessage()]));
-
-            return;
-        }
-
-        // After a successful restore, reload the editor buffer so the operator
-        // sees the restored content rather than what they had typed.
-        $this->loadWebserverConfig($this->config_selected_path);
-        $this->config_validate_output = $result['validate_output'];
-        $this->config_validate_ok = $result['validate_ok'];
-
-        if ($result['validate_ok']) {
-            $this->toastSuccess(__('Backup restored and validated.'));
-        } else {
-            $this->toastError(__('Backup restored, but validation reported problems.'));
-        }
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Restore revision: :path', ['path' => basename($backup_path)]),
+        );
+        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+            $this->server->id,
+            $consoleId,
+            'restore',
+            $this->workspace_tab,
+            $this->config_selected_path,
+            '',
+            $backup_path,
+        );
+        $this->toastSuccess(__('Restore queued — progress shows in the banner above.'));
     }
 
     /**

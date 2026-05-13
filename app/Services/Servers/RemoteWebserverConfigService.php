@@ -96,26 +96,33 @@ class RemoteWebserverConfigService
      *
      * @return array{contents: string, truncated: bool, size: int}
      */
-    public function read(Server $server, string $engine, string $path): array
+    public function read(Server $server, string $engine, string $path, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($path);
 
         $cap = (int) config('server_manage.config_preview_max_bytes', 48_000);
 
+        $emitter?->step('config', 'Reading '.$path);
         $script = sprintf(
             '{ stat -c "%%s" %1$s 2>/dev/null; echo "---"; head -c %2$d %1$s 2>/dev/null; } || true',
             escapeshellarg($path),
             $cap,
         );
 
+        // Pass null so the file contents don't stream into the banner — the
+        // line-by-line output would flood the console with the whole config.
+        // The step + summary lines below give the operator enough context.
         $output = $this->runScript($server, 'webserver-config:read', $script, 60);
         [$head, $body] = array_pad(explode("---\n", $output, 2), 2, '');
         $size = (int) trim($head);
+        $truncated = $size > $cap;
+
+        $emitter?->info(sprintf('Read %d bytes%s.', $size, $truncated ? ' (truncated for preview)' : ''));
 
         return [
             'contents' => (string) $body,
-            'truncated' => $size > $cap,
+            'truncated' => $truncated,
             'size' => $size,
         ];
     }
@@ -131,7 +138,7 @@ class RemoteWebserverConfigService
      *
      * @return array{backup: ?string, validate_output: string, validate_ok: bool}
      */
-    public function write(Server $server, string $engine, string $path, string $contents): array
+    public function write(Server $server, string $engine, string $path, string $contents, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($path);
@@ -178,21 +185,172 @@ rm -f "\$TMP"
 ls -1t "\$BACKUP_DIR"/{$this->bashLiteral($backupSlug)}.* 2>/dev/null | tail -n +\$((KEEP + 1)) | xargs -r sudo -n rm -f -- 2>/dev/null || true
 BASH;
 
-        $this->runScript($server, 'webserver-config:write', $script, 60);
+        $emitter?->step('config', 'Backing up live file to '.$backupPath);
+        $emitter?->step('config', 'Atomically installing new contents at '.$path);
+        $this->runScript($server, 'webserver-config:write', $script, 60, $emitter);
 
+        $emitter?->step('config', 'Validating with the engine');
         $validate = $this->runScript(
             $server,
             'webserver-config:validate',
             (string) ($layout['validate'] ?? 'true'),
             (int) ($layout['validate_timeout'] ?? 60),
+            $emitter,
         );
         $validateOk = $this->validateOutputLooksOk($engine, $validate);
+
+        if (! $validateOk) {
+            $emitter?->warn('Validator rejected the new file — restoring snapshot.');
+            $revertScript = <<<BASH
+set -uo pipefail
+PATHX={$this->bashArg($path)}
+BACKUP_PATH={$this->bashArg($backupPath)}
+if [ -e "\$BACKUP_PATH" ]; then
+  (sudo -n install -m 0644 -o root -g root "\$BACKUP_PATH" "\$PATHX" || install -m 0644 -o root -g root "\$BACKUP_PATH" "\$PATHX") 2>&1
+  echo "[revert] restored \$BACKUP_PATH"
+fi
+BASH;
+            $this->runScript($server, 'webserver-config:revert', $revertScript, 30, $emitter);
+            $emitter?->error('Save aborted; previous file restored.');
+        } else {
+            $emitter?->success('Saved + validated.');
+        }
 
         return [
             'backup' => $backupPath,
             'validate_output' => trim($validate),
             'validate_ok' => $validateOk,
+            'reverted' => ! $validateOk,
         ];
+    }
+
+    /**
+     * Dry-run validation: stage the proposed contents at a temp path on the
+     * server, swap into the live path long enough to run the validator, then
+     * always restore from the snapshot regardless of outcome. The live file
+     * is never left modified — successful or not — so this is the
+     * "edit → validate → save" middle step.
+     *
+     * Engines that support arbitrary config paths (nginx -t -c, caddy
+     * validate --config, apachectl -t -f, haproxy -c -f) could in theory
+     * point at the temp path directly, but for OLS that doesn't work, and
+     * the swap-and-revert pattern works uniformly so we use it everywhere.
+     *
+     * @return array{output: string, ok: bool}
+     */
+    public function validateContent(Server $server, string $engine, string $path, string $contents, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    {
+        $this->assertEngineSupported($engine);
+        $this->assertPathAllowed($path);
+
+        $max = (int) config('server_manage.config_edit_max_bytes', 256_000);
+        if (strlen($contents) > $max) {
+            throw new \InvalidArgumentException("Config payload exceeds the {$max}-byte limit.");
+        }
+
+        $layout = $this->layoutFor($engine);
+        $b64 = base64_encode($contents);
+        $bakStem = '/tmp/dply-cfg-dryrun.'.bin2hex(random_bytes(6));
+
+        // Stage proposed → snapshot live → install proposed → validate →
+        // ALWAYS restore. The whole dance lives in one bash script so any
+        // SIGTERM mid-flight still hits the trap-driven restore.
+        $script = <<<BASH
+set -uo pipefail
+PATHX={$this->bashArg($path)}
+BAK={$this->bashArg($bakStem)}
+TMP=\$(mktemp)
+printf %s {$this->bashArg($b64)} | base64 -d > "\$TMP"
+
+# Always restore on exit (success, failure, signal).
+restore() {
+  if [ -e "\$BAK" ]; then
+    (sudo -n install -m 0644 -o root -g root "\$BAK" "\$PATHX" || install -m 0644 -o root -g root "\$BAK" "\$PATHX") >/dev/null 2>&1
+    (sudo -n rm -f "\$BAK" || rm -f "\$BAK") >/dev/null 2>&1
+  fi
+  rm -f "\$TMP" 2>/dev/null
+}
+trap restore EXIT INT TERM HUP
+
+# Snapshot current live file (no-op if missing) and swap in proposed.
+if [ -e "\$PATHX" ]; then
+  (sudo -n cp -a "\$PATHX" "\$BAK" || cp -a "\$PATHX" "\$BAK") >/dev/null 2>&1
+fi
+(sudo -n install -m 0644 -o root -g root "\$TMP" "\$PATHX" || install -m 0644 -o root -g root "\$TMP" "\$PATHX") 2>&1
+
+# Run engine validator. Output (combined stdout+stderr) is what we surface.
+{$layout['validate']}
+BASH;
+
+        $emitter?->step('config', 'Staging proposed contents to '.$bakStem);
+        $emitter?->step('config', 'Swapping into '.$path.' for dry-run validation');
+        $emitter?->step('config', 'Running engine validator');
+        $output = $this->runScript(
+            $server,
+            'webserver-config:validate-buffer',
+            $script,
+            (int) ($layout['validate_timeout'] ?? 60) + 10,
+            $emitter,
+        );
+        $emitter?->step('config', 'Restoring original (live file is unchanged)');
+
+        $ok = $this->validateOutputLooksOk($engine, $output);
+        if ($ok) {
+            $emitter?->success('Buffer is valid — safe to save.');
+        } else {
+            $emitter?->error('Buffer failed validation.');
+        }
+
+        return [
+            'output' => trim($output),
+            'ok' => $ok,
+        ];
+    }
+
+    /**
+     * Regenerate the dply-canonical content for a managed config file. For
+     * httpd_config.conf we invoke the {@see OpenLiteSpeedHttpdConfigBuilder}
+     * against the server's current sites + active port; for per-site
+     * vhconf.conf we use {@see \App\Services\Sites\OpenLiteSpeedSiteConfigBuilder}.
+     * Files outside the dply-managed set raise a RuntimeException — there's
+     * no canonical "default" to fall back to.
+     *
+     * Returns the new content WITHOUT writing it — the caller (Livewire)
+     * decides whether to drop it into the editor buffer or write directly.
+     */
+    public function defaultContent(Server $server, string $engine, string $path): string
+    {
+        $this->assertEngineSupported($engine);
+        $this->assertPathAllowed($path);
+
+        if ($engine === 'openlitespeed') {
+            if ($path === '/usr/local/lsws/conf/httpd_config.conf') {
+                $sites = \App\Models\Site::query()
+                    ->where('server_id', $server->id)
+                    ->with(['domains', 'domainAliases', 'tenantDomains'])
+                    ->get();
+                $port = 80;
+
+                return app(\App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder::class)->build($sites, $port);
+            }
+
+            // Per-site vhconf at /usr/local/lsws/conf/vhosts/<basename>/vhconf.conf.
+            if (preg_match('#^/usr/local/lsws/conf/vhosts/([^/]+)/vhconf\.conf$#', $path, $m) === 1) {
+                $basename = $m[1];
+                $site = \App\Models\Site::query()
+                    ->where('server_id', $server->id)
+                    ->get(['id', 'slug'])
+                    ->first(fn ($s) => 'dply-'.$s->id.'-'.$s->slug === $basename);
+                if ($site === null) {
+                    throw new \RuntimeException('No Site found for vhost basename `'.$basename.'`. The provisioner can\'t regenerate a default.');
+                }
+                $full = \App\Models\Site::query()->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'webserverConfigProfile', 'server'])->find($site->id);
+
+                return app(\App\Services\Sites\OpenLiteSpeedSiteConfigBuilder::class)->build($full);
+            }
+        }
+
+        throw new \RuntimeException('Reset-to-default is not available for `'.$path.'` on engine `'.$engine.'`. dply doesn\'t own this file.');
     }
 
     /**
@@ -259,7 +417,7 @@ BASH;
      *
      * @return array{validate_output: string, validate_ok: bool}
      */
-    public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath): array
+    public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($targetPath);
@@ -268,6 +426,7 @@ BASH;
             throw new \InvalidArgumentException('Backup path is outside the engine backup directory.');
         }
 
+        $emitter?->step('config', 'Reading revision '.$backupPath);
         // Read the backup directly (not via read(), which caps at the preview
         // size). Backups can be near the edit cap (256 KB) for large nginx
         // configs and silently truncating a restore would be the worst kind
@@ -275,7 +434,7 @@ BASH;
         // before clobbering, so a botched restore can still be undone.
         $contents = $this->raw($server, $backupPath);
 
-        return $this->write($server, $engine, $targetPath, $contents);
+        return $this->write($server, $engine, $targetPath, $contents, $emitter);
     }
 
     private function raw(Server $server, string $absPath): string
@@ -371,15 +530,24 @@ BASH;
         return $this->bashLiteral($s);
     }
 
-    private function runScript(Server $server, string $task, string $script, int $timeout): string
+    private function runScript(Server $server, string $task, string $script, int $timeout, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): string
     {
-        $out = $this->executor->runInlineBash(
-            $server,
-            $task,
-            $script,
-            $timeout,
-            function (string $type, string $buffer): void {},
-        );
+        // When an emitter is passed (Livewire's manage_action banner path),
+        // stream every newline-terminated chunk from the SSH pipe straight
+        // through so the operator sees progress live. Without an emitter,
+        // the callback is a no-op and the buffer is captured at the end.
+        $onOutput = $emitter === null
+            ? function (string $type, string $buffer): void {}
+            : function (string $type, string $buffer) use ($emitter): void {
+                foreach (preg_split('/\R/', rtrim($buffer, "\n")) ?: [] as $line) {
+                    $line = trim($line);
+                    if ($line !== '') {
+                        $emitter($line);
+                    }
+                }
+            };
+
+        $out = $this->executor->runInlineBash($server, $task, $script, $timeout, $onOutput);
 
         return ServerManageSshExecutor::stripSshClientNoise($out->getBuffer());
     }

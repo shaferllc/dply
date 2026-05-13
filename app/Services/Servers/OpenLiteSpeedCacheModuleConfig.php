@@ -120,26 +120,26 @@ class OpenLiteSpeedCacheModuleConfig
     public function read(Server $server): array
     {
         $values = array_map(fn (array $meta): string => (string) $meta['default'], self::PARAMS);
-        $exists = false;
-        $raw = '';
 
         try {
             $ssh = new SshConnection($server);
-            $contents = $ssh->exec('cat '.escapeshellarg(self::REMOTE_PATH).' 2>/dev/null', 15);
+            // sudo -n: the conf file is often root-owned 600/640. The deploy
+            // user has passwordless sudo configured by the provisioner, so a
+            // plain `cat` would silently return empty and we'd fall back to
+            // defaults even when a cache block exists on disk.
+            $contents = $ssh->exec('sudo -n cat '.escapeshellarg(self::REMOTE_PATH).' 2>/dev/null', 15);
             if ($contents === '' || $ssh->lastExecExitCode() !== 0) {
-                return ['values' => $values, 'exists' => false, 'raw' => ''];
+                return ['values' => $values, 'exists' => false, 'raw' => '', 'unreadable' => true];
             }
         } catch (\Throwable) {
-            return ['values' => $values, 'exists' => false, 'raw' => ''];
+            return ['values' => $values, 'exists' => false, 'raw' => '', 'unreadable' => true];
         }
 
         $block = $this->extractCacheBlock($contents);
         if ($block === null) {
-            return ['values' => $values, 'exists' => false, 'raw' => ''];
+            return ['values' => $values, 'exists' => false, 'raw' => '', 'unreadable' => false];
         }
 
-        $exists = true;
-        $raw = $block;
         foreach (self::PARAMS as $key => $meta) {
             if ($meta['type'] === 'lines') {
                 $values[$key] = implode("\n", $this->extractRepeatedDirective($block, $key));
@@ -151,7 +151,7 @@ class OpenLiteSpeedCacheModuleConfig
             }
         }
 
-        return ['values' => $values, 'exists' => $exists, 'raw' => $raw];
+        return ['values' => $values, 'exists' => true, 'raw' => $block, 'unreadable' => false];
     }
 
     /**
@@ -191,29 +191,42 @@ class OpenLiteSpeedCacheModuleConfig
      * `lshttpd -t`, and gracefully reload. On validation failure, the
      * previous file is restored from the .bak snapshot we take first.
      *
+     * If an emitter is supplied (Livewire flow), each stage emits a step
+     * line so the operator sees the work progress in the ConsoleAction
+     * banner instead of staring at a spinner.
+     *
      * @param  array<string, string>  $values
      * @throws \RuntimeException when validate or reload fails
      */
-    public function save(Server $server, array $values): void
+    public function save(Server $server, array $values, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): void
     {
+        $emit = $emitter ?? new \App\Services\ConsoleActions\ConsoleEmitter(null);
+
         $ssh = new SshConnection($server);
 
+        $emit->step('ols-cache', 'Reading current httpd_config.conf');
         $contents = $ssh->exec('sudo -n cat '.escapeshellarg(self::REMOTE_PATH), 15);
         if ($ssh->lastExecExitCode() !== 0 || $contents === '') {
+            $emit->error('Could not read '.self::REMOTE_PATH);
             throw new \RuntimeException('Could not read httpd_config.conf from the server.');
         }
 
         $block = $this->renderBlock($values);
-        if ($this->extractCacheBlock($contents) !== null) {
+        $hadBlock = $this->extractCacheBlock($contents) !== null;
+        if ($hadBlock) {
+            $emit->info('Existing module cache block found — replacing in place.');
             $newContents = preg_replace('/^module\s+cache\s*\{.*?^\}\s*$/sm', rtrim($block, "\n"), $contents, 1);
         } else {
+            $emit->info('No module cache block on disk — appending a new one.');
             $newContents = rtrim($contents, "\n")."\n\n".$block;
         }
 
         if (! is_string($newContents) || $newContents === '') {
+            $emit->error('Failed to render the new httpd_config.conf');
             throw new \RuntimeException('Failed to render the new httpd_config.conf.');
         }
 
+        $emit->step('ols-cache', 'Staging new config to /tmp');
         $tmpRemote = '/tmp/dply-httpd_config.conf.'.bin2hex(random_bytes(6));
         $encoded = base64_encode($newContents);
         $writeCmd = sprintf(
@@ -223,34 +236,51 @@ class OpenLiteSpeedCacheModuleConfig
         );
         $ssh->exec($writeCmd, 15);
         if ($ssh->lastExecExitCode() !== 0) {
+            $emit->error('Failed to stage the new config on the server');
             throw new \RuntimeException('Failed to stage the new config on the server.');
         }
 
-        // Snapshot the current file before overwriting so a bad validate
-        // can be rolled back. Snapshot path is timestamped so the operator
-        // can find it on disk later.
         $bak = self::REMOTE_PATH.'.dply-bak.'.now()->format('YmdHis');
+        $emit->step('ols-cache', 'Snapshotting current config to '.$bak);
         $ssh->exec(sprintf('sudo -n cp -p %s %s', escapeshellarg(self::REMOTE_PATH), escapeshellarg($bak)), 10);
+
+        $emit->step('ols-cache', 'Installing new config at '.self::REMOTE_PATH);
         $ssh->exec(sprintf('sudo -n install -m 0644 -T %s %s', escapeshellarg($tmpRemote), escapeshellarg(self::REMOTE_PATH)), 10);
         if ($ssh->lastExecExitCode() !== 0) {
             $ssh->exec('sudo -n rm -f '.escapeshellarg($tmpRemote), 5);
+            $emit->error('install failed — previous config left in place');
             throw new \RuntimeException('Failed to install the new config on the server.');
         }
         $ssh->exec('sudo -n rm -f '.escapeshellarg($tmpRemote), 5);
 
+        $emit->step('ols-cache', 'Validating with `lshttpd -t`');
         $validate = $ssh->exec('sudo -n /usr/local/lsws/bin/lshttpd -t 2>&1; echo "__exit__:$?"', 30);
         $exit = $this->parseExitMarker($validate);
-        if ($exit !== 0) {
-            $ssh->exec(sprintf('sudo -n cp -p %s %s', escapeshellarg($bak), escapeshellarg(self::REMOTE_PATH)), 10);
-            throw new \RuntimeException('Config validation failed; previous config restored. lshttpd -t output:'."\n".trim($this->stripExitMarker($validate)));
+        $validateOutput = trim($this->stripExitMarker($validate));
+        if ($validateOutput !== '') {
+            foreach (preg_split('/\R/', $validateOutput) ?: [] as $line) {
+                $line = trim($line);
+                if ($line !== '') {
+                    $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                }
+            }
         }
+        if ($exit !== 0) {
+            $emit->step('ols-cache', 'Validation failed — restoring '.$bak);
+            $ssh->exec(sprintf('sudo -n cp -p %s %s', escapeshellarg($bak), escapeshellarg(self::REMOTE_PATH)), 10);
+            $emit->error('Config validation failed; previous config restored.');
+            throw new \RuntimeException('Config validation failed; previous config restored. lshttpd -t output:'."\n".$validateOutput);
+        }
+        $emit->success('Config validated.');
 
+        $emit->step('ols-cache', 'Reloading OpenLiteSpeed (`systemctl reload lshttpd`)');
         $reload = $ssh->exec('sudo -n systemctl reload lshttpd 2>&1; echo "__exit__:$?"', 20);
         $reloadExit = $this->parseExitMarker($reload);
         if ($reloadExit !== 0) {
-            // Restart fallback — reload sometimes fails on a stopped daemon.
+            $emit->warn('Reload returned non-zero — falling back to restart.');
             $ssh->exec('sudo -n systemctl restart lshttpd 2>&1', 30);
         }
+        $emit->success('OpenLiteSpeed reloaded with the new cache config.');
     }
 
     private function parseExitMarker(string $output): int
@@ -274,7 +304,7 @@ class OpenLiteSpeedCacheModuleConfig
      */
     private function extractCacheBlock(string $contents): ?string
     {
-        if (preg_match('/^module\s+cache\s*\{.*?^\}/sm', $contents, $m) !== 1) {
+        if (preg_match('/^[\t ]*module\s+cache\s*\{.*?^[\t ]*\}/sm', $contents, $m) !== 1) {
             return null;
         }
 
@@ -283,7 +313,7 @@ class OpenLiteSpeedCacheModuleConfig
 
     private function extractScalarDirective(string $block, string $key): ?string
     {
-        if (preg_match('/^\s*'.preg_quote($key, '/').'\s+(\S.*?)\s*$/m', $block, $m) !== 1) {
+        if (preg_match('/^[\t ]*'.preg_quote($key, '/').'\s+(\S.*?)\s*$/m', $block, $m) !== 1) {
             return null;
         }
 
@@ -295,7 +325,7 @@ class OpenLiteSpeedCacheModuleConfig
      */
     private function extractRepeatedDirective(string $block, string $key): array
     {
-        if (preg_match_all('/^\s*'.preg_quote($key, '/').'\s+(\S.*?)\s*$/m', $block, $matches) === false) {
+        if (preg_match_all('/^[\t ]*'.preg_quote($key, '/').'\s+(\S.*?)\s*$/m', $block, $matches) === false) {
             return [];
         }
 
