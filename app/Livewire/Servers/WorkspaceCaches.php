@@ -8,8 +8,10 @@ use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\TailCacheServiceMonitorJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerCacheServiceAuditEvent;
@@ -40,8 +42,10 @@ use Livewire\Component;
 class WorkspaceCaches extends Component
 {
     use ConfirmsActionWithModal;
+    use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RunsServerConsoleActions;
 
     /** Active workspace tab. URL-bound so deep links + back/forward work. */
     #[Url(as: 'tab', except: 'overview', history: true)]
@@ -318,38 +322,26 @@ class WorkspaceCaches extends Component
     }
 
     /**
-     * Per-instance command-output buffer. Originally fed only by debugCacheServiceInstance() —
-     * now also fed by repair/restart/stop/start so every one-shot SSH script lands in the same
-     * console panel below the action row. Keyed by `engine` so each engine's panel is independent.
-     *
-     * @var array<string, string>
+     * Stream output from an SSH-executor result into the given ConsoleEmitter
+     * line-by-line, preserving exit semantics. Each non-empty line becomes one
+     * entry; the source defaults to 'cache' so the partial's per-source colouring
+     * groups cache-engine output together. Throws on non-zero exit so the
+     * {@see runConsoleAction()} wrapper marks the row failed and re-throws.
      */
-    public array $debug_output_by_engine = [];
-
-    /**
-     * Human label for whichever action last wrote to {@see $debug_output_by_engine}. Used by the
-     * blade view to render the panel header ("Debug — output", "Repair port — output", etc.) so
-     * the operator can attribute the buffer to the command that produced it. Keyed by `engine`.
-     *
-     * @var array<string, string>
-     */
-    public array $debug_output_label_by_engine = [];
-
-    /**
-     * Capture a one-shot command's stdout+stderr into the per-engine console panel so the
-     * operator can see exactly what ran and what came back. Truncates to the last 8KB to keep
-     * the wire payload bounded; `$label` becomes the panel header. Centralised so every action
-     * (debug, repair, restart, stop, start, ...) surfaces in the same place with consistent
-     * shape — silently toasting "succeeded"/"failed" without showing the buffer was the previous
-     * footgun.
-     */
-    protected function recordCommandOutput(string $engine, string $label, string $buffer): void
+    protected function emitExecutorBuffer(\App\Services\ConsoleActions\ConsoleEmitter $emit, string $buffer, int $exitCode, string $verb): void
     {
-        $trimmed = trim($buffer);
-        $this->debug_output_by_engine[$engine] = $trimmed === ''
-            ? __('No output.')
-            : mb_substr($buffer, -8_000);
-        $this->debug_output_label_by_engine[$engine] = $label;
+        foreach (preg_split("/\r?\n/", $buffer) ?: [] as $line) {
+            if ($line === '') {
+                continue;
+            }
+            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'cache');
+        }
+
+        if ($exitCode !== 0) {
+            throw new \RuntimeException(__(':verb failed (exit :code).', [
+                'verb' => ucfirst($verb), 'code' => $exitCode,
+            ]));
+        }
     }
 
     /**
@@ -451,25 +443,30 @@ BASH,
         );
 
         try {
-            $output = $executor->runInlineBash(
-                $this->server,
-                'cache-service:debug:'.$engine.':'.$row->name,
-                $script,
-                timeoutSeconds: 30,
-                asRoot: true,
+            $this->runConsoleAction(
+                $row,
+                'cache_debug',
+                __('Debug :engine instance :name on :host', [
+                    'engine' => $engine, 'name' => $row->name, 'host' => $this->server->name,
+                ]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $engine, $row, $script): void {
+                    $output = $executor->runInlineBash(
+                        $this->server,
+                        'cache-service:debug:'.$engine.':'.$row->name,
+                        $script,
+                        timeoutSeconds: 30,
+                        asRoot: true,
+                    );
+                    // Diagnostic script is intentionally `|| true`-guarded throughout, so
+                    // exit 0 is the norm even when a probe finds nothing. We surface the
+                    // whole buffer regardless and never treat it as a failure here.
+                    $this->emitExecutorBuffer($emit, $output->buffer, 0, 'debug');
+                },
             );
-            $this->recordCommandOutput($engine, __('Debug'), $output->buffer);
-            $this->toastSuccess(__('Diagnostics captured. See the console panel below.'));
+            $this->toastSuccess(__('Diagnostics captured. See the console banner below.'));
         } catch (\Throwable $e) {
-            $this->recordCommandOutput($engine, __('Debug'), __('SSH diagnostic failed: :err', ['err' => $e->getMessage()]));
-            $this->toastError(__('Diagnostic run failed — see the console panel below for details.'));
+            $this->toastError(__('Diagnostic run failed — see the console banner below for details.'));
         }
-    }
-
-    public function clearCacheServiceDebugOutput(string $engine): void
-    {
-        unset($this->debug_output_by_engine[$engine]);
-        unset($this->debug_output_label_by_engine[$engine]);
     }
 
     /**
@@ -840,9 +837,9 @@ BASH,
             auth()->user(),
         );
 
-        // Drop any debug-panel buffer for this engine since the row it belonged to is gone.
-        unset($this->debug_output_by_engine[$engine]);
-        unset($this->debug_output_label_by_engine[$engine]);
+        // The deleted ServerCacheService row took any banner-attached ConsoleAction
+        // rows with it (subject_id no longer resolves), so the per-engine banner
+        // disappears on the next render without explicit cleanup.
 
         $this->toastSuccess(__(':engine instance ":name" removed from dply. Server-side state (binaries, config files, data dirs) was NOT touched — run apt purge / systemctl disable / rm manually if anything needs cleaning up on the box.', [
             'engine' => $engine,
@@ -2304,43 +2301,44 @@ systemctl status --no-pager --lines=15 {$serviceShell} 2>&1 || true
 exit \$verb_exit
 BASH;
         // Caller-provided label (e.g. "Disable" for `disable --now`) takes precedence so the
-        // console panel header doesn't read "Disable --now". Fall back to titlecased verb for
+        // console banner header doesn't read "Disable --now". Fall back to titlecased verb for
         // the simple restart/stop/start cases.
         $label = $label ?? __(ucfirst($verb));
-        $buffer = '';
+        // First word of the verb keyed into a stable kind slug so banner-getters can
+        // filter to "cache_*" rows. `disable --now` collapses to `cache_disable`, etc.
+        $kindVerb = strtolower((string) preg_replace('/\W.*/', '', $verb));
         try {
-            $output = $executor->runInlineBash(
-                $row->server,
-                'cache-service:'.$verb.':'.$row->engine.':'.$row->name,
-                $script,
-                timeoutSeconds: 60,
-                asRoot: true,
+            $this->runConsoleAction(
+                $row,
+                'cache_'.$kindVerb,
+                __(':label :engine on :host', [
+                    'label' => $label, 'engine' => $row->engine, 'host' => $this->server->name,
+                ]),
+                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $row, $verb, $script, $audit, $event, $newStatus): void {
+                    $output = $executor->runInlineBash(
+                        $row->server,
+                        'cache-service:'.$verb.':'.$row->engine.':'.$row->name,
+                        $script,
+                        timeoutSeconds: 60,
+                        asRoot: true,
+                    );
+                    // emitExecutorBuffer throws on non-zero exit so runConsoleAction's
+                    // catch block flips the row to failed without us double-handling.
+                    $this->emitExecutorBuffer($emit, $output->buffer, $output->exitCode, $verb);
+
+                    if ($newStatus) {
+                        $row->update(['status' => $newStatus]);
+                    }
+                    $audit->record($row->server, $event, ['engine' => $row->engine, 'name' => $row->name], auth()->user());
+                    $this->forgetStats($row);
+                },
             );
-            $buffer = $output->buffer;
-
-            if ($output->exitCode !== 0) {
-                $this->recordCommandOutput($engine, $label, $buffer);
-                $this->toastError(__(':verb failed for :engine — see the console panel below.', [
-                    'verb' => ucfirst($verb), 'engine' => $row->engine,
-                ]));
-
-                return;
-            }
-
-            if ($newStatus) {
-                $row->update(['status' => $newStatus]);
-            }
-
-            $audit->record($row->server, $event, ['engine' => $row->engine, 'name' => $row->name], auth()->user());
-            $this->forgetStats($row);
-            $this->recordCommandOutput($engine, $label, $buffer);
-            $this->toastSuccess(__(':verb succeeded for :engine — see the console panel below.', [
+            $this->toastSuccess(__(':verb succeeded for :engine — see the console banner above.', [
                 'verb' => ucfirst($verb),
-                'engine' => $row->engine, 'name' => $row->name,
+                'engine' => $row->engine,
             ]));
-        } catch (\Throwable $e) {
-            $this->recordCommandOutput($engine, $label, $buffer !== '' ? $buffer : $e->getMessage());
-            $this->toastError(__(':verb failed for :engine — see the console panel below.', [
+        } catch (\Throwable) {
+            $this->toastError(__(':verb failed for :engine — see the console banner above.', [
                 'verb' => ucfirst($verb), 'engine' => $row->engine,
             ]));
         }
@@ -2396,6 +2394,16 @@ BASH;
         // legacy (engine, name) double-grouping the multi-instance era required.
         $primaryByEngine = $services->keyBy('engine');
 
+        // Per-engine console-action runs. The blade renders the static banner whenever a
+        // matching row exists; filtering by 'cache_' kind family keeps unrelated runs
+        // (notification dispatches, audit replay) from leaking onto a cache banner.
+        $cacheRunsByEngine = $primaryByEngine
+            ->mapWithKeys(fn (ServerCacheService $row): array => [
+                $row->engine => $this->latestConsoleActionFor($row, 'cache_'),
+            ])
+            ->filter()
+            ->all();
+
         $auditEvents = ServerCacheServiceAuditEvent::query()
             ->where('server_id', $this->server->id)
             ->with('user:id,name')
@@ -2408,6 +2416,7 @@ BASH;
             'engineUnsupportedReasons' => $engineUnsupportedReasons,
             'cacheServices' => $services,
             'cacheServicesByEngine' => $primaryByEngine,
+            'cacheRunsByEngine' => $cacheRunsByEngine,
             'cacheStatsByInstance' => $statsByInstance,
             'cacheAuditEvents' => $auditEvents,
             'engineLabels' => [

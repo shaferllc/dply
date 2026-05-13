@@ -188,22 +188,32 @@
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
                         <span class="inline-flex items-center gap-2">
-                            @switch($engine)
-                                @case('memcached')
-                                    <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    @break
-                                @case('valkey')
-                                    <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />
-                                    @break
-                                @case('keydb')
-                                    <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-violet-600" aria-hidden="true" />
-                                    @break
-                                @case('dragonfly')
-                                    <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-                                    @break
-                                @default
-                                    <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
-                            @endswitch
+                            {{-- Per-engine icon is colored per engine so we can't use the tab
+                                 component's `icon=` prop (which is what gives the Overview /
+                                 Advanced tabs their built-in spinner-swap). Replicate that swap
+                                 here: render the icon while idle, and substitute a spinner while
+                                 setWorkspaceTab is in flight against THIS engine. --}}
+                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading.remove wire:target="setWorkspaceTab('{{ $engine }}')">
+                                @switch($engine)
+                                    @case('memcached')
+                                        <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        @break
+                                    @case('valkey')
+                                        <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />
+                                        @break
+                                    @case('keydb')
+                                        <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-violet-600" aria-hidden="true" />
+                                        @break
+                                    @case('dragonfly')
+                                        <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                                        @break
+                                    @default
+                                        <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
+                                @endswitch
+                            </span>
+                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="setWorkspaceTab('{{ $engine }}')">
+                                <x-spinner class="h-4 w-4" />
+                            </span>
                             {{ $engineLabels[$engine] }}
                             @if ($row)
                                 @if ($isInFlight)
@@ -407,14 +417,14 @@
                     \App\Models\ServerCacheService::STATUS_INSTALLING,
                     \App\Models\ServerCacheService::STATUS_UNINSTALLING,
                 ], true);
-                // Per-instance probe — uses the row's actual port instead of the
-                // engine-level aggregate which hardcoded 6379 and produced
-                // false-negatives on non-default-port instances (e.g. KeyDB on 6382).
-                // Falls back to the engine-level signal when there's no row yet.
-                $probeRunning = $row
-                    ? app(\App\Support\Servers\ServerCacheServiceHostCapabilities::class)
-                        ->probeInstance($server, $engine, (int) $row->port)
-                    : (bool) ($capabilities[$engine] ?? false);
+                // Reachability badge. Post-collapse every row is on the engine default port, so
+                // the cached `$capabilities[$engine]` map (set by ServerCacheServiceHostCapabilities::
+                // forServer() and TTL'd for 24h) is the source of truth. Going through the live
+                // `probeInstance()` call here used to fire an uncached SSH round-trip on every
+                // render — including every tab switch — which made the workspace feel slow next
+                // to webserver's tab strip. The Refresh data action busts the cache when the
+                // operator wants fresh numbers.
+                $probeRunning = (bool) ($capabilities[$engine] ?? false);
             @endphp
             <x-server-workspace-tab-panel
                 :id="'cache-panel-'.$engine"
@@ -681,30 +691,18 @@
                             </p>
                         @endif
 
-                        {{-- Command-output panel — Debug, Repair, Restart/Stop/Start all land here
-                             so the operator can read the actual shell output instead of guessing
-                             what a one-line success/failure toast meant. The label tracks the
-                             action that most recently wrote into this buffer. Dismiss clears it. --}}
-                        @if (! empty($debug_output_by_engine[$engine]))
-                            @php
-                                $consoleLabel = $debug_output_label_by_engine[$engine] ?? __('Debug');
-                            @endphp
-                            <div class="mt-4 overflow-hidden rounded-xl border border-amber-300 bg-amber-50">
-                                <div class="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-100/60 px-4 py-2.5">
-                                    <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-900">
-                                        <x-heroicon-o-command-line class="h-3.5 w-3.5" />
-                                        {{ __(':label — :engine instance :name', ['label' => $consoleLabel, 'engine' => $engineLabels[$engine] ?? $engine, 'name' => $row->name]) }}
-                                    </p>
-                                    <button
-                                        type="button"
-                                        wire:click="clearCacheServiceDebugOutput('{{ $engine }}')"
-                                        class="inline-flex items-center gap-1 rounded-md text-[11px] font-medium text-amber-900 hover:bg-amber-200/60 px-1.5 py-0.5"
-                                    >
-                                        <x-heroicon-o-x-mark class="h-3 w-3" />
-                                        {{ __('Dismiss') }}
-                                    </button>
-                                </div>
-                                <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-words bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-emerald-100">{{ $debug_output_by_engine[$engine] }}</pre>
+                        {{-- Command-output banner — Debug, Restart/Stop/Start/Disable/Enable all
+                             route through the shared ConsoleAction banner so the operator sees the
+                             actual shell output with consistent chrome, tone-coded lines, copy-output
+                             and "open in modal" affordances. Subject is the ServerCacheService row;
+                             kind is `cache_*` (filtered in render() via `latestConsoleActionFor`). --}}
+                        @php $cacheRun = $cacheRunsByEngine[$engine] ?? null; @endphp
+                        @if ($cacheRun)
+                            <div class="mt-4">
+                                @include('livewire.partials.console-action-banner-static', [
+                                    'run' => $cacheRun,
+                                    'kindLabels' => [],
+                                ])
                             </div>
                         @endif
 
