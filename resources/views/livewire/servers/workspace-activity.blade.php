@@ -38,17 +38,11 @@
     </x-explainer>
 
     <x-server-workspace-tablist :aria-label="__('Activity sections')">
-        <x-server-workspace-tab id="activity-tab-feed" :active="$tab === 'feed'" wire:click="setTab('feed')">
-            <span class="inline-flex items-center gap-1.5">
-                <x-heroicon-o-list-bullet class="h-4 w-4" aria-hidden="true" />
-                {{ __('Feed') }}
-            </span>
+        <x-server-workspace-tab id="activity-tab-feed" :active="$tab === 'feed'" wire:click="setTab('feed')" icon="heroicon-o-list-bullet">
+            {{ __('Feed') }}
         </x-server-workspace-tab>
-        <x-server-workspace-tab id="activity-tab-trends" :active="$tab === 'trends'" wire:click="setTab('trends')">
-            <span class="inline-flex items-center gap-1.5">
-                <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
-                {{ __('Trends') }}
-            </span>
+        <x-server-workspace-tab id="activity-tab-trends" :active="$tab === 'trends'" wire:click="setTab('trends')" icon="heroicon-o-chart-bar">
+            {{ __('Trends') }}
         </x-server-workspace-tab>
     </x-server-workspace-tablist>
 

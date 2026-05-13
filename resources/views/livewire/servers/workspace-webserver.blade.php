@@ -491,11 +491,9 @@
             id="ws-tab-overview"
             :active="$workspace_tab === 'overview'"
             wire:click="setWorkspaceTab('overview')"
+            icon="heroicon-o-bolt"
         >
-            <span class="inline-flex items-center gap-2">
-                <x-heroicon-o-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Overview') }}
-            </span>
+            {{ __('Overview') }}
         </x-server-workspace-tab>
         @foreach ($engineTabCatalog as $key => $info)
             @php
@@ -508,27 +506,23 @@
                 :id="'ws-tab-'.$key"
                 :active="$workspace_tab === $key"
                 wire:click="setWorkspaceTab('{{ $key }}')"
+                :icon="$info['icon']"
             >
-                <span class="inline-flex items-center gap-2">
-                    <x-dynamic-component :component="$info['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ $info['label'] }}
-                    @if ($isActiveEngine)
-                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ $isEdgeProxyTab ? __('Edge') : __('Active') }}</span>
-                    @elseif (! $isEdgeProxyTab && $preflight->isBlocked($server, $key))
-                        <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('Unavailable') }}</span>
-                    @endif
-                </span>
+                {{ $info['label'] }}
+                @if ($isActiveEngine)
+                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ $isEdgeProxyTab ? __('Edge') : __('Active') }}</span>
+                @elseif (! $isEdgeProxyTab && $preflight->isBlocked($server, $key))
+                    <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('Unavailable') }}</span>
+                @endif
             </x-server-workspace-tab>
         @endforeach
         <x-server-workspace-tab
             id="ws-tab-advanced"
             :active="$workspace_tab === 'advanced'"
             wire:click="setWorkspaceTab('advanced')"
+            icon="heroicon-o-wrench-screwdriver"
         >
-            <span class="inline-flex items-center gap-2">
-                <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Advanced') }}
-            </span>
+            {{ __('Advanced') }}
         </x-server-workspace-tab>
     </x-server-workspace-tablist>
 
@@ -864,11 +858,9 @@
                     :id="'ws-subtab-'.$key.'-overview'"
                     :active="$engine_subtab === 'overview'"
                     wire:click="setEngineSubtab('overview')"
+                    icon="heroicon-o-presentation-chart-line"
                 >
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-presentation-chart-line class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Overview') }}
-                    </span>
+                    {{ __('Overview') }}
                 </x-server-workspace-tab>
                 @if ($hasControls)
                     {{-- Tools sub-tab removed: the same per-engine diagnostic
@@ -879,21 +871,17 @@
                         :id="'ws-subtab-'.$key.'-logs'"
                         :active="$engine_subtab === 'logs'"
                         wire:click="setEngineSubtab('logs')"
+                        icon="heroicon-o-document-text"
                     >
-                        <span class="inline-flex items-center gap-2">
-                            <x-heroicon-o-document-text class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Logs') }}
-                        </span>
+                        {{ __('Logs') }}
                     </x-server-workspace-tab>
                     <x-server-workspace-tab
                         :id="'ws-subtab-'.$key.'-config'"
                         :active="$engine_subtab === 'config'"
                         wire:click="setEngineSubtab('config')"
+                        icon="heroicon-o-pencil-square"
                     >
-                        <span class="inline-flex items-center gap-2">
-                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Config') }}
-                        </span>
+                        {{ __('Config') }}
                     </x-server-workspace-tab>
                 @endif
                 {{-- Per-engine live-state sub-tabs. Only shown for the
@@ -934,11 +922,9 @@
                             :id="'ws-subtab-'.$key.'-'.$stKey"
                             :active="$engine_subtab === $stKey"
                             wire:click="setEngineSubtab('{{ $stKey }}')"
+                            :icon="$stInfo['icon']"
                         >
-                            <span class="inline-flex items-center gap-2">
-                                <x-dynamic-component :component="$stInfo['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ $stInfo['label'] }}
-                            </span>
+                            {{ $stInfo['label'] }}
                         </x-server-workspace-tab>
                     @endforeach
                 @endif
@@ -946,11 +932,9 @@
                     :id="'ws-subtab-'.$key.'-info'"
                     :active="$engine_subtab === 'info'"
                     wire:click="setEngineSubtab('info')"
+                    icon="heroicon-o-information-circle"
                 >
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Info') }}
-                    </span>
+                    {{ __('Info') }}
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
 

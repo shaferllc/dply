@@ -169,11 +169,9 @@
                     id="cache-tab-overview"
                     :active="$workspace_tab === 'overview'"
                     wire:click="setWorkspaceTab('overview')"
+                    icon="heroicon-o-bolt"
                 >
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Overview') }}
-                    </span>
+                    {{ __('Overview') }}
                 </x-server-workspace-tab>
                 @foreach ($engines as $engine)
                     @php
@@ -228,11 +226,9 @@
                     id="cache-tab-advanced"
                     :active="$workspace_tab === 'advanced'"
                     wire:click="setWorkspaceTab('advanced')"
+                    icon="heroicon-o-wrench-screwdriver"
                 >
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Advanced') }}
-                    </span>
+                    {{ __('Advanced') }}
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
 
