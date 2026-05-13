@@ -5,9 +5,10 @@ declare(strict_types=1);
 return [
     /**
      * Cache the per-server cache-service probe so the WorkspaceCaches render path doesn't run an
-     * SSH round-trip on every Livewire update. Recheck button busts this manually.
+     * SSH round-trip on every Livewire update. The workspace's "Refresh data" action busts this
+     * manually whenever the operator wants fresh badges.
      */
-    'capabilities_cache_ttl_seconds' => (int) env('SERVER_CACHE_CAPABILITIES_TTL', 120),
+    'capabilities_cache_ttl_seconds' => (int) env('SERVER_CACHE_CAPABILITIES_TTL', 86_400),
 
     /**
      * Cache TTL for the per-server distro probe (ID + codename from /etc/os-release). Codename
@@ -15,6 +16,14 @@ return [
      * ServerCacheServiceHostCapabilities::forgetDistro() if you rebuild the box in-place.
      */
     'distro_cache_ttl_seconds' => (int) env('SERVER_CACHE_DISTRO_TTL', 86_400),
+
+    /**
+     * Cache TTL for the per-engine `INFO` / `stats` snapshot rendered on the Overview tab.
+     * Snapshots are SSH round-trips through redis-cli / nc and we don't want every Livewire
+     * tick to re-run them; the workspace's "Refresh data" action busts these for every engine
+     * whenever the operator wants live numbers.
+     */
+    'stats_cache_ttl_seconds' => (int) env('SERVER_CACHE_STATS_TTL', 86_400),
 
     /**
      * Optional dedicated queue for cache-service install / uninstall jobs. Horizon must list this

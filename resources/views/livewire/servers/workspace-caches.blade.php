@@ -258,17 +258,17 @@
                             class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <span class="block font-medium">
-                                <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Recheck engines') }}</span>
-                                <span wire:loading wire:target="refreshCacheCapabilities">{{ __('Rechecking…') }}</span>
+                                <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Refresh data') }}</span>
+                                <span wire:loading wire:target="refreshCacheCapabilities">{{ __('Refreshing…') }}</span>
                             </span>
-                            <span class="mt-0.5 block text-xs leading-snug text-brand-mist">{{ __('Re-runs engine detection over SSH. Use this if you installed or removed something on the box and the badges look stale; detection is cached for a few minutes.') }}</span>
+                            <span class="mt-0.5 block text-xs leading-snug text-brand-mist">{{ __('Re-runs engine detection, distro probe, and per-engine stats over SSH. Results are cached for 24 hours; use this whenever you want live numbers or after installing/removing something on the box.') }}</span>
                         </button>
                     </x-slot>
                 </x-dropdown>
             </div>
         </div>
 
-        <div class="relative">
+        <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setWorkspaceTab">
 
         {{-- ============================================================================
              OVERVIEW TAB — list every installed engine as its own card. Empty state when

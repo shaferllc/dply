@@ -13,9 +13,9 @@ use Illuminate\Support\Facades\Cache;
  * `ServerDatabaseHostCapabilities` and is consumed by the WorkspaceCaches
  * Livewire component to gate the per-engine status UI.
  *
- * Result is cached per-server via the application cache for ~120s; the
- * workspace exposes a Recheck button that calls forget() to bypass the
- * cache after install/uninstall.
+ * Result is cached per-server via the application cache for ~24h; the
+ * workspace exposes a "Refresh data" button that calls forget() to bypass
+ * the cache on demand (also called automatically after install/uninstall).
  *
  * Engines:
  *   - redis      → `redis-cli -p {port} ping` returns "PONG"
@@ -40,7 +40,7 @@ class ServerCacheServiceHostCapabilities
             return $this->emptyResult();
         }
 
-        $ttl = max(0, (int) config('server_cache.capabilities_cache_ttl_seconds', 120));
+        $ttl = max(0, (int) config('server_cache.capabilities_cache_ttl_seconds', 86_400));
         $key = 'server.'.$server->id.'.cache_service_capabilities_v1';
 
         if ($ttl === 0) {

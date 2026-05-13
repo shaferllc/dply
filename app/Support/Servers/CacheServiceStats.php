@@ -26,10 +26,11 @@ class CacheServiceStats
      */
     public function snapshot(Server $server, ServerCacheService $cacheService): array
     {
-        // Cache the per-engine snapshot for ~30s so tab switching doesn't fire a fresh `redis-cli
-        // INFO` round-trip on every render. The TTL is short enough that the Overview tab still
-        // feels live; restart/stop/flush actions bust the key explicitly via forget().
-        $ttl = max(0, (int) config('server_cache.stats_cache_ttl_seconds', 30));
+        // Cache the per-engine snapshot for ~24h so the Overview tab loads instantly on
+        // subsequent visits. Stats are inherently volatile, so the workspace surfaces a
+        // "Refresh data" button that busts every engine's key on demand; restart/stop/flush
+        // actions also bust the key explicitly via forget().
+        $ttl = max(0, (int) config('server_cache.stats_cache_ttl_seconds', 86_400));
         $key = 'server.'.$server->id.'.cache_stats_v1.'.$cacheService->engine;
 
         $compute = function () use ($server, $cacheService): array {

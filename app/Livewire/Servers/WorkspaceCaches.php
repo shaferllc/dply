@@ -298,11 +298,23 @@ class WorkspaceCaches extends Component
         return false;
     }
 
-    public function refreshCacheCapabilities(ServerCacheServiceHostCapabilities $capabilities): void
-    {
+    public function refreshCacheCapabilities(
+        ServerCacheServiceHostCapabilities $capabilities,
+        CacheServiceStats $stats,
+    ): void {
         $this->authorize('update', $this->server);
+
+        // Bust every SSH-bound cache the render path touches so the next render pulls fresh
+        // data. Capabilities + distro feed the engine badges and install gating; stats feed
+        // the per-engine Overview cards. Without busting all three, the operator clicks
+        // Refresh and only the badges update — leaving stale memory / hit-rate numbers.
         $capabilities->forget($this->server);
-        $this->toastSuccess(__('Rechecked the server for cache services.'));
+        $capabilities->forgetDistro($this->server);
+        foreach (CacheServiceInstallScripts::supportedEngines() as $engine) {
+            $stats->forget($this->server, $engine);
+        }
+
+        $this->toastSuccess(__('Refreshed cache workspace data from the server.'));
     }
 
     /**
