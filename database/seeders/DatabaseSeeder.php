@@ -36,16 +36,6 @@ class DatabaseSeeder extends Seeder
             $this->call(LocalDemoServersSeeder::class);
         }
 
-<<<<<<< Updated upstream
         $this->call(ScriptSeeder::class);
-=======
-    /**
-     * Local development: ensure tj@tjshafer.com exists with a normal workspace organization
-     * (password: "password"). Legacy rows with slug "local-dev" are renamed in place.
-     */
-    protected function seedLocalDevAdmin(): void
-    {
-        EnsureLocalDevAdminUser::run();
->>>>>>> Stashed changes
     }
 }
