@@ -200,17 +200,11 @@
         @endif
 
         <x-server-workspace-tablist :aria-label="__('Services workspace')">
-            <x-server-workspace-tab id="services-tab-inventory" :active="$services_workspace_tab === 'inventory'" wire:click="$set('services_workspace_tab', 'inventory')">
-                <span class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-cog-6-tooth class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Inventory') }}
-                </span>
+            <x-server-workspace-tab id="services-tab-inventory" icon="heroicon-o-cog-6-tooth" :active="$services_workspace_tab === 'inventory'" wire:click="$set('services_workspace_tab', 'inventory')">
+                {{ __('Inventory') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab id="services-tab-activity" :active="$services_workspace_tab === 'activity'" wire:click="$set('services_workspace_tab', 'activity')">
-                <span class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Activity') }}
-                </span>
+            <x-server-workspace-tab id="services-tab-activity" icon="heroicon-o-clock" :active="$services_workspace_tab === 'activity'" wire:click="$set('services_workspace_tab', 'activity')">
+                {{ __('Activity') }}
             </x-server-workspace-tab>
         </x-server-workspace-tablist>
 

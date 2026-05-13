@@ -559,55 +559,45 @@
                     <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])">
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-overview'"
+                            icon="heroicon-o-presentation-chart-line"
                             :active="$activeSubtab === 'overview'"
                             wire:click="setEngineSubtab('overview')"
                         >
-                            <span class="inline-flex items-center gap-2">
-                                <x-heroicon-o-presentation-chart-line class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Overview') }}
-                            </span>
+                            {{ __('Overview') }}
                         </x-server-workspace-tab>
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-info'"
+                            icon="heroicon-o-information-circle"
                             :active="$activeSubtab === 'info'"
                             wire:click="setEngineSubtab('info')"
                         >
-                            <span class="inline-flex items-center gap-2">
-                                <x-heroicon-o-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Info') }}
-                            </span>
+                            {{ __('Info') }}
                         </x-server-workspace-tab>
                         @if ($isRedisFamily)
                             <x-server-workspace-tab
                                 :id="'cache-subtab-'.$engine.'-console'"
+                                icon="heroicon-o-command-line"
                                 :active="$activeSubtab === 'console'"
                                 wire:click="setEngineSubtab('console')"
                             >
-                                <span class="inline-flex items-center gap-2">
-                                    <x-heroicon-o-command-line class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Console') }}
-                                </span>
+                                {{ __('Console') }}
                             </x-server-workspace-tab>
                             <x-server-workspace-tab
                                 :id="'cache-subtab-'.$engine.'-stats'"
+                                icon="heroicon-o-chart-bar"
                                 :active="$activeSubtab === 'stats'"
                                 wire:click="setEngineSubtab('stats')"
                             >
-                                <span class="inline-flex items-center gap-2">
-                                    <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Stats') }}
-                                </span>
+                                {{ __('Stats') }}
                             </x-server-workspace-tab>
                         @endif
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-configure'"
+                            icon="heroicon-o-adjustments-horizontal"
                             :active="$activeSubtab === 'configure'"
                             wire:click="setEngineSubtab('configure')"
                         >
-                            <span class="inline-flex items-center gap-2">
-                                <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Configure') }}
-                            </span>
+                            {{ __('Configure') }}
                         </x-server-workspace-tab>
                     </x-server-workspace-tablist>
 
@@ -1116,7 +1106,7 @@
                                     <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
                                     <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="exposeCacheToNetwork" x-on:click="$dispatch('close')">
                                         <span wire:loading.remove wire:target="exposeCacheToNetwork">{{ __('Expose') }}</span>
-                                        <span wire:loading wire:target="exposeCacheToNetwork">{{ __('Working…') }}</span>
+                                        <span wire:loading wire:target="exposeCacheToNetwork">{{ __('Exposing…') }}</span>
                                     </x-primary-button>
                                 </div>
                             </form>

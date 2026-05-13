@@ -40,13 +40,11 @@
             <x-server-workspace-tablist :aria-label="__('Database workspace sections')" class="sm:min-w-0 sm:flex-1">
                 <x-server-workspace-tab
                     id="db-tab-basics"
+                    icon="heroicon-o-circle-stack"
                     :active="$workspace_tab === 'databases'"
                     wire:click="setWorkspaceTab('databases')"
                 >
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-circle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Basics') }}
-                    </span>
+                    {{ __('Basics') }}
                 </x-server-workspace-tab>
                 @foreach (['mysql', 'postgres', 'sqlite'] as $engine)
                     @php
@@ -69,11 +67,21 @@
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
                         <span class="inline-flex items-center gap-2">
-                            @if ($engine === 'sqlite')
-                                <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            @else
-                                <x-heroicon-o-circle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            @endif
+                            {{-- Per-engine icon switches on engine type, so we can't use the tab
+                                 component's `icon=` prop (which is what auto-swaps to a spinner
+                                 during wire:loading). Replicate that swap manually: render the
+                                 icon while idle, substitute a spinner while setWorkspaceTab is
+                                 in flight against THIS engine. Mirrors the caches pattern. --}}
+                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading.remove wire:target="setWorkspaceTab('{{ $engine }}')">
+                                @if ($engine === 'sqlite')
+                                    <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                @else
+                                    <x-heroicon-o-circle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                @endif
+                            </span>
+                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="setWorkspaceTab('{{ $engine }}')">
+                                <x-spinner class="h-4 w-4" />
+                            </span>
                             {{ $engineLabels[$engine] ?? ucfirst($engine) }}
                             @if ($engineRow && in_array($engineRow->status, [
                                 \App\Models\ServerDatabaseEngine::STATUS_PENDING,
@@ -94,23 +102,19 @@
                 @endforeach
                 <x-server-workspace-tab
                     id="db-tab-advanced"
+                    icon="heroicon-o-wrench-screwdriver"
                     :active="$workspace_tab === 'advanced'"
                     wire:click="setWorkspaceTab('advanced')"
                 >
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Advanced') }}
-                    </span>
+                    {{ __('Advanced') }}
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
                     id="db-tab-notifications"
+                    icon="heroicon-o-bell"
                     :active="$workspace_tab === 'notifications'"
                     wire:click="setWorkspaceTab('notifications')"
                 >
-                    <span class="inline-flex items-center gap-2">
-                        <x-heroicon-o-bell class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Notifications') }}
-                    </span>
+                    {{ __('Notifications') }}
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
 
@@ -385,23 +389,19 @@
                     <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $engineLabels[$engine] ?? $engine])">
                         <x-server-workspace-tab
                             :id="'db-subtab-'.$engine.'-overview'"
+                            icon="heroicon-o-presentation-chart-line"
                             :active="$engine_subtab === 'overview'"
                             wire:click="setEngineSubtab('overview')"
                         >
-                            <span class="inline-flex items-center gap-2">
-                                <x-heroicon-o-presentation-chart-line class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Overview') }}
-                            </span>
+                            {{ __('Overview') }}
                         </x-server-workspace-tab>
                         <x-server-workspace-tab
                             :id="'db-subtab-'.$engine.'-info'"
+                            icon="heroicon-o-information-circle"
                             :active="$engine_subtab === 'info'"
                             wire:click="setEngineSubtab('info')"
                         >
-                            <span class="inline-flex items-center gap-2">
-                                <x-heroicon-o-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Info') }}
-                            </span>
+                            {{ __('Info') }}
                         </x-server-workspace-tab>
                     </x-server-workspace-tablist>
                 @endif
