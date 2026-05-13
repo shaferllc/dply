@@ -158,6 +158,13 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
             $meta['webserver'] = $this->target;
             $server->update(['meta' => $meta]);
 
+            // Re-probe systemd inventory so meta.manage_units reflects the
+            // new daemon's active_state + unit_file_state. Without this the
+            // webserver workspace shows stale state from the OLD engine for
+            // up to the next scheduled probe — see the engine-Overview filter
+            // that hides Start when daemon is active, etc.
+            \App\Jobs\SyncServerSystemdServicesJob::dispatch($server->id);
+
             $emitter->info('Done.');
             $this->completeConsoleAction();
             $this->recordAudit($server, $from, ServerWebserverAuditEvent::ACTION_SWITCHED, [

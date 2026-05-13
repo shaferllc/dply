@@ -300,12 +300,17 @@ BASH,
             'rerun_probe_after_finish' => true,
         ],
 
+        // Note: every *_test_config script wraps the parse-only validator in a
+        // `cmd && echo "[ok] …" || { echo "[error] …"; exit 1; }` trailer so
+        // the banner shows a clear pass/fail summary on top of the binary's
+        // own output. The `set -euo pipefail` wrapper around inline bash
+        // doesn't trip on `cmd && a || b` chains, so this stays safe.
         'nginx_test_config' => [
             'label' => 'Test nginx config',
             'description' => 'Runs nginx -t to validate configuration without reloading.',
             'confirm' => 'Test the nginx configuration now?',
             'timeout' => 60,
-            'script' => '(sudo -n nginx -t 2>&1 || nginx -t 2>&1)',
+            'script' => '(sudo -n nginx -t 2>&1 || nginx -t 2>&1) && echo "[ok] nginx config is valid." || { echo "[error] nginx config validation failed."; exit 1; }',
         ],
 
         // Caddy service actions — mirror the nginx triad. Registered so the
@@ -804,14 +809,14 @@ BASH,
             'description' => '`lshttpd -v` — server version + build identifier.',
             'confirm' => 'Show OpenLiteSpeed version?',
             'timeout' => 10,
-            'script' => '(sudo -n /usr/local/lsws/bin/lshttpd -v 2>&1 || /usr/local/lsws/bin/lshttpd -v 2>&1)',
+            'script' => '/usr/local/lsws/bin/lshttpd -v 2>&1',
         ],
         'openlitespeed_modules' => [
             'label' => 'OpenLiteSpeed modules',
-            'description' => '`lshttpd -M` — modules compiled into the binary.',
+            'description' => 'List shared modules in /usr/local/lsws/modules. `lshttpd -M` itself refuses to run while the server is active.',
             'confirm' => 'List OpenLiteSpeed modules?',
             'timeout' => 10,
-            'script' => '(sudo -n /usr/local/lsws/bin/lshttpd -M 2>&1 || /usr/local/lsws/bin/lshttpd -M 2>&1)',
+            'script' => 'ls -1 /usr/local/lsws/modules/*.so 2>/dev/null | sed -e "s|.*/||" -e "s|\\.so\\$||" | sort',
         ],
         'openlitespeed_status' => [
             'label' => 'OpenLiteSpeed status',

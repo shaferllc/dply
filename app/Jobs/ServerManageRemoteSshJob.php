@@ -214,6 +214,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
             ]);
             $this->updateLog(ServerManageAction::STATUS_FINISHED, output: $trimmed);
             $this->emitConsoleTail($emitter, $trimmed, $lastEmittedLen);
+            $this->emitConsolePlaceholderIfEmpty($emitter, $trimmed);
             $this->markConsoleCompleted();
             $this->broadcastCompletion(true, null, $trimmed);
 
@@ -273,6 +274,24 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 $emitter($line);
             }
         }
+    }
+
+    /**
+     * Drop a friendly placeholder when a successful run produced no terminal
+     * output at all — some daemons (e.g. `lshttpd -t`) write their diagnostics
+     * into the server's own log file instead of stdout/stderr, so the SSH
+     * stream stays empty even though the run finished cleanly. Without this
+     * the banner shows the unhelpful "No output recorded." copy.
+     */
+    private function emitConsolePlaceholderIfEmpty(ConsoleEmitter $emitter, string $finalOutput): void
+    {
+        if ($this->consoleActionId === null) {
+            return;
+        }
+        if (trim($finalOutput) !== '') {
+            return;
+        }
+        $emitter->success(__('Command finished with no terminal output.'), 'dply');
     }
 
     private function markConsoleRunning(): void

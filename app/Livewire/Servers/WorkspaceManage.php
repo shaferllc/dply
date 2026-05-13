@@ -349,6 +349,14 @@ BASH;
                     $timeout,
                 );
                 $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
+                // Some daemons (e.g. `lshttpd -t`) write diagnostics into their
+                // own log file rather than stdout/stderr, so the streaming
+                // callback never fires and the banner shows "No output
+                // recorded." Drop a placeholder line so the operator at least
+                // sees that the command finished cleanly.
+                if (trim((string) $this->remote_output) === '') {
+                    $emitter->success(__('Command finished with no terminal output.'), 'dply');
+                }
                 \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
                     'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
                     'finished_at' => now(),

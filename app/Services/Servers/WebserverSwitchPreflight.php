@@ -61,6 +61,16 @@ final class WebserverSwitchPreflight
     private array $sitesCache = [];
 
     /**
+     * Per-instance cache of varnish-running rows keyed by server_id. The
+     * varnish blocker check runs inside detectBlocker(), once per target
+     * the picker shows — without this every non-active engine pays for its
+     * own varnish select even though the answer is identical across targets.
+     *
+     * @var array<string, \App\Models\ServerCacheService|null>
+     */
+    private array $varnishCache = [];
+
+    /**
      * Compute the cascade preview for switching {old} → {new}. Returns the
      * shape consumed by `livewire.servers.partials.manage.group-web` and
      * `WorkspaceManage::confirmSwitchWebserver()`.
@@ -217,14 +227,7 @@ final class WebserverSwitchPreflight
         // webserver bound to 127.0.0.1:8080. The switch flow uses :8080 as
         // its staging port — both can't share it. Operator uninstalls
         // Varnish first, switches the webserver, then reinstalls Varnish.
-        $varnishRow = \App\Models\ServerCacheService::query()
-            ->where('server_id', $server->id)
-            ->where('engine', 'varnish')
-            ->whereIn('status', [
-                \App\Models\ServerCacheService::STATUS_RUNNING,
-                \App\Models\ServerCacheService::STATUS_INSTALLING,
-            ])
-            ->first();
+        $varnishRow = $this->varnishRowFor($server);
         if ($varnishRow !== null) {
             return [
                 'key' => 'varnish_running',
@@ -261,6 +264,26 @@ final class WebserverSwitchPreflight
             ->where('server_id', $server->id)
             ->with(['webserverConfigProfile', 'certificates'])
             ->get(['id', 'name', 'runtime', 'status', 'type']);
+    }
+
+    /**
+     * Most-recent running/installing varnish row for this server, memoized so
+     * the picker loop doesn't pay for a select per target.
+     */
+    private function varnishRowFor(Server $server): ?\App\Models\ServerCacheService
+    {
+        if (array_key_exists($server->id, $this->varnishCache)) {
+            return $this->varnishCache[$server->id];
+        }
+
+        return $this->varnishCache[$server->id] = \App\Models\ServerCacheService::query()
+            ->where('server_id', $server->id)
+            ->where('engine', 'varnish')
+            ->whereIn('status', [
+                \App\Models\ServerCacheService::STATUS_RUNNING,
+                \App\Models\ServerCacheService::STATUS_INSTALLING,
+            ])
+            ->first();
     }
 
     /**

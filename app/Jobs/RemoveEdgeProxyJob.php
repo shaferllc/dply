@@ -116,6 +116,10 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             $meta['webserver'] = 'caddy';
             $server->update(['meta' => $meta]);
 
+            // Re-probe systemd inventory so meta.manage_units reflects the
+            // post-remove state (caddy back on :80, edge proxy stopped+disabled).
+            \App\Jobs\SyncServerSystemdServicesJob::dispatch($server->id);
+
             $emitter->info('Done.');
             $this->completeConsoleAction();
             $this->recordAudit($server, $edgeProxy, ServerWebserverAuditEvent::ACTION_EDGE_PROXY_REMOVED, [

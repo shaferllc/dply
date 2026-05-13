@@ -68,6 +68,17 @@ final class ServerMetricsRangeQuery
         'io_write_bps',
     ];
 
+    /**
+     * Per-instance memo of (in-range snapshots, latest snapshot) keyed by
+     * `{server_id}|{range}`. The engine-overview panel renders one chart card
+     * per active engine — caddy backend + traefik edge can both be "active"
+     * for the same server, so without this memo the same range fetch + most-
+     * recent select run once per active engine.
+     *
+     * @var array<string, array{snapshots: Collection, latest: ?ServerMetricSnapshot, from: Carbon, to: Carbon}>
+     */
+    private array $snapshotCache = [];
+
     public static function defaultRange(): string
     {
         return '1h';
@@ -94,21 +105,9 @@ final class ServerMetricsRangeQuery
     {
         $range = self::isValidRange($range) ? $range : self::defaultRange();
         $bucketSeconds = self::RANGES[$range];
-        $windowSeconds = self::WINDOW_SECONDS[$range];
 
-        $to = now();
-        $from = $to->copy()->subSeconds($windowSeconds);
-
-        $snapshots = ServerMetricSnapshot::query()
-            ->where('server_id', $server->id)
-            ->where('captured_at', '>=', $from)
-            ->orderBy('captured_at')
-            ->get(['captured_at', 'payload']);
-
-        $latest = ServerMetricSnapshot::query()
-            ->where('server_id', $server->id)
-            ->orderByDesc('captured_at')
-            ->first();
+        ['snapshots' => $snapshots, 'latest' => $latest, 'from' => $from, 'to' => $to]
+            = $this->loadSnapshots($server, $range);
 
         $metrics = [];
         foreach (self::METRICS as $metric) {
@@ -124,6 +123,43 @@ final class ServerMetricsRangeQuery
             'latest_payload' => is_array($latest?->payload) ? $latest->payload : [],
             'latest_at' => $latest?->captured_at,
             'metrics' => $metrics,
+        ];
+    }
+
+    /**
+     * Read in-range + latest snapshots for one (server, range) pair, memoized
+     * per instance. Engine-health charts call this once per active engine,
+     * but the underlying rows don't change per engine — we want one fetch.
+     *
+     * @return array{snapshots: Collection, latest: ?ServerMetricSnapshot, from: Carbon, to: Carbon}
+     */
+    private function loadSnapshots(Server $server, string $range): array
+    {
+        $cacheKey = $server->id.'|'.$range;
+        if (isset($this->snapshotCache[$cacheKey])) {
+            return $this->snapshotCache[$cacheKey];
+        }
+
+        $windowSeconds = self::WINDOW_SECONDS[$range];
+        $to = now();
+        $from = $to->copy()->subSeconds($windowSeconds);
+
+        $snapshots = ServerMetricSnapshot::query()
+            ->where('server_id', $server->id)
+            ->where('captured_at', '>=', $from)
+            ->orderBy('captured_at')
+            ->get(['captured_at', 'payload']);
+
+        $latest = ServerMetricSnapshot::query()
+            ->where('server_id', $server->id)
+            ->orderByDesc('captured_at')
+            ->first();
+
+        return $this->snapshotCache[$cacheKey] = [
+            'snapshots' => $snapshots,
+            'latest' => $latest,
+            'from' => $from,
+            'to' => $to,
         ];
     }
 
@@ -152,21 +188,9 @@ final class ServerMetricsRangeQuery
     {
         $range = self::isValidRange($range) ? $range : self::defaultRange();
         $bucketSeconds = self::RANGES[$range];
-        $windowSeconds = self::WINDOW_SECONDS[$range];
 
-        $to = now();
-        $from = $to->copy()->subSeconds($windowSeconds);
-
-        $snapshots = ServerMetricSnapshot::query()
-            ->where('server_id', $server->id)
-            ->where('captured_at', '>=', $from)
-            ->orderBy('captured_at')
-            ->get(['captured_at', 'payload']);
-
-        $latest = ServerMetricSnapshot::query()
-            ->where('server_id', $server->id)
-            ->orderByDesc('captured_at')
-            ->first();
+        ['snapshots' => $snapshots, 'latest' => $latest, 'from' => $from, 'to' => $to]
+            = $this->loadSnapshots($server, $range);
 
         $activeSeries = $this->bucketEngineGauge($snapshots, $engine, 'active_connections', $bucketSeconds);
         $requestsRateSeries = $this->bucketEngineCounterRate($snapshots, $engine, 'requests_total', $bucketSeconds, perSecond: true);

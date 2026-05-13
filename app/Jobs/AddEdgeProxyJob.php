@@ -131,6 +131,12 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             $meta['edge_proxy_previous_webserver'] = $previousWebserver;
             $server->update(['meta' => $meta]);
 
+            // Re-probe systemd inventory so meta.manage_units picks up the
+            // new edge-proxy unit (traefik / haproxy) + the freshly-restarted
+            // caddy backend's state. See SwitchServerWebserverJob's matching
+            // dispatch for the rationale.
+            \App\Jobs\SyncServerSystemdServicesJob::dispatch($server->id);
+
             $emitter->info('Done.');
             $this->completeConsoleAction();
             $this->recordAudit($server, ServerWebserverAuditEvent::ACTION_EDGE_PROXY_ADDED, [

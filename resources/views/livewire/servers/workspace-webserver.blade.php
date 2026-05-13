@@ -290,6 +290,91 @@
     /** True when the engine has its own config editor / logs / tools surface. */
     $engineHasFullControls = fn (string $key): bool => in_array($key, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'], true);
 
+    /**
+     * Map an action key to a semantic heroicon — better than every button
+     * sharing the same lightning bolt. Falls back to bolt for unknowns.
+     */
+    $iconForAction = function (string $actionKey): string {
+        return match (true) {
+            str_contains($actionKey, 'test_config') => 'heroicon-o-shield-check',
+            str_starts_with($actionKey, 'start_') => 'heroicon-o-play',
+            str_starts_with($actionKey, 'stop_') => 'heroicon-o-stop',
+            str_starts_with($actionKey, 'reload_') => 'heroicon-o-arrow-path',
+            str_starts_with($actionKey, 'restart_') => 'heroicon-o-arrow-path-rounded-square',
+            str_starts_with($actionKey, 'enable_') => 'heroicon-o-power',
+            str_starts_with($actionKey, 'disable_') => 'heroicon-o-no-symbol',
+            str_contains($actionKey, '_version') => 'heroicon-o-tag',
+            str_contains($actionKey, '_modules') => 'heroicon-o-puzzle-piece',
+            str_contains($actionKey, '_status') => 'heroicon-o-signal',
+            str_contains($actionKey, '_show_config') => 'heroicon-o-document-text',
+            str_contains($actionKey, '_show_static_config') => 'heroicon-o-document-text',
+            str_contains($actionKey, '_list_dynamic_configs') => 'heroicon-o-list-bullet',
+            str_contains($actionKey, '_runtime_info') => 'heroicon-o-cpu-chip',
+            str_contains($actionKey, '_build_info') => 'heroicon-o-cube',
+            str_contains($actionKey, '_vhosts') => 'heroicon-o-server-stack',
+            str_contains($actionKey, '_reopen_logs') => 'heroicon-o-document-text',
+            str_contains($actionKey, '_environ') => 'heroicon-o-list-bullet',
+            str_contains($actionKey, '_effective_config') => 'heroicon-o-document-text',
+            str_contains($actionKey, '_adapt') => 'heroicon-o-arrows-right-left',
+            str_contains($actionKey, '_fmt') => 'heroicon-o-code-bracket',
+            default => 'heroicon-o-bolt',
+        };
+    };
+
+    /**
+     * Group label → header copy. Slightly richer than the raw label so the
+     * card header reads as guidance rather than a form caption.
+     */
+    $groupHeaderFor = function (string $groupKey): array {
+        return match ($groupKey) {
+            'health' => ['title' => __('Health'), 'sub' => __('Validate config before reload')],
+            'service' => ['title' => __('Service'), 'sub' => __('Start / stop / reload the daemon')],
+            'boot' => ['title' => __('Boot'), 'sub' => __('Whether the daemon auto-starts at server boot')],
+            default => ['title' => ucfirst($groupKey), 'sub' => ''],
+        };
+    };
+
+    /**
+     * Derive an "effective" unit state — uses real values from
+     * meta.manage_units when present, but falls back to sensible defaults
+     * keyed by whether dply considers this engine the active one. The
+     * fallback matters because the systemd inventory probe doesn't always
+     * re-run after a webserver switch / edge-proxy add — so the cache may
+     * lack the new engine's row entirely. Without this default the lifecycle
+     * panel ended up showing Start AND Stop together for the engine the
+     * operator was clearly managing.
+     */
+    $effectiveUnitState = function (?array $unit, bool $isActiveEngine): array {
+        return [
+            'active_state' => (string) ($unit['active_state'] ?? ($isActiveEngine ? 'active' : 'inactive')),
+            'unit_file_state' => (string) ($unit['unit_file_state'] ?? ($isActiveEngine ? 'enabled' : 'disabled')),
+        ];
+    };
+
+    /**
+     * Filter lifecycle actions against the daemon's effective state so we
+     * don't show both Start AND Stop (or Enable AND Disable) at the same
+     * time. Reload/Restart require an active daemon (meaningless on a
+     * stopped one — Start it instead). Enable/Disable mirror unit_file_state.
+     *
+     * Health + Tools always pass through — Test-config is THE point of
+     * having it when the daemon is stopped, before you start it.
+     */
+    $shouldShowAction = function (string $actionKey, array $state): bool {
+        $isActive = $state['active_state'] === 'active';
+        $isEnabled = $state['unit_file_state'] === 'enabled';
+
+        return match (true) {
+            str_starts_with($actionKey, 'start_') => ! $isActive,
+            str_starts_with($actionKey, 'stop_') => $isActive,
+            str_starts_with($actionKey, 'reload_'),
+            str_starts_with($actionKey, 'restart_') => $isActive,
+            str_starts_with($actionKey, 'enable_') => ! $isEnabled,
+            str_starts_with($actionKey, 'disable_') => $isEnabled,
+            default => true,
+        };
+    };
+
     $versionFor = function (string $key) use ($nginxVersion): string {
         return match ($key) {
             'nginx' => $nginxVersion,
@@ -313,10 +398,9 @@
     :title="__('Webserver')"
     :description="__('Pick which webserver runs on this box. Switching reprovisions all sites under the new daemon, then service-swaps to :80.')"
 >
-    {{-- The legacy "Command output" block (workspace-flashes with `command_output`)
-         is deliberately omitted on this workspace — output for runAllowlistedAction
-         calls now lands in the manage_action ConsoleAction banner rendered below
-         (same partial the webserver_switch flow uses). --}}
+    {{-- Output for runAllowlistedAction lands in the manage_action
+         ConsoleAction banner rendered below (same partial the webserver_switch
+         flow uses). Pass null to the legacy flash partial to keep it dormant. --}}
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
@@ -363,6 +447,13 @@
                 ->whereNull('dismissed_at')
                 ->orderByDesc('created_at')
                 ->first();
+        // Single source of truth for "an action is in flight on this server".
+        // We disable every action button (lifecycle + tools + switch + edge
+        // proxy add/remove) while this is true so a fast double-click can't
+        // queue a second manage_action on top of a running one.
+        $actionInFlight = $webserverBannerRun !== null
+            && $webserverBannerRun->isInFlight()
+            && ! $webserverBannerRun->isStale();
     @endphp
     @include('livewire.partials.console-action-banner-static', [
         'run' => $webserverBannerRun,
@@ -462,19 +553,23 @@
         @endphp
 
         @if ($activeInfo !== null)
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="max-w-2xl">
-                        <div class="flex items-center gap-2">
-                            <x-dynamic-component :component="$activeInfo['icon']" class="h-5 w-5 shrink-0 text-brand-forest" />
-                            <h3 class="text-base font-semibold text-brand-ink">{{ $activeInfo['label'] }}</h3>
+            <div class="{{ $card }} overflow-hidden">
+                {{-- Engine header — icon + label + version + status pill, all
+                     more prominent than the old inline arrangement. --}}
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10">
+                            <x-dynamic-component :component="$activeInfo['icon']" class="h-5 w-5 text-brand-forest" />
                         </div>
-                        @if ($activeVersion !== '')
-                            <p class="mt-1 font-mono text-xs text-brand-moss">{{ $activeVersion }}</p>
-                        @endif
+                        <div class="min-w-0">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ $activeInfo['label'] }}</h3>
+                            @if ($activeVersion !== '')
+                                <p class="font-mono text-[11px] text-brand-mist">{{ $activeVersion }}</p>
+                            @endif
+                        </div>
                     </div>
                     @if ($activeUnit !== null)
-                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $activePill['classes'] }}">
+                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $activePill['classes'] }}">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $activePill['dot'] }}"></span>
                             {{ $activePill['label'] }}
                         </span>
@@ -482,70 +577,98 @@
                 </div>
 
                 @if ($opsReady && ! $isDeployer && ! empty($activeLifecycleGroups))
-                    {{-- Grouped lifecycle controls (Health / Service / Boot) so
-                         start/stop/enable/disable don't visually merge with the
-                         test/reload/restart "health" row. Mirrors the layout on
-                         the per-engine Overview sub-tab. --}}
-                    <div class="mt-6 space-y-3">
+                    {{-- Lifecycle action groups in sub-cards. Each group gets
+                         a header + sub-line + a row of semantic-icon buttons.
+                         Stop/Disable/Restart get a danger ring rather than a
+                         red border so they read as "still-an-action" but flagged.
+                         State-aware filter hides Start when running and Stop
+                         when stopped (and similarly for enable/disable) so we
+                         never show both at once. --}}
+                    <div class="grid gap-px bg-brand-ink/5 sm:grid-cols-1">
+                        @php
+                            // Operator is on the Overview tab — by definition the
+                            // engine we're rendering controls for is the active one.
+                            $effectiveState = $effectiveUnitState($activeUnit, true);
+                        @endphp
                         @foreach ($activeLifecycleGroups as $groupKey => $group)
-                            <div class="flex flex-wrap items-center gap-3">
-                                <span class="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $group['label'] }}</span>
-                                <div class="flex flex-wrap gap-2">
-                                    @foreach ($group['rows'] as [$actionKey, $dangerous])
-                                        @if (! empty($serviceActions[$actionKey]))
-                                            @php $action = $serviceActions[$actionKey]; @endphp
-                                            <button
-                                                type="button"
-                                                wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
-                                                wire:loading.attr="disabled"
-                                                wire:target="openConfirmActionModal,runAllowlistedAction"
-                                                @class([
-                                                    'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40 disabled:opacity-60',
-                                                    'border-brand-ink/15 bg-white text-brand-ink' => ! $dangerous,
-                                                    'border-rose-200 bg-white text-rose-800 hover:bg-rose-50' => $dangerous,
-                                                ])
-                                            >
-                                                <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
-                                                {{ $action['label'] }}
-                                            </button>
+                            @php
+                                $header = $groupHeaderFor($groupKey);
+                                $visibleRows = array_values(array_filter(
+                                    $group['rows'],
+                                    fn ($pair) => $shouldShowAction($pair[0], $effectiveState),
+                                ));
+                            @endphp
+                            @if (! empty($visibleRows))
+                            <div class="bg-white px-6 py-4 sm:px-8">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ $header['title'] }}</p>
+                                        @if ($header['sub'] !== '')
+                                            <p class="mt-0.5 text-[12px] text-brand-mist">{{ $header['sub'] }}</p>
                                         @endif
-                                    @endforeach
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach ($visibleRows as [$actionKey, $dangerous])
+                                            @if (! empty($serviceActions[$actionKey]))
+                                                @php $action = $serviceActions[$actionKey]; @endphp
+                                                <button
+                                                    type="button"
+                                                    @if ($dangerous) wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), true)" @else wire:click="runAllowlistedAction('{{ $actionKey }}')" @endif
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="openConfirmActionModal,runAllowlistedAction"
+                                                    @disabled($actionInFlight)
+                                                    title="{{ $actionInFlight ? __('Another action is running — wait for it to finish.') : ($action['description'] ?? '') }}"
+                                                    @class([
+                                                        'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
+                                                        'border-brand-ink/15 bg-white text-brand-ink shadow-sm hover:bg-brand-sand/40' => ! $dangerous,
+                                                        'border-rose-200 bg-rose-50/30 text-rose-800 hover:bg-rose-50' => $dangerous,
+                                                    ])
+                                                >
+                                                    <x-dynamic-component :component="$iconForAction($actionKey)" class="h-3.5 w-3.5 opacity-80" aria-hidden="true" />
+                                                    {{ $action['label'] }}
+                                                </button>
+                                            @endif
+                                        @endforeach
+                                    </div>
                                 </div>
                             </div>
+                            @endif
                         @endforeach
-                    </div>
 
-                    @if (! empty($activeCliTools))
-                        {{-- Tools row — read-only per-engine CLI helpers. Same
-                             buttons that live on the engine Tools sub-tab, kept
-                             here so the operator doesn't have to navigate away
-                             for a one-shot `caddy version` or `nginx -T`. --}}
-                        <div class="mt-4 flex flex-wrap items-center gap-3">
-                            <span class="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Tools') }}</span>
-                            <div class="flex flex-wrap gap-2">
-                                @foreach ($activeCliTools as [$actionKey, $dangerous])
-                                    @if (! empty($serviceActions[$actionKey]))
-                                        @php $action = $serviceActions[$actionKey]; @endphp
-                                        <button
-                                            type="button"
-                                            wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="openConfirmActionModal,runAllowlistedAction"
-                                            @class([
-                                                'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40 disabled:opacity-60',
-                                                'border-brand-ink/15 bg-white text-brand-ink' => ! $dangerous,
-                                                'border-rose-200 bg-white text-rose-800 hover:bg-rose-50' => $dangerous,
-                                            ])
-                                            title="{{ $action['description'] ?? '' }}"
-                                        >
-                                            <x-heroicon-o-command-line class="h-4 w-4 opacity-80" aria-hidden="true" />
-                                            {{ $action['label'] }}
-                                        </button>
-                                    @endif
-                                @endforeach
+                        @if (! empty($activeCliTools))
+                            {{-- Tools row — read-only diagnostics. Visually
+                                 quieter than the lifecycle rows above (the buttons
+                                 lose their drop shadow + sit in a tinted bg) so it
+                                 doesn't compete with the lifecycle group hierarchy. --}}
+                            <div class="bg-brand-sand/15 px-6 py-4 sm:px-8">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Tools') }}</p>
+                                        <p class="mt-0.5 text-[12px] text-brand-mist">{{ __('Read-only diagnostics — version, config dumps, module list, etc.') }}</p>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach ($activeCliTools as [$actionKey, $dangerous])
+                                            @if (! empty($serviceActions[$actionKey]))
+                                                @php $action = $serviceActions[$actionKey]; @endphp
+                                                <button
+                                                    type="button"
+                                                    @if ($dangerous) wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), true)" @else wire:click="runAllowlistedAction('{{ $actionKey }}')" @endif
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="openConfirmActionModal,runAllowlistedAction"
+                                                    @disabled($actionInFlight)
+                                                    title="{{ $actionInFlight ? __('Another action is running — wait for it to finish.') : ($action['description'] ?? '') }}"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    <x-dynamic-component :component="$iconForAction($actionKey)" class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                    {{ $action['label'] }}
+                                                </button>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
                 @endif
             </div>
         @endif
@@ -585,7 +708,7 @@
                                 wire:click="openSwitchWebserver('{{ $key }}')"
                                 wire:loading.attr="disabled"
                                 wire:target="openSwitchWebserver"
-                                @disabled($isDeployer || ! $opsReady || $isBlocked)
+                                @disabled($isDeployer || ! $opsReady || $isBlocked || $actionInFlight)
                                 @class([
                                     'mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60',
                                     'bg-brand-forest text-brand-cream shadow-sm shadow-brand-forest/20 hover:bg-brand-forest/90' => ! $isBlocked,
@@ -593,19 +716,21 @@
                                 ])
                                 title="{{ $isBlocked ? __('Unavailable — see preflight blocker') : '' }}"
                             >
-                                <span class="inline-flex items-center gap-1.5" wire:loading.remove wire:target="openSwitchWebserver">
+                                <span wire:loading.remove wire:target="openSwitchWebserver" class="inline-flex">
                                     @if ($isBlocked)
                                         <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
-                                        {{ __('Unavailable') }}
                                     @else
                                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                        {{ __('Switch to :name', ['name' => $info['label']]) }}
                                     @endif
                                 </span>
-                                <span class="inline-flex items-center gap-1.5" wire:loading wire:target="openSwitchWebserver">
+                                <span wire:loading wire:target="openSwitchWebserver" class="inline-flex">
                                     <x-spinner variant="cream" size="sm" />
-                                    {{ __('Preparing…') }}
                                 </span>
+                                @if ($isBlocked)
+                                    {{ __('Unavailable') }}
+                                @else
+                                    {{ __('Switch to :name', ['name' => $info['label']]) }}
+                                @endif
                             </button>
                         @endif
                     </div>
@@ -664,7 +789,7 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('removeEdgeProxy', [], @js(__('Remove edge proxy')), @js(__('Remove the :name edge proxy? Caddy will resume serving :80 directly.', ['name' => $info['label']])), @js(__('Remove')), true)"
-                                @disabled($isDeployer || ! $opsReady || $inflightEdge)
+                                @disabled($isDeployer || ! $opsReady || $inflightEdge || $actionInFlight)
                                 class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
                             >
                                 <x-heroicon-o-trash class="h-3.5 w-3.5" />
@@ -684,7 +809,7 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('addEdgeProxy', ['{{ $key }}'], @js(__('Add :name edge proxy', ['name' => $info['label']])), @js(__('Install :name in front of the webserver? Caddy will be installed as the per-site backend; your current webserver (:active) will be stopped.', ['name' => $info['label'], 'active' => $activeWebserver])), @js(__('Add :name', ['name' => $info['label']])), false)"
-                                @disabled($isDeployer || ! $opsReady || $inflightEdge || $inflightSwitch)
+                                @disabled($isDeployer || ! $opsReady || $inflightEdge || $inflightSwitch || $actionInFlight)
                                 class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition hover:bg-brand-forest/90 disabled:opacity-60"
                             >
                                 <x-heroicon-o-arrow-up-tray class="h-3.5 w-3.5" />
@@ -746,16 +871,10 @@
                     </span>
                 </x-server-workspace-tab>
                 @if ($hasControls)
-                    <x-server-workspace-tab
-                        :id="'ws-subtab-'.$key.'-tools'"
-                        :active="$engine_subtab === 'tools'"
-                        wire:click="setEngineSubtab('tools')"
-                    >
-                        <span class="inline-flex items-center gap-2">
-                            <x-heroicon-o-command-line class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Tools') }}
-                        </span>
-                    </x-server-workspace-tab>
+                    {{-- Tools sub-tab removed: the same per-engine diagnostic
+                         buttons (version, modules, status, etc.) now live in
+                         the Overview panel's Tools row, so the dedicated tab
+                         was duplicate UI. --}}
                     <x-server-workspace-tab
                         :id="'ws-subtab-'.$key.'-logs'"
                         :active="$engine_subtab === 'logs'"
@@ -836,24 +955,26 @@
             </x-server-workspace-tablist>
 
             @if ($engine_subtab === 'overview')
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="max-w-2xl">
-                        <div class="flex items-center gap-2">
-                            <x-dynamic-component :component="$info['icon']" class="h-5 w-5 shrink-0 text-brand-forest" />
-                            <h3 class="text-base font-semibold text-brand-ink">{{ $info['label'] }}</h3>
+            <div class="{{ $card }} overflow-hidden">
+                {{-- Header — engine icon + name + version + status pill.
+                     Matches the redesigned Overview-tab panel for consistency. --}}
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10">
+                            <x-dynamic-component :component="$info['icon']" class="h-5 w-5 text-brand-forest" />
                         </div>
-                        @if ($version !== '')
-                            <p class="mt-1 font-mono text-xs text-brand-moss">{{ $version }}</p>
-                        @endif
-                        @if (! $isActive)
-                            <p class="mt-2 text-sm text-brand-moss">
-                                {{ __('Not the active webserver on this server.') }}
-                            </p>
-                        @endif
+                        <div class="min-w-0">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ $info['label'] }}</h3>
+                            @if ($version !== '')
+                                <p class="font-mono text-[11px] text-brand-mist">{{ $version }}</p>
+                            @endif
+                            @if (! $isActive && ! $isEdgeProxyPanel)
+                                <p class="mt-0.5 text-[12px] text-brand-moss">{{ __('Not the active webserver on this server.') }}</p>
+                            @endif
+                        </div>
                     </div>
                     @if ($isActive && $unit !== null)
-                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $pill['classes'] }}">
+                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $pill['classes'] }}">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $pill['dot'] }}"></span>
                             {{ $pill['label'] }}
                         </span>
@@ -862,35 +983,91 @@
 
                 @if ($isActive)
                     @if ($opsReady && ! $isDeployer)
-                        @php $lifecycleGroups = $lifecycleGroupsFor($key); @endphp
+                        @php
+                            $lifecycleGroups = $lifecycleGroupsFor($key);
+                            $tools = $cliToolsFor($key);
+                        @endphp
                         @if (! empty($lifecycleGroups))
-                            <div class="mt-6 space-y-3">
+                            @php
+                                // $isActive is set near the top of the panel loop
+                                // ($key === activeWebserver || activeEdgeProxy).
+                                $effectiveState = $effectiveUnitState($unit, $isActive);
+                            @endphp
+                            <div class="grid gap-px bg-brand-ink/5 sm:grid-cols-1">
                                 @foreach ($lifecycleGroups as $groupKey => $group)
-                                    <div class="flex flex-wrap items-center gap-3">
-                                        <span class="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $group['label'] }}</span>
-                                        <div class="flex flex-wrap gap-2">
-                                            @foreach ($group['rows'] as [$actionKey, $dangerous])
-                                                @if (! empty($serviceActions[$actionKey]))
-                                                    @php $action = $serviceActions[$actionKey]; @endphp
-                                                    <button
-                                                        type="button"
-                                                        wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
-                                                        wire:loading.attr="disabled"
-                                                        wire:target="openConfirmActionModal,runAllowlistedAction"
-                                                        @class([
-                                                            'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40 disabled:opacity-60',
-                                                            'border-brand-ink/15 bg-white text-brand-ink' => ! $dangerous,
-                                                            'border-rose-200 bg-white text-rose-800 hover:bg-rose-50' => $dangerous,
-                                                        ])
-                                                    >
-                                                        <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
-                                                        {{ $action['label'] }}
-                                                    </button>
+                                    @php
+                                        $header = $groupHeaderFor($groupKey);
+                                        $visibleRows = array_values(array_filter(
+                                            $group['rows'],
+                                            fn ($pair) => $shouldShowAction($pair[0], $effectiveState),
+                                        ));
+                                    @endphp
+                                    @if (! empty($visibleRows))
+                                    <div class="bg-white px-6 py-4 sm:px-8">
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ $header['title'] }}</p>
+                                                @if ($header['sub'] !== '')
+                                                    <p class="mt-0.5 text-[12px] text-brand-mist">{{ $header['sub'] }}</p>
                                                 @endif
-                                            @endforeach
+                                            </div>
+                                            <div class="flex flex-wrap gap-2">
+                                                @foreach ($visibleRows as [$actionKey, $dangerous])
+                                                    @if (! empty($serviceActions[$actionKey]))
+                                                        @php $action = $serviceActions[$actionKey]; @endphp
+                                                        <button
+                                                            type="button"
+                                                            @if ($dangerous) wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), true)" @else wire:click="runAllowlistedAction('{{ $actionKey }}')" @endif
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="openConfirmActionModal,runAllowlistedAction"
+                                                            @disabled($actionInFlight)
+                                                            title="{{ $actionInFlight ? __('Another action is running — wait for it to finish.') : ($action['description'] ?? '') }}"
+                                                            @class([
+                                                                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
+                                                                'border-brand-ink/15 bg-white text-brand-ink shadow-sm hover:bg-brand-sand/40' => ! $dangerous,
+                                                                'border-rose-200 bg-rose-50/30 text-rose-800 hover:bg-rose-50' => $dangerous,
+                                                            ])
+                                                        >
+                                                            <x-dynamic-component :component="$iconForAction($actionKey)" class="h-3.5 w-3.5 opacity-80" aria-hidden="true" />
+                                                            {{ $action['label'] }}
+                                                        </button>
+                                                    @endif
+                                                @endforeach
+                                            </div>
                                         </div>
                                     </div>
+                                    @endif
                                 @endforeach
+
+                                @if (! empty($tools))
+                                    <div class="bg-brand-sand/15 px-6 py-4 sm:px-8">
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Tools') }}</p>
+                                                <p class="mt-0.5 text-[12px] text-brand-mist">{{ __('Read-only diagnostics — version, config dumps, module list, etc.') }}</p>
+                                            </div>
+                                            <div class="flex flex-wrap gap-2">
+                                                @foreach ($tools as [$actionKey, $dangerous])
+                                                    @if (! empty($serviceActions[$actionKey]))
+                                                        @php $action = $serviceActions[$actionKey]; @endphp
+                                                        <button
+                                                            type="button"
+                                                            @if ($dangerous) wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), true)" @else wire:click="runAllowlistedAction('{{ $actionKey }}')" @endif
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="openConfirmActionModal,runAllowlistedAction"
+                                                            @disabled($actionInFlight)
+                                                            title="{{ $actionInFlight ? __('Another action is running — wait for it to finish.') : ($action['description'] ?? '') }}"
+                                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                                        >
+                                                            <x-dynamic-component :component="$iconForAction($actionKey)" class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ $action['label'] }}
+                                                        </button>
+                                                    @endif
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
                         @endif
                     @endif
@@ -914,26 +1091,28 @@
                                 wire:click="openSwitchWebserver('{{ $key }}')"
                                 wire:loading.attr="disabled"
                                 wire:target="openSwitchWebserver"
-                                @disabled($isDeployer || ! $opsReady || $isBlocked)
+                                @disabled($isDeployer || ! $opsReady || $isBlocked || $actionInFlight)
                                 @class([
                                     'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-60',
                                     'bg-brand-forest text-brand-cream shadow-sm shadow-brand-forest/20 hover:bg-brand-forest/90' => ! $isBlocked,
                                     'cursor-not-allowed bg-brand-sand/40 text-brand-mist' => $isBlocked,
                                 ])
                             >
-                                <span class="inline-flex items-center gap-2" wire:loading.remove wire:target="openSwitchWebserver">
+                                <span wire:loading.remove wire:target="openSwitchWebserver" class="inline-flex">
                                     @if ($isBlocked)
                                         <x-heroicon-o-no-symbol class="h-4 w-4" />
-                                        {{ __('Unavailable') }}
                                     @else
                                         <x-heroicon-o-arrow-path class="h-4 w-4" />
-                                        {{ __('Switch to :name', ['name' => $info['label']]) }}
                                     @endif
                                 </span>
-                                <span class="inline-flex items-center gap-2" wire:loading wire:target="openSwitchWebserver">
+                                <span wire:loading wire:target="openSwitchWebserver" class="inline-flex">
                                     <x-spinner variant="cream" size="sm" />
-                                    {{ __('Preparing…') }}
                                 </span>
+                                @if ($isBlocked)
+                                    {{ __('Unavailable') }}
+                                @else
+                                    {{ __('Switch to :name', ['name' => $info['label']]) }}
+                                @endif
                             </button>
                         @endif
                     </div>
@@ -1124,46 +1303,10 @@
                  apachectl -M). Output lands in the existing remote_output
                  surface near the bottom of the page.
                  ============================================================= --}}
-            @if ($engine_subtab === 'tools' && $isActive && $engineHasFullControls($key))
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="max-w-2xl">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — diagnostics & tools', ['engine' => $info['label']]) }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            {{ __('Read-only CLI helpers for inspecting how :engine is built and configured. Output appears below the page in the action result panel.', ['engine' => $info['label']]) }}
-                        </p>
-                    </div>
-
-                    @if (! $opsReady || $isDeployer)
-                        <p class="mt-4 text-sm text-brand-moss">{{ __('Tools require ready ops access and a non-deployer role.') }}</p>
-                    @else
-                        @php $tools = $cliToolsFor($key); @endphp
-                        <div class="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                            @foreach ($tools as [$actionKey, $dangerous])
-                                @if (! empty($serviceActions[$actionKey]))
-                                    @php $action = $serviceActions[$actionKey]; @endphp
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), {{ $dangerous ? 'true' : 'false' }})"
-                                        wire:loading.attr="disabled"
-                                        wire:target="openConfirmActionModal,runAllowlistedAction"
-                                        @class([
-                                            'flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-brand-sand/40 disabled:opacity-60',
-                                            'border-brand-ink/15 bg-white text-brand-ink' => ! $dangerous,
-                                            'border-rose-200 bg-white text-rose-800 hover:bg-rose-50' => $dangerous,
-                                        ])
-                                    >
-                                        <x-heroicon-o-command-line class="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
-                                        <span class="min-w-0 flex-1">
-                                            <span class="block font-medium">{{ $action['label'] }}</span>
-                                            <span class="mt-0.5 block text-[11px] {{ $dangerous ? 'text-rose-700' : 'text-brand-moss' }}">{{ $action['description'] ?? '' }}</span>
-                                        </span>
-                                    </button>
-                                @endif
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
-            @endif
+            {{-- Tools panel removed: the same diagnostic buttons live in the
+                 Overview panel's Tools row now, so this dedicated tab body
+                 was duplicate UI. Sub-tab strip and setEngineSubtab() allow-
+                 list were updated to match. --}}
 
             {{-- =============================================================
                  LOGS — last N lines of access / error / journal for the active
@@ -1235,7 +1378,7 @@
                             </button>
                             <span class="ml-auto inline-flex items-center gap-1 text-[11px] text-brand-moss">
                                 {{ __('Lines:') }}
-                                <select wire:change="refreshWebserverLog(null, $event.target.value)" class="rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 text-[11px] font-medium text-brand-ink">
+                                <select wire:change="refreshWebserverLog(null, $event.target.value)" class="rounded-md border border-brand-ink/15 bg-white py-0.5 pl-2 pr-7 text-[11px] font-medium text-brand-ink">
                                     @foreach ([100, 300, 500, 1000, 2000] as $n)
                                         <option value="{{ $n }}" @selected($log_lines === $n)>{{ $n }}</option>
                                     @endforeach
@@ -1470,14 +1613,13 @@
                             wire:target="refreshEngineLiveState"
                             class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                         >
-                            <span class="inline-flex items-center gap-1.5" wire:loading.remove wire:target="refreshEngineLiveState">
+                            <span wire:loading.remove wire:target="refreshEngineLiveState" class="inline-flex">
                                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                {{ __('Refresh now') }}
                             </span>
-                            <span class="inline-flex items-center gap-1.5" wire:loading wire:target="refreshEngineLiveState">
+                            <span wire:loading wire:target="refreshEngineLiveState" class="inline-flex">
                                 <x-spinner variant="forest" size="sm" />
-                                {{ __('Probing…') }}
                             </span>
+                            {{ __('Refresh now') }}
                         </button>
                     </div>
 
@@ -2051,9 +2193,11 @@
             <div class="shrink-0 flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
                 <x-secondary-button type="button" wire:click="cancelSwitchWebserver">{{ __('Cancel') }}</x-secondary-button>
                 @if ($switch_plan['blocker'] === null)
-                    <x-primary-button type="button" wire:click="confirmSwitchWebserver" wire:loading.attr="disabled" wire:target="confirmSwitchWebserver">
-                        <span wire:loading.remove wire:target="confirmSwitchWebserver">{{ __('Switch to :to', ['to' => $switch_plan['to']]) }}</span>
-                        <span wire:loading wire:target="confirmSwitchWebserver">{{ __('Queueing…') }}</span>
+                    <x-primary-button type="button" wire:click="confirmSwitchWebserver" wire:loading.attr="disabled" wire:target="confirmSwitchWebserver" class="inline-flex items-center gap-2">
+                        <span wire:loading wire:target="confirmSwitchWebserver" class="inline-flex">
+                            <x-spinner variant="cream" size="sm" />
+                        </span>
+                        {{ __('Switch to :to', ['to' => $switch_plan['to']]) }}
                     </x-primary-button>
                 @endif
             </div>

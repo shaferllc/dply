@@ -133,11 +133,12 @@ class WorkspaceWebserver extends WorkspaceManage
     public function setEngineSubtab(string $subtab): void
     {
         // Engine-specific live-state sub-tabs (Vhosts/Listeners/etc.) live
-        // alongside the common ones (overview/info/tools/logs/config).
-        // Allow-list them in one place so accidental URL fiddling falls back
-        // to overview instead of breaking the render.
+        // alongside the common ones (overview/info/logs/config). The Tools
+        // sub-tab was retired — its diagnostic buttons now render inline in
+        // the Overview's Tools row. We keep 'tools' silently mapping to
+        // overview so an old bookmark / URL doesn't break the render.
         $allowed = [
-            'overview', 'info', 'tools', 'logs', 'config',
+            'overview', 'info', 'logs', 'config',
             // OLS
             'vhosts', 'listeners', 'extapps', 'cache',
             // nginx
@@ -151,6 +152,9 @@ class WorkspaceWebserver extends WorkspaceManage
             // haproxy
             'frontends', 'backends', 'ssl', 'runtime',
         ];
+        if ($subtab === 'tools') {
+            $subtab = 'overview';
+        }
         $this->engine_subtab = in_array($subtab, $allowed, true) ? $subtab : 'overview';
         if ($this->engine_subtab !== 'config') {
             $this->resetConfigEditorState();

@@ -127,6 +127,19 @@ class AppServiceProvider extends ServiceProvider
         // (DeploymentContractBuilder::build + DeploymentPreflightValidator::validate).
         $this->app->scoped(SiteResourceBindingResolver::class);
 
+        // Scoped: the engine-overview panel renders one chart card per active
+        // engine (e.g. caddy backend + traefik edge), and the range fetch +
+        // latest-snapshot select would otherwise run once per engine instance.
+        // The class memoizes snapshots per (server, range) on the instance.
+        $this->app->scoped(\App\Services\Servers\ServerMetricsRangeQuery::class);
+
+        // Scoped: the webserver picker calls plan()/isBlocked() once per known
+        // target during a single render, and each non-cached target triggers
+        // its own varnish-running select. The instance already memoizes plan()
+        // results — we add an explicit binding to make sure every call site
+        // hits the same instance.
+        $this->app->scoped(\App\Services\Servers\WebserverSwitchPreflight::class);
+
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
         $this->app->singleton(ServerlessProvisionerFactory::class);

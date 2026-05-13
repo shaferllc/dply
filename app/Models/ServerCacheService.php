@@ -116,6 +116,19 @@ class ServerCacheService extends Model
         return $this->belongsTo(Server::class);
     }
 
+    /**
+     * Single-instance-per-(server,engine) is the invariant since the
+     * `collapse_cache_services_to_one_per_family` migration — every row is
+     * the "default" instance for its engine. Re-added to support the
+     * workspace view's `@if (! $row->isDefaultInstance())` guards that
+     * still ship in `resources/views/livewire/servers/workspace-caches.blade.php`
+     * but were orphaned when the method was deleted in commit 60f4703 (wip).
+     */
+    public function isDefaultInstance(): bool
+    {
+        return ((string) $this->name) === self::DEFAULT_INSTANCE_NAME;
+    }
+
     public static function defaultPortFor(string $engine): int
     {
         return match ($engine) {
