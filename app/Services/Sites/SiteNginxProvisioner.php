@@ -353,9 +353,22 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $fcgiZone = config('sites.nginx_engine_fcgi_cache_zone');
         $proxyZone = config('sites.nginx_engine_proxy_cache_zone');
 
+        // Zone sizes live on `server_webserver_cache_features` so operators
+        // can tune them per-server from the workspace. The row is created
+        // lazily here with the legacy defaults (100m/100m/2g/60m) so existing
+        // servers get the same on-disk output until someone touches it.
+        $feature = \App\Models\ServerWebserverCacheFeature::findOrCreateFor(
+            $server->id,
+            \App\Models\ServerWebserverCacheFeature::WEBSERVER_NGINX,
+        );
+        $fcgiSize = (int) $feature->nginx_fcgi_zone_size_mb;
+        $proxySize = (int) $feature->nginx_proxy_zone_size_mb;
+        $maxSize = (int) $feature->nginx_zone_max_size_gb;
+        $inactive = (int) $feature->nginx_zone_inactive_minutes;
+
         $contents = "# Managed by Dply — shared HTTP cache zones (do not edit by hand)\n";
-        $contents .= "fastcgi_cache_path {$fcgiPath} levels=1:2 keys_zone={$fcgiZone}:100m inactive=60m max_size=2g;\n";
-        $contents .= "proxy_cache_path {$proxyPath} levels=1:2 keys_zone={$proxyZone}:100m inactive=60m max_size=2g;\n";
+        $contents .= "fastcgi_cache_path {$fcgiPath} levels=1:2 keys_zone={$fcgiZone}:{$fcgiSize}m inactive={$inactive}m max_size={$maxSize}g;\n";
+        $contents .= "proxy_cache_path {$proxyPath} levels=1:2 keys_zone={$proxyZone}:{$proxySize}m inactive={$inactive}m max_size={$maxSize}g;\n";
 
         $wrote = $this->writeSystemFileIfChanged($server, $ssh, $confPath, $contents);
         if ($wrote) {

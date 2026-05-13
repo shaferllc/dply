@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
+use App\Services\Servers\WebserverStatsEndpointTemplates;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\CaddySiteConfigBuilder;
@@ -364,26 +365,7 @@ BASH;
             // for Host-header matching — it's not what Apache reads for the
             // global identity. We source from `hostname -f`, falling back
             // through `hostname` to `localhost` for systems without a FQDN.
-            'apache' => $this->aptInstallIdempotent('apache2').'; '.<<<'BASH'
-a2enmod proxy proxy_http proxy_fcgi rewrite headers status >/dev/null
-DPLY_FQDN="$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo localhost)"
-printf 'ServerName %s\n' "$DPLY_FQDN" > /etc/apache2/conf-available/dply-servername.conf
-a2enconf dply-servername >/dev/null
-# Localhost-only mod_status endpoint at :9092 used by the dply metrics
-# agent to scrape Active connections / Total Accesses / etc. Bound to
-# 127.0.0.1 so it never reaches the public network.
-cat > /etc/apache2/conf-available/dply-server-status.conf <<'CONF'
-Listen 127.0.0.1:9092
-<VirtualHost 127.0.0.1:9092>
-    ServerName dply-status
-    <Location /server-status>
-        SetHandler server-status
-        Require ip 127.0.0.1
-    </Location>
-</VirtualHost>
-CONF
-a2enconf dply-server-status >/dev/null
-BASH,
+            'apache' => $this->aptInstallIdempotent('apache2').'; '.$this->apacheInstallPostPatches(),
             // Caddy ships in the official cloudsmith / cloudflare-managed apt repo.
             // `command -v` (not dpkg) drives the skip check: a half-installed
             // package can still show `ii` in dpkg while the binary is missing
@@ -420,28 +402,46 @@ BASH,
     }
 
     /**
-     * Localhost-only nginx stub_status endpoint on :9091. Used by the dply
-     * metrics agent to scrape connection counts and request totals. Bound
-     * to 127.0.0.1 so it never reaches the public network. nginx_status
-     * relies on ngx_http_stub_status_module which is compiled into the
-     * Debian/Ubuntu nginx package by default — no module install needed.
+     * Post-apt-install patches for apache: a2enmod the modules dply's
+     * vhost templates assume (proxy*, rewrite, headers, status), drop the
+     * ServerName conf to silence AH00558, and write+enable the
+     * mod_status localhost-only endpoint dply's metrics agent scrapes.
+     * Sourced from {@see WebserverStatsEndpointTemplates::apacheServerStatusConf()}
+     * so the backfill command and install path share one template body.
+     */
+    private function apacheInstallPostPatches(): string
+    {
+        $statusBody = WebserverStatsEndpointTemplates::apacheServerStatusConf();
+        $statusPath = WebserverStatsEndpointTemplates::APACHE_CONF_PATH;
+        $statusName = WebserverStatsEndpointTemplates::APACHE_CONF_NAME;
+
+        return <<<BASH
+a2enmod proxy proxy_http proxy_fcgi rewrite headers status >/dev/null
+DPLY_FQDN="\$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo localhost)"
+printf 'ServerName %s\n' "\$DPLY_FQDN" > /etc/apache2/conf-available/dply-servername.conf
+a2enconf dply-servername >/dev/null
+cat > {$statusPath} <<'CONF'
+{$statusBody}
+CONF
+a2enconf {$statusName} >/dev/null
+BASH;
+    }
+
+    /**
+     * Localhost-only nginx stub_status endpoint. Body sourced from
+     * {@see WebserverStatsEndpointTemplates::nginxStubStatusConf()} so the
+     * backfill command and the install script share one template.
      */
     private function nginxStatsEndpointPatch(): string
     {
-        return <<<'BASH'
-cat > /etc/nginx/conf.d/dply-stub-status.conf <<'CONF'
-server {
-    listen 127.0.0.1:9091 default_server;
-    server_name _;
-    access_log off;
-    location = /nginx_status {
-        stub_status on;
-        allow 127.0.0.1;
-        deny all;
-    }
-}
-CONF
-BASH;
+        $body = WebserverStatsEndpointTemplates::nginxStubStatusConf();
+        $path = WebserverStatsEndpointTemplates::NGINX_CONF_PATH;
+
+        return sprintf(
+            "cat > %s <<'CONF'\n%s\nCONF\n",
+            $path,
+            $body,
+        );
     }
 
     /**

@@ -132,7 +132,25 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public function setEngineSubtab(string $subtab): void
     {
-        $allowed = ['overview', 'info', 'tools', 'logs', 'config'];
+        // Engine-specific live-state sub-tabs (Vhosts/Listeners/etc.) live
+        // alongside the common ones (overview/info/tools/logs/config).
+        // Allow-list them in one place so accidental URL fiddling falls back
+        // to overview instead of breaking the render.
+        $allowed = [
+            'overview', 'info', 'tools', 'logs', 'config',
+            // OLS
+            'vhosts', 'listeners', 'extapps', 'cache',
+            // nginx
+            'hosts', 'upstreams', 'certs', 'workers',
+            // caddy (routes/upstreams/certs share with nginx; admin is unique)
+            'routes', 'admin',
+            // apache (vhosts/workers/certs shared; modules unique)
+            'modules',
+            // traefik
+            'routers', 'services', 'middlewares', 'providers',
+            // haproxy
+            'frontends', 'backends', 'ssl', 'runtime',
+        ];
         $this->engine_subtab = in_array($subtab, $allowed, true) ? $subtab : 'overview';
         if ($this->engine_subtab !== 'config') {
             $this->resetConfigEditorState();
@@ -140,6 +158,46 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->engine_subtab !== 'logs') {
             $this->resetLogViewerState();
         }
+    }
+
+    /**
+     * Refresh-now action for the per-engine live-state sub-tabs. Runs a
+     * fresh probe (synchronous SSH) and updates the cached state on
+     * Server.meta. Returns nothing — the blade re-renders against the
+     * new cached state on next paint.
+     */
+    public function refreshEngineLiveState(): void
+    {
+        $this->authorize('view', $this->server);
+        $engine = $this->workspace_tab;
+        $probe = $this->resolveLiveStateProbe($engine);
+        if ($probe === null) {
+            $this->toastError(__('No live-state probe registered for :engine.', ['engine' => $engine]));
+
+            return;
+        }
+        try {
+            $probe->probe($this->server->fresh(), forceFresh: true);
+            $this->server->refresh();
+            $this->toastSuccess(__('Refreshed.'));
+        } catch (\Throwable $e) {
+            $this->toastError(__('Refresh failed: :msg', ['msg' => $e->getMessage()]));
+        }
+    }
+
+    /**
+     * Engine key → probe implementation. Returns null for engines whose
+     * probe isn't built yet (anything other than OLS in v1). Each
+     * subsequent engine wires in here as its probe lands.
+     */
+    private function resolveLiveStateProbe(string $engine): ?\App\Services\Servers\LiveState\EngineLiveStateProbe
+    {
+        return match ($engine) {
+            'openlitespeed' => app(\App\Services\Servers\LiveState\OlsLiveStateProbe::class),
+            'traefik' => app(\App\Services\Servers\LiveState\TraefikLiveStateProbe::class),
+            'haproxy' => app(\App\Services\Servers\LiveState\HaproxyLiveStateProbe::class),
+            default => null,
+        };
     }
 
     /**

@@ -91,7 +91,7 @@ final class WebserverSwitchPreflight
         $sitesAffected = $sites->count();
         $driftSites = $this->detectCustomConfigDrift($sites);
 
-        $blocker = $this->detectBlocker($from, $to, $sites);
+        $blocker = $this->detectBlocker($from, $to, $sites, $server);
 
         $auto = [
             ['key' => 'install', 'label' => __('Install :target (apt/package)', ['target' => $to])],
@@ -198,7 +198,7 @@ final class WebserverSwitchPreflight
      * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
      * @return array{key: string, label: string, detail?: array<string, mixed>}|null
      */
-    private function detectBlocker(string $from, string $to, $sites): ?array
+    private function detectBlocker(string $from, string $to, $sites, Server $server): ?array
     {
         if ($from === $to) {
             return [
@@ -210,6 +210,29 @@ final class WebserverSwitchPreflight
             return [
                 'key' => 'unknown_target',
                 'label' => __('Unknown webserver: :to.', ['to' => $to]),
+            ];
+        }
+
+        // HTTP-front cache daemons (Varnish) own port :80 with the backend
+        // webserver bound to 127.0.0.1:8080. The switch flow uses :8080 as
+        // its staging port — both can't share it. Operator uninstalls
+        // Varnish first, switches the webserver, then reinstalls Varnish.
+        $varnishRow = \App\Models\ServerCacheService::query()
+            ->where('server_id', $server->id)
+            ->where('engine', 'varnish')
+            ->whereIn('status', [
+                \App\Models\ServerCacheService::STATUS_RUNNING,
+                \App\Models\ServerCacheService::STATUS_INSTALLING,
+            ])
+            ->first();
+        if ($varnishRow !== null) {
+            return [
+                'key' => 'varnish_running',
+                'label' => __('Uninstall Varnish before switching the webserver — Varnish and the switch flow both need port :8080.'),
+                'detail' => [
+                    'engine' => 'varnish',
+                    'status' => $varnishRow->status,
+                ],
             ];
         }
 

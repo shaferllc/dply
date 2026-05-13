@@ -472,10 +472,21 @@ entryPoints:
   # Bound to 127.0.0.1 so it never reaches the public network.
   metrics:
     address: "127.0.0.1:9093"
+  # Localhost-only API/dashboard endpoint scraped by the dply live-state
+  # probe (TraefikLiveStateProbe). The entry-point MUST be named `traefik`
+  # — that's the magic name Traefik routes `api.insecure: true` traffic
+  # through. `insecure: true` is acceptable ONLY because this entrypoint
+  # binds 127.0.0.1; the public-network `web` entrypoint never serves
+  # /api or /dashboard.
+  traefik:
+    address: "127.0.0.1:9094"
 providers:
   file:
     directory: /etc/traefik/dynamic
     watch: true
+api:
+  dashboard: true
+  insecure: true
 metrics:
   prometheus:
     entryPoint: metrics

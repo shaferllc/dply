@@ -219,7 +219,7 @@ NGINX;
         if ($site->octane_port) {
             $port = (int) $site->octane_port;
             $reverb = $this->reverbProxyLocationBlock($site);
-            $octaneProxyCache = $site->wantsEngineHttpCache() ? $this->nginxProxyCacheDirectives() : '';
+            $octaneProxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
             $octaneBa = $this->nginxBasicAuthOctaneFragments($site, $root);
 
             return <<<NGINX
@@ -255,8 +255,8 @@ NGINX;
         }
 
         $reverbPlain = $this->reverbProxyLocationBlock($site);
-        $fcgiEngine = $site->wantsEngineHttpCache() && $site->type === SiteType::Php
-            ? $this->nginxFastcgiCacheDirectives()
+        $fcgiEngine = $site->type === SiteType::Php
+            ? app(SiteCacheDirectivesBuilder::class)->nginxFastcgiDirectives($site)
             : '';
         $phpBa = $this->nginxBasicAuthPhpFragments($site, $root, $phpSock, $fcgiEngine);
 
@@ -300,9 +300,7 @@ NGINX;
         string $extraBlock,
         Site $site
     ): string {
-        $openFile = $site->wantsEngineHttpCache()
-            ? "    open_file_cache max=4000 inactive=30s;\n    open_file_cache_valid 45s;\n    open_file_cache_min_uses 2;\n"
-            : '';
+        $openFile = app(SiteCacheDirectivesBuilder::class)->nginxOpenFileCacheBlock($site);
         $staticBa = $this->nginxBasicAuthStaticFragments($site, $root);
 
         return <<<NGINX
@@ -337,7 +335,7 @@ NGINX;
         string $extraBlock,
         Site $site
     ): string {
-        $proxyCache = $site->wantsEngineHttpCache() ? $this->nginxProxyCacheDirectives() : '';
+        $proxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
         $webRoot = rtrim($site->effectiveDocumentRootForNginx(), '/');
         $nodeBa = $this->nginxBasicAuthNodeFragments($site, $webRoot);
 
@@ -360,40 +358,6 @@ server {
     }
 {$extraBlock}
 }
-NGINX;
-    }
-
-    protected function nginxFastcgiCacheDirectives(): string
-    {
-        $zone = config('sites.nginx_engine_fcgi_cache_zone');
-
-        return <<<NGINX
-        fastcgi_cache {$zone};
-        fastcgi_cache_key "\$scheme\$request_method\$host\$request_uri";
-        fastcgi_cache_valid 200 60m;
-        fastcgi_cache_valid 404 10m;
-        fastcgi_cache_bypass \$http_pragma \$http_authorization;
-        fastcgi_no_cache \$http_pragma \$http_authorization;
-        fastcgi_cache_min_uses 1;
-        fastcgi_cache_use_stale error timeout updating http_500 http_503;
-        add_header X-Dply-Engine-Cache \$upstream_cache_status;
-
-NGINX;
-    }
-
-    protected function nginxProxyCacheDirectives(): string
-    {
-        $zone = config('sites.nginx_engine_proxy_cache_zone');
-
-        return <<<NGINX
-        proxy_cache {$zone};
-        proxy_cache_key "\$scheme\$request_method\$host\$request_uri";
-        proxy_cache_valid 200 60m;
-        proxy_cache_valid 404 10m;
-        proxy_cache_bypass \$http_pragma \$http_authorization;
-        proxy_cache_use_stale error timeout updating http_500 http_503;
-        add_header X-Dply-Engine-Cache \$upstream_cache_status;
-
 NGINX;
     }
 

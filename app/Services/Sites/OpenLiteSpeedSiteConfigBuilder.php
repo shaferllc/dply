@@ -47,6 +47,7 @@ class OpenLiteSpeedSiteConfigBuilder
         $authRealms = $this->olsBasicAuthRealmBlocks($site);
         $authPrefixContexts = $this->olsBasicAuthPrefixContexts($site);
         $rootAuthLines = $this->olsBasicAuthRootContextLines($site);
+        $lscacheBlock = app(SiteCacheDirectivesBuilder::class)->olsLscacheBlock($site);
 
         return match ($site->type) {
             SiteType::Php => <<<CONF
@@ -85,7 +86,7 @@ extprocessor {$this->configName($site)} {
   extGroup                nogroup
   runOnStartUp            3
 }
-{$authRealms}{$this->rewriteBlock($site)}
+{$lscacheBlock}{$authRealms}{$this->rewriteBlock($site)}
 {$authPrefixContexts}context / {
   type                    appserver
   location                {$root}
@@ -101,7 +102,7 @@ index  {
   useServer               0
   indexFiles              index.html
 }
-{$authRealms}{$this->rewriteBlock($site)}
+{$lscacheBlock}{$authRealms}{$this->rewriteBlock($site)}
 {$authPrefixContexts}context / {
   location                {$root}
   allowBrowse             1

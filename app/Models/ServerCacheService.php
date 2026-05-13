@@ -42,7 +42,7 @@ class ServerCacheService extends Model
     public const STATUS_UNINSTALLING = 'uninstalling';
 
     /** @var list<string> */
-    public const ENGINES = ['redis', 'valkey', 'memcached', 'keydb', 'dragonfly'];
+    public const ENGINES = ['redis', 'valkey', 'memcached', 'keydb', 'dragonfly', 'varnish'];
 
     /**
      * Engines that speak the Redis wire protocol on port 6379. dply allows at most one of these
@@ -56,11 +56,15 @@ class ServerCacheService extends Model
     /**
      * Family identifier the coexistence rule keys on. `redis-family` covers Redis / Valkey /
      * KeyDB / Dragonfly (all RESP-on-6379); `memcached` is its own family because the protocol
-     * + port are different and the two can legitimately coexist on one server.
+     * + port are different and the two can legitimately coexist on one server. `http-front`
+     * covers reverse-proxy HTTP cache daemons (Varnish today) — they own port 80 with the
+     * webserver moved to 127.0.0.1:8080, and coexist with redis-family + memcached.
      */
     public const FAMILY_REDIS = 'redis-family';
 
     public const FAMILY_MEMCACHED = 'memcached';
+
+    public const FAMILY_HTTP_FRONT = 'http-front';
 
     /**
      * Legacy single-instance name kept only so historical rows compare equal under the new
@@ -116,6 +120,7 @@ class ServerCacheService extends Model
     {
         return match ($engine) {
             'memcached' => 11211,
+            'varnish' => 80, // Varnish fronts the webserver on :80; backend moves to :8080.
             default => 6379, // redis / valkey / keydb / dragonfly all wire-compatible on 6379
         };
     }
@@ -134,7 +139,18 @@ class ServerCacheService extends Model
         return match ($engine) {
             'redis', 'valkey', 'keydb', 'dragonfly' => self::FAMILY_REDIS,
             'memcached' => self::FAMILY_MEMCACHED,
+            'varnish' => self::FAMILY_HTTP_FRONT,
             default => throw new \InvalidArgumentException("Unknown cache engine: {$engine}"),
         };
+    }
+
+    /**
+     * HTTP-front engines (Varnish today). They sit in front of the webserver
+     * and require the backend to move off port 80 — surface this so callers
+     * can branch on it (e.g. webserver-switch preflight, port-allocation).
+     */
+    public static function isHttpFrontEngine(string $engine): bool
+    {
+        return self::familyOf($engine) === self::FAMILY_HTTP_FRONT;
     }
 }

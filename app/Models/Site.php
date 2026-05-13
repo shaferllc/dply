@@ -154,6 +154,23 @@ class Site extends Model
 
     protected static function booted(): void
     {
+        // Keep the legacy `engine_http_cache_enabled` column in sync with
+        // `meta['caching']` so existing direct-column readers (5 in
+        // NginxSiteConfigBuilder / SiteNginxProvisioner) keep working until
+        // the column is dropped in a follow-up release. The reverse mapping
+        // lives in {@see Site::cachingConfig()}, which falls back to the
+        // boolean when `meta['caching']` is absent.
+        static::saving(function (Site $site): void {
+            $meta = is_array($site->meta) ? $site->meta : [];
+            if (! isset($meta['caching']) || ! is_array($meta['caching'])) {
+                return;
+            }
+            $enabled = (bool) ($meta['caching']['enabled'] ?? false);
+            $methods = $meta['caching']['methods'] ?? [];
+            $hasNginxHttp = is_array($methods) && in_array('nginx_http', $methods, true);
+            $site->engine_http_cache_enabled = $enabled && $hasNginxHttp;
+        });
+
         static::creating(function (Site $site): void {
             if (empty($site->slug)) {
                 $site->slug = Str::slug($site->name) ?: 'site';
@@ -1779,20 +1796,110 @@ class Site extends Model
 
     /**
      * Managed VM vhosts may emit engine-level HTTP cache directives (e.g. nginx FastCGI / proxy_cache).
+     *
+     * Reads from {@see Site::cachingConfig()} (`meta['caching']`) and falls back to the legacy
+     * boolean column for sites that haven't run through the `migrate_engine_http_cache_to_meta_caching`
+     * migration yet. The boolean column is also kept in sync by a `saving` observer so existing
+     * direct-column reads keep working until the column is dropped in a follow-up release.
      */
     public function wantsEngineHttpCache(): bool
     {
-        if (! $this->engine_http_cache_enabled) {
-            return false;
-        }
-
         if ($this->isSuspended()) {
             return false;
         }
 
-        return ! $this->usesFunctionsRuntime()
-            && ! $this->usesDockerRuntime()
-            && ! $this->usesKubernetesRuntime();
+        if ($this->usesFunctionsRuntime() || $this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
+            return false;
+        }
+
+        return $this->hasCachingMethod('nginx_http');
+    }
+
+    /**
+     * Site-level caching configuration, materialised with sensible defaults.
+     *
+     * Lives under `meta['caching']`. Pre-migration sites (no `caching` key yet) get a synthetic
+     * structure derived from the legacy `engine_http_cache_enabled` boolean so the rest of the
+     * code can read one shape regardless of migration state.
+     *
+     * @return array<string, mixed>
+     */
+    public function cachingConfig(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $caching = $meta['caching'] ?? null;
+
+        if (is_array($caching)) {
+            return $caching;
+        }
+
+        $legacyEnabled = (bool) $this->engine_http_cache_enabled;
+
+        return [
+            'enabled' => $legacyEnabled,
+            'methods' => $legacyEnabled ? ['nginx_http'] : [],
+            'nginx_http' => [
+                'fcgi' => ['ttl_200' => '60m', 'ttl_404' => '10m', 'min_uses' => 1],
+                'proxy' => ['ttl_200' => '60m', 'ttl_404' => '10m'],
+                'bypass_cookies' => [],
+            ],
+            'lscache' => ['enabled' => false, 'rules' => []],
+            'varnish' => ['enabled' => false, 'ttl_default' => '120s'],
+        ];
+    }
+
+    /**
+     * Whether the master caching toggle is on AND the given method id appears in `methods`.
+     * The single gate every consumer should funnel through — keeps the "enabled vs methods"
+     * invariant in one place.
+     */
+    public function hasCachingMethod(string $method): bool
+    {
+        $cfg = $this->cachingConfig();
+        if (empty($cfg['enabled'])) {
+            return false;
+        }
+        $methods = $cfg['methods'] ?? [];
+
+        return is_array($methods) && in_array($method, $methods, true);
+    }
+
+    /**
+     * Methods this site is eligible to enable, given its type/runtime/webserver. Single source
+     * of truth for the Livewire toggle list, validation, and the audit-event payload.
+     *
+     * Webserver-native cache modules surface only for the webserver the server currently runs;
+     * Varnish + OPcache are webserver-agnostic and surface for any non-container PHP/static/node
+     * site. v2 will add `apache_modcache` and `caddy_souin`.
+     *
+     * @return list<string>
+     */
+    public function availableCachingMethods(): array
+    {
+        if ($this->usesFunctionsRuntime() || $this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
+            return [];
+        }
+
+        $serverMeta = is_array($this->server?->meta) ? $this->server->meta : [];
+        $webserver = strtolower((string) ($serverMeta['webserver'] ?? 'nginx'));
+
+        $methods = ['varnish'];
+
+        if ($this->type === SiteType::Php) {
+            $methods[] = 'opcache';
+        }
+
+        switch ($webserver) {
+            case 'nginx':
+                $methods[] = 'nginx_http';
+                break;
+            case 'openlitespeed':
+                $methods[] = 'lscache';
+                break;
+            // apache mod_cache + caddy souin land in v2.
+        }
+
+        return array_values(array_unique($methods));
     }
 
     /**

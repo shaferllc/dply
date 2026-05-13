@@ -106,6 +106,13 @@ final class SiteSettingsSidebar
                             'group' => 'networking',
                             'route' => 'sites.webserver-config',
                         ],
+                        [
+                            'id' => 'caching',
+                            'label' => __('Caching'),
+                            'icon' => 'heroicon-o-bolt-slash',
+                            'group' => 'networking',
+                            'route' => 'sites.caching',
+                        ],
                     ];
                 })
                 ->values()
