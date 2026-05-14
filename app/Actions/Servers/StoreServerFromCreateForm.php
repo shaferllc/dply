@@ -105,7 +105,7 @@ final class StoreServerFromCreateForm
      */
     private function meta(ServerCreateForm $form): array
     {
-        return BuildServerProvisionMeta::run(
+        $meta = BuildServerProvisionMeta::run(
             $form->install_profile,
             $form->server_role,
             $form->cache_service,
@@ -119,6 +119,14 @@ final class StoreServerFromCreateForm
                 'go' => $form->go_version,
             ],
         );
+
+        // Provider-mode Docker hosts: tag the meta so Server::hostKind() returns
+        // HOST_KIND_DOCKER. Custom-mode does this inline in its own branch.
+        if ($form->mode === 'provider' && $form->provider_host_kind === 'docker') {
+            $meta['host_kind'] = Server::HOST_KIND_DOCKER;
+        }
+
+        return $meta;
     }
 
     /**

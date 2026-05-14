@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Create;
 
 use App\Actions\Servers\StoreServerFromCreateForm;
+use App\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\Imports\RunMigrationStepJob;
 use App\Models\Organization;
 use App\Livewire\Forms\ServerCreateForm;
@@ -232,13 +233,16 @@ class StepReview extends Component
             return null;
         }
 
-        // Capture migration context BEFORE deleteCurrentDraft() wipes it.
+        // Capture migration + container-launch context BEFORE deleteCurrentDraft() wipes it.
         $draft = $this->currentDraft();
         $draftPayload = is_array($draft?->payload ?? null) ? $draft->payload : [];
         $ploiSourceId = $draftPayload['_ploi_migration_source_id'] ?? null;
         $forgeSourceId = $draftPayload['_forge_migration_source_id'] ?? null;
         $ploiSelection = $draftPayload['_ploi_migration_site_selection'] ?? null;
         $forgeSelection = $draftPayload['_forge_migration_site_selection'] ?? null;
+        $containerLaunchPayload = is_array($draftPayload['_container_launch'] ?? null)
+            ? $draftPayload['_container_launch']
+            : null;
 
         try {
             $server = StoreServerFromCreateForm::run($user, $org, $this->form);
@@ -246,6 +250,15 @@ class StepReview extends Component
             $this->mergeValidationException($e);
 
             return null;
+        }
+
+        // Container launch finalizer: when the wizard ran via /launches/containers/create
+        // for a Docker host, seed the server's container_launch meta and dispatch the
+        // finalizer job (creates the site after the server is ready).
+        $isDockerHost = ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker')
+            || ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker');
+        if ($isDockerHost && is_array($containerLaunchPayload) && is_array($containerLaunchPayload['inspection'] ?? null)) {
+            $this->dispatchContainerLaunchFinalizer($server, $user->id, $org->id, $containerLaunchPayload);
         }
 
         // Kick off migration orchestration if the user entered via /imports/{source}.
@@ -286,6 +299,52 @@ class StepReview extends Component
         $destinationRoute = $isDockerHost ? 'servers.overview' : 'servers.show';
 
         return $this->redirect(route($destinationRoute, $server), navigate: true);
+    }
+
+    /**
+     * Seed the server with container_launch meta and dispatch the finalize job.
+     * Called from the success path of finalize() when the wizard ran via
+     * /launches/containers/create for a Docker host.
+     *
+     * @param  array<string, mixed>  $payload The _container_launch sub-key from draft.payload.
+     */
+    private function dispatchContainerLaunchFinalizer(Server $server, string $userId, string $organizationId, array $payload): void
+    {
+        $inspection = is_array($payload['inspection'] ?? null) ? $payload['inspection'] : [];
+        $targetFamily = (string) ($payload['target_family'] ?? '');
+        if ($targetFamily === '' || $inspection === []) {
+            return;
+        }
+
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta['container_launch'] = [
+            'status' => 'waiting_for_server',
+            'target_family' => $targetFamily,
+            'repository_url' => (string) ($payload['repository_url'] ?? ''),
+            'repository_branch' => (string) ($payload['repository_branch'] ?? 'main'),
+            'repository_subdirectory' => (string) ($payload['repository_subdirectory'] ?? ''),
+            'current_step_label' => 'Provisioning server',
+            'summary' => 'Dply is provisioning the remote server before it can create the site workspace.',
+            'events' => [[
+                'at' => now()->toIso8601String(),
+                'level' => 'info',
+                'message' => 'Remote container launch queued via the server wizard. Dply will create the site after the server is ready.',
+                'context' => array_filter([
+                    'target_family' => $targetFamily,
+                    'repository_branch' => (string) ($payload['repository_branch'] ?? ''),
+                    'repository_subdirectory' => (string) ($payload['repository_subdirectory'] ?? ''),
+                ], fn (mixed $value): bool => $value !== null && $value !== ''),
+            ]],
+        ];
+        $server->forceFill(['meta' => $meta])->save();
+
+        FinalizeContainerCloudLaunchJob::dispatch(
+            (string) $server->id,
+            $userId,
+            $organizationId,
+            $inspection,
+            $targetFamily,
+        );
     }
 
     /**
