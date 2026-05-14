@@ -114,9 +114,139 @@
                 </div>
             </header>
             @if ($cutoverReady)
-                <div class="border-b border-amber-200 bg-amber-50/70 px-5 py-3 text-xs text-amber-950">
-                    <p class="font-semibold">{{ __('Ready to cut over.') }}</p>
-                    <p class="mt-1 leading-relaxed">{{ __('Clicking Begin cutover puts the Ploi site in maintenance mode, captures the final DB delta, swaps DNS, and re-points webhooks. Allow ~5 minutes; the smoke test polls until propagation completes.') }}</p>
+                @php
+                    // Aggregate the pre-cutover verification data from each staging step's
+                    // result_data so the user can audit what we actually did before
+                    // pulling the trigger on DNS swap.
+                    $stagingByKey = $site->steps->whereIn('step_key', \App\Services\Imports\MigrationPlanner::STAGING_STEPS)->keyBy('step_key');
+
+                    $checks = [];
+                    // CreateTargetSite — confirms the dply Site row + ProvisionSiteJob.
+                    if ($s = $stagingByKey->get('create_target_site')) {
+                        $checks[] = [
+                            'ok' => $s->status === 'succeeded',
+                            'title' => __('dply site provisioned'),
+                            'detail' => ($s->result_data['site_id'] ?? null)
+                                ? __('Site id: :id', ['id' => $s->result_data['site_id']])
+                                : null,
+                        ];
+                    }
+                    if ($s = $stagingByKey->get('clone_repo')) {
+                        $checks[] = [
+                            'ok' => $s->status === 'succeeded',
+                            'title' => __('Code cloned'),
+                            'detail' => ($s->result_data['head'] ?? null)
+                                ? __('HEAD: :head', ['head' => substr((string) $s->result_data['head'], 0, 12)])
+                                : null,
+                        ];
+                    }
+                    if ($s = $stagingByKey->get('copy_env')) {
+                        $bytes = (int) ($s->result_data['bytes'] ?? 0);
+                        $checks[] = [
+                            'ok' => $s->status === 'succeeded',
+                            'title' => __('Environment copied'),
+                            'detail' => $bytes > 0 ? __(':bytes bytes', ['bytes' => number_format($bytes)]) : __('(empty)'),
+                        ];
+                    }
+                    if ($s = $stagingByKey->get('dump_database')) {
+                        $bytes = (int) ($s->result_data['bytes'] ?? 0);
+                        $warnings = $s->result_data['warnings'] ?? [];
+                        if ($s->status === 'skipped') {
+                            $checks[] = ['ok' => true, 'title' => __('Database'), 'detail' => __('No database on source site — skipped'), 'warn' => false];
+                        } else {
+                            $checks[] = [
+                                'ok' => $s->status === 'succeeded',
+                                'title' => __('Database dumped'),
+                                'detail' => $bytes > 0
+                                    ? __(':size MB', ['size' => number_format($bytes / 1024 / 1024, 1)])
+                                    : null,
+                                'warn' => ! empty($warnings),
+                            ];
+                        }
+                    }
+                    if ($s = $stagingByKey->get('restore_database')) {
+                        if ($s->status === 'skipped') {
+                            // already covered by dump skip
+                        } else {
+                            $checks[] = [
+                                'ok' => $s->status === 'succeeded',
+                                'title' => __('Database restored on dply'),
+                                'detail' => ($s->result_data['target_database'] ?? null)
+                                    ? __('Target DB: :name', ['name' => $s->result_data['target_database']])
+                                    : null,
+                            ];
+                        }
+                    }
+                    if ($s = $stagingByKey->get('recreate_crons')) {
+                        $count = (int) ($s->result_data['crons_created'] ?? 0);
+                        $checks[] = [
+                            'ok' => $s->status === 'succeeded',
+                            'title' => trans_choice('{0} No crons to recreate|{1} 1 cron recreated|[2,*] :count crons recreated', $count, ['count' => $count]),
+                            'detail' => null,
+                        ];
+                    }
+                    if ($s = $stagingByKey->get('recreate_daemons')) {
+                        $count = (int) ($s->result_data['workers_created'] ?? 0);
+                        $warns = $s->result_data['warnings'] ?? [];
+                        $checks[] = [
+                            'ok' => $s->status === 'succeeded',
+                            'title' => trans_choice('{0} No worker daemons to recreate|{1} 1 worker recreated|[2,*] :count workers recreated', $count, ['count' => $count]),
+                            'detail' => ! empty($warns) ? __('Path warnings: :n', ['n' => count($warns)]) : null,
+                            'warn' => ! empty($warns),
+                        ];
+                    }
+                    if ($s = $stagingByKey->get('recreate_scheduler')) {
+                        $created = (bool) ($s->result_data['scheduler_created'] ?? false);
+                        $checks[] = [
+                            'ok' => $s->status === 'succeeded',
+                            'title' => $created
+                                ? __('Laravel scheduler recreated')
+                                : __('Scheduler not applicable (no schedule:run cron on source)'),
+                            'detail' => null,
+                        ];
+                    }
+                    if ($s = $stagingByKey->get('setup_ssl')) {
+                        $strategy = $s->result_data['strategy'] ?? $site->ssl_strategy ?? 'unknown';
+                        $note = $s->result_data['note'] ?? $s->result_data['detail'] ?? null;
+                        $isWarn = $strategy === 'gap';
+                        $checks[] = [
+                            'ok' => $s->status === 'succeeded',
+                            'title' => __('SSL strategy: :strategy', ['strategy' => $strategy]),
+                            'detail' => $note,
+                            'warn' => $isWarn,
+                        ];
+                    }
+                    $allGreen = collect($checks)->every(fn ($c) => ($c['ok'] ?? false) === true);
+                    $anyWarn = collect($checks)->contains(fn ($c) => ($c['warn'] ?? false) === true);
+                @endphp
+                <div class="border-b border-amber-200 bg-amber-50/70 px-5 py-4 text-xs text-amber-950 space-y-3">
+                    <div>
+                        <p class="font-semibold">{{ __('Pre-cutover verification') }}</p>
+                        <p class="mt-1 leading-relaxed">{{ __('Review what was prepared during staging before triggering the cutover. After Begin cutover the source site goes into maintenance mode, the DB delta is captured, DNS swaps to dply, and webhooks re-point. Allow ~5 minutes; the smoke test polls until propagation completes.') }}</p>
+                    </div>
+                    <ul class="rounded-lg border border-amber-200 bg-white/60 ring-1 ring-amber-200/60 divide-y divide-amber-200/60">
+                        @foreach ($checks as $c)
+                            @php
+                                $icon = ! ($c['ok'] ?? false)
+                                    ? ['heroicon-o-x-circle', 'text-red-700']
+                                    : (($c['warn'] ?? false) ? ['heroicon-o-exclamation-triangle', 'text-amber-700'] : ['heroicon-o-check-circle', 'text-brand-forest']);
+                            @endphp
+                            <li class="flex items-start gap-3 px-3 py-2">
+                                <x-dynamic-component :component="$icon[0]" class="mt-0.5 h-4 w-4 shrink-0 {{ $icon[1] }}" aria-hidden="true" />
+                                <span class="min-w-0">
+                                    <span class="block font-medium">{{ $c['title'] }}</span>
+                                    @if (! empty($c['detail']))
+                                        <span class="block text-[11px] text-amber-900">{{ $c['detail'] }}</span>
+                                    @endif
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if (! $allGreen)
+                        <p class="font-semibold text-red-900">{{ __('Some staging steps did not succeed — fix or skip them before triggering cutover.') }}</p>
+                    @elseif ($anyWarn)
+                        <p class="text-amber-900">{{ __('Cutover is ready, but review the amber warnings above before proceeding.') }}</p>
+                    @endif
                 </div>
             @endif
             <ul class="divide-y divide-brand-ink/5">
