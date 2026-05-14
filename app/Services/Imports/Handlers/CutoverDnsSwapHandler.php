@@ -10,8 +10,11 @@ use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Cloudflare\CloudflareDnsService;
+use App\Services\DigitalOceanService;
 use App\Services\Imports\StepHandler;
 use App\Services\Imports\WaitForTargetServerException;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -83,18 +86,71 @@ class CutoverDnsSwapHandler implements StepHandler
     }
 
     /**
-     * Pick the first DNS-capable credential in the org. A smarter resolver would
-     * check whether the credential's account actually hosts the domain's zone;
-     * dply's existing DNS adapter handles that gracefully (returns not-found
-     * which we treat as instructions-fallback). For v1 we go best-effort.
+     * Probe each DNS-capable credential in the org and return the first whose
+     * account hosts the zone for the domain. dply's DNS adapters expose
+     * different zone-lookup shapes (CloudflareDnsService::findZoneId,
+     * DigitalOceanService::fetchDomain) — we try each in turn.
      */
     protected function resolveDnsCredentialForDomain(string $orgId, string $domain): ?ProviderCredential
     {
-        return ProviderCredential::query()
+        $zone = $this->zoneNameFor($domain);
+        $candidates = ProviderCredential::query()
             ->where('organization_id', $orgId)
             ->whereIn('provider', ProviderCredential::dnsAutomationProviderKeys())
             ->orderBy('created_at')
-            ->first();
+            ->get();
+
+        foreach ($candidates as $credential) {
+            try {
+                if ($this->credentialHostsZone($credential, $zone)) {
+                    return $credential;
+                }
+            } catch (\Throwable $e) {
+                // Treat as not-a-match; move on to the next.
+                Log::info('DNS credential zone probe failed', [
+                    'credential' => $credential->id,
+                    'provider' => $credential->provider,
+                    'zone' => $zone,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
+    }
+
+    protected function credentialHostsZone(ProviderCredential $credential, string $zone): bool
+    {
+        return match ($credential->provider) {
+            'digitalocean' => (new DigitalOceanService($credential->getApiToken() ?? ''))
+                ->domainExistsInAccount($zone),
+            'cloudflare' => (new CloudflareDnsService($credential))->zoneExists($zone),
+            default => false, // gandi/namecheap/vercel_dns/route53 — not yet wired
+        };
+    }
+
+    /**
+     * Best-effort apex-zone extraction. For app.example.com → example.com; for
+     * sub.tenant.example.co.uk → example.co.uk via a small public-suffix-ish
+     * heuristic. A perfect implementation would use the PSL; for v1 we take
+     * the last two labels except when the TLD is a known second-level
+     * country suffix (co.uk, com.au, etc.).
+     */
+    protected function zoneNameFor(string $domain): string
+    {
+        $domain = strtolower(trim($domain));
+        $parts = explode('.', $domain);
+        if (count($parts) <= 2) {
+            return $domain;
+        }
+        $multiLevelTlds = ['co.uk', 'com.au', 'co.jp', 'com.br', 'co.za', 'ac.uk', 'gov.uk'];
+        $tail2 = implode('.', array_slice($parts, -2));
+        $tail3 = implode('.', array_slice($parts, -3));
+        if (in_array($tail2, $multiLevelTlds, true)) {
+            return $tail3;
+        }
+
+        return $tail2;
     }
 
     /**
@@ -102,18 +158,68 @@ class CutoverDnsSwapHandler implements StepHandler
      */
     protected function swapViaAdapter(ProviderCredential $credential, string $domain, string $newIp): array
     {
-        // Dispatch via the existing DNS adapters; full per-provider implementation
-        // (records list + diff + update) is handled by dply's DNS services. Here we
-        // record the intent + a marker that the orchestrator-driven swap was attempted.
-        // Real DNS service invocation goes through DigitalOceanService::updateDomainRecord,
-        // CloudflareDnsService::createOrUpdateRecord, etc. — connected up in a follow-up
-        // when DNS adapter contracts converge into a single unified interface (currently
-        // each adapter exposes provider-shaped methods).
+        $zone = $this->zoneNameFor($domain);
+        $relative = $this->relativeRecordName($domain, $zone);
+
+        return match ($credential->provider) {
+            'digitalocean' => $this->swapViaDigitalOcean($credential, $domain, $zone, $relative, $newIp),
+            'cloudflare' => $this->swapViaCloudflare($credential, $domain, $zone, $relative, $newIp),
+            default => [
+                'strategy' => 'instructions',
+                'reason' => 'no_adapter_for_provider:'.$credential->provider,
+                'records' => [['type' => 'A', 'name' => $relative, 'value' => $newIp]],
+            ],
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function swapViaDigitalOcean(ProviderCredential $credential, string $domain, string $zone, string $relative, string $newIp): array
+    {
+        $token = $credential->getApiToken() ?? '';
+        $service = new DigitalOceanService($token);
+        $created = $service->createDomainRecord($zone, 'A', $relative, $newIp, ttl: 60);
+        $recordId = is_array($created) ? (int) ($created['id'] ?? 0) : 0;
+
         return [
-            'domain' => $domain,
+            'zone' => $zone,
+            'record' => $relative,
+            'record_id' => $recordId,
             'new_ip' => $newIp,
             'attempted_at' => now()->toIso8601String(),
-            'note' => 'DNS swap dispatched via '.$credential->provider.' adapter. Verify via dig + browser.',
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function swapViaCloudflare(ProviderCredential $credential, string $domain, string $zone, string $relative, string $newIp): array
+    {
+        $service = new CloudflareDnsService($credential);
+        $result = $service->upsertARecord($zone, $relative, $newIp);
+        $recordId = is_array($result) ? (string) ($result['id'] ?? '') : '';
+
+        return [
+            'zone' => $zone,
+            'record' => $relative,
+            'record_id' => $recordId,
+            'new_ip' => $newIp,
+            'attempted_at' => now()->toIso8601String(),
+        ];
+    }
+
+    protected function relativeRecordName(string $domain, string $zone): string
+    {
+        $domain = strtolower(trim($domain));
+        $zone = strtolower(trim($zone));
+        if ($domain === $zone) {
+            return '@';
+        }
+        if (str_ends_with($domain, '.'.$zone)) {
+            return mb_substr($domain, 0, -1 * (strlen($zone) + 1));
+        }
+
+        return $domain;
     }
 }

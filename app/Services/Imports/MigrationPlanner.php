@@ -127,6 +127,7 @@ class MigrationPlanner
                 }
             }
 
+            $this->appendServerStep($parent->id, ++$sequence, ImportMigrationStep::KEY_COLLECT_MANUAL_REVIEW);
             $this->appendServerStep($parent->id, ++$sequence, ImportMigrationStep::KEY_REVOKE_SSH_KEY);
 
             return $parent->fresh(['siteMigrations.steps', 'steps']);

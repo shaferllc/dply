@@ -6,9 +6,12 @@ namespace App\Services\Imports\Handlers;
 
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
+use App\Models\ImportSiteMigration;
 use App\Models\Server;
+use App\Models\Site;
 use App\Services\Imports\StepHandler;
 use App\Services\Imports\WaitForTargetServerException;
+use App\Services\Imports\WaitForTargetSiteException;
 use RuntimeException;
 
 /**
@@ -46,7 +49,37 @@ abstract class SshDependentHandler implements StepHandler
             ));
         }
 
+        // For per-site steps, also gate on the target Site being provisioned. Steps
+        // like clone_repo, restore_database, setup_ssl all need /home/{slug}/ to
+        // exist, which only happens after ProvisionSiteJob completes.
+        if ($this->requiresProvisionedTargetSite() && $step->import_site_migration_id !== null) {
+            $child = ImportSiteMigration::find($step->import_site_migration_id);
+            if ($child === null || $child->target_site_id === null) {
+                throw new RuntimeException('SSH step requires target_site_id on the child migration.');
+            }
+            $site = Site::find($child->target_site_id);
+            if ($site === null) {
+                throw new RuntimeException('Target dply site row missing for step.');
+            }
+            if (! $site->isReadyForTraffic()) {
+                throw new WaitForTargetSiteException(sprintf(
+                    'Target dply site %s is %s; waiting for provisioning to finish.',
+                    $site->name,
+                    $site->status,
+                ));
+            }
+        }
+
         $this->executeOnReadyServer($step, $migration, $target);
+    }
+
+    /**
+     * Default true: SSH-dependent handlers usually need the target Site provisioned.
+     * Override in subclasses that only need the Server (e.g. server-level steps).
+     */
+    protected function requiresProvisionedTargetSite(): bool
+    {
+        return true;
     }
 
     abstract protected function executeOnReadyServer(

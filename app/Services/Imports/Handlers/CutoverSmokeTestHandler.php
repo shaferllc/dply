@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Imports\Handlers;
 
+use App\Jobs\IssueSiteSslJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -103,10 +104,17 @@ class CutoverSmokeTestHandler implements StepHandler
         $child->cutover_completed_at = Carbon::now();
         $child->save();
 
+        // Gap-strategy sites have ssl_status=NONE entering cutover; once DNS now
+        // points at dply, HTTP-01 issuance can succeed. Dispatch the job.
+        if ($child->ssl_strategy === ImportSiteMigration::SSL_GAP) {
+            IssueSiteSslJob::dispatch($site->id);
+        }
+
         $step->result_data = [
             'attempts' => $attempts,
             'last_status' => $lastStatus,
             'verified_header' => $headerName,
+            'ssl_issuance_queued' => $child->ssl_strategy === ImportSiteMigration::SSL_GAP,
         ];
         $step->save();
 

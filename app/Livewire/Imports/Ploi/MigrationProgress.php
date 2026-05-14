@@ -66,6 +66,18 @@ class MigrationProgress extends Component
      * first cutover step (cutover_maintenance_on); from there the orchestrator
      * walks the cutover sub-plan.
      */
+    public function dismissReviewItem(int $index): void
+    {
+        $items = $this->migration->manual_review_items ?? [];
+        if (! isset($items[$index])) {
+            return;
+        }
+        $items[$index]['dismissed_at'] = now()->toIso8601String();
+        $this->migration->manual_review_items = array_values($items);
+        $this->migration->save();
+        $this->toastSuccess(__('Marked reviewed.'));
+    }
+
     public function beginCutover(string $siteMigrationId): void
     {
         $child = ImportSiteMigration::query()

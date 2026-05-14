@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Imports\Handlers;
 
 use App\Enums\SiteType;
+use App\Jobs\ProvisionSiteJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -13,6 +14,7 @@ use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Services\Imports\StepHandler;
 use App\Services\Imports\WaitForTargetServerException;
+use App\Services\Sites\SiteProvisioner;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -28,6 +30,8 @@ use RuntimeException;
  */
 class CreateTargetSiteHandler implements StepHandler
 {
+    public function __construct(protected SiteProvisioner $provisioner) {}
+
     public static function key(): string
     {
         return ImportMigrationStep::KEY_CREATE_TARGET_SITE;
@@ -110,7 +114,16 @@ class CreateTargetSiteHandler implements StepHandler
         $child->status = ImportSiteMigration::STATUS_STAGING;
         $child->save();
 
-        $step->result_data = ['site_id' => $site->id];
+        // Kick off dply's standard site provisioning (creates system user, site dir,
+        // nginx vhost, database). Subsequent SshDependent handlers (CloneRepo, etc.)
+        // verify the site directory exists before running and throw a wait exception
+        // if provisioning is still in flight; ProvisionSiteJob completion is observed
+        // via Site::status transition similarly to how ServerObserver wakes us.
+        $site->loadMissing(['server', 'domains']);
+        $this->provisioner->markQueued($site);
+        ProvisionSiteJob::dispatch($site->id);
+
+        $step->result_data = ['site_id' => $site->id, 'provision_dispatched' => true];
         $step->save();
     }
 

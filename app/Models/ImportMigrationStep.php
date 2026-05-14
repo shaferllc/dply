@@ -27,6 +27,8 @@ class ImportMigrationStep extends Model
 
     public const KEY_ELIGIBILITY_SCAN = 'eligibility_scan';
 
+    public const KEY_COLLECT_MANUAL_REVIEW = 'collect_manual_review';
+
     public const KEY_REVOKE_SSH_KEY = 'revoke_ssh_key';
 
     // Per-site step keys (declared upfront for the UI).

@@ -23,6 +23,7 @@ final class HandlerManifest
             PushSshKeyHandler::class,
             RevokeSshKeyHandler::class,
             EligibilityScanHandler::class,
+            CollectManualReviewHandler::class,
 
             // Per-site staging handlers.
             FreezeSnapshotHandler::class,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Imports\Handlers;
 
+use App\Jobs\IssueSiteSslJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -110,15 +111,20 @@ class SetupSslHandler extends SshDependentHandler
     }
 
     /**
-     * Mark the site so dply's existing SSL machinery issues via DNS-01 on the
-     * next ssl-issuance pass. The orchestrator doesn't drive issuance directly
-     * here — dply has a queue for that; we just request it.
+     * Mark the site eligible for issuance and dispatch the existing dply
+     * SSL job, which handles DNS-01 issuance when a DNS-capable
+     * ProviderCredential is available on the org (it auto-selects DNS-01
+     * vs HTTP-01 internally based on what's connected).
      */
     protected function primeCleanStrategy(Site $site, ImportMigrationStep $step): void
     {
-        $site->ssl_status = Site::SSL_NONE; // makes the site eligible for the SSL issuer
+        $site->ssl_status = Site::SSL_PENDING;
         $site->save();
-        $step->result_data = ['strategy' => 'clean', 'detail' => 'queued for DNS-01 issuance'];
+        IssueSiteSslJob::dispatch($site->id);
+        $step->result_data = [
+            'strategy' => 'clean',
+            'detail' => 'dispatched IssueSiteSslJob — DNS-01 issuance against connected DNS credentials',
+        ];
         $step->save();
     }
 
@@ -176,6 +182,8 @@ class SetupSslHandler extends SshDependentHandler
     {
         $site->ssl_status = Site::SSL_NONE;
         $site->save();
+        // No immediate dispatch — IssueSiteSslJob is queued from the cutover
+        // smoke-test step's success path (see CutoverSmokeTestHandler).
         $step->result_data = [
             'strategy' => 'gap',
             'note' => 'No DNS automation and no usable LE cert on Ploi; HTTPS issuance happens immediately after DNS swap (~30–120s gap).',

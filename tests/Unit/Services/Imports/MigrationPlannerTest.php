@@ -127,7 +127,7 @@ class MigrationPlannerTest extends TestCase
         );
 
         $stepsPerSite = count(MigrationPlanner::STAGING_STEPS) + count(MigrationPlanner::CUTOVER_STEPS);
-        $serverSteps = 3; // push_ssh_key, eligibility_scan, revoke_ssh_key
+        $serverSteps = 4; // push_ssh_key, eligibility_scan, collect_manual_review, revoke_ssh_key
         $expectedTotal = $serverSteps + (2 * $stepsPerSite);
         $this->assertSame($expectedTotal, ImportMigrationStep::query()->where('import_server_migration_id', $parent->id)->count());
     }

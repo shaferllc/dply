@@ -145,6 +145,42 @@
         </article>
     @endforeach
 
+    @php $reviewItems = $migration->manual_review_items ?? []; @endphp
+    @if (! empty($reviewItems))
+        <section class="dply-card mt-8 overflow-hidden">
+            <header class="border-b border-brand-ink/10 bg-amber-50/70 px-5 py-3">
+                <h2 class="text-sm font-semibold text-amber-950">{{ __('Manual review — items dply did not migrate') }}</h2>
+                <p class="text-xs text-amber-900">{{ __('These existed on your Ploi server but require manual handling on dply. Review each one and dismiss when done.') }}</p>
+            </header>
+            <ul class="divide-y divide-brand-ink/5">
+                @foreach ($reviewItems as $idx => $item)
+                    @php
+                        $dismissed = ! empty($item['dismissed_at'] ?? null);
+                        $rawJson = ! empty($item['raw'] ?? []) ? json_encode($item['raw'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : null;
+                    @endphp
+                    <li class="px-5 py-3 {{ $dismissed ? 'opacity-50' : '' }}">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0 space-y-1">
+                                <p class="text-sm font-medium text-brand-ink">{{ $item['title'] ?? $item['kind'] }}</p>
+                                <p class="text-xs text-brand-moss leading-relaxed">{{ $item['detail'] ?? '' }}</p>
+                                @if ($rawJson)
+                                    <pre class="mt-2 max-h-48 overflow-auto rounded-md bg-brand-cream px-3 py-2 text-[11px] font-mono text-brand-ink">{{ $rawJson }}</pre>
+                                @endif
+                            </div>
+                            @if (! $dismissed)
+                                <button type="button" wire:click="dismissReviewItem({{ $idx }})" class="text-xs font-semibold text-brand-forest underline underline-offset-2 hover:text-brand-ink">
+                                    {{ __('Mark reviewed') }}
+                                </button>
+                            @else
+                                <span class="text-[10px] uppercase tracking-wide text-brand-moss">{{ __('Reviewed') }}</span>
+                            @endif
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
+
     <footer class="mt-8">
         <a href="{{ route('imports.ploi.inventory') }}" wire:navigate class="text-sm font-medium text-brand-forest underline underline-offset-2 hover:text-brand-ink">
             ← {{ __('Back to Ploi inventory') }}

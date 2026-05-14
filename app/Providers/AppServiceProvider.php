@@ -32,6 +32,7 @@ use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
 use App\Observers\BackupAutoResumeObserver;
 use App\Observers\BackupFailureNotifyObserver;
+use App\Observers\ImportSiteWakeupObserver;
 use App\Observers\ServerObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
@@ -331,6 +332,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Server::observe(ServerObserver::class);
+        Site::observe(ImportSiteWakeupObserver::class);
         SupervisorProgram::observe(SupervisorProgramObserver::class);
         TaskRunnerTask::observe(TaskRunnerTaskObserver::class);
         ServerDatabaseBackup::observe(BackupAutoResumeObserver::class);

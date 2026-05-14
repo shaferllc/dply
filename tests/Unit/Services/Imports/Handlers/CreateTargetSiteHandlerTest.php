@@ -13,9 +13,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\User;
+use App\Jobs\ProvisionSiteJob;
 use App\Services\Imports\Handlers\CreateTargetSiteHandler;
 use App\Services\Imports\WaitForTargetServerException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class CreateTargetSiteHandlerTest extends TestCase
@@ -76,9 +78,12 @@ class CreateTargetSiteHandlerTest extends TestCase
 
     public function test_creates_site_and_primary_domain_from_source_snapshot(): void
     {
+        Bus::fake();
         [$step, $child, $target] = $this->seedFixture();
 
-        (new CreateTargetSiteHandler())->execute($step);
+        ($this->app->make(CreateTargetSiteHandler::class))->execute($step);
+
+        Bus::assertDispatched(ProvisionSiteJob::class);
 
         $child->refresh();
         $this->assertNotNull($child->target_site_id);
@@ -102,21 +107,23 @@ class CreateTargetSiteHandlerTest extends TestCase
 
     public function test_throws_wait_when_target_server_not_ready(): void
     {
+        Bus::fake();
         [$step] = $this->seedFixture(serverStatus: Server::STATUS_PROVISIONING);
 
         $this->expectException(WaitForTargetServerException::class);
-        (new CreateTargetSiteHandler())->execute($step);
+        ($this->app->make(CreateTargetSiteHandler::class))->execute($step);
     }
 
     public function test_idempotent_when_target_site_id_already_set(): void
     {
+        Bus::fake();
         [$step, $child] = $this->seedFixture();
-        (new CreateTargetSiteHandler())->execute($step);
+        ($this->app->make(CreateTargetSiteHandler::class))->execute($step);
         $firstSiteId = $child->fresh()->target_site_id;
 
         // Re-run.
         $step->refresh();
-        (new CreateTargetSiteHandler())->execute($step);
+        ($this->app->make(CreateTargetSiteHandler::class))->execute($step);
 
         $this->assertSame($firstSiteId, $child->fresh()->target_site_id);
         $this->assertSame(1, Site::query()->count(), 'Should not double-create the site');

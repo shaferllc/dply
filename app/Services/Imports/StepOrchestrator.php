@@ -52,6 +52,13 @@ class StepOrchestrator
                 'step_key' => $step->step_key,
             ]);
             $this->markPendingAfterWait($step, $e);
+        } catch (WaitForTargetSiteException $e) {
+            // Same shape — paused on Site provisioning.
+            Log::info('import migration step paused waiting for target site', [
+                'step_id' => $step->id,
+                'step_key' => $step->step_key,
+            ]);
+            $this->markPendingAfterWait($step, $e);
         } catch (Throwable $e) {
             Log::warning('import migration step failed', [
                 'step_id' => $step->id,
@@ -105,12 +112,12 @@ class StepOrchestrator
     }
 
     /**
-     * Return a step to PENDING after a server-ready wait — the orchestrator's
-     * follow-up dispatch will not enqueue it because nextStep() returns the
-     * first PENDING step in sequence; instead the ServerObserver triggers a
-     * fresh dispatch when the target server reaches READY.
+     * Return a step to PENDING after a wait — the orchestrator's follow-up
+     * dispatch will not enqueue it because nextStep() returns the first
+     * PENDING step in sequence; instead the ServerObserver / SiteObserver
+     * trigger a fresh dispatch when the underlying resource is ready.
      */
-    protected function markPendingAfterWait(ImportMigrationStep $step, WaitForTargetServerException $e): void
+    protected function markPendingAfterWait(ImportMigrationStep $step, Throwable $e): void
     {
         $step->status = ImportMigrationStep::STATUS_PENDING;
         $step->error_message = mb_substr($e->getMessage(), 0, 5000);
