@@ -339,6 +339,15 @@ class Index extends Component
         $hasProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
+        // Q19 onboarding empty state: surface a "Migrate from {Ploi,Forge}" CTA
+        // alongside Create Server when at least one inventory-import credential
+        // is connected for the current org.
+        $hasImportCredentials = $org
+            ? ProviderCredential::query()
+                ->where('organization_id', $org->id)
+                ->whereIn('provider', \App\Enums\ServerProvider::importProviderKeys())
+                ->exists()
+            : false;
 
         $deleteModalServer = $this->deleteModalServerId
             ? Server::query()->find($this->deleteModalServerId)
@@ -358,6 +367,7 @@ class Index extends Component
             'summary' => $summary,
             'openInsights' => $openInsights,
             'hasProviderCredentials' => $hasProviderCredentials,
+            'hasImportCredentials' => $hasImportCredentials,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
             'serverCreateDraft' => $serverCreateDraft,

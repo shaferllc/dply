@@ -291,6 +291,16 @@
                                     <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                     {{ __('Open launchpad') }}
                                 </a>
+                                @if ($hasImportCredentials)
+                                    <a
+                                        href="{{ route('imports.ploi.inventory') }}"
+                                        wire:navigate
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-950 shadow-sm transition hover:bg-amber-100"
+                                    >
+                                        <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                        {{ __('Migrate from Ploi') }}
+                                    </a>
+                                @endif
                             @endcan
                             <a
                                 href="{{ route('credentials.index') }}"
