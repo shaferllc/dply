@@ -28,7 +28,7 @@
                 @if ($dockerHostHinted)
                     <div class="mt-5 inline-flex items-start gap-3 rounded-2xl border border-sky-200/80 bg-white/80 px-4 py-3 text-sm text-slate-800 shadow-sm">
                         <x-heroicon-m-information-circle class="mt-0.5 h-5 w-5 shrink-0 text-sky-600" />
-                        <span>{{ __('Detected a Docker-host launch path. Custom mode is preselected; you can switch back to a managed provider below.') }}</span>
+                        <span>{{ __('Detected a Docker-host launch path. Provider mode is preselected with a Docker host; you can change the host kind on the next step.') }}</span>
                     </div>
                 @endif
             </div>

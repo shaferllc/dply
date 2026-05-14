@@ -72,8 +72,8 @@ class StepType extends Component
             $requestedHostTarget = request()->query('host_target');
             if ($requestedHostTarget === 'docker') {
                 $this->dockerHostHinted = true;
-                $this->form->mode = 'custom';
-                $this->form->custom_host_kind = 'docker';
+                $this->form->mode = 'provider';
+                $this->form->provider_host_kind = 'docker';
             }
         }
 

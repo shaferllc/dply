@@ -119,6 +119,14 @@ class StepWhere extends Component
         $this->form->custom_host_kind = $kind;
     }
 
+    public function chooseProviderHostKind(string $kind): void
+    {
+        if (! in_array($kind, ['vm', 'docker'], true)) {
+            return;
+        }
+        $this->form->provider_host_kind = $kind;
+    }
+
     public function updatedFormProviderCredentialId(): void
     {
         // Trait's version syncs stack defaults; we additionally pick a single region/size if available.
@@ -161,11 +169,13 @@ class StepWhere extends Component
         if ($this->form->mode === 'provider') {
             $this->validate([
                 'form.type' => ['required', 'string', 'max:64'],
+                'form.provider_host_kind' => ['required', Rule::in(['vm', 'docker'])],
                 'form.provider_credential_id' => ['required', 'string'],
                 'form.region' => ['required', 'string'],
                 'form.size' => ['required', 'string'],
             ], attributes: [
                 'form.type' => __('provider'),
+                'form.provider_host_kind' => __('host kind'),
                 'form.provider_credential_id' => __('account'),
                 'form.region' => __('region'),
                 'form.size' => __('plan'),
@@ -186,8 +196,9 @@ class StepWhere extends Component
             ]);
         }
 
-        // Custom + Docker host has no stack step — jump to Review (advance high-water mark to 4).
-        $skipsStack = $this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker';
+        // Docker host (either mode) has no stack step — jump to Review (advance high-water mark to 4).
+        $skipsStack = ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker')
+            || ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker');
         $next = $skipsStack ? 4 : 3;
 
         $this->saveDraftFromForm($this->form, advanceTo: $next);

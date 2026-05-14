@@ -34,6 +34,14 @@ class ServerCreateForm extends Form
 
     public string $custom_host_kind = 'vm';
 
+    /**
+     * Provider mode host kind: 'vm' (default — full stack install) or 'docker' (skip stack,
+     * just provision the cloud VM with Docker on it). Mirrors custom_host_kind but for the
+     * provider/cloud-provisioned path. Set via StepWhere's tile picker or pre-filled by the
+     * Containers launcher hint (host_target=docker query param).
+     */
+    public string $provider_host_kind = 'vm';
+
     public string $server_role = 'application';
 
     public string $cache_service = 'redis';

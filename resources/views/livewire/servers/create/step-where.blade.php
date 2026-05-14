@@ -26,6 +26,53 @@
         </header>
 
         @if ($form->mode === 'provider')
+            {{-- Host kind picker (VM vs Docker). Pre-selected from the Containers
+                 launcher's host_target=docker hint; default 'vm' for direct entry. --}}
+            <section class="space-y-4">
+                <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Host kind') }}</h2>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <button
+                        type="button"
+                        wire:click="chooseProviderHostKind('vm')"
+                        @class([
+                            'group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all',
+                            'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->provider_host_kind === 'vm',
+                            'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->provider_host_kind !== 'vm',
+                        ])
+                    >
+                        <span @class([
+                            'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors',
+                            'bg-brand-sage text-white shadow-md shadow-brand-sage/20' => $form->provider_host_kind === 'vm',
+                            'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15' => $form->provider_host_kind !== 'vm',
+                        ])>
+                            <x-heroicon-o-server class="h-6 w-6" />
+                        </span>
+                        <p class="mt-4 text-base font-semibold text-brand-ink">{{ __('Full stack VM') }}</p>
+                        <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">{{ __('Dply installs Nginx, PHP, your database, etc. — the traditional VPS-style setup.') }}</p>
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="chooseProviderHostKind('docker')"
+                        @class([
+                            'group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all',
+                            'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->provider_host_kind === 'docker',
+                            'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->provider_host_kind !== 'docker',
+                        ])
+                    >
+                        <span @class([
+                            'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors',
+                            'bg-brand-sage text-white shadow-md shadow-brand-sage/20' => $form->provider_host_kind === 'docker',
+                            'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15' => $form->provider_host_kind !== 'docker',
+                        ])>
+                            <x-heroicon-o-cube-transparent class="h-6 w-6" />
+                        </span>
+                        <p class="mt-4 text-base font-semibold text-brand-ink">{{ __('Docker host') }}</p>
+                        <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">{{ __('Skip the stack install. Dply just provisions the VM with Docker and orchestrates containers.') }}</p>
+                    </button>
+                </div>
+                <x-input-error :messages="$errors->get('form.provider_host_kind')" class="mt-1" />
+            </section>
+
             {{-- Provider tile picker --}}
             <section class="space-y-4">
                 <div class="flex items-baseline justify-between gap-2">
