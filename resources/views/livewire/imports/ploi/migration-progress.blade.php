@@ -92,6 +92,11 @@
                                 <button type="button" wire:click="retryFailedStep('{{ $step->id }}')" class="text-xs font-semibold text-brand-forest underline underline-offset-2 hover:text-brand-ink">
                                     {{ __('Retry') }}
                                 </button>
+                                @if (in_array($step->step_key, \App\Models\ImportMigrationStep::SKIPPABLE_KEYS, true))
+                                    <button type="button" wire:click="skipFailedStep('{{ $step->id }}')" class="text-xs font-semibold text-brand-moss underline underline-offset-2 hover:text-brand-ink">
+                                        {{ __('Skip') }}
+                                    </button>
+                                @endif
                             @endif
                         </div>
                     </li>
@@ -309,6 +314,11 @@
                                 <button type="button" wire:click="retryFailedStep('{{ $step->id }}')" class="text-xs font-semibold text-brand-forest underline underline-offset-2 hover:text-brand-ink">
                                     {{ __('Retry') }}
                                 </button>
+                                @if (in_array($step->step_key, \App\Models\ImportMigrationStep::SKIPPABLE_KEYS, true))
+                                    <button type="button" wire:click="skipFailedStep('{{ $step->id }}')" class="text-xs font-semibold text-brand-moss underline underline-offset-2 hover:text-brand-ink">
+                                        {{ __('Skip') }}
+                                    </button>
+                                @endif
                             @endif
                         </div>
                     </li>

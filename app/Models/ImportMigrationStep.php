@@ -62,6 +62,26 @@ class ImportMigrationStep extends Model
 
     public const KEY_CUTOVER_SMOKE_TEST = 'cutover_smoke_test';
 
+    /**
+     * Step keys the user may Skip when failed. Per Q13 — DB and code-clone
+     * are load-bearing (the migration is meaningless without them); cutover
+     * steps are the cutover dance and can't be partially executed. Cron /
+     * daemon / scheduler / SSL setup are recreatable in dply UI later, so a
+     * skip just means "I'll fix it manually post-migration."
+     */
+    public const SKIPPABLE_KEYS = [
+        self::KEY_RECREATE_CRONS,
+        self::KEY_RECREATE_DAEMONS,
+        self::KEY_RECREATE_SCHEDULER,
+        self::KEY_SETUP_SSL,
+        self::KEY_COLLECT_MANUAL_REVIEW,
+    ];
+
+    public function isSkippable(): bool
+    {
+        return in_array($this->step_key, self::SKIPPABLE_KEYS, true);
+    }
+
     protected $fillable = [
         'import_server_migration_id',
         'import_site_migration_id',

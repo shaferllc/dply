@@ -78,6 +78,53 @@ class MigrationProgress extends Component
         $this->toastSuccess(__('Retry queued.'));
     }
 
+    /**
+     * Q13 skip path: mark a failed non-critical step as SKIPPED and resume
+     * the migration. Bounded by ImportMigrationStep::SKIPPABLE_KEYS so the
+     * user can't accidentally skip clone_repo or restore_database — those
+     * would leave the migrated site empty / data-less.
+     */
+    public function skipFailedStep(string $stepId): void
+    {
+        $this->authorizeMutate();
+
+        $step = ImportMigrationStep::query()
+            ->where('id', $stepId)
+            ->where('import_server_migration_id', $this->migration->id)
+            ->where('status', ImportMigrationStep::STATUS_FAILED)
+            ->first();
+
+        if ($step === null) {
+            $this->toastError(__('Step is not in a skippable state.'));
+
+            return;
+        }
+        if (! $step->isSkippable()) {
+            $this->toastError(__('This step is load-bearing and can\'t be skipped; retry or abort instead.'));
+
+            return;
+        }
+
+        $step->status = ImportMigrationStep::STATUS_SKIPPED;
+        $step->error_message = ($step->error_message ? $step->error_message."\n" : '').'Skipped by user.';
+        $step->finished_at = now();
+        $step->save();
+
+        // Dispatch the next pending step so the migration keeps moving.
+        $next = ImportMigrationStep::query()
+            ->where('import_server_migration_id', $this->migration->id)
+            ->where('status', ImportMigrationStep::STATUS_PENDING)
+            ->whereNotIn('step_key', MigrationPlanner::CUTOVER_STEPS)
+            ->orderBy('sequence')
+            ->first();
+
+        if ($next !== null) {
+            RunMigrationStepJob::dispatch($next->id);
+        }
+
+        $this->toastSuccess(__('Step skipped. Migration resumed.'));
+    }
+
     /** Toggles the abort confirmation modal. */
     public bool $confirmingAbort = false;
 
