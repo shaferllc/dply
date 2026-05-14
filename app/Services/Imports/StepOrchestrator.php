@@ -115,6 +115,26 @@ class StepOrchestrator
         $step->error_message = mb_substr($e->getMessage(), 0, 5000);
         $step->save();
 
+        // Q13: when a CUTOVER step fails, transition the parent site to
+        // cutover_failed so the progress UI can surface DNS rollback / manual
+        // resolution affordances. Staging-tier failures stay at the step level
+        // and use the existing retry/skip flow.
+        if ($step->import_site_migration_id !== null
+            && in_array($step->step_key, MigrationPlanner::CUTOVER_STEPS, true)
+        ) {
+            $child = ImportSiteMigration::find($step->import_site_migration_id);
+            if ($child !== null
+                && in_array($child->status, [
+                    ImportSiteMigration::STATUS_CUTOVER_IN_PROGRESS,
+                    ImportSiteMigration::STATUS_READY_FOR_CUTOVER,
+                ], true)
+            ) {
+                $child->status = ImportSiteMigration::STATUS_CUTOVER_FAILED;
+                $child->failure_summary = mb_substr($e->getMessage(), 0, 1000);
+                $child->save();
+            }
+        }
+
         $this->publishStepFailed($step);
     }
 

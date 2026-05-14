@@ -9,9 +9,13 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
+use App\Models\ProviderCredential;
+use App\Services\Cloudflare\CloudflareDnsService;
+use App\Services\DigitalOceanService;
 use App\Services\Imports\MigrationPlanner;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -91,6 +95,128 @@ class MigrationProgress extends Component
         $this->migration->manual_review_items = array_values($items);
         $this->migration->save();
         $this->toastSuccess(__('Marked reviewed.'));
+    }
+
+    /**
+     * Q13 rollback path: site is in cutover_failed → attempt to delete the
+     * dply A record we created during cutover_dns_swap so DNS reverts to the
+     * source. Best-effort: if the delete fails (record removed, credential
+     * gone) the user still gets the manual-instructions panel; status flips
+     * to cutover_rolled_back either way so the migration leaves the failed
+     * state.
+     */
+    public function rollbackCutoverDns(string $siteMigrationId): void
+    {
+        $this->authorizeMutate();
+
+        $child = ImportSiteMigration::query()
+            ->where('id', $siteMigrationId)
+            ->where('import_server_migration_id', $this->migration->id)
+            ->first();
+
+        if ($child === null) {
+            $this->toastError(__('Site migration not found.'));
+
+            return;
+        }
+        if ($child->status !== ImportSiteMigration::STATUS_CUTOVER_FAILED) {
+            $this->toastError(__('Site is not in a rolled-back-able state (current: :status).', ['status' => $child->status]));
+
+            return;
+        }
+
+        $dnsStep = ImportMigrationStep::query()
+            ->where('import_site_migration_id', $child->id)
+            ->where('step_key', ImportMigrationStep::KEY_CUTOVER_DNS_SWAP)
+            ->where('status', ImportMigrationStep::STATUS_SUCCEEDED)
+            ->first();
+
+        $deleted = false;
+        if ($dnsStep !== null && ! empty($dnsStep->result_data['record_id'])) {
+            $deleted = $this->tryDeleteDnsRecord($dnsStep->result_data ?? []) === null;
+        }
+
+        $child->status = ImportSiteMigration::STATUS_CUTOVER_ROLLED_BACK;
+        $child->save();
+
+        $sourceLabel = $this->migration->source === 'forge' ? 'Forge' : 'Ploi';
+        if ($deleted) {
+            $this->toastSuccess(__('DNS rollback dispatched. Verify your domain now resolves back to :source.', ['source' => $sourceLabel]));
+        } else {
+            $this->toastError(__('DNS rollback could not be automated; follow the manual steps shown.'));
+        }
+    }
+
+    /**
+     * Q13 escape hatch: user handled the failed cutover outside dply. Mark
+     * the site as cutover_rolled_back so the progress page stops flagging
+     * action-required.
+     */
+    public function markCutoverResolvedManually(string $siteMigrationId): void
+    {
+        $this->authorizeMutate();
+        $child = ImportSiteMigration::query()
+            ->where('id', $siteMigrationId)
+            ->where('import_server_migration_id', $this->migration->id)
+            ->first();
+        if ($child === null || $child->status !== ImportSiteMigration::STATUS_CUTOVER_FAILED) {
+            $this->toastError(__('Site is not in a manually-resolvable state.'));
+
+            return;
+        }
+        $child->status = ImportSiteMigration::STATUS_CUTOVER_ROLLED_BACK;
+        $child->failure_summary = ($child->failure_summary ? $child->failure_summary."\n" : '').'Manually resolved by user.';
+        $child->save();
+        $this->toastSuccess(__('Marked resolved.'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $resultData  result_data of the cutover_dns_swap step
+     * @return string|null  null on success, error reason string on failure
+     */
+    protected function tryDeleteDnsRecord(array $resultData): ?string
+    {
+        $zone = (string) ($resultData['zone'] ?? '');
+        $recordId = $resultData['record_id'] ?? null;
+        if ($zone === '' || $recordId === null) {
+            return 'malformed_result_data';
+        }
+        $credential = $this->resolveDnsCredential();
+        if ($credential === null) {
+            return 'no_dns_credential';
+        }
+        try {
+            match ($credential->provider) {
+                'digitalocean' => (new DigitalOceanService($credential->getApiToken() ?? ''))
+                    ->deleteDomainRecord($zone, (int) $recordId),
+                'cloudflare' => (new CloudflareDnsService($credential))
+                    ->deleteDnsRecord($zone, (string) $recordId),
+                default => throw new \RuntimeException('no_adapter_for_provider:'.$credential->provider),
+            };
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::warning('cutover DNS rollback delete failed', [
+                'migration_id' => $this->migration->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 'delete_failed';
+        }
+    }
+
+    protected function resolveDnsCredential(): ?ProviderCredential
+    {
+        $orgId = $this->migration->organization_id;
+        if (! is_string($orgId) || $orgId === '') {
+            return null;
+        }
+
+        return ProviderCredential::query()
+            ->where('organization_id', $orgId)
+            ->whereIn('provider', ProviderCredential::dnsAutomationProviderKeys())
+            ->orderBy('created_at')
+            ->first();
     }
 
     public function beginCutover(string $siteMigrationId): void

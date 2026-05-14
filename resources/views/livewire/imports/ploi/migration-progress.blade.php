@@ -95,6 +95,10 @@
         @php
             $sitePill = $pill($site->status);
             $cutoverReady = $site->status === 'ready_for_cutover';
+            $cutoverFailed = $site->status === 'cutover_failed';
+            $dnsStep = $site->steps->firstWhere('step_key', 'cutover_dns_swap');
+            $dnsSwapped = $dnsStep && $dnsStep->status === 'succeeded'
+                && ! empty($dnsStep->result_data['record_id']);
         @endphp
         <article class="dply-card overflow-hidden mb-6">
             <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3">
@@ -111,8 +115,36 @@
                             {{ __('Begin cutover') }}
                         </button>
                     @endif
+                    @if ($cutoverFailed)
+                        @if ($dnsSwapped)
+                            <button type="button" wire:click="rollbackCutoverDns('{{ $site->id }}')" class="inline-flex items-center justify-center rounded-xl bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-400">
+                                {{ __('Roll back DNS') }}
+                            </button>
+                        @endif
+                        <button type="button" wire:click="markCutoverResolvedManually('{{ $site->id }}')" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/20 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-cream">
+                            {{ __('Mark resolved manually') }}
+                        </button>
+                    @endif
                 </div>
             </header>
+            @if ($cutoverFailed)
+                @php
+                    $sourceLabel = $migration->source === 'forge' ? 'Forge' : 'Ploi';
+                @endphp
+                <div class="border-b border-red-200 bg-red-50/70 px-5 py-4 text-xs text-red-950 space-y-2">
+                    <p class="font-semibold">{{ __('Cutover failed.') }}</p>
+                    @if ($site->failure_summary)
+                        <p class="font-mono text-[11px] leading-relaxed">{{ $site->failure_summary }}</p>
+                    @endif
+                    <p class="leading-relaxed">
+                        @if ($dnsSwapped)
+                            {{ __('DNS for :domain currently points at dply. Roll back DNS deletes the dply A record so traffic returns to :source. If you have already manually fixed DNS, click "Mark resolved manually" instead.', ['domain' => $site->domain, 'source' => $sourceLabel]) }}
+                        @else
+                            {{ __('Cutover failed before DNS swapped. Source DNS is unchanged; click "Mark resolved manually" once you have addressed the underlying issue.') }}
+                        @endif
+                    </p>
+                </div>
+            @endif
             @if ($cutoverReady)
                 @php
                     // Aggregate the pre-cutover verification data from each staging step's
