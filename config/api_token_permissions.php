@@ -59,6 +59,8 @@ return [
         'firewall.template_apply' => 'network.write',
         'insights.server_findings' => 'insights.read',
         'insights.org_summary' => 'insights.read',
+        'imports.migrations_index' => 'imports.read',
+        'imports.migrations_show' => 'imports.read',
     ],
 
     'categories' => [
@@ -181,6 +183,13 @@ return [
             'label' => 'Insights',
             'permissions' => [
                 ['ability' => 'insights.read', 'label' => 'Read'],
+            ],
+        ],
+        [
+            'id' => 'imports',
+            'label' => 'Imports & migrations',
+            'permissions' => [
+                ['ability' => 'imports.read', 'label' => 'Read'],
             ],
         ],
     ],
