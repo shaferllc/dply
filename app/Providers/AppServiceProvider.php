@@ -270,6 +270,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Workspace::class, WorkspacePolicy::class);
         Gate::policy(StatusPage::class, StatusPagePolicy::class);
         Gate::policy(Incident::class, IncidentPolicy::class);
+        Gate::policy(\App\Models\ImportServerMigration::class, \App\Policies\ImportServerMigrationPolicy::class);
 
         Gate::define('manageNotificationChannels', function (User $user, User|Organization|Team $owner): bool {
             return match (true) {

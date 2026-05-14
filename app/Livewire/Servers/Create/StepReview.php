@@ -6,6 +6,7 @@ namespace App\Livewire\Servers\Create;
 
 use App\Actions\Servers\StoreServerFromCreateForm;
 use App\Jobs\Imports\RunMigrationStepJob;
+use App\Models\Organization;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
@@ -152,6 +153,16 @@ class StepReview extends Component
         try {
             $org = $user->currentOrganization();
             if ($org === null) {
+                return null;
+            }
+            // Q18: migrate-import is restricted to owners + admins; deployers
+            // can create servers but not start migrations on them.
+            if (! $org->hasAdminAccess($user)) {
+                Log::info('Ploi migration kickoff blocked by role gate', [
+                    'user_id' => $user->getKey(),
+                    'org_id' => $org->getKey(),
+                ]);
+
                 return null;
             }
 

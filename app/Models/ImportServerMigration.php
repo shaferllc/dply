@@ -31,6 +31,9 @@ class ImportServerMigration extends Model
 
     public const STATUS_CUTOVER_FAILED = 'cutover_failed';
 
+    /** Auto-set by ExpirePausedMigrationsCommand at 7d of pause-inactivity per Q17. */
+    public const STATUS_EXPIRED = 'expired';
+
     protected $fillable = [
         'organization_id',
         'user_id',

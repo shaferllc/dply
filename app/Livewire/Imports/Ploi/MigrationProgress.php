@@ -38,8 +38,22 @@ class MigrationProgress extends Component
         $this->migration = $migration->load(['siteMigrations.steps', 'steps' => fn ($q) => $q->orderBy('sequence')]);
     }
 
+    /**
+     * Q18 policy gate: only owners + admins of the migration's org can act on it.
+     * View is already gated in mount(); this further-restricts mutating actions.
+     */
+    protected function authorizeMutate(): void
+    {
+        $user = auth()->user();
+        if ($user === null || ! $user->can('operate', $this->migration)) {
+            abort(403);
+        }
+    }
+
     public function retryFailedStep(string $stepId): void
     {
+        $this->authorizeMutate();
+
         $step = ImportMigrationStep::query()
             ->where('id', $stepId)
             ->where('import_server_migration_id', $this->migration->id)
@@ -68,6 +82,7 @@ class MigrationProgress extends Component
      */
     public function dismissReviewItem(int $index): void
     {
+        $this->authorizeMutate();
         $items = $this->migration->manual_review_items ?? [];
         if (! isset($items[$index])) {
             return;
@@ -80,6 +95,7 @@ class MigrationProgress extends Component
 
     public function beginCutover(string $siteMigrationId): void
     {
+        $this->authorizeMutate();
         $child = ImportSiteMigration::query()
             ->where('id', $siteMigrationId)
             ->where('import_server_migration_id', $this->migration->id)
@@ -138,8 +154,8 @@ class MigrationProgress extends Component
         if ($user === null) {
             abort(403);
         }
-        $org = $user->currentOrganization();
-        if ($org === null || $migration->organization_id !== $org->getKey()) {
+        // Org match + admin/owner role per Q18.
+        if (! $user->can('view', $migration)) {
             abort(403);
         }
     }

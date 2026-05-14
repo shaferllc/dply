@@ -90,6 +90,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
+        // Q17 trust-window enforcement: revoke ephemeral SSH keys for migrations
+        // paused beyond 168h. Hourly cadence so the trust window doesn't quietly
+        // extend during scheduler downtime.
+        $schedule->command(\App\Console\Commands\ExpirePausedImportMigrationsCommand::class)->hourly();
 
         $schedule->command(CheckSupervisorHealthCommand::class)
             ->everyFifteenMinutes()
