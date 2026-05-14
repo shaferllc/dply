@@ -8,8 +8,7 @@ use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
-use App\Services\Imports\Ploi\PloiImportDriver;
-use App\Services\Imports\Ploi\PloiSshConnectionFactory;
+use App\Services\Imports\SourceSshConnectionFactory;
 use App\Services\Imports\StepHandler;
 use RuntimeException;
 
@@ -30,7 +29,7 @@ use RuntimeException;
  */
 class DumpDatabaseHandler implements StepHandler
 {
-    public function __construct(protected PloiSshConnectionFactory $ploiFactory) {}
+    public function __construct(protected SourceSshConnectionFactory $sourceFactory) {}
 
     public static function key(): string
     {
@@ -55,7 +54,7 @@ class DumpDatabaseHandler implements StepHandler
             throw new RuntimeException('Provider credential missing.');
         }
 
-        $driver = PloiImportDriver::for($credential);
+        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
         $dbs = $driver->listSiteDatabases($migration->source_server_id, $child->source_site_id);
 
         if ($dbs === []) {
@@ -74,7 +73,7 @@ class DumpDatabaseHandler implements StepHandler
             $warnings[] = 'Site has multiple databases; only '.$primary['name'].' will be migrated. Others: '.implode(', ', $extra);
         }
 
-        $ssh = $this->ploiFactory->forMigration($migration);
+        $ssh = $this->sourceFactory->forMigration($migration);
         $dumpPath = sprintf('/tmp/dply-migrate-%s-%d.sql', mb_substr($migration->id, -10), $child->source_site_id);
         $dbName = $primary['name'];
 

@@ -22,7 +22,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use Tests\Support\Imports\FakePloiSshConnectionFactory;
+use Tests\Support\Imports\FakeSourceSshConnectionFactory;
 use Tests\Support\Imports\FakeSshConnectionFactory;
 use Tests\Support\Imports\RecordingShell;
 use Tests\TestCase;
@@ -138,7 +138,7 @@ class CutoverHandlersTest extends TestCase
 
         (new CutoverDbDeltaHandler(
             new FakeSshConnectionFactory($dply),
-            new FakePloiSshConnectionFactory($ploi),
+            new FakeSourceSshConnectionFactory($ploi),
         ))->execute($step);
 
         // Both restore path on dply and dump path on ploi were exercised
@@ -163,7 +163,7 @@ class CutoverHandlersTest extends TestCase
         [$step] = $this->seedFixture(ImportMigrationStep::KEY_CUTOVER_DB_DELTA);
         (new CutoverDbDeltaHandler(
             new FakeSshConnectionFactory(new RecordingShell()),
-            new FakePloiSshConnectionFactory(new RecordingShell()),
+            new FakeSourceSshConnectionFactory(new RecordingShell()),
         ))->execute($step);
 
         $this->assertSame(ImportMigrationStep::STATUS_SKIPPED, $step->fresh()->status);

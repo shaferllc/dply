@@ -14,19 +14,26 @@
             </div>
         </header>
 
-        @if ($migrationSourcePloiServerId && ! empty($migrationSiteSelection))
+        @if (($migrationSourcePloiServerId || $migrationSourceForgeServerId) && ! empty($migrationSiteSelection))
             @php
-                $ploiSites = \App\Models\PloiSite::query()
-                    ->where('ploi_server_id', $migrationSourcePloiServerId)
-                    ->orderBy('domain')
-                    ->get();
-                $totalCount = $ploiSites->count();
+                $isForge = $migrationSourceKind === 'forge';
+                $sourceLabel = $isForge ? 'Laravel Forge' : 'Ploi';
+                $sourceSites = $isForge
+                    ? \App\Models\ForgeSite::query()
+                        ->where('forge_server_id', $migrationSourceForgeServerId)
+                        ->orderBy('domain')
+                        ->get()
+                    : \App\Models\PloiSite::query()
+                        ->where('ploi_server_id', $migrationSourcePloiServerId)
+                        ->orderBy('domain')
+                        ->get();
+                $totalCount = $sourceSites->count();
                 $checkedCount = collect($migrationSiteSelection)->filter(fn ($v) => $v === true)->count();
             @endphp
             <section class="rounded-2xl border border-amber-200 bg-amber-50/70 p-6">
                 <div class="flex flex-wrap items-end justify-between gap-3">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">{{ __('Migrate from Ploi') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">{{ __('Migrate from :source', ['source' => $sourceLabel]) }}</p>
                         <h2 class="mt-1 text-xl font-semibold text-amber-950">{{ __('Sites to migrate from :label', ['label' => $migrationSourceLabel]) }}</h2>
                     </div>
                     <p class="text-sm text-amber-900">
@@ -35,11 +42,11 @@
                     </p>
                 </div>
                 <ul class="mt-4 divide-y divide-amber-200/70 rounded-xl bg-white/60 ring-1 ring-amber-200">
-                    @foreach ($ploiSites as $site)
+                    @foreach ($sourceSites as $site)
                         @php
                             $eligible = $site->isMigrationEligible() && ! $site->removed_from_source;
                             $pillLabel = match (true) {
-                                $site->removed_from_source => __('Removed on Ploi'),
+                                $site->removed_from_source => __('Removed on :source', ['source' => $sourceLabel]),
                                 ! $site->isMigrationEligible() => __('Unsupported in v1'),
                                 default => __('Eligible'),
                             };
@@ -69,7 +76,7 @@
                         </li>
                     @endforeach
                 </ul>
-                <p class="mt-3 text-xs text-amber-900">{{ __('Unsupported sites stay on Ploi. You can migrate eligible sites one at a time from the inventory page later if you change your mind.') }}</p>
+                <p class="mt-3 text-xs text-amber-900">{{ __('Unsupported sites stay on :source. You can migrate eligible sites one at a time from the inventory page later if you change your mind.', ['source' => $sourceLabel]) }}</p>
             </section>
         @endif
 

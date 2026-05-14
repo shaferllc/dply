@@ -10,7 +10,6 @@ use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SiteProcess;
-use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\Imports\StepHandler;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -47,7 +46,7 @@ class RecreateDaemonsHandler implements StepHandler
             throw new RuntimeException('Provider credential missing.');
         }
 
-        $driver = PloiImportDriver::for($credential);
+        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
         $daemons = $driver->listDaemons($migration->source_server_id, $child->source_site_id);
 
         $createdRows = 0;

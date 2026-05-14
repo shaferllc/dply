@@ -30,7 +30,7 @@ class SshKeyHandlersTest extends TestCase
 
         [$migration, $step] = $this->seedPushStep();
 
-        (new PushSshKeyHandler())->execute($step);
+        $this->app->make(PushSshKeyHandler::class)->execute($step);
 
         $migration->refresh();
         $this->assertSame(9001, $migration->ssh_key_source_id);
@@ -52,7 +52,7 @@ class SshKeyHandlersTest extends TestCase
         $migration->ssh_key_source_id = 1234;
         $migration->save();
 
-        (new PushSshKeyHandler())->execute($step);
+        $this->app->make(PushSshKeyHandler::class)->execute($step);
 
         Http::assertNothingSent();
     }
@@ -65,7 +65,7 @@ class SshKeyHandlersTest extends TestCase
 
         [$migration, $step] = $this->seedRevokeStep(9001);
 
-        (new RevokeSshKeyHandler())->execute($step);
+        $this->app->make(RevokeSshKeyHandler::class)->execute($step);
 
         $migration->refresh();
         $this->assertNotNull($migration->ssh_key_revoked_at);
@@ -78,7 +78,7 @@ class SshKeyHandlersTest extends TestCase
         Http::fake();
         [$migration, $step] = $this->seedRevokeStep(null);
 
-        (new RevokeSshKeyHandler())->execute($step);
+        $this->app->make(RevokeSshKeyHandler::class)->execute($step);
 
         $migration->refresh();
         $this->assertNull($migration->ssh_key_revoked_at);

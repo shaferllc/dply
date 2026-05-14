@@ -18,7 +18,7 @@ use App\Services\Imports\Handlers\SetupSslHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use Tests\Support\Imports\FakePloiSshConnectionFactory;
+use Tests\Support\Imports\FakeSourceSshConnectionFactory;
 use Tests\Support\Imports\FakeSshConnectionFactory;
 use Tests\Support\Imports\RecordingShell;
 use Tests\TestCase;
@@ -112,7 +112,7 @@ class SetupSslHandlerTest extends TestCase
 
         $handler = new SetupSslHandler(
             new FakeSshConnectionFactory(new RecordingShell()),
-            new FakePloiSshConnectionFactory(new RecordingShell()),
+            new FakeSourceSshConnectionFactory(new RecordingShell()),
         );
         $handler->execute($step);
 
@@ -156,7 +156,7 @@ class SetupSslHandlerTest extends TestCase
 
         $handler = new SetupSslHandler(
             new FakeSshConnectionFactory($dply),
-            new FakePloiSshConnectionFactory($ploi),
+            new FakeSourceSshConnectionFactory($ploi),
         );
         $handler->execute($step);
 
@@ -184,7 +184,7 @@ class SetupSslHandlerTest extends TestCase
 
         $handler = new SetupSslHandler(
             new FakeSshConnectionFactory(new RecordingShell()),
-            new FakePloiSshConnectionFactory(new RecordingShell()),
+            new FakeSourceSshConnectionFactory(new RecordingShell()),
         );
         $handler->execute($step);
 
@@ -216,7 +216,7 @@ class SetupSslHandlerTest extends TestCase
         [$step, $child] = $this->seedFixture();
         $handler = new SetupSslHandler(
             new FakeSshConnectionFactory(new RecordingShell()),
-            new FakePloiSshConnectionFactory(new RecordingShell()),
+            new FakeSourceSshConnectionFactory(new RecordingShell()),
         );
         $handler->execute($step);
 

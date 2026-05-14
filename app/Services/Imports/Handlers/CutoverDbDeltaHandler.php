@@ -10,8 +10,7 @@ use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Imports\Ploi\PloiImportDriver;
-use App\Services\Imports\Ploi\PloiSshConnectionFactory;
+use App\Services\Imports\SourceSshConnectionFactory;
 use App\Services\SshConnectionFactory;
 use RuntimeException;
 
@@ -25,7 +24,7 @@ class CutoverDbDeltaHandler extends SshDependentHandler
 {
     public function __construct(
         protected SshConnectionFactory $factory,
-        protected PloiSshConnectionFactory $ploiFactory,
+        protected SourceSshConnectionFactory $sourceFactory,
     ) {}
 
     public static function key(): string
@@ -51,7 +50,7 @@ class CutoverDbDeltaHandler extends SshDependentHandler
             throw new RuntimeException('Provider credential missing.');
         }
 
-        $driver = PloiImportDriver::for($credential);
+        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
         $dbs = $driver->listSiteDatabases($migration->source_server_id, $child->source_site_id);
         if ($dbs === []) {
             $step->status = ImportMigrationStep::STATUS_SKIPPED;
@@ -62,7 +61,7 @@ class CutoverDbDeltaHandler extends SshDependentHandler
         }
         $dbName = $dbs[0]['name'];
 
-        $ploiSsh = $this->ploiFactory->forMigration($migration);
+        $ploiSsh = $this->sourceFactory->forMigration($migration);
         $deltaPath = sprintf('/tmp/dply-cutover-%s-%d.sql', mb_substr($migration->id, -10), $child->source_site_id);
 
         $cmd = sprintf(

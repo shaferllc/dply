@@ -11,8 +11,7 @@ use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Imports\Ploi\PloiImportDriver;
-use App\Services\Imports\Ploi\PloiSshConnectionFactory;
+use App\Services\Imports\SourceSshConnectionFactory;
 use App\Services\SshConnectionFactory;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -39,7 +38,7 @@ class SetupSslHandler extends SshDependentHandler
 {
     public function __construct(
         protected SshConnectionFactory $factory,
-        protected PloiSshConnectionFactory $ploiFactory,
+        protected SourceSshConnectionFactory $sourceFactory,
     ) {}
 
     public static function key(): string
@@ -98,7 +97,7 @@ class SetupSslHandler extends SshDependentHandler
         }
 
         // Look at Ploi cert state for the site.
-        $driver = PloiImportDriver::for($credential);
+        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
         $cert = $driver->fetchSiteCertificate($migration->source_server_id, $child->source_site_id);
         if ($cert !== null
             && $cert['status'] === 'active'
@@ -148,7 +147,7 @@ class SetupSslHandler extends SshDependentHandler
         $certPath = "/etc/letsencrypt/live/{$domain}/fullchain.pem";
         $keyPath = "/etc/letsencrypt/live/{$domain}/privkey.pem";
 
-        $ploiSsh = $this->ploiFactory->forMigration($migration);
+        $ploiSsh = $this->sourceFactory->forMigration($migration);
         $certB64 = trim($ploiSsh->exec('sudo cat '.escapeshellarg($certPath).' | base64 -w0'));
         $keyB64 = trim($ploiSsh->exec('sudo cat '.escapeshellarg($keyPath).' | base64 -w0'));
 

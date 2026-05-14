@@ -48,7 +48,12 @@ class StepReview extends Component
     /** Toggled visible only when this Step 4 is a migration-target server-create. */
     public ?string $migrationSourcePloiServerId = null;
 
+    public ?string $migrationSourceForgeServerId = null;
+
     public ?string $migrationSourceLabel = null;
+
+    /** 'ploi' | 'forge' | null — drives banner copy + selection wiring. */
+    public ?string $migrationSourceKind = null;
 
     public function mount(): mixed
     {
@@ -73,25 +78,42 @@ class StepReview extends Component
     {
         $draft = $this->currentDraft();
         $payload = is_array($draft?->payload ?? null) ? $draft->payload : [];
-        $migrationSourceId = $payload['_ploi_migration_source_id'] ?? null;
-        if (! is_string($migrationSourceId) || $migrationSourceId === '') {
-            return;
-        }
+
+        // Branch on source. Ploi gets priority if both are somehow set (defensive).
+        $ploiSourceId = $payload['_ploi_migration_source_id'] ?? null;
+        $forgeSourceId = $payload['_forge_migration_source_id'] ?? null;
 
         $org = auth()->user()?->currentOrganization();
         if ($org === null) {
             return;
         }
+
+        if (is_string($ploiSourceId) && $ploiSourceId !== '') {
+            $this->hydratePloiMigrationSelection($ploiSourceId, $payload, $org);
+
+            return;
+        }
+        if (is_string($forgeSourceId) && $forgeSourceId !== '') {
+            $this->hydrateForgeMigrationSelection($forgeSourceId, $payload, $org);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function hydratePloiMigrationSelection(string $sourceId, array $payload, $org): void
+    {
         $ploiServer = \App\Models\PloiServer::query()
             ->with('sites')
             ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
-            ->find($migrationSourceId);
+            ->find($sourceId);
         if ($ploiServer === null) {
             return;
         }
 
         $this->migrationSourcePloiServerId = $ploiServer->id;
         $this->migrationSourceLabel = $ploiServer->name;
+        $this->migrationSourceKind = 'ploi';
 
         $explicit = $payload['_ploi_migration_site_selection'] ?? null;
         foreach ($ploiServer->sites as $site) {
@@ -99,7 +121,34 @@ class StepReview extends Component
             if (is_array($explicit) && array_key_exists($key, $explicit)) {
                 $this->migrationSiteSelection[$key] = (bool) $explicit[$key];
             } else {
-                // Default-all-checked per Q10, with ineligible sites pre-unchecked.
+                $this->migrationSiteSelection[$key] = $site->isMigrationEligible() && ! $site->removed_from_source;
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function hydrateForgeMigrationSelection(string $sourceId, array $payload, $org): void
+    {
+        $forgeServer = \App\Models\ForgeServer::query()
+            ->with('sites')
+            ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
+            ->find($sourceId);
+        if ($forgeServer === null) {
+            return;
+        }
+
+        $this->migrationSourceForgeServerId = $forgeServer->id;
+        $this->migrationSourceLabel = $forgeServer->name;
+        $this->migrationSourceKind = 'forge';
+
+        $explicit = $payload['_forge_migration_site_selection'] ?? null;
+        foreach ($forgeServer->sites as $site) {
+            $key = $site->id;
+            if (is_array($explicit) && array_key_exists($key, $explicit)) {
+                $this->migrationSiteSelection[$key] = (bool) $explicit[$key];
+            } else {
                 $this->migrationSiteSelection[$key] = $site->isMigrationEligible() && ! $site->removed_from_source;
             }
         }
@@ -113,7 +162,10 @@ class StepReview extends Component
             return;
         }
         $payload = is_array($draft->payload) ? $draft->payload : [];
-        $payload['_ploi_migration_site_selection'] = array_map(
+        $key = $this->migrationSourceKind === 'forge'
+            ? '_forge_migration_site_selection'
+            : '_ploi_migration_site_selection';
+        $payload[$key] = array_map(
             fn ($v) => (bool) $v,
             $this->migrationSiteSelection,
         );
@@ -182,12 +234,11 @@ class StepReview extends Component
 
         // Capture migration context BEFORE deleteCurrentDraft() wipes it.
         $draft = $this->currentDraft();
-        $migrationSourceId = is_array($draft?->payload ?? null)
-            ? ($draft->payload['_ploi_migration_source_id'] ?? null)
-            : null;
-        $explicitSelection = is_array($draft?->payload ?? null)
-            ? ($draft->payload['_ploi_migration_site_selection'] ?? null)
-            : null;
+        $draftPayload = is_array($draft?->payload ?? null) ? $draft->payload : [];
+        $ploiSourceId = $draftPayload['_ploi_migration_source_id'] ?? null;
+        $forgeSourceId = $draftPayload['_forge_migration_source_id'] ?? null;
+        $ploiSelection = $draftPayload['_ploi_migration_site_selection'] ?? null;
+        $forgeSelection = $draftPayload['_forge_migration_site_selection'] ?? null;
 
         try {
             $server = StoreServerFromCreateForm::run($user, $org, $this->form);
@@ -197,22 +248,32 @@ class StepReview extends Component
             return null;
         }
 
-        // Kick off Ploi-migration orchestration if the user entered the wizard via
-        // /imports/ploi → "Migrate this server". Failures here don't abort server
-        // creation — the user still gets their server; the migration just doesn't
-        // start automatically. They can retry from the inventory page.
+        // Kick off migration orchestration if the user entered via /imports/{source}.
+        // Failures here don't abort server creation; the migration just doesn't
+        // start automatically — they can retry from the inventory page.
         $migration = null;
-        if (is_string($migrationSourceId) && $migrationSourceId !== '') {
-            $migration = $this->kickOffPloiMigration($migrationSourceId, $server, $user, $explicitSelection);
+        $migrationSourceLabel = null;
+        if (is_string($ploiSourceId) && $ploiSourceId !== '') {
+            $migration = $this->kickOffPloiMigration($ploiSourceId, $server, $user, $ploiSelection);
+            $migrationSourceLabel = 'Ploi';
+        } elseif (is_string($forgeSourceId) && $forgeSourceId !== '') {
+            $migration = $this->kickOffForgeMigration($forgeSourceId, $server, $user, $forgeSelection);
+            $migrationSourceLabel = 'Forge';
         }
 
         $this->deleteCurrentDraft();
         $this->flashSuccessForServerType($this->form->type);
 
         if ($migration !== null) {
-            Session::flash('success', __('Server is being created. We will start migrating your Ploi sites once it is ready.'));
+            Session::flash('success', __('Server is being created. We will start migrating your :source sites once it is ready.', [
+                'source' => $migrationSourceLabel,
+            ]));
 
-            return $this->redirect(route('imports.ploi.inventory'), navigate: true);
+            $inventoryRoute = $migration->source === 'forge'
+                ? 'imports.forge.inventory'
+                : 'imports.ploi.inventory';
+
+            return $this->redirect(route($inventoryRoute), navigate: true);
         }
 
         return $this->redirect(route('servers.show', $server), navigate: true);
@@ -297,6 +358,85 @@ class StepReview extends Component
             return $migration;
         } catch (\Throwable $e) {
             Log::warning('Ploi migration kickoff failed; server-create succeeded', [
+                'migration_source_id' => $migrationSourceId,
+                'target_server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Forge analogue of kickOffPloiMigration — same shape, ForgeServer/ForgeSite.
+     *
+     * @param  array<string, bool>|null  $explicitSelection
+     */
+    protected function kickOffForgeMigration(string $migrationSourceId, Server $server, $user, ?array $explicitSelection = null): ?ImportServerMigration
+    {
+        try {
+            $org = $user->currentOrganization();
+            if ($org === null) {
+                return null;
+            }
+            if (! $org->hasAdminAccess($user)) {
+                Log::info('Forge migration kickoff blocked by role gate', [
+                    'user_id' => $user->getKey(),
+                    'org_id' => $org->getKey(),
+                ]);
+
+                return null;
+            }
+
+            $forgeServer = \App\Models\ForgeServer::query()
+                ->with('providerCredential')
+                ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
+                ->find($migrationSourceId);
+
+            if ($forgeServer === null || $forgeServer->providerCredential === null) {
+                return null;
+            }
+
+            $eligibleSiteIds = \App\Models\ForgeSite::query()
+                ->where('forge_server_id', $forgeServer->id)
+                ->where('removed_from_source', false)
+                ->whereIn('site_type', ['laravel', 'php'])
+                ->pluck('id')
+                ->all();
+
+            if (is_array($explicitSelection)) {
+                $selectedSiteIds = array_values(array_filter(
+                    $eligibleSiteIds,
+                    fn (string $id): bool => ($explicitSelection[$id] ?? false) === true,
+                ));
+            } else {
+                $selectedSiteIds = $eligibleSiteIds;
+            }
+
+            if ($selectedSiteIds === []) {
+                Log::info('Forge migration kickoff: no eligible sites on source server', [
+                    'forge_server_id' => $forgeServer->id,
+                ]);
+
+                return null;
+            }
+
+            $migration = (new MigrationPlanner())->plan(
+                source: $forgeServer,
+                selectedSiteIds: $selectedSiteIds,
+                targetServerId: $server->id,
+                credential: $forgeServer->providerCredential,
+                userId: $user->getKey(),
+            );
+
+            $firstStep = $migration->steps()->first();
+            if ($firstStep !== null) {
+                RunMigrationStepJob::dispatch($firstStep->id);
+            }
+
+            return $migration;
+        } catch (\Throwable $e) {
+            Log::warning('Forge migration kickoff failed; server-create succeeded', [
                 'migration_source_id' => $migrationSourceId,
                 'target_server_id' => $server->id,
                 'error' => $e->getMessage(),

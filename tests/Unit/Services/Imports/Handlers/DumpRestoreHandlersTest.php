@@ -17,7 +17,7 @@ use App\Services\Imports\Handlers\DumpDatabaseHandler;
 use App\Services\Imports\Handlers\RestoreDatabaseHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-use Tests\Support\Imports\FakePloiSshConnectionFactory;
+use Tests\Support\Imports\FakeSourceSshConnectionFactory;
 use Tests\Support\Imports\FakeSshConnectionFactory;
 use Tests\Support\Imports\RecordingShell;
 use Tests\TestCase;
@@ -123,7 +123,7 @@ class DumpRestoreHandlersTest extends TestCase
 
         [$step] = $this->seedFixture(ImportMigrationStep::KEY_DUMP_DB);
 
-        $handler = new DumpDatabaseHandler(new FakePloiSshConnectionFactory($shell));
+        $handler = new DumpDatabaseHandler(new FakeSourceSshConnectionFactory($shell));
         $handler->execute($step);
 
         $step->refresh();
@@ -143,7 +143,7 @@ class DumpRestoreHandlersTest extends TestCase
         $shell = new RecordingShell();
         [$step] = $this->seedFixture(ImportMigrationStep::KEY_DUMP_DB);
 
-        $handler = new DumpDatabaseHandler(new FakePloiSshConnectionFactory($shell));
+        $handler = new DumpDatabaseHandler(new FakeSourceSshConnectionFactory($shell));
         $handler->execute($step);
 
         $step->refresh();
@@ -167,7 +167,7 @@ class DumpRestoreHandlersTest extends TestCase
         $shell->responses[] = "1024\n";
 
         [$step] = $this->seedFixture(ImportMigrationStep::KEY_DUMP_DB);
-        (new DumpDatabaseHandler(new FakePloiSshConnectionFactory($shell)))->execute($step);
+        (new DumpDatabaseHandler(new FakeSourceSshConnectionFactory($shell)))->execute($step);
 
         $step->refresh();
         $this->assertNotEmpty($step->result_data['warnings']);
@@ -189,7 +189,7 @@ class DumpRestoreHandlersTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/mysqldump produced empty file/');
-        (new DumpDatabaseHandler(new FakePloiSshConnectionFactory($shell)))->execute($step);
+        (new DumpDatabaseHandler(new FakeSourceSshConnectionFactory($shell)))->execute($step);
     }
 
     public function test_restore_pulls_dump_from_ploi_and_restores_on_dply(): void
@@ -210,7 +210,7 @@ class DumpRestoreHandlersTest extends TestCase
 
         $handler = new RestoreDatabaseHandler(
             new FakeSshConnectionFactory($shellDply),
-            new FakePloiSshConnectionFactory($shellPloi),
+            new FakeSourceSshConnectionFactory($shellPloi),
         );
         $handler->execute($step);
 
@@ -249,7 +249,7 @@ class DumpRestoreHandlersTest extends TestCase
 
         (new RestoreDatabaseHandler(
             new FakeSshConnectionFactory($shellDply),
-            new FakePloiSshConnectionFactory($shellPloi),
+            new FakeSourceSshConnectionFactory($shellPloi),
         ))->execute($step);
 
         $step->refresh();
@@ -268,7 +268,7 @@ class DumpRestoreHandlersTest extends TestCase
 
         (new RestoreDatabaseHandler(
             new FakeSshConnectionFactory(new RecordingShell()),
-            new FakePloiSshConnectionFactory(new RecordingShell()),
+            new FakeSourceSshConnectionFactory(new RecordingShell()),
         ))->execute($step);
     }
 }

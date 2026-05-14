@@ -7,7 +7,8 @@ namespace App\Services\Imports\Handlers;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ProviderCredential;
-use App\Services\Imports\Ploi\PloiImportDriver;
+use App\Services\Imports\ImportDriver;
+use App\Services\Imports\SourceDriverFactory;
 use App\Services\Imports\StepHandler;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -23,6 +24,8 @@ use RuntimeException;
  */
 class RevokeSshKeyHandler implements StepHandler
 {
+    public function __construct(protected SourceDriverFactory $drivers) {}
+
     public static function key(): string
     {
         return ImportMigrationStep::KEY_REVOKE_SSH_KEY;
@@ -51,8 +54,8 @@ class RevokeSshKeyHandler implements StepHandler
         $migration->save();
     }
 
-    protected function driverFor(ProviderCredential $credential): PloiImportDriver
+    protected function driverFor(ProviderCredential $credential): ImportDriver
     {
-        return PloiImportDriver::for($credential);
+        return $this->drivers->for($credential);
     }
 }

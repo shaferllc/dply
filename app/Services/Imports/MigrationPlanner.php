@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Imports;
 
+use App\Models\ForgeServer;
+use App\Models\ForgeSite;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -52,28 +54,42 @@ class MigrationPlanner
     ];
 
     /**
-     * @param  PloiServer  $source  the inventory-side row for the Ploi server
-     * @param  list<string>  $selectedSiteIds  ulid PKs from ploi_sites for the user-checked sites
+     * @param  PloiServer|ForgeServer  $source  the inventory-side row for the source server
+     * @param  list<string>  $selectedSiteIds  ulid PKs from the source-side sites table for the user-checked sites
      * @param  string  $targetServerId  ulid PK of the dply Server provisioned for this migration
-     * @param  ProviderCredential  $credential  the Ploi credential used for API calls
+     * @param  ProviderCredential  $credential  the credential used for API calls
      */
     public function plan(
-        PloiServer $source,
+        PloiServer|ForgeServer $source,
         array $selectedSiteIds,
         string $targetServerId,
         ProviderCredential $credential,
         string $userId,
     ): ImportServerMigration {
-        if ($credential->provider !== 'ploi') {
-            throw new RuntimeException('MigrationPlanner expects a ploi ProviderCredential.');
+        $sourceKey = match (true) {
+            $source instanceof PloiServer => 'ploi',
+            $source instanceof ForgeServer => 'forge',
+        };
+        if ($credential->provider !== $sourceKey) {
+            throw new RuntimeException(sprintf(
+                'MigrationPlanner expects a %s ProviderCredential for a %s source.',
+                $sourceKey,
+                $sourceKey,
+            ));
         }
 
-        /** @var Collection<int, PloiSite> $selectedSites */
-        $selectedSites = PloiSite::query()
-            ->where('ploi_server_id', $source->id)
-            ->whereIn('id', $selectedSiteIds)
-            ->orderBy('domain')
-            ->get();
+        /** @var Collection<int, PloiSite|ForgeSite> $selectedSites */
+        $selectedSites = $source instanceof PloiServer
+            ? PloiSite::query()
+                ->where('ploi_server_id', $source->id)
+                ->whereIn('id', $selectedSiteIds)
+                ->orderBy('domain')
+                ->get()
+            : ForgeSite::query()
+                ->where('forge_server_id', $source->id)
+                ->whereIn('id', $selectedSiteIds)
+                ->orderBy('domain')
+                ->get();
 
         if ($selectedSites->isEmpty()) {
             throw new RuntimeException('Migration plan requires at least one selected site.');
@@ -88,17 +104,17 @@ class MigrationPlanner
             }
         }
 
-        return DB::transaction(function () use ($source, $selectedSites, $targetServerId, $credential, $userId): ImportServerMigration {
+        return DB::transaction(function () use ($source, $selectedSites, $targetServerId, $credential, $userId, $sourceKey): ImportServerMigration {
             $orgId = $credential->organization_id;
             if (! is_string($orgId) || $orgId === '') {
-                throw new RuntimeException('Ploi credential is missing an organization scope.');
+                throw new RuntimeException($sourceKey.' credential is missing an organization scope.');
             }
 
             $parent = ImportServerMigration::create([
                 'organization_id' => $orgId,
                 'user_id' => $userId,
                 'provider_credential_id' => $credential->id,
-                'source' => 'ploi',
+                'source' => $sourceKey,
                 'source_server_id' => $source->source_id,
                 'target_server_id' => $targetServerId,
                 'status' => ImportServerMigration::STATUS_PENDING,
@@ -111,7 +127,7 @@ class MigrationPlanner
             foreach ($selectedSites as $site) {
                 $child = ImportSiteMigration::create([
                     'import_server_migration_id' => $parent->id,
-                    'source' => 'ploi',
+                    'source' => $sourceKey,
                     'source_site_id' => $site->source_id,
                     'domain' => $site->domain,
                     'site_type' => $site->site_type,

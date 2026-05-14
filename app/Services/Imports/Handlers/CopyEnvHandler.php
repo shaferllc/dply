@@ -9,7 +9,6 @@ use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\Imports\StepHandler;
 use RuntimeException;
 
@@ -36,7 +35,7 @@ class CopyEnvHandler implements StepHandler
             throw new RuntimeException('Provider credential missing for migration.');
         }
 
-        $driver = PloiImportDriver::for($credential);
+        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
         $envContent = $driver->fetchEnv($migration->source_server_id, $child->source_site_id);
 
         $site->env_file_content = $envContent;

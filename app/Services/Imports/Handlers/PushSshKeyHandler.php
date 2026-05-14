@@ -7,7 +7,8 @@ namespace App\Services\Imports\Handlers;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ProviderCredential;
-use App\Services\Imports\Ploi\PloiImportDriver;
+use App\Services\Imports\ImportDriver;
+use App\Services\Imports\SourceDriverFactory;
 use App\Services\Imports\StepHandler;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
@@ -28,6 +29,8 @@ use RuntimeException;
  */
 class PushSshKeyHandler implements StepHandler
 {
+    public function __construct(protected SourceDriverFactory $drivers) {}
+
     public static function key(): string
     {
         return ImportMigrationStep::KEY_PUSH_SSH_KEY;
@@ -86,8 +89,8 @@ class PushSshKeyHandler implements StepHandler
         return 'dply-migrate-'.Str::lower(Str::substr($migrationId, -10));
     }
 
-    protected function driverFor(ProviderCredential $credential): PloiImportDriver
+    protected function driverFor(ProviderCredential $credential): ImportDriver
     {
-        return PloiImportDriver::for($credential);
+        return $this->drivers->for($credential);
     }
 }

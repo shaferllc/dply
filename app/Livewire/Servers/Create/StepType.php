@@ -6,6 +6,7 @@ namespace App\Livewire\Servers\Create;
 
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
+use App\Models\ForgeServer;
 use App\Models\PloiServer;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
@@ -30,7 +31,13 @@ class StepType extends Component
     /** Set from ?from_ploi_server= when the user enters the wizard via the Ploi inventory. */
     public ?string $migrationSourcePloiServerId = null;
 
+    /** Set from ?from_forge_server= when the user enters the wizard via the Forge inventory. */
+    public ?string $migrationSourceForgeServerId = null;
+
     public ?string $migrationSourceLabel = null;
+
+    /** 'ploi' | 'forge' | null — which source family the banner reflects. */
+    public ?string $migrationSourceKind = null;
 
     public function mount(): mixed
     {
@@ -71,8 +78,43 @@ class StepType extends Component
         }
 
         $this->applyPloiMigrationContext($draft);
+        $this->applyForgeMigrationContext($draft);
 
         return null;
+    }
+
+    /**
+     * Same shape as the Ploi handler; stashes the Forge server id under
+     * _forge_migration_source_id in the draft payload.
+     */
+    protected function applyForgeMigrationContext(?ServerCreateDraft $draft): void
+    {
+        if ($draft !== null && isset($draft->payload['_forge_migration_source_id'])) {
+            $this->hydrateMigrationContextFromForgeServer((string) $draft->payload['_forge_migration_source_id']);
+
+            return;
+        }
+        $param = request()->query('from_forge_server');
+        if (is_string($param) && $param !== '') {
+            $this->hydrateMigrationContextFromForgeServer($param);
+        }
+    }
+
+    protected function hydrateMigrationContextFromForgeServer(string $forgeServerId): void
+    {
+        $org = $this->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+        $forgeServer = ForgeServer::query()
+            ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
+            ->find($forgeServerId);
+        if ($forgeServer === null) {
+            return;
+        }
+        $this->migrationSourceForgeServerId = $forgeServer->id;
+        $this->migrationSourceLabel = $forgeServer->name;
+        $this->migrationSourceKind = 'forge';
     }
 
     /**
@@ -115,6 +157,7 @@ class StepType extends Component
 
         $this->migrationSourcePloiServerId = $ploiServer->id;
         $this->migrationSourceLabel = $ploiServer->name;
+        $this->migrationSourceKind = 'ploi';
     }
 
     public function regenerateName(): void
@@ -155,10 +198,18 @@ class StepType extends Component
 
         $draft = $this->saveDraftFromForm($this->form, advanceTo: 2);
 
-        // Stash the Ploi migration source on the draft so it survives subsequent steps.
+        // Stash the migration source on the draft so it survives subsequent steps.
+        $payload = is_array($draft->payload) ? $draft->payload : [];
+        $payloadChanged = false;
         if ($this->migrationSourcePloiServerId !== null) {
-            $payload = is_array($draft->payload) ? $draft->payload : [];
             $payload['_ploi_migration_source_id'] = $this->migrationSourcePloiServerId;
+            $payloadChanged = true;
+        }
+        if ($this->migrationSourceForgeServerId !== null) {
+            $payload['_forge_migration_source_id'] = $this->migrationSourceForgeServerId;
+            $payloadChanged = true;
+        }
+        if ($payloadChanged) {
             $draft->payload = $payload;
             $draft->save();
         }
