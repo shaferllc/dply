@@ -164,18 +164,6 @@ class Create extends Component
         $inspection = $this->inspection;
         $nameBase = (string) ($inspection['slug'] ?? 'project');
 
-        if (str_starts_with($this->target_family, 'local_')) {
-            $server = $this->storeLocalServer($user, $organization, $nameBase);
-            $site = $siteCreator->handle($server, $user, $organization, $inspection, $this->target_family);
-
-            Bus::chain([
-                new ProvisionSiteJob($site->id),
-                new RunSiteDeploymentJob($site, SiteDeployment::TRIGGER_API, null, (string) $user->id),
-            ])->dispatch();
-
-            return $this->redirect(route('sites.show', [$server, $site]), navigate: true);
-        }
-
         $server = $this->storeCloudServer($user, $organization, $nameBase);
 
         if (str_contains($this->target_family, 'kubernetes')) {
@@ -213,9 +201,7 @@ class Create extends Component
             'targetBadges' => $badges,
             'targetDescriptions' => $this->targetDescriptions(),
             'hasAnyCloudCredentials' => collect($badges)
-                ->filter(fn (array $badge, string $id): bool => ! str_starts_with($id, 'local_'))
                 ->contains(fn (array $badge): bool => $badge['linked'] === true),
-            'localTargetsEnabled' => self::localTargetsEnabled(),
         ]);
     }
 
@@ -235,9 +221,7 @@ class Create extends Component
         $badges = [];
         foreach ($this->targetOptions() as $option) {
             $id = $option['id'];
-            if (str_starts_with($id, 'local_')) {
-                $badges[$id] = ['linked' => true];
-            } elseif (str_starts_with($id, 'digitalocean_')) {
+            if (str_starts_with($id, 'digitalocean_')) {
                 $badges[$id] = ['linked' => $doLinked];
             } elseif (str_starts_with($id, 'aws_')) {
                 $badges[$id] = ['linked' => $awsLinked];
@@ -259,8 +243,6 @@ class Create extends Component
             'digitalocean_kubernetes' => __('DOKS managed cluster'),
             'aws_docker' => __('EC2 instance running Docker'),
             'aws_kubernetes' => __('EKS managed cluster'),
-            'local_orbstack_docker' => __('Local OrbStack Docker (testing only)'),
-            'local_orbstack_kubernetes' => __('Local OrbStack Kubernetes (testing only)'),
         ];
     }
 
@@ -326,48 +308,24 @@ class Create extends Component
     }
 
     /**
-     * Production targets are remote-only. Local Docker / local Kubernetes
-     * launchers stay available behind DPLY_ENABLE_LOCAL_DOCKER_LAUNCH for
-     * dogfooding (default on in local env, off everywhere else) — they
-     * point at 127.0.0.1 and would be misleading to a customer.
+     * Cloud-only targets. Local OrbStack targets were retired alongside
+     * the move to the server wizard for cloud Docker provisioning.
      *
      * @return list<array{id: string, label: string}>
      */
     private function targetOptions(): array
     {
-        $options = [
+        return [
             ['id' => 'digitalocean_docker', 'label' => __('Remote Docker (DigitalOcean)')],
             ['id' => 'digitalocean_kubernetes', 'label' => __('Remote Kubernetes (DigitalOcean)')],
             ['id' => 'aws_docker', 'label' => __('Remote Docker (AWS)')],
             ['id' => 'aws_kubernetes', 'label' => __('Remote Kubernetes (AWS)')],
         ];
-
-        if (self::localTargetsEnabled()) {
-            array_unshift(
-                $options,
-                ['id' => 'local_orbstack_docker', 'label' => __('Local Docker (testing only)')],
-                ['id' => 'local_orbstack_kubernetes', 'label' => __('Local Kubernetes (testing only)')],
-            );
-        }
-
-        return $options;
-    }
-
-    public static function localTargetsEnabled(): bool
-    {
-        return filter_var(
-            config('launches.local_docker_enabled', app()->environment('local')),
-            FILTER_VALIDATE_BOOL,
-        );
     }
 
     private function defaultTargetForDetection(string $targetKind): string
     {
-        if ($targetKind === 'kubernetes') {
-            return self::localTargetsEnabled() ? 'local_orbstack_kubernetes' : 'digitalocean_kubernetes';
-        }
-
-        return self::localTargetsEnabled() ? 'local_orbstack_docker' : 'digitalocean_docker';
+        return $targetKind === 'kubernetes' ? 'digitalocean_kubernetes' : 'digitalocean_docker';
     }
 
     private function resolvedRepositoryUrl(): string
@@ -399,7 +357,7 @@ class Create extends Component
             $rules['provider_credential_id'] = ['required', 'string', 'max:26'];
         }
 
-        if (! str_starts_with($this->target_family, 'local_') && str_ends_with($this->target_family, '_docker')) {
+        if (str_ends_with($this->target_family, '_docker')) {
             $rules['cloud_region'] = ['required', 'string', 'max:120'];
             $rules['cloud_size'] = ['required', 'string', 'max:120'];
         }
@@ -475,40 +433,6 @@ class Create extends Component
         }
 
         return ['regions' => [], 'sizes' => []];
-    }
-
-    private function storeLocalServer($user, $organization, string $nameBase): Server
-    {
-        $mode = str_contains($this->target_family, 'kubernetes') ? 'kubernetes' : 'docker';
-        $meta = [
-            'host_kind' => $mode === 'kubernetes' ? Server::HOST_KIND_KUBERNETES : Server::HOST_KIND_DOCKER,
-            'local_runtime' => [
-                'provider' => 'orbstack',
-                'mode' => $mode,
-                'auto_created' => true,
-                'detected_at' => now()->toIso8601String(),
-            ],
-        ];
-
-        if ($mode === 'kubernetes') {
-            $meta['kubernetes'] = [
-                'namespace' => $this->kubernetes_namespace,
-                'context' => config('kubernetes.context'),
-                'kubeconfig_path' => config('kubernetes.kubeconfig_path'),
-            ];
-        }
-
-        return $user->servers()->create([
-            'organization_id' => $organization->id,
-            'name' => $this->server_name !== '' ? $this->server_name : $nameBase.'-'.$this->target_family,
-            'provider' => ServerProvider::Custom,
-            'ip_address' => '127.0.0.1',
-            'ssh_port' => 2222,
-            'ssh_user' => 'dplytest',
-            'status' => Server::STATUS_READY,
-            'health_status' => Server::HEALTH_REACHABLE,
-            'meta' => $meta,
-        ]);
     }
 
     private function storeCloudServer($user, $organization, string $nameBase): Server

@@ -13,9 +13,9 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Coverage for /launches/containers/create after the LocalDocker rename:
+ * Coverage for /launches/containers/create:
  *  - The /launches/create card wires up to the new route + edge.create.
- *  - Local target options gate behind launches.local_docker_enabled.
+ *  - Only cloud targets are exposed (local OrbStack targets were retired).
  *  - The form renders an empty-state "Connect …" notice when no
  *    credential exists for the selected cloud target.
  */
@@ -43,9 +43,8 @@ class LaunchesContainersCreateTest extends TestCase
         $response->assertSee(route('edge.create'), false);
     }
 
-    public function test_dropdown_hides_local_options_when_flag_off(): void
+    public function test_target_options_are_cloud_only(): void
     {
-        config(['launches.local_docker_enabled' => false]);
         $user = $this->userWithOrganization();
 
         Livewire::actingAs($user)
@@ -54,26 +53,13 @@ class LaunchesContainersCreateTest extends TestCase
             ->set('inspection', $this->fakeInspection())
             ->assertDontSee('Local Docker')
             ->assertDontSee('Local Kubernetes')
+            ->assertDontSee('local_orbstack')
             ->assertSee('Remote Docker (DigitalOcean)')
             ->assertSee('Remote Kubernetes (AWS)');
     }
 
-    public function test_dropdown_shows_local_options_when_flag_on(): void
+    public function test_validation_rejects_local_target_family(): void
     {
-        config(['launches.local_docker_enabled' => true]);
-        $user = $this->userWithOrganization();
-
-        Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('has_inspection', true)
-            ->set('inspection', $this->fakeInspection())
-            ->assertSee('Local Docker (testing only)')
-            ->assertSee('Local Kubernetes (testing only)');
-    }
-
-    public function test_validation_rejects_local_target_when_flag_off(): void
-    {
-        config(['launches.local_docker_enabled' => false]);
         $user = $this->userWithOrganization();
 
         Livewire::actingAs($user)
@@ -190,9 +176,8 @@ class LaunchesContainersCreateTest extends TestCase
             ->assertSee(route('credentials.index'), false);
     }
 
-    public function test_global_empty_state_when_no_cloud_credentials_and_locals_off(): void
+    public function test_global_empty_state_when_no_cloud_credentials(): void
     {
-        config(['launches.local_docker_enabled' => false]);
         $user = $this->userWithOrganization();
 
         Livewire::actingAs($user)
@@ -216,14 +201,23 @@ class LaunchesContainersCreateTest extends TestCase
 
     public function test_server_name_is_required_on_launch(): void
     {
-        config(['launches.local_docker_enabled' => true]);
         $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 't'],
+        ]);
 
         Livewire::actingAs($user)
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
-            ->set('target_family', 'local_orbstack_docker')
+            ->set('target_family', 'digitalocean_docker')
+            ->set('provider_credential_id', (string) $credential->id)
+            ->set('cloud_region', 'nyc3')
+            ->set('cloud_size', 's-1vcpu-1gb')
             ->set('server_name', '')
             ->call('launch')
             ->assertHasErrors(['server_name']);

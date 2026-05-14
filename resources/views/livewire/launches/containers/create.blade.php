@@ -144,7 +144,7 @@
                         <a href="{{ $connectCredentialUrl }}" wire:navigate class="text-sm font-medium text-sky-700 transition-colors hover:text-sky-900">{{ __('Manage credentials') }} →</a>
                     </div>
 
-                    @if (! $hasAnyCloudCredentials && ! $localTargetsEnabled)
+                    @if (! $hasAnyCloudCredentials)
                         <div data-testid="empty-credential-notice" class="rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
                             <p class="text-sm font-semibold text-amber-900">{{ __('No connected providers yet.') }}</p>
                             <p class="mt-1 text-sm text-amber-800">{{ __('Connect a DigitalOcean or AWS API token to launch a container target.') }}</p>
