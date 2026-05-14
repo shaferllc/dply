@@ -19,7 +19,7 @@ class Index extends Component
      *
      * @var list<string>
      */
-    private const TABS = ['all', 'server', 'dns'];
+    private const TABS = ['all', 'server', 'dns', 'imports'];
 
     public ?Organization $organization = null;
 
@@ -86,6 +86,7 @@ class Index extends Component
         return match ($this->tab) {
             'server' => 'compute',
             'dns' => 'dns',
+            'imports' => 'import',
             default => null,
         };
     }
@@ -150,6 +151,12 @@ class Index extends Component
                     ['id' => 'oracle', 'label' => __('Oracle Cloud')],
                 ],
             ],
+            [
+                'label' => __('Migrate from'),
+                'items' => [
+                    ['id' => 'ploi', 'label' => 'Ploi'],
+                ],
+            ],
         ];
 
         $filtered = [];
@@ -164,7 +171,11 @@ class Index extends Component
                     if ($enum === null) {
                         continue;
                     }
-                    $matches = $capability === 'dns' ? $enum->supportsDns() : $enum->supportsCompute();
+                    $matches = match ($capability) {
+                        'dns' => $enum->supportsDns(),
+                        'import' => $enum->supportsImport(),
+                        default => $enum->supportsCompute(),
+                    };
                     if (! $matches) {
                         continue;
                     }

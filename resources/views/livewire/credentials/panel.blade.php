@@ -6,6 +6,7 @@
         return match ($cap) {
             'compute' => ['label' => __('compute'), 'class' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10'],
             'dns' => ['label' => __('DNS'), 'class' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/30'],
+            'import' => ['label' => __('import'), 'class' => 'bg-amber-100 text-amber-900 ring-amber-200'],
             default => ['label' => $cap, 'class' => 'bg-brand-sand/40 text-brand-mist ring-brand-ink/10'],
         };
     };
@@ -696,6 +697,37 @@
                     </div>
                     <p class="{{ $hint }}">{{ $comingSoonCopy }}</p>
                     <p class="mt-3 text-xs text-brand-mist">{{ __('Connect a supported DNS provider (DigitalOcean, Cloudflare, AWS Route53) in the meantime — site DNS settings already accept any of them.') }}</p>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('ploi')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                    <p class="font-semibold">{{ __('Migrate sites from Ploi to dply') }}</p>
+                    <p class="mt-1 leading-relaxed">{{ __('Connect your Ploi account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, crons, SSL.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="ploi_name" :value="__('Label (optional)')" />
+                        <x-text-input id="ploi_name" wire:model="ploi_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Personal Ploi') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="ploi_api_token" :value="__('API token')" />
+                        <x-text-input id="ploi_api_token" wire:model="ploi_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://ploi.io/profile/api-keys" target="_blank" rel="noopener" class="'.$link.'">Ploi → Profile → API Keys</a>']) !!}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('The token needs read access to servers and sites, plus SSH-key management (we add and remove a short-lived key per migration). It is never used to mutate your Ploi configuration outside of cutover.') }}</p>
+                        <x-input-error :messages="$errors->get('ploi_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storePloi" wire:loading.attr="disabled" wire:target="storePloi">
+                        <span wire:loading.remove wire:target="storePloi">{{ __('Connect Ploi') }}</span>
+                        <span wire:loading wire:target="storePloi" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
                 </div>
             </div>
         </div>

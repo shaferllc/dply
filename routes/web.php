@@ -17,6 +17,7 @@ use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Edge\Create as EdgeCreate;
 use App\Livewire\Edge\Index as EdgeIndex;
+use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
@@ -205,6 +206,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
     Route::livewire('edge', EdgeIndex::class)->name('edge.index');
     Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
+    Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
     Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
     Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
     Route::livewire('projects/{workspace}/overview', ProjectsShow::class)->defaults('section', 'overview')->name('projects.overview');

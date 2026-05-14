@@ -63,6 +63,9 @@
     @case('oracle')
         <x-heroicon-o-cloud {{ $iconAttrs }} />
         @break
+    @case('ploi')
+        <x-heroicon-o-arrow-down-tray {{ $iconAttrs }} />
+        @break
     @default
         <x-heroicon-o-server {{ $iconAttrs }} />
 @endswitch
