@@ -200,7 +200,13 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         $meta[$key] = $output;
 
         $site->meta = $meta;
-        $site->save();
+        // Skip the DB save for transient sites (test fixtures, in-memory probes). When
+        // the row isn't persisted there's nothing to update back to — saving here would
+        // try to INSERT and trip the Site creating hook against a fixture without an
+        // organization_id/user_id pair. Persisted sites still get their meta written.
+        if ($site->exists) {
+            $site->save();
+        }
     }
 
     protected function readRemoteFile(Server $server, SshConnection $ssh, string $path): ?string

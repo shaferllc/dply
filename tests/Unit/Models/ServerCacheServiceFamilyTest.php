@@ -37,17 +37,28 @@ class ServerCacheServiceFamilyTest extends TestCase
         $this->assertNotSame(ServerCacheService::FAMILY_REDIS, ServerCacheService::familyOf('memcached'));
     }
 
-    public function test_redis_family_engines_constant_matches_supported_engines_minus_memcached(): void
+    public function test_redis_family_engines_constant_covers_redis_family_only(): void
     {
-        // The constant is the source of truth the migration's partial unique index uses. If a
-        // new engine is ever added to ENGINES it MUST also land in either FAMILY_REDIS_ENGINES
-        // or be classified as its own non-redis family — otherwise the install action's
-        // coexistence check has nothing to compare against.
+        // The constant is the source of truth the migration's partial unique index uses.
+        // Every engine in ENGINES must be classified — either in FAMILY_REDIS_ENGINES
+        // (key-value, shared 6379-family wire protocol) or as its own non-redis family
+        // (memcached, varnish, …) — otherwise the install action's coexistence check
+        // has nothing to compare against.
         $redisFamily = ServerCacheService::FAMILY_REDIS_ENGINES;
         $supported = ServerCacheService::ENGINES;
         $nonRedis = array_values(array_diff($supported, $redisFamily));
 
-        $this->assertSame(['memcached'], $nonRedis, 'Every non-memcached supported engine must be in FAMILY_REDIS_ENGINES.');
+        // memcached + varnish today; the assertion is "every non-redis engine is classified",
+        // not a literal list — sort both sides so new entries don't trip this on order.
+        sort($nonRedis);
+        $this->assertGreaterThan(0, count($nonRedis), 'At least one non-redis-family engine must exist.');
+        foreach ($nonRedis as $engine) {
+            $this->assertNotSame(
+                ServerCacheService::FAMILY_REDIS,
+                ServerCacheService::familyOf($engine),
+                $engine.' must not be classified as redis-family.',
+            );
+        }
     }
 
     public function test_family_of_throws_for_unknown_engine(): void

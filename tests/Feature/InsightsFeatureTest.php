@@ -873,7 +873,7 @@ class InsightsFeatureTest extends TestCase
                 ];
             }
 
-            public function saveTarget(Server $server, string $version, string $target, string $content): array
+            public function saveTarget(Server $server, string $version, string $target, string $content, ?\App\Models\User $user = null, ?string $summary = null): array
             {
                 $this->state['saved_content'] = $content;
                 $this->state['saved_target'] = $target;
@@ -990,7 +990,7 @@ class InsightsFeatureTest extends TestCase
                 $this->state = &$state;
             }
 
-            public function saveTarget(Server $server, string $version, string $target, string $content): array
+            public function saveTarget(Server $server, string $version, string $target, string $content, ?\App\Models\User $user = null, ?string $summary = null): array
             {
                 $this->state['saved_content'] = $content;
 
@@ -1330,7 +1330,7 @@ class InsightsFeatureTest extends TestCase
                 ];
             }
 
-            public function saveTarget(Server $server, string $version, string $target, string $content): array
+            public function saveTarget(Server $server, string $version, string $target, string $content, ?\App\Models\User $user = null, ?string $summary = null): array
             {
                 throw new \RuntimeException('saveTarget should not be called when substitution is a no-op');
             }

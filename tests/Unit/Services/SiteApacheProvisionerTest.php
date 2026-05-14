@@ -40,7 +40,7 @@ class SiteApacheProvisionerTest extends TestCase
             'repository_path' => '/var/www/docs',
             'php_version' => '8.3',
         ]);
-        $site->id = '01HZYTESTAPACHE000000000001';
+        $site->id = '01HZYTESTAPACHE00000000001';
         $site->setRelation('server', $server);
         $site->setRelation('domains', new Collection([
             new SiteDomain(['hostname' => 'docs.example.com', 'is_primary' => true]),
@@ -60,6 +60,13 @@ class SiteApacheProvisionerTest extends TestCase
             ->andReturnUsing(function (string $command): string {
                 if (str_contains($command, 'DPLY_INDEX_PLACEHOLDER_EXIT')) {
                     return "missing\nDPLY_INDEX_PLACEHOLDER_EXIT:0";
+                }
+                // The shared AbstractSiteWebserverProvisioner runs `mkdir -p <root>` for the
+                // placeholder web root with its own exit marker — the test stub must answer it
+                // before the apache-specific marker below, otherwise the mkdir guard rejects
+                // the response and the provisioner throws.
+                if (str_contains($command, 'DPLY_PLACEHOLDER_MKDIR')) {
+                    return "\nDPLY_PLACEHOLDER_MKDIR:0";
                 }
 
                 return "\nDPLY_APACHE_EXIT:0";

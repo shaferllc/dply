@@ -40,7 +40,7 @@ class SiteOpenLiteSpeedProvisionerTest extends TestCase
             'repository_path' => '/var/www/shop',
             'php_version' => '8.3',
         ]);
-        $site->id = '01HZYTESTOLS000000000000001';
+        $site->id = '01HZYTESTOLS00000000000001';
         $site->setRelation('server', $server);
         $site->setRelation('domains', new Collection([
             new SiteDomain(['hostname' => 'shop.example.com', 'is_primary' => true]),
@@ -60,6 +60,11 @@ class SiteOpenLiteSpeedProvisionerTest extends TestCase
             ->andReturnUsing(function (string $command): string {
                 if (str_contains($command, 'DPLY_INDEX_PLACEHOLDER_EXIT')) {
                     return "missing\nDPLY_INDEX_PLACEHOLDER_EXIT:0";
+                }
+                // Shared placeholder mkdir step from AbstractSiteWebserverProvisioner — must be
+                // answered before the OLS-specific marker below or the mkdir guard throws.
+                if (str_contains($command, 'DPLY_PLACEHOLDER_MKDIR')) {
+                    return "\nDPLY_PLACEHOLDER_MKDIR:0";
                 }
 
                 return "\nDPLY_OLS_EXIT:0";

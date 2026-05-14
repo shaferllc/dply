@@ -62,6 +62,11 @@ class SiteTraefikProvisionerTest extends TestCase
                 if (str_contains($command, 'DPLY_INDEX_PLACEHOLDER_EXIT')) {
                     return "missing\nDPLY_INDEX_PLACEHOLDER_EXIT:0";
                 }
+                // Shared placeholder mkdir step from AbstractSiteWebserverProvisioner — must be
+                // answered before the Traefik-specific marker below or the mkdir guard throws.
+                if (str_contains($command, 'DPLY_PLACEHOLDER_MKDIR')) {
+                    return "\nDPLY_PLACEHOLDER_MKDIR:0";
+                }
 
                 return "\nDPLY_TRAEFIK_EXIT:0";
             });

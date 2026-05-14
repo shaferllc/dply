@@ -187,7 +187,11 @@ class Site extends Model
                     $site->workspace_id = $server->workspace_id;
                 }
             }
-            if ($site->project_id === null) {
+            if ($site->project_id === null && $site->organization_id && $site->user_id) {
+                // Auto-create a BYO-site Project only when we can satisfy its NOT NULL
+                // owners (organization_id + user_id). In-memory test fixtures and other
+                // edge cases that lack those skip the auto-creation rather than
+                // crashing the host save() — the operator can attach a project later.
                 $project = Project::query()->create([
                     'organization_id' => $site->organization_id,
                     'user_id' => $site->user_id,
@@ -200,10 +204,15 @@ class Site extends Model
         });
 
         static::created(function (Site $site): void {
-            $site->project()->update([
-                'slug' => $site->slug.'-'.$site->id,
-                'name' => $site->name,
-            ]);
+            if ($site->project_id !== null) {
+                // The `creating` hook only auto-attaches a Project when org_id + user_id
+                // are present; without a project we skip the rename pass rather than firing
+                // an UPDATE against zero rows. Sites without a project attach one later.
+                $site->project()->update([
+                    'slug' => $site->slug.'-'.$site->id,
+                    'name' => $site->name,
+                ]);
+            }
 
             // Every site that runs *something* (i.e. not a pure static host) gets a
             // canonical "web" process row. The row's command is null at create time:

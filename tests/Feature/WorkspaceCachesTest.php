@@ -103,6 +103,7 @@ class WorkspaceCachesTest extends TestCase
 
         $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
             $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('engineUnsupportedReason')->zeroOrMoreTimes()->andReturn(null);
             $mock->shouldReceive('forget')->zeroOrMoreTimes();
         });
 
@@ -1004,9 +1005,13 @@ class WorkspaceCachesTest extends TestCase
     {
         [$user, $server] = $this->actingOwnerWithServer();
 
+        // Post-collapse, redis-family engines are mutually exclusive on a server (one
+        // redis_OR_valkey_OR_keydb_OR_dragonfly row per server). Pair memcached with valkey
+        // — those two CAN coexist by design — and test the port-collision rejection between
+        // them. Memcached default port is 11211, but we put valkey there to force the conflict.
         ServerCacheService::query()->create([
             'server_id' => $server->id,
-            'engine' => 'redis',
+            'engine' => 'memcached',
             'status' => ServerCacheService::STATUS_RUNNING,
             'port' => 6380,
         ]);
@@ -1018,7 +1023,7 @@ class WorkspaceCachesTest extends TestCase
         ]);
 
         $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
-            $mock->shouldReceive('forServer')->andReturn(['redis' => true, 'valkey' => true, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+            $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => true, 'memcached' => true, 'keydb' => false, 'dragonfly' => false]);
             $mock->shouldReceive('forget')->zeroOrMoreTimes();
         });
 
@@ -1026,7 +1031,7 @@ class WorkspaceCachesTest extends TestCase
             $mock->shouldNotReceive('changePort');
         });
 
-        // Try to move Valkey onto Redis's port — must be rejected before SSH.
+        // Try to move Valkey onto Memcached's port — must be rejected before SSH.
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
             ->set('workspace_tab', 'valkey')
@@ -1114,16 +1119,19 @@ class WorkspaceCachesTest extends TestCase
             ->assertSee('active (running)');
     }
 
-    public function test_show_cache_instance_logs_runs_journalctl_for_named_instance(): void
+    public function test_show_cache_instance_logs_runs_journalctl_for_default_instance(): void
     {
+        // Post-collapse there's only one instance per engine per server (`name='default'`)
+        // and the systemd unit is the non-templated form (e.g. `redis-server`, not
+        // `redis-server@queue`). This test verifies the logs modal targets that unit.
         [$user, $server] = $this->actingOwnerWithServer();
 
         ServerCacheService::query()->create([
             'server_id' => $server->id,
             'engine' => 'redis',
             'status' => ServerCacheService::STATUS_RUNNING,
-            'name' => 'queue',
-            'port' => 6380,
+            'name' => ServerCacheService::DEFAULT_INSTANCE_NAME,
+            'port' => 6379,
         ]);
 
         $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
@@ -1136,9 +1144,9 @@ class WorkspaceCachesTest extends TestCase
             $mock->shouldReceive('runInlineBash')
                 ->once()
                 ->withArgs(function ($server, $name, $cmd): bool {
-                    return $name === 'cache-service:logs:redis:queue'
+                    return str_starts_with($name, 'cache-service:logs:redis:')
                         && str_contains($cmd, 'journalctl --no-pager --output=short-iso')
-                        && str_contains($cmd, "'redis-server@queue'")
+                        && str_contains($cmd, "'redis-server'")
                         && str_contains($cmd, '-n 200');
                 })
                 ->andReturn(new \App\Modules\TaskRunner\ProcessOutput("2026-05-11T10:00:00+0000 redis-server: Ready to accept connections\n", 0, false));
@@ -1147,12 +1155,10 @@ class WorkspaceCachesTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceCaches::class, ['server' => $server])
             ->set('workspace_tab', 'redis')
-            ->set('active_instance', 'queue')
             ->call('showCacheInstanceLogs', 'redis')
             ->assertHasNoErrors()
             ->assertSet('showCacheStatusModal', true)
-            ->assertSet('cacheStatusModalInstance', 'queue')
-            ->assertSet('cacheStatusModalUnit', 'redis-server@queue')
+            ->assertSet('cacheStatusModalUnit', 'redis-server')
             ->assertSet('cacheStatusModalView', 'logs')
             ->assertSee('Ready to accept connections');
     }
