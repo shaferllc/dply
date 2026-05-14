@@ -6,6 +6,7 @@ namespace App\Livewire\Imports\Ploi;
 
 use App\Jobs\Imports\SyncPloiInventoryJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\ImportServerMigration;
 use App\Models\PloiServer;
 use App\Models\ProviderCredential;
 use Carbon\CarbonInterface;
@@ -79,12 +80,45 @@ class Inventory extends Component
     {
         $credentials = $this->credentials();
         $servers = $this->servers($credentials);
+        $activeMigrations = $this->activeMigrationsForServers($servers);
 
         return view('livewire.imports.ploi.inventory', [
             'credentials' => $credentials,
             'servers' => $servers,
             'hasCredentials' => $credentials->isNotEmpty(),
+            'activeMigrations' => $activeMigrations,
+            'activeMigrationCount' => $activeMigrations->count(),
         ]);
+    }
+
+    /**
+     * Map of source_server_id (int) → ImportServerMigration for any of these
+     * PloiServers that has an active migration (not in a terminal state).
+     * Used by the Blade to show a "View migration" badge in place of the
+     * "Migrate" CTA — enforces the per-PloiServer lock from Q18 visibly.
+     *
+     * @param  \Illuminate\Support\Collection<int, PloiServer>  $servers
+     * @return \Illuminate\Support\Collection<int, ImportServerMigration>
+     */
+    protected function activeMigrationsForServers($servers): \Illuminate\Support\Collection
+    {
+        if ($servers->isEmpty()) {
+            return collect();
+        }
+
+        $terminalStatuses = [
+            ImportServerMigration::STATUS_COMPLETED,
+            ImportServerMigration::STATUS_PARTIAL,
+            ImportServerMigration::STATUS_ABORTED,
+        ];
+
+        return ImportServerMigration::query()
+            ->where('source', 'ploi')
+            ->whereIn('source_server_id', $servers->pluck('source_id'))
+            ->whereNotIn('status', $terminalStatuses)
+            ->orderByDesc('created_at')
+            ->get()
+            ->keyBy('source_server_id');
     }
 
     /**

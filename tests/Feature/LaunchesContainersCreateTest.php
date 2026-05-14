@@ -112,6 +112,26 @@ class LaunchesContainersCreateTest extends TestCase
             ->assertSee(route('credentials.index'), false);
     }
 
+    public function test_apply_preset_fills_repository_fields_and_resets_inspection(): void
+    {
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', true)
+            ->set('inspection', $this->fakeInspection())
+            ->set('repo_source', 'provider')
+            ->call('applyPreset', 'plausible')
+            ->assertSet('repo_source', 'manual')
+            ->assertSet('repository_url', 'https://github.com/plausible/analytics.git')
+            ->assertSet('repository_branch', 'master')
+            ->assertSet('repository_subdirectory', '')
+            ->assertSet('has_inspection', false)
+            ->assertSet('inspection', [])
+            ->assertSee('Try an open-source preset')
+            ->assertSee('Plausible Analytics');
+    }
+
     public function test_empty_state_hidden_when_credential_present(): void
     {
         $user = $this->userWithOrganization();
@@ -129,6 +149,84 @@ class LaunchesContainersCreateTest extends TestCase
             ->set('inspection', $this->fakeInspection())
             ->set('target_family', 'digitalocean_docker')
             ->assertDontSee('No DigitalOcean credentials connected');
+    }
+
+    public function test_target_tile_shows_connected_badge_when_credential_exists(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 't'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', true)
+            ->set('inspection', $this->fakeInspection())
+            ->assertSee('Remote Docker (DigitalOcean)')
+            ->assertSee('Connected');
+    }
+
+    public function test_target_tile_shows_needs_account_badge_when_credential_missing(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 't'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', true)
+            ->set('inspection', $this->fakeInspection())
+            ->assertSee('Remote Docker (AWS)')
+            ->assertSee('Needs account')
+            ->assertSee(route('credentials.index'), false);
+    }
+
+    public function test_global_empty_state_when_no_cloud_credentials_and_locals_off(): void
+    {
+        config(['launches.local_docker_enabled' => false]);
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', true)
+            ->set('inspection', $this->fakeInspection())
+            ->assertSee('No connected providers yet.')
+            ->assertSee('Connect a provider');
+    }
+
+    public function test_server_name_defaults_from_inspection_slug(): void
+    {
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', true)
+            ->set('inspection', $this->fakeInspection())
+            ->assertSet('server_name', 'demo-digitalocean-docker');
+    }
+
+    public function test_server_name_is_required_on_launch(): void
+    {
+        config(['launches.local_docker_enabled' => true]);
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', true)
+            ->set('inspection', $this->fakeInspection())
+            ->set('target_family', 'local_orbstack_docker')
+            ->set('server_name', '')
+            ->call('launch')
+            ->assertHasErrors(['server_name']);
     }
 
     /**

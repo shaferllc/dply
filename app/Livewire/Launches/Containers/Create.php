@@ -48,6 +48,8 @@ class Create extends Component
 
     public string $kubernetes_namespace = 'default';
 
+    public string $server_name = '';
+
     public array $linkedSourceControlAccounts = [];
 
     public array $availableRepositories = [];
@@ -112,6 +114,29 @@ class Create extends Component
         }
         $this->kubernetes_namespace = (string) ($inspection['detection']['kubernetes_namespace'] ?: 'default');
         $this->syncCloudDefaults();
+        $this->seedServerNameFromInspection();
+    }
+
+    public function updatedTargetFamily(string $value): void
+    {
+        $this->seedServerNameFromInspection();
+    }
+
+    public function updatedInspection(): void
+    {
+        $this->seedServerNameFromInspection();
+    }
+
+    private function seedServerNameFromInspection(): void
+    {
+        if ($this->server_name !== '') {
+            return;
+        }
+        $slug = (string) ($this->inspection['slug'] ?? '');
+        if ($slug === '') {
+            return;
+        }
+        $this->server_name = $slug.'-'.str_replace('_', '-', $this->target_family);
     }
 
     public function launch(LocalRepositoryInspector $repositoryInspector, CreateContainerSiteFromInspection $siteCreator): mixed
@@ -166,12 +191,127 @@ class Create extends Component
 
     public function render(): View
     {
+        $badges = $this->targetBadges();
+
         return view('livewire.launches.containers.create', [
             'targetOptions' => $this->targetOptions(),
             'providerCredentials' => $this->providerCredentials(),
             'cloudCatalog' => $this->cloudCatalog(),
             'connectCredentialUrl' => route('credentials.index'),
+            'ossPresets' => $this->ossPresets(),
+            'targetBadges' => $badges,
+            'targetDescriptions' => $this->targetDescriptions(),
+            'hasAnyCloudCredentials' => collect($badges)
+                ->filter(fn (array $badge, string $id): bool => ! str_starts_with($id, 'local_'))
+                ->contains(fn (array $badge): bool => $badge['linked'] === true),
+            'localTargetsEnabled' => self::localTargetsEnabled(),
         ]);
+    }
+
+    /**
+     * @return array<string, array{linked: bool}>
+     */
+    private function targetBadges(): array
+    {
+        $organization = auth()->user()?->currentOrganization();
+        $doLinked = $organization
+            ? GetProviderCredentialsForServerType::run($organization, 'digitalocean')->isNotEmpty()
+            : false;
+        $awsLinked = $organization
+            ? GetProviderCredentialsForServerType::run($organization, 'aws')->isNotEmpty()
+            : false;
+
+        $badges = [];
+        foreach ($this->targetOptions() as $option) {
+            $id = $option['id'];
+            if (str_starts_with($id, 'local_')) {
+                $badges[$id] = ['linked' => true];
+            } elseif (str_starts_with($id, 'digitalocean_')) {
+                $badges[$id] = ['linked' => $doLinked];
+            } elseif (str_starts_with($id, 'aws_')) {
+                $badges[$id] = ['linked' => $awsLinked];
+            } else {
+                $badges[$id] = ['linked' => false];
+            }
+        }
+
+        return $badges;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function targetDescriptions(): array
+    {
+        return [
+            'digitalocean_docker' => __('Single Droplet running Docker'),
+            'digitalocean_kubernetes' => __('DOKS managed cluster'),
+            'aws_docker' => __('EC2 instance running Docker'),
+            'aws_kubernetes' => __('EKS managed cluster'),
+            'local_orbstack_docker' => __('Local OrbStack Docker (testing only)'),
+            'local_orbstack_kubernetes' => __('Local OrbStack Kubernetes (testing only)'),
+        ];
+    }
+
+    public function applyPreset(string $id): void
+    {
+        $preset = collect($this->ossPresets())->firstWhere('id', $id);
+        if (! $preset) {
+            return;
+        }
+
+        $this->repo_source = 'manual';
+        $this->repository_url = (string) $preset['url'];
+        $this->repository_branch = (string) $preset['branch'];
+        $this->repository_subdirectory = (string) $preset['subdirectory'];
+        $this->has_inspection = false;
+        $this->inspection = [];
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Open-source repos with known-good Dockerfiles, surfaced as
+     * one-click presets so the launcher can be exercised against
+     * real apps without hunting down a sample.
+     *
+     * @return list<array{id: string, label: string, description: string, url: string, branch: string, subdirectory: string}>
+     */
+    private function ossPresets(): array
+    {
+        return [
+            [
+                'id' => 'plausible',
+                'label' => 'Plausible Analytics',
+                'description' => __('Privacy-friendly web analytics (Elixir).'),
+                'url' => 'https://github.com/plausible/analytics.git',
+                'branch' => 'master',
+                'subdirectory' => '',
+            ],
+            [
+                'id' => 'uptime-kuma',
+                'label' => 'Uptime Kuma',
+                'description' => __('Self-hosted uptime monitor (Node.js).'),
+                'url' => 'https://github.com/louislam/uptime-kuma.git',
+                'branch' => 'master',
+                'subdirectory' => '',
+            ],
+            [
+                'id' => 'listmonk',
+                'label' => 'Listmonk',
+                'description' => __('Mailing-list and newsletter manager (Go).'),
+                'url' => 'https://github.com/knadh/listmonk.git',
+                'branch' => 'master',
+                'subdirectory' => '',
+            ],
+            [
+                'id' => 'vaultwarden',
+                'label' => 'Vaultwarden',
+                'description' => __('Bitwarden-compatible password vault (Rust).'),
+                'url' => 'https://github.com/dani-garcia/vaultwarden.git',
+                'branch' => 'main',
+                'subdirectory' => '',
+            ],
+        ];
     }
 
     /**
@@ -241,6 +381,7 @@ class Create extends Component
         $allowedFamilies = collect($this->targetOptions())->pluck('id')->all();
         $rules = [
             'target_family' => ['required', 'string', 'in:'.implode(',', $allowedFamilies)],
+            'server_name' => ['required', 'string', 'max:120'],
         ];
 
         if (str_starts_with($this->target_family, 'digitalocean_') || str_starts_with($this->target_family, 'aws_')) {
@@ -348,7 +489,7 @@ class Create extends Component
 
         return $user->servers()->create([
             'organization_id' => $organization->id,
-            'name' => $nameBase.'-'.$this->target_family,
+            'name' => $this->server_name !== '' ? $this->server_name : $nameBase.'-'.$this->target_family,
             'provider' => ServerProvider::Custom,
             'ip_address' => '127.0.0.1',
             'ssh_port' => 2222,
@@ -384,10 +525,12 @@ class Create extends Component
             ]],
         ];
 
+        $name = $this->server_name !== '' ? $this->server_name : $nameBase.'-'.str_replace('_', '-', $this->target_family);
+
         if ($this->target_family === 'digitalocean_docker') {
             $server = $user->servers()->create([
                 'organization_id' => $organization->id,
-                'name' => $nameBase.'-digitalocean-docker',
+                'name' => $name,
                 'provider' => ServerProvider::DigitalOcean,
                 'provider_credential_id' => $credential->id,
                 'region' => $this->cloud_region,
@@ -406,7 +549,7 @@ class Create extends Component
         if ($this->target_family === 'aws_docker') {
             $server = $user->servers()->create([
                 'organization_id' => $organization->id,
-                'name' => $nameBase.'-aws-docker',
+                'name' => $name,
                 'provider' => ServerProvider::Aws,
                 'provider_credential_id' => $credential->id,
                 'region' => $this->cloud_region,
@@ -424,7 +567,7 @@ class Create extends Component
 
         return $user->servers()->create([
             'organization_id' => $organization->id,
-            'name' => $nameBase.'-'.$this->target_family,
+            'name' => $name,
             'provider' => str_starts_with($this->target_family, 'aws_') ? ServerProvider::Aws : ServerProvider::DigitalOcean,
             'provider_credential_id' => $credential->id,
             'region' => $this->cloud_region !== '' ? $this->cloud_region : null,

@@ -27,6 +27,13 @@
         </div>
     </header>
 
+    @if ($activeMigrationCount > 0)
+        <div class="mb-6 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm text-sky-900">
+            <span class="font-semibold">{{ trans_choice('{1} 1 migration in progress|[2,*] :count migrations in progress', $activeMigrationCount, ['count' => $activeMigrationCount]) }}.</span>
+            {{ __('You can keep using dply while migrations run. Click View migration on a server below to inspect step-by-step progress.') }}
+        </div>
+    @endif
+
     @if (! $hasCredentials)
         <section class="dply-card overflow-hidden">
             <div class="space-y-4 p-8 text-center">
@@ -86,13 +93,21 @@
                             </p>
                         </div>
                         <div class="flex items-center gap-2">
-                            @unless ($server->removed_from_source)
+                            @php $active = $activeMigrations[$server->source_id] ?? null; @endphp
+                            @if ($active)
+                                <a href="{{ route('imports.ploi.migration.progress', $active) }}" wire:navigate>
+                                    <x-secondary-button type="button">
+                                        <x-heroicon-o-arrow-path class="mr-1.5 h-4 w-4" />
+                                        {{ __('View migration in progress') }}
+                                    </x-secondary-button>
+                                </a>
+                            @elseif (! $server->removed_from_source)
                                 <a href="{{ url('/servers/create?from_ploi_server=' . $server->id) }}" wire:navigate>
                                     <x-primary-button type="button">
                                         {{ __('Migrate this server') }}
                                     </x-primary-button>
                                 </a>
-                            @endunless
+                            @endif
                         </div>
                     </div>
 

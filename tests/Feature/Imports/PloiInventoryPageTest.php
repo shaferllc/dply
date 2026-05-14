@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Imports;
 
 use App\Jobs\Imports\SyncPloiInventoryJob;
+use App\Models\ImportServerMigration;
 use App\Models\Organization;
 use App\Models\PloiServer;
 use App\Models\PloiSite;
@@ -157,6 +158,47 @@ class PloiInventoryPageTest extends TestCase
         $this->actingAs($user)->get('/imports/ploi')->assertOk();
 
         Queue::assertNotPushed(SyncPloiInventoryJob::class);
+    }
+
+    public function test_active_migration_replaces_migrate_cta_with_view_link(): void
+    {
+        Queue::fake();
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'ploi',
+        ]);
+        $server = PloiServer::create([
+            'provider_credential_id' => $credential->id,
+            'source_id' => 42,
+            'name' => 'prod-web-01',
+            'ip_address' => '203.0.113.10',
+            'provider_label' => 'digital-ocean',
+            'server_type' => null,
+            'php_versions' => [],
+            'status' => 'active',
+            'last_synced_at' => now(),
+            'removed_from_source' => false,
+            'source_snapshot' => null,
+        ]);
+        ImportServerMigration::create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+            'provider_credential_id' => $credential->id,
+            'source' => 'ploi',
+            'source_server_id' => 42,
+            'status' => ImportServerMigration::STATUS_STAGING,
+        ]);
+
+        $response = $this->actingAs($user)->get('/imports/ploi');
+
+        $response->assertOk()
+            ->assertSee('1 migration in progress')
+            ->assertSee('View migration in progress')
+            ->assertDontSee('Migrate this server');
     }
 
     public function test_credentials_sidebar_shows_ploi_tab(): void
