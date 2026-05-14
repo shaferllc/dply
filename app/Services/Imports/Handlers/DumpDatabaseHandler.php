@@ -9,7 +9,7 @@ use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Services\Imports\Ploi\PloiImportDriver;
-use App\Services\Imports\Ploi\PloiSshConnection;
+use App\Services\Imports\Ploi\PloiSshConnectionFactory;
 use App\Services\Imports\StepHandler;
 use RuntimeException;
 
@@ -30,6 +30,8 @@ use RuntimeException;
  */
 class DumpDatabaseHandler implements StepHandler
 {
+    public function __construct(protected PloiSshConnectionFactory $ploiFactory) {}
+
     public static function key(): string
     {
         return ImportMigrationStep::KEY_DUMP_DB;
@@ -72,7 +74,7 @@ class DumpDatabaseHandler implements StepHandler
             $warnings[] = 'Site has multiple databases; only '.$primary['name'].' will be migrated. Others: '.implode(', ', $extra);
         }
 
-        $ssh = PloiSshConnection::forMigration($migration);
+        $ssh = $this->ploiFactory->forMigration($migration);
         $dumpPath = sprintf('/tmp/dply-migrate-%s-%d.sql', mb_substr($migration->id, -10), $child->source_site_id);
         $dbName = $primary['name'];
 

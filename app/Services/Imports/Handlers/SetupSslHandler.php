@@ -12,7 +12,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Imports\Ploi\PloiImportDriver;
-use App\Services\Imports\Ploi\PloiSshConnection;
+use App\Services\Imports\Ploi\PloiSshConnectionFactory;
 use App\Services\SshConnectionFactory;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -37,7 +37,10 @@ use RuntimeException;
  */
 class SetupSslHandler extends SshDependentHandler
 {
-    public function __construct(protected SshConnectionFactory $factory) {}
+    public function __construct(
+        protected SshConnectionFactory $factory,
+        protected PloiSshConnectionFactory $ploiFactory,
+    ) {}
 
     public static function key(): string
     {
@@ -145,7 +148,7 @@ class SetupSslHandler extends SshDependentHandler
         $certPath = "/etc/letsencrypt/live/{$domain}/fullchain.pem";
         $keyPath = "/etc/letsencrypt/live/{$domain}/privkey.pem";
 
-        $ploiSsh = PloiSshConnection::forMigration($migration);
+        $ploiSsh = $this->ploiFactory->forMigration($migration);
         $certB64 = trim($ploiSsh->exec('sudo cat '.escapeshellarg($certPath).' | base64 -w0'));
         $keyB64 = trim($ploiSsh->exec('sudo cat '.escapeshellarg($keyPath).' | base64 -w0'));
 

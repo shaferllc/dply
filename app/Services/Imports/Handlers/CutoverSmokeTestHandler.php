@@ -62,7 +62,7 @@ class CutoverSmokeTestHandler implements StepHandler
         $attempts = 0;
         $headerName = 'X-Dply-Migration';
 
-        for ($i = 0; $i < self::POLL_ATTEMPTS; $i++) {
+        for ($i = 0; $i < static::POLL_ATTEMPTS; $i++) {
             $attempts++;
             try {
                 // Probe via the public hostname first; the propagation check requires
@@ -87,8 +87,8 @@ class CutoverSmokeTestHandler implements StepHandler
                 // Network errors during propagation are expected; keep polling.
             }
 
-            if ($i < self::POLL_ATTEMPTS - 1) {
-                sleep(self::POLL_INTERVAL_SECONDS);
+            if ($i < static::POLL_ATTEMPTS - 1) {
+                sleep(static::POLL_INTERVAL_SECONDS);
             }
         }
 

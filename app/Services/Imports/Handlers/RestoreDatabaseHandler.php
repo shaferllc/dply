@@ -9,7 +9,7 @@ use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Imports\Ploi\PloiSshConnection;
+use App\Services\Imports\Ploi\PloiSshConnectionFactory;
 use App\Services\SshConnectionFactory;
 use RuntimeException;
 
@@ -27,7 +27,10 @@ use RuntimeException;
  */
 class RestoreDatabaseHandler extends SshDependentHandler
 {
-    public function __construct(protected SshConnectionFactory $factory) {}
+    public function __construct(
+        protected SshConnectionFactory $factory,
+        protected PloiSshConnectionFactory $ploiFactory,
+    ) {}
 
     public static function key(): string
     {
@@ -71,7 +74,7 @@ class RestoreDatabaseHandler extends SshDependentHandler
         }
 
         // Pull the dump off Ploi, push to dply, restore.
-        $ploiSsh = PloiSshConnection::forMigration($migration);
+        $ploiSsh = $this->ploiFactory->forMigration($migration);
         $base64 = $ploiSsh->exec('base64 -w0 '.escapeshellarg($dumpPath));
         if (trim($base64) === '') {
             throw new RuntimeException('Failed to read dump from Ploi (empty content).');

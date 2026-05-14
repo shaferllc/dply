@@ -11,7 +11,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Imports\Ploi\PloiImportDriver;
-use App\Services\Imports\Ploi\PloiSshConnection;
+use App\Services\Imports\Ploi\PloiSshConnectionFactory;
 use App\Services\SshConnectionFactory;
 use RuntimeException;
 
@@ -23,7 +23,10 @@ use RuntimeException;
  */
 class CutoverDbDeltaHandler extends SshDependentHandler
 {
-    public function __construct(protected SshConnectionFactory $factory) {}
+    public function __construct(
+        protected SshConnectionFactory $factory,
+        protected PloiSshConnectionFactory $ploiFactory,
+    ) {}
 
     public static function key(): string
     {
@@ -59,7 +62,7 @@ class CutoverDbDeltaHandler extends SshDependentHandler
         }
         $dbName = $dbs[0]['name'];
 
-        $ploiSsh = PloiSshConnection::forMigration($migration);
+        $ploiSsh = $this->ploiFactory->forMigration($migration);
         $deltaPath = sprintf('/tmp/dply-cutover-%s-%d.sql', mb_substr($migration->id, -10), $child->source_site_id);
 
         $cmd = sprintf(

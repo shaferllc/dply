@@ -18,6 +18,7 @@ use App\Services\Imports\WaitForTargetServerException;
 use App\Services\Imports\WaitForTargetSiteException;
 use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\Imports\RecordingShell;
 use Tests\TestCase;
 
 class CloneRepoHandlerTest extends TestCase
@@ -166,31 +167,3 @@ class CloneRepoHandlerTest extends TestCase
     }
 }
 
-/**
- * Minimal RemoteShell double — records every command invocation and returns
- * pre-set responses in order. Used by the handler tests to assert exact
- * command pipelines without needing a real SSH endpoint.
- */
-final class RecordingShell implements RemoteShell
-{
-    /** @var list<string> */
-    public array $commands = [];
-
-    /** @var list<string> */
-    public array $responses = [];
-
-    /** @var array<string, string> remote_path → contents */
-    public array $written = [];
-
-    public function exec(string $command, int $timeoutSeconds = 120): string
-    {
-        $this->commands[] = $command;
-
-        return array_shift($this->responses) ?? '';
-    }
-
-    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-        $this->written[$remotePath] = $contents;
-    }
-}
