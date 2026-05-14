@@ -82,7 +82,26 @@ class ForgeClient
         $url = $this->baseUrl.'/'.ltrim($path, '/');
         $req = Http::withToken($this->token)
             ->acceptJson()
-            ->asJson();
+            ->asJson()
+            // Same retry posture as PloiClient — exponential backoff + Retry-After.
+            ->retry(3, function (int $attempt, \Throwable $exception): int {
+                $delay = (int) (1000 * (2 ** ($attempt - 1)));
+                if ($exception instanceof \Illuminate\Http\Client\RequestException) {
+                    $retryAfter = $exception->response?->header('Retry-After');
+                    if (is_string($retryAfter) && ctype_digit($retryAfter)) {
+                        $delay = max($delay, (int) $retryAfter * 1000);
+                    }
+                }
+
+                return $delay;
+            }, function (\Throwable $exception): bool {
+                if (! $exception instanceof \Illuminate\Http\Client\RequestException) {
+                    return false;
+                }
+                $status = $exception->response?->status();
+
+                return in_array($status, [429, 502, 503, 504], true);
+            }, throw: false);
 
         return match (strtolower($method)) {
             'get' => $req->get($url, $query),
