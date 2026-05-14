@@ -34,12 +34,22 @@
 
 <div class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" @if ($shouldPoll) wire:poll.5s @endif>
     <header class="mb-6 space-y-2">
-        <div class="flex flex-wrap items-center gap-3">
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Migration · :id', ['id' => $migration->id]) }}</h1>
-            @php $statusPill = $pill($migration->status); @endphp
-            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 {{ $statusPill['class'] }}">
-                {{ $migration->status }}
-            </span>
+        @php
+            $statusPill = $pill($migration->status);
+            $migrationTerminal = in_array($migration->status, ['completed', 'partial', 'aborted', 'expired'], true);
+        @endphp
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+                <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Migration · :id', ['id' => $migration->id]) }}</h1>
+                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 {{ $statusPill['class'] }}">
+                    {{ $migration->status }}
+                </span>
+            </div>
+            @if (! $migrationTerminal)
+                <button type="button" wire:click="requestAbort" class="inline-flex items-center justify-center rounded-xl border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900 hover:bg-red-100">
+                    {{ __('Abort migration') }}
+                </button>
+            @endif
         </div>
         <p class="text-sm text-brand-moss">
             {{ __('Source: Ploi server #:src · Target dply server: :target', [
@@ -306,6 +316,32 @@
             </ul>
         </article>
     @endforeach
+
+    @if ($confirmingAbort)
+        <div
+            x-data="{ open: true }"
+            x-show="open"
+            x-init="$nextTick(() => document.addEventListener('keydown', e => e.key === 'Escape' && $wire.cancelAbort()))"
+            class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
+            <div class="dply-card max-w-md overflow-hidden">
+                <div class="space-y-4 p-6">
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Abort this migration?') }}</h3>
+                        <p class="text-sm leading-relaxed text-brand-moss">{{ __('Pending steps will be skipped, in-flight sites marked aborted, and the ephemeral SSH key revoked immediately. The dply target server is left untouched — delete it manually if you no longer need it.') }}</p>
+                        <p class="text-xs text-red-900">{{ __('This is not reversible. Sites already cut-over (live on dply) stay live.') }}</p>
+                    </div>
+                    <div class="flex items-center justify-end gap-2">
+                        <button type="button" wire:click="cancelAbort" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-cream">
+                            {{ __('Keep migrating') }}
+                        </button>
+                        <button type="button" wire:click="abortMigration" class="inline-flex items-center justify-center rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-400">
+                            {{ __('Yes, abort migration') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     @php $reviewItems = $migration->manual_review_items ?? []; @endphp
     @if (! empty($reviewItems))

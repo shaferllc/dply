@@ -78,6 +78,88 @@ class MigrationProgress extends Component
         $this->toastSuccess(__('Retry queued.'));
     }
 
+    /** Toggles the abort confirmation modal. */
+    public bool $confirmingAbort = false;
+
+    public function requestAbort(): void
+    {
+        $this->authorizeMutate();
+        $this->confirmingAbort = true;
+    }
+
+    public function cancelAbort(): void
+    {
+        $this->confirmingAbort = false;
+    }
+
+    /**
+     * Q13 abort path: user explicitly tears down a non-terminal migration.
+     * Marks the parent ABORTED, cascade-marks pending steps as SKIPPED, each
+     * in-flight child as ABORTED, and queues the revoke_ssh_key step so the
+     * trust window closes immediately rather than waiting for the 168h
+     * expire-paused sweep. Does NOT delete the dply target server — that
+     * would be a separate confirmation per Q13 (impacts billing, irreversible).
+     */
+    public function abortMigration(): void
+    {
+        $this->authorizeMutate();
+        $this->confirmingAbort = false;
+
+        $migration = $this->migration->refresh();
+        $terminal = [
+            ImportServerMigration::STATUS_COMPLETED,
+            ImportServerMigration::STATUS_PARTIAL,
+            ImportServerMigration::STATUS_ABORTED,
+            ImportServerMigration::STATUS_EXPIRED,
+        ];
+        if (in_array($migration->status, $terminal, true)) {
+            $this->toastError(__('Migration is already terminal (status: :status).', ['status' => $migration->status]));
+
+            return;
+        }
+
+        // Cascade: pending steps → skipped, in-flight site migrations → aborted.
+        ImportMigrationStep::query()
+            ->where('import_server_migration_id', $migration->id)
+            ->whereIn('status', [ImportMigrationStep::STATUS_PENDING, ImportMigrationStep::STATUS_RUNNING])
+            ->whereNotIn('step_key', [ImportMigrationStep::KEY_REVOKE_SSH_KEY])
+            ->update([
+                'status' => ImportMigrationStep::STATUS_SKIPPED,
+                'finished_at' => now(),
+                'error_message' => 'Migration aborted by user before this step ran.',
+            ]);
+        ImportSiteMigration::query()
+            ->where('import_server_migration_id', $migration->id)
+            ->whereIn('status', [
+                ImportSiteMigration::STATUS_PENDING,
+                ImportSiteMigration::STATUS_STAGING,
+                ImportSiteMigration::STATUS_READY_FOR_CUTOVER,
+                ImportSiteMigration::STATUS_CUTOVER_IN_PROGRESS,
+            ])
+            ->update([
+                'status' => ImportSiteMigration::STATUS_ABORTED,
+            ]);
+
+        $migration->status = ImportServerMigration::STATUS_ABORTED;
+        $migration->completed_at = now();
+        $migration->failure_summary = ($migration->failure_summary ? $migration->failure_summary."\n" : '').'Aborted by user via UI.';
+        $migration->save();
+
+        // Dispatch the revoke step immediately so the ephemeral key is closed
+        // without waiting for the next scheduled sweep.
+        $revokeStep = ImportMigrationStep::query()
+            ->where('import_server_migration_id', $migration->id)
+            ->where('step_key', ImportMigrationStep::KEY_REVOKE_SSH_KEY)
+            ->where('status', ImportMigrationStep::STATUS_PENDING)
+            ->orderBy('sequence')
+            ->first();
+        if ($revokeStep !== null && $migration->ssh_key_source_id !== null && $migration->ssh_key_revoked_at === null) {
+            RunMigrationStepJob::dispatch($revokeStep->id);
+        }
+
+        $this->toastSuccess(__('Migration aborted. Ephemeral SSH key revocation queued.'));
+    }
+
     /**
      * Begin cutover for a single child site. Only valid when the site is in
      * READY_FOR_CUTOVER and no cutover step is already running. Dispatches the
