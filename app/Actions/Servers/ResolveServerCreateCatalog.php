@@ -160,9 +160,7 @@ final class ResolveServerCreateCatalog
                 ];
             }
 
-            usort($sizes, static function (array $a, array $b): int {
-                return strnatcasecmp($a['value'], $b['value']);
-            });
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -214,6 +212,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -284,6 +283,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => ((int) ($t['disk'] ?? 0)) > 0 ? (int) ($t['disk'] ?? 0) : null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -335,6 +335,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => ((int) ($p['disk'] ?? 0)) > 0 ? (int) ($p['disk'] ?? 0) : null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -435,6 +436,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => ((int) ($p['storage_size'] ?? 0)) > 0 ? (int) ($p['storage_size'] ?? 0) : null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -486,6 +488,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -646,6 +649,36 @@ final class ResolveServerCreateCatalog
         }
 
         return '';
+    }
+
+    /**
+     * Sort size options by monthly price ascending so the wizard defaults
+     * to the cheapest plan. Sizes without pricing sink to the bottom; ties
+     * break alphabetically by SKU for stability.
+     *
+     * @param  list<array<string, mixed>>  $sizes
+     */
+    private function sortSizesByPriceAscending(array &$sizes): void
+    {
+        usort($sizes, static function (array $a, array $b): int {
+            $priceA = $a['price_monthly'] ?? null;
+            $priceB = $b['price_monthly'] ?? null;
+
+            if ($priceA === null && $priceB === null) {
+                return strnatcasecmp((string) $a['value'], (string) $b['value']);
+            }
+            if ($priceA === null) {
+                return 1;
+            }
+            if ($priceB === null) {
+                return -1;
+            }
+            if ($priceA === $priceB) {
+                return strnatcasecmp((string) $a['value'], (string) $b['value']);
+            }
+
+            return $priceA <=> $priceB;
+        });
     }
 
     private function awsMemoryForInstanceType(string $instanceType): ?int
