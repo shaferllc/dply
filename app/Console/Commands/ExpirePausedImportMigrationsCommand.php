@@ -194,6 +194,24 @@ class ExpirePausedImportMigrationsCommand extends Command
         $migration->failure_summary = sprintf('Auto-expired after %dh of pause inactivity (Q17 trust-window enforcement).', (int) $this->option('hours'));
         $migration->save();
 
+        try {
+            if ($migration->organization) {
+                audit_log(
+                    $migration->organization,
+                    User::find($migration->user_id),
+                    'import.migration.expired',
+                    $migration,
+                    null,
+                    ['hours' => (int) $this->option('hours')],
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('failed to write expired audit log', [
+                'migration_id' => $migration->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         // Cascade-abort any pending steps so they don't try to run later if the
         // queue catches up.
         ImportMigrationStep::query()

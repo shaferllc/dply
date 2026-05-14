@@ -75,6 +75,15 @@ class MigrationProgress extends Component
         $step->save();
 
         RunMigrationStepJob::dispatch($step->id);
+
+        if ($this->migration->organization && auth()->user()) {
+            audit_log($this->migration->organization, auth()->user(), 'import.migration.step_retried', $this->migration, null, [
+                'step_id' => $step->id,
+                'step_key' => $step->step_key,
+                'attempt' => $step->attempts,
+            ]);
+        }
+
         $this->toastSuccess(__('Retry queued.'));
     }
 
@@ -120,6 +129,13 @@ class MigrationProgress extends Component
 
         if ($next !== null) {
             RunMigrationStepJob::dispatch($next->id);
+        }
+
+        if ($this->migration->organization && auth()->user()) {
+            audit_log($this->migration->organization, auth()->user(), 'import.migration.step_skipped', $this->migration, null, [
+                'step_id' => $step->id,
+                'step_key' => $step->step_key,
+            ]);
         }
 
         $this->toastSuccess(__('Step skipped. Migration resumed.'));
@@ -191,6 +207,10 @@ class MigrationProgress extends Component
         $migration->completed_at = now();
         $migration->failure_summary = ($migration->failure_summary ? $migration->failure_summary."\n" : '').'Aborted by user via UI.';
         $migration->save();
+
+        if ($migration->organization && auth()->user()) {
+            audit_log($migration->organization, auth()->user(), 'import.migration.aborted', $migration);
+        }
 
         // Dispatch the revoke step immediately so the ephemeral key is closed
         // without waiting for the next scheduled sweep.
@@ -268,6 +288,14 @@ class MigrationProgress extends Component
         $child->status = ImportSiteMigration::STATUS_CUTOVER_ROLLED_BACK;
         $child->save();
 
+        if ($this->migration->organization && auth()->user()) {
+            audit_log($this->migration->organization, auth()->user(), 'import.migration.cutover_rolled_back', $this->migration, null, [
+                'site_migration_id' => $child->id,
+                'domain' => $child->domain,
+                'dns_record_deleted' => $deleted,
+            ]);
+        }
+
         $sourceLabel = $this->migration->source === 'forge' ? 'Forge' : 'Ploi';
         if ($deleted) {
             $this->toastSuccess(__('DNS rollback dispatched. Verify your domain now resolves back to :source.', ['source' => $sourceLabel]));
@@ -296,6 +324,14 @@ class MigrationProgress extends Component
         $child->status = ImportSiteMigration::STATUS_CUTOVER_ROLLED_BACK;
         $child->failure_summary = ($child->failure_summary ? $child->failure_summary."\n" : '').'Manually resolved by user.';
         $child->save();
+
+        if ($this->migration->organization && auth()->user()) {
+            audit_log($this->migration->organization, auth()->user(), 'import.migration.cutover_marked_resolved', $this->migration, null, [
+                'site_migration_id' => $child->id,
+                'domain' => $child->domain,
+            ]);
+        }
+
         $this->toastSuccess(__('Marked resolved.'));
     }
 
@@ -381,6 +417,14 @@ class MigrationProgress extends Component
         }
 
         RunMigrationStepJob::dispatch($firstCutoverStep->id);
+
+        if ($this->migration->organization && auth()->user()) {
+            audit_log($this->migration->organization, auth()->user(), 'import.migration.cutover_begun', $this->migration, null, [
+                'site_migration_id' => $child->id,
+                'domain' => $child->domain,
+            ]);
+        }
+
         $this->toastSuccess(__('Cutover started for :domain.', ['domain' => $child->domain]));
     }
 

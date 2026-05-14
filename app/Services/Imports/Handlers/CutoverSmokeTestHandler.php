@@ -124,7 +124,36 @@ class CutoverSmokeTestHandler implements StepHandler
         $step->save();
 
         $this->publishCutoverComplete($migration, $child);
+        $this->writeCutoverCompletedAudit($migration, $child);
         $this->maybeMarkMigrationComplete($migration);
+    }
+
+    /**
+     * Audit-trail entry. No user context (the smoke-test handler runs from
+     * the queue) so the user_id is the migration's originator if available.
+     */
+    protected function writeCutoverCompletedAudit(ImportServerMigration $migration, ImportSiteMigration $child): void
+    {
+        try {
+            if ($migration->organization) {
+                audit_log(
+                    $migration->organization,
+                    User::find($migration->user_id),
+                    'import.migration.cutover_completed',
+                    $migration,
+                    null,
+                    [
+                        'site_migration_id' => $child->id,
+                        'domain' => $child->domain,
+                    ],
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('failed to write cutover-completed audit log', [
+                'migration_id' => $migration->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

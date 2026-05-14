@@ -350,6 +350,13 @@ class StepReview extends Component
                 userId: $user->getKey(),
             );
 
+            audit_log($org, $user, 'import.migration.started', $migration, null, [
+                'source' => 'ploi',
+                'source_server_id' => $ploiServer->source_id,
+                'target_server_id' => $server->id,
+                'site_count' => count($selectedSiteIds),
+            ]);
+
             $firstStep = $migration->steps()->first();
             if ($firstStep !== null) {
                 RunMigrationStepJob::dispatch($firstStep->id);
@@ -428,6 +435,13 @@ class StepReview extends Component
                 credential: $forgeServer->providerCredential,
                 userId: $user->getKey(),
             );
+
+            audit_log($org, $user, 'import.migration.started', $migration, null, [
+                'source' => 'forge',
+                'source_server_id' => $forgeServer->source_id,
+                'target_server_id' => $server->id,
+                'site_count' => count($selectedSiteIds),
+            ]);
 
             $firstStep = $migration->steps()->first();
             if ($firstStep !== null) {
