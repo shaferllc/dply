@@ -339,15 +339,20 @@ class Index extends Component
         $hasProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
-        // Q19 onboarding empty state: surface a "Migrate from {Ploi,Forge}" CTA
-        // alongside Create Server when at least one inventory-import credential
-        // is connected for the current org.
-        $hasImportCredentials = $org
-            ? ProviderCredential::query()
+        // Q19 onboarding empty state: surface per-source "Migrate from {X}" CTAs
+        // alongside Create Server when matching inventory-import credentials are
+        // connected for the current org. Keeps Ploi and Forge as separate buttons
+        // so an empty page doesn't push a user toward a source they aren't on.
+        $importSources = collect();
+        if ($org) {
+            $importSources = ProviderCredential::query()
                 ->where('organization_id', $org->id)
                 ->whereIn('provider', \App\Enums\ServerProvider::importProviderKeys())
-                ->exists()
-            : false;
+                ->pluck('provider')
+                ->unique()
+                ->values();
+        }
+        $hasImportCredentials = $importSources->isNotEmpty();
 
         $deleteModalServer = $this->deleteModalServerId
             ? Server::query()->find($this->deleteModalServerId)
@@ -368,6 +373,7 @@ class Index extends Component
             'openInsights' => $openInsights,
             'hasProviderCredentials' => $hasProviderCredentials,
             'hasImportCredentials' => $hasImportCredentials,
+            'importSources' => $importSources,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
             'serverCreateDraft' => $serverCreateDraft,

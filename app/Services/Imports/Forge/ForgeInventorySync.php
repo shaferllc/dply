@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Imports\Ploi;
+namespace App\Services\Imports\Forge;
 
-use App\Models\PloiServer;
-use App\Models\PloiSite;
+use App\Models\ForgeServer;
+use App\Models\ForgeSite;
 use App\Models\ProviderCredential;
 use App\Services\Imports\ImportDriver;
 use App\Services\Imports\SyncResult;
@@ -14,50 +14,40 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * Pulls the user's Ploi fleet into ploi_servers / ploi_sites rows. Idempotent;
- * safe to re-run. Source rows that disappear from Ploi are marked
- * removed_from_source rather than deleted, preserving audit trail and any
- * in-progress migrations holding a frozen snapshot against them.
- *
- * Pre-migration callers should pass syncSites=true and a single $onlyServerId
- * to bound the cost to just the server being migrated (per Q15 design — the
- * blocking pre-migration re-sync).
+ * Pulls a user's Forge fleet into forge_servers / forge_sites. Same idempotent
+ * upsert + cascade-mark semantics as PloiInventorySync (Q15 source-deletion
+ * = removed_from_source).
  */
-class PloiInventorySync
+class ForgeInventorySync
 {
     public function __construct(protected ?ImportDriver $driver = null) {}
 
     public function syncAll(ProviderCredential $credential): SyncResult
     {
-        if ($credential->provider !== 'ploi') {
-            throw new RuntimeException(
-                sprintf('Expected provider=ploi for sync, got %s', $credential->provider)
-            );
-        }
+        $this->assertForge($credential);
 
-        $driver = $this->driver ?? PloiImportDriver::for($credential);
+        $driver = $this->driver ?? ForgeImportDriver::for($credential);
         $now = Carbon::now();
 
         $sourceServers = $driver->listServers();
-        $seenServerSourceIds = [];
+        $seenServers = [];
         $serversTouched = 0;
         $sitesTouched = 0;
 
         foreach ($sourceServers as $row) {
             $server = $this->upsertServer($credential, $row, $now);
-            $seenServerSourceIds[] = $row['id'];
+            $seenServers[] = $row['id'];
             $serversTouched++;
 
-            $sourceSites = $driver->listSites($row['id']);
-            $seenSiteSourceIds = [];
-            foreach ($sourceSites as $siteRow) {
+            $seenSites = [];
+            foreach ($driver->listSites($row['id']) as $siteRow) {
                 $this->upsertSite($server, $siteRow);
-                $seenSiteSourceIds[] = $siteRow['id'];
+                $seenSites[] = $siteRow['id'];
                 $sitesTouched++;
             }
-            $this->markMissingSitesRemoved($server, $seenSiteSourceIds);
+            $this->markMissingSitesRemoved($server, $seenSites);
         }
-        $this->markMissingServersRemoved($credential, $seenServerSourceIds);
+        $this->markMissingServersRemoved($credential, $seenServers);
 
         return new SyncResult(
             serversSeen: $serversTouched,
@@ -68,31 +58,36 @@ class PloiInventorySync
 
     public function syncOneServer(ProviderCredential $credential, int $sourceServerId): SyncResult
     {
-        if ($credential->provider !== 'ploi') {
-            throw new RuntimeException(
-                sprintf('Expected provider=ploi for sync, got %s', $credential->provider)
-            );
-        }
+        $this->assertForge($credential);
 
-        $driver = $this->driver ?? PloiImportDriver::for($credential);
+        $driver = $this->driver ?? ForgeImportDriver::for($credential);
         $now = Carbon::now();
 
-        $serverRow = $driver->fetchServerDetail($sourceServerId);
-        $server = $this->upsertServer($credential, $serverRow, $now);
+        $row = $driver->fetchServerDetail($sourceServerId);
+        $server = $this->upsertServer($credential, $row, $now);
 
         $sourceSites = $driver->listSites($sourceServerId);
-        $seenSiteSourceIds = [];
+        $seenSites = [];
         foreach ($sourceSites as $siteRow) {
             $this->upsertSite($server, $siteRow);
-            $seenSiteSourceIds[] = $siteRow['id'];
+            $seenSites[] = $siteRow['id'];
         }
-        $this->markMissingSitesRemoved($server, $seenSiteSourceIds);
+        $this->markMissingSitesRemoved($server, $seenSites);
 
         return new SyncResult(
             serversSeen: 1,
             sitesSeen: count($sourceSites),
             syncedAt: $now,
         );
+    }
+
+    protected function assertForge(ProviderCredential $credential): void
+    {
+        if ($credential->provider !== 'forge') {
+            throw new RuntimeException(
+                sprintf('Expected provider=forge for sync, got %s', $credential->provider)
+            );
+        }
     }
 
     /**
@@ -102,16 +97,16 @@ class PloiInventorySync
      *     raw: array<string, mixed>,
      * }  $row
      */
-    protected function upsertServer(ProviderCredential $credential, array $row, Carbon $now): PloiServer
+    protected function upsertServer(ProviderCredential $credential, array $row, Carbon $now): ForgeServer
     {
-        return DB::transaction(function () use ($credential, $row, $now): PloiServer {
-            $server = PloiServer::query()
+        return DB::transaction(function () use ($credential, $row, $now): ForgeServer {
+            $server = ForgeServer::query()
                 ->where('provider_credential_id', $credential->id)
                 ->where('source_id', $row['id'])
                 ->lockForUpdate()
                 ->first();
 
-            $attributes = [
+            $attrs = [
                 'provider_credential_id' => $credential->id,
                 'source_id' => $row['id'],
                 'name' => $row['name'],
@@ -126,9 +121,9 @@ class PloiInventorySync
             ];
 
             if ($server === null) {
-                return PloiServer::create($attributes);
+                return ForgeServer::create($attrs);
             }
-            $server->fill($attributes)->save();
+            $server->fill($attrs)->save();
 
             return $server;
         });
@@ -141,17 +136,17 @@ class PloiInventorySync
      *     status: ?string, raw: array<string, mixed>,
      * }  $row
      */
-    protected function upsertSite(PloiServer $server, array $row): PloiSite
+    protected function upsertSite(ForgeServer $server, array $row): ForgeSite
     {
-        return DB::transaction(function () use ($server, $row): PloiSite {
-            $site = PloiSite::query()
-                ->where('ploi_server_id', $server->id)
+        return DB::transaction(function () use ($server, $row): ForgeSite {
+            $site = ForgeSite::query()
+                ->where('forge_server_id', $server->id)
                 ->where('source_id', $row['id'])
                 ->lockForUpdate()
                 ->first();
 
-            $attributes = [
-                'ploi_server_id' => $server->id,
+            $attrs = [
+                'forge_server_id' => $server->id,
                 'source_id' => $row['id'],
                 'domain' => $row['domain'],
                 'site_type' => $row['site_type'],
@@ -165,52 +160,46 @@ class PloiInventorySync
             ];
 
             if ($site === null) {
-                return PloiSite::create($attributes);
+                return ForgeSite::create($attrs);
             }
-            $site->fill($attributes)->save();
+            $site->fill($attrs)->save();
 
             return $site;
         });
     }
 
     /**
-     * @param  list<int>  $seenSourceIds
+     * @param  list<int>  $seen
      */
-    protected function markMissingServersRemoved(ProviderCredential $credential, array $seenSourceIds): void
+    protected function markMissingServersRemoved(ProviderCredential $credential, array $seen): void
     {
-        $query = PloiServer::query()
+        $query = ForgeServer::query()
             ->where('provider_credential_id', $credential->id)
             ->where('removed_from_source', false);
-
-        if ($seenSourceIds !== []) {
-            $query->whereNotIn('source_id', $seenSourceIds);
+        if ($seen !== []) {
+            $query->whereNotIn('source_id', $seen);
         }
-
-        // Snapshot the about-to-be-removed servers before flipping the flag so we can
-        // cascade-mark their sites. The parent disappearing from Ploi implies every
-        // site under it is also gone, even though we never visited them in this pull.
-        $vanishedServerIds = $query->clone()->pluck('id')->all();
+        $vanished = $query->clone()->pluck('id')->all();
         $query->update(['removed_from_source' => true]);
 
-        if ($vanishedServerIds !== []) {
-            PloiSite::query()
-                ->whereIn('ploi_server_id', $vanishedServerIds)
+        if ($vanished !== []) {
+            ForgeSite::query()
+                ->whereIn('forge_server_id', $vanished)
                 ->where('removed_from_source', false)
                 ->update(['removed_from_source' => true]);
         }
     }
 
     /**
-     * @param  list<int>  $seenSourceIds
+     * @param  list<int>  $seen
      */
-    protected function markMissingSitesRemoved(PloiServer $server, array $seenSourceIds): void
+    protected function markMissingSitesRemoved(ForgeServer $server, array $seen): void
     {
-        $query = PloiSite::query()
-            ->where('ploi_server_id', $server->id)
+        $query = ForgeSite::query()
+            ->where('forge_server_id', $server->id)
             ->where('removed_from_source', false);
-
-        if ($seenSourceIds !== []) {
-            $query->whereNotIn('source_id', $seenSourceIds);
+        if ($seen !== []) {
+            $query->whereNotIn('source_id', $seen);
         }
         $query->update(['removed_from_source' => true]);
     }

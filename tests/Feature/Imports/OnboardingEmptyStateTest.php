@@ -63,7 +63,7 @@ class OnboardingEmptyStateTest extends TestCase
             ->assertDontSee('Migrate from Ploi');
     }
 
-    public function test_empty_state_shows_migrate_cta_when_only_forge_credential_present(): void
+    public function test_empty_state_shows_forge_cta_when_only_forge_credential_present(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -76,6 +76,29 @@ class OnboardingEmptyStateTest extends TestCase
         $this->actingAs($user)
             ->get('/servers')
             ->assertOk()
-            ->assertSee('Migrate from Ploi');
+            ->assertSee('Migrate from Forge')
+            ->assertDontSee('Migrate from Ploi');
+    }
+
+    public function test_empty_state_shows_both_ctas_when_both_credentials_present(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'ploi',
+        ]);
+        ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'forge',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/servers')
+            ->assertOk()
+            ->assertSee('Migrate from Ploi')
+            ->assertSee('Migrate from Forge');
     }
 }

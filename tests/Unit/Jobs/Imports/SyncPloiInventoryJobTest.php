@@ -7,7 +7,7 @@ namespace Tests\Unit\Jobs\Imports;
 use App\Jobs\Imports\SyncPloiInventoryJob;
 use App\Models\ProviderCredential;
 use App\Services\Imports\Ploi\PloiInventorySync;
-use App\Services\Imports\Ploi\SyncResult;
+use App\Services\Imports\SyncResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Mockery;
