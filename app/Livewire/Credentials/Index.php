@@ -155,6 +155,7 @@ class Index extends Component
                 'label' => __('Migrate from'),
                 'items' => [
                     ['id' => 'ploi', 'label' => 'Ploi'],
+                    ['id' => 'forge', 'label' => 'Laravel Forge'],
                 ],
             ],
         ];

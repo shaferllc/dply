@@ -29,6 +29,7 @@ enum ServerProvider: string
     case Namecheap = 'namecheap';
     case VercelDns = 'vercel_dns';
     case Ploi = 'ploi';
+    case Forge = 'forge';
 
     /**
      * Human-readable label for UI.
@@ -61,6 +62,7 @@ enum ServerProvider: string
             self::Namecheap => 'Namecheap',
             self::VercelDns => 'Vercel DNS',
             self::Ploi => 'Ploi',
+            self::Forge => 'Laravel Forge',
         };
     }
 
@@ -101,7 +103,7 @@ enum ServerProvider: string
     public function supportsImport(): bool
     {
         return match ($this) {
-            self::Ploi => true,
+            self::Ploi, self::Forge => true,
             default => false,
         };
     }

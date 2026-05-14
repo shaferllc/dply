@@ -64,6 +64,7 @@
         <x-heroicon-o-cloud {{ $iconAttrs }} />
         @break
     @case('ploi')
+    @case('forge')
         <x-heroicon-o-arrow-down-tray {{ $iconAttrs }} />
         @break
     @default

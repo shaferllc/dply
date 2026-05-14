@@ -702,6 +702,37 @@
         </div>
         @break
 
+    @case('forge')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                    <p class="font-semibold">{{ __('Migrate sites from Laravel Forge to dply') }}</p>
+                    <p class="mt-1 leading-relaxed">{{ __('Connect your Forge account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, scheduled jobs, daemons, SSL.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="forge_name" :value="__('Label (optional)')" />
+                        <x-text-input id="forge_name" wire:model="forge_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Agency Forge') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="forge_api_token" :value="__('API token')" />
+                        <x-text-input id="forge_api_token" wire:model="forge_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://forge.laravel.com/user-profile/api" target="_blank" rel="noopener" class="'.$link.'">Forge → My Profile → API</a>']) !!}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('The token needs read access to servers and sites, plus SSH-key management (we add and remove a short-lived key per migration). We do not mutate your Forge configuration outside of cutover.') }}</p>
+                        <x-input-error :messages="$errors->get('forge_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeForge" wire:loading.attr="disabled" wire:target="storeForge">
+                        <span wire:loading.remove wire:target="storeForge">{{ __('Connect Laravel Forge') }}</span>
+                        <span wire:loading wire:target="storeForge" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
     @case('ploi')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
