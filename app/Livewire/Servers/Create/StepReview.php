@@ -509,7 +509,10 @@ class StepReview extends Component
         $org = auth()->user()?->currentOrganization();
         $context = $this->buildPreflightContext($org);
 
-        $isVmShaped = ! ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker');
+        $isVmShaped = ! (
+            ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker')
+            || ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker')
+        );
 
         return view('livewire.servers.create.step-review', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
@@ -517,6 +520,7 @@ class StepReview extends Component
             'catalog' => $context['catalog'],
             'preflight' => $context['preflight'],
             'isVmShaped' => $isVmShaped,
+            'containerLaunch' => $this->containerLaunchContext(),
         ]);
     }
 }
