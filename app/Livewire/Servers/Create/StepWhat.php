@@ -44,7 +44,9 @@ class StepWhat extends Component
 
         $this->hydrateFormFromDraft($this->form, $this->currentDraft());
 
-        if ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker') {
+        $skipsStack = ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker')
+            || ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker');
+        if ($skipsStack) {
             $this->saveDraftFromForm($this->form, advanceTo: 4);
 
             return $this->redirect(route(self::routeNameForStep(4)), navigate: true);

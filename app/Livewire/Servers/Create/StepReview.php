@@ -276,7 +276,16 @@ class StepReview extends Component
             return $this->redirect(route($inventoryRoute), navigate: true);
         }
 
-        return $this->redirect(route('servers.show', $server), navigate: true);
+        // Docker hosts (either custom BYO or provider-provisioned) skip the
+        // server-provision-journey redirect chain because they're gated off
+        // /servers/{id}/journey by InteractsWithServerWorkspace::bootWorkspace.
+        // Land them directly on overview, where the container_launch progress
+        // card surfaces the in-flight setup.
+        $isDockerHost = ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker')
+            || ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker');
+        $destinationRoute = $isDockerHost ? 'servers.overview' : 'servers.show';
+
+        return $this->redirect(route($destinationRoute, $server), navigate: true);
     }
 
     /**

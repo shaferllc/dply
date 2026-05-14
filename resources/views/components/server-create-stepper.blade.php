@@ -3,9 +3,11 @@
     'reached' => 1,
     'mode' => 'provider',
     'hostKind' => 'vm',
+    'providerHostKind' => 'vm',
 ])
 @php
-    $skipsStep3 = $mode === 'custom' && $hostKind === 'docker';
+    $skipsStep3 = ($mode === 'custom' && $hostKind === 'docker')
+        || ($mode === 'provider' && $providerHostKind === 'docker');
     $whereLabel = $mode === 'custom' ? __('Connection') : __('Where it runs');
     $steps = [
         ['n' => 1, 'label' => __('Type & name'), 'route' => 'servers.create',         'params' => ['edit' => 1]],
