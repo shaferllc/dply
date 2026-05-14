@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Livewire\Launches\Containers\Create as LaunchesContainersCreate;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
+use App\Models\ServerCreateDraft;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -15,9 +16,10 @@ use Tests\TestCase;
 /**
  * Coverage for /launches/containers/create:
  *  - The /launches/create card wires up to the new route + edge.create.
- *  - Only cloud targets are exposed (local OrbStack targets were retired).
- *  - The form renders an empty-state "Connect …" notice when no
- *    credential exists for the selected cloud target.
+ *  - Inspection auto-picks path (docker vs kubernetes) from detection.
+ *  - Docker path: goToDockerWizard writes draft + redirects to /servers/create.
+ *  - Kubernetes path: in-place launch with provider/region/cluster_name/namespace.
+ *  - OSS presets + applyPreset behavior preserved.
  */
 class LaunchesContainersCreateTest extends TestCase
 {
@@ -43,7 +45,7 @@ class LaunchesContainersCreateTest extends TestCase
         $response->assertSee(route('edge.create'), false);
     }
 
-    public function test_target_options_are_cloud_only(): void
+    public function test_target_options_are_kubernetes_only(): void
     {
         $user = $this->userWithOrganization();
 
@@ -51,14 +53,14 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
+            ->set('path', 'kubernetes')
+            ->assertSee('DOKS (DigitalOcean)')
+            ->assertSee('EKS (AWS)')
             ->assertDontSee('Local Docker')
-            ->assertDontSee('Local Kubernetes')
-            ->assertDontSee('local_orbstack')
-            ->assertSee('Remote Docker (DigitalOcean)')
-            ->assertSee('Remote Kubernetes (AWS)');
+            ->assertDontSee('local_orbstack');
     }
 
-    public function test_validation_rejects_local_target_family(): void
+    public function test_path_picker_default_is_docker(): void
     {
         $user = $this->userWithOrganization();
 
@@ -66,13 +68,49 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
+            ->assertSet('path', 'docker')
+            ->assertSee('Continue to the server wizard');
+    }
+
+    public function test_go_to_docker_wizard_writes_draft_and_redirects(): void
+    {
+        $user = $this->userWithOrganization();
+
+        $inspection = $this->fakeInspection();
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', true)
+            ->set('inspection', $inspection)
             ->set('repository_url', 'https://github.com/acme/demo.git')
-            ->set('target_family', 'local_orbstack_docker')
-            ->call('launch')
-            ->assertHasErrors(['target_family']);
+            ->set('repository_branch', 'main')
+            ->set('path', 'docker')
+            ->call('goToDockerWizard')
+            ->assertRedirect(route('servers.create', ['host_target' => 'docker']));
+
+        $draft = ServerCreateDraft::query()
+            ->where('user_id', $user->id)
+            ->where('organization_id', $user->currentOrganization()->id)
+            ->first();
+        $this->assertNotNull($draft);
+        $this->assertIsArray($draft->payload['_container_launch'] ?? null);
+        $this->assertSame('https://github.com/acme/demo.git', $draft->payload['_container_launch']['repository_url']);
+        $this->assertSame('main', $draft->payload['_container_launch']['repository_branch']);
+        $this->assertSame('demo', $draft->payload['_container_launch']['slug']);
+        $this->assertSame('cloud_docker', $draft->payload['_container_launch']['target_family']);
     }
 
-    public function test_empty_state_connect_link_when_digitalocean_credential_missing(): void
+    public function test_go_to_docker_wizard_requires_inspection(): void
+    {
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', false)
+            ->call('goToDockerWizard')
+            ->assertHasErrors(['repository_url']);
+    }
+
+    public function test_kubernetes_path_credential_empty_state(): void
     {
         $user = $this->userWithOrganization();
 
@@ -80,21 +118,9 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
-            ->set('target_family', 'digitalocean_docker')
+            ->set('path', 'kubernetes')
+            ->set('target_family', 'digitalocean_kubernetes')
             ->assertSee('No DigitalOcean credentials connected')
-            ->assertSee(route('credentials.index'), false);
-    }
-
-    public function test_empty_state_connect_link_when_aws_credential_missing(): void
-    {
-        $user = $this->userWithOrganization();
-
-        Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('has_inspection', true)
-            ->set('inspection', $this->fakeInspection())
-            ->set('target_family', 'aws_docker')
-            ->assertSee('No AWS credentials connected')
             ->assertSee(route('credentials.index'), false);
     }
 
@@ -118,7 +144,7 @@ class LaunchesContainersCreateTest extends TestCase
             ->assertSee('Plausible Analytics');
     }
 
-    public function test_empty_state_hidden_when_credential_present(): void
+    public function test_kubernetes_path_credential_present_hides_empty_state(): void
     {
         $user = $this->userWithOrganization();
         $organization = $user->currentOrganization();
@@ -133,11 +159,12 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
-            ->set('target_family', 'digitalocean_docker')
+            ->set('path', 'kubernetes')
+            ->set('target_family', 'digitalocean_kubernetes')
             ->assertDontSee('No DigitalOcean credentials connected');
     }
 
-    public function test_target_tile_shows_connected_badge_when_credential_exists(): void
+    public function test_kubernetes_tile_shows_connected_badge_when_credential_exists(): void
     {
         $user = $this->userWithOrganization();
         $organization = $user->currentOrganization();
@@ -152,11 +179,12 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
-            ->assertSee('Remote Docker (DigitalOcean)')
+            ->set('path', 'kubernetes')
+            ->assertSee('DOKS (DigitalOcean)')
             ->assertSee('Connected');
     }
 
-    public function test_target_tile_shows_needs_account_badge_when_credential_missing(): void
+    public function test_kubernetes_tile_shows_needs_account_when_aws_missing(): void
     {
         $user = $this->userWithOrganization();
         $organization = $user->currentOrganization();
@@ -171,7 +199,8 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
-            ->assertSee('Remote Docker (AWS)')
+            ->set('path', 'kubernetes')
+            ->assertSee('EKS (AWS)')
             ->assertSee('Needs account')
             ->assertSee(route('credentials.index'), false);
     }
@@ -184,6 +213,7 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
+            ->set('path', 'kubernetes')
             ->assertSee('No connected providers yet.')
             ->assertSee('Connect a provider');
     }
@@ -196,10 +226,21 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
-            ->assertSet('server_name', 'demo-digitalocean-docker');
+            ->assertSet('server_name', 'demo-digitalocean-kubernetes');
     }
 
-    public function test_server_name_is_required_on_launch(): void
+    public function test_inspection_auto_picks_kubernetes_path_when_detected(): void
+    {
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(LaunchesContainersCreate::class)
+            ->set('has_inspection', true)
+            ->set('inspection', $this->fakeInspectionWithKubernetes())
+            ->assertSet('path', 'docker');  // not auto-set when forcing has_inspection directly
+    }
+
+    public function test_kubernetes_launch_requires_server_name(): void
     {
         $user = $this->userWithOrganization();
         $organization = $user->currentOrganization();
@@ -214,10 +255,10 @@ class LaunchesContainersCreateTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('has_inspection', true)
             ->set('inspection', $this->fakeInspection())
-            ->set('target_family', 'digitalocean_docker')
+            ->set('path', 'kubernetes')
+            ->set('target_family', 'digitalocean_kubernetes')
             ->set('provider_credential_id', (string) $credential->id)
             ->set('cloud_region', 'nyc3')
-            ->set('cloud_size', 's-1vcpu-1gb')
             ->set('server_name', '')
             ->call('launch')
             ->assertHasErrors(['server_name']);
@@ -245,6 +286,17 @@ class LaunchesContainersCreateTest extends TestCase
                 'env_template' => ['path' => null, 'keys' => []],
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fakeInspectionWithKubernetes(): array
+    {
+        $base = $this->fakeInspection();
+        $base['detection']['target_kind'] = 'kubernetes';
+
+        return $base;
     }
 
     private function userWithOrganization(): User

@@ -299,226 +299,7 @@ class ServerTest extends TestCase
         $response->assertDontSee('SSH private key');
     }
 
-    public function test_local_docker_repo_first_flow_auto_creates_hidden_host_and_site(): void
-    {
-        Bus::fake();
-        config(['launches.local_docker_enabled' => true]);
-
-        $user = $this->userWithOrganization();
-        $organization = $user->currentOrganization();
-
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
-        {
-            /**
-             * @param  array<string, mixed>  $result
-             */
-            public function __construct(private array $result) {}
-
-            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
-            {
-                return $this->result;
-            }
-        });
-
-        Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('repository_url', 'https://github.com/acme/demo.git')
-            ->set('repository_branch', 'main')
-            ->set('target_family', 'local_orbstack_docker')
-            ->call('launch')
-            ->assertHasNoErrors()
-            ->assertRedirect();
-
-        $server = Server::query()
-            ->where('organization_id', $organization->id)
-            ->where('provider', 'custom')
-            ->latest('created_at')
-            ->first();
-
-        $this->assertNotNull($server);
-        $this->assertTrue($server->isDockerHost());
-
-        $site = Site::query()
-            ->where('server_id', $server->id)
-            ->latest('created_at')
-            ->first();
-
-        $this->assertNotNull($site);
-        $this->assertTrue($site->usesDockerRuntime());
-        $this->assertSame('https://github.com/acme/demo.git', $site->git_repository_url);
-        $this->assertSame('main', $site->git_branch);
-        $this->assertSame('laravel', data_get($site->meta, 'docker_runtime.detected.framework'));
-        $this->assertStringContainsString('APP_KEY=base64:', (string) $site->env_file_content);
-        $this->assertSame('docker', data_get($server->meta, 'local_runtime.mode'));
-
-        Bus::assertChained([
-            ProvisionSiteJob::class,
-            RunSiteDeploymentJob::class,
-        ]);
-    }
-
-    public function test_local_docker_repo_first_flow_creates_kubernetes_target_when_repo_detects_cluster_markers(): void
-    {
-        Bus::fake();
-        config(['launches.local_docker_enabled' => true]);
-
-        $user = $this->userWithOrganization();
-        $organization = $user->currentOrganization();
-
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult(['target_runtime' => 'kubernetes_web', 'target_kind' => 'kubernetes', 'kubernetes_namespace' => 'local-kube', 'detected_files' => ['k8s/deployment.yaml']])) extends LocalRepositoryInspector
-        {
-            /**
-             * @param  array<string, mixed>  $result
-             */
-            public function __construct(private array $result) {}
-
-            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
-            {
-                return $this->result;
-            }
-        });
-
-        Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('repository_url', 'https://github.com/acme/demo.git')
-            ->set('repository_branch', 'main')
-            ->set('target_family', 'local_orbstack_kubernetes')
-            ->call('launch')
-            ->assertHasNoErrors()
-            ->assertRedirect();
-
-        $server = Server::query()
-            ->where('organization_id', $organization->id)
-            ->latest('created_at')
-            ->first();
-
-        $site = Site::query()
-            ->where('server_id', $server?->id)
-            ->latest('created_at')
-            ->first();
-
-        $this->assertNotNull($server);
-        $this->assertSame(Server::HOST_KIND_KUBERNETES, data_get($server->meta, 'host_kind'));
-        $this->assertNotNull($site);
-        $this->assertTrue($site->usesKubernetesRuntime());
-        $this->assertSame('local-kube', data_get($site->meta, 'kubernetes_runtime.namespace'));
-
-        Bus::assertChained([
-            ProvisionSiteJob::class,
-            RunSiteDeploymentJob::class,
-        ]);
-    }
-
-    public function test_local_docker_repo_first_flow_stores_low_confidence_detection_metadata(): void
-    {
-        Bus::fake();
-        config(['launches.local_docker_enabled' => true]);
-
-        $user = $this->userWithOrganization();
-
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult(['framework' => 'unknown', 'language' => 'unknown', 'confidence' => 'low', 'warnings' => ['Review runtime details after launch.'], 'reasons' => ['No clear framework markers were detected in the repository root.'], 'env_template' => ['path' => '.env.example', 'keys' => ['APP_NAME']]])) extends LocalRepositoryInspector
-        {
-            /**
-             * @param  array<string, mixed>  $result
-             */
-            public function __construct(private array $result) {}
-
-            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
-            {
-                return $this->result;
-            }
-        });
-
-        Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('repository_url', 'https://github.com/acme/demo.git')
-            ->set('repository_branch', 'main')
-            ->set('target_family', 'local_orbstack_docker')
-            ->call('launch')
-            ->assertHasNoErrors()
-            ->assertRedirect();
-
-        $site = Site::query()->latest('created_at')->first();
-
-        $this->assertNotNull($site);
-        $this->assertSame('low', data_get($site->meta, 'docker_runtime.detected.confidence'));
-        $this->assertSame('.env.example', data_get($site->meta, 'docker_runtime.detected.env_template.path'));
-    }
-
-    public function test_local_docker_repo_first_flow_persists_repository_subdirectory_for_runtime_checkout(): void
-    {
-        Bus::fake();
-        config(['launches.local_docker_enabled' => true]);
-
-        $user = $this->userWithOrganization();
-
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult(['repository_subdirectory' => 'apps/web'])) extends LocalRepositoryInspector
-        {
-            /**
-             * @param  array<string, mixed>  $result
-             */
-            public function __construct(private array $result) {}
-
-            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
-            {
-                return $this->result;
-            }
-        });
-
-        Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('repository_url', 'https://github.com/acme/monorepo.git')
-            ->set('repository_branch', 'main')
-            ->set('repository_subdirectory', 'apps/web')
-            ->set('target_family', 'local_orbstack_docker')
-            ->call('launch')
-            ->assertHasNoErrors()
-            ->assertRedirect();
-
-        $site = Site::query()->latest('created_at')->first();
-
-        $this->assertNotNull($site);
-        $this->assertSame('apps/web', data_get($site->meta, 'docker_runtime.repository_subdirectory'));
-        $this->assertSame('apps/web', data_get($site->meta, 'runtime_target.repository_subdirectory'));
-    }
-
-    public function test_local_docker_launch_redirects_to_site_workspace(): void
-    {
-        Bus::fake();
-        config(['launches.local_docker_enabled' => true]);
-
-        $user = $this->userWithOrganization();
-
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
-        {
-            /**
-             * @param  array<string, mixed>  $result
-             */
-            public function __construct(private array $result) {}
-
-            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
-            {
-                return $this->result;
-            }
-        });
-
-        $component = Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('repository_url', 'https://github.com/acme/demo.git')
-            ->set('repository_branch', 'main')
-            ->set('target_family', 'local_orbstack_docker')
-            ->call('launch')
-            ->assertHasNoErrors()
-            ->assertRedirect();
-
-        $site = Site::query()->latest('created_at')->firstOrFail();
-        $server = $site->server()->firstOrFail();
-
-        $component
-            ->assertRedirect(route('sites.show', [$server, $site], false));
-    }
-
-    public function test_local_docker_page_shows_cloud_target_choices_after_inspection(): void
+    public function test_containers_launcher_page_shows_path_picker_after_inspection(): void
     {
         $user = $this->userWithOrganization();
 
@@ -536,23 +317,14 @@ class ServerTest extends TestCase
             ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
             ->call('inspectRepository')
-            ->assertSee('Choose the container target')
-            ->assertSee('Remote Docker (DigitalOcean)')
-            ->assertSee('Remote Kubernetes (AWS)');
+            ->assertSee('Pick a path')
+            ->assertSee('Cloud Docker host')
+            ->assertSee('Cloud Kubernetes');
     }
 
-    public function test_local_docker_can_launch_digitalocean_docker_target_and_queue_finalizer(): void
+    public function test_containers_launcher_docker_path_writes_draft_and_redirects_to_wizard(): void
     {
-        Queue::fake();
-
         $user = $this->userWithOrganization();
-        $organization = $user->currentOrganization();
-        $credential = ProviderCredential::factory()->create([
-            'organization_id' => $organization->id,
-            'user_id' => $user->id,
-            'provider' => 'digitalocean',
-            'credentials' => ['api_token' => 'token'],
-        ]);
 
         app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
         {
@@ -567,21 +339,19 @@ class ServerTest extends TestCase
         Livewire::actingAs($user)
             ->test(LaunchesContainersCreate::class)
             ->set('repository_url', 'https://github.com/acme/demo.git')
-            ->set('target_family', 'digitalocean_docker')
-            ->set('provider_credential_id', (string) $credential->id)
-            ->set('cloud_region', 'nyc3')
-            ->set('cloud_size', 's-1vcpu-1gb')
-            ->call('launch')
-            ->assertHasNoErrors()
-            ->assertRedirect();
+            ->call('inspectRepository')
+            ->assertSet('has_inspection', true)
+            ->assertSet('path', 'docker')
+            ->call('goToDockerWizard')
+            ->assertRedirect(route('servers.create', ['host_target' => 'docker']));
 
-        $server = Server::query()->where('provider', 'digitalocean')->latest('created_at')->first();
-
-        $this->assertNotNull($server);
-        $this->assertSame(Server::HOST_KIND_DOCKER, data_get($server->meta, 'host_kind'));
-
-        Queue::assertPushed(ProvisionDigitalOceanDropletJob::class);
-        Queue::assertPushed(FinalizeContainerCloudLaunchJob::class);
+        $draft = \App\Models\ServerCreateDraft::query()
+            ->where('user_id', $user->id)
+            ->first();
+        $this->assertNotNull($draft);
+        $this->assertSame('https://github.com/acme/demo.git', $draft->payload['_container_launch']['repository_url']);
+        $this->assertSame('cloud_docker', $draft->payload['_container_launch']['target_family']);
+        $this->assertIsArray($draft->payload['_container_launch']['inspection'] ?? null);
     }
 
     public function test_finalize_container_cloud_launch_job_creates_site_after_server_is_ready(): void
