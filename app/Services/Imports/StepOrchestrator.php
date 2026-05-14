@@ -7,6 +7,8 @@ namespace App\Services\Imports;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
+use App\Models\User;
+use App\Services\Notifications\NotificationPublisher;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,7 +32,10 @@ class StepOrchestrator
 {
     public const MAX_ATTEMPTS = 5;
 
-    public function __construct(protected StepRegistry $registry) {}
+    public function __construct(
+        protected StepRegistry $registry,
+        protected ?NotificationPublisher $publisher = null,
+    ) {}
 
     public function executeStep(ImportMigrationStep $step): void
     {
@@ -109,6 +114,44 @@ class StepOrchestrator
         $step->finished_at = Carbon::now();
         $step->error_message = mb_substr($e->getMessage(), 0, 5000);
         $step->save();
+
+        $this->publishStepFailed($step);
+    }
+
+    /**
+     * Action-required notification — surfaced in-app + via email per Q17.
+     */
+    protected function publishStepFailed(ImportMigrationStep $step): void
+    {
+        if ($this->publisher === null) {
+            return;
+        }
+        $migration = ImportServerMigration::find($step->import_server_migration_id);
+        if ($migration === null) {
+            return;
+        }
+        $actor = User::find($migration->user_id);
+
+        try {
+            $this->publisher->publish(
+                eventKey: 'import.migration.step_failed',
+                subject: $migration,
+                title: 'Migration step failed: '.$step->step_key,
+                body: $step->error_message ?? 'Step failed without an error message.',
+                url: route('imports.ploi.migration.progress', $migration),
+                metadata: [
+                    'step_id' => $step->id,
+                    'step_key' => $step->step_key,
+                    'migration_id' => $migration->id,
+                ],
+                actor: $actor,
+            );
+        } catch (Throwable $e) {
+            Log::warning('failed to publish import.migration.step_failed', [
+                'step_id' => $step->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -161,17 +204,59 @@ class StepOrchestrator
             ->where('status', '!=', ImportMigrationStep::STATUS_SUCCEEDED)
             ->exists();
 
-        if (! $remainingStaging && $site->status === ImportSiteMigration::STATUS_PENDING) {
+        $becameReady = false;
+        if (! $remainingStaging && in_array($site->status, [
+            ImportSiteMigration::STATUS_PENDING,
+            ImportSiteMigration::STATUS_STAGING,
+        ], true)) {
             $site->status = ImportSiteMigration::STATUS_READY_FOR_CUTOVER;
             $site->staging_completed_at = Carbon::now();
             $site->save();
-        } elseif (! $remainingStaging && $site->status === ImportSiteMigration::STATUS_STAGING) {
-            $site->status = ImportSiteMigration::STATUS_READY_FOR_CUTOVER;
-            $site->staging_completed_at = Carbon::now();
-            $site->save();
+            $becameReady = true;
         } elseif ($site->status === ImportSiteMigration::STATUS_PENDING) {
             $site->status = ImportSiteMigration::STATUS_STAGING;
             $site->save();
+        }
+
+        if ($becameReady) {
+            $this->publishCutoverReady($site);
+        }
+    }
+
+    /**
+     * Fire the action-required "cutover ready" notification per Q17. Only sent
+     * once per site (status transition guard above ensures idempotency).
+     */
+    protected function publishCutoverReady(ImportSiteMigration $site): void
+    {
+        if ($this->publisher === null) {
+            return;
+        }
+        $migration = ImportServerMigration::find($site->import_server_migration_id);
+        if ($migration === null) {
+            return;
+        }
+        $actor = User::find($migration->user_id);
+
+        try {
+            $this->publisher->publish(
+                eventKey: 'import.migration.cutover_ready',
+                subject: $migration,
+                title: 'Cutover ready: '.$site->domain,
+                body: 'Staging complete. Begin cutover from the migration progress page when you are ready.',
+                url: route('imports.ploi.migration.progress', $migration),
+                metadata: [
+                    'site_migration_id' => $site->id,
+                    'domain' => $site->domain,
+                    'migration_id' => $migration->id,
+                ],
+                actor: $actor,
+            );
+        } catch (Throwable $e) {
+            Log::warning('failed to publish import.migration.cutover_ready', [
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

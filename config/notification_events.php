@@ -42,5 +42,14 @@ return [
                 'project.activity' => 'Project activity summaries',
             ],
         ],
+        'import' => [
+            'label' => 'Import & migration notifications',
+            'events' => [
+                'import.migration.cutover_ready' => 'Migration ready for cutover (action required)',
+                'import.migration.step_failed' => 'Migration step failed (action required)',
+                'import.migration.cutover_complete' => 'Migration cutover complete',
+                'import.migration.aborted' => 'Migration aborted',
+            ],
+        ],
     ],
 ];

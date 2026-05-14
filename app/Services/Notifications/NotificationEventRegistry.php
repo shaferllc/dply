@@ -24,9 +24,12 @@ class NotificationEventRegistry
                 'key' => $eventKey,
                 'label' => (string) $events[$eventKey],
                 'category' => (string) $categoryKey,
-                'severity' => str_contains($eventKey, 'monitor') || str_contains($eventKey, 'alerts') ? 'warning' : 'info',
+                'severity' => $this->severityFor($eventKey),
                 'supports_in_app' => true,
-                'supports_email' => false,
+                // Import migration events surface action-required moments;
+                // default them to email-on per the Q17 cadence (in-app +
+                // email at action-required moments only).
+                'supports_email' => str_starts_with($eventKey, 'import.migration.'),
                 'supports_webhook' => true,
             ];
         }
@@ -67,5 +70,23 @@ class NotificationEventRegistry
             'supports_email' => false,
             'supports_webhook' => true,
         ];
+    }
+
+    /**
+     * Severity bumps to 'warning' for monitoring / alerts / failed-step / cutover-ready
+     * / aborted events. Default 'info'.
+     */
+    protected function severityFor(string $eventKey): string
+    {
+        if (str_contains($eventKey, 'monitor')
+            || str_contains($eventKey, 'alerts')
+            || str_ends_with($eventKey, 'step_failed')
+            || str_ends_with($eventKey, 'cutover_ready')
+            || str_ends_with($eventKey, 'aborted')
+        ) {
+            return 'warning';
+        }
+
+        return 'info';
     }
 }

@@ -10,9 +10,12 @@ use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\Imports\StepHandler;
+use App\Services\Notifications\NotificationPublisher;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -31,6 +34,8 @@ class CutoverSmokeTestHandler implements StepHandler
     public const POLL_ATTEMPTS = 60;
 
     public const POLL_INTERVAL_SECONDS = 5;
+
+    public function __construct(protected ?NotificationPublisher $publisher = null) {}
 
     public static function key(): string
     {
@@ -118,7 +123,40 @@ class CutoverSmokeTestHandler implements StepHandler
         ];
         $step->save();
 
+        $this->publishCutoverComplete($migration, $child);
         $this->maybeMarkMigrationComplete($migration);
+    }
+
+    /**
+     * Surface "cutover complete: {domain}" in the inbox + email queue. Best-effort:
+     * a publisher failure must not roll the cutover back.
+     */
+    protected function publishCutoverComplete(ImportServerMigration $migration, ImportSiteMigration $child): void
+    {
+        if ($this->publisher === null) {
+            return;
+        }
+        $actor = User::find($migration->user_id);
+        try {
+            $this->publisher->publish(
+                eventKey: 'import.migration.cutover_complete',
+                subject: $migration,
+                title: 'Cutover complete: '.$child->domain,
+                body: 'Site is now live on dply. Take down the Ploi site when you are ready.',
+                url: route('imports.ploi.migration.progress', $migration),
+                metadata: [
+                    'site_migration_id' => $child->id,
+                    'domain' => $child->domain,
+                    'migration_id' => $migration->id,
+                ],
+                actor: $actor,
+            );
+        } catch (\Throwable $e) {
+            Log::warning('failed to publish import.migration.cutover_complete', [
+                'site_id' => $child->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function maybeMarkMigrationComplete(ImportServerMigration $migration): void
