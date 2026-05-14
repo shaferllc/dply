@@ -14,6 +14,65 @@
             </div>
         </header>
 
+        @if ($migrationSourcePloiServerId && ! empty($migrationSiteSelection))
+            @php
+                $ploiSites = \App\Models\PloiSite::query()
+                    ->where('ploi_server_id', $migrationSourcePloiServerId)
+                    ->orderBy('domain')
+                    ->get();
+                $totalCount = $ploiSites->count();
+                $checkedCount = collect($migrationSiteSelection)->filter(fn ($v) => $v === true)->count();
+            @endphp
+            <section class="rounded-2xl border border-amber-200 bg-amber-50/70 p-6">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">{{ __('Migrate from Ploi') }}</p>
+                        <h2 class="mt-1 text-xl font-semibold text-amber-950">{{ __('Sites to migrate from :label', ['label' => $migrationSourceLabel]) }}</h2>
+                    </div>
+                    <p class="text-sm text-amber-900">
+                        {{ trans_choice('{1} 1 site selected|[2,*] :count selected', $checkedCount, ['count' => $checkedCount]) }}
+                        · {{ trans_choice('{1} 1 site total|[2,*] :count sites total', $totalCount, ['count' => $totalCount]) }}
+                    </p>
+                </div>
+                <ul class="mt-4 divide-y divide-amber-200/70 rounded-xl bg-white/60 ring-1 ring-amber-200">
+                    @foreach ($ploiSites as $site)
+                        @php
+                            $eligible = $site->isMigrationEligible() && ! $site->removed_from_source;
+                            $pillLabel = match (true) {
+                                $site->removed_from_source => __('Removed on Ploi'),
+                                ! $site->isMigrationEligible() => __('Unsupported in v1'),
+                                default => __('Eligible'),
+                            };
+                            $pillClass = match (true) {
+                                $site->removed_from_source => 'bg-red-100 text-red-900 ring-red-200',
+                                ! $site->isMigrationEligible() => 'bg-amber-200 text-amber-950 ring-amber-300',
+                                default => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/30',
+                            };
+                        @endphp
+                        <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                            <label class="flex flex-1 min-w-0 items-start gap-3 {{ $eligible ? '' : 'opacity-60 cursor-not-allowed' }}">
+                                <input type="checkbox"
+                                    wire:model.live="migrationSiteSelection.{{ $site->id }}"
+                                    @disabled(! $eligible)
+                                    class="mt-1 rounded border-amber-300 text-amber-700 focus:ring-amber-500" />
+                                <span class="min-w-0">
+                                    <span class="block truncate font-mono text-sm text-amber-950">{{ $site->domain }}</span>
+                                    <span class="block text-xs text-amber-900">
+                                        {{ $site->site_type }}@if ($site->php_version) · PHP {{ $site->php_version }} @endif
+                                        @if ($site->repository_url) · <span class="font-mono">{{ $site->repository_url }}</span>@endif
+                                    </span>
+                                </span>
+                            </label>
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $pillClass }}">
+                                {{ $pillLabel }}
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+                <p class="mt-3 text-xs text-amber-900">{{ __('Unsupported sites stay on Ploi. You can migrate eligible sites one at a time from the inventory page later if you change your mind.') }}</p>
+            </section>
+        @endif
+
         @php
             $modeLabel = $form->mode === 'provider'
                 ? __('Provision with :provider', ['provider' => $form->type ?: __('a provider')])

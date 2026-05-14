@@ -36,6 +36,20 @@ class StepReview extends Component
 
     public ServerCreateForm $form;
 
+    /**
+     * Per-site selection state for the Q10 wizard checklist. Keyed by PloiSite ulid;
+     * value is bool (selected). Empty array means "no migration context" — only
+     * populated when the draft carries _ploi_migration_source_id.
+     *
+     * @var array<string, bool>
+     */
+    public array $migrationSiteSelection = [];
+
+    /** Toggled visible only when this Step 4 is a migration-target server-create. */
+    public ?string $migrationSourcePloiServerId = null;
+
+    public ?string $migrationSourceLabel = null;
+
     public function mount(): mixed
     {
         $this->authorize('create', Server::class);
@@ -45,8 +59,66 @@ class StepReview extends Component
         }
 
         $this->hydrateFormFromDraft($this->form, $this->currentDraft());
+        $this->hydrateMigrationSelection();
 
         return null;
+    }
+
+    /**
+     * Populate $migrationSiteSelection from the draft payload (or default to all
+     * eligible sites if not yet set). Each site shows as a row with a checkbox
+     * on the review screen; Confirm uses the resulting map.
+     */
+    protected function hydrateMigrationSelection(): void
+    {
+        $draft = $this->currentDraft();
+        $payload = is_array($draft?->payload ?? null) ? $draft->payload : [];
+        $migrationSourceId = $payload['_ploi_migration_source_id'] ?? null;
+        if (! is_string($migrationSourceId) || $migrationSourceId === '') {
+            return;
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+        $ploiServer = \App\Models\PloiServer::query()
+            ->with('sites')
+            ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
+            ->find($migrationSourceId);
+        if ($ploiServer === null) {
+            return;
+        }
+
+        $this->migrationSourcePloiServerId = $ploiServer->id;
+        $this->migrationSourceLabel = $ploiServer->name;
+
+        $explicit = $payload['_ploi_migration_site_selection'] ?? null;
+        foreach ($ploiServer->sites as $site) {
+            $key = $site->id;
+            if (is_array($explicit) && array_key_exists($key, $explicit)) {
+                $this->migrationSiteSelection[$key] = (bool) $explicit[$key];
+            } else {
+                // Default-all-checked per Q10, with ineligible sites pre-unchecked.
+                $this->migrationSiteSelection[$key] = $site->isMigrationEligible() && ! $site->removed_from_source;
+            }
+        }
+    }
+
+    public function updatedMigrationSiteSelection(): void
+    {
+        // Persist user toggles into the draft so they survive a refresh / step-back.
+        $draft = $this->currentDraft();
+        if ($draft === null) {
+            return;
+        }
+        $payload = is_array($draft->payload) ? $draft->payload : [];
+        $payload['_ploi_migration_site_selection'] = array_map(
+            fn ($v) => (bool) $v,
+            $this->migrationSiteSelection,
+        );
+        $draft->payload = $payload;
+        $draft->save();
     }
 
     public function previous(): mixed
@@ -113,6 +185,9 @@ class StepReview extends Component
         $migrationSourceId = is_array($draft?->payload ?? null)
             ? ($draft->payload['_ploi_migration_source_id'] ?? null)
             : null;
+        $explicitSelection = is_array($draft?->payload ?? null)
+            ? ($draft->payload['_ploi_migration_site_selection'] ?? null)
+            : null;
 
         try {
             $server = StoreServerFromCreateForm::run($user, $org, $this->form);
@@ -128,7 +203,7 @@ class StepReview extends Component
         // start automatically. They can retry from the inventory page.
         $migration = null;
         if (is_string($migrationSourceId) && $migrationSourceId !== '') {
-            $migration = $this->kickOffPloiMigration($migrationSourceId, $server, $user);
+            $migration = $this->kickOffPloiMigration($migrationSourceId, $server, $user, $explicitSelection);
         }
 
         $this->deleteCurrentDraft();
@@ -148,7 +223,11 @@ class StepReview extends Component
      * Defaults to all v1-eligible (laravel/php, not removed_from_source) sites on
      * the source server — site-selection UI lands in a follow-up phase.
      */
-    protected function kickOffPloiMigration(string $migrationSourceId, Server $server, $user): ?ImportServerMigration
+    /**
+     * @param  array<string, bool>|null  $explicitSelection  Site ulid → selected map
+     *         from the wizard. Null falls back to all-eligible-sites default.
+     */
+    protected function kickOffPloiMigration(string $migrationSourceId, Server $server, $user, ?array $explicitSelection = null): ?ImportServerMigration
     {
         try {
             $org = $user->currentOrganization();
@@ -175,12 +254,24 @@ class StepReview extends Component
                 return null;
             }
 
-            $selectedSiteIds = PloiSite::query()
+            $eligibleSiteIds = PloiSite::query()
                 ->where('ploi_server_id', $ploiServer->id)
                 ->where('removed_from_source', false)
                 ->whereIn('site_type', ['laravel', 'php'])
                 ->pluck('id')
                 ->all();
+
+            // Apply the wizard's explicit selection if present; intersect with
+            // the eligibility-filtered set so a user can't override an
+            // unsupported site into the plan.
+            if (is_array($explicitSelection)) {
+                $selectedSiteIds = array_values(array_filter(
+                    $eligibleSiteIds,
+                    fn (string $id): bool => ($explicitSelection[$id] ?? false) === true,
+                ));
+            } else {
+                $selectedSiteIds = $eligibleSiteIds;
+            }
 
             if ($selectedSiteIds === []) {
                 Log::info('Ploi migration kickoff: no eligible sites on source server', [
