@@ -1,6 +1,17 @@
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
     <x-server-create-stepper :current="1" :reached="1" :mode="$form->mode" :hostKind="$form->custom_host_kind" />
 
+    @if ($migrationSourcePloiServerId)
+        <section class="rounded-2xl border border-amber-200 bg-amber-50/70 p-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">{{ __('Migrate from Ploi') }}</p>
+            <h2 class="mt-2 text-2xl font-semibold text-amber-950">{{ __('Creating the dply server for :label', ['label' => $migrationSourceLabel]) }}</h2>
+            <p class="mt-3 max-w-3xl text-sm leading-6 text-amber-900">
+                {{ __('Walk through the wizard to provision the destination server. Once it is ready, your selected sites migrate automatically — code, env, databases, crons, and SSL.') }}
+            </p>
+            <a href="{{ route('imports.ploi.inventory') }}" wire:navigate class="mt-4 inline-flex items-center text-sm font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-700">{{ __('Cancel and return to inventory') }}</a>
+        </section>
+    @endif
+
     <form wire:submit.prevent="next" class="space-y-10">
         <header class="relative overflow-hidden rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-brand-cream via-white to-brand-sand/20 px-6 py-8 shadow-sm sm:px-10 sm:py-10">
             <div class="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-brand-sage/10 blur-3xl" aria-hidden="true"></div>
