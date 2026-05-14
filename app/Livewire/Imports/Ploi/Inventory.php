@@ -81,6 +81,7 @@ class Inventory extends Component
         $credentials = $this->credentials();
         $servers = $this->servers($credentials);
         $activeMigrations = $this->activeMigrationsForServers($servers);
+        $previousMigrations = $this->mostRecentTerminalMigrationsForServers($servers);
 
         return view('livewire.imports.ploi.inventory', [
             'credentials' => $credentials,
@@ -88,7 +89,39 @@ class Inventory extends Component
             'hasCredentials' => $credentials->isNotEmpty(),
             'activeMigrations' => $activeMigrations,
             'activeMigrationCount' => $activeMigrations->count(),
+            'previousMigrations' => $previousMigrations,
         ]);
+    }
+
+    /**
+     * Most-recent terminal migration per source_server_id, surfaced as a
+     * "View last migration" link on the inventory page so the user has
+     * a way back into history after a completed/aborted run.
+     *
+     * @param  \Illuminate\Support\Collection<int, PloiServer>  $servers
+     * @return \Illuminate\Support\Collection<int, ImportServerMigration>
+     */
+    protected function mostRecentTerminalMigrationsForServers($servers): \Illuminate\Support\Collection
+    {
+        if ($servers->isEmpty()) {
+            return collect();
+        }
+
+        $terminal = [
+            ImportServerMigration::STATUS_COMPLETED,
+            ImportServerMigration::STATUS_PARTIAL,
+            ImportServerMigration::STATUS_ABORTED,
+            ImportServerMigration::STATUS_EXPIRED,
+        ];
+
+        return ImportServerMigration::query()
+            ->where('source', 'ploi')
+            ->whereIn('source_server_id', $servers->pluck('source_id'))
+            ->whereIn('status', $terminal)
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('source_server_id')
+            ->map(fn ($group) => $group->first());
     }
 
     /**

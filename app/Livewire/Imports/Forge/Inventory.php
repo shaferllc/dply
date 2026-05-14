@@ -69,6 +69,7 @@ class Inventory extends Component
         $credentials = $this->credentials();
         $servers = $this->servers($credentials);
         $activeMigrations = $this->activeMigrationsForServers($servers);
+        $previousMigrations = $this->mostRecentTerminalMigrationsForServers($servers);
 
         return view('livewire.imports.forge.inventory', [
             'credentials' => $credentials,
@@ -76,7 +77,38 @@ class Inventory extends Component
             'hasCredentials' => $credentials->isNotEmpty(),
             'activeMigrations' => $activeMigrations,
             'activeMigrationCount' => $activeMigrations->count(),
+            'previousMigrations' => $previousMigrations,
         ]);
+    }
+
+    /**
+     * Mirror of the Ploi helper — most-recent terminal migration per
+     * source_server_id, surfaced as a "View last migration" link.
+     *
+     * @param  Collection<int, ForgeServer>  $servers
+     * @return Collection<int, ImportServerMigration>
+     */
+    protected function mostRecentTerminalMigrationsForServers(Collection $servers): Collection
+    {
+        if ($servers->isEmpty()) {
+            return collect();
+        }
+
+        $terminal = [
+            ImportServerMigration::STATUS_COMPLETED,
+            ImportServerMigration::STATUS_PARTIAL,
+            ImportServerMigration::STATUS_ABORTED,
+            ImportServerMigration::STATUS_EXPIRED,
+        ];
+
+        return ImportServerMigration::query()
+            ->where('source', 'forge')
+            ->whereIn('source_server_id', $servers->pluck('source_id'))
+            ->whereIn('status', $terminal)
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('source_server_id')
+            ->map(fn ($group) => $group->first());
     }
 
     /**

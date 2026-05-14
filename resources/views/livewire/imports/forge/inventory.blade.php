@@ -86,20 +86,44 @@
                                 · {{ trans_choice('{0} no sites|{1} 1 site|[2,*] :count sites', $server->sites->count(), ['count' => $server->sites->count()]) }}
                             </p>
                         </div>
-                        <div class="flex items-center gap-2">
-                            @php $active = $activeMigrations[$server->source_id] ?? null; @endphp
-                            @if ($active)
-                                <a href="{{ route('imports.ploi.migration.progress', $active) }}" wire:navigate>
-                                    <x-secondary-button type="button">
-                                        <x-heroicon-o-arrow-path class="mr-1.5 h-4 w-4" />
-                                        {{ __('View migration in progress') }}
-                                    </x-secondary-button>
-                                </a>
-                            @elseif (! $server->removed_from_source)
-                                <a href="{{ url('/servers/create?from_forge_server=' . $server->id) }}" wire:navigate>
-                                    <x-primary-button type="button">
-                                        {{ __('Migrate this server') }}
-                                    </x-primary-button>
+                        <div class="flex flex-col items-end gap-1.5">
+                            <div class="flex items-center gap-2">
+                                @php
+                                    $active = $activeMigrations[$server->source_id] ?? null;
+                                    $previous = $previousMigrations[$server->source_id] ?? null;
+                                @endphp
+                                @if ($active)
+                                    <a href="{{ route('imports.ploi.migration.progress', $active) }}" wire:navigate>
+                                        <x-secondary-button type="button">
+                                            <x-heroicon-o-arrow-path class="mr-1.5 h-4 w-4" />
+                                            {{ __('View migration in progress') }}
+                                        </x-secondary-button>
+                                    </a>
+                                @elseif (! $server->removed_from_source)
+                                    <a href="{{ url('/servers/create?from_forge_server=' . $server->id) }}" wire:navigate>
+                                        <x-primary-button type="button">
+                                            @if ($previous)
+                                                {{ __('Migrate again') }}
+                                            @else
+                                                {{ __('Migrate this server') }}
+                                            @endif
+                                        </x-primary-button>
+                                    </a>
+                                @endif
+                            </div>
+                            @if ($previous && ! $active)
+                                @php
+                                    $prevPill = match ($previous->status) {
+                                        'completed' => ['label' => __('Completed'), 'class' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/30'],
+                                        'partial' => ['label' => __('Partial'), 'class' => 'bg-amber-100 text-amber-900 ring-amber-200'],
+                                        'aborted' => ['label' => __('Aborted'), 'class' => 'bg-red-100 text-red-900 ring-red-200'],
+                                        'expired' => ['label' => __('Expired'), 'class' => 'bg-red-100 text-red-900 ring-red-200'],
+                                        default => ['label' => $previous->status, 'class' => 'bg-brand-sand/40 text-brand-mist ring-brand-ink/10'],
+                                    };
+                                @endphp
+                                <a href="{{ route('imports.ploi.migration.progress', $previous) }}" wire:navigate class="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand-moss hover:text-brand-ink">
+                                    <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ring-1 {{ $prevPill['class'] }}">{{ $prevPill['label'] }}</span>
+                                    <span>{{ __('Last migration · :ago', ['ago' => optional($previous->completed_at ?? $previous->created_at)->diffForHumans()]) }}</span>
                                 </a>
                             @endif
                         </div>
