@@ -49,6 +49,7 @@ return [
                 'import.migration.step_failed' => 'Migration step failed (action required)',
                 'import.migration.cutover_complete' => 'Migration cutover complete',
                 'import.migration.aborted' => 'Migration aborted',
+                'import.migration.paused_nudge' => 'Migration paused — auto-revoke in <96h (action required)',
             ],
         ],
     ],

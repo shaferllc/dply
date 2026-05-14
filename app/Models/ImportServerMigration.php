@@ -52,6 +52,7 @@ class ImportServerMigration extends Model
         'completed_at',
         'failure_summary',
         'manual_review_items',
+        'paused_nudge_sent_at',
     ];
 
     protected function casts(): array
@@ -63,6 +64,7 @@ class ImportServerMigration extends Model
             'ssh_key_revoked_at' => 'datetime',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'paused_nudge_sent_at' => 'datetime',
             'manual_review_items' => 'array',
         ];
     }

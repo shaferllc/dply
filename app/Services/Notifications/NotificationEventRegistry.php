@@ -83,6 +83,7 @@ class NotificationEventRegistry
             || str_ends_with($eventKey, 'step_failed')
             || str_ends_with($eventKey, 'cutover_ready')
             || str_ends_with($eventKey, 'aborted')
+            || str_ends_with($eventKey, 'paused_nudge')
         ) {
             return 'warning';
         }

@@ -8,7 +8,9 @@ use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
+use App\Models\User;
 use App\Services\Imports\Ploi\PloiImportDriver;
+use App\Services\Notifications\NotificationPublisher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -29,20 +31,28 @@ class ExpirePausedImportMigrationsCommand extends Command
 {
     protected $signature = 'dply:imports:expire-paused
                             {--hours=168 : Stale-pause threshold in hours (default 168 = 7 days)}
+                            {--nudge-hours=72 : Send the action-required nudge after this many paused hours}
                             {--dry-run : Report without revoking keys or mutating state}';
 
-    protected $description = 'Auto-revoke ephemeral SSH keys for migrations paused beyond the trust window (Q17).';
+    protected $description = 'Send 72h paused-migration nudges, then revoke ephemeral SSH keys at 168h (Q17 trust window).';
 
-    public function handle(): int
+    public function handle(NotificationPublisher $publisher): int
     {
         $hours = (int) $this->option('hours');
+        $nudgeHours = (int) $this->option('nudge-hours');
         if ($hours < 24) {
             $this->error('Threshold must be at least 24 hours to avoid expiring active migrations.');
 
             return self::FAILURE;
         }
+        if ($nudgeHours >= $hours) {
+            $this->error('Nudge threshold must be less than the expiry threshold.');
+
+            return self::FAILURE;
+        }
         $dryRun = (bool) $this->option('dry-run');
-        $threshold = Carbon::now()->subHours($hours);
+        $expiryThreshold = Carbon::now()->subHours($hours);
+        $nudgeThreshold = Carbon::now()->subHours($nudgeHours);
 
         $terminal = [
             ImportServerMigration::STATUS_COMPLETED,
@@ -58,23 +68,74 @@ class ExpirePausedImportMigrationsCommand extends Command
             ->get();
 
         $expired = 0;
+        $nudged = 0;
         foreach ($candidates as $migration) {
             $latestActivity = $this->latestStepActivity($migration);
-            if ($latestActivity !== null && $latestActivity->isAfter($threshold)) {
+
+            if ($latestActivity === null || $latestActivity->isBefore($expiryThreshold)) {
+                $this->expireOne($migration, $dryRun);
+                $expired++;
+
                 continue;
             }
-            $this->expireOne($migration, $dryRun);
-            $expired++;
+
+            if ($latestActivity->isBefore($nudgeThreshold)
+                && $migration->paused_nudge_sent_at === null
+            ) {
+                $this->nudgeOne($migration, $publisher, $dryRun, $hours);
+                $nudged++;
+            }
         }
 
         $this->info(sprintf(
-            '%s %d paused migrations exceeded the %dh threshold.',
-            $dryRun ? '[dry-run]' : 'Expired',
+            '%s %d migrations expired, %d nudged (thresholds: %dh/%dh).',
+            $dryRun ? '[dry-run]' : 'Run:',
             $expired,
+            $nudged,
+            $nudgeHours,
             $hours,
         ));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Emit the action-required 72h nudge notification, once per migration.
+     */
+    protected function nudgeOne(ImportServerMigration $migration, NotificationPublisher $publisher, bool $dryRun, int $expiryHours): void
+    {
+        $this->line(sprintf(
+            '%s nudging migration %s — paused past nudge threshold.',
+            $dryRun ? '[dry-run]' : 'Nudging',
+            $migration->id,
+        ));
+
+        if ($dryRun) {
+            return;
+        }
+
+        try {
+            $actor = User::find($migration->user_id);
+            $publisher->publish(
+                eventKey: 'import.migration.paused_nudge',
+                subject: $migration,
+                title: __('Migration paused — auto-revoke in <:remaining h', ['remaining' => $expiryHours]),
+                body: __('Resume the migration to keep the ephemeral SSH key alive, or abort to revoke immediately. After :hours h of inactivity dply will auto-revoke the key.', ['hours' => $expiryHours]),
+                url: route('imports.ploi.migration.progress', $migration),
+                metadata: [
+                    'migration_id' => $migration->id,
+                    'expiry_hours' => $expiryHours,
+                ],
+                actor: $actor,
+            );
+            $migration->paused_nudge_sent_at = Carbon::now();
+            $migration->save();
+        } catch (\Throwable $e) {
+            Log::warning('failed to publish import.migration.paused_nudge', [
+                'migration_id' => $migration->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function latestStepActivity(ImportServerMigration $migration): ?Carbon
