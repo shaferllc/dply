@@ -119,7 +119,18 @@ class Create extends Component
 
     public function updatedTargetFamily(string $value): void
     {
+        $this->provider_credential_id = '';
+        $this->cloud_region = '';
+        $this->cloud_size = '';
+        $this->syncCloudDefaults();
         $this->seedServerNameFromInspection();
+    }
+
+    public function updatedProviderCredentialId(string $value): void
+    {
+        $this->cloud_region = '';
+        $this->cloud_size = '';
+        $this->syncCloudDefaults();
     }
 
     public function updatedInspection(): void
@@ -186,7 +197,7 @@ class Create extends Component
             $this->target_family,
         );
 
-        return $this->redirect(route('servers.show', $server), navigate: true);
+        return $this->redirect(route('servers.overview', $server), navigate: true);
     }
 
     public function render(): View

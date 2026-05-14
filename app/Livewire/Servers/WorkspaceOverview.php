@@ -209,6 +209,42 @@ class WorkspaceOverview extends Component
             'events' => $events,
             'site' => $site,
             'site_route' => $site ? route('sites.show', ['server' => $this->server, 'site' => $site]) : null,
+            'steps' => $this->containerLaunchSteps($status),
+            'is_failed' => $status === 'failed',
         ];
+    }
+
+    /**
+     * Step list for the in-flight container launch, mirroring the status
+     * progression in FinalizeContainerCloudLaunchJob::updateLaunchState.
+     *
+     * @return list<array{key: string, label: string, state: string}>
+     */
+    private function containerLaunchSteps(string $status): array
+    {
+        $steps = [
+            ['key' => 'waiting_for_server', 'label' => __('Provisioning server')],
+            ['key' => 'creating_site', 'label' => __('Creating site record')],
+            ['key' => 'waiting_for_site_provisioning', 'label' => __('Provisioning site workspace')],
+            ['key' => 'ready', 'label' => __('Site ready for first deploy')],
+        ];
+
+        $order = ['waiting_for_server', 'creating_site', 'waiting_for_site_provisioning', 'ready'];
+        $currentIdx = array_search($status, $order, true);
+
+        return array_map(function (array $step, int $idx) use ($status, $currentIdx): array {
+            $state = 'pending';
+            if ($status === 'failed') {
+                $state = 'pending';
+            } elseif ($currentIdx === false) {
+                $state = 'pending';
+            } elseif ($idx < $currentIdx) {
+                $state = 'completed';
+            } elseif ($idx === $currentIdx) {
+                $state = 'active';
+            }
+
+            return ['key' => $step['key'], 'label' => $step['label'], 'state' => $state];
+        }, $steps, array_keys($steps));
     }
 }

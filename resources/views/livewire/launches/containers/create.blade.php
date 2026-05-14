@@ -131,7 +131,7 @@
                     $isCloudTarget = str_starts_with($target_family, 'digitalocean_') || str_starts_with($target_family, 'aws_');
                     $isLocalTarget = str_starts_with($target_family, 'local_');
                     $cloudLabel = str_starts_with($target_family, 'aws_') ? __('AWS') : __('DigitalOcean');
-                    $accountReady = $isLocalTarget || ($isCloudTarget && $provider_credential_id !== '');
+                    $accountReady = $isLocalTarget || ($isCloudTarget && $providerCredentials !== []);
                 @endphp
 
                 {{-- Card A: Container target tiles --}}
@@ -205,6 +205,7 @@
                                         <option value="{{ $credential['id'] }}">{{ $credential['name'] }}</option>
                                     @endforeach
                                 </select>
+                                <x-input-error :messages="$errors->get('provider_credential_id')" class="mt-2" />
                             </div>
                         @endif
                     </section>
@@ -225,21 +226,23 @@
                                 @if (($cloudCatalog['regions'] ?? []) !== [])
                                     <div>
                                         <x-input-label for="cloud_region" :value="__('Region')" />
-                                        <select id="cloud_region" wire:model="cloud_region" class="mt-2 block w-full rounded-xl border-slate-300 text-sm">
+                                        <select id="cloud_region" wire:model.live="cloud_region" class="mt-2 block w-full rounded-xl border-slate-300 text-sm">
                                             @foreach ($cloudCatalog['regions'] as $region)
                                                 <option value="{{ $region['value'] }}">{{ $region['label'] }}</option>
                                             @endforeach
                                         </select>
+                                        <x-input-error :messages="$errors->get('cloud_region')" class="mt-2" />
                                     </div>
                                 @endif
                                 @if (($cloudCatalog['sizes'] ?? []) !== [] && str_ends_with($target_family, '_docker'))
                                     <div>
                                         <x-input-label for="cloud_size" :value="__('Size')" />
-                                        <select id="cloud_size" wire:model="cloud_size" class="mt-2 block w-full rounded-xl border-slate-300 text-sm">
+                                        <select id="cloud_size" wire:model.live="cloud_size" class="mt-2 block w-full rounded-xl border-slate-300 text-sm">
                                             @foreach ($cloudCatalog['sizes'] as $size)
                                                 <option value="{{ $size['value'] }}">{{ $size['label'] }}</option>
                                             @endforeach
                                         </select>
+                                        <x-input-error :messages="$errors->get('cloud_size')" class="mt-2" />
                                     </div>
                                 @endif
                             </div>
