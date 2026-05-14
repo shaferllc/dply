@@ -1087,8 +1087,15 @@ class SiteTest extends TestCase
             ->assertSee('preview-app.dply.cc');
     }
 
-    public function test_site_settings_route_redirects_to_site_show_general_section(): void
+    public function test_site_settings_route_redirects_legacy_webhooks_section_to_notifications(): void
     {
+        // The legacy /servers/{server}/sites/{site}/settings/{section} URL now lives
+        // only as a redirect for renamed sections (webhooks → notifications;
+        // domains/aliases/redirects/preview/tenants → routing). A request without a
+        // section is handled by the wildcard SiteSettings route directly and does
+        // not 302 anywhere, so the older "bare URL → general" test no longer matches
+        // real behavior; this version exercises the actual rename path that still
+        // exists in routes/web.php.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -1102,9 +1109,17 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site], false));
+        $response = $this->actingAs($user)->get(route('sites.settings', [
+            'server' => $server,
+            'site' => $site,
+            'section' => 'webhooks',
+        ], false));
 
-        $response->assertRedirect(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
+        $response->assertRedirect(route('sites.show', [
+            'server' => $server,
+            'site' => $site,
+            'section' => 'notifications',
+        ], false));
     }
 
     public function test_site_show_defaults_to_general_site_workspace(): void

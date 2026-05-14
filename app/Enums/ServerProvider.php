@@ -28,6 +28,7 @@ enum ServerProvider: string
     case Gandi = 'gandi';
     case Namecheap = 'namecheap';
     case VercelDns = 'vercel_dns';
+    case Ploi = 'ploi';
 
     /**
      * Human-readable label for UI.
@@ -59,6 +60,7 @@ enum ServerProvider: string
             self::Gandi => 'Gandi',
             self::Namecheap => 'Namecheap',
             self::VercelDns => 'Vercel DNS',
+            self::Ploi => 'Ploi',
         };
     }
 
@@ -91,6 +93,20 @@ enum ServerProvider: string
     }
 
     /**
+     * Whether this provider is a source for inventory imports (existing fleets that
+     * dply can read sites/servers from and migrate). Distinct from compute/DNS —
+     * import providers don't host anything; dply only talks to their APIs to read
+     * the user's existing state and orchestrate a one-way move to dply-managed servers.
+     */
+    public function supportsImport(): bool
+    {
+        return match ($this) {
+            self::Ploi => true,
+            default => false,
+        };
+    }
+
+    /**
      * Capability tags for badge rendering on credential rows.
      *
      * @return list<string>
@@ -103,6 +119,9 @@ enum ServerProvider: string
         }
         if ($this->supportsDns()) {
             $caps[] = 'dns';
+        }
+        if ($this->supportsImport()) {
+            $caps[] = 'import';
         }
 
         return $caps;
@@ -132,6 +151,19 @@ enum ServerProvider: string
         return array_values(array_map(
             fn (self $p) => $p->value,
             array_filter(self::cases(), fn (self $p) => $p->supportsCompute())
+        ));
+    }
+
+    /**
+     * Provider keys that can be used as inventory-import sources.
+     *
+     * @return list<string>
+     */
+    public static function importProviderKeys(): array
+    {
+        return array_values(array_map(
+            fn (self $p) => $p->value,
+            array_filter(self::cases(), fn (self $p) => $p->supportsImport())
         ));
     }
 

@@ -208,6 +208,12 @@
         <div class="min-w-0 lg:col-span-9">
             <x-breadcrumb-trail :items="$settingsBreadcrumbs" />
 
+            {{-- Page-level workspace eyebrow. Pairs the runtime family (Edge / Cloud /
+                 Container / etc.) with the resource noun and lives ABOVE the per-section
+                 page header so operators reading top-to-bottom see "Site workspace · General"
+                 rather than landing on a bare "General" with no orientation. --}}
+            <p class="mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
+
             @if ($headerRoleLabel !== null)
                 {{-- Role badge sits above the page-header title so a viewer/deployer
                      sees the access level before they look for save actions that
