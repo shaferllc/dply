@@ -33,6 +33,8 @@ return [
         'azure' => env('DPLY_SERVER_PROVIDER_AZURE', false), // https://azure.microsoft.com/en-us/products/virtual-machines/
         'oracle' => env('DPLY_SERVER_PROVIDER_ORACLE', false), // https://www.oracle.com/cloud/compute/
         'custom' => env('DPLY_SERVER_PROVIDER_CUSTOM', true), // Custom/manual server entry
+        /** Inventory-import source (not a compute target). dply reads existing fleets from Ploi to migrate them. */
+        'ploi' => env('DPLY_SERVER_PROVIDER_PLOI', true), // https://ploi.io/
 
     ],
 ];

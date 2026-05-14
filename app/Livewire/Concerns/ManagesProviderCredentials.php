@@ -9,6 +9,7 @@ use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
 use App\Services\HetznerService;
+use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\LinodeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
@@ -129,6 +130,10 @@ trait ManagesProviderCredentials
 
     public string $aws_app_runner_region = 'us-east-1';
 
+    public string $ploi_name = '';
+
+    public string $ploi_api_token = '';
+
     public function storeDigitalOcean(): void
     {
         if (! $this->ensureProviderEnabled('digitalocean')) {
@@ -168,6 +173,20 @@ trait ManagesProviderCredentials
         ], [], ['hetzner_api_token' => 'API token']);
         if ($this->storeProviderCredential('hetzner', $this->hetzner_name, $this->hetzner_api_token, 'hetzner_api_token')) {
             $this->reset('hetzner_name', 'hetzner_api_token');
+        }
+    }
+
+    public function storePloi(): void
+    {
+        if (! $this->ensureProviderEnabled('ploi')) {
+            return;
+        }
+        $this->validate([
+            'ploi_name' => 'nullable|string|max:255',
+            'ploi_api_token' => 'required|string',
+        ], [], ['ploi_api_token' => 'API token']);
+        if ($this->storeProviderCredential('ploi', $this->ploi_name, $this->ploi_api_token, 'ploi_api_token')) {
+            $this->reset('ploi_name', 'ploi_api_token');
         }
     }
 
@@ -656,7 +675,7 @@ trait ManagesProviderCredentials
         $defaultNames = [
             'digitalocean' => 'DigitalOcean', 'cloudflare' => 'Cloudflare', 'hetzner' => 'Hetzner', 'linode' => 'Linode', 'vultr' => 'Vultr',
             'akamai' => 'Akamai', 'ovh' => 'OVH', 'rackspace' => 'Rackspace', 'render' => 'Render', 'railway' => 'Railway',
-            'gcp' => 'GCP', 'azure' => 'Azure', 'oracle' => 'Oracle Cloud',
+            'gcp' => 'GCP', 'azure' => 'Azure', 'oracle' => 'Oracle Cloud', 'ploi' => 'Ploi',
         ];
         $credential = auth()->user()->providerCredentials()->create([
             'organization_id' => $org->id,
@@ -680,6 +699,8 @@ trait ManagesProviderCredentials
                 $vultr->validateToken();
             } elseif ($provider === 'cloudflare') {
                 (new CloudflareDnsService($credential))->verifyToken();
+            } elseif ($provider === 'ploi') {
+                PloiImportDriver::for($credential)->validateConnection();
             } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'digitalocean_app_platform'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
@@ -711,7 +732,7 @@ trait ManagesProviderCredentials
     {
         return in_array($provider, [
             'digitalocean', 'cloudflare', 'hetzner', 'linode', 'akamai', 'vultr',
-            'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws',
+            'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws', 'ploi',
         ], true);
     }
 
@@ -741,6 +762,7 @@ trait ManagesProviderCredentials
                 'scaleway' => (new ScalewayService($credential))->validateToken(),
                 'fly_io' => (new FlyIoService($credential))->validateToken($credential->credentials['org_slug'] ?? 'personal'),
                 'aws' => (new AwsEc2Service($credential))->validateCredentials(),
+                'ploi' => PloiImportDriver::for($credential)->validateConnection(),
                 default => throw new \RuntimeException(__('Unknown provider.')),
             };
 
