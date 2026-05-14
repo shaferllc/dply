@@ -140,6 +140,18 @@ class AppServiceProvider extends ServiceProvider
         // hits the same instance.
         $this->app->scoped(\App\Services\Servers\WebserverSwitchPreflight::class);
 
+        // Migration step handler registry — bind handler classes to their step keys.
+        // Bind eagerly so the orchestrator always has a fully populated registry; the
+        // resolved handler instances are still container-managed (per-resolve).
+        $this->app->singleton(\App\Services\Imports\StepRegistry::class, function (): \App\Services\Imports\StepRegistry {
+            $registry = new \App\Services\Imports\StepRegistry();
+            foreach (\App\Services\Imports\Handlers\HandlerManifest::all() as $handlerClass) {
+                $registry->register($handlerClass::key(), $handlerClass);
+            }
+
+            return $registry;
+        });
+
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
         $this->app->singleton(ServerlessProvisionerFactory::class);
