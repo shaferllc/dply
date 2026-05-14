@@ -79,23 +79,12 @@ class OlsLiveStateRefreshTest extends TestCase
         $this->assertSame('demo-site', $cached['units']['vhosts'][0]['name']);
     }
 
-    public function test_refresh_no_op_for_engine_without_probe(): void
-    {
-        $user = $this->makeUser();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()->id,
-            'meta' => ['webserver' => 'nginx'],
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceWebserver::class, ['server' => $server])
-            ->set('workspace_tab', 'nginx')
-            ->call('refreshEngineLiveState');
-
-        $server->refresh();
-        $this->assertNull(data_get($server->meta, 'webserver_live_state.nginx'));
-    }
+    // test_refresh_no_op_for_engine_without_probe removed: every webserver engine the
+    // workspace_tab accepts now has a registered LiveStateProbe (openlitespeed, caddy,
+    // nginx, apache, traefik, haproxy). The "no probe" code path is unreachable through
+    // the Livewire UI, so the test has no live behavior to assert. resolveLiveStateProbe()
+    // still returns null for unmapped strings — that's covered structurally by the match
+    // exhaustiveness, not by a feature test.
 
     public function test_engine_live_state_round_trips_through_meta(): void
     {

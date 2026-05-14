@@ -18,6 +18,10 @@ class SiteShowRuntimeSummaryTest extends TestCase
     public function test_install_summary_shows_runtime_and_internal_port_for_node_site(): void
     {
         [$user, $server] = $this->makeUserServer();
+        // Install summary (which surfaces Runtime / Internal port / Build + Start commands
+        // in the right-side aside during provisioning) is gated by !$site->isReadyForWorkspace().
+        // NGINX_ACTIVE flips the view to the post-install workspace pane, which doesn't carry
+        // the Runtime row — so the test uses STATUS_PENDING to land on the install view.
         $site = Site::factory()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
@@ -27,7 +31,7 @@ class SiteShowRuntimeSummaryTest extends TestCase
             'internal_port' => 30007,
             'build_command' => 'npm run build',
             'start_command' => 'npm start',
-            'status' => Site::STATUS_NGINX_ACTIVE,
+            'status' => Site::STATUS_PENDING,
         ]);
 
         $response = $this->actingAs($user)->get(route('sites.show', [

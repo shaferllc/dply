@@ -39,9 +39,13 @@ class SiteSettingsProcessesPanelTest extends TestCase
             'command' => 'npm run worker',
         ]);
 
+        // The processes panel lives on the runtime section now (it's logically a
+        // runtime-of-this-site concern, not a general-overview one). Test the section
+        // where the panel actually renders.
         $response = $this->actingAs($user)->get(route('sites.show', [
             'server' => $server,
             'site' => $site,
+            'section' => 'runtime',
         ]));
 
         $response->assertOk()
@@ -63,9 +67,13 @@ class SiteSettingsProcessesPanelTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
+        // The processes panel lives on the runtime section now (it's logically a
+        // runtime-of-this-site concern, not a general-overview one). Test the section
+        // where the panel actually renders.
         $response = $this->actingAs($user)->get(route('sites.show', [
             'server' => $server,
             'site' => $site,
+            'section' => 'runtime',
         ]));
 
         // Static sites have no SiteProcess rows (Site::created hook
@@ -95,9 +103,13 @@ class SiteSettingsProcessesPanelTest extends TestCase
             'is_active' => false,
         ]);
 
+        // The processes panel lives on the runtime section now (it's logically a
+        // runtime-of-this-site concern, not a general-overview one). Test the section
+        // where the panel actually renders.
         $response = $this->actingAs($user)->get(route('sites.show', [
             'server' => $server,
             'site' => $site,
+            'section' => 'runtime',
         ]));
 
         $response->assertOk()

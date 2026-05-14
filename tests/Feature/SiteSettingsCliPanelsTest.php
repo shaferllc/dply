@@ -41,7 +41,13 @@ class SiteSettingsCliPanelsTest extends TestCase
         session(['current_organization_id' => $organization->id]);
         $this->actingAs($user);
 
+        // External-route sidebar items (cron / schedule / daemons / queue-workers / backups /
+        // commits / monitor / webserver-config) navigate away from the settings page rather
+        // than rendering a section inside it, so SiteSettings has no panel for them. The CLI
+        // snippet requirement is for *internal* sections only — items whose sidebar entry
+        // lacks an explicit `route` field.
         $sections = collect(SiteSettingsSidebar::items($site->fresh(), $server))
+            ->reject(fn (array $item): bool => isset($item['route']))
             ->pluck('id')
             ->reject(fn (string $id): bool => in_array($id, ['webserver-config', 'monitor', 'commits'], true))
             ->values()

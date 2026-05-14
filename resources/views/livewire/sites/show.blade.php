@@ -489,6 +489,18 @@
                                         <dd class="mt-0.5 font-mono text-brand-ink">{{ $site->internal_port }}</dd>
                                     </div>
                                 @endif
+                                @if (filled($site->build_command))
+                                    <div class="sm:col-span-2">
+                                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Build command') }}</dt>
+                                        <dd class="mt-0.5 break-all font-mono text-xs text-brand-ink">{{ $site->build_command }}</dd>
+                                    </div>
+                                @endif
+                                @if (filled($site->start_command))
+                                    <div class="sm:col-span-2">
+                                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Start command') }}</dt>
+                                        <dd class="mt-0.5 break-all font-mono text-xs text-brand-ink">{{ $site->start_command }}</dd>
+                                    </div>
+                                @endif
                                 <div class="sm:col-span-2">
                                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Primary domain') }}</dt>
                                     <dd class="mt-0.5 break-all font-mono text-xs font-medium text-brand-ink">{{ optional($site->primaryDomain())->hostname ?? '—' }}</dd>

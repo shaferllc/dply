@@ -167,3 +167,12 @@
         </div>
     </form>
 </section>
+
+{{-- CLI snippet — every settings section ships one so operators always know the
+     equivalent dply CLI command. This section's edits are name/slug only, both
+     of which today flow through the rename cascade modal rather than a direct
+     CLI verb, so the stub variant explains the gap until that lands. --}}
+<x-cli-snippet :commands="[
+    ['label' => __('Show site'), 'command' => 'dply sites:show '.$site->slug],
+    ['label' => __('Rename site'), 'command' => 'dply sites:rename '.$site->slug.' <new-slug>'],
+]" />

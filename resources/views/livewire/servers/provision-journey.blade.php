@@ -1033,7 +1033,9 @@
                 @endif
 
                 @if (app()->environment('local') && ! empty($localDevShellHints))
-                    @php($hints = $localDevShellHints)
+                    @php
+                        $hints = $localDevShellHints;
+                    @endphp
                     <section
                         class="{{ $card }} p-6"
                         x-data="{ copied: null }"

@@ -42,6 +42,11 @@ class WorkspaceActivityTest extends TestCase
     /**
      * Direct insert so we can pin created_at — the helper would stamp it
      * to "now" and we want to verify date-range behavior at boundaries.
+     *
+     * `created_at` isn't in AuditLog's $fillable so Eloquent's mass-assign would
+     * silently drop the explicit value and stamp `now()` via the model's saving
+     * event. Use withoutTimestamps + an explicit assign so the row lands with
+     * the timestamp the test demands.
      */
     private function writeAudit(
         Organization $org,
@@ -54,18 +59,23 @@ class WorkspaceActivityTest extends TestCase
     ): AuditLog {
         $createdAt ??= now();
 
-        return AuditLog::create([
-            'organization_id' => $org->id,
-            'user_id' => $user?->id,
-            'action' => $action,
-            'subject_type' => $subjectType,
-            'subject_id' => $subjectId,
-            'old_values' => null,
-            'new_values' => $newValues,
-            'ip_address' => '127.0.0.1',
-            'created_at' => $createdAt,
-            'updated_at' => $createdAt,
-        ]);
+        return AuditLog::withoutTimestamps(function () use ($org, $user, $action, $subjectType, $subjectId, $newValues, $createdAt): AuditLog {
+            $row = new AuditLog([
+                'organization_id' => $org->id,
+                'user_id' => $user?->id,
+                'action' => $action,
+                'subject_type' => $subjectType,
+                'subject_id' => $subjectId,
+                'old_values' => null,
+                'new_values' => $newValues,
+                'ip_address' => '127.0.0.1',
+            ]);
+            $row->created_at = $createdAt;
+            $row->updated_at = $createdAt;
+            $row->save();
+
+            return $row;
+        });
     }
 
     public function test_route_renders_for_owning_org(): void

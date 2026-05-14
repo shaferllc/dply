@@ -269,11 +269,17 @@ class WebserverSwitchTest extends TestCase
     {
         $user = $this->makeUser();
         $server = $this->makeServer($user);
-        Site::factory()->create([
+
+        // Stand up a running Varnish row — Varnish owns :8080 and the switch flow
+        // stages on :8080 too, so {@see WebserverSwitchPreflight::detectBlocker}
+        // hard-rejects any target while it's running. Operator must uninstall
+        // Varnish before switching the webserver.
+        \App\Models\ServerCacheService::query()->create([
             'server_id' => $server->id,
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()->id,
-            'runtime' => 'php',
+            'engine' => 'varnish',
+            'name' => 'default',
+            'status' => \App\Models\ServerCacheService::STATUS_RUNNING,
+            'port' => 80,
         ]);
 
         // Modal opens, but the plan has a blocker. The button in the modal
@@ -282,7 +288,7 @@ class WebserverSwitchTest extends TestCase
         Queue::fake();
         Livewire::actingAs($user)
             ->test(WorkspaceWebserver::class, ['server' => $server])
-            ->call('openSwitchWebserver', 'openlitespeed')
+            ->call('openSwitchWebserver', 'caddy')
             ->call('confirmSwitchWebserver');
 
         Queue::assertNotPushed(SwitchServerWebserverJob::class);
@@ -442,7 +448,10 @@ class WebserverSwitchTest extends TestCase
         // exercising here; the actual SSH stages have their own tests once the
         // executor service lands.
         $job = new class(serverId: $server->id, target: 'caddy', tlsToCaddy: false, userId: $user->id) extends SwitchServerWebserverJob {
-            protected function executeStageInstall(\App\Models\Server $server): void {}
+            // Production `executeStageInstall` takes an additional ConsoleEmitter for streaming
+            // apt output into the banner; the no-op test override matches that signature so the
+            // anonymous-class declaration stays binary-compatible with the parent.
+            protected function executeStageInstall(\App\Models\Server $server, \App\Services\ConsoleActions\ConsoleEmitter $emitter): void {}
             protected function executeStageProvision(\App\Models\Server $server, array $preflight): void {}
             protected function executeStageValidate(\App\Models\Server $server): void {}
             protected function executeStageCutover(\App\Models\Server $server, string $from): void {}

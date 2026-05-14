@@ -165,7 +165,11 @@
     @endif
 </section>
 
-{{-- 3. Site processes --}}
+{{-- 3. Site processes — hidden for static sites, which have no SiteProcess rows
+     (Site::created skips the auto-web-row for SiteType::Static). Showing the panel
+     for static sites would expose a worker/scheduler form that has no meaningful
+     systemd unit to back it. --}}
+@if ($site->type !== \App\Enums\SiteType::Static)
 <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
         <div>
@@ -252,6 +256,7 @@
         </div>
     </div>
 </section>
+@endif
 
 {{-- 4. Container lifecycle (Docker only) --}}
 @if ($site->usesDockerRuntime())

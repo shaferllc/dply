@@ -368,28 +368,36 @@
 
                             <div class="p-6 sm:p-8">
                                 <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Last deploy') }}</dt>
-                                        <dd class="mt-2 text-sm font-medium text-brand-ink">
-                                            @if ($this->latestDeployment !== null)
-                                                <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $this->latestDeployment]) }}" wire:navigate class="inline-flex items-center gap-1 hover:underline">
-                                                    @if ($this->latestDeployment->status === 'success')
-                                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                                    @elseif ($this->latestDeployment->status === 'failed')
-                                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-rose-600"></span>
-                                                    @else
-                                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-mist"></span>
-                                                    @endif
-                                                    <span class="capitalize">{{ $this->latestDeployment->status }}</span>
-                                                    @if ($this->latestDeployment->started_at)
-                                                        <span class="font-normal text-brand-mist">· {{ $this->latestDeployment->started_at->diffForHumans(null, true) }}</span>
-                                                    @endif
+                                    @if ($this->latestDeployment !== null)
+                                        @php
+                                            // Tone-coded badge: failed deploys rose, running sky, success emerald.
+                                            // Tests assert the bg-rose-100 class for failed deploys so the badge
+                                            // colour is part of the contract, not just a decorative cue.
+                                            $latestStatus = (string) $this->latestDeployment->status;
+                                            $latestTone = match ($latestStatus) {
+                                                'failed' => 'bg-rose-100 text-rose-800',
+                                                'running' => 'bg-sky-100 text-sky-800',
+                                                'success' => 'bg-emerald-100 text-emerald-800',
+                                                default => 'bg-brand-sand/60 text-brand-ink',
+                                            };
+                                        @endphp
+                                        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Last deploy') }}</dt>
+                                            <dd class="mt-2 text-sm font-medium text-brand-ink">
+                                                <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $this->latestDeployment]) }}"
+                                                    wire:navigate
+                                                    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize {{ $latestTone }} hover:opacity-90">
+                                                    {{ $latestStatus }}
                                                 </a>
-                                            @else
-                                                <span class="text-brand-mist">{{ __('Not deployed yet') }}</span>
-                                            @endif
-                                        </dd>
-                                    </div>
+                                                @if ($this->latestDeployment->started_at)
+                                                    <span class="ml-1 text-xs font-normal text-brand-mist">· {{ $this->latestDeployment->started_at->diffForHumans(null, true) }}</span>
+                                                @endif
+                                            </dd>
+                                            <dd class="mt-1 text-xs">
+                                                <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-medium text-brand-sage hover:underline">{{ __('All deploys') }}</a>
+                                            </dd>
+                                        </div>
+                                    @endif
                                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
                                         <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Runtime') }}</dt>
                                         <dd class="mt-2 text-sm font-medium text-brand-ink">
@@ -515,6 +523,22 @@
                             ['label' => __('Export deploy manifest'), 'command' => 'dply:site:export-manifest '.$site->slug.' --to=manifest.json'],
                             ['label' => __('List all sites'), 'command' => 'dply:site:list'],
                         ]" />
+
+                        @php
+                            // Recent deployments with structured phase_results (set by the deploy
+                            // runner). Predates-the-runner rows are excluded so the panel only
+                            // surfaces drill-into-able deploys. Capped at 10 — Deploys page has
+                            // pagination for older history.
+                            $deployments = $site->deployments
+                                ->filter(fn (\App\Models\SiteDeployment $d): bool => is_array($d->phase_results) && $d->phase_results !== [])
+                                ->take(10)
+                                ->values();
+                        @endphp
+                        @if ($deployments->isNotEmpty())
+                            <div class="mt-6">
+                                @include('livewire.sites.partials.recent-deployments')
+                            </div>
+                        @endif
                     @elseif ($section === 'settings')
                         @include('livewire.sites.settings.partials.settings-tab')
                     @elseif ($section === 'routing')
