@@ -238,4 +238,40 @@ final class FakeImportDriver implements ImportDriver
     }
 
     public function revokeSshKey(int $sourceServerId, int $sourceKeyId): void {}
+
+    public function fetchEnv(int $sourceServerId, int $sourceSiteId): string
+    {
+        return '';
+    }
+
+    public function listSiteCrons(int $sourceServerId, int $sourceSiteId): array
+    {
+        return [];
+    }
+
+    public function listDaemons(int $sourceServerId, int $sourceSiteId): array
+    {
+        return [];
+    }
+
+    public function listSiteDatabases(int $sourceServerId, int $sourceSiteId): array
+    {
+        return [];
+    }
+
+    public function fetchSiteCertificate(int $sourceServerId, int $sourceSiteId): ?array
+    {
+        return null;
+    }
+
+    public function enableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void {}
+
+    public function disableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void {}
+
+    public function listSiteWebhooks(int $sourceServerId, int $sourceSiteId): array
+    {
+        return [];
+    }
+
+    public function deleteSiteWebhook(int $sourceServerId, int $sourceSiteId, int $webhookId): void {}
 }

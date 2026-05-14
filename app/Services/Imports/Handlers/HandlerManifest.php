@@ -19,13 +19,14 @@ final class HandlerManifest
     public static function all(): array
     {
         return [
-            // Phase 3a — fully implemented.
+            // Server-level handlers.
             PushSshKeyHandler::class,
             RevokeSshKeyHandler::class,
             EligibilityScanHandler::class,
-            FreezeSnapshotHandler::class,
 
-            // Phase 3b stubs — fail loudly until SSH-side implementations land.
+            // Per-site staging handlers.
+            FreezeSnapshotHandler::class,
+            CreateTargetSiteHandler::class,
             CloneRepoHandler::class,
             CopyEnvHandler::class,
             DumpDatabaseHandler::class,
@@ -34,6 +35,8 @@ final class HandlerManifest
             RecreateDaemonsHandler::class,
             RecreateSchedulerHandler::class,
             SetupSslHandler::class,
+
+            // Per-site cutover handlers.
             CutoverMaintenanceOnHandler::class,
             CutoverDbDeltaHandler::class,
             CutoverDnsSwapHandler::class,

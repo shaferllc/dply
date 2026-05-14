@@ -94,6 +94,42 @@ interface ImportDriver
     public function pushSshKey(int $sourceServerId, string $label, string $publicKey): int;
 
     public function revokeSshKey(int $sourceServerId, int $sourceKeyId): void;
+
+    /**
+     * Raw .env content for the site (KEY=value lines).
+     */
+    public function fetchEnv(int $sourceServerId, int $sourceSiteId): string;
+
+    /**
+     * @return list<array{id: int, schedule: string, command: string, user: ?string, raw: array<string, mixed>}>
+     */
+    public function listSiteCrons(int $sourceServerId, int $sourceSiteId): array;
+
+    /**
+     * @return list<array{id: int, name: ?string, command: string, directory: ?string, user: ?string, processes: int, raw: array<string, mixed>}>
+     */
+    public function listDaemons(int $sourceServerId, int $sourceSiteId): array;
+
+    /**
+     * @return list<array{id: int, name: string, username: ?string, raw: array<string, mixed>}>
+     */
+    public function listSiteDatabases(int $sourceServerId, int $sourceSiteId): array;
+
+    /**
+     * @return ?array{id: int, issuer: ?string, domain: ?string, valid_until: ?string, status: ?string, raw: array<string, mixed>}
+     */
+    public function fetchSiteCertificate(int $sourceServerId, int $sourceSiteId): ?array;
+
+    public function enableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void;
+
+    public function disableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void;
+
+    /**
+     * @return list<array{id: int, url: string, raw: array<string, mixed>}>
+     */
+    public function listSiteWebhooks(int $sourceServerId, int $sourceSiteId): array;
+
+    public function deleteSiteWebhook(int $sourceServerId, int $sourceSiteId, int $webhookId): void;
 }
 
 /**

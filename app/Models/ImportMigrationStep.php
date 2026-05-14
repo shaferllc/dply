@@ -32,6 +32,8 @@ class ImportMigrationStep extends Model
     // Per-site step keys (declared upfront for the UI).
     public const KEY_FREEZE_SNAPSHOT = 'freeze_snapshot';
 
+    public const KEY_CREATE_TARGET_SITE = 'create_target_site';
+
     public const KEY_CLONE_REPO = 'clone_repo';
 
     public const KEY_COPY_ENV = 'copy_env';

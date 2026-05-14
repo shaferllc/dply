@@ -102,6 +102,152 @@ class PloiImportDriver implements ImportDriver
         $this->client->assertSuccess($response, "revoke ssh key {$sourceKeyId} on server {$sourceServerId}");
     }
 
+    public function fetchEnv(int $sourceServerId, int $sourceSiteId): string
+    {
+        // Ploi exposes the raw .env content at /servers/{server}/sites/{site}/env
+        // returning {data: {content: "KEY=value\n..."}}
+        $response = $this->client->get("/servers/{$sourceServerId}/sites/{$sourceSiteId}/env");
+        $this->client->assertSuccess($response, "fetch env for site {$sourceServerId}/{$sourceSiteId}");
+        $payload = $response->json();
+        if (! is_array($payload)) {
+            return '';
+        }
+        $envelope = $payload['data'] ?? $payload;
+        if (is_array($envelope) && isset($envelope['content']) && is_string($envelope['content'])) {
+            return $envelope['content'];
+        }
+
+        return '';
+    }
+
+    public function listSiteCrons(int $sourceServerId, int $sourceSiteId): array
+    {
+        $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/crons");
+
+        return array_values(array_map(
+            fn (array $r): array => [
+                'id' => (int) ($r['id'] ?? 0),
+                'schedule' => (string) ($r['frequency'] ?? $r['schedule'] ?? ''),
+                'command' => (string) ($r['command'] ?? ''),
+                'user' => $this->nullableString($r['user'] ?? null),
+                'raw' => $r,
+            ],
+            $rows,
+        ));
+    }
+
+    public function listDaemons(int $sourceServerId, int $sourceSiteId): array
+    {
+        // Ploi exposes daemons at server level with a site filter, or at site level
+        // depending on API version. Try site-scoped first; the index normalises to a list.
+        $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/daemons");
+
+        return array_values(array_map(
+            fn (array $r): array => [
+                'id' => (int) ($r['id'] ?? 0),
+                'name' => $this->nullableString($r['name'] ?? null),
+                'command' => (string) ($r['command'] ?? ''),
+                'directory' => $this->nullableString($r['directory'] ?? null),
+                'user' => $this->nullableString($r['user'] ?? null),
+                'processes' => (int) ($r['processes'] ?? 1),
+                'raw' => $r,
+            ],
+            $rows,
+        ));
+    }
+
+    public function listSiteDatabases(int $sourceServerId, int $sourceSiteId): array
+    {
+        $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/databases");
+
+        return array_values(array_map(
+            fn (array $r): array => [
+                'id' => (int) ($r['id'] ?? 0),
+                'name' => (string) ($r['name'] ?? ''),
+                'username' => $this->nullableString($r['user'] ?? $r['username'] ?? null),
+                'raw' => $r,
+            ],
+            $rows,
+        ));
+    }
+
+    public function fetchSiteCertificate(int $sourceServerId, int $sourceSiteId): ?array
+    {
+        $response = $this->client->get("/servers/{$sourceServerId}/sites/{$sourceSiteId}/certificates");
+        // Some Ploi accounts may not have certificates; treat 404 as null rather than error.
+        if ($response->status() === 404) {
+            return null;
+        }
+        $this->client->assertSuccess($response, "fetch certificates for site {$sourceServerId}/{$sourceSiteId}");
+        $payload = $response->json();
+        if (! is_array($payload)) {
+            return null;
+        }
+        $data = $payload['data'] ?? [];
+        if (! is_array($data) || $data === []) {
+            return null;
+        }
+        // Prefer the active LE-issued certificate; fall back to whatever is most recent.
+        $primary = null;
+        foreach ($data as $cert) {
+            if (! is_array($cert)) {
+                continue;
+            }
+            $status = $cert['status'] ?? null;
+            if ($status === 'active') {
+                $primary = $cert;
+                break;
+            }
+        }
+        $cert = $primary ?? $data[0];
+        if (! is_array($cert)) {
+            return null;
+        }
+
+        return [
+            'id' => (int) ($cert['id'] ?? 0),
+            'issuer' => $this->nullableString($cert['type'] ?? null),
+            'domain' => $this->nullableString($cert['domain'] ?? null),
+            'valid_until' => $this->nullableString($cert['expires_at'] ?? null),
+            'status' => $this->nullableString($cert['status'] ?? null),
+            'raw' => $cert,
+        ];
+    }
+
+    public function enableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void
+    {
+        $response = $this->client->post("/servers/{$sourceServerId}/sites/{$sourceSiteId}/maintenance");
+        $this->client->assertSuccess($response, "enable maintenance for site {$sourceServerId}/{$sourceSiteId}");
+    }
+
+    public function disableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void
+    {
+        $response = $this->client->delete("/servers/{$sourceServerId}/sites/{$sourceSiteId}/maintenance");
+        $this->client->assertSuccess($response, "disable maintenance for site {$sourceServerId}/{$sourceSiteId}");
+    }
+
+    public function listSiteWebhooks(int $sourceServerId, int $sourceSiteId): array
+    {
+        $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/deploy-keys");
+        // Ploi's deploy-keys endpoint also reports webhooks; some accounts use a separate
+        // /webhooks endpoint. Use the deploy-keys API as the primary source — it includes
+        // the webhook URLs used by repository auto-deploy.
+        return array_values(array_map(
+            fn (array $r): array => [
+                'id' => (int) ($r['id'] ?? 0),
+                'url' => (string) ($r['url'] ?? ''),
+                'raw' => $r,
+            ],
+            $rows,
+        ));
+    }
+
+    public function deleteSiteWebhook(int $sourceServerId, int $sourceSiteId, int $webhookId): void
+    {
+        $response = $this->client->delete("/servers/{$sourceServerId}/sites/{$sourceSiteId}/deploy-keys/{$webhookId}");
+        $this->client->assertSuccess($response, "delete webhook {$webhookId} on site {$sourceServerId}/{$sourceSiteId}");
+    }
+
     /**
      * Walk Ploi's paginated index endpoints and return the concatenated `data` rows.
      * Defensive against either Laravel-shape (`meta.last_page`) or no-pagination shape.

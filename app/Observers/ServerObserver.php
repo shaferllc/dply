@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Observers;
 
 use App\Events\Servers\ServerStateUpdated;
+use App\Jobs\Imports\RunMigrationStepJob;
+use App\Models\ImportMigrationStep;
+use App\Models\ImportServerMigration;
 use App\Models\Server;
+use App\Services\Imports\MigrationPlanner;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use Illuminate\Support\Facades\Log;
 
@@ -62,6 +66,7 @@ class ServerObserver
 
         if (array_key_exists('status', $changes) && $server->status === Server::STATUS_READY) {
             $this->emitWebhook($server, 'server.provisioned', $this->serverPayload($server), 'Server '.$server->name.' is ready');
+            $this->resumeWaitingImportMigrations($server);
         }
 
         if (array_key_exists('health_status', $changes)) {
@@ -78,6 +83,45 @@ class ServerObserver
                 'scheduled_for' => $server->scheduled_deletion_at->toIso8601String(),
                 'server' => $this->serverPayload($server),
             ], 'Server scheduled for deletion');
+        }
+    }
+
+    /**
+     * When a Server transitions to READY, find any ImportServerMigration whose
+     * target_server_id is this server and dispatch the next runnable step —
+     * SSH-dependent handlers throw WaitForTargetServerException when called
+     * before the server is ready, and that's what we're resolving here.
+     */
+    private function resumeWaitingImportMigrations(Server $server): void
+    {
+        try {
+            $migrations = ImportServerMigration::query()
+                ->where('target_server_id', $server->id)
+                ->whereNotIn('status', [
+                    ImportServerMigration::STATUS_COMPLETED,
+                    ImportServerMigration::STATUS_PARTIAL,
+                    ImportServerMigration::STATUS_ABORTED,
+                    ImportServerMigration::STATUS_CUTOVER_FAILED,
+                ])
+                ->get();
+
+            foreach ($migrations as $migration) {
+                $next = ImportMigrationStep::query()
+                    ->where('import_server_migration_id', $migration->id)
+                    ->where('status', ImportMigrationStep::STATUS_PENDING)
+                    ->whereNotIn('step_key', MigrationPlanner::CUTOVER_STEPS)
+                    ->orderBy('sequence')
+                    ->first();
+
+                if ($next !== null) {
+                    RunMigrationStepJob::dispatch($next->id);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('failed to resume import migrations on server ready', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

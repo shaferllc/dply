@@ -32,6 +32,7 @@ class MigrationPlanner
 {
     public const STAGING_STEPS = [
         ImportMigrationStep::KEY_FREEZE_SNAPSHOT,
+        ImportMigrationStep::KEY_CREATE_TARGET_SITE,
         ImportMigrationStep::KEY_CLONE_REPO,
         ImportMigrationStep::KEY_COPY_ENV,
         ImportMigrationStep::KEY_DUMP_DB,

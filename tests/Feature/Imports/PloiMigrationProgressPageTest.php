@@ -129,6 +129,70 @@ class PloiMigrationProgressPageTest extends TestCase
         Bus::assertNotDispatched(RunMigrationStepJob::class);
     }
 
+    public function test_begin_cutover_dispatches_first_cutover_step_when_site_ready(): void
+    {
+        Bus::fake();
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        session(['current_organization_id' => $org->id]);
+
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'provider' => 'ploi',
+        ]);
+        $migration = ImportServerMigration::create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+            'provider_credential_id' => $credential->id,
+            'source' => 'ploi',
+            'source_server_id' => 42,
+            'status' => ImportServerMigration::STATUS_STAGING,
+        ]);
+        $site = ImportSiteMigration::create([
+            'import_server_migration_id' => $migration->id,
+            'source' => 'ploi',
+            'source_site_id' => 100,
+            'domain' => 'app.example.com',
+            'site_type' => 'laravel',
+            'status' => ImportSiteMigration::STATUS_READY_FOR_CUTOVER,
+            'source_snapshot' => [],
+        ]);
+        $cutoverStep = ImportMigrationStep::create([
+            'import_server_migration_id' => $migration->id,
+            'import_site_migration_id' => $site->id,
+            'sequence' => 50,
+            'step_key' => ImportMigrationStep::KEY_CUTOVER_MAINTENANCE_ON,
+            'status' => ImportMigrationStep::STATUS_PENDING,
+        ]);
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(MigrationProgress::class, ['migration' => $migration])
+            ->call('beginCutover', $site->id)
+            ->assertHasNoErrors();
+
+        Bus::assertDispatched(RunMigrationStepJob::class, function (RunMigrationStepJob $job) use ($cutoverStep): bool {
+            return $job->stepId === $cutoverStep->id;
+        });
+    }
+
+    public function test_begin_cutover_rejects_site_not_ready(): void
+    {
+        Bus::fake();
+        $user = User::factory()->create();
+        $migration = $this->seedMigration($user);
+        $site = $migration->siteMigrations()->first();
+        $this->assertNotNull($site);
+        $this->assertNotSame(ImportSiteMigration::STATUS_READY_FOR_CUTOVER, $site->status);
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(MigrationProgress::class, ['migration' => $migration])
+            ->call('beginCutover', $site->id);
+
+        Bus::assertNotDispatched(RunMigrationStepJob::class);
+    }
+
     public function test_page_403_for_other_org_members(): void
     {
         $owner = User::factory()->create();

@@ -10,6 +10,7 @@ use App\Models\ImportSiteMigration;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -43,6 +44,14 @@ class StepOrchestrator
             $handler->execute($step->refresh());
             $this->markSucceeded($step);
             $this->maybeAdvanceMigration($step);
+        } catch (WaitForTargetServerException $e) {
+            // Don't mark failed — this is a wait state. ServerObserver re-dispatches
+            // the step when the target Server transitions to READY.
+            Log::info('import migration step paused waiting for target server', [
+                'step_id' => $step->id,
+                'step_key' => $step->step_key,
+            ]);
+            $this->markPendingAfterWait($step, $e);
         } catch (Throwable $e) {
             Log::warning('import migration step failed', [
                 'step_id' => $step->id,
@@ -92,6 +101,20 @@ class StepOrchestrator
         $step->status = ImportMigrationStep::STATUS_FAILED;
         $step->finished_at = Carbon::now();
         $step->error_message = mb_substr($e->getMessage(), 0, 5000);
+        $step->save();
+    }
+
+    /**
+     * Return a step to PENDING after a server-ready wait — the orchestrator's
+     * follow-up dispatch will not enqueue it because nextStep() returns the
+     * first PENDING step in sequence; instead the ServerObserver triggers a
+     * fresh dispatch when the target server reaches READY.
+     */
+    protected function markPendingAfterWait(ImportMigrationStep $step, WaitForTargetServerException $e): void
+    {
+        $step->status = ImportMigrationStep::STATUS_PENDING;
+        $step->error_message = mb_substr($e->getMessage(), 0, 5000);
+        $step->started_at = null;
         $step->save();
     }
 

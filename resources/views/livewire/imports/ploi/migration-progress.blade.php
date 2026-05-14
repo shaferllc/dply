@@ -92,17 +92,33 @@
 
     {{-- Per-site steps --}}
     @foreach ($migration->siteMigrations as $site)
-        @php $sitePill = $pill($site->status); @endphp
+        @php
+            $sitePill = $pill($site->status);
+            $cutoverReady = $site->status === 'ready_for_cutover';
+        @endphp
         <article class="dply-card overflow-hidden mb-6">
             <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3">
                 <div class="space-y-0.5">
                     <h2 class="text-sm font-semibold text-brand-ink">{{ $site->domain }}</h2>
                     <p class="text-xs text-brand-moss">{{ $site->site_type }}@if ($site->ssl_strategy) · SSL: {{ $site->ssl_strategy }} @endif</p>
                 </div>
-                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $sitePill['class'] }}">
-                    {{ $sitePill['label'] }}
-                </span>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $sitePill['class'] }}">
+                        {{ $sitePill['label'] }}
+                    </span>
+                    @if ($cutoverReady)
+                        <button type="button" wire:click="beginCutover('{{ $site->id }}')" class="inline-flex items-center justify-center rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-400">
+                            {{ __('Begin cutover') }}
+                        </button>
+                    @endif
+                </div>
             </header>
+            @if ($cutoverReady)
+                <div class="border-b border-amber-200 bg-amber-50/70 px-5 py-3 text-xs text-amber-950">
+                    <p class="font-semibold">{{ __('Ready to cut over.') }}</p>
+                    <p class="mt-1 leading-relaxed">{{ __('Clicking Begin cutover puts the Ploi site in maintenance mode, captures the final DB delta, swaps DNS, and re-points webhooks. Allow ~5 minutes; the smoke test polls until propagation completes.') }}</p>
+                </div>
+            @endif
             <ul class="divide-y divide-brand-ink/5">
                 @foreach ($site->steps as $step)
                     @php $sp = $pill($step->status); @endphp

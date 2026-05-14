@@ -752,7 +752,6 @@ class ServerTest extends TestCase
 
     public function test_servers_overview_shows_container_launch_progress_card_before_site_is_ready(): void
     {
-        $this->markTestSkipped('Overview was rewritten as a lean dashboard; the original "Container launch in progress" banner copy was rephrased. The container-launch surface is preserved on the new overview but with different exact strings — re-write this test against the new copy when the rewrite is finalised.');
         $user = $this->userWithOrganization();
         $organization = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -788,12 +787,73 @@ class ServerTest extends TestCase
         $response = $this->actingAs($user)->get(route('servers.overview', $server));
 
         $response->assertOk();
-        $response->assertSee('Container launch in progress');
+        $response->assertSee('Container launch');
         $response->assertSee('Provisioning site workspace');
-        $response->assertSee('digitalocean_docker');
-        $response->assertSee('apps/web');
+        $response->assertSee('Provisioning server');
+        $response->assertSee('Creating site record');
+        $response->assertSee('Site ready for first deploy');
+        $response->assertSee('Digitalocean Docker', false);
         $response->assertSee('Remote server is ready. Creating the site from the inspected repository.');
         $response->assertSee('Site created. Provisioning and first deployment have been queued.');
+        $response->assertSee('wire:poll.5s', false);
+        $response->assertSee('data-testid="container-launch-progress"', false);
+    }
+
+    public function test_servers_overview_marks_completed_steps_when_launch_is_provisioning_site(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'setup_status' => Server::SETUP_STATUS_DONE,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'container_launch' => [
+                    'status' => 'waiting_for_site_provisioning',
+                    'target_family' => 'digitalocean_docker',
+                    'current_step_label' => 'Provisioning site workspace',
+                    'summary' => 'Site created. Provisioning and first deployment have been queued.',
+                    'events' => [],
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        // Steps 1+2 completed → emerald border class renders.
+        // Step 3 active → sky ring class renders.
+        $response->assertSee('border-emerald-200', false);
+        $response->assertSee('ring-sky-200', false);
+    }
+
+    public function test_servers_overview_renders_failed_container_launch_in_red(): void
+    {
+        $user = $this->userWithOrganization();
+        $organization = $user->currentOrganization();
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'setup_status' => Server::SETUP_STATUS_DONE,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DOCKER,
+                'container_launch' => [
+                    'status' => 'failed',
+                    'target_family' => 'digitalocean_docker',
+                    'current_step_label' => 'Container launch failed',
+                    'summary' => 'Could not reach the DigitalOcean API.',
+                    'events' => [],
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('servers.overview', $server));
+
+        $response->assertOk();
+        $response->assertSee('Container launch failed');
+        $response->assertSee('Could not reach the DigitalOcean API.');
+        $response->assertSee('border-rose-300', false);
     }
 
     public function test_site_provisioner_records_docker_runtime_activity_details(): void
