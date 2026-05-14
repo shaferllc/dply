@@ -207,6 +207,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('edge', EdgeIndex::class)->name('edge.index');
     Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
+    Route::livewire('imports/ploi/migrations/{migration}', \App\Livewire\Imports\Ploi\MigrationProgress::class)->name('imports.ploi.migration.progress');
     Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
     Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
     Route::livewire('projects/{workspace}/overview', ProjectsShow::class)->defaults('section', 'overview')->name('projects.overview');
