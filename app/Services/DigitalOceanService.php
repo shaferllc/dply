@@ -216,6 +216,16 @@ class DigitalOceanService
     }
 
     /**
+     * List managed DOKS clusters in this account. Same caching shape as regions/sizes.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getKubernetesClusters(): array
+    {
+        return $this->cachedCatalogList('do_kubernetes_clusters', '/kubernetes/clusters', 'kubernetes_clusters');
+    }
+
+    /**
      * Cache regions/sizes responses per token. The wizard renders these on every
      * step and they don't change often — a 10 minute cache keeps the page fast
      * even when the DO API is slow, and bounded HTTP timeouts (in request())

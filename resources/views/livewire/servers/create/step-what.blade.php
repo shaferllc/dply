@@ -14,6 +14,60 @@
             </div>
         </header>
 
+        @if ($isKubernetes)
+            {{-- K8s host: pick the cluster + namespace instead of a stack template. --}}
+            <section class="rounded-2xl border-2 border-brand-sage/20 bg-white p-6 shadow-sm space-y-5 sm:p-7">
+                <div class="flex items-start gap-4">
+                    <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest">
+                        <x-heroicon-o-server-stack class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Pick a Kubernetes cluster') }}</h2>
+                        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.') }}</p>
+                    </div>
+                </div>
+
+                @if ($kubernetesClusters === [])
+                    <div data-testid="no-kubernetes-clusters" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        <p class="font-semibold">{{ __('No managed clusters found in this account.') }}</p>
+                        <p class="mt-1">{{ __('Create a Kubernetes cluster in the DigitalOcean console first, then come back. Your draft will still be waiting.') }}</p>
+                        <a href="https://cloud.digitalocean.com/kubernetes/clusters" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 font-semibold underline hover:text-amber-700">
+                            {{ __('Open DigitalOcean Kubernetes') }} →
+                        </a>
+                    </div>
+                @else
+                    <div>
+                        <x-input-label for="do_kubernetes_cluster_name" :value="__('Cluster')" />
+                        <select
+                            id="do_kubernetes_cluster_name"
+                            wire:model.live="form.do_kubernetes_cluster_name"
+                            class="mt-2 block w-full rounded-xl border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                        >
+                            <option value="">{{ __('Select a cluster…') }}</option>
+                            @foreach ($kubernetesClusters as $cluster)
+                                <option value="{{ $cluster['name'] }}" data-region="{{ $cluster['region'] }}">
+                                    {{ $cluster['name'] }} — {{ $cluster['region'] }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <x-input-error :messages="$errors->get('form.do_kubernetes_cluster_name')" class="mt-2" />
+                    </div>
+                @endif
+
+                <div>
+                    <x-input-label for="do_kubernetes_namespace" :value="__('Default namespace')" />
+                    <x-text-input
+                        id="do_kubernetes_namespace"
+                        wire:model.live.debounce.500ms="form.do_kubernetes_namespace"
+                        type="text"
+                        class="mt-2 block w-full font-mono text-sm"
+                        placeholder="default"
+                    />
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Used as the default for containers added to this server. You can override per container.') }}</p>
+                    <x-input-error :messages="$errors->get('form.do_kubernetes_namespace')" class="mt-2" />
+                </div>
+            </section>
+        @else
         @php
             $selectedInstallProfile = collect($installProfiles)->firstWhere('id', $form->install_profile);
             $selectedServerRole = collect($provisionOptions['server_roles'] ?? [])->firstWhere('id', $form->server_role);
@@ -371,6 +425,7 @@
                 @endif
             </div>
         </details>
+        @endif
 
         <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-6">
             <button

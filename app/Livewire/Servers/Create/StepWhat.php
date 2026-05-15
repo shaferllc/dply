@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Create;
 
+use App\Actions\Servers\ResolveKubernetesClusters;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Services\Servers\ServerCreatePresetCatalog;
@@ -44,6 +46,8 @@ class StepWhat extends Component
 
         $this->hydrateFormFromDraft($this->form, $this->currentDraft());
 
+        // Docker hosts skip the stack-shaped step entirely. K8s does NOT skip — it
+        // re-uses this step for cluster + namespace selection (see render() below).
         $skipsStack = ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker')
             || ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker');
         if ($skipsStack) {
@@ -66,21 +70,32 @@ class StepWhat extends Component
     {
         $this->authorize('create', Server::class);
 
-        $this->validate([
-            'form.install_profile' => ['required', 'string'],
-            'form.server_role' => ['required', 'string'],
-            'form.webserver' => ['required', 'string'],
-            'form.php_version' => ['required', 'string'],
-            'form.database' => ['required', 'string'],
-            'form.cache_service' => ['required', 'string'],
-        ], attributes: [
-            'form.install_profile' => __('install profile'),
-            'form.server_role' => __('server role'),
-            'form.webserver' => __('web server'),
-            'form.php_version' => __('PHP version'),
-            'form.database' => __('database'),
-            'form.cache_service' => __('cache service'),
-        ]);
+        // K8s hosts validate cluster + namespace; VM/Docker validate the stack.
+        if ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'kubernetes') {
+            $this->validate([
+                'form.do_kubernetes_cluster_name' => ['required', 'string', 'max:255'],
+                'form.do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+            ], attributes: [
+                'form.do_kubernetes_cluster_name' => __('cluster'),
+                'form.do_kubernetes_namespace' => __('namespace'),
+            ]);
+        } else {
+            $this->validate([
+                'form.install_profile' => ['required', 'string'],
+                'form.server_role' => ['required', 'string'],
+                'form.webserver' => ['required', 'string'],
+                'form.php_version' => ['required', 'string'],
+                'form.database' => ['required', 'string'],
+                'form.cache_service' => ['required', 'string'],
+            ], attributes: [
+                'form.install_profile' => __('install profile'),
+                'form.server_role' => __('server role'),
+                'form.webserver' => __('web server'),
+                'form.php_version' => __('PHP version'),
+                'form.database' => __('database'),
+                'form.cache_service' => __('cache service'),
+            ]);
+        }
 
         $this->saveDraftFromForm($this->form, advanceTo: 4);
 
@@ -164,6 +179,40 @@ class StepWhat extends Component
             'installProfiles' => config('server_provision_options.install_profiles', []),
             'serverPresets' => app(ServerCreatePresetCatalog::class)->all(),
             'selectedPreset' => $this->selectedPreset,
+            'isKubernetes' => $this->form->mode === 'provider' && $this->form->provider_host_kind === 'kubernetes',
+            'kubernetesClusters' => $this->kubernetesClusters(),
         ]);
+    }
+
+    /**
+     * Available DOKS clusters for the picked credential. Empty list when host_kind
+     * is not kubernetes, no credential is picked, or the API returned nothing —
+     * the blade renders an empty-state in all three cases.
+     *
+     * @return list<array{id: string, name: string, region: string}>
+     */
+    private function kubernetesClusters(): array
+    {
+        if ($this->form->mode !== 'provider' || $this->form->provider_host_kind !== 'kubernetes') {
+            return [];
+        }
+        if ($this->form->provider_credential_id === '') {
+            return [];
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return [];
+        }
+
+        $credential = ProviderCredential::query()
+            ->where('organization_id', $org->getKey())
+            ->find($this->form->provider_credential_id);
+
+        if ($credential === null) {
+            return [];
+        }
+
+        return ResolveKubernetesClusters::run($credential);
     }
 }
