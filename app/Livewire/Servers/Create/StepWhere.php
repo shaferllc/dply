@@ -121,7 +121,7 @@ class StepWhere extends Component
 
     public function chooseProviderHostKind(string $kind): void
     {
-        if (! in_array($kind, ['vm', 'docker'], true)) {
+        if (! in_array($kind, ['vm', 'docker', 'kubernetes'], true)) {
             return;
         }
         $this->form->provider_host_kind = $kind;
@@ -169,7 +169,7 @@ class StepWhere extends Component
         if ($this->form->mode === 'provider') {
             $this->validate([
                 'form.type' => ['required', 'string', 'max:64'],
-                'form.provider_host_kind' => ['required', Rule::in(['vm', 'docker'])],
+                'form.provider_host_kind' => ['required', Rule::in(['vm', 'docker', 'kubernetes'])],
                 'form.provider_credential_id' => ['required', 'string'],
                 'form.region' => ['required', 'string'],
                 'form.size' => ['required', 'string'],
