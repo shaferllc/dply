@@ -17,6 +17,9 @@
 
     <div class="py-10">
         <div class="dply-page-shell space-y-8">
+            @if ($isContainerMode)
+                @include('livewire.sites._create-container-mode')
+            @else
             @if (config('dply.scaffold_v1_enabled'))
                 @include('livewire.sites._create-mode-toggle')
             @endif
@@ -490,6 +493,7 @@
                 </div>
             </form>
             @endif
+            @endif {{-- @if ($isContainerMode) ... @else ... --}}
         </div>
     </div>
 </div>
