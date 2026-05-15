@@ -11,17 +11,35 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @php
+        $isContainerHostExplainer = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+    @endphp
     <x-explainer class="mb-4">
-        <p>{{ __('Sites hosted on this server. Each row is a vhost (nginx/caddy/apache) with its own document root, runtime version (PHP/Node/Python), database bindings, deploy hooks, and SSL certs. Click a row to drop into the site\'s own page where deploys, env vars, and per-site settings live.') }}</p>
-        <p>{{ __('Adding a site here scaffolds the vhost config + filesystem layout on the server and (optionally) creates a database for it. Removing a site offers cascading cleanup: vhost, files, database, deploy keys.') }}</p>
+        @if ($isContainerHostExplainer)
+            <p>{{ __('Container apps deployed onto this host. Each row is a Site rooted at a Git repo: dply builds the image, runs it on the host (Docker container or Kubernetes Deployment), and tracks deploys + env per app.') }}</p>
+            <p>{{ __('Adding a container here inspects the repo, queues the first build + deploy, and surfaces progress on this server\'s overview. Removing a container tears down the running workload and the matching dply records.') }}</p>
+        @else
+            <p>{{ __('Sites hosted on this server. Each row is a vhost (nginx/caddy/apache) with its own document root, runtime version (PHP/Node/Python), database bindings, deploy hooks, and SSL certs. Click a row to drop into the site\'s own page where deploys, env vars, and per-site settings live.') }}</p>
+            <p>{{ __('Adding a site here scaffolds the vhost config + filesystem layout on the server and (optionally) creates a database for it. Removing a site offers cascading cleanup: vhost, files, database, deploy keys.') }}</p>
+        @endif
     </x-explainer>
 
+    @php
+        // Q19-D: container-host CTAs use the "container" vocabulary; VM hosts
+        // keep the existing "site" copy. Schema is still `sites` everywhere.
+        $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+        $newCardHeading = $isContainerHost ? __('New container app') : __('New site');
+        $newCardDescription = $isContainerHost
+            ? __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.')
+            : __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.');
+        $addCtaLabel = $isContainerHost ? __('Add container') : __('Add site');
+    @endphp
     <div class="{{ $card }}">
         <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('New site') }}</h2>
+                <h2 class="text-lg font-semibold text-brand-ink">{{ $newCardHeading }}</h2>
                 <p class="mt-1 text-sm text-brand-moss leading-relaxed">
-                    {{ __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.') }}
+                    {{ $newCardDescription }}
                 </p>
                 @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
                     <p class="mt-3 inline-flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
@@ -31,13 +49,13 @@
                 @endif
             </div>
             @if ($this->canAddSite)
-                <x-primary-button type="button" wire:click="openAddSiteModal" class="justify-center">{{ __('Add site') }}</x-primary-button>
+                <x-primary-button type="button" wire:click="openAddSiteModal" class="justify-center">{{ $addCtaLabel }}</x-primary-button>
             @else
                 <span
                     class="inline-flex cursor-not-allowed items-center justify-center rounded-lg bg-brand-mist/40 px-4 py-2.5 text-sm font-semibold text-brand-moss"
                     title="{{ $this->addSiteBlockedReason }}"
                 >
-                    {{ __('Add site') }}
+                    {{ $addCtaLabel }}
                 </span>
             @endif
         </div>
@@ -49,7 +67,9 @@
             <x-heroicon-o-funnel class="h-4 w-4 text-brand-mist" aria-hidden="true" />
         </div>
         @if ($server->sites->isEmpty())
-            <p class="px-5 py-10 sm:px-8 text-center text-sm text-brand-moss">{{ __('No sites yet. Add a site to manage web server config, SSL, Git deploys, and environment files.') }}</p>
+            <p class="px-5 py-10 sm:px-8 text-center text-sm text-brand-moss">{{ $isContainerHost
+                ? __('No container apps yet. Add one to deploy a Git repo onto this host.')
+                : __('No sites yet. Add a site to manage web server config, SSL, Git deploys, and environment files.') }}</p>
         @else
             <ul class="divide-y divide-brand-ink/10">
                 @foreach ($server->sites as $s)

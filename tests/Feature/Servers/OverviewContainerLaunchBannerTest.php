@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Servers;
 
 use App\Livewire\Servers\WorkspaceOverview;
+use App\Livewire\Servers\WorkspaceSites;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -89,6 +90,32 @@ final class OverviewContainerLaunchBannerTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceOverview::class, ['server' => $server])
             ->assertDontSeeHtml('data-testid="add-first-container-cta"');
+    }
+
+    public function test_workspace_sites_uses_container_copy_for_container_hosts(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->dockerServer($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSites::class, ['server' => $server])
+            ->assertSee('New container app')
+            ->assertSee('Add container')
+            ->assertDontSee('New site')
+            ->assertDontSee('Add site');
+    }
+
+    public function test_workspace_sites_keeps_site_copy_for_vm_hosts(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->vmServer($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSites::class, ['server' => $server])
+            ->assertSee('New site')
+            ->assertSee('Add site')
+            ->assertDontSee('New container app')
+            ->assertDontSee('Add container');
     }
 
     private function dockerServer(User $user): Server
