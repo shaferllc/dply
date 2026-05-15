@@ -464,37 +464,56 @@
 
       {{-- Sidebar: explain the new vocabulary so the user gets it. --}}
       <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
-                <x-heroicon-m-academic-cap class="h-3.5 w-3.5" />
-                {{ __('How these fit together') }}
-            </p>
-            <dl class="mt-3 space-y-3 text-sm">
-                <div>
-                    <dt class="font-semibold text-brand-ink">{{ __('Template') }}</dt>
-                    <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('"I want to deploy a Laravel app." Sets the bundle + job + stack to a known-good combo for that use case.') }}</dd>
-                </div>
-                <div class="border-t border-brand-ink/10 pt-3">
-                    <dt class="font-semibold text-brand-ink">{{ __('Package bundle (profile)') }}</dt>
-                    <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('Which set of system packages to install. Templates pick this for you; override only if you know your bundle differs from the defaults.') }}</dd>
-                </div>
-                <div class="border-t border-brand-ink/10 pt-3">
-                    <dt class="font-semibold text-brand-ink">{{ __('Machine\'s job (role)') }}</dt>
-                    <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('What this server actually does in your fleet — application, worker, database node, cache, load balancer. Drives which packages from the bundle actually get installed.') }}</dd>
-                </div>
-            </dl>
-        </div>
-
-        @if ($selectedServerRole && ! empty($selectedServerRole['installs']) && is_array($selectedServerRole['installs']))
+        @if ($isKubernetes)
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Will install') }}</p>
-                <p class="mt-1 text-xs text-brand-mist">{{ __('From your current job choice') }}</p>
-                <ul class="mt-2 space-y-1 text-xs text-brand-moss">
-                    @foreach (array_slice($selectedServerRole['installs'], 0, 6) as $item)
-                        <li class="inline-flex items-start gap-1.5"><x-heroicon-m-check-circle class="mt-0.5 h-3 w-3 text-brand-sage" />{{ is_array($item) ? ($item['label'] ?? '') : $item }}</li>
-                    @endforeach
-                </ul>
+                <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                    <x-heroicon-m-academic-cap class="h-3.5 w-3.5" />
+                    {{ __('Cluster + namespace') }}
+                </p>
+                <dl class="mt-3 space-y-3 text-sm">
+                    <div>
+                        <dt class="font-semibold text-brand-ink">{{ __('Cluster') }}</dt>
+                        <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('The DOKS cluster you already have in DigitalOcean. Dply registers it as a server here so you can deploy containers into it.') }}</dd>
+                    </div>
+                    <div class="border-t border-brand-ink/10 pt-3">
+                        <dt class="font-semibold text-brand-ink">{{ __('Namespace') }}</dt>
+                        <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('Default Kubernetes namespace for containers added to this server. You can override per container later.') }}</dd>
+                    </div>
+                </dl>
             </div>
+        @else
+            <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                    <x-heroicon-m-academic-cap class="h-3.5 w-3.5" />
+                    {{ __('How these fit together') }}
+                </p>
+                <dl class="mt-3 space-y-3 text-sm">
+                    <div>
+                        <dt class="font-semibold text-brand-ink">{{ __('Template') }}</dt>
+                        <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('"I want to deploy a Laravel app." Sets the bundle + job + stack to a known-good combo for that use case.') }}</dd>
+                    </div>
+                    <div class="border-t border-brand-ink/10 pt-3">
+                        <dt class="font-semibold text-brand-ink">{{ __('Package bundle (profile)') }}</dt>
+                        <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('Which set of system packages to install. Templates pick this for you; override only if you know your bundle differs from the defaults.') }}</dd>
+                    </div>
+                    <div class="border-t border-brand-ink/10 pt-3">
+                        <dt class="font-semibold text-brand-ink">{{ __('Machine\'s job (role)') }}</dt>
+                        <dd class="mt-0.5 text-xs leading-5 text-brand-moss">{{ __('What this server actually does in your fleet — application, worker, database node, cache, load balancer. Drives which packages from the bundle actually get installed.') }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            @if ($selectedServerRole && ! empty($selectedServerRole['installs']) && is_array($selectedServerRole['installs']))
+                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Will install') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('From your current job choice') }}</p>
+                    <ul class="mt-2 space-y-1 text-xs text-brand-moss">
+                        @foreach (array_slice($selectedServerRole['installs'], 0, 6) as $item)
+                            <li class="inline-flex items-start gap-1.5"><x-heroicon-m-check-circle class="mt-0.5 h-3 w-3 text-brand-sage" />{{ is_array($item) ? ($item['label'] ?? '') : $item }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         @endif
       </aside>
     </form>
