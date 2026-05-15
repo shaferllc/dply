@@ -152,53 +152,6 @@ trait InteractsWithServerCreateDraft
     }
 
     /**
-     * Container-launch context (when the wizard was opened from the
-     * Containers launcher). The launcher writes the inspected repo info
-     * into draft.payload._container_launch before redirecting; the banner
-     * partial reads it via this helper. Returns null when not set.
-     *
-     * @return array{repository_url: string, repository_branch: string, repository_subdirectory: string, slug: string}|null
-     */
-    protected function containerLaunchContext(): ?array
-    {
-        $draft = $this->currentDraft();
-        if ($draft === null) {
-            return null;
-        }
-        $launch = $draft->payload['_container_launch'] ?? null;
-        if (! is_array($launch) || ! is_string($launch['repository_url'] ?? null) || $launch['repository_url'] === '') {
-            return null;
-        }
-
-        return [
-            'repository_url' => (string) $launch['repository_url'],
-            'repository_branch' => (string) ($launch['repository_branch'] ?? 'main'),
-            'repository_subdirectory' => (string) ($launch['repository_subdirectory'] ?? ''),
-            'slug' => (string) ($launch['slug'] ?? ''),
-        ];
-    }
-
-    /**
-     * Clear only the _container_launch portion of the draft payload, leaving
-     * the rest of the wizard state intact (Q12 — Change-repo preserves draft).
-     */
-    protected function clearContainerLaunchFromDraft(): void
-    {
-        $draft = $this->currentDraft();
-        if ($draft === null) {
-            return;
-        }
-        $payload = is_array($draft->payload ?? null) ? $draft->payload : [];
-        if (! array_key_exists('_container_launch', $payload)) {
-            return;
-        }
-        unset($payload['_container_launch']);
-        $draft->payload = $payload;
-        $draft->bumpExpiry();
-        $draft->save();
-    }
-
-    /**
      * Map a step number (1..4) to its route name. Used by the gate redirect and the stepper.
      */
     public static function routeNameForStep(int $step): string

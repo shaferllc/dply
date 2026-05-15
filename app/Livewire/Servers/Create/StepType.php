@@ -229,7 +229,6 @@ class StepType extends Component
     {
         return view('livewire.servers.create.step-type', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
-            'containerLaunch' => $this->containerLaunchContext(),
         ]);
     }
 }

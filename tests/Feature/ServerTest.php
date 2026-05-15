@@ -11,7 +11,6 @@ use App\Jobs\RunSetupScriptJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\WaitForServerSshReadyJob;
-use App\Livewire\Launches\Containers\Create as LaunchesContainersCreate;
 use App\Livewire\Servers\Create as ServersCreate;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney;
@@ -37,7 +36,6 @@ use App\Models\UserSshKey;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
-use App\Services\Deploy\LocalRepositoryInspector;
 use App\Services\Sites\Contracts\SiteRuntimeProvisioner;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
@@ -216,13 +214,16 @@ class ServerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Launch setup');
         $response->assertSee('Bring your own server');
-        $response->assertSee('Containers');
+        // Container flow inversion (2026-05): Containers tile copy reframed
+        // and the href now jumps straight to /servers/create with the docker
+        // host_target preset instead of the retired launcher page.
+        $response->assertSee('Run a container app');
         $response->assertSee('Edge');
         $response->assertSee('Cloud');
         $response->assertSee('Serverless');
         $response->assertSee('Coming soon');
         $response->assertSee(route('servers.create'), false);
-        $response->assertSee(route('launches.containers.create'), false);
+        $response->assertSee(route('servers.create', ['host_target' => 'docker']), false);
         $response->assertSee(route('edge.create'), false);
         $response->assertDontSee(route('launches.serverless'), false);
         $response->assertDontSee(route('launches.cloud-network'), false);
@@ -278,81 +279,16 @@ class ServerTest extends TestCase
             'source' => 'launches.containers',
         ]));
 
-        // The new wizard surfaces a "Detected a Docker-host launch path"
-        // hint at step 1 instead of jumping straight into the BYO form.
+        // After Phase 5 of the container flow inversion, the wizard's wizard-
+        // banner referencing the now-deleted launcher is gone. host_target=docker
+        // still opens StepType correctly with the docker provider_host_kind preset.
         $response->assertOk();
         $response->assertSee('Docker');
-        $response->assertSee('Detected a Docker-host launch path');
     }
 
-    public function test_local_docker_repo_first_page_is_displayed(): void
-    {
-        $user = $this->userWithOrganization();
-
-        $response = $this->actingAs($user)->get(route('launches.containers.create'));
-
-        $response->assertOk();
-        $response->assertSee('Repo-first containers');
-        $response->assertSee('Repository URL');
-        $response->assertSee('Inspect repository');
-        $response->assertDontSee('IP address');
-        $response->assertDontSee('SSH private key');
-    }
-
-    public function test_containers_launcher_page_shows_path_picker_after_inspection(): void
-    {
-        $user = $this->userWithOrganization();
-
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
-        {
-            public function __construct(private array $result) {}
-
-            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
-            {
-                return $this->result;
-            }
-        });
-
-        Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('repository_url', 'https://github.com/acme/demo.git')
-            ->call('inspectRepository')
-            ->assertSee('Pick a path')
-            ->assertSee('Cloud Docker host')
-            ->assertSee('Cloud Kubernetes');
-    }
-
-    public function test_containers_launcher_docker_path_writes_draft_and_redirects_to_wizard(): void
-    {
-        $user = $this->userWithOrganization();
-
-        app()->instance(LocalRepositoryInspector::class, new class($this->localInspectionResult()) extends LocalRepositoryInspector
-        {
-            public function __construct(private array $result) {}
-
-            public function inspect(string $repositoryUrl, string $branch = 'main', string $subdirectory = '', int|string|null $userId = null, ?string $sourceControlAccountId = null): array
-            {
-                return $this->result;
-            }
-        });
-
-        Livewire::actingAs($user)
-            ->test(LaunchesContainersCreate::class)
-            ->set('repository_url', 'https://github.com/acme/demo.git')
-            ->call('inspectRepository')
-            ->assertSet('has_inspection', true)
-            ->assertSet('path', 'docker')
-            ->call('goToDockerWizard')
-            ->assertRedirect(route('servers.create', ['host_target' => 'docker']));
-
-        $draft = \App\Models\ServerCreateDraft::query()
-            ->where('user_id', $user->id)
-            ->first();
-        $this->assertNotNull($draft);
-        $this->assertSame('https://github.com/acme/demo.git', $draft->payload['_container_launch']['repository_url']);
-        $this->assertSame('cloud_docker', $draft->payload['_container_launch']['target_family']);
-        $this->assertIsArray($draft->payload['_container_launch']['inspection'] ?? null);
-    }
+    // The three /launches/containers/create tests that lived here were retired in
+    // the container flow inversion (Phase 5, 2026-05). The launcher page is
+    // gone; redirect coverage is in tests/Feature/LaunchesContainersCreateTest.php.
 
     public function test_finalize_container_cloud_launch_job_creates_site_after_server_is_ready(): void
     {

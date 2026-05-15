@@ -174,7 +174,6 @@ class StepWhat extends Component
         return view('livewire.servers.create.step-what', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
             'reachedStep' => $this->currentDraft()?->step ?? 3,
-            'containerLaunch' => $this->containerLaunchContext(),
             'provisionOptions' => $context['provisionOptions'],
             'installProfiles' => config('server_provision_options.install_profiles', []),
             'serverPresets' => app(ServerCreatePresetCatalog::class)->all(),

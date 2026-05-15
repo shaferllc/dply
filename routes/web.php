@@ -23,7 +23,6 @@ use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
-use App\Livewire\Launches\Containers\Create as LaunchesContainersCreate;
 use App\Livewire\Launches\Create as LaunchesCreate;
 use App\Livewire\Launches\Path as LaunchesPath;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
@@ -219,7 +218,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
     Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
     Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
-    Route::livewire('launches/containers/create', LaunchesContainersCreate::class)->name('launches.containers.create');
+    // Container flow inversion (2026-05): the standalone container launcher is gone.
+    // Container apps are now created server-first (host via /servers/create wizard,
+    // container via /servers/{id}/sites/create container mode). This route is kept for
+    // one release as a 302 to the wizard so external bookmarks don't 404.
+    Route::redirect('launches/containers/create', '/servers/create?host_target=docker', 302)->name('launches.containers.create');
     Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
     Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');

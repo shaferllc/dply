@@ -250,7 +250,6 @@ class StepWhere extends Component
             'hasLinkedCredential' => $context['hasLinkedCredential'],
             'providerCards' => $this->provisionProviderCardsFromList($this->listServerProviderCards()),
             'credentialProviderNav' => $this->memoCredentialProviderNav(),
-            'containerLaunch' => $this->containerLaunchContext(),
         ]);
     }
 }
