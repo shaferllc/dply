@@ -8,8 +8,13 @@
             <div class="absolute -bottom-16 -left-12 h-40 w-40 rounded-full bg-brand-gold/10 blur-3xl" aria-hidden="true"></div>
             <div class="relative">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Step :n of :total', ['n' => 3, 'total' => $totalSteps]) }}</p>
-                <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ __('What it runs') }}</h1>
-                <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">{{ __('Pick a stack template and dply fills in everything else. The underlying knobs are tucked below in case you want to override.') }}</p>
+                @if ($isKubernetes)
+                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ __('Pick the cluster') }}</h1>
+                    <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">{{ __('Choose an existing managed cluster from your cloud account and the default namespace dply should target.') }}</p>
+                @else
+                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ __('What it runs') }}</h1>
+                    <p class="mt-2 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">{{ __('Pick a stack template and dply fills in everything else. The underlying knobs are tucked below in case you want to override.') }}</p>
+                @endif
             </div>
         </header>
 
