@@ -126,19 +126,23 @@ class StepWhere extends Component
         }
         $this->form->provider_host_kind = $kind;
 
-        // K8s is wired only for DigitalOcean managed clusters in this PR.
-        // Pin form.type so the existing storeDigitalOceanKubernetes branch
-        // in StoreServerFromCreateForm handles the submission. AWS EKS
-        // ships in a follow-up.
+        // For K8s the user picks the provider (DO or AWS) via the tile picker
+        // below, which calls chooseProvider() and resolves form.type to
+        // {provider}_kubernetes. Clearing any stale K8s type pin here lets the
+        // user freely toggle between vm/docker/kubernetes without ghost state.
+        if (in_array($this->form->type, ['digitalocean_kubernetes', 'aws_kubernetes'], true) && $kind !== 'kubernetes') {
+            $this->form->type = '';
+            $this->active_provider = '';
+        }
         if ($kind === 'kubernetes') {
-            $this->form->type = 'digitalocean_kubernetes';
-            $this->active_provider = 'digitalocean';
+            // If a non-K8s provider was previously selected, drop the type so
+            // the picker re-opens with a clean DO-or-AWS choice.
+            if (! in_array($this->form->type, ['digitalocean_kubernetes', 'aws_kubernetes'], true)) {
+                $this->form->type = '';
+                $this->active_provider = '';
+            }
             $this->memoServerCreateCatalog = null;
             $this->memoServerCreateCatalogKey = null;
-            $this->autoSelectSingleOptions();
-        } elseif ($this->form->type === 'digitalocean_kubernetes') {
-            // Switching back to vm/docker — clear the K8s pin so user picks fresh.
-            $this->form->type = '';
         }
     }
 
@@ -155,6 +159,27 @@ class StepWhere extends Component
 
     public function chooseProvider(string $provider): void
     {
+        // For K8s the tile id is the bare provider name (digitalocean / aws)
+        // but the form.type the wizard ultimately stores is the K8s-suffixed
+        // variant — that's what StoreServerFromCreateForm dispatches on.
+        if ($this->form->provider_host_kind === 'kubernetes') {
+            if (! in_array($provider, ['digitalocean', 'aws'], true)) {
+                return;
+            }
+            $type = $provider.'_kubernetes';
+            if (! ServerProviderGate::enabled($type)) {
+                return;
+            }
+            $this->form->mode = 'provider';
+            $this->form->type = $type;
+            $this->active_provider = $provider;
+            $this->memoServerCreateCatalog = null;
+            $this->memoServerCreateCatalogKey = null;
+            $this->autoSelectSingleOptions();
+
+            return;
+        }
+
         if (! ServerProviderGate::enabled($provider)) {
             return;
         }
@@ -236,6 +261,26 @@ class StepWhere extends Component
         return 2;
     }
 
+    /**
+     * Provider tile picker. For VM/Docker hosts the full provider list applies;
+     * for Kubernetes hosts only DigitalOcean (DOKS) and AWS (EKS) are valid
+     * targets in this release.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function resolveProviderCards(): array
+    {
+        $cards = $this->provisionProviderCardsFromList($this->listServerProviderCards());
+        if ($this->form->provider_host_kind !== 'kubernetes') {
+            return $cards;
+        }
+
+        return array_values(array_filter(
+            $cards,
+            fn (array $card): bool => in_array($card['id'] ?? '', ['digitalocean', 'aws'], true),
+        ));
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -248,7 +293,7 @@ class StepWhere extends Component
             'preflight' => $context['preflight'],
             'hasAnyProviderCredentials' => $context['hasAnyProviderCredentials'],
             'hasLinkedCredential' => $context['hasLinkedCredential'],
-            'providerCards' => $this->provisionProviderCardsFromList($this->listServerProviderCards()),
+            'providerCards' => $this->resolveProviderCards(),
             'credentialProviderNav' => $this->memoCredentialProviderNav(),
         ]);
     }

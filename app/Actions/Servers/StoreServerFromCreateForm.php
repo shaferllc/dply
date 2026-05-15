@@ -67,7 +67,7 @@ final class StoreServerFromCreateForm
             )->validate();
         }
 
-        if (! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
+        if (! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
             $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
             Validator::make(
                 [
@@ -85,6 +85,7 @@ final class StoreServerFromCreateForm
             'digitalocean' => $this->storeDigitalOcean($user, $org, $form, $scriptKeys),
             'digitalocean_functions' => $this->storeDigitalOceanFunctions($user, $org, $form),
             'digitalocean_kubernetes' => $this->storeDigitalOceanKubernetes($user, $org, $form),
+            'aws_kubernetes' => $this->storeAwsKubernetes($user, $org, $form),
             'aws_lambda' => $this->storeAwsLambda($user, $org, $form),
             'hetzner' => $this->storeHetzner($user, $org, $form, $scriptKeys),
             'linode' => $this->storeLinode($user, $org, $form, $scriptKeys),
@@ -286,6 +287,62 @@ final class StoreServerFromCreateForm
             // provisioning phase, no SSH bootstrap. Per the agreed design,
             // the server lands READY immediately so /servers/{id}/overview
             // can surface the "Add a container" CTA right away.
+            'status' => Server::STATUS_READY,
+            'health_status' => Server::HEALTH_REACHABLE,
+            'meta' => $meta,
+        ]);
+
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    /**
+     * Register an existing AWS EKS cluster as a dply server. Mirrors the DOKS path —
+     * cluster + namespace come from the wizard form (do_kubernetes_* fields are
+     * provider-agnostic at the form layer despite the prefix; renaming is churn).
+     */
+    private function storeAwsKubernetes(User $user, Organization $org, ServerCreateForm $form): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'do_kubernetes_cluster_name' => $form->do_kubernetes_cluster_name,
+                'do_kubernetes_namespace' => $form->do_kubernetes_namespace,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'do_kubernetes_cluster_name' => 'required|string|max:255',
+                'do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'aws')
+            ->findOrFail($form->provider_credential_id);
+
+        $region = (string) ($credential->credentials['region'] ?? config('services.aws.default_region', 'us-east-1'));
+
+        $meta = [
+            'host_kind' => Server::HOST_KIND_KUBERNETES,
+            'kubernetes' => [
+                'provider' => 'aws',
+                'cluster_name' => trim($form->do_kubernetes_cluster_name),
+                'namespace' => trim($form->do_kubernetes_namespace) !== '' ? trim($form->do_kubernetes_namespace) : 'default',
+                'region' => $region,
+            ],
+        ];
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::Aws,
+            'provider_credential_id' => $credential->id,
+            'region' => $region,
+            'ssh_port' => 22,
+            'ssh_user' => 'kubernetes',
             'status' => Server::STATUS_READY,
             'health_status' => Server::HEALTH_REACHABLE,
             'meta' => $meta,

@@ -27,6 +27,7 @@ final class ServerProviderGate
         'fly_io',
         'aws',
         'aws_app_runner',
+        'aws_kubernetes',
         'aws_lambda',
         'custom',
     ];

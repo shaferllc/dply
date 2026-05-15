@@ -84,6 +84,7 @@ final class BuildServerCreatePreflight
             'custom' => $this->customChecks($form, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $customConnectionTest, $hasLinkedCredential),
             'digitalocean_functions' => $this->digitalOceanFunctionsChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
             'digitalocean_kubernetes' => $this->digitalOceanKubernetesChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
+            'aws_kubernetes' => $this->digitalOceanKubernetesChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
             'aws_lambda' => $this->awsLambdaChecks($form, $catalog, $canCreateServer, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth),
             default => $this->cloudChecks($form, $catalog, $provisionOptions, $canCreateServer, $hasUserSshKeys, $hasProvisionableUserSshKeys, $hasAnyProviderCredentials, $hasLinkedCredential, $providerHealth, $sizeRecommendations),
         };
@@ -674,7 +675,7 @@ final class BuildServerCreatePreflight
         $size = collect($catalog['sizes'] ?? [])->first(fn (array $option): bool => (string) ($option['value'] ?? '') === $form->size);
 
         if (! is_array($size)) {
-            if (in_array($form->type, ['digitalocean_functions', 'digitalocean_kubernetes'], true)) {
+            if (in_array($form->type, ['digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes'], true)) {
                 return [
                     'state' => 'unavailable',
                     'provider' => $form->type,
@@ -684,11 +685,13 @@ final class BuildServerCreatePreflight
                     'price_hourly' => null,
                     'formatted_price' => null,
                     'source' => null,
-                    'detail' => $form->type === 'digitalocean_kubernetes'
-                        ? __('DigitalOcean Kubernetes pricing depends on node pools, load balancers, storage, and network usage. Review pricing in DigitalOcean before launch.')
-                        : __('DigitalOcean Functions pricing depends on invocations, execution time, and memory. Review pricing in DigitalOcean before launch.'),
+                    'detail' => match ($form->type) {
+                        'digitalocean_kubernetes' => __('DigitalOcean Kubernetes pricing depends on node pools, load balancers, storage, and network usage. Review pricing in DigitalOcean before launch.'),
+                        'aws_kubernetes' => __('AWS EKS pricing depends on the cluster, node groups, load balancers, storage, and network usage. Review pricing in AWS before launch.'),
+                        default => __('DigitalOcean Functions pricing depends on invocations, execution time, and memory. Review pricing in DigitalOcean before launch.'),
+                    },
                     'extras' => [],
-                    'notes' => [$form->type === 'digitalocean_kubernetes'
+                    'notes' => [in_array($form->type, ['digitalocean_kubernetes', 'aws_kubernetes'], true)
                         ? __('Managed Kubernetes targets do not use VM region/size catalogs in this create flow.')
                         : __('Functions hosts do not use VM region/size catalogs.')],
                 ];

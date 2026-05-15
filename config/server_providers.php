@@ -29,6 +29,7 @@ return [
         /** DNS / API token only (not a compute host in v1). */
         'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true), // https://www.cloudflare.com/
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/
+        'aws_kubernetes' => env('DPLY_SERVER_PROVIDER_AWS_KUBERNETES', true), // https://aws.amazon.com/eks/
         'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false), // https://cloud.google.com/compute
         'azure' => env('DPLY_SERVER_PROVIDER_AZURE', false), // https://azure.microsoft.com/en-us/products/virtual-machines/
         'oracle' => env('DPLY_SERVER_PROVIDER_ORACLE', false), // https://www.oracle.com/cloud/compute/

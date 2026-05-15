@@ -263,7 +263,7 @@ trait ServerCreateActions
 
     protected function syncProvisionPreferenceFields(): void
     {
-        if (in_array($this->form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
+        if (in_array($this->form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
             return;
         }
 
@@ -584,7 +584,7 @@ trait ServerCreateActions
 
     protected function applyInstallProfile(): void
     {
-        if (in_array($this->form->type, ['digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
+        if (in_array($this->form->type, ['digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
             return;
         }
 

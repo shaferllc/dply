@@ -86,21 +86,28 @@
                             <x-heroicon-o-server-stack class="h-6 w-6" />
                         </span>
                         <p class="mt-4 text-base font-semibold text-brand-ink">{{ __('Managed Kubernetes') }}</p>
-                        <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">{{ __('Register an existing DOKS cluster. Dply deploys containers into it; DigitalOcean bills you for the cluster.') }}</p>
+                        <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">{{ __('Register an existing DOKS or EKS cluster. Dply deploys containers into it; the cloud provider bills you for the cluster.') }}</p>
                     </button>
                 </div>
                 <x-input-error :messages="$errors->get('form.provider_host_kind')" class="mt-1" />
             </section>
 
-            {{-- Provider tile picker. Hidden for Kubernetes hosts (DO is auto-selected
-                 in this PR; AWS EKS ships in a follow-up). --}}
-            <section @class(['space-y-4', 'hidden' => $form->provider_host_kind === 'kubernetes'])>
+            {{-- Provider tile picker. For Kubernetes hosts the cards list is filtered to
+                 DigitalOcean + AWS in StepWhere::resolveProviderCards(); chooseProvider()
+                 then suffixes form.type to {provider}_kubernetes. --}}
+            <section class="space-y-4">
                 <div class="flex items-baseline justify-between gap-2">
-                    <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Provider') }}</h2>
+                    <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Provider') }}</h2>
                     <a href="{{ route('credentials.index') }}" wire:navigate class="text-sm font-medium text-brand-sage transition-colors hover:text-brand-forest">{{ __('Manage credentials') }} →</a>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($providerCards as $card)
+                        @php
+                            // K8s tile id is the bare provider name (e.g. "digitalocean") but
+                            // form.type carries the {provider}_kubernetes suffix once chosen.
+                            $isCardSelected = $form->type === $card['id']
+                                || ($form->provider_host_kind === 'kubernetes' && $form->type === $card['id'].'_kubernetes');
+                        @endphp
                         <button
                             type="button"
                             wire:click="chooseProvider('{{ $card['id'] }}')"
@@ -108,8 +115,8 @@
                             wire:target="chooseProvider"
                             @class([
                                 'group rounded-2xl border-2 p-4 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-60',
-                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->type === $card['id'],
-                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->type !== $card['id'],
+                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $isCardSelected,
+                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => ! $isCardSelected,
                             ])
                         >
                             <div class="flex items-center justify-between gap-3">
@@ -167,10 +174,13 @@
 
             {{-- K8s: account-only card with a hint about what comes next. --}}
             @if ($form->provider_host_kind === 'kubernetes' && $form->provider_credential_id !== '')
+                @php
+                    $k8sProviderLabel = $form->type === 'aws_kubernetes' ? __('AWS EKS') : __('DigitalOcean DOKS');
+                @endphp
                 <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Cluster') }}</p>
                     <p class="mt-3 text-sm leading-relaxed text-brand-moss">
-                        {{ __('You will pick the cluster from your DigitalOcean account on the next step. Region is inherited from the cluster.') }}
+                        {{ __('You will pick the cluster from your :provider account on the next step. Region is inherited from the cluster.', ['provider' => $k8sProviderLabel]) }}
                     </p>
                 </section>
             @endif

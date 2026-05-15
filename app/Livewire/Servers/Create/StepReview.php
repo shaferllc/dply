@@ -206,7 +206,7 @@ class StepReview extends Component
             return null;
         }
 
-        if (! in_array($this->form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true) && ! $user->sshKeys()->exists()) {
+        if (! in_array($this->form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true) && ! $user->sshKeys()->exists()) {
             return $this->redirectRoute('profile.ssh-keys', [
                 'source' => 'servers.create',
                 'return_to' => 'servers.create',
