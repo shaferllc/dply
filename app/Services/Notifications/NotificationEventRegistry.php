@@ -84,6 +84,7 @@ class NotificationEventRegistry
             || str_ends_with($eventKey, 'cutover_ready')
             || str_ends_with($eventKey, 'aborted')
             || str_ends_with($eventKey, 'paused_nudge')
+            || str_ends_with($eventKey, 'container_launch.failed')
         ) {
             return 'warning';
         }

@@ -60,6 +60,14 @@
                         $sslOn = $s->ssl_status === \App\Models\Site::SSL_ACTIVE;
                         $gitRef = $s->git_repository_url;
                         $gitShort = $gitRef ? (preg_match('#([^/:]+/[^/]+?)(?:\.git)?$#', $gitRef, $m) ? $m[1] : \Illuminate\Support\Str::limit($gitRef, 40)) : null;
+
+                        // Waiting-for-host hint: a container Site sits in STATUS_PENDING while
+                        // FinalizeContainerCloudLaunchJob polls for the host to be ready.
+                        // Surface that state inline so the row makes sense on its own (per Q18-B).
+                        $containerLaunchStatus = (string) data_get($server->meta, 'container_launch.status', '');
+                        $isWaitingOnHost = $s->status === \App\Models\Site::STATUS_PENDING
+                            && in_array($containerLaunchStatus, ['waiting_for_server', 'queued'], true)
+                            && (string) data_get($server->meta, 'container_launch.site_id', '') === (string) $s->id;
                     @endphp
                     <li class="relative flex">
                         <span
@@ -83,6 +91,12 @@
                                 @endif
                                 @if (filter_var($s->meta['debug'] ?? false, FILTER_VALIDATE_BOOLEAN))
                                     <span class="rounded-md bg-brand-sand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-olive">{{ __('Debug mode on') }}</span>
+                                @endif
+                                @if ($isWaitingOnHost)
+                                    <span data-testid="container-site-waiting-host" class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200">
+                                        <x-heroicon-m-clock class="h-3 w-3" />
+                                        {{ __('Waiting for host setup') }}
+                                    </span>
                                 @endif
                             </div>
                             <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">

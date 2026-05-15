@@ -7,9 +7,11 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use App\Services\Notifications\NotificationPublisher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class FinalizeContainerCloudLaunchJob implements ShouldQueue
@@ -100,6 +102,33 @@ class FinalizeContainerCloudLaunchJob implements ShouldQueue
             new ProvisionSiteJob($site->id),
             new RunSiteDeploymentJob($site, SiteDeployment::TRIGGER_API, null, $this->userId),
         ])->dispatch();
+
+        $this->publishCompletedNotification($server, $site, $user);
+    }
+
+    private function publishCompletedNotification(Server $server, \App\Models\Site $site, User $user): void
+    {
+        try {
+            app(NotificationPublisher::class)->publish(
+                eventKey: 'server.container_launch.completed',
+                subject: $server,
+                title: 'Container app deploy queued: '.$site->name,
+                body: 'The container site has been created and the first deploy is queued.',
+                url: route('sites.show', ['server' => $server, 'site' => $site]),
+                metadata: [
+                    'server_id' => (string) $server->id,
+                    'site_id' => (string) $site->id,
+                    'target_family' => $this->targetFamily,
+                ],
+                actor: $user,
+            );
+        } catch (Throwable $e) {
+            Log::warning('failed to publish server.container_launch.completed', [
+                'server_id' => $server->id,
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function failed(?Throwable $exception): void
@@ -109,13 +138,35 @@ class FinalizeContainerCloudLaunchJob implements ShouldQueue
             return;
         }
 
+        $message = $exception?->getMessage() ?: 'The container launch did not finish successfully.';
         $this->updateLaunchState(
             $server,
             'failed',
             'Container launch failed',
-            $exception?->getMessage() ?: 'The container launch did not finish successfully.',
+            $message,
             'error',
         );
+
+        try {
+            $user = User::query()->find($this->userId);
+            app(NotificationPublisher::class)->publish(
+                eventKey: 'server.container_launch.failed',
+                subject: $server,
+                title: 'Container app deploy failed on '.$server->name,
+                body: $message,
+                url: route('servers.overview', $server),
+                metadata: [
+                    'server_id' => (string) $server->id,
+                    'target_family' => $this->targetFamily,
+                ],
+                actor: $user,
+            );
+        } catch (Throwable $e) {
+            Log::warning('failed to publish server.container_launch.failed', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

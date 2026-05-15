@@ -1,6 +1,15 @@
 @php
     $card = 'dply-card overflow-hidden';
-    $setupIncomplete = $server->status !== \App\Models\Server::STATUS_READY || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE;
+    // Container hosts (docker/kubernetes) don't run the VM-shaped setup journey,
+    // so they're "setup complete" the moment they're STATUS_READY — even when
+    // setup_status is null. Without this branch, Docker / K8s hosts show the
+    // VM-shaped "setup in progress" hero instead of the at-a-glance overview
+    // (and the new "Add your first container app" CTA below).
+    $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+    $setupIncomplete = ! $isContainerHost && (
+        $server->status !== \App\Models\Server::STATUS_READY
+        || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE
+    );
     $containerLaunchTranscript = collect($containerLaunch['events'] ?? [])->map(function (array $event): string {
         $timestamp = (string) ($event['at'] ?? '');
         $level = strtoupper((string) ($event['level'] ?? 'info'));
@@ -277,6 +286,26 @@
                             <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border {{ $containerLaunch['is_failed'] ? 'border-rose-200' : 'border-sky-200' }} bg-white px-3 py-3 font-mono text-[11px] leading-5 text-brand-ink">{{ $containerLaunchTranscript }}</pre>
                         </div>
                     @endif
+                </section>
+            @endif
+
+            {{-- Container-host empty state. Only visible when the host is docker/kubernetes,
+                 there are no sites yet, and there's no in-flight launch banner above. The
+                 corresponding VM-host welcome / first-site CTA stays in the existing flow.
+                 ($isContainerHost is computed above with $setupIncomplete.) --}}
+            @if ($isContainerHost && $siteCount === 0 && ! $containerLaunch)
+                <section data-testid="add-first-container-cta" class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-sky-50/50 p-8 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-6">
+                        <div class="max-w-xl space-y-2">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">{{ __('Next step') }}</p>
+                            <h3 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ __('Add your first container app') }}</h3>
+                            <p class="text-sm leading-6 text-brand-moss">{{ __('Point dply at a Git repo and we will inspect the Dockerfile, build the image, and deploy onto this host. You can add more apps any time.') }}</p>
+                        </div>
+                        <a href="{{ route('sites.create', $server) }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-sky-700">
+                            <x-heroicon-o-plus class="h-4 w-4" />
+                            {{ __('Add a container app') }}
+                        </a>
+                    </div>
                 </section>
             @endif
 
