@@ -27,11 +27,11 @@
         </header>
 
         @if ($form->mode === 'provider')
-            {{-- Host kind picker (VM vs Docker). Pre-selected from the Containers
-                 launcher's host_target=docker hint; default 'vm' for direct entry. --}}
+            {{-- Host kind picker (VM / Docker / Managed Kubernetes). Pre-selected from the
+                 Containers launcher's host_target=docker|kubernetes hint; default 'vm'. --}}
             <section class="space-y-4">
                 <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Host kind') }}</h2>
-                <div class="grid gap-4 sm:grid-cols-2">
+                <div class="grid gap-4 sm:grid-cols-3">
                     <button
                         type="button"
                         wire:click="chooseProviderHostKind('vm')"
@@ -70,12 +70,32 @@
                         <p class="mt-4 text-base font-semibold text-brand-ink">{{ __('Docker host') }}</p>
                         <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">{{ __('Skip the stack install. Dply just provisions the VM with Docker and orchestrates containers.') }}</p>
                     </button>
+                    <button
+                        type="button"
+                        wire:click="chooseProviderHostKind('kubernetes')"
+                        @class([
+                            'group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all',
+                            'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->provider_host_kind === 'kubernetes',
+                            'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->provider_host_kind !== 'kubernetes',
+                        ])
+                    >
+                        <span @class([
+                            'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors',
+                            'bg-brand-sage text-white shadow-md shadow-brand-sage/20' => $form->provider_host_kind === 'kubernetes',
+                            'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15' => $form->provider_host_kind !== 'kubernetes',
+                        ])>
+                            <x-heroicon-o-server-stack class="h-6 w-6" />
+                        </span>
+                        <p class="mt-4 text-base font-semibold text-brand-ink">{{ __('Managed Kubernetes') }}</p>
+                        <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">{{ __('Register an existing DOKS cluster. Dply deploys containers into it; DigitalOcean bills you for the cluster.') }}</p>
+                    </button>
                 </div>
                 <x-input-error :messages="$errors->get('form.provider_host_kind')" class="mt-1" />
             </section>
 
-            {{-- Provider tile picker --}}
-            <section class="space-y-4">
+            {{-- Provider tile picker. Hidden for Kubernetes hosts (DO is auto-selected
+                 in this PR; AWS EKS ships in a follow-up). --}}
+            <section @class(['space-y-4', 'hidden' => $form->provider_host_kind === 'kubernetes'])>
                 <div class="flex items-baseline justify-between gap-2">
                     <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Provider') }}</h2>
                     <a href="{{ route('credentials.index') }}" wire:navigate class="text-sm font-medium text-brand-sage transition-colors hover:text-brand-forest">{{ __('Manage credentials') }} →</a>
@@ -136,11 +156,23 @@
                 @endif
             </section>
 
-            {{-- Region + size pickers, only when there's a credential --}}
-            @if ($form->provider_credential_id !== '')
+            {{-- Region + size pickers, only when there's a credential and the host is VM/Docker.
+                 K8s hosts inherit region from the picked cluster (chosen on the next step) and
+                 don't have a VM size. --}}
+            @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes')
                 <section class="grid gap-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:grid-cols-2">
                     @include('livewire.servers.create._provider-region-picker')
                     @include('livewire.servers.create._provider-size-picker')
+                </section>
+            @endif
+
+            {{-- K8s: account-only card with a hint about what comes next. --}}
+            @if ($form->provider_host_kind === 'kubernetes' && $form->provider_credential_id !== '')
+                <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Cluster') }}</p>
+                    <p class="mt-3 text-sm leading-relaxed text-brand-moss">
+                        {{ __('You will pick the cluster from your DigitalOcean account on the next step. Region is inherited from the cluster.') }}
+                    </p>
                 </section>
             @endif
         @else

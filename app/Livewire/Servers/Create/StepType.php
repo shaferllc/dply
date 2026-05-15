@@ -74,6 +74,9 @@ class StepType extends Component
                 $this->dockerHostHinted = true;
                 $this->form->mode = 'provider';
                 $this->form->provider_host_kind = 'docker';
+            } elseif ($requestedHostTarget === 'kubernetes') {
+                $this->form->mode = 'provider';
+                $this->form->provider_host_kind = 'kubernetes';
             }
         }
 

@@ -125,6 +125,21 @@ class StepWhere extends Component
             return;
         }
         $this->form->provider_host_kind = $kind;
+
+        // K8s is wired only for DigitalOcean managed clusters in this PR.
+        // Pin form.type so the existing storeDigitalOceanKubernetes branch
+        // in StoreServerFromCreateForm handles the submission. AWS EKS
+        // ships in a follow-up.
+        if ($kind === 'kubernetes') {
+            $this->form->type = 'digitalocean_kubernetes';
+            $this->active_provider = 'digitalocean';
+            $this->memoServerCreateCatalog = null;
+            $this->memoServerCreateCatalogKey = null;
+            $this->autoSelectSingleOptions();
+        } elseif ($this->form->type === 'digitalocean_kubernetes') {
+            // Switching back to vm/docker — clear the K8s pin so user picks fresh.
+            $this->form->type = '';
+        }
     }
 
     public function updatedFormProviderCredentialId(): void
@@ -167,19 +182,29 @@ class StepWhere extends Component
         $this->authorize('create', Server::class);
 
         if ($this->form->mode === 'provider') {
-            $this->validate([
+            $isKubernetes = $this->form->provider_host_kind === 'kubernetes';
+
+            $rules = [
                 'form.type' => ['required', 'string', 'max:64'],
                 'form.provider_host_kind' => ['required', Rule::in(['vm', 'docker', 'kubernetes'])],
                 'form.provider_credential_id' => ['required', 'string'],
-                'form.region' => ['required', 'string'],
-                'form.size' => ['required', 'string'],
-            ], attributes: [
+            ];
+            $attributes = [
                 'form.type' => __('provider'),
                 'form.provider_host_kind' => __('host kind'),
                 'form.provider_credential_id' => __('account'),
-                'form.region' => __('region'),
-                'form.size' => __('plan'),
-            ]);
+            ];
+
+            // VM and Docker hosts pick a region + plan; K8s servers infer
+            // both from the selected cluster (chosen on the next step).
+            if (! $isKubernetes) {
+                $rules['form.region'] = ['required', 'string'];
+                $rules['form.size'] = ['required', 'string'];
+                $attributes['form.region'] = __('region');
+                $attributes['form.size'] = __('plan');
+            }
+
+            $this->validate($rules, attributes: $attributes);
         } else {
             $this->validate([
                 'form.custom_host_kind' => ['required', Rule::in(['vm', 'docker'])],
