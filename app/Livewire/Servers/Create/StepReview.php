@@ -178,8 +178,11 @@ class StepReview extends Component
     {
         $this->saveDraftFromForm($this->form);
 
-        // VM-shaped servers go back to "What it runs"; Docker hosts skip step 3.
-        $back = ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker') ? 2 : 3;
+        // VM-shaped + K8s servers go back to "What it runs" (K8s uses that step
+        // for cluster/namespace selection); Docker hosts skip step 3 entirely.
+        $isDockerHost = ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker')
+            || ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker');
+        $back = $isDockerHost ? 2 : 3;
 
         return $this->redirect(route(self::routeNameForStep($back)), navigate: true);
     }
@@ -568,7 +571,8 @@ class StepReview extends Component
         $org = auth()->user()?->currentOrganization();
         $context = $this->buildPreflightContext($org);
 
-        $isVmShaped = ! (
+        $isKubernetes = $this->form->mode === 'provider' && $this->form->provider_host_kind === 'kubernetes';
+        $isVmShaped = ! $isKubernetes && ! (
             ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker')
             || ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker')
         );
@@ -579,6 +583,7 @@ class StepReview extends Component
             'catalog' => $context['catalog'],
             'preflight' => $context['preflight'],
             'isVmShaped' => $isVmShaped,
+            'isKubernetes' => $isKubernetes,
             'containerLaunch' => $this->containerLaunchContext(),
         ]);
     }

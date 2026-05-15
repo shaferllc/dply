@@ -117,17 +117,32 @@
                     </span>
 
                     @if ($form->mode === 'provider')
-                        @if ($form->region !== '')
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</span>
-                                <span class="font-medium text-brand-ink">{{ $form->region }}</span>
-                            </span>
-                        @endif
-                        @if ($form->size !== '')
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</span>
-                                <span class="font-medium text-brand-ink">{{ $form->size }}</span>
-                            </span>
+                        @if ($isKubernetes)
+                            @if ($form->do_kubernetes_cluster_name !== '')
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cluster') }}</span>
+                                    <span class="font-mono font-medium text-brand-ink">{{ $form->do_kubernetes_cluster_name }}</span>
+                                </span>
+                            @endif
+                            @if ($form->do_kubernetes_namespace !== '')
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Namespace') }}</span>
+                                    <span class="font-mono font-medium text-brand-ink">{{ $form->do_kubernetes_namespace }}</span>
+                                </span>
+                            @endif
+                        @else
+                            @if ($form->region !== '')
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</span>
+                                    <span class="font-medium text-brand-ink">{{ $form->region }}</span>
+                                </span>
+                            @endif
+                            @if ($form->size !== '')
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</span>
+                                    <span class="font-medium text-brand-ink">{{ $form->size }}</span>
+                                </span>
+                            @endif
                         @endif
                     @else
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
@@ -300,7 +315,22 @@
            it has room; the cost preview lifts up here so the operator
            sees pricing at a glance while scanning the summary. --}}
       <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
-        @include('livewire.servers.create._cost-preview-panel', ['preflight' => $preflight])
+        @if ($isKubernetes)
+            <div data-testid="k8s-billing-disclosure" class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                    <x-heroicon-m-banknotes class="h-3.5 w-3.5" />
+                    {{ __('Billing') }}
+                </p>
+                <p class="mt-3 text-sm leading-relaxed text-brand-moss">
+                    {{ __('DigitalOcean bills you directly for the cluster and its node pool — dply does not add anything on top.') }}
+                </p>
+                <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                    {{ __('Dply manages container deploys into the cluster as part of your existing dply plan.') }}
+                </p>
+            </div>
+        @else
+            @include('livewire.servers.create._cost-preview-panel', ['preflight' => $preflight])
+        @endif
 
         <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
             <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
