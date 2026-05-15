@@ -282,8 +282,12 @@ final class StoreServerFromCreateForm
             'provider_credential_id' => $credential->id,
             'ssh_port' => 22,
             'ssh_user' => 'kubernetes',
-            'status' => Server::STATUS_PENDING,
-            'health_status' => null,
+            // Cluster already exists in the DO account at register time; no
+            // provisioning phase, no SSH bootstrap. Per the agreed design,
+            // the server lands READY immediately so /servers/{id}/overview
+            // can surface the "Add a container" CTA right away.
+            'status' => Server::STATUS_READY,
+            'health_status' => Server::HEALTH_REACHABLE,
             'meta' => $meta,
         ]);
 
