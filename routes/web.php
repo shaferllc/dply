@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CancelServerProvisionController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
@@ -270,6 +271,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         return redirect()->route('servers.overview', $server);
     })->name('servers.show');
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
+    Route::post('servers/{server}/cancel-provision', CancelServerProvisionController::class)->name('servers.cancel-provision');
     Route::livewire('servers/{server}/cluster', WorkspaceCluster::class)->name('servers.cluster');
     Route::get('servers/{server}/cluster/kubeconfig', function (Server $server) {
         Gate::authorize('view', $server);

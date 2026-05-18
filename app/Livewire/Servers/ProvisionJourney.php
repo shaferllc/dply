@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
-use App\Enums\ServerProvider;
-use App\Jobs\ProvisionDigitalOceanDropletJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
@@ -27,8 +25,6 @@ use App\Support\Servers\ProvisionStepSnapshots;
 use App\Support\Servers\ProvisionVerificationSummary;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Livewire;
@@ -45,12 +41,6 @@ class ProvisionJourney extends Component
 
     /** @var string SHA-256 of last logged journey snapshot (avoids log spam on wire:poll). */
     public string $journeyViewLogSignature = '';
-
-    /** @var array{message: string, region?: ?string, size?: ?string, at?: ?string, source: 'meta'|'failed_jobs'}|null|false */
-    protected array|null|false $provisionJobFailureMemo = false;
-
-    /** @var bool|null */
-    protected ?bool $queueWorkerLikelyStalledMemo = null;
 
     public function mount(Server $server): void
     {
@@ -178,31 +168,13 @@ class ProvisionJourney extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server->fresh())
                 : null,
-            'provisionJobFailure' => $this->provisionJobFailure(),
-            'provisionCancellation' => $this->provisionCancellation(),
-            'queueWorkerLikelyStalled' => $this->queueWorkerLikelyStalled(),
         ]);
     }
 
     public function openCancelProvisionModal(): void
     {
-        \Illuminate\Support\Facades\Log::info('openCancelProvisionModal called', [
-            'server_id' => $this->server->id,
-            'status' => $this->server->status,
-            'user_id' => auth()->id(),
-        ]);
-
-        try {
-            $this->authorize('update', $this->server);
-            $this->showCancelProvisionModal = true;
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('openCancelProvisionModal threw', [
-                'server_id' => $this->server->id,
-                'error' => $e->getMessage(),
-                'class' => $e::class,
-            ]);
-            $this->toastError(__('Could not open cancel dialog: :message', ['message' => $e->getMessage()]));
-        }
+        $this->authorize('update', $this->server);
+        $this->showCancelProvisionModal = true;
     }
 
     public function closeCancelProvisionModal(): void
@@ -212,326 +184,52 @@ class ProvisionJourney extends Component
 
     public function cancelProvision(TaskRunnerService $taskRunner): void
     {
-        try {
-            $this->authorize('update', $this->server);
-
-            $task = $this->activeProvisionTask();
-            if ($task) {
-                $result = $taskRunner->cancelTask((string) $task->id);
-
-                if (! ($result['success'] ?? false)) {
-                    $this->toastError((string) ($result['error'] ?? __('Could not cancel the build task.')));
-
-                    return;
-                }
-            }
-
-            // Either we just cancelled the task, OR there was never a task
-            // (the build failed before a task was created — e.g. DO API
-            // rejected the droplet request). Either way, if the server is
-            // still in a provisioning state, flip it to ERROR and record
-            // the cancellation so the UI stops showing "build in progress"
-            // and the user can decide to keep or remove the server.
-            $changed = $this->markServerCancelled();
-
-            $this->server->refresh();
-            $this->showCancelProvisionModal = false;
-
-            if ($changed) {
-                $this->toastSuccess(__('Build cancelled. You can keep this server or remove it.'));
-            } else {
-                $this->toastSuccess(__('Build is already finished — nothing to cancel.'));
-            }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('cancelProvision threw', [
-                'server_id' => $this->server->id,
-                'status' => $this->server->status,
-                'setup_status' => $this->server->setup_status,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            $this->toastError(__('Cancel failed: :message', ['message' => $e->getMessage()]));
-        }
-    }
-
-    public function cancelProvisionAndOpenDelete(TaskRunnerService $taskRunner): void
-    {
-        try {
-            $this->authorize('delete', $this->server);
-
-            $task = $this->activeProvisionTask();
-            if ($task) {
-                $result = $taskRunner->cancelTask((string) $task->id);
-
-                if (! ($result['success'] ?? false)) {
-                    $this->toastError((string) ($result['error'] ?? __('Could not cancel the build task.')));
-
-                    return;
-                }
-            }
-
-            $this->markServerCancelled();
-
-            $this->server->refresh();
-            $this->showCancelProvisionModal = false;
-            $this->openRemoveServerModal();
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('cancelProvisionAndOpenDelete threw', [
-                'server_id' => $this->server->id,
-                'status' => $this->server->status,
-                'setup_status' => $this->server->setup_status,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            $this->toastError(__('Cancel failed: :message', ['message' => $e->getMessage()]));
-        }
-    }
-
-    /**
-     * Re-dispatch the provider provision job for a server that failed at
-     * the dispatch boundary (e.g. DO API rejected the request). Clears
-     * the prior error and flips status back to PENDING so the job runs
-     * cleanly. Currently DO-only; other providers fall through with an
-     * error toast.
-     */
-    public function retryProvision(): void
-    {
         $this->authorize('update', $this->server);
 
-        if ($this->server->provider !== ServerProvider::DigitalOcean) {
-            $this->toastError(__('Retry is not wired for :provider yet — recreate the server instead.', [
-                'provider' => $this->server->provider?->value ?? 'this provider',
-            ]));
+        $task = $this->activeProvisionTask();
+        if (! $task) {
+            $this->toastError(__('There is no active build task to cancel right now.'));
+            $this->showCancelProvisionModal = false;
 
             return;
         }
 
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        unset($meta['provision_error'], $meta['provision_cancelled']);
+        $result = $taskRunner->cancelTask((string) $task->id);
 
-        $this->server->forceFill([
-            'status' => Server::STATUS_PENDING,
-            'meta' => $meta,
-        ])->save();
+        if (! ($result['success'] ?? false)) {
+            $this->toastError((string) ($result['error'] ?? __('Could not cancel the build task.')));
 
-        ProvisionDigitalOceanDropletJob::dispatch($this->server);
+            return;
+        }
 
         $this->server->refresh();
-        $this->provisionJobFailureMemo = false;
-        $this->queueWorkerLikelyStalledMemo = null;
-
-        $this->toastSuccess(__('Provision job re-queued.'));
+        $this->showCancelProvisionModal = false;
+        $this->toastSuccess(__('Build cancelled. You can keep this server or remove it.'));
     }
 
-    /**
-     * Surfaces the latest provision-job failure for this server:
-     *  - meta.provision_error written by the job's catch block
-     *  - or, as a fallback, the most recent failed_jobs row tagged with
-     *    this server's id (covers paths that pre-date the meta hook).
-     *
-     * @return array{message: string, region?: ?string, size?: ?string, at?: ?string, source: 'meta'|'failed_jobs'}|null
-     */
-    protected function provisionJobFailure(): ?array
+    public function cancelProvisionAndOpenDelete(TaskRunnerService $taskRunner): void
     {
-        if ($this->provisionJobFailureMemo !== false) {
-            return $this->provisionJobFailureMemo;
-        }
+        $this->authorize('delete', $this->server);
 
-        $this->provisionJobFailureMemo = $this->computeProvisionJobFailure();
+        $task = $this->activeProvisionTask();
+        if ($task) {
+            $result = $taskRunner->cancelTask((string) $task->id);
 
-        return $this->provisionJobFailureMemo;
-    }
+            if (! ($result['success'] ?? false)) {
+                $this->toastError((string) ($result['error'] ?? __('Could not cancel the build task.')));
 
-    private function computeProvisionJobFailure(): ?array
-    {
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $err = $meta['provision_error'] ?? null;
-        if (is_array($err) && ! empty($err['message'])) {
-            return [
-                'message' => (string) $err['message'],
-                'region' => $err['region'] ?? null,
-                'size' => $err['size'] ?? null,
-                'at' => $err['at'] ?? null,
-                'source' => 'meta',
-            ];
-        }
-
-        if (! Schema::hasTable('failed_jobs')) {
-            return null;
-        }
-
-        // Search by raw server ULID + the provision job classname. The
-        // earlier approach used the Horizon-style tag (App\Models\Server:<id>)
-        // but Laravel JSON-escapes backslashes in the payload, so a LIKE
-        // against an un-escaped tag never matches. Server ULIDs are
-        // unique enough that bare-ID matching is reliable.
-        $serverId = (string) $this->server->id;
-        $row = DB::table('failed_jobs')
-            ->where(function ($q) use ($serverId) {
-                $q->where('payload', 'like', '%'.$serverId.'%')
-                    ->orWhere('exception', 'like', '%'.$serverId.'%');
-            })
-            ->where(function ($q) {
-                $q->where('payload', 'like', '%Provision%Job%')
-                    ->orWhere('exception', 'like', '%Provision%Job%');
-            })
-            ->orderByDesc('failed_at')
-            ->first(['exception', 'failed_at']);
-
-        if (! $row) {
-            return null;
-        }
-
-        $firstLine = strtok((string) $row->exception, "\n") ?: 'Queued provision job failed.';
-
-        return [
-            'message' => $firstLine,
-            'at' => (string) $row->failed_at,
-            'source' => 'failed_jobs',
-        ];
-    }
-
-    /**
-     * Surfaces the user-triggered cancellation written by markServerCancelled().
-     *
-     * @return array{at: ?string, by_user_id: ?string}|null
-     */
-    protected function provisionCancellation(): ?array
-    {
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $c = $meta['provision_cancelled'] ?? null;
-        if (! is_array($c)) {
-            return null;
-        }
-
-        return [
-            'at' => isset($c['at']) ? (string) $c['at'] : null,
-            'by_user_id' => isset($c['by_user_id']) ? (string) $c['by_user_id'] : null,
-        ];
-    }
-
-    /**
-     * Heuristic: the queue worker may not be running locally if the
-     * server has been in PENDING/PROVISIONING for > 2 minutes with no
-     * task row, no failed_jobs row, and no provision_error on meta.
-     * In that state the job is presumably stuck in the `jobs` table.
-     */
-    protected function queueWorkerLikelyStalled(): bool
-    {
-        if ($this->queueWorkerLikelyStalledMemo !== null) {
-            return $this->queueWorkerLikelyStalledMemo;
-        }
-
-        $this->queueWorkerLikelyStalledMemo = $this->computeQueueWorkerLikelyStalled();
-
-        return $this->queueWorkerLikelyStalledMemo;
-    }
-
-    private function computeQueueWorkerLikelyStalled(): bool
-    {
-        $stillProvisioning = in_array($this->server->status, [
-            Server::STATUS_PENDING,
-            Server::STATUS_PROVISIONING,
-        ], true);
-
-        if (! $stillProvisioning) {
-            return false;
-        }
-
-        if ($this->provisionJobFailure() !== null) {
-            return false;
-        }
-
-        if ($this->provisionTask() !== null) {
-            return false;
-        }
-
-        $created = $this->server->created_at;
-        if (! $created || $created->diffInMinutes(now()) < 2) {
-            return false;
-        }
-
-        // Pending job in the jobs table = worker isn't picking it up.
-        if (Schema::hasTable('jobs')) {
-            $tag = 'App\\Models\\Server:'.$this->server->id;
-            $stuck = DB::table('jobs')
-                ->where('payload', 'like', '%'.$tag.'%')
-                ->exists();
-
-            if ($stuck) {
-                return true;
+                return;
             }
         }
 
-        // Nothing in jobs table, nothing in failed_jobs, no task — the
-        // dispatch may have been swallowed silently. Still suspicious.
-        return true;
-    }
-
-    /**
-     * Flip a server that's stuck in PENDING/PROVISIONING/setup-running
-     * over to ERROR with a cancellation reason on meta. Idempotent — if
-     * the server is already past the provisioning phase, we don't
-     * stomp on its state.
-     */
-    private function markServerCancelled(): bool
-    {
-        $stillProvisioning = in_array($this->server->status, [
-            Server::STATUS_PENDING,
-            Server::STATUS_PROVISIONING,
-        ], true) || $this->server->setup_status === Server::SETUP_STATUS_RUNNING;
-
-        if (! $stillProvisioning) {
-            return false;
-        }
-
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $meta['provision_cancelled'] = [
-            'at' => now()->toIso8601String(),
-            'by_user_id' => (string) (auth()->id() ?? ''),
-        ];
-
-        $this->server->forceFill([
-            'status' => Server::STATUS_ERROR,
-            'setup_status' => $this->server->setup_status === Server::SETUP_STATUS_RUNNING
-                ? Server::SETUP_STATUS_FAILED
-                : $this->server->setup_status,
-            'meta' => $meta,
-        ])->save();
-
-        \Illuminate\Support\Facades\Log::info('Server provision cancelled by user', [
-            'server_id' => $this->server->id,
-            'previous_status' => $this->server->getOriginal('status'),
-        ]);
-
-        // Invalidate per-request memos so any subsequent render in the
-        // same request sees the new server state instead of pre-cancel
-        // values cached on this component instance.
-        $this->provisionJobFailureMemo = false;
-        $this->queueWorkerLikelyStalledMemo = null;
-
-        return true;
+        $this->server->refresh();
+        $this->showCancelProvisionModal = false;
+        $this->openRemoveServerModal();
     }
 
     protected function shouldPoll(): bool
     {
-        if ($this->shouldRedirectToServerOverview()) {
-            return false;
-        }
-
-        // Terminal states: no point polling. Polling here both wastes
-        // PHP-FPM workers (delaying the user's next click on a small
-        // worker pool) AND keeps the page in a "REFRESHING" visual
-        // state long after the build stopped moving.
-        if ($this->server->status === Server::STATUS_ERROR) {
-            return false;
-        }
-
-        if ($this->server->setup_status === Server::SETUP_STATUS_FAILED) {
-            return false;
-        }
-
-        return true;
+        return ! $this->shouldRedirectToServerOverview();
     }
 
     /**

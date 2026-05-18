@@ -56,11 +56,13 @@
         : null;
 @endphp
 
+{{-- Component root MUST be first element for Livewire v3 to inject wire:id/wire:snapshot --}}
+<div x-data @if ($shouldPoll) wire:poll.5s @endif>
+
 @once
+    @push('styles')
     <style>
-        /* Animated stripe sheen for an actively-progressing bar (e.g. cloud bar mid-fill).
-           The fill keeps its solid colour; we overlay a translucent diagonal-stripe gradient
-           and march it left→right at a steady tempo. */
+        /* Animated stripe sheen for an actively-progressing bar (e.g. cloud bar mid-fill). */
         @keyframes dply-progress-stripes {
             0%   { background-position: 0 0; }
             100% { background-position: 1.25rem 0; }
@@ -80,9 +82,7 @@
             animation: dply-progress-stripes 1s linear infinite;
         }
 
-        /* Indeterminate marching highlight on an empty track — used while we're waiting on
-           a phase handoff (e.g. cloud done, setup not yet dispatched) so the rail doesn't
-           look stalled. A narrow translucent emerald sweeps left→right across the track. */
+        /* Indeterminate marching highlight on an empty track */
         @keyframes dply-progress-indeterminate {
             0%   { background-position: -40% 0; }
             100% { background-position: 140% 0; }
@@ -99,7 +99,6 @@
             animation: dply-progress-indeterminate 1.6s ease-in-out infinite;
         }
 
-        /* Reduce-motion: disable the marching animations but keep colour cues. */
         @media (prefers-reduced-motion: reduce) {
             .dply-progress-fill-active,
             .dply-progress-track-indeterminate {
@@ -107,23 +106,8 @@
             }
         }
     </style>
+    @endpush
 @endonce
-
-<div
-    @if ($shouldPoll)
-        {{-- Polling cadence: every 5s while the journey is active.
-             We previously gated this with the .visible modifier to pause
-             polling when the page scrolled out of view / backgrounded, but
-             that caused the page to look frozen for operators who'd
-             scrolled to read step output — and modern browsers already
-             throttle setInterval to 1Hz on backgrounded tabs natively,
-             which mitigates the multi-tab thrash the modifier was
-             defending against. Plain wire:poll is the simpler, more
-             predictable behavior for a status page. --}}
-        wire:poll.5s
-    @endif
-    x-data
->
     <x-server-workspace-layout
         :server="$server"
         active="overview"
@@ -153,121 +137,6 @@
                  the fake-cloud routing that quick-marked steps done.
                  Operators can't recover this — the row has no real
                  provider credentials. Steer them to delete + recreate. --}}
-            @if (! empty($provisionCancellation))
-                <div class="col-span-full overflow-hidden rounded-2xl border-2 border-brand-ink/15 bg-white shadow-sm" data-testid="provision-cancelled-banner">
-                    <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
-                        <x-heroicon-o-no-symbol class="mt-0.5 h-5 w-5 shrink-0 text-brand-ink/60" />
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm font-semibold text-brand-ink">{{ __('Build cancelled') }}</p>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                {{ __('You stopped this server\'s build') }}@if (! empty($provisionCancellation['at'])) {{ __(' at :at', ['at' => $provisionCancellation['at']]) }}@endif.
-                                {{ __('Either retry the provision job or remove the server.') }}
-                            </p>
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    wire:click="retryProvision"
-                                    wire:loading.attr="disabled"
-                                    wire:target="retryProvision"
-                                    class="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-ink px-3 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
-                                >
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                    <span wire:loading.remove wire:target="retryProvision">{{ __('Retry provision') }}</span>
-                                    <span wire:loading wire:target="retryProvision">{{ __('Re-queueing…') }}</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    wire:click="openRemoveServerModal"
-                                    class="inline-flex h-9 items-center gap-2 rounded-lg border border-brand-rust/30 bg-white px-3 text-xs font-semibold text-brand-rust shadow-sm hover:bg-brand-rust/5"
-                                >
-                                    {{ __('Remove server') }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
-            @if (! empty($provisionJobFailure))
-                <div class="col-span-full overflow-hidden rounded-2xl border-2 border-brand-rust/40 bg-brand-rust/5 shadow-sm" data-testid="provision-job-failure-banner">
-                    <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
-                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-brand-rust" />
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm font-semibold text-brand-rust">{{ __('Provision job failed') }}</p>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-ink">{{ $provisionJobFailure['message'] }}</p>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">
-                                @if (! empty($provisionJobFailure['region']))
-                                    <span><strong class="text-brand-ink">{{ __('Region') }}:</strong> {{ $provisionJobFailure['region'] }}</span>
-                                @endif
-                                @if (! empty($provisionJobFailure['size']))
-                                    <span><strong class="text-brand-ink">{{ __('Size') }}:</strong> {{ $provisionJobFailure['size'] }}</span>
-                                @endif
-                                @if (! empty($provisionJobFailure['at']))
-                                    <span><strong class="text-brand-ink">{{ __('At') }}:</strong> {{ $provisionJobFailure['at'] }}</span>
-                                @endif
-                                <span class="text-brand-mist">{{ __('Source:') }} {{ $provisionJobFailure['source'] }}</span>
-                            </div>
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    wire:click="retryProvision"
-                                    wire:loading.attr="disabled"
-                                    wire:target="retryProvision"
-                                    class="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-ink px-3 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
-                                >
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                    <span wire:loading.remove wire:target="retryProvision">{{ __('Try again') }}</span>
-                                    <span wire:loading wire:target="retryProvision">{{ __('Re-queueing…') }}</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    wire:click="openCancelProvisionModal"
-                                    class="inline-flex h-9 items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                >
-                                    {{ __('Cancel build') }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
-            @if ($queueWorkerLikelyStalled)
-                <div class="col-span-full overflow-hidden rounded-2xl border-2 border-amber-300 bg-amber-50 shadow-sm" data-testid="queue-worker-stalled-banner">
-                    <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
-                        <x-heroicon-o-clock class="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm font-semibold text-amber-950">{{ __('Queue worker may not be running') }}</p>
-                            <p class="mt-1 text-sm leading-relaxed text-amber-950/90">
-                                {{ __('This server has been in :status for more than two minutes with no task activity and no recorded failure. The provision job is likely stuck in the jobs table waiting for a worker.', ['status' => $server->status]) }}
-                            </p>
-                            <div class="mt-2 rounded-lg bg-white/60 p-3 text-xs text-amber-950/90">
-                                <p class="font-semibold">{{ __('In your dply checkout, start the worker:') }}</p>
-                                <code class="mt-1 block font-mono">php artisan queue:work --tries=1</code>
-                                <p class="mt-2 text-amber-900/80">{{ __('Or use the supervisor / Horizon process you normally run in dev. Once the worker is up the job will pick up automatically.') }}</p>
-                            </div>
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    wire:click="retryProvision"
-                                    class="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-700/30 bg-white px-3 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-100"
-                                >
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                    {{ __('Re-queue the job') }}
-                                </button>
-                                <button
-                                    type="button"
-                                    wire:click="openCancelProvisionModal"
-                                    class="inline-flex h-9 items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                >
-                                    {{ __('Cancel build') }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
             @if (! empty($isOrphanedFakeServer))
                 <div class="col-span-full overflow-hidden rounded-2xl border-2 border-amber-300 bg-amber-50 shadow-sm">
                     <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
