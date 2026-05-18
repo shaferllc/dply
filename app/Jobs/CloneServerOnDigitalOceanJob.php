@@ -195,6 +195,16 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
 
         $emitter?->success(__('Droplet :id created. Polling for IP …', ['id' => $newDropletId]), 'dply');
 
+        $clone->loadMissing('organization');
+        if ($clone->organization) {
+            audit_log($clone->organization, null, 'server.clone.droplet_created', $clone, null, [
+                'source_server_id' => (string) $this->sourceServerId,
+                'clone_server_id' => (string) $this->cloneServerId,
+                'snapshot_name' => $this->snapshotName,
+                'droplet_id' => $newDropletId,
+            ]);
+        }
+
         if ($consoleRow !== null) {
             // Hand off to the IP poll job; PollDropletIpJob flips status to
             // READY and pings ServerProvisionDispatch (which is a no-op for
@@ -266,6 +276,15 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
     {
         if ($clone !== null) {
             $clone->update(['status' => Server::STATUS_ERROR]);
+            $clone->loadMissing('organization');
+            if ($clone->organization) {
+                audit_log($clone->organization, null, 'server.clone.failed', $clone, null, [
+                    'source_server_id' => (string) $this->sourceServerId,
+                    'clone_server_id' => (string) $this->cloneServerId,
+                    'snapshot_name' => $this->snapshotName,
+                    'error' => mb_substr($message, 0, 1000),
+                ]);
+            }
         }
         if ($consoleRow !== null) {
             try {

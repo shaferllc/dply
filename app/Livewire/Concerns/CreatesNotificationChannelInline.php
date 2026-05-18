@@ -136,6 +136,21 @@ trait CreatesNotificationChannelInline
             'config' => $this->newChannelConfigFromInput($this->new_type),
         ]);
 
+        $org = match (true) {
+            $owner instanceof Organization => $owner,
+            $owner instanceof Team => $owner->organization,
+            $owner instanceof User => Auth::user()?->currentOrganization(),
+            default => null,
+        };
+        if ($org !== null) {
+            audit_log($org, Auth::user(), 'notification_channel.created', $channel, null, [
+                'channel_id' => (string) $channel->id,
+                'type' => $channel->type,
+                'label' => $channel->label,
+                'surface' => 'inline_modal',
+            ]);
+        }
+
         $this->resetNewChannelFields();
         $this->createChannelModalOpen = false;
         $this->dispatch('close-modal', 'create-notification-channel-modal');

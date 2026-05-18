@@ -206,10 +206,30 @@ class RunSiteDeploymentJob implements ShouldQueue
             SiteDeployment::STATUS_SKIPPED => 'site.deploy.skipped',
             default => 'site.deploy.finished',
         };
+
+        $startedAt = $deployment->started_at;
+        $finishedAt = $deployment->finished_at;
+        $durationMs = $startedAt && $finishedAt
+            ? (int) round(($finishedAt->getTimestamp() - $startedAt->getTimestamp()) * 1000)
+            : null;
+
+        $errorExcerpt = null;
+        if ($deployment->status === SiteDeployment::STATUS_FAILED && $deployment->log_output) {
+            $errorExcerpt = mb_strimwidth((string) $deployment->log_output, 0, 1000, '…');
+        }
+
         audit_log($org, $user, $action, $deployment, null, [
             'site' => $this->site->name,
+            'site_id' => (string) $this->site->id,
+            'deployment_id' => (string) $deployment->id,
             'trigger' => $this->trigger,
             'status' => $deployment->status,
+            'exit_code' => $deployment->exit_code,
+            'git_sha' => $deployment->git_sha,
+            'duration_ms' => $durationMs,
+            'started_at' => $startedAt?->toIso8601String(),
+            'finished_at' => $finishedAt?->toIso8601String(),
+            'error_excerpt' => $errorExcerpt,
         ]);
     }
 

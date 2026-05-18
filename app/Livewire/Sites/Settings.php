@@ -573,6 +573,15 @@ class Settings extends Show
         }
 
         $this->loadSiteNotificationPreferences();
+
+        $auditOrg = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+        if ($auditOrg) {
+            audit_log($auditOrg, auth()->user(), 'site.notifications.subscriptions_updated', $this->site, null, [
+                'channel_ids' => array_values(array_map('strval', $this->site_notification_channel_ids)),
+                'event_keys' => array_values($this->site_notification_event_keys),
+            ]);
+        }
+
         $this->dispatch('notify', message: __('Site notification subscriptions saved.'));
     }
 
@@ -612,7 +621,7 @@ class Settings extends Show
             $events[] = 'uptime_recovered';
         }
 
-        NotificationWebhookDestination::query()->create([
+        $created = NotificationWebhookDestination::query()->create([
             'organization_id' => $this->site->organization_id,
             'site_id' => $this->site->id,
             'name' => $this->site_int_hook_name,
@@ -621,6 +630,16 @@ class Settings extends Show
             'events' => $events !== [] ? $events : null,
             'enabled' => true,
         ]);
+
+        $org = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.integration_webhook.created', $this->site, null, [
+                'destination_id' => (string) $created->id,
+                'name' => $this->site_int_hook_name,
+                'driver' => $this->site_int_hook_driver,
+                'events' => $events,
+            ]);
+        }
 
         $this->reset([
             'site_int_hook_name',
@@ -652,7 +671,18 @@ class Settings extends Show
             ->where('site_id', $this->site->id)
             ->whereKey($id)
             ->firstOrFail();
+        $snapshot = [
+            'destination_id' => (string) $hook->id,
+            'name' => $hook->name,
+            'driver' => $hook->driver,
+            'events' => $hook->events,
+        ];
         $hook->delete();
+
+        $org = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.integration_webhook.deleted', $this->site, $snapshot, null);
+        }
 
         $this->dispatch('notify', message: __('Webhook destination removed.'));
     }

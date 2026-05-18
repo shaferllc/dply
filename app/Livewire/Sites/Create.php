@@ -569,6 +569,23 @@ class Create extends Component
             session()->flash('info', __('WordPress site queued for scaffolding. The pipeline runs in the background.'));
         }
 
+        if ($this->server->organization) {
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'site.created',
+                $site,
+                null,
+                [
+                    'name' => $site->name,
+                    'slug' => $site->slug,
+                    'server_id' => (string) $this->server->id,
+                    'mode' => 'scaffold',
+                    'scaffold_framework' => $this->form->scaffold_framework,
+                ],
+            );
+        }
+
         return $this->redirect(route('sites.scaffold-journey', [
             'server' => $this->server,
             'site' => $site,
@@ -1209,6 +1226,27 @@ class Create extends Component
         $site->loadMissing(['server', 'domains']);
         $siteProvisioner->markQueued($site);
         ProvisionSiteJob::dispatch($site->id);
+
+        if ($this->server->organization) {
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'site.created',
+                $site,
+                null,
+                [
+                    'name' => $site->name,
+                    'slug' => $site->slug,
+                    'server_id' => (string) $this->server->id,
+                    'type' => (string) $site->type->value,
+                    'runtime' => $site->runtime,
+                    'runtime_version' => $site->runtime_version,
+                    'primary_hostname' => strtolower(trim($this->form->primary_hostname)),
+                    'git_repository_url' => $site->git_repository_url,
+                    'git_branch' => $site->git_branch,
+                ],
+            );
+        }
 
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
     }

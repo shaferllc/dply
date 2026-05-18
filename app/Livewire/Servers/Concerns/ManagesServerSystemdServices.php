@@ -1012,6 +1012,13 @@ trait ManagesServerSystemdServices
                 );
                 $this->systemdActionBannerStatus = 'queued';
 
+                if ($server->organization) {
+                    audit_log($server->organization, auth()->user(), 'server.service.'.$action, $server, null, [
+                        'unit' => $normalized,
+                        'queued' => true,
+                    ]);
+                }
+
                 return;
             }
 
@@ -1027,6 +1034,12 @@ trait ManagesServerSystemdServices
             $this->toastSuccess($flash);
             $this->remote_error = null;
             $this->clearPendingActionAndRehydrate();
+            if ($server->organization) {
+                audit_log($server->organization, auth()->user(), 'server.service.'.$action, $server, null, [
+                    'unit' => $normalized,
+                    'result' => 'success',
+                ]);
+            }
             if ($syncInventoryAfter && (bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
@@ -1034,6 +1047,13 @@ trait ManagesServerSystemdServices
             $this->finishSystemdActionBanner('failed', $e->getMessage());
             $this->setSystemdRemoteError($e->getMessage());
             $this->clearPendingActionAndRehydrate();
+            if ($this->server->organization) {
+                audit_log($this->server->organization, auth()->user(), 'server.service.'.$action, $this->server, null, [
+                    'unit' => $normalized,
+                    'result' => 'failed',
+                    'error' => mb_strimwidth($e->getMessage(), 0, 500),
+                ]);
+            }
         } finally {
             if (! $this->shouldQueueManageRemoteTasks()) {
                 $this->clearSystemdActionBusyState();
@@ -1136,6 +1156,13 @@ trait ManagesServerSystemdServices
             $this->finishSystemdActionBanner('completed');
             $this->toastSuccess($flash);
             $this->clearPendingActionAndRehydrate();
+            if ($server->organization) {
+                audit_log($server->organization, auth()->user(), 'server.service.bulk_'.$action, $server, null, [
+                    'units' => $normalized,
+                    'count' => count($normalized),
+                    'result' => 'success',
+                ]);
+            }
             if ((bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
@@ -1143,6 +1170,14 @@ trait ManagesServerSystemdServices
             $this->finishSystemdActionBanner('failed', $e->getMessage());
             $this->setSystemdRemoteError($e->getMessage());
             $this->clearPendingActionAndRehydrate();
+            if ($this->server->organization) {
+                audit_log($this->server->organization, auth()->user(), 'server.service.bulk_'.$action, $this->server, null, [
+                    'units' => $normalized,
+                    'count' => count($normalized),
+                    'result' => 'failed',
+                    'error' => mb_strimwidth($e->getMessage(), 0, 500),
+                ]);
+            }
         } finally {
             if (! $this->shouldQueueManageRemoteTasks()) {
                 $this->clearSystemdActionBusyState();

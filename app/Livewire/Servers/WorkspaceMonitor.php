@@ -6,9 +6,11 @@ use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Jobs\RunServerMonitoringProbeJob;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\UpgradeGuestMetricsScriptJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\ConfirmsServerMonitoringInstall;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerPackageInstalls;
+use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Models\ServerManageAction;
@@ -16,6 +18,7 @@ use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Insights\InsightCorrelationService;
+use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;
@@ -24,7 +27,10 @@ use App\Services\Servers\ServerMetricsRangeQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -33,6 +39,7 @@ use Livewire\Component;
 class WorkspaceMonitor extends Component
 {
     use ConfirmsServerMonitoringInstall;
+    use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use RunsServerPackageInstalls;
 
@@ -44,8 +51,31 @@ class WorkspaceMonitor extends Component
     /** Metrics page time range: '1h' | '6h' | '24h' | '7d' | '30d'. Persisted client-side via localStorage on the segmented control. */
     public string $metricsRange = '1h';
 
-    /** Workspace tab: 'status' (health + current usage) | 'history' (charts) | 'diagnostics' (repair / inspect tooling). */
+    /** Workspace tab: 'status' (health + current usage) | 'history' (charts) | 'notifications' (alert routing) | 'diagnostics' (repair / inspect tooling). */
     public string $monitor_workspace_tab = 'status';
+
+    /** Notification subscription form properties */
+    public string $notifAddChannelId = '';
+
+    /** @var list<string> */
+    public array $notifAddEventKeys = [];
+
+    /** Threshold settings (server overrides) - null means use config default */
+    public ?float $thresholdCpu = null;
+
+    public ?float $thresholdMem = null;
+
+    public ?float $thresholdLoad = null;
+
+    /** Threshold input values for the edit form */
+    public float $thresholdCpuInput = 85.0;
+
+    public float $thresholdMemInput = 85.0;
+
+    public float $thresholdLoadInput = 4.0;
+
+    /** Whether threshold inputs are in edit mode */
+    public bool $editingThresholds = false;
 
     /**
      * Identifies which Diagnostics action populated the shared $remote_output / $remote_error
@@ -56,7 +86,7 @@ class WorkspaceMonitor extends Component
 
     public function setMonitorWorkspaceTab(string $tab): void
     {
-        if (! in_array($tab, ['status', 'history', 'diagnostics'], true)) {
+        if (! in_array($tab, ['status', 'history', 'notifications', 'diagnostics'], true)) {
             return;
         }
         $this->monitor_workspace_tab = $tab;
@@ -124,6 +154,256 @@ class WorkspaceMonitor extends Component
         $this->remote_output_kind = null;
     }
 
+    /* ========================================================================
+     * Notification Subscription Management
+     * ======================================================================== */
+
+    /**
+     * Override from CreatesNotificationChannelInline to scope channels to org.
+     */
+    protected function creatableChannelOwner(): \App\Models\User|\App\Models\Organization|\App\Models\Team
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            throw new \RuntimeException('No authenticated user for channel creation.');
+        }
+
+        $org = $user->currentOrganization();
+        if ($org !== null) {
+            return $org;
+        }
+
+        return $user;
+    }
+
+    /**
+     * After creating a channel inline, auto-select it in the subscription form.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->notifAddChannelId = $channelId;
+    }
+
+    /**
+     * Add notification subscription(s) for this server.
+     */
+    public function addServerNotificationSubscription(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change notification subscriptions.'));
+
+            return;
+        }
+
+        $this->validate([
+            'notifAddChannelId' => ['required', 'string', 'exists:notification_channels,id'],
+            'notifAddEventKeys' => ['required', 'array', 'min:1'],
+            'notifAddEventKeys.*' => ['string', 'in:server.automatic_updates,server.ssh_login,server.insights_alerts,server.monitoring'],
+        ], [], [
+            'notifAddChannelId' => __('channel'),
+            'notifAddEventKeys' => __('notification types'),
+        ]);
+
+        $org = Auth::user()?->currentOrganization();
+        $allowed = AssignableNotificationChannels::forUser(Auth::user(), $org)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        if (! in_array($this->notifAddChannelId, $allowed, true)) {
+            $this->addError('notifAddChannelId', __('Channel is not assignable to this server.'));
+
+            return;
+        }
+
+        $channel = NotificationChannel::query()->findOrFail($this->notifAddChannelId);
+        Gate::authorize('manageNotificationChannels', $channel->owner);
+
+        $created = 0;
+        foreach ($this->notifAddEventKeys as $eventKey) {
+            $row = NotificationSubscription::firstOrCreate([
+                'notification_channel_id' => $channel->id,
+                'subscribable_type' => Server::class,
+                'subscribable_id' => $this->server->id,
+                'event_key' => $eventKey,
+            ]);
+            if ($row->wasRecentlyCreated) {
+                $created++;
+            }
+        }
+
+        $this->notifAddChannelId = '';
+        $this->notifAddEventKeys = [];
+        $this->toastSuccess(__('Added :count subscription(s) routing this server\'s events to :channel.', [
+            'count' => $created,
+            'channel' => $channel->label,
+        ]));
+    }
+
+    /**
+     * Remove a notification subscription from this server.
+     */
+    public function removeServerNotificationSubscription(string $subscriptionId): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change notification subscriptions.'));
+
+            return;
+        }
+
+        $sub = NotificationSubscription::query()
+            ->where('subscribable_type', Server::class)
+            ->where('subscribable_id', $this->server->id)
+            ->whereKey($subscriptionId)
+            ->first();
+
+        if ($sub === null) {
+            return;
+        }
+
+        // Only allow removal when the user can manage the underlying channel
+        $channel = $sub->channel;
+        if ($channel instanceof NotificationChannel) {
+            Gate::authorize('manageNotificationChannels', $channel->owner);
+        }
+
+        $sub->delete();
+        $this->toastSuccess(__('Subscription removed.'));
+    }
+
+    /* ========================================================================
+     * Threshold Configuration
+     * ======================================================================== */
+
+    /**
+     * Load threshold settings from server meta or fallback to config defaults.
+     */
+    protected function syncThresholdSettingsFromServer(): void
+    {
+        $meta = $this->server->meta ?? [];
+        $thresholds = $meta['metric_thresholds'] ?? [];
+
+        $this->thresholdCpu = isset($thresholds['cpu_warn_pct'])
+            ? (float) $thresholds['cpu_warn_pct']
+            : null;
+        $this->thresholdMem = isset($thresholds['mem_warn_pct'])
+            ? (float) $thresholds['mem_warn_pct']
+            : null;
+        $this->thresholdLoad = isset($thresholds['load_warn'])
+            ? (float) $thresholds['load_warn']
+            : null;
+    }
+
+    /**
+     * Get effective thresholds (server override or config default).
+     *
+     * @return array{cpu: float, mem: float, load: float}
+     */
+    protected function effectiveThresholds(): array
+    {
+        return [
+            'cpu' => $this->thresholdCpu ?? (float) config('insights.thresholds.cpu_warn_pct', 85),
+            'mem' => $this->thresholdMem ?? (float) config('insights.thresholds.mem_warn_pct', 85),
+            'load' => $this->thresholdLoad ?? (float) config('insights.thresholds.load_warn', 4.0),
+        ];
+    }
+
+    /**
+     * Enable threshold editing mode.
+     */
+    public function startEditingThresholds(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        // Initialize input values to current effective thresholds
+        $effective = $this->effectiveThresholds();
+        $this->thresholdCpuInput = $effective['cpu'];
+        $this->thresholdMemInput = $effective['mem'];
+        $this->thresholdLoadInput = $effective['load'];
+
+        $this->editingThresholds = true;
+    }
+
+    /**
+     * Cancel threshold editing without saving.
+     */
+    public function cancelEditingThresholds(): void
+    {
+        $this->editingThresholds = false;
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Save threshold settings to server meta.
+     */
+    public function saveThresholdSettings(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        $this->validate([
+            'thresholdCpuInput' => ['required', 'numeric', 'min:1', 'max:99'],
+            'thresholdMemInput' => ['required', 'numeric', 'min:1', 'max:99'],
+            'thresholdLoadInput' => ['required', 'numeric', 'min:0.1', 'max:100'],
+        ], [], [
+            'thresholdCpuInput' => __('CPU threshold'),
+            'thresholdMemInput' => __('Memory threshold'),
+            'thresholdLoadInput' => __('Load threshold'),
+        ]);
+
+        $meta = $this->server->meta ?? [];
+        $meta['metric_thresholds'] = [
+            'cpu_warn_pct' => round($this->thresholdCpuInput, 1),
+            'mem_warn_pct' => round($this->thresholdMemInput, 1),
+            'load_warn' => round($this->thresholdLoadInput, 2),
+        ];
+
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
+        $this->syncThresholdSettingsFromServer();
+        $this->editingThresholds = false;
+        $this->toastSuccess(__('Metric thresholds saved. KPI warning colors will update on the next sample.'));
+    }
+
+    /**
+     * Clear server-specific thresholds and revert to config defaults.
+     */
+    public function resetThresholdsToDefaults(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        $meta = $this->server->meta ?? [];
+        unset($meta['metric_thresholds']);
+
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
+        $this->syncThresholdSettingsFromServer();
+        $this->editingThresholds = false;
+        $this->toastSuccess(__('Reverted to organization defaults.'));
+    }
+
     public function setMetricsRange(string $range): void
     {
         if (! ServerMetricsRangeQuery::isValidRange($range)) {
@@ -142,6 +422,7 @@ class WorkspaceMonitor extends Component
         $this->bootWorkspace($server);
         $this->server->refresh();
         $this->wasProbePending = $this->probePendingFromMeta($this->server->meta ?? []);
+        $this->syncThresholdSettingsFromServer();
     }
 
     #[On('monitoring-probe-requested')]
@@ -666,12 +947,12 @@ BASH);
         $rangeMetricSeries = $rangeData['metrics'];
         $tz = config('app.timezone');
 
-        // Threshold tints for per-panel header icon + KPI. Pulled from the
-        // same insights config the alert runners use, so the visual matches
-        // what fires a finding.
-        $thresholdCpu = (float) config('insights.thresholds.cpu_warn_pct', 85);
-        $thresholdMem = (float) config('insights.thresholds.mem_warn_pct', 85);
-        $thresholdLoad = (float) config('insights.thresholds.load_warn', 4.0);
+        // Threshold tints for per-panel header icon + KPI. Use server-specific
+        // thresholds if set, otherwise fall back to config defaults.
+        $effectiveThresholds = $this->effectiveThresholds();
+        $thresholdCpu = $effectiveThresholds['cpu'];
+        $thresholdMem = $effectiveThresholds['mem'];
+        $thresholdLoad = $effectiveThresholds['load'];
         $thresholdDiskWarn = 85.0; // Disk has no insights threshold yet — match cpu/mem default.
 
         $statusFor = function (?float $value, float $warn, float $critical): string {
@@ -793,6 +1074,21 @@ BASH);
             'has_project' => $workspace !== null,
         ];
 
+        // Notification subscriptions data (for the Notifications tab)
+        $serverNotifSubscriptions = NotificationSubscription::query()
+            ->where('subscribable_type', Server::class)
+            ->where('subscribable_id', $this->server->id)
+            ->with('channel')
+            ->get();
+
+        $assignableChannels = AssignableNotificationChannels::forUser(
+            Auth::user(),
+            Auth::user()?->currentOrganization()
+        )->sortBy('label')->values();
+
+        // Server-scoped notification event labels
+        $serverEventLabels = config('notification_events.categories.server.events', []);
+
         return view('livewire.servers.workspace-monitor', [
             'latest' => $latest,
             'chartPointLimit' => $chartLimit,
@@ -828,6 +1124,15 @@ BASH);
             'routingSummary' => $routingSummary,
             'monitoringInstallAction' => $monitoringInstallAction,
             'monitoringInstallInProgress' => $monitoringInstallInProgress,
+            // Notification subscription data
+            'serverNotifSubscriptions' => $serverNotifSubscriptions,
+            'assignableChannels' => $assignableChannels,
+            'serverEventLabels' => $serverEventLabels,
+            // Threshold editing state
+            'editingThresholds' => $this->editingThresholds,
+            'thresholdCpuInput' => $this->thresholdCpu ?? $thresholdCpu,
+            'thresholdMemInput' => $this->thresholdMem ?? $thresholdMem,
+            'thresholdLoadInput' => $this->thresholdLoad ?? $thresholdLoad,
         ]);
     }
 }

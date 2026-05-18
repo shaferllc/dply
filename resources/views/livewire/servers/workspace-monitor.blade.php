@@ -401,6 +401,21 @@
                 </span>
             </x-server-workspace-tab>
             <x-server-workspace-tab
+                id="monitor-tab-notifications"
+                :active="$monitor_workspace_tab === 'notifications'"
+                wire:click="setMonitorWorkspaceTab('notifications')"
+            >
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Notifications') }}
+                    @if($routingSummary['server_routes'] > 0)
+                        <span class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-brand-ink px-1.5 text-[10px] font-semibold text-brand-cream">
+                            {{ $routingSummary['server_routes'] }}
+                        </span>
+                    @endif
+                </span>
+            </x-server-workspace-tab>
+            <x-server-workspace-tab
                 id="monitor-tab-diagnostics"
                 :active="$monitor_workspace_tab === 'diagnostics'"
                 wire:click="setMonitorWorkspaceTab('diagnostics')"
@@ -487,6 +502,42 @@
                     @endforeach
                 </dl>
             </div>
+
+            {{-- Routing CTA Banner - shows when no notification routes configured --}}
+            @if ($routingSummary['server_routes'] === 0 && $opsReady)
+                <div class="rounded-2xl border border-amber-200/80 bg-amber-50/80 px-5 py-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                                <x-heroicon-o-bell-alert class="h-4 w-4" aria-hidden="true" />
+                            </span>
+                            <div>
+                                <p class="font-semibold text-amber-950">{{ __('No notification routes configured') }}</p>
+                                <p class="mt-1 text-sm text-amber-800">
+                                    {{ __('Add a channel to get alerts when metrics go stale or thresholds are breached.') }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                wire:click="setMonitorWorkspaceTab('notifications')"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors"
+                            >
+                                <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ __('Add route') }}
+                            </button>
+                            <a
+                                href="{{ route('servers.settings', ['server' => $server, 'section' => 'alerts']) }}"
+                                wire:navigate
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300/80 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-amber-900 shadow-sm hover:bg-amber-100 transition-colors"
+                            >
+                                {{ __('Manage in Settings') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             @if ($showMetricsPanels)
                 @php
@@ -640,6 +691,147 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- Threshold Configuration Card --}}
+                @if (! $isDeployer)
+                    <div class="{{ $card }} p-6 sm:p-8" x-data="{ editing: @js($editingThresholds) }" x-init="$watch('editing', value => { if (!value) $wire.editingThresholds = false; })">
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Alert thresholds') }}</h2>
+                                <p class="mt-1 text-sm text-brand-moss">
+                                    {{ __('Values that trigger warning colors on KPIs and Insights alerts.') }}
+                                </p>
+                            </div>
+                            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                @if ($editingThresholds)
+                                    <button
+                                        type="button"
+                                        wire:click="cancelEditingThresholds"
+                                        class="{{ $btnSecondary }}"
+                                    >
+                                        {{ __('Cancel') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="saveThresholdSettings"
+                                        wire:loading.attr="disabled"
+                                        class="{{ $btnPrimary }}"
+                                    >
+                                        <span wire:loading.remove wire:target="saveThresholdSettings">{{ __('Save thresholds') }}</span>
+                                        <span wire:loading wire:target="saveThresholdSettings">{{ __('Saving…') }}</span>
+                                    </button>
+                                @else
+                                    <button
+                                        type="button"
+                                        wire:click="startEditingThresholds"
+                                        class="{{ $btnSecondary }}"
+                                    >
+                                        <x-heroicon-o-pencil class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Edit thresholds') }}
+                                    </button>
+                                    @if ($thresholds['cpu'] !== (float) config('insights.thresholds.cpu_warn_pct', 85) ||
+                                          $thresholds['mem'] !== (float) config('insights.thresholds.mem_warn_pct', 85) ||
+                                          $thresholds['load'] !== (float) config('insights.thresholds.load_warn', 4.0))
+                                        <button
+                                            type="button"
+                                            wire:click="resetThresholdsToDefaults"
+                                            wire:confirm="{{ __('Revert to organization defaults?') }}"
+                                            class="{{ $btnSecondary }}"
+                                        >
+                                            {{ __('Reset to defaults') }}
+                                        </button>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+
+                        @if ($editingThresholds)
+                            <form wire:submit="saveThresholdSettings" class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
+                                <div>
+                                    <x-input-label for="threshold-cpu" value="{{ __('CPU warning %') }}" />
+                                    <div class="mt-1 flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            id="threshold-cpu"
+                                            wire:model="thresholdCpuInput"
+                                            min="1"
+                                            max="99"
+                                            step="1"
+                                            class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                        />
+                                        <span class="text-sm text-brand-moss">%</span>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('thresholdCpuInput')" class="mt-2" />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Default: :value%', ['value' => config('insights.thresholds.cpu_warn_pct', 85)]) }}</p>
+                                </div>
+                                <div>
+                                    <x-input-label for="threshold-mem" value="{{ __('Memory warning %') }}" />
+                                    <div class="mt-1 flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            id="threshold-mem"
+                                            wire:model="thresholdMemInput"
+                                            min="1"
+                                            max="99"
+                                            step="1"
+                                            class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                        />
+                                        <span class="text-sm text-brand-moss">%</span>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('thresholdMemInput')" class="mt-2" />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Default: :value%', ['value' => config('insights.thresholds.mem_warn_pct', 85)]) }}</p>
+                                </div>
+                                <div>
+                                    <x-input-label for="threshold-load" value="{{ __('Load warning') }}" />
+                                    <div class="mt-1">
+                                        <input
+                                            type="number"
+                                            id="threshold-load"
+                                            wire:model="thresholdLoadInput"
+                                            min="0.1"
+                                            max="100"
+                                            step="0.1"
+                                            class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                        />
+                                    </div>
+                                    <x-input-error :messages="$errors->get('thresholdLoadInput')" class="mt-2" />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Default: :value', ['value' => config('insights.thresholds.load_warn', 4.0)]) }}</p>
+                                </div>
+                            </form>
+                        @else
+                            <dl class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('CPU warning') }}</dt>
+                                    <dd class="mt-1 flex items-baseline gap-1">
+                                        <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $thresholds['cpu'] }}</span>
+                                        <span class="text-sm text-brand-moss">%</span>
+                                    </dd>
+                                </div>
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Memory warning') }}</dt>
+                                    <dd class="mt-1 flex items-baseline gap-1">
+                                        <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $thresholds['mem'] }}</span>
+                                        <span class="text-sm text-brand-moss">%</span>
+                                    </dd>
+                                </div>
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Load warning') }}</dt>
+                                    <dd class="mt-1 flex items-baseline gap-1">
+                                        <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $thresholds['load'] }}</span>
+                                    </dd>
+                                </div>
+                            </dl>
+                            @if ($thresholds['cpu'] !== (float) config('insights.thresholds.cpu_warn_pct', 85) ||
+                                  $thresholds['mem'] !== (float) config('insights.thresholds.mem_warn_pct', 85) ||
+                                  $thresholds['load'] !== (float) config('insights.thresholds.load_warn', 4.0))
+                                <p class="mt-4 text-xs text-brand-sage">
+                                    <x-heroicon-o-information-circle class="inline h-3.5 w-3.5" aria-hidden="true" />
+                                    {{ __('Using custom server thresholds. Organization defaults shown in help text.') }}
+                                </p>
+                            @endif
+                        @endif
+                    </div>
+                @endif
             @endif
         </x-server-workspace-tab-panel>
 
@@ -1063,6 +1255,176 @@
             @endif
         </x-server-workspace-tab-panel>
 
+        {{-- Notifications Tab Panel --}}
+        <x-server-workspace-tab-panel
+            id="monitor-panel-notifications"
+            labelled-by="monitor-tab-notifications"
+            :hidden="$monitor_workspace_tab !== 'notifications'"
+            panel-class="space-y-6"
+        >
+            @php
+                $subscriptionsByChannel = $serverNotifSubscriptions->groupBy('notification_channel_id');
+                $serverEventLabels = $serverEventLabels ?? [];
+            @endphp
+
+            <div class="{{ $card }}">
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                            <x-heroicon-o-bell class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Notification routing') }}</h2>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                {{ __('Pick which notification channels should receive alerts for this server\'s events. Each row binds one channel to one event.') }}
+                            </p>
+                        </div>
+                    </div>
+                    <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'alerts']) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors">
+                        {{ __('Manage in Settings') }}
+                        <x-heroicon-o-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+                    </a>
+                </div>
+
+                {{-- Current subscriptions list --}}
+                <div class="px-6 py-5 sm:px-8">
+                    @if ($subscriptionsByChannel->isEmpty())
+                        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
+                            <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
+                            <p class="mt-3 text-sm text-brand-moss">
+                                {{ __('No notification subscriptions yet for this server.') }}
+                            </p>
+                            <p class="mt-1 text-xs text-brand-mist">
+                                {{ __('Add a subscription below to get alerts when metrics go stale or thresholds are breached.') }}
+                            </p>
+                        </div>
+                    @else
+                        <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
+                            @foreach ($subscriptionsByChannel as $channelId => $subs)
+                                @php $channel = $subs->first()->channel; @endphp
+                                <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-medium text-brand-ink">{{ $channel?->label ?? __('(deleted channel)') }}</p>
+                                        <p class="text-xs text-brand-moss">
+                                            {{ ucfirst((string) ($channel?->type ?? '—')) }}
+                                        </p>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        @foreach ($subs as $sub)
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10">
+                                                {{ $serverEventLabels[$sub->event_key] ?? $sub->event_key }}
+                                                @if (! $isDeployer)
+                                                    <button
+                                                        type="button"
+                                                        wire:click="removeServerNotificationSubscription(@js($sub->id))"
+                                                        wire:confirm="{{ __('Remove this subscription?') }}"
+                                                        class="text-brand-moss hover:text-red-700"
+                                                        aria-label="{{ __('Remove subscription') }}"
+                                                    >×</button>
+                                                @endif
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+
+                {{-- Add subscription form --}}
+                @if (! $isDeployer)
+                    <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('Add subscription') }}</p>
+                        <form wire:submit="addServerNotificationSubscription" class="mt-4 space-y-4">
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <x-input-label for="notif-add-channel" value="{{ __('Channel') }}" />
+                                    <select
+                                        id="notif-add-channel"
+                                        wire:model="notifAddChannelId"
+                                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                    >
+                                        <option value="">{{ __('Select a channel…') }}</option>
+                                        @foreach ($assignableChannels as $channel)
+                                            <option value="{{ $channel->id }}">{{ $channel->label }} ({{ ucfirst($channel->type) }})</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                                        @if ($assignableChannels->isEmpty())
+                                            <p class="text-xs text-brand-moss">
+                                                {{ __('No assignable channels found.') }}
+                                            </p>
+                                        @endif
+                                        <button
+                                            type="button"
+                                            wire:click="openCreateChannelModal"
+                                            class="inline-flex items-center gap-1.5 text-xs font-medium text-brand-ink hover:text-brand-sage"
+                                        >
+                                            <x-heroicon-o-plus-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Create new channel') }}
+                                        </button>
+                                        <span class="text-[10px] text-brand-mist">·</span>
+                                        <a
+                                            href="{{ route('profile.notification-channels') }}"
+                                            class="text-xs text-brand-mist hover:text-brand-ink"
+                                        >
+                                            {{ __('Manage all in Settings →') }}
+                                        </a>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('notifAddChannelId')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label value="{{ __('Events') }}" />
+                                    <div class="mt-1 space-y-1.5">
+                                        @foreach ($serverEventLabels as $key => $label)
+                                            <label class="flex items-center gap-2 text-sm text-brand-ink">
+                                                <input
+                                                    type="checkbox"
+                                                    wire:model="notifAddEventKeys"
+                                                    value="{{ $key }}"
+                                                    class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage"
+                                                />
+                                                <span>{{ $label }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <x-input-error :messages="$errors->get('notifAddEventKeys')" class="mt-2" />
+                                </div>
+                            </div>
+                            <div class="flex justify-end">
+                                <x-primary-button
+                                    type="submit"
+                                    wire:loading.attr="disabled"
+                                    :disabled="$assignableChannels->isEmpty()"
+                                >
+                                    {{ __('Add subscription') }}
+                                </x-primary-button>
+                            </div>
+                        </form>
+                    </div>
+                @endif
+            </div>
+
+            {{-- Routing summary card --}}
+            <div class="{{ $card }} p-6 sm:p-8">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Routing summary') }}</h3>
+                <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Server routes') }}</dt>
+                        <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $routingSummary['server_routes'] }}</dd>
+                    </div>
+                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Project routes') }}</dt>
+                        <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $routingSummary['project_routes'] }}</dd>
+                    </div>
+                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Available channels') }}</dt>
+                        <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $assignableChannels->count() }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </x-server-workspace-tab-panel>
+
         <x-server-workspace-tab-panel
             id="monitor-panel-diagnostics"
             labelled-by="monitor-tab-diagnostics"
@@ -1154,5 +1516,10 @@
 
     <x-slot name="modals">
         @include('livewire.servers.partials.install-monitoring-confirm-modal')
+
+        {{-- Inline channel-create modal. Triggered from the Add subscription
+             form's "Create new channel" link; auto-selects the new channel
+             on success via the notification-channel-created Livewire event. --}}
+        @include('livewire.partials.create-notification-channel-modal')
     </x-slot>
 </x-server-workspace-layout>

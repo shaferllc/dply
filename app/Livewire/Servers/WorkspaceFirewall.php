@@ -272,7 +272,7 @@ class WorkspaceFirewall extends Component
         }
     }
 
-    public function toggleFirewallRuleEnabled(string $id, ServerFirewallProvisioner $firewall): void
+    public function toggleFirewallRuleEnabled(string $id, ServerFirewallProvisioner $firewall, ServerFirewallAuditLogger $audit): void
     {
         $this->authorize('update', $this->server);
         $rule = ServerFirewallRule::query()
@@ -284,6 +284,22 @@ class WorkspaceFirewall extends Component
         $snapshot = $rule->replicate();
         $rule->update(['enabled' => ! $wasEnabled]);
         $rule->refresh();
+
+        $audit->record(
+            $this->server,
+            $rule->enabled ? 'rule_enabled' : 'rule_disabled',
+            [
+                'rule_id' => (string) $rule->id,
+                'port' => $rule->port,
+                'protocol' => $rule->protocol,
+                'source' => $rule->source,
+                'action' => $rule->action,
+                'name' => $rule->name,
+                'was_enabled' => $wasEnabled,
+                'now_enabled' => (bool) $rule->enabled,
+            ],
+            auth()->user(),
+        );
 
         if (! $this->opsReady()) {
             $this->toastSuccess($rule->enabled

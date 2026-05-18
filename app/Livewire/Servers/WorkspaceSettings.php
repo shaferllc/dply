@@ -119,6 +119,13 @@ class WorkspaceSettings extends Component
             'Manual test webhook'
         );
 
+        if ($this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'server.webhook.test_dispatched', $this->server, null, [
+                'delivery_id' => (string) $delivery->id,
+                'status' => $delivery->status,
+            ]);
+        }
+
         if ($delivery->status === OutboundWebhookDelivery::STATUS_WOULD_SEND) {
             $this->toastSuccess(__('No URL configured — recorded as “would send”. Check the deliveries log below.'));
 
@@ -150,6 +157,15 @@ class WorkspaceSettings extends Component
         }
 
         $dispatcher->resend($delivery);
+
+        if ($this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'server.webhook.delivery_resent', $this->server, null, [
+                'delivery_id' => (string) $delivery->id,
+                'original_status' => $delivery->status,
+                'event' => $delivery->event ?? null,
+            ]);
+        }
+
         $this->toastSuccess(__('Delivery requeued.'));
     }
 

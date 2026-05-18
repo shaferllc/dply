@@ -94,6 +94,14 @@ class SiteClone extends Component
             (string) auth()->id(),
         );
 
+        audit_log($org, auth()->user(), 'site.clone_started', $this->site, null, [
+            'source_site_id' => (string) $this->site->id,
+            'source_server_id' => (string) $this->site->server_id,
+            'destination_server_id' => (string) $dest->id,
+            'clone_hostname' => strtolower(trim($this->clone_hostname)),
+            'clone_site_name' => trim($this->clone_site_name),
+        ]);
+
         session()->flash('success', __('Site clone started. This can take a while for large trees; refresh the destination server’s site list for the new site when provisioning finishes.'));
 
         return redirect()->route('servers.sites', $dest);

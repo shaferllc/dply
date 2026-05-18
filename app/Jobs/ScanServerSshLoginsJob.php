@@ -216,6 +216,15 @@ class ScanServerSshLoginsJob implements ShouldQueue
                     'raw' => $entry['raw'],
                 ],
             );
+
+            $server->loadMissing('organization');
+            if ($server->organization) {
+                audit_log($server->organization, null, 'server.ssh_login_detected', $server, null, [
+                    'remote_user' => $entry['user'],
+                    'remote_ip' => $entry['ip'],
+                    'occurred_at' => $when->toIso8601String(),
+                ]);
+            }
         } catch (\Throwable) {
             // Swallow per-event failures — a bad row shouldn't poison the
             // remaining events in the same scan.

@@ -479,10 +479,23 @@ class Show extends Component
         // PHP-version writes now flow through runtime_version (the
         // canonical column post-php_version-drop). Always pin runtime
         // to 'php' on the way out so future reads of runtimeKey() agree.
+        $oldVersion = $this->site->runtime_version;
         $this->site->runtime = 'php';
         $this->site->runtime_version = $validated['php_version'];
         $this->site->meta = $meta;
         $this->site->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.php_settings_updated', $this->site, [
+                'runtime_version' => $oldVersion,
+            ], [
+                'runtime_version' => $validated['php_version'],
+                'memory_limit' => $meta['php_runtime']['memory_limit'] ?? null,
+                'upload_max_filesize' => $meta['php_runtime']['upload_max_filesize'] ?? null,
+                'max_execution_time' => $meta['php_runtime']['max_execution_time'] ?? null,
+            ]);
+        }
 
         $this->toastSuccess('PHP settings saved.');
         $this->syncFormFromSite();
@@ -630,6 +643,14 @@ class Show extends Component
         }
 
         IssueSiteSslJob::dispatch($this->site->id);
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.ssl.issuance_queued', $this->site, null, [
+                'primary_hostname' => optional($this->site->primaryDomain)->hostname,
+            ]);
+        }
+
         $this->toastSuccess(__('SSL certificate issuance queued.'));
     }
 
@@ -914,7 +935,16 @@ class Show extends Component
             $updates['meta'] = $meta;
         }
 
+        $oldRepoSnapshot = [
+            'git_repository_url' => $this->site->git_repository_url,
+            'git_branch' => $this->site->git_branch,
+            'post_deploy_command' => $this->site->post_deploy_command,
+        ];
         $this->site->update($updates);
+        $org = $this->site->server?->organization;
+        if ($org && $oldRepoSnapshot !== array_intersect_key($updates, $oldRepoSnapshot)) {
+            audit_log($org, auth()->user(), 'site.repository_updated', $this->site, $oldRepoSnapshot, array_intersect_key($updates, $oldRepoSnapshot));
+        }
         $this->toastSuccess('Git settings saved.');
         $this->syncFormFromSite();
     }
@@ -1201,6 +1231,12 @@ class Show extends Component
         $this->site->save();
         $this->revealed_webhook_secret = $plain;
         $provisioner->syncProviderHookSecret($this->site->fresh());
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.webhook.secret_rotated', $this->site, null, null);
+        }
+
         $this->toastSuccess('Webhook secret rotated. Copy it below — it will not be shown again.');
     }
 
@@ -1568,6 +1604,13 @@ class Show extends Component
             'env_cache_origin' => 'local-edit',
         ])->save();
 
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.var_added', $this->site, null, [
+                'key' => $this->new_env_key,
+            ]);
+        }
+
         $this->new_env_key = '';
         $this->new_env_value = '';
         $this->new_env_comment = '';
@@ -1606,6 +1649,15 @@ class Show extends Component
         ])->save();
 
         $count = count($incoming['variables']);
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.bulk_imported', $this->site, null, [
+                'imported_count' => $count,
+                'imported_keys' => array_keys($incoming['variables']),
+            ]);
+        }
+
         $this->bulk_env_input = '';
         $this->autoPushAfterCacheMutation(__(':count variable(s) imported.', ['count' => $count]));
     }
@@ -1659,6 +1711,13 @@ class Show extends Component
             'env_cache_origin' => 'local-edit',
         ])->save();
 
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.var_updated', $this->site, null, [
+                'key' => $key,
+            ]);
+        }
+
         $this->cancelEditEnvVar();
         $this->autoPushAfterCacheMutation(__('Variable updated.'));
     }
@@ -1695,6 +1754,11 @@ class Show extends Component
             'env_file_content' => $writer->render($parsed['variables'], $parsed['comments']),
             'env_cache_origin' => 'local-edit',
         ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.var_removed', $this->site, ['key' => $key], null);
+        }
 
         $this->revealed_env_keys = array_values(array_diff($this->revealed_env_keys, [$key]));
         $this->autoPushAfterCacheMutation(__('Variable removed.'));
@@ -2173,13 +2237,22 @@ class Show extends Component
             ],
             'new_domain_comment' => ['nullable', 'string', 'max:2000'],
         ]);
-        SiteDomain::query()->create([
+        $newDomain = SiteDomain::query()->create([
             'site_id' => $this->site->id,
             'hostname' => strtolower(trim($this->new_domain_hostname)),
             'is_primary' => false,
             'www_redirect' => false,
             'comment' => trim($this->new_domain_comment) ?: null,
         ]);
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.domain.added', $this->site, null, [
+                'domain_id' => (string) $newDomain->id,
+                'hostname' => $newDomain->hostname,
+            ]);
+        }
+
         $this->new_domain_hostname = '';
         $this->new_domain_comment = '';
         $this->finalizeRoutingMutation('Domain added.');
@@ -2236,6 +2309,17 @@ class Show extends Component
                 'hostname' => $newHostname,
                 'comment' => trim($this->editing_domain_comment) ?: null,
             ])->save();
+
+            $org = $this->site->server?->organization;
+            if ($org) {
+                audit_log($org, auth()->user(), 'site.domain.updated', $this->site, [
+                    'hostname' => $oldHostname,
+                ], [
+                    'domain_id' => (string) $domain->id,
+                    'hostname' => $newHostname,
+                ]);
+            }
+
             $this->cancelEditDomain();
             $this->finalizeRoutingMutation('Domain updated.');
 
@@ -2480,14 +2564,45 @@ class Show extends Component
 
             return;
         }
+        $snapshot = [
+            'domain_id' => (string) $domain->id,
+            'hostname' => $domain->hostname,
+            'is_primary' => (bool) $domain->is_primary,
+        ];
         $domain->delete();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.domain.removed', $this->site, $snapshot, null);
+        }
+
         $this->finalizeRoutingMutation('Domain removed.');
     }
 
     public function deleteSite(): void
     {
         $this->authorize('delete', $this->site);
+        $organization = $this->site->server?->organization;
+        $snapshot = [
+            'name' => $this->site->name,
+            'slug' => $this->site->slug,
+            'server_id' => (string) $this->site->server_id,
+            'type' => $this->site->type instanceof \BackedEnum ? $this->site->type->value : (string) $this->site->type,
+            'runtime' => $this->site->runtime,
+            'git_repository_url' => $this->site->git_repository_url,
+        ];
         $this->site->delete();
+
+        if ($organization) {
+            audit_log(
+                $organization,
+                auth()->user(),
+                'site.deleted',
+                $this->site,
+                $snapshot,
+                null,
+            );
+        }
 
         $this->redirect(route('servers.show', $this->server), navigate: true);
     }
@@ -2545,6 +2660,13 @@ class Show extends Component
         $this->site->refresh();
         $this->syncFormFromSite();
 
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.suspended', $this->site, null, [
+                'message' => $message !== '' ? $message : null,
+            ]);
+        }
+
         ApplySiteWebserverConfigJob::dispatch($this->site->id);
         $this->toastSuccess(__('Site suspended. Webserver config queued.'));
     }
@@ -2568,6 +2690,11 @@ class Show extends Component
         $this->site->save();
         $this->site->refresh();
         $this->settings_suspended_message = '';
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.resumed', $this->site, null, null);
+        }
 
         ApplySiteWebserverConfigJob::dispatch($this->site->id);
         $this->toastSuccess(__('Site resumed. Webserver config queued.'));

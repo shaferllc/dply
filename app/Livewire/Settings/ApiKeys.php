@@ -153,6 +153,14 @@ class ApiKeys extends Component
             $allowedIps
         );
 
+        audit_log($org, $user, 'api_token.created', $created['token'] ?? null, null, [
+            'token_name' => $this->token_name,
+            'abilities' => $abilities,
+            'expires_at' => $expiresAt?->toIso8601String(),
+            'allowed_ips' => $allowedIps,
+            'token_id' => isset($created['token']) ? (string) $created['token']->id : null,
+        ]);
+
         $this->new_token_plaintext = $created['plaintext'];
         $this->new_token_name = $this->token_name;
         $this->reset(['token_name', 'token_expires_at', 'token_allowed_ips_text', 'selected_abilities']);
@@ -210,7 +218,16 @@ class ApiKeys extends Component
             ->where('user_id', Auth::id())
             ->findOrFail($apiTokenId);
 
+        $snapshot = [
+            'token_id' => (string) $token->id,
+            'token_name' => $token->name,
+            'token_prefix' => $token->token_prefix,
+            'abilities' => $token->abilities,
+            'expires_at' => $token->expires_at?->toIso8601String(),
+        ];
         $token->delete();
+
+        audit_log($org, Auth::user(), 'api_token.revoked', null, $snapshot, null);
     }
 
     /**

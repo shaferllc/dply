@@ -99,6 +99,14 @@ class WorkspaceBackups extends Component
 
         ExportServerDatabaseBackupJob::dispatch($backup->id);
 
+        if ($this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'backup.database.run_dispatched', $this->server, null, [
+                'backup_id' => (string) $backup->id,
+                'database_id' => (string) $database->id,
+                'database_name' => $database->name,
+            ]);
+        }
+
         $this->run_database_id = '';
         $this->toastSuccess(__('Database backup queued for :name.', ['name' => $database->name]));
     }
@@ -125,6 +133,14 @@ class WorkspaceBackups extends Component
         ]);
 
         ExportSiteFileBackupJob::dispatch($backup->id);
+
+        if ($this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'backup.site_files.run_dispatched', $site, null, [
+                'backup_id' => (string) $backup->id,
+                'site_id' => (string) $site->id,
+                'site_name' => $site->name,
+            ]);
+        }
 
         $this->run_site_id = '';
         $this->toastSuccess(__('Site files backup queued for :name.', ['name' => $site->name]));
@@ -530,7 +546,18 @@ class WorkspaceBackups extends Component
                 $disk->delete($backup->disk_path);
             }
         }
+        $snapshot = [
+            'backup_id' => (string) $backup->id,
+            'server_database_id' => (string) $backup->server_database_id,
+            'disk_path' => $backup->disk_path,
+            'status' => $backup->status,
+        ];
         $backup->delete();
+
+        if ($this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'backup.database.deleted', $this->server, $snapshot, null);
+        }
+
         $this->toastSuccess(__('Backup deleted.'));
     }
 
@@ -549,7 +576,18 @@ class WorkspaceBackups extends Component
         if (! empty($backup->disk_path) && Storage::disk('local')->exists($backup->disk_path)) {
             Storage::disk('local')->delete($backup->disk_path);
         }
+        $snapshot = [
+            'backup_id' => (string) $backup->id,
+            'site_id' => (string) $backup->site_id,
+            'disk_path' => $backup->disk_path,
+            'status' => $backup->status,
+        ];
         $backup->delete();
+
+        if ($this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'backup.site_files.deleted', $this->server, $snapshot, null);
+        }
+
         $this->toastSuccess(__('Backup deleted.'));
     }
 

@@ -70,6 +70,7 @@ trait RunsServerConsoleCommands
 
         $this->error = null;
         $cmd = trim($this->command);
+        $startedAt = microtime(true);
 
         try {
             $ssh = new SshConnection($this->server);
@@ -86,6 +87,8 @@ trait RunsServerConsoleCommands
                 'ran_at' => now()->toIso8601String(),
                 'error' => null,
             ];
+
+            $this->logConsoleAudit($cmd, $exit, null, $startedAt);
         } catch (\Throwable $e) {
             $this->history[] = [
                 'cmd' => $cmd,
@@ -94,6 +97,8 @@ trait RunsServerConsoleCommands
                 'ran_at' => now()->toIso8601String(),
                 'error' => $e->getMessage(),
             ];
+
+            $this->logConsoleAudit($cmd, null, $e->getMessage(), $startedAt);
         }
 
         if (count($this->history) > self::CONSOLE_HISTORY_LIMIT) {
@@ -101,6 +106,39 @@ trait RunsServerConsoleCommands
         }
 
         $this->command = '';
+    }
+
+    /**
+     * Persist a one-line audit record per shell command. Command text is
+     * stored verbatim (the operator typed it knowing it was logged); output
+     * is intentionally NOT stored — it can contain secrets pasted into a
+     * shell and the operator already sees it in the rolling history above.
+     */
+    protected function logConsoleAudit(string $command, ?int $exit, ?string $error, float $startedAt): void
+    {
+        $organization = $this->server->organization;
+        if ($organization === null) {
+            return;
+        }
+
+        $duration = (int) round((microtime(true) - $startedAt) * 1000);
+        $status = $error !== null ? 'failed' : ($exit === 0 ? 'success' : 'nonzero_exit');
+
+        audit_log(
+            $organization,
+            auth()->user(),
+            'server.console.command_run',
+            $this->server,
+            null,
+            [
+                'command' => Str::limit($command, 1000),
+                'exit_code' => $exit,
+                'status' => $status,
+                'duration_ms' => $duration,
+                'error' => $error !== null ? Str::limit($error, 500) : null,
+                'surface' => static::class,
+            ],
+        );
     }
 
     public function insertCommand(string $command): void

@@ -367,7 +367,28 @@ class WorkspaceCron extends Component
                 ->where('server_id', $this->server->id)
                 ->whereKey($this->editing_job_id)
                 ->firstOrFail();
+            $oldSnapshot = [
+                'cron_expression' => $job->cron_expression,
+                'command' => $job->command,
+                'user' => $job->user,
+                'description' => $job->description,
+                'site_id' => $job->site_id,
+                'overlap_policy' => $job->overlap_policy,
+                'alert_on_failure' => (bool) $job->alert_on_failure,
+                'schedule_timezone' => $job->schedule_timezone,
+            ];
             $job->update($payload);
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'server.cron.updated',
+                $this->server,
+                $oldSnapshot,
+                array_merge(
+                    array_intersect_key($payload, $oldSnapshot),
+                    ['cron_job_id' => (string) $job->id],
+                ),
+            );
             $this->emitPanelEvent(
                 __('Cron job updated — sync to apply'),
                 array_filter([
@@ -382,6 +403,23 @@ class WorkspaceCron extends Component
                 'server_id' => $this->server->id,
                 'enabled' => true,
             ]));
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'server.cron.created',
+                $this->server,
+                null,
+                [
+                    'cron_job_id' => (string) $created->id,
+                    'cron_expression' => $created->cron_expression,
+                    'command' => $created->command,
+                    'user' => $created->user,
+                    'description' => $created->description,
+                    'site_id' => $created->site_id,
+                    'schedule_timezone' => $created->schedule_timezone,
+                    'overlap_policy' => $created->overlap_policy,
+                ],
+            );
             $this->emitPanelEvent(
                 __('Cron job added — sync to install on server'),
                 array_filter([
@@ -459,6 +497,20 @@ class WorkspaceCron extends Component
 
             return;
         }
+
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            'server.cron.bundle_applied',
+            $this->server,
+            null,
+            [
+                'bundle_key' => $key,
+                'bundle_label' => $bundle['label'] ?? $key,
+                'created' => $created,
+                'skipped' => $skipped,
+            ],
+        );
 
         $this->emitPanelEvent(
             __('Bundle ":label" added — sync to install on server', ['label' => $bundle['label'] ?? $key]),
@@ -545,6 +597,20 @@ class WorkspaceCron extends Component
         // need a separate Sync to make the line appear or disappear.
         $job->update(['enabled' => $newEnabled, 'is_synced' => false]);
         $this->server->refresh();
+
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            $newEnabled ? 'server.cron.enabled' : 'server.cron.disabled',
+            $this->server,
+            ['enabled' => ! $newEnabled],
+            [
+                'cron_job_id' => (string) $job->id,
+                'command' => $job->command,
+                'cron_expression' => $job->cron_expression,
+                'enabled' => $newEnabled,
+            ],
+        );
 
         try {
             // Pre-flight reuses the same validator the explicit Sync button uses.
@@ -637,7 +703,23 @@ class WorkspaceCron extends Component
             return;
         }
         $jobLabel = $job->description ?: $job->command;
+        $snapshot = [
+            'cron_job_id' => (string) $job->id,
+            'cron_expression' => $job->cron_expression,
+            'command' => $job->command,
+            'user' => $job->user,
+            'description' => $job->description,
+            'site_id' => $job->site_id,
+        ];
         $job->delete();
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            'server.cron.deleted',
+            $this->server,
+            $snapshot,
+            null,
+        );
         if ($this->editing_job_id === $jobId) {
             $this->cancelEdit();
         }
@@ -689,6 +771,20 @@ class WorkspaceCron extends Component
         );
 
         RunServerCronJobNowJob::dispatch($this->server->id, $job->id, $runId);
+
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            'server.cron.run_now_dispatched',
+            $this->server,
+            null,
+            [
+                'cron_job_id' => (string) $job->id,
+                'run_id' => $runId,
+                'command' => $job->command,
+                'description' => $job->description,
+            ],
+        );
 
         $rid = json_encode($runId);
         // Set active run id for Echo (may already be set from the first broadcast if the worker was fast).
@@ -1025,6 +1121,15 @@ class WorkspaceCron extends Component
                 return;
             }
 
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'server.cron.synced',
+                $this->server,
+                null,
+                ['result' => 'success'],
+            );
+
             $this->emitPanelEvent(
                 __('Crontab synced to server.'),
                 array_merge(
@@ -1035,6 +1140,18 @@ class WorkspaceCron extends Component
             );
             $this->toastSuccess(__('Crontab sync finished — see the banner for the host output.'));
         } catch (\Throwable $e) {
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'server.cron.synced',
+                $this->server,
+                null,
+                [
+                    'result' => 'failed',
+                    'error' => Str::limit($e->getMessage(), 500),
+                ],
+            );
+
             $this->emitPanelEvent(
                 __('Crontab sync failed.'),
                 [

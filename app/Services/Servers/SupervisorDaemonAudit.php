@@ -25,5 +25,24 @@ class SupervisorDaemonAudit
             'action' => $action,
             'properties' => $properties,
         ]);
+
+        // Mirror to the main audit log so the server activity feed surfaces
+        // daemon events alongside firewall/ssh/db/cache/cron events. The
+        // table-specific row above keeps deeper per-program detail for the
+        // Daemons → Activity tab.
+        $organization = $server->organization;
+        if ($organization !== null) {
+            audit_log(
+                $organization,
+                Auth::user(),
+                'server.daemons.'.$action,
+                $server,
+                null,
+                array_filter([
+                    'program_id' => $program?->id,
+                    'program_slug' => $program?->slug,
+                ] + ($properties ?? []), static fn ($v) => $v !== null),
+            );
+        }
     }
 }

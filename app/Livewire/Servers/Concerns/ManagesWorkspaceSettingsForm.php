@@ -120,8 +120,19 @@ trait ManagesWorkspaceSettingsForm
         try {
             $repairer->repairOperationalAccess($this->server->fresh());
             $this->server->refresh();
+            if ($this->server->organization) {
+                audit_log($this->server->organization, auth()->user(), 'server.ssh_access_repaired', $this->server, null, [
+                    'result' => 'success',
+                ]);
+            }
             $this->toastSuccess(__('SSH access repaired. Dply reinstalled the operational key for this server.'));
         } catch (\Throwable $e) {
+            if ($this->server->organization) {
+                audit_log($this->server->organization, auth()->user(), 'server.ssh_access_repaired', $this->server, null, [
+                    'result' => 'failed',
+                    'error' => mb_strimwidth($e->getMessage(), 0, 500),
+                ]);
+            }
             $this->toastError($e->getMessage());
         }
     }
@@ -140,9 +151,13 @@ trait ManagesWorkspaceSettingsForm
         ]);
 
         $meta = $this->server->meta ?? [];
+        $old = $meta['timezone'] ?? null;
         $meta['timezone'] = $this->settingsTimezone;
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
+        if ($old !== $this->settingsTimezone && $this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'server.timezone_updated', $this->server, ['timezone' => $old], ['timezone' => $this->settingsTimezone]);
+        }
         $this->syncSettingsFormFromServer();
         $this->toastSuccess(__('Timezone preference saved (for your notes; Dply does not change the OS clock).'));
     }
