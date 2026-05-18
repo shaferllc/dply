@@ -105,8 +105,13 @@
                                     href="{{ route('sites.show', [$server, $s]) }}"
                                     wire:navigate
                                     class="text-base font-semibold text-brand-ink hover:text-brand-sage transition-colors"
-                                >{{ $displayHost }}</a>
-                                @if ($sslOn)
+                                >{{ $s->isCustom() ? $s->name : $displayHost }}</a>
+                                @if ($s->isCustom())
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-ink/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/70 ring-1 ring-brand-ink/10">
+                                        <x-heroicon-m-wrench-screwdriver class="h-3 w-3" />
+                                        {{ __('Custom') }}
+                                    </span>
+                                @elseif ($sslOn)
                                     <x-heroicon-s-lock-closed class="h-4 w-4 text-brand-forest" title="{{ __('SSL active') }}" />
                                 @endif
                                 @if (filter_var($s->meta['debug'] ?? false, FILTER_VALIDATE_BOOLEAN))
@@ -128,6 +133,12 @@
                                             <span class="text-brand-mist">({{ $s->git_branch }})</span>
                                         @endif
                                     </span>
+                                @elseif ($s->isCustomNoRepoMode())
+                                    <span class="inline-flex items-center gap-1 font-mono">
+                                        <x-heroicon-o-folder class="h-3.5 w-3.5 opacity-80" />
+                                        {{ $s->repository_path ?: '/home/'.$s->effectiveSystemUser($server).'/'.$s->slug }}
+                                    </span>
+                                    <span class="text-brand-mist">{{ __('no repo') }}</span>
                                 @endif
                                 <span class="inline-flex items-center gap-1">
                                     <x-heroicon-o-user class="h-3.5 w-3.5 opacity-80" />

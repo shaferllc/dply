@@ -50,6 +50,7 @@ use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
 use App\Livewire\Servers\Deploys as ServerDeploys;
+use App\Livewire\Servers\ImportFromDigitalOcean as ServersImportFromDigitalOcean;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceActivity;
@@ -82,6 +83,7 @@ use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Commits as SitesCommits;
 use App\Livewire\Sites\Create as SitesCreate;
+use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
 use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
@@ -228,6 +230,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
+    Route::livewire('servers/import/digitalocean', ServersImportFromDigitalOcean::class)->name('servers.import.digitalocean');
     // Multi-step server-create wizard. /servers/create is Step 1 directly; if a draft
     // is past step 1, StepType::mount() redirects on to the current step.
     Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
@@ -283,6 +286,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ]);
     })->name('servers.cluster.kubeconfig');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
+    Route::livewire('servers/{server}/sites/create-custom', SitesCreateCustom::class)->name('sites.create-custom');
     Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::livewire('servers/{server}/sites/{site}/env-diff', SitesEnvDiff::class)->name('sites.env-diff');

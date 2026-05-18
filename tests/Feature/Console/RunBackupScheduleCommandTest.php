@@ -9,6 +9,8 @@ use App\Jobs\ExportSiteFileBackupJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
+use App\Models\ServerCronJob;
+use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -122,7 +124,7 @@ class RunBackupScheduleCommandTest extends TestCase
         ]);
 
         // Materialize a cron entry like the real schedule path does.
-        $cronJob = \App\Models\ServerCronJob::create([
+        $cronJob = ServerCronJob::create([
             'server_id' => $server->id,
             'cron_expression' => '0 3 * * *',
             'command' => 'php artisan dply:run-backup-schedule X',
@@ -141,7 +143,7 @@ class RunBackupScheduleCommandTest extends TestCase
 
         // Three failed backups for the target.
         for ($i = 0; $i < 3; $i++) {
-            \App\Models\ServerDatabaseBackup::create([
+            ServerDatabaseBackup::create([
                 'server_database_id' => $database->id,
                 'user_id' => null,
                 'status' => 'failed',

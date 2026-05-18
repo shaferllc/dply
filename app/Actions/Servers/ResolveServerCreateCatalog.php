@@ -72,14 +72,14 @@ final class ResolveServerCreateCatalog
 
         if (! $credential) {
             if ($type === 'digitalocean' && filled((string) config('services.digitalocean.token'))) {
-                return $this->catalogDigitalOcean($credentials, null);
+                return $this->catalogDigitalOcean($credentials, null, $selectedRegion);
             }
 
             return array_merge($empty, ['credentials' => $credentials]);
         }
 
         return match ($type) {
-            'digitalocean' => $this->catalogDigitalOcean($credentials, $credential),
+            'digitalocean' => $this->catalogDigitalOcean($credentials, $credential, $selectedRegion),
             'digitalocean_kubernetes' => $this->catalogDigitalOceanKubernetes($credentials, $credential),
             'hetzner' => $this->catalogHetzner($credentials, $credential),
             'linode' => $this->catalogLinode($credentials, $credential),
@@ -100,10 +100,11 @@ final class ResolveServerCreateCatalog
     /**
      * @param  Collection<int, ProviderCredential>  $credentials
      */
-    private function catalogDigitalOcean(Collection $credentials, ?ProviderCredential $credential): array
+    private function catalogDigitalOcean(Collection $credentials, ?ProviderCredential $credential, string $selectedRegion = ''): array
     {
         $regions = [];
         $sizes = [];
+        $selectedRegion = trim($selectedRegion);
         try {
             $token = config('services.digitalocean.token');
             $do = match (true) {
@@ -136,6 +137,15 @@ final class ResolveServerCreateCatalog
                 if ($v === '') {
                     continue;
                 }
+
+                // DO publishes per-size region availability — filter so the
+                // picker never offers a combo that the create-droplet API
+                // will reject with "Size is not available in this region."
+                $sizeRegions = is_array($s['regions'] ?? null) ? array_map('strval', $s['regions']) : [];
+                if ($selectedRegion !== '' && $sizeRegions !== [] && ! in_array($selectedRegion, $sizeRegions, true)) {
+                    continue;
+                }
+
                 $memMb = (int) ($s['memory'] ?? 0);
                 $vcpus = (int) ($s['vcpus'] ?? 0);
                 $diskGb = (int) ($s['disk'] ?? 0);

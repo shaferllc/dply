@@ -112,6 +112,10 @@ class DeployPhaseRunner
      */
     public function runRestart(Site $site, ?Closure $shellFactory = null): array
     {
+        if ($site->isCustom()) {
+            return [];
+        }
+
         $runtime = $site->runtimeKey();
         if ($runtime === 'static') {
             return [];

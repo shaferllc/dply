@@ -103,8 +103,10 @@ class StepWhere extends Component
         if ($this->form->region === '' && $regions !== []) {
             $this->form->region = $this->preferredRegionValue($regions);
 
-            // Scaleway sizes depend on region — drop the catalog memo so the next read reloads.
-            if ($this->form->type === 'scaleway') {
+            // Scaleway and DigitalOcean sizes depend on region — drop the
+            // catalog memo so the next read reloads filtered by the
+            // newly-defaulted region.
+            if (in_array($this->form->type, ['scaleway', 'digitalocean'], true)) {
                 $this->memoServerCreateCatalog = null;
                 $this->memoServerCreateCatalogKey = null;
                 $catalog = $this->resolveServerCreateCatalog($org);

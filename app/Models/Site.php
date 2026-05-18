@@ -66,6 +66,8 @@ class Site extends Model
 
     public const STATUS_SCAFFOLD_FAILED = 'scaffold_failed';
 
+    public const STATUS_CUSTOM_ACTIVE = 'custom_active';
+
     public const STATUS_ERROR = 'error';
 
     public const SSL_NONE = 'none';
@@ -231,6 +233,30 @@ class Site extends Model
         });
 
         static::deleting(function (Site $site): void {
+            // Dispatch on-server cleanup for Custom (headless) sites
+            // before the row vanishes. We capture the resolved values
+            // here because effectiveSystemUser() needs the server, and
+            // we don't want the job racing on a stale lookup.
+            if ($site->isCustom() && $site->server_id !== null) {
+                try {
+                    $server = $site->server;
+                    if ($server) {
+                        \App\Jobs\CleanupCustomSiteJob::dispatch(
+                            (string) $server->id,
+                            (string) ($site->repository_path ?? ''),
+                            $site->effectiveSystemUser($server),
+                            trim((string) $site->php_fpm_user) !== '',
+                            $site->deploy_script_id ? (string) $site->deploy_script_id : null,
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Custom site cleanup dispatch failed', [
+                        'site_id' => $site->getKey(),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Release any placeholder DNS record + ondply.io zone entry
             // assigned to this site by the scaffold pipeline. release()
             // is idempotent + safe to call on non-scaffolded sites
@@ -702,7 +728,30 @@ class Site extends Model
                 self::STATUS_CONTAINER_PROVISIONING,
                 self::STATUS_CONTAINER_ACTIVE,
                 self::STATUS_CONTAINER_FAILED,
+                self::STATUS_CUSTOM_ACTIVE,
             ], true);
+    }
+
+    public function isCustom(): bool
+    {
+        return $this->type === SiteType::Custom;
+    }
+
+    public function isCustomGitMode(): bool
+    {
+        return $this->isCustom() && trim((string) $this->git_repository_url) !== '';
+    }
+
+    public function isCustomNoRepoMode(): bool
+    {
+        return $this->isCustom() && trim((string) $this->git_repository_url) === '';
+    }
+
+    public function supportsWebserver(): bool
+    {
+        return $this->type instanceof SiteType
+            ? $this->type->managesWebserver()
+            : true;
     }
 
     public function statusLabel(): string
@@ -719,6 +768,7 @@ class Site extends Model
             self::STATUS_KUBERNETES_ACTIVE => 'kubernetes active',
             self::STATUS_FUNCTIONS_CONFIGURED => 'functions configured',
             self::STATUS_FUNCTIONS_ACTIVE => 'functions active',
+            self::STATUS_CUSTOM_ACTIVE => 'custom active',
             default => str_replace('_', ' ', $this->status),
         };
     }

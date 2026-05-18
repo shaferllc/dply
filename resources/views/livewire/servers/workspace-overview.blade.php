@@ -41,6 +41,38 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @php
+        $provisionError = is_array($server->meta['provision_error'] ?? null) ? $server->meta['provision_error'] : null;
+    @endphp
+    @if ($provisionError && $server->status === \App\Models\Server::STATUS_ERROR)
+        <div class="mx-auto mt-4 max-w-7xl px-4 sm:px-6 lg:px-8" data-testid="server-provision-error">
+            <div class="rounded-2xl border-2 border-brand-rust/40 bg-brand-rust/5 p-4">
+                <div class="flex items-start gap-3">
+                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-rust text-white">
+                        <x-heroicon-o-exclamation-triangle class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-brand-rust">
+                            {{ __('Provisioning failed at :provider', ['provider' => $provisionError['provider'] ?? 'the provider']) }}
+                        </p>
+                        <p class="mt-1 text-sm text-brand-ink">{{ $provisionError['message'] ?? __('Unknown error.') }}</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">
+                            @if (! empty($provisionError['region']))
+                                <span><strong class="text-brand-ink">{{ __('Region') }}:</strong> {{ $provisionError['region'] }}</span>
+                            @endif
+                            @if (! empty($provisionError['size']))
+                                <span><strong class="text-brand-ink">{{ __('Size') }}:</strong> {{ $provisionError['size'] }}</span>
+                            @endif
+                            @if (! empty($provisionError['at']))
+                                <span><strong class="text-brand-ink">{{ __('At') }}:</strong> {{ $provisionError['at'] }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- K8s host whose cluster has gone away at the provider (deleted in the
          DO/AWS console, or the poller gave up after :tries attempts). Stays
          prominent at the top of the overview so the operator can't miss it —

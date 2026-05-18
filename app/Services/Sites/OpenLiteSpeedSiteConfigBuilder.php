@@ -131,6 +131,7 @@ accesslog {$vhostRoot}/logs/access.log {
   logFormat               "%h %l %u %t \"%r\" %>s %b"
 }
 CONF,
+            SiteType::Custom => '',
         };
     }
 

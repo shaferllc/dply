@@ -339,8 +339,12 @@ class InsightsFeatureTest extends TestCase
         $this->assertNotNull($crit->acknowledged_at);
         $this->assertSame($user->id, $crit->acknowledged_by_user_id);
 
+        // After ack: out of the active list + banner, into the dedicated
+        // dismissed section (its own tab) so it stays visible without burying
+        // the actively-firing findings.
         $component->assertViewHas('bannerFindings', fn ($c) => $c->isEmpty())
-            ->assertViewHas('findings', fn ($c) => $c->where('id', $crit->id)->count() === 1);
+            ->assertViewHas('findings', fn ($c) => $c->where('id', $crit->id)->isEmpty())
+            ->assertViewHas('dismissedFindings', fn ($c) => $c->where('id', $crit->id)->count() === 1);
     }
 
     public function test_findings_are_ordered_by_severity_then_recency(): void
@@ -2002,6 +2006,9 @@ class InsightsFeatureTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceInsights::class, ['server' => $server])
             ->assertViewHas('ignoredSuggestions', fn ($c) => $c->count() === 1)
+            // Ignored-recommendations card only renders inside the dismissed
+            // tab; switch the workspace tab before asserting the text.
+            ->call('setTab', 'dismissed')
             ->assertSee('Ignored recommendations')
             ->assertSee('Restore')
             ->call('unignoreFinding', $finding->id);

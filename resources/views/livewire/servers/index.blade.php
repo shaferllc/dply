@@ -133,6 +133,14 @@
                         <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                         {{ __('First server guide') }}
                     </a>
+                    <a
+                        href="{{ route('servers.import.digitalocean') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-cloud-arrow-down class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Import from DigitalOcean') }}
+                    </a>
                 @endcan
             </x-slot>
         </x-page-header>

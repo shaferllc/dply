@@ -122,7 +122,12 @@ APACHE,
     ProxyPassReverse / http://127.0.0.1:{$site->app_port}/
 </VirtualHost>
 APACHE,
+            SiteType::Custom => '',
         };
+
+        if ($config === '') {
+            return '';
+        }
 
         return $this->applyListenPort($config, $listenPort);
     }

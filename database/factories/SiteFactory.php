@@ -44,4 +44,28 @@ class SiteFactory extends Factory
             'restart_supervisor_programs_after_deploy' => false,
         ];
     }
+
+    public function custom(): self
+    {
+        return $this->state(fn (array $attrs) => [
+            'type' => SiteType::Custom,
+            'runtime' => null,
+            'runtime_version' => null,
+            'document_root' => null,
+            'repository_path' => '/home/forge/'.($attrs['slug'] ?? 'custom-site'),
+            'status' => Site::STATUS_CUSTOM_ACTIVE,
+            'ssl_status' => Site::SSL_NONE,
+            'git_repository_url' => 'git@github.com:example/custom.git',
+            'git_branch' => 'main',
+            'deploy_strategy' => 'simple',
+        ]);
+    }
+
+    public function customNoRepo(): self
+    {
+        return $this->custom()->state(fn () => [
+            'git_repository_url' => null,
+            'git_branch' => null,
+        ]);
+    }
 }

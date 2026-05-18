@@ -12,7 +12,7 @@
         <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add a personal SSH key') }}</h2>
         <p class="mt-2 text-sm leading-6 text-brand-moss">
             @if ($source === 'servers.create')
-                {{ __('Save one of your own public keys here so Dply can place your access during setup. Your answers on this page stay as they are.') }}
+                {{ __('Add a public key and Dply will install it on the new server when it provisions.') }}
             @else
                 {{ __('Save a public key on your profile so you can provision it onto new servers and deploy it to existing ones later.') }}
             @endif
@@ -69,8 +69,44 @@
         </label>
 
         <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-3 text-sm leading-6 text-brand-moss">
-            {{ __('Paste an OpenSSH public key only, or use “Generate key pair.” Private keys are never stored in Dply—you must copy them from the dialog into your SSH agent or a local file.') }}
-            <span class="block mt-2">{{ __('Alternatively, run `ssh-keygen -t ed25519 -C "you@example.com"` locally and paste the `.pub` file contents.') }}</span>
+            <p>{{ __('Paste an OpenSSH public key only, or use “Generate key pair.” Private keys are never stored in Dply—you must copy them from the dialog into your SSH agent or a local file.') }}</p>
+
+            <p class="mt-3 font-semibold text-brand-ink">{{ __('Handy terminal commands') }}</p>
+            <div
+                x-data="{
+                    copy(text, btn) {
+                        navigator.clipboard.writeText(text);
+                        const original = btn.textContent;
+                        btn.textContent = '{{ __('Copied') }}';
+                        setTimeout(() => { btn.textContent = original; }, 1500);
+                    }
+                }"
+                class="mt-2 space-y-2 text-xs"
+            >
+                @php
+                    $commands = [
+                        ['label' => __('Generate a new ed25519 keypair'), 'cmd' => 'ssh-keygen -t ed25519 -C "you@example.com"'],
+                        ['label' => __('Copy your existing public key (macOS)'), 'cmd' => 'cat ~/.ssh/id_ed25519.pub | pbcopy'],
+                        ['label' => __('Copy your existing public key (Linux, X11)'), 'cmd' => 'cat ~/.ssh/id_ed25519.pub | xclip -selection clipboard'],
+                        ['label' => __('Copy your existing public key (Linux, Wayland)'), 'cmd' => 'wl-copy < ~/.ssh/id_ed25519.pub'],
+                        ['label' => __('Print to terminal (then select & copy)'), 'cmd' => 'cat ~/.ssh/id_ed25519.pub'],
+                    ];
+                @endphp
+
+                @foreach ($commands as $c)
+                    <div>
+                        <p class="text-brand-mist">{{ $c['label'] }}</p>
+                        <div class="mt-0.5 flex items-stretch gap-2">
+                            <code class="flex-1 truncate rounded border border-brand-ink/10 bg-white px-2 py-1.5 font-mono text-brand-ink">{{ $c['cmd'] }}</code>
+                            <button
+                                type="button"
+                                @click="copy({{ json_encode($c['cmd']) }}, $event.currentTarget)"
+                                class="shrink-0 rounded border border-brand-ink/15 bg-white px-2 py-1.5 font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            >{{ __('Copy') }}</button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
         </div>
     </div>
 

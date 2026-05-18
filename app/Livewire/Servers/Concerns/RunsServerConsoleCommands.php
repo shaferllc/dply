@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Models\Server;
 use App\Services\SshConnection;
 use Illuminate\Support\Str;
 
@@ -32,6 +33,9 @@ trait RunsServerConsoleCommands
     public array $history = [];
 
     public ?string $error = null;
+
+    /** Whether a command is currently running. Prevents concurrent execution. */
+    public bool $consoleRunning = false;
 
     protected const CONSOLE_HISTORY_LIMIT = 30;
 
@@ -64,11 +68,35 @@ trait RunsServerConsoleCommands
             return;
         }
 
+        // Prevent concurrent command execution
+        if ($this->consoleRunning) {
+            $this->error = __('A command is already running. Wait for it to complete.');
+
+            return;
+        }
+
         $this->validate([
             'command' => 'required|string|max:2000',
         ]);
 
+        // Check server is still ready before attempting SSH
+        $this->server->refresh();
+        if ($this->server->status !== Server::STATUS_READY) {
+            $this->error = __('Server is not ready (status: :status). Cannot execute commands.', [
+                'status' => $this->server->status,
+            ]);
+
+            return;
+        }
+
+        if (empty($this->server->ssh_private_key)) {
+            $this->error = __('Server SSH key is not configured. Cannot connect.');
+
+            return;
+        }
+
         $this->error = null;
+        $this->consoleRunning = true;
         $cmd = trim($this->command);
         $startedAt = microtime(true);
 
@@ -90,15 +118,19 @@ trait RunsServerConsoleCommands
 
             $this->logConsoleAudit($cmd, $exit, null, $startedAt);
         } catch (\Throwable $e) {
+            $errorMessage = $this->classifyError($e);
+
             $this->history[] = [
                 'cmd' => $cmd,
                 'out' => '',
                 'exit' => null,
                 'ran_at' => now()->toIso8601String(),
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
             ];
 
-            $this->logConsoleAudit($cmd, null, $e->getMessage(), $startedAt);
+            $this->logConsoleAudit($cmd, null, $errorMessage, $startedAt);
+        } finally {
+            $this->consoleRunning = false;
         }
 
         if (count($this->history) > self::CONSOLE_HISTORY_LIMIT) {
@@ -106,6 +138,42 @@ trait RunsServerConsoleCommands
         }
 
         $this->command = '';
+    }
+
+    /**
+     * Classify SSH/execution errors into user-friendly messages.
+     */
+    protected function classifyError(\Throwable $e): string
+    {
+        $message = $e->getMessage();
+
+        // SSH connection errors
+        if (str_contains($message, 'Connection refused') || str_contains($message, 'Connection timed out')) {
+            return __('SSH connection failed: Server may be offline or unreachable.');
+        }
+
+        if (str_contains($message, 'Authentication failed') || str_contains($message, 'Invalid key')) {
+            return __('SSH authentication failed: Check server SSH key configuration.');
+        }
+
+        if (str_contains($message, 'Host key verification failed')) {
+            return __('SSH host key verification failed. Server identity may have changed.');
+        }
+
+        // Timeout errors
+        if (str_contains($message, 'timeout') || str_contains($message, 'timed out')) {
+            return __('Command timed out after :seconds seconds. Try a simpler command or use the Run page for long-running operations.', [
+                'seconds' => self::CONSOLE_EXEC_TIMEOUT,
+            ]);
+        }
+
+        // Permission errors
+        if (str_contains($message, 'Permission denied')) {
+            return __('Permission denied: The SSH user does not have permission to run this command.');
+        }
+
+        // Generic fallback
+        return Str::limit($message, 200);
     }
 
     /**

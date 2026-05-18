@@ -21,6 +21,10 @@ final class SiteSettingsSidebar
     {
         $supportsSsh = $server->hostCapabilities()->supportsSsh();
 
+        if ($site->isCustom()) {
+            return self::customItems($site);
+        }
+
         $showWebserverConfigEditor = $supportsSsh
             && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
@@ -168,6 +172,38 @@ final class SiteSettingsSidebar
             ...$background,
             ...array_slice($items, $insertIndex),
         ];
+    }
+
+    /**
+     * Tight sidebar for Custom (headless) sites — no webserver, SSL, caching,
+     * insights, or web-shaped runtime tabs. Daemons / Cron / Queue Workers
+     * are first-class since they're the typical workload.
+     *
+     * @return list<array{id: string, label: string, icon: string, group: string, route?: string, parent?: string}>
+     */
+    private static function customItems(Site $site): array
+    {
+        $items = [
+            ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
+            ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
+            ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
+        ];
+
+        if ($site->isCustomGitMode()) {
+            $items[] = ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy'];
+        }
+
+        $items = [...$items,
+            ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],
+            ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
+            ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability'],
+            ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
+            ['id' => 'daemons', 'label' => __('Daemons'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
+            ['id' => 'queue-workers', 'label' => __('Queue workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.queue-workers'],
+            ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
+        ];
+
+        return $items;
     }
 
     /**

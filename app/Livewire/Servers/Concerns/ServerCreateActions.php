@@ -69,8 +69,15 @@ trait ServerCreateActions
 
     public function updatedFormRegion(): void
     {
-        if ($this->form->type === 'scaleway') {
+        // Region-scoped catalogs (DO, Scaleway) must re-resolve with the
+        // new region so the size dropdown stops offering plans that don't
+        // exist in that DC. We also blank the current size pick — if it
+        // isn't available in the new region the next render would silently
+        // leave it stale and provisioning would fail server-side.
+        if (in_array($this->form->type, ['scaleway', 'digitalocean'], true)) {
             $this->form->size = '';
+            $this->memoServerCreateCatalog = null;
+            $this->memoServerCreateCatalogKey = null;
         }
     }
 
@@ -193,7 +200,11 @@ trait ServerCreateActions
     protected function resolveServerCreateCatalog(Organization $org, ?string $selectedRegionOverride = null): array
     {
         $selectedRegion = $selectedRegionOverride ?? $this->form->region;
-        $memoSegment = $this->form->type === 'scaleway' ? $selectedRegion : '';
+        // Sizes are region-scoped on every provider that publishes per-region
+        // availability — Scaleway's catalog is region-specific, and DO's
+        // /sizes returns a regions array per plan. Without region in the
+        // memo key, switching region reuses the previous region's sizes.
+        $memoSegment = in_array($this->form->type, ['scaleway', 'digitalocean'], true) ? $selectedRegion : '';
         $memoKey = implode('|', [(string) $org->getKey(), $this->form->type, $this->form->provider_credential_id, $memoSegment]);
 
         if ($this->memoServerCreateCatalog !== null && $this->memoServerCreateCatalogKey === $memoKey) {

@@ -30,11 +30,56 @@ class ConsoleArgspecs
     {
         $units = self::unitsFor($server);
         $logs = self::logPathsFor($server);
+        $tags = ServerInstalledServices::tagsFor($server);
+        $phpVersion = ServerInstalledServices::phpVersionFor($server);
 
         $verbs = [
             'start', 'stop', 'restart', 'reload', 'status',
             'enable', 'disable', 'is-active', 'is-enabled',
         ];
+
+        $sudoVerbs = [
+            'start', 'stop', 'restart', 'reload', 'status',
+            'enable', 'disable', 'mask', 'unmask', 'is-active', 'is-enabled',
+        ];
+
+        // Build dply subcommands based on installed services
+        $dplySubcommands = ['status', 'help', 'version', 'restart', 'tail', 'site', 'recipe', 'ssl'];
+        $dplyRestartServices = [];
+        $dplyTailServices = [];
+
+        if (isset($tags['php'])) {
+            $dplyRestartServices[] = 'php';
+            $dplyTailServices[] = 'php';
+        }
+        if (isset($tags['nginx']) || isset($tags['apache']) || isset($tags['caddy'])) {
+            $dplyRestartServices[] = 'web';
+        }
+        if (isset($tags['nginx'])) {
+            $dplyTailServices[] = 'nginx';
+        }
+        $dplyTailServices[] = 'syslog';
+        if (isset($tags['mysql'])) {
+            $dplyTailServices[] = 'mysql';
+        }
+
+        // Build ufw commands
+        $ufwCommands = ['status', 'enable', 'disable', 'reload', 'reset'];
+        $ufwActions = ['allow', 'deny', 'delete'];
+        $ufwDefaults = ['allow', 'deny', 'reject', 'limit'];
+        $ufwDirections = ['incoming', 'outgoing', 'routed'];
+
+        // Build nginx commands
+        $nginxCommands = ['-v', '-t', '-T', '-s'];
+        $nginxSignals = ['reload', 'stop', 'quit', 'reopen'];
+
+        // Build php-fpm test command
+        $phpFpmUnit = $phpVersion !== null ? "php{$phpVersion}-fpm" : 'php-fpm';
+
+        $sudoCommands = array_values(array_unique(array_merge(
+            ['systemctl', 'ufw', 'nginx', 'service'],
+            $tags['php'] ? [$phpFpmUnit] : []
+        )));
 
         return [
             'systemctl' => [
@@ -65,6 +110,38 @@ class ConsoleArgspecs
                 'after_flag' => [
                     '-u' => $units,
                     '--unit' => $units,
+                ],
+            ],
+            'dply' => [
+                'positional' => [
+                    1 => $dplySubcommands,
+                    2 => array_values(array_unique(array_merge(
+                        $dplyRestartServices,
+                        $dplyTailServices,
+                        ['list', 'show', 'run'] // site/recipe/ssl sub-subcommands
+                    ))),
+                ],
+            ],
+            'sudo' => [
+                'positional' => [
+                    1 => $sudoCommands,
+                ],
+                'after_flag' => [
+                    'systemctl' => $sudoVerbs,
+                ],
+            ],
+            'ufw' => [
+                'positional' => [
+                    1 => $ufwCommands,
+                    2 => array_merge($ufwActions, $ufwDefaults, ['from', 'to']),
+                ],
+            ],
+            'nginx' => [
+                'positional' => [
+                    1 => $nginxCommands,
+                ],
+                'after_flag' => [
+                    '-s' => $nginxSignals,
                 ],
             ],
         ];

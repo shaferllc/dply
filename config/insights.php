@@ -3,22 +3,42 @@
 use App\Services\Insights\FixActions\ApplyPackageSecurityUpdatesFixAction;
 use App\Services\Insights\FixActions\BumpFpmWorkersFixAction;
 use App\Services\Insights\FixActions\EnableNtpFixAction;
+use App\Services\Insights\FixActions\EnableUnattendedUpgradesFixAction;
+use App\Services\Insights\FixActions\HardenSshConfigFixAction;
+use App\Services\Insights\FixActions\InstallFail2banFixAction;
 use App\Services\Insights\FixActions\SupervisorStartFixAction;
 use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\Runners\CpuRamUsageInsightRunner;
+use App\Services\Insights\Runners\DatabaseConnectionsInsightRunner;
 use App\Services\Insights\Runners\DiskCapacityInsightRunner;
+use App\Services\Insights\Runners\Fail2banInsightRunner;
+use App\Services\Insights\Runners\FailedSystemdUnitsInsightRunner;
 use App\Services\Insights\Runners\HealthCheckUrlMissingInsightRunner;
 use App\Services\Insights\Runners\HorizonRecommendedInsightRunner;
+use App\Services\Insights\Runners\InnodbBufferPoolInsightRunner;
+use App\Services\Insights\Runners\LaravelAppDebugInsightRunner;
 use App\Services\Insights\Runners\LoadAverageInsightRunner;
 use App\Services\Insights\Runners\MetricsMissingInsightRunner;
+use App\Services\Insights\Runners\MysqlBinLogsInsightRunner;
+use App\Services\Insights\Runners\NginxWorkerConnectionsInsightRunner;
+use App\Services\Insights\Runners\NodejsUpdatesInsightRunner;
+use App\Services\Insights\Runners\NoNotificationChannelsInsightRunner;
 use App\Services\Insights\Runners\OctaneRecommendedInsightRunner;
+use App\Services\Insights\Runners\OpcacheDisabledInsightRunner;
+use App\Services\Insights\Runners\OpcacheFullInsightRunner;
 use App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner;
 use App\Services\Insights\Runners\PhpEolSitesInsightRunner;
 use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
+use App\Services\Insights\Runners\PhpMaxChildrenSaturatedInsightRunner;
 use App\Services\Insights\Runners\PipelineHeartbeatInsightRunner;
+use App\Services\Insights\Runners\RebootRequiredInsightRunner;
+use App\Services\Insights\Runners\SshSecurityPostureInsightRunner;
 use App\Services\Insights\Runners\SslCertificateInsightRunner;
+use App\Services\Insights\Runners\SslExpirationInsightRunner;
+use App\Services\Insights\Runners\StaleBackupsInsightRunner;
 use App\Services\Insights\Runners\SupervisorRunningInsightRunner;
 use App\Services\Insights\Runners\SystemClockSyncInsightRunner;
+use App\Services\Insights\Runners\UnattendedUpgradesInsightRunner;
 
 /**
  * Registered insight checks: `runner` null means not implemented yet (skipped by jobs).
@@ -151,10 +171,10 @@ return [
 
         'opcache_disabled' => [
             'label' => 'OPcache disabled',
-            'description' => 'Check if OPcache is disabled.',
+            'description' => 'Detect PHP-FPM SAPIs running without OPcache enabled.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => OpcacheDisabledInsightRunner::class,
             'fix' => null,
             'requires' => ['php'],
         ],
@@ -190,12 +210,28 @@ return [
 
         'innodb_buffer_pool' => [
             'label' => 'InnoDB buffer pool',
-            'description' => 'Monitor InnoDB buffer pool usage.',
+            'description' => 'Flag undersized innodb_buffer_pool relative to RAM and working set.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => InnodbBufferPoolInsightRunner::class,
             'fix' => null,
             'requires' => ['mysql'],
+            'parameters' => [
+                'min_ram_share_pct' => [
+                    'type' => 'number',
+                    'label' => 'Min RAM share for buffer pool (%)',
+                    'min' => 5,
+                    'max' => 90,
+                    'default' => 25,
+                ],
+                'working_set_full_pct' => [
+                    'type' => 'number',
+                    'label' => 'Pages-data fullness that signals saturation (%)',
+                    'min' => 50,
+                    'max' => 100,
+                    'default' => 95,
+                ],
+            ],
         ],
 
         'package_security_updates' => [
@@ -238,12 +274,21 @@ return [
 
         'php_max_children' => [
             'label' => 'PHP max children',
-            'description' => 'Check if PHP-FPM max children limit is being reached.',
+            'description' => 'Flag PHP-FPM pools currently at their pm.max_children worker ceiling.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => PhpMaxChildrenSaturatedInsightRunner::class,
             'fix' => null,
             'requires' => ['php'],
+            'parameters' => [
+                'saturation_pct' => [
+                    'type' => 'number',
+                    'label' => 'At-or-above this %, flag as saturated',
+                    'min' => 50,
+                    'max' => 100,
+                    'default' => 100,
+                ],
+            ],
         ],
 
         /*
@@ -280,12 +325,28 @@ return [
 
         'opcache_full' => [
             'label' => 'OPcache full',
-            'description' => 'Monitor OPcache memory usage.',
+            'description' => 'Detect PHP OPcache memory or key-table pressure (OOM restarts).',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => OpcacheFullInsightRunner::class,
             'fix' => null,
             'requires' => ['php'],
+            'parameters' => [
+                'usage_warn_pct' => [
+                    'type' => 'number',
+                    'label' => 'Warn at memory used %',
+                    'min' => 50,
+                    'max' => 99,
+                    'default' => 90,
+                ],
+                'keys_warn_pct' => [
+                    'type' => 'number',
+                    'label' => 'Warn at cached-keys used %',
+                    'min' => 50,
+                    'max' => 99,
+                    'default' => 90,
+                ],
+            ],
         ],
 
         'supervisor_running' => [
@@ -302,41 +363,91 @@ return [
 
         'nodejs_updates' => [
             'label' => 'Node.js updates',
-            'description' => 'Check for Node.js updates.',
+            'description' => 'Detect installed Node.js majors at or near end-of-life.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => NodejsUpdatesInsightRunner::class,
             'fix' => null,
+            'parameters' => [
+                'warn_days' => [
+                    'type' => 'number',
+                    'label' => 'Warn when major reaches EOL within N days',
+                    'min' => 1,
+                    'max' => 365,
+                    'default' => 90,
+                ],
+            ],
         ],
 
         'mysql_bin_logs' => [
             'label' => 'MySQL bin logs',
-            'description' => 'Monitor MySQL binary log growth.',
+            'description' => 'Detect unbounded or oversized MySQL binary log retention.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => MysqlBinLogsInsightRunner::class,
             'fix' => null,
             'requires' => ['mysql'],
+            'parameters' => [
+                'bin_log_warn_pct' => [
+                    'type' => 'number',
+                    'label' => 'Warn when binlogs ≥ % of used space',
+                    'min' => 5,
+                    'max' => 90,
+                    'default' => 30,
+                ],
+            ],
         ],
 
         'database_connections' => [
             'label' => 'Database connections',
-            'description' => 'Check database connection limits.',
+            'description' => 'Detect MySQL connection-pool saturation against max_connections.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => DatabaseConnectionsInsightRunner::class,
             'fix' => null,
             'requires' => ['mysql', 'postgres'],
+            'parameters' => [
+                'warn_pct' => [
+                    'type' => 'number',
+                    'label' => 'Warn at max-used ratio (%)',
+                    'min' => 50,
+                    'max' => 99,
+                    'default' => 80,
+                ],
+                'critical_pct' => [
+                    'type' => 'number',
+                    'label' => 'Critical at max-used ratio (%)',
+                    'min' => 60,
+                    'max' => 100,
+                    'default' => 95,
+                ],
+            ],
         ],
 
         'nginx_worker_connections' => [
             'label' => 'Nginx worker connections',
-            'description' => 'Monitor Nginx worker connections.',
+            'description' => 'Flag nginx near its worker_connections × worker_processes ceiling.',
             'scope' => 'server',
             'requires_pro' => false,
-            'runner' => null,
+            'runner' => NginxWorkerConnectionsInsightRunner::class,
             'fix' => null,
             'requires' => ['nginx'],
+            'parameters' => [
+                'warn_pct' => [
+                    'type' => 'number',
+                    'label' => 'Warn at capacity %',
+                    'min' => 30,
+                    'max' => 95,
+                    'default' => 60,
+                ],
+                'critical_pct' => [
+                    'type' => 'number',
+                    'label' => 'Critical at capacity %',
+                    'min' => 50,
+                    'max' => 100,
+                    'default' => 85,
+                ],
+            ],
         ],
 
         /*
@@ -399,6 +510,191 @@ return [
                     'label' => 'Severities',
                 ],
             ],
+        ],
+
+        /*
+         * SSH daemon posture — parses `sshd -T` and flags PasswordAuthentication yes,
+         * PermitRootLogin yes, PermitEmptyPasswords yes, deprecated protocol 1, and
+         * X11Forwarding. Severity is the highest across detected issues. Read-only.
+         */
+        'ssh_security_posture' => [
+            'label' => 'SSH daemon posture',
+            'description' => 'Audit sshd config for password auth, root login, weak settings.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => SshSecurityPostureInsightRunner::class,
+            'fix' => [
+                'handler' => HardenSshConfigFixAction::class,
+                'mutates_config' => true,
+            ],
+        ],
+
+        /*
+         * Per-site SSL expiration countdown. Probes the live cert NotAfter via openssl
+         * from the box itself, warns at ≤30 days, critical at ≤14 days. Skipped for
+         * sites whose ssl_status isn't active (sibling runner handles those).
+         */
+        'ssl_certificate_expiring' => [
+            'label' => 'SSL certificate expiring soon',
+            'description' => 'Warn when SSL certs are within their renewal window.',
+            'scope' => 'site',
+            'requires_pro' => false,
+            'runner' => SslExpirationInsightRunner::class,
+            'fix' => null,
+            'parameters' => [
+                'warn_days' => [
+                    'type' => 'number',
+                    'label' => 'Warn when days remaining ≤',
+                    'min' => 1,
+                    'max' => 120,
+                    'default' => 30,
+                ],
+                'critical_days' => [
+                    'type' => 'number',
+                    'label' => 'Critical when days remaining ≤',
+                    'min' => 1,
+                    'max' => 60,
+                    'default' => 14,
+                ],
+            ],
+        ],
+
+        /*
+         * Reboot required after kernel/libc patch. Reads /var/run/reboot-required +
+         * /var/run/reboot-required.pkgs. Severity escalates from warn to critical
+         * after `critical_after_days` (default 14).
+         */
+        'reboot_required' => [
+            'label' => 'Reboot required',
+            'description' => 'Surface pending kernel/libc updates that require a host reboot.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => RebootRequiredInsightRunner::class,
+            'fix' => null,
+            'parameters' => [
+                'critical_after_days' => [
+                    'type' => 'number',
+                    'label' => 'Escalate to critical after days',
+                    'min' => 1,
+                    'max' => 90,
+                    'default' => 14,
+                ],
+            ],
+        ],
+
+        /*
+         * Failed systemd units. Lists unit names in failed state; warns on any,
+         * escalates to critical at `critical_count` (default 3) — usually a cascade
+         * from a deeper issue like an apt failure or storage problem.
+         */
+        'systemd_failed_units' => [
+            'label' => 'Failed systemd units',
+            'description' => 'Detect systemd units in a failed state.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => FailedSystemdUnitsInsightRunner::class,
+            'fix' => null,
+            'parameters' => [
+                'critical_count' => [
+                    'type' => 'number',
+                    'label' => 'Critical when failed units ≥',
+                    'min' => 1,
+                    'max' => 50,
+                    'default' => 3,
+                ],
+            ],
+        ],
+
+        /*
+         * Stale backups. Walks server_backup_schedules + their last successful run
+         * (database or site-files); flags any whose latest success is older than
+         * `stale_after_hours` (default 48), critical at `critical_after_hours` (168).
+         * Pure DB check, no SSH probe.
+         */
+        'stale_backups' => [
+            'label' => 'Stale backups',
+            'description' => 'Flag active backup schedules whose latest successful run is overdue.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => StaleBackupsInsightRunner::class,
+            'fix' => null,
+            'parameters' => [
+                'stale_after_hours' => [
+                    'type' => 'number',
+                    'label' => 'Warn after hours without a successful backup',
+                    'min' => 1,
+                    'max' => 720,
+                    'default' => 48,
+                ],
+                'critical_after_hours' => [
+                    'type' => 'number',
+                    'label' => 'Critical after hours without a successful backup',
+                    'min' => 24,
+                    'max' => 2160,
+                    'default' => 168,
+                ],
+            ],
+        ],
+
+        /*
+         * unattended-upgrades disabled. Detects missing package, disabled config,
+         * or inactive timer. Suggestion if not installed (operator may have opted
+         * out); warning if installed but not running.
+         */
+        'unattended_upgrades_disabled' => [
+            'label' => 'Unattended security upgrades',
+            'description' => 'Check that automatic security updates are configured and running.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => UnattendedUpgradesInsightRunner::class,
+            'fix' => [
+                'handler' => EnableUnattendedUpgradesFixAction::class,
+                'mutates_config' => true,
+            ],
+        ],
+
+        /*
+         * fail2ban presence/activity. Suggestion if not installed; warning if
+         * installed but the service isn't active.
+         */
+        'fail2ban_inactive' => [
+            'label' => 'fail2ban inactive',
+            'description' => 'Detect when fail2ban is missing or not running.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => Fail2banInsightRunner::class,
+            'fix' => [
+                'handler' => InstallFail2banFixAction::class,
+                'mutates_config' => true,
+            ],
+        ],
+
+        /*
+         * Alerts have nowhere to go. Flags the org-no-channels case (warning) and
+         * the server-no-subscriptions case (suggestion). Pure DB check.
+         */
+        'no_notification_channels' => [
+            'label' => 'No notification channels',
+            'description' => 'Surface when alerts won\'t reach anyone because no channels are configured.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => NoNotificationChannelsInsightRunner::class,
+            'fix' => null,
+        ],
+
+        /*
+         * Laravel APP_DEBUG=true with APP_ENV=production. Reads dply's encrypted
+         * env cache (env_file_content); no SSH round-trip. Critical — leaks stack
+         * traces and env values on errors.
+         */
+        'laravel_app_debug_enabled' => [
+            'label' => 'Laravel APP_DEBUG=true in production',
+            'description' => 'Flag Laravel sites where APP_DEBUG=true while APP_ENV=production.',
+            'scope' => 'site',
+            'requires_pro' => false,
+            'runner' => LaravelAppDebugInsightRunner::class,
+            'fix' => null,
+            'requires' => ['php'],
         ],
 
     ],

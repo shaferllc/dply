@@ -196,13 +196,13 @@
                         {{ __('Open project') }}
                     </x-outline-link>
                 @endif
-                @if ($showWebserverConfigEditor)
+                @if ($showWebserverConfigEditor && ! $site->isCustom())
                     <x-outline-link :href="route('sites.webserver-config', [$server, $site])" wire:navigate>
                         <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Web server config') }}
                     </x-outline-link>
                 @endif
-                @if ($readyForWorkspace)
+                @if ($readyForWorkspace && ! $site->isCustom())
                     <x-outline-link :href="route('sites.files', [$server, $site])" wire:navigate>
                         <x-heroicon-o-folder class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Files') }}
@@ -217,6 +217,12 @@
                     <x-outline-link :href="route('sites.monitor', [$server, $site])" wire:navigate>
                         <x-heroicon-o-signal class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Monitor') }}
+                    </x-outline-link>
+                @endif
+                @if ($site->isCustom() && $site->status === \App\Models\Site::STATUS_CUSTOM_ACTIVE)
+                    <x-outline-link :href="route('sites.deployments.index', [$server, $site])" wire:navigate>
+                        <x-heroicon-o-code-bracket-square class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('Deployments') }}
                     </x-outline-link>
                 @endif
             </x-slot>

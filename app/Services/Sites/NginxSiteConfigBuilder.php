@@ -109,7 +109,12 @@ class NginxSiteConfigBuilder
             SiteType::Php => $this->phpBlock($basename, $names, $root, $phpSock, $redirectBlock, $layerPrefix, $extraBlock, $poolNote, $site),
             SiteType::Static => $this->staticBlock($basename, $names, $root, $redirectBlock, $layerPrefix, $extraBlock, $site),
             SiteType::Node => $this->nodeBlock($basename, $names, $this->resolveUpstreamPort($site), $redirectBlock, $layerPrefix, $extraBlock, $site),
+            SiteType::Custom => null,
         };
+
+        if ($config === null) {
+            return '';
+        }
 
         return $listenPort === null ? $config : $this->rewriteForListenPort($config, $listenPort);
     }

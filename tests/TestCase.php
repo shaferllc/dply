@@ -6,6 +6,14 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * Drop Postgres composite types alongside tables when RefreshDatabase
+     * triggers `migrate:fresh`. Without this, composite types auto-created
+     * with each table linger after wipe and the *next* test run collides
+     * with "duplicate key value violates unique constraint pg_type_typname_nsp_index".
+     */
+    protected bool $dropTypes = true;
+
     protected function setUp(): void
     {
         parent::setUp();

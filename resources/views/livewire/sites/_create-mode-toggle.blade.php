@@ -9,7 +9,11 @@
         </div>
     </div>
 
-    <div class="mt-5 grid gap-4 sm:grid-cols-2">
+    <div @class([
+        'mt-5 grid gap-4',
+        'sm:grid-cols-2' => $server->hostKind() !== \App\Models\Server::HOST_KIND_VM,
+        'sm:grid-cols-3' => $server->hostKind() === \App\Models\Server::HOST_KIND_VM,
+    ])>
         <button
             type="button"
             wire:click="chooseImportMode"
@@ -61,5 +65,19 @@
                 </span>
             @endif
         </button>
+
+        @if ($server->hostKind() === \App\Models\Server::HOST_KIND_VM)
+            <a
+                href="{{ route('sites.create-custom', $server) }}"
+                wire:navigate
+                class="group relative flex flex-col items-start rounded-2xl border-2 border-brand-ink/10 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md"
+            >
+                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15">
+                    <x-heroicon-o-wrench-screwdriver class="h-5 w-5" />
+                </span>
+                <span class="mt-3 block text-base font-semibold text-brand-ink">{{ __('Custom — headless workload') }}</span>
+                <span class="mt-1 block text-sm leading-relaxed text-brand-moss">{{ __('No domain, no webserver. Workers, daemons, microservices on private ports, or pure deploy-pipeline targets.') }}</span>
+            </a>
+        @endif
     </div>
 </section>

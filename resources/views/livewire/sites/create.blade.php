@@ -22,6 +22,22 @@
             @else
             @if (config('dply.scaffold_v1_enabled'))
                 @include('livewire.sites._create-mode-toggle')
+            @elseif ($server->hostKind() === \App\Models\Server::HOST_KIND_VM)
+                <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-4 text-sm text-brand-moss">
+                    <div class="flex items-start gap-3">
+                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest shadow-sm">
+                            <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-brand-ink">{{ __('Headless workload?') }}</p>
+                            <p class="mt-0.5 text-xs leading-relaxed">{{ __('For workers, daemons, microservices on private ports, or pure deploy-pipeline targets — skip the webserver and SSL setup.') }}</p>
+                        </div>
+                        <a href="{{ route('sites.create-custom', $server) }}" wire:navigate class="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg bg-brand-ink px-3 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
+                            {{ __('Create a Custom site') }}
+                            <x-heroicon-o-arrow-right class="h-3 w-3" />
+                        </a>
+                    </div>
+                </div>
             @endif
 
             @if ($form->mode === 'scaffold' && config('dply.scaffold_v1_enabled'))

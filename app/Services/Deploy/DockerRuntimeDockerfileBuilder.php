@@ -12,6 +12,7 @@ final class DockerRuntimeDockerfileBuilder
         return match ($site->type) {
             SiteType::Node => $this->nodeDockerfile($site),
             SiteType::Static => $this->staticDockerfile($site),
+            SiteType::Custom => '',
             default => $this->phpDockerfile($site),
         };
     }
