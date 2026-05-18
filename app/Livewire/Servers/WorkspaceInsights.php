@@ -73,7 +73,7 @@ class WorkspaceInsights extends Component
 
     public function setTab(string $tab): void
     {
-        $this->tab = in_array($tab, ['overview', 'notifications', 'settings'], true) ? $tab : 'overview';
+        $this->tab = in_array($tab, ['overview', 'dismissed', 'notifications', 'settings'], true) ? $tab : 'overview';
     }
 
     public function saveSettings(): void
@@ -427,6 +427,27 @@ class WorkspaceInsights extends Component
         if ($this->rejectIfInsightsBusy()) {
             return;
         }
+
+        // Stamp the run-start markers on the finding (mirrors runFix) so the
+        // list row swaps the "Apply fix" button for a queued chip immediately,
+        // not minutes later when the worker stamps a terminal key. Without
+        // this, the row gives no feedback that the click registered.
+        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta['fix_run_started_at'] = now()->toIso8601String();
+        $meta['fix_run_started_by'] = $user->id;
+        $meta['fix_run_queue'] = config('queue.default');
+        unset(
+            $meta['fix_applied_at'],
+            $meta['fix_applied_by'],
+            $meta['fix_failed_at'],
+            $meta['fix_failed_by'],
+            $meta['fix_failure_reason'],
+            $meta['fix_refused_at'],
+            $meta['fix_refused_by'],
+            $meta['fix_refusal_reason'],
+            $meta['fix_output'],
+        );
+        $finding->forceFill(['meta' => $meta])->save();
 
         $runId = (string) Str::ulid();
         $this->seedFixBannerMeta($runId, $finding->id);
@@ -1064,19 +1085,28 @@ class WorkspaceInsights extends Component
             ->values();
         $suggestionFindings = $findings->where('kind', InsightFinding::KIND_SUGGESTION)->values();
 
-        // Banner: top 3 unacknowledged critical *problems*. Acknowledged
-        // ones still appear in the list below — ack silences the
-        // banner, not the whole row. Suggestions are excluded defensively
-        // so a misconfigured suggestion runner can't hijack the banner.
-        $bannerFindings = $problemFindings
+        // Dismissed = acknowledged problems. Pulled out of the Overview list so
+        // a noisy week of acks doesn't bury the actually-active findings. Lives
+        // on its own tab; rows can be restored from there.
+        $dismissedFindings = $problemFindings
+            ->filter(fn (InsightFinding $f): bool => $f->acknowledged_at !== null)
+            ->values();
+        $activeFindings = $problemFindings
+            ->filter(fn (InsightFinding $f): bool => $f->acknowledged_at === null)
+            ->values();
+
+        // Banner: top 3 unacknowledged critical *problems*. Suggestions are
+        // excluded defensively so a misconfigured suggestion runner can't
+        // hijack the banner.
+        $bannerFindings = $activeFindings
             ->where('severity', InsightFinding::SEVERITY_CRITICAL)
-            ->whereNull('acknowledged_at')
             ->take(3)
             ->values();
 
         return view('livewire.servers.workspace-insights', [
             'orgHasPro' => $orgHasPro,
-            'findings' => $problemFindings,
+            'findings' => $activeFindings,
+            'dismissedFindings' => $dismissedFindings,
             'suggestionFindings' => $suggestionFindings,
             'ignoredSuggestions' => $ignoredSuggestions,
             'bannerFindings' => $bannerFindings,

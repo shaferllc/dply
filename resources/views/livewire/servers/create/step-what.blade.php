@@ -80,14 +80,28 @@
                     <div class="space-y-5">
                         <div>
                             <x-input-label for="do_kubernetes_new_name" :value="__('Cluster name')" />
-                            <x-text-input
-                                id="do_kubernetes_new_name"
-                                wire:model.live.debounce.500ms="form.do_kubernetes_new_name"
-                                type="text"
-                                class="mt-2 block w-full font-mono text-sm"
-                                placeholder="prod-cluster"
-                            />
-                            <p class="mt-1 text-xs text-brand-mist">{{ __('Lowercase letters, numbers, and hyphens. Must start with a letter (DOKS naming rules).') }}</p>
+                            <div class="mt-2 flex gap-2">
+                                <x-text-input
+                                    id="do_kubernetes_new_name"
+                                    wire:model.live.debounce.500ms="form.do_kubernetes_new_name"
+                                    type="text"
+                                    class="block w-full font-mono text-sm"
+                                    placeholder="dply-cluster-XXXXXX"
+                                />
+                                <button
+                                    type="button"
+                                    wire:click="regenerateNewClusterName"
+                                    wire:loading.attr="disabled"
+                                    wire:target="regenerateNewClusterName"
+                                    title="{{ __('Roll a new random cluster name') }}"
+                                    class="inline-flex h-[42px] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 text-xs font-semibold text-brand-moss transition-colors hover:border-brand-sage hover:text-brand-sage disabled:cursor-wait disabled:opacity-60"
+                                >
+                                    <x-heroicon-o-arrow-path wire:loading.remove wire:target="regenerateNewClusterName" class="h-4 w-4" />
+                                    <x-spinner wire:loading wire:target="regenerateNewClusterName" size="sm" />
+                                    {{ __('Regenerate') }}
+                                </button>
+                            </div>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Lowercase letters, numbers, and hyphens. Must start with a letter (DOKS naming rules). Dply pre-filled one for you — edit or roll a new one.') }}</p>
                             <x-input-error :messages="$errors->get('form.do_kubernetes_new_name')" class="mt-2" />
                         </div>
 
@@ -143,32 +157,67 @@
                             </span>
                         </label>
                     </div>
-                @elseif ($kubernetesClusters === [])
-                    <div data-testid="no-kubernetes-clusters" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                        <p class="font-semibold">{{ __('No managed clusters found in this account.') }}</p>
-                        <p class="mt-1">{{ __('Switch to "Create new" above to have dply provision one, or create one in the DigitalOcean console and come back. Your draft will still be waiting.') }}</p>
-                        <a href="https://cloud.digitalocean.com/kubernetes/clusters" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 font-semibold underline hover:text-amber-700">
-                            {{ __('Open DigitalOcean Kubernetes') }} →
-                        </a>
-                    </div>
                 @else
-                    @php
-                        $clusterOptions = collect($kubernetesClusters)->map(fn (array $c): array => [
-                            'id' => (string) ($c['name'] ?? ''),
-                            'label' => (string) ($c['name'] ?? ''),
-                            'summary' => (string) ($c['region'] ?? ''),
-                        ])->all();
-                    @endphp
-                    @include('livewire.servers.create._rich-select', [
-                        'id' => 'do_kubernetes_cluster_name',
-                        'label' => __('Cluster'),
-                        'field' => 'form.do_kubernetes_cluster_name',
-                        'value' => $form->do_kubernetes_cluster_name,
-                        'options' => $clusterOptions,
-                        'errorKey' => 'form.do_kubernetes_cluster_name',
-                        'eyebrow' => __('Selected cluster'),
-                        'placeholder' => __('Select a cluster'),
-                    ])
+                    {{-- EKS register-existing: clusters are region-scoped, so
+                         the user picks a region first. Changing the region
+                         invalidates any prior cluster pick (handled in
+                         StepWhat::updatedFormDoKubernetesAwsRegion). --}}
+                    @if ($kubernetesProvider === 'aws_kubernetes')
+                        @php
+                            $awsRegionOptions = collect($kubernetesAwsRegions)->map(fn (array $r): array => [
+                                'id' => (string) ($r['value'] ?? ''),
+                                'label' => (string) ($r['label'] ?? ''),
+                            ])->all();
+                        @endphp
+                        @include('livewire.servers.create._rich-select', [
+                            'id' => 'do_kubernetes_aws_region',
+                            'label' => __('AWS region'),
+                            'field' => 'form.do_kubernetes_aws_region',
+                            'value' => $form->do_kubernetes_aws_region,
+                            'options' => $awsRegionOptions,
+                            'errorKey' => 'form.do_kubernetes_aws_region',
+                            'eyebrow' => __('Selected region'),
+                            'placeholder' => __('Pick the region your cluster lives in'),
+                        ])
+                    @endif
+
+                    @if ($kubernetesClusters === [])
+                        @if ($kubernetesProvider === 'aws_kubernetes')
+                            <div data-testid="no-kubernetes-clusters" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                <p class="font-semibold">{{ __('No EKS clusters found in this region.') }}</p>
+                                <p class="mt-1">{{ __('Try a different region above, or create a cluster in this region first.') }}</p>
+                                <a href="https://console.aws.amazon.com/eks/home" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 font-semibold underline hover:text-amber-700">
+                                    {{ __('Open AWS EKS console') }} →
+                                </a>
+                            </div>
+                        @else
+                            <div data-testid="no-kubernetes-clusters" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                <p class="font-semibold">{{ __('No managed clusters found in this account.') }}</p>
+                                <p class="mt-1">{{ __('Switch to "Create new" above to have dply provision one, or create one in the DigitalOcean console and come back. Your draft will still be waiting.') }}</p>
+                                <a href="https://cloud.digitalocean.com/kubernetes/clusters" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 font-semibold underline hover:text-amber-700">
+                                    {{ __('Open DigitalOcean Kubernetes') }} →
+                                </a>
+                            </div>
+                        @endif
+                    @else
+                        @php
+                            $clusterOptions = collect($kubernetesClusters)->map(fn (array $c): array => [
+                                'id' => (string) ($c['name'] ?? ''),
+                                'label' => (string) ($c['name'] ?? ''),
+                                'summary' => (string) ($c['region'] ?? ''),
+                            ])->all();
+                        @endphp
+                        @include('livewire.servers.create._rich-select', [
+                            'id' => 'do_kubernetes_cluster_name',
+                            'label' => __('Cluster'),
+                            'field' => 'form.do_kubernetes_cluster_name',
+                            'value' => $form->do_kubernetes_cluster_name,
+                            'options' => $clusterOptions,
+                            'errorKey' => 'form.do_kubernetes_cluster_name',
+                            'eyebrow' => __('Selected cluster'),
+                            'placeholder' => __('Select a cluster'),
+                        ])
+                    @endif
                 @endif
 
                 <div>
@@ -566,9 +615,11 @@
                     type="submit"
                     wire:loading.attr="disabled"
                     wire:target="next"
-                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-ink px-6 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest disabled:cursor-wait disabled:opacity-60"
+                    @disabled(! $canContinue)
+                    title="{{ ! $canContinue ? ($isKubernetes ? __('Pick or create a cluster (and confirm the namespace) before continuing.') : __('Fill in the stack template before continuing.')) : '' }}"
+                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-ink px-6 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:bg-slate-400 disabled:opacity-60"
                 >
-                    <span wire:loading.remove wire:target="next">{{ __('Continue to review') }}</span>
+                    <span wire:loading.remove wire:target="next">{{ $canContinue ? __('Continue to review') : __('Fill required fields') }}</span>
                     <span wire:loading wire:target="next" class="inline-flex items-center gap-2">
                         <x-spinner variant="cream" size="sm" />
                         {{ __('Saving…') }}

@@ -13,9 +13,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
+use App\Jobs\PollDoksClusterStatusJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -306,6 +308,169 @@ final class KubernetesWizardTest extends TestCase
         $this->assertSame('error', $clusterCheck['severity']);
     }
 
+    public function test_step_what_seeds_default_cluster_name_when_create_new_active(): void
+    {
+        Cache::flush();
+        Http::fake(['api.digitalocean.com/v2/*' => Http::response([
+            'kubernetes_clusters' => [], 'regions' => [], 'sizes' => [],
+            'options' => ['versions' => []],
+        ], 200)]);
+
+        $user = $this->userWithOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 't'],
+        ]);
+        $this->seedDraftAtStep($user, step: 3, payload: [
+            'mode' => 'provider',
+            'type' => 'digitalocean_kubernetes',
+            'provider_host_kind' => 'kubernetes',
+            'provider_credential_id' => (string) $credential->id,
+            'name' => 'doks-test',
+            'do_kubernetes_source' => 'new',
+            // No do_kubernetes_new_name → mount should fill one in.
+        ]);
+
+        $name = Livewire::actingAs($user)
+            ->test(StepWhat::class)
+            ->get('form.do_kubernetes_new_name');
+
+        $this->assertMatchesRegularExpression('/^dply-cluster-[0-9a-f]{6}$/', $name);
+    }
+
+    public function test_step_what_regenerate_button_rolls_a_new_cluster_name(): void
+    {
+        Cache::flush();
+        Http::fake(['api.digitalocean.com/v2/*' => Http::response([
+            'kubernetes_clusters' => [], 'regions' => [], 'sizes' => [],
+            'options' => ['versions' => []],
+        ], 200)]);
+
+        $user = $this->userWithOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 't'],
+        ]);
+        $this->seedDraftAtStep($user, step: 3, payload: [
+            'mode' => 'provider',
+            'type' => 'digitalocean_kubernetes',
+            'provider_host_kind' => 'kubernetes',
+            'provider_credential_id' => (string) $credential->id,
+            'name' => 'doks-test',
+            'do_kubernetes_source' => 'new',
+            'do_kubernetes_new_name' => 'dply-cluster-aaaaaa',
+        ]);
+
+        $component = Livewire::actingAs($user)->test(StepWhat::class);
+        $before = $component->get('form.do_kubernetes_new_name');
+        $component->call('regenerateNewClusterName');
+        $after = $component->get('form.do_kubernetes_new_name');
+
+        $this->assertNotSame($before, $after, 'regenerate should produce a different name');
+        $this->assertMatchesRegularExpression('/^dply-cluster-[0-9a-f]{6}$/', $after);
+    }
+
+    public function test_step_what_does_not_clobber_user_edited_cluster_name(): void
+    {
+        Cache::flush();
+        Http::fake(['api.digitalocean.com/v2/*' => Http::response([
+            'kubernetes_clusters' => [], 'regions' => [], 'sizes' => [],
+            'options' => ['versions' => []],
+        ], 200)]);
+
+        $user = $this->userWithOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 't'],
+        ]);
+        $this->seedDraftAtStep($user, step: 3, payload: [
+            'mode' => 'provider',
+            'type' => 'digitalocean_kubernetes',
+            'provider_host_kind' => 'kubernetes',
+            'provider_credential_id' => (string) $credential->id,
+            'name' => 'doks-test',
+            'do_kubernetes_source' => 'new',
+            'do_kubernetes_new_name' => 'my-handpicked-name',
+        ]);
+
+        $name = Livewire::actingAs($user)
+            ->test(StepWhat::class)
+            ->get('form.do_kubernetes_new_name');
+
+        $this->assertSame('my-handpicked-name', $name, 'mount auto-default must not overwrite an existing name');
+    }
+
+    public function test_step_what_continue_button_disabled_when_no_cluster_picked_in_existing_mode(): void
+    {
+        Cache::flush();
+        Http::fake(['api.digitalocean.com/v2/*' => Http::response([
+            'kubernetes_clusters' => [], 'regions' => [], 'sizes' => [],
+            'options' => ['versions' => []],
+        ], 200)]);
+
+        $user = $this->userWithOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 't'],
+        ]);
+        $this->seedDraftAtStep($user, step: 3, payload: [
+            'mode' => 'provider',
+            'type' => 'digitalocean_kubernetes',
+            'provider_host_kind' => 'kubernetes',
+            'provider_credential_id' => (string) $credential->id,
+            'name' => 'doks-test',
+            // existing mode (default) with no cluster picked → can't continue
+        ]);
+
+        $this->assertFalse(
+            Livewire::actingAs($user)->test(StepWhat::class)->viewData('canContinue'),
+            'Continue button should be disabled when existing-mode and no cluster picked',
+        );
+    }
+
+    public function test_step_what_continue_button_enabled_once_create_new_fields_are_filled(): void
+    {
+        Cache::flush();
+        Http::fake(['api.digitalocean.com/v2/*' => Http::response([
+            'kubernetes_clusters' => [], 'regions' => [], 'sizes' => [],
+            'options' => ['versions' => []],
+        ], 200)]);
+
+        $user = $this->userWithOrganization();
+        $credential = ProviderCredential::factory()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'digitalocean',
+            'credentials' => ['api_token' => 't'],
+        ]);
+        $this->seedDraftAtStep($user, step: 3, payload: [
+            'mode' => 'provider',
+            'type' => 'digitalocean_kubernetes',
+            'provider_host_kind' => 'kubernetes',
+            'provider_credential_id' => (string) $credential->id,
+            'name' => 'doks-test',
+            'do_kubernetes_source' => 'new',
+            'do_kubernetes_new_name' => 'fresh-cluster',
+            'do_kubernetes_new_region' => 'nyc3',
+            'do_kubernetes_new_node_size' => 's-2vcpu-4gb',
+            'do_kubernetes_new_node_count' => 2,
+            'do_kubernetes_namespace' => 'default',
+        ]);
+
+        $this->assertTrue(
+            Livewire::actingAs($user)->test(StepWhat::class)->viewData('canContinue'),
+            'Continue button should be enabled when all create-new fields are filled',
+        );
+    }
+
     public function test_step_what_renders_create_new_toggle_for_doks(): void
     {
         Cache::flush();
@@ -408,11 +573,15 @@ final class KubernetesWizardTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('servers.show', $server))
-            ->assertRedirect(route('servers.overview', $server));
+            ->assertRedirect(route('servers.cluster', $server));
     }
 
     public function test_storing_create_new_doks_calls_digitalocean_api_and_lands_provisioning(): void
     {
+        // The store action dispatches PollDoksClusterStatusJob — fake the queue
+        // so the poller doesn't run synchronously and overwrite the
+        // PROVISIONING state we're asserting on. The poller has its own tests.
+        Queue::fake();
         Cache::flush();
         Http::fake(function ($request) {
             // POST /kubernetes/clusters → create response. Anything else (e.g.
@@ -475,6 +644,9 @@ final class KubernetesWizardTest extends TestCase
             && $request->method() === 'POST'
             && $request['name'] === 'fresh-cluster'
             && $request['node_pools'][0]['size'] === 's-2vcpu-4gb');
+
+        // And the poller was queued so the server eventually flips to READY.
+        Queue::assertPushed(PollDoksClusterStatusJob::class);
     }
 
     public function test_doks_node_size_picker_only_shows_kubernetes_eligible_sizes(): void
@@ -641,6 +813,15 @@ final class KubernetesWizardTest extends TestCase
 
     public function test_storing_aws_kubernetes_server_lands_status_ready_immediately(): void
     {
+        // Store action now dispatches PollEksClusterStatusJob + calls
+        // AwsEksService::getCluster for the cluster_id lookup. Fake the queue
+        // so the poller doesn't run synchronously and overwrite state; the
+        // getCluster call goes through the AWS SDK which we don't fake here
+        // so we expect it to fail silently and the store to proceed without
+        // a cluster_id (matching the production "AWS hiccup at register time"
+        // graceful path).
+        Queue::fake();
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $credential = ProviderCredential::factory()->create([
@@ -661,6 +842,7 @@ final class KubernetesWizardTest extends TestCase
             'name' => 'eks-prod',
             'do_kubernetes_cluster_name' => 'prod-eks',
             'do_kubernetes_namespace' => 'apps',
+            'do_kubernetes_aws_region' => 'us-west-2',
         ]);
 
         Livewire::actingAs($user)
@@ -680,6 +862,17 @@ final class KubernetesWizardTest extends TestCase
 
     public function test_storing_kubernetes_server_lands_status_ready_immediately(): void
     {
+        // Existing-mode store now does a getKubernetesClusters() lookup to find
+        // the cluster_id, and dispatches a poller. Fake the HTTP so the lookup
+        // works and fake the queue so the poller doesn't run synchronously.
+        Queue::fake();
+        Cache::flush();
+        Http::fake([
+            'api.digitalocean.com/v2/kubernetes/clusters*' => Http::response(['kubernetes_clusters' => [
+                ['id' => 'cluster-id', 'name' => 'prod-cluster', 'region' => 'nyc3'],
+            ]], 200),
+        ]);
+
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $credential = ProviderCredential::factory()->create([

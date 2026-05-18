@@ -159,6 +159,17 @@ class RunSetupScriptJob implements ShouldQueue
                     ->delay(now()->addSeconds(30));
             }
 
+            // Capture the full inventory/manage snapshot (package versions,
+            // service state, kernel reboot-required, unattended-upgrades
+            // status, etc.) so the Manage tab lands populated instead of
+            // showing "No state data yet · Never refreshed". Delay 45s so
+            // it runs after the metrics agent install (15s) and systemd
+            // sync (30s) — they share SSH bandwidth.
+            if (! empty($server->ip_address) && $server->isVmHost()) {
+                RefreshServerInventoryJob::dispatch((string) $server->id)
+                    ->delay(now()->addSeconds(45));
+            }
+
             return;
         }
 

@@ -105,8 +105,56 @@
         @if (empty($output))
             <p class="text-xs opacity-80">{{ $resolvedEmpty }}</p>
         @else
-            <pre class="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100" x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">@foreach ($output as $line){{ $line }}
+            <div
+                class="relative"
+                x-data="{
+                    copied: false,
+                    copy() {
+                        const text = this.$refs.consoleText.innerText;
+                        const done = () => {
+                            this.copied = true;
+                            clearTimeout(this._t);
+                            this._t = setTimeout(() => { this.copied = false; }, 1500);
+                        };
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(text).then(done).catch(() => done());
+                        } else {
+                            const ta = document.createElement('textarea');
+                            ta.value = text;
+                            ta.setAttribute('readonly', '');
+                            ta.style.position = 'absolute';
+                            ta.style.left = '-9999px';
+                            document.body.appendChild(ta);
+                            ta.select();
+                            try { document.execCommand('copy'); } catch (e) {}
+                            document.body.removeChild(ta);
+                            done();
+                        }
+                    },
+                }"
+            >
+                <button
+                    type="button"
+                    x-on:click="copy()"
+                    x-bind:aria-label="copied ? @js(__('Copied')) : @js(__('Copy console output'))"
+                    class="absolute right-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-2 py-1 text-[11px] font-medium text-emerald-50/90 backdrop-blur transition hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
+                >
+                    <template x-if="!copied">
+                        <span class="inline-flex items-center gap-1.5">
+                            <x-heroicon-o-clipboard class="h-3.5 w-3.5" aria-hidden="true" />
+                            {{ __('Copy') }}
+                        </span>
+                    </template>
+                    <template x-if="copied">
+                        <span class="inline-flex items-center gap-1.5 text-emerald-200">
+                            <x-heroicon-o-check class="h-3.5 w-3.5" aria-hidden="true" />
+                            {{ __('Copied') }}
+                        </span>
+                    </template>
+                </button>
+                <pre x-ref="consoleText" class="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 pr-20 font-mono text-xs leading-relaxed text-emerald-100" x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">@foreach ($output as $line){{ $line }}
 @endforeach</pre>
+            </div>
         @endif
     </div>
 </div>

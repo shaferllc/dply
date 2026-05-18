@@ -111,17 +111,16 @@
 
 <div
     @if ($shouldPoll)
-        {{-- Polling cadence + visibility gating to keep the journey
-             page from thrashing when the operator has multiple tabs
-             open or has switched away.
-             - 10s base interval (was 5s — 2× headroom against Livewire
-               request stacking with multiple tabs open)
-             - .visible modifier uses IntersectionObserver, which both
-               pauses the poll when the journey panel is scrolled out
-               of view AND when the browser tab is hidden (browsers
-               throttle IO entries on backgrounded tabs, so polling
-               effectively stops within ~250ms of tab-switch). --}}
-        wire:poll.10s.visible
+        {{-- Polling cadence: every 5s while the journey is active.
+             We previously gated this with the .visible modifier to pause
+             polling when the page scrolled out of view / backgrounded, but
+             that caused the page to look frozen for operators who'd
+             scrolled to read step output — and modern browsers already
+             throttle setInterval to 1Hz on backgrounded tabs natively,
+             which mitigates the multi-tab thrash the modifier was
+             defending against. Plain wire:poll is the simpler, more
+             predictable behavior for a status page. --}}
+        wire:poll.5s
     @endif
     x-data
 >
@@ -272,6 +271,15 @@
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ $journeyIsDone ? __('Total provision time') : __('Time elapsed since this server row was created') }}">
                                         <x-heroicon-m-clock class="h-3 w-3" />
                                         {{ $journeyIsDone ? __('Took :elapsed', ['elapsed' => $journeyElapsedHuman]) : __('Elapsed :elapsed', ['elapsed' => $journeyElapsedHuman]) }}
+                                    </span>
+                                @endif
+                                {{-- Visible "Refreshing…" indicator fires for the duration of every
+                                     wire:poll round-trip. Surfaces "the page IS auto-updating" so
+                                     the operator doesn't think the journey is frozen between polls. --}}
+                                @if ($shouldPoll)
+                                    <span wire:loading.delay.shortest.flex wire:target="$refresh" class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                        <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500"></span>
+                                        {{ __('Refreshing') }}
                                     </span>
                                 @endif
                             </div>

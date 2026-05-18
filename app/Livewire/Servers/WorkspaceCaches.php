@@ -11,6 +11,7 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\Server;
 use App\Models\ServerCacheService;
@@ -45,6 +46,7 @@ class WorkspaceCaches extends Component
     use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RunsAllowlistedManageAction;
     use RunsServerConsoleActions;
 
     /** Active workspace tab. URL-bound so deep links + back/forward work. */
@@ -2456,6 +2458,16 @@ BASH;
             ->limit(40)
             ->get();
 
+        // Latest non-dismissed manage_action run for this server — drives the
+        // Show Redis INFO output banner on the redis Stats subtab.
+        $manageActionRun = \App\Models\ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->id)
+            ->where('kind', 'manage_action')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+
         return view('livewire.servers.workspace-caches', [
             'capabilities' => $capabilities,
             'engineUnsupportedReasons' => $engineUnsupportedReasons,
@@ -2464,6 +2476,10 @@ BASH;
             'cacheRunsByEngine' => $cacheRunsByEngine,
             'cacheStatsByInstance' => $statsByInstance,
             'cacheAuditEvents' => $auditEvents,
+            // Allowlisted manage actions exposed on Caches (currently just `redis_info`).
+            // Banner-only flow — see RunsAllowlistedManageAction.
+            'serviceActions' => config('server_manage.service_actions', []),
+            'manageActionRun' => $manageActionRun,
             'engineLabels' => [
                 'redis' => 'Redis',
                 'valkey' => 'Valkey',

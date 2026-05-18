@@ -6,15 +6,17 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
+use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\InsightFinding;
 use App\Models\Server;
+use App\Models\ServerMetricSnapshot;
+use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -33,12 +35,33 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceOverview extends Component
 {
+    use BuildsContainerLaunchSummary;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->kickClusterPollIfStale();
+    }
+
+    /**
+     * Manual "re-check the cluster at the provider" — surfaced as the retry
+     * button on the K8s error banner below. Mirrors WorkspaceCluster::retryPolling
+     * so operators landing on overview after a manual cluster deletion can
+     * trigger a fresh poll without bouncing to the dedicated cluster page.
+     */
+    public function retryClusterPolling(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $provider = (string) ($this->server->meta['kubernetes']['provider'] ?? 'digitalocean');
+        if ($provider === 'aws') {
+            \App\Jobs\PollEksClusterStatusJob::dispatch($this->server);
+        } else {
+            \App\Jobs\PollDoksClusterStatusJob::dispatch($this->server);
+        }
+        $this->toastSuccess(__('Re-checking cluster status…'));
     }
 
     public function rerunSetup(): void
@@ -152,15 +175,134 @@ class WorkspaceOverview extends Component
                     ->count(),
         ];
 
-        // K8s clusters created by dply (do_kubernetes_source=new) land in
-        // STATUS_PROVISIONING and won't have working manifests/deploys until DO
-        // brings the node pool online (~5–10 min). We surface that with a
-        // dedicated banner instead of letting the overview look "empty" while
-        // it's actually still spinning up.
-        $isK8sCluster = ($this->server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES;
-        $kubernetesProvisioning = $isK8sCluster
-            && in_array($this->server->status, [Server::STATUS_PROVISIONING, Server::STATUS_PENDING], true)
-            && ($this->server->meta['kubernetes']['provisioned_by_dply'] ?? false);
+        // Most-recent metric snapshot for the live CPU/Mem/Disk/Load card.
+        // One row, cheap. Same source the Monitor page uses — duplicating it
+        // here means the overview reflects current load without a full
+        // Monitor-tab fetch and the operator can decide whether to drill in.
+        $latestMetricSnapshot = ServerMetricSnapshot::query()
+            ->where('server_id', $this->server->id)
+            ->orderByDesc('captured_at')
+            ->first();
+
+        // Sites preview for the overview. We already have $sites with id+status;
+        // pull the small bit extra we need to render five rows (name + updated_at)
+        // and the most recent deployment per site so each preview row can show
+        // "last deploy: 3m ago". Cap at 5 — the dedicated Sites tab owns the
+        // full list.
+        $sitesPreview = $this->server->sites()
+            ->select(['id', 'name', 'status', 'server_id', 'updated_at'])
+            ->orderByDesc('updated_at')
+            ->limit(5)
+            ->get();
+        $sitesPreviewLatestDeploys = $sitesPreview->isEmpty()
+            ? collect()
+            : SiteDeployment::query()
+                ->whereIn('site_id', $sitesPreview->pluck('id'))
+                ->select(['id', 'site_id', 'status', 'created_at', 'finished_at'])
+                ->orderByDesc('created_at')
+                ->get()
+                ->groupBy('site_id')
+                ->map(fn ($group) => $group->first());
+
+        // Onboarding checklist for a fresh server. Each step reads from
+        // already-computed state above (no extra queries), and a step is
+        // marked done when we can detect the artifact in the database.
+        // The checklist hides itself once every applicable step is done.
+        //
+        // Container hosts (Docker / K8s) skip the SSH-key / monitor-agent /
+        // backups steps because those don't apply to clusters — sites are
+        // deployed *into* the cluster, not onto an OS the operator manages.
+        $hostKind = $this->server->meta['host_kind'] ?? Server::HOST_KIND_VM;
+        $isContainerHostForChecklist = in_array(
+            $hostKind,
+            [Server::HOST_KIND_DOCKER, Server::HOST_KIND_KUBERNETES],
+            true,
+        );
+        $monitorInstalled = $latestMetricSnapshot !== null
+            && is_array($latestMetricSnapshot->payload ?? null)
+            && isset($latestMetricSnapshot->payload['cpu_pct']);
+        $hasBackupSchedule = ($backgroundSummary['active_schedules'] ?? 0)
+            + ($backgroundSummary['paused_schedules'] ?? 0) > 0;
+
+        $onboardingSteps = [];
+        if (! $isContainerHostForChecklist) {
+            $onboardingSteps[] = [
+                'key' => 'ssh_key',
+                'label' => __('Attach your personal SSH key'),
+                'help' => __('So your laptop can log in over SSH directly.'),
+                'done' => $serverHasPersonalProfileKey,
+                'cta_label' => __('Add key'),
+                'cta_route' => route('servers.ssh-keys', $this->server),
+            ];
+        }
+        $onboardingSteps[] = [
+            'key' => 'first_site',
+            'label' => $isContainerHostForChecklist
+                ? __('Add your first container app')
+                : __('Add your first site'),
+            'help' => $isContainerHostForChecklist
+                ? __('Point dply at a Git repo and deploy a container.')
+                : __('Connect a Git repo, configure the web root, and deploy.'),
+            'done' => $sites->count() > 0,
+            'cta_label' => __('Add'),
+            'cta_route' => route('sites.create', $this->server),
+        ];
+        if (! $isContainerHostForChecklist) {
+            $onboardingSteps[] = [
+                'key' => 'monitor',
+                'label' => __('Install the monitor agent'),
+                'help' => __('Streams CPU / memory / disk for the Live load card and Insights.'),
+                'done' => $monitorInstalled,
+                'cta_label' => __('Install'),
+                'cta_route' => route('servers.monitor', $this->server),
+            ];
+            $onboardingSteps[] = [
+                'key' => 'backups',
+                'label' => __('Schedule backups'),
+                'help' => __('Automatic database + site-files backups on a cron you choose.'),
+                'done' => $hasBackupSchedule,
+                'cta_label' => __('Open Backups'),
+                'cta_route' => route('servers.backups', $this->server),
+            ];
+        }
+        if ($notificationSummary['manage_url']) {
+            $onboardingSteps[] = [
+                'key' => 'notifications',
+                'label' => __('Hook up notifications'),
+                'help' => __('Get pinged on Slack / email when something this server runs misbehaves.'),
+                'done' => ($notificationSummary['channel_count'] ?? 0) > 0,
+                'cta_label' => __('Manage'),
+                'cta_route' => $notificationSummary['manage_url'],
+            ];
+        }
+
+        $onboardingTotal = count($onboardingSteps);
+        $onboardingDone = collect($onboardingSteps)->where('done', true)->count();
+        $onboardingComplete = $onboardingTotal > 0 && $onboardingDone === $onboardingTotal;
+
+        // K8s cluster gone / unreachable. PollDoksClusterStatusJob (and the EKS
+        // counterpart) flip the server to STATUS_ERROR and stash a human
+        // message in meta.kubernetes.last_error when the provider returns 404
+        // ("cluster deleted in console") or hits its retry cap. We render
+        // those as a prominent error banner instead of letting the overview
+        // look like a working cluster with empty tiles.
+        $isK8sHost = ($this->server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES;
+        $kubernetesError = null;
+        if ($isK8sHost && $this->server->status === Server::STATUS_ERROR) {
+            $k8sMeta = is_array($this->server->meta['kubernetes'] ?? null) ? $this->server->meta['kubernetes'] : [];
+            $provider = (string) ($k8sMeta['provider'] ?? 'digitalocean');
+            $kubernetesError = [
+                'message' => (string) ($k8sMeta['last_error'] ?? __('Cluster status check failed.')),
+                'cluster_name' => (string) ($k8sMeta['cluster_name'] ?? ''),
+                'cluster_id' => (string) ($k8sMeta['cluster_id'] ?? ''),
+                'provider' => $provider,
+                'provider_label' => $provider === 'aws' ? 'AWS' : 'DigitalOcean',
+                'provider_console_url' => $provider === 'aws'
+                    ? 'https://console.aws.amazon.com/eks/home'
+                    : 'https://cloud.digitalocean.com/kubernetes/clusters',
+                'errored_at' => (string) ($k8sMeta['errored_at'] ?? ''),
+            ];
+        }
 
         return view('livewire.servers.workspace-overview', [
             'siteCount' => $sites->count(),
@@ -177,88 +319,18 @@ class WorkspaceOverview extends Component
             'criticalInsightsCount' => $criticalInsightsCount,
             'notificationSummary' => $notificationSummary,
             'backgroundSummary' => $backgroundSummary,
-            'kubernetesProvisioning' => $kubernetesProvisioning,
-            'kubernetesClusterMeta' => $kubernetesProvisioning
-                ? ($this->server->meta['kubernetes'] ?? [])
-                : null,
+            'kubernetesError' => $kubernetesError,
+            'latestMetricSnapshot' => $latestMetricSnapshot,
+            'sitesPreview' => $sitesPreview,
+            'sitesPreviewLatestDeploys' => $sitesPreviewLatestDeploys,
+            'onboardingSteps' => $onboardingSteps,
+            'onboardingDone' => $onboardingDone,
+            'onboardingTotal' => $onboardingTotal,
+            'onboardingComplete' => $onboardingComplete,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
         ]);
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    protected function containerLaunchSummary(): ?array
-    {
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $launch = is_array($meta['container_launch'] ?? null) ? $meta['container_launch'] : [];
-        if ($launch === []) {
-            return null;
-        }
-
-        $status = (string) ($launch['status'] ?? '');
-        if ($status === '' || $status === 'completed') {
-            return null;
-        }
-
-        $siteId = is_string($launch['site_id'] ?? null) ? $launch['site_id'] : null;
-        $site = $siteId ? $this->server->sites()->with('domains')->find($siteId) : null;
-        $events = collect(is_array($launch['events'] ?? null) ? $launch['events'] : [])
-            ->filter(fn (mixed $event): bool => is_array($event) && is_string($event['message'] ?? null))
-            ->take(-5)
-            ->values()
-            ->all();
-
-        return [
-            'status' => $status,
-            'target_family' => (string) ($launch['target_family'] ?? 'container'),
-            'repository_url' => (string) ($launch['repository_url'] ?? ''),
-            'repository_branch' => (string) ($launch['repository_branch'] ?? ''),
-            'repository_subdirectory' => (string) ($launch['repository_subdirectory'] ?? ''),
-            'current_step_label' => (string) ($launch['current_step_label'] ?? 'Container launch in progress'),
-            'summary' => (string) ($launch['summary'] ?? 'Dply is still preparing this container launch.'),
-            'updated_at' => isset($launch['updated_at']) ? Carbon::parse((string) $launch['updated_at']) : null,
-            'events' => $events,
-            'site' => $site,
-            'site_route' => $site ? route('sites.show', ['server' => $this->server, 'site' => $site]) : null,
-            'steps' => $this->containerLaunchSteps($status),
-            'is_failed' => $status === 'failed',
-        ];
-    }
-
-    /**
-     * Step list for the in-flight container launch, mirroring the status
-     * progression in FinalizeContainerCloudLaunchJob::updateLaunchState.
-     *
-     * @return list<array{key: string, label: string, state: string}>
-     */
-    private function containerLaunchSteps(string $status): array
-    {
-        $steps = [
-            ['key' => 'waiting_for_server', 'label' => __('Provisioning server')],
-            ['key' => 'creating_site', 'label' => __('Creating site record')],
-            ['key' => 'waiting_for_site_provisioning', 'label' => __('Provisioning site workspace')],
-            ['key' => 'ready', 'label' => __('Site ready for first deploy')],
-        ];
-
-        $order = ['waiting_for_server', 'creating_site', 'waiting_for_site_provisioning', 'ready'];
-        $currentIdx = array_search($status, $order, true);
-
-        return array_map(function (array $step, int $idx) use ($status, $currentIdx): array {
-            $state = 'pending';
-            if ($status === 'failed') {
-                $state = 'pending';
-            } elseif ($currentIdx === false) {
-                $state = 'pending';
-            } elseif ($idx < $currentIdx) {
-                $state = 'completed';
-            } elseif ($idx === $currentIdx) {
-                $state = 'active';
-            }
-
-            return ['key' => $step['key'], 'label' => $step['label'], 'state' => $state];
-        }, $steps, array_keys($steps));
-    }
 }

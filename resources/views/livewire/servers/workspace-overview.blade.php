@@ -36,18 +36,71 @@
     :server="$server"
     active="overview"
     :title="__('Overview')"
-    :description="__('At-a-glance health, sites, deploy status, and operations shortcuts for this server.')"
     :show-navigation="! $setupIncomplete"
-    doc-route="docs.create-first-server"
-    :doc-label="__('First server guide')"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4">
-        <p>{{ __('At-a-glance summary of this server: provisioning state, what\'s installed (PHP, databases, caches), the latest metrics snapshot, recent activity, and a project context bar when the server is bound to a workspace.') }}</p>
-        <p>{{ __('Most cards on this page are read-only summaries; the Manage / Sites / Caches / Databases / Monitor tabs are where mutating actions live. Use this page to land, then jump to the right tab from the cards or the top nav.') }}</p>
-    </x-explainer>
+    {{-- K8s host whose cluster has gone away at the provider (deleted in the
+         DO/AWS console, or the poller gave up after :tries attempts). Stays
+         prominent at the top of the overview so the operator can't miss it —
+         the rest of the overview's tiles read off a missing cluster and would
+         otherwise look like a healthy-but-empty server. --}}
+    @if (! empty($kubernetesError))
+        <section data-testid="kubernetes-cluster-error" class="overflow-hidden rounded-[2rem] border border-rose-200 bg-rose-50 p-6 shadow-sm">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div class="flex min-w-0 flex-1 items-start gap-3">
+                    <x-heroicon-o-exclamation-triangle class="mt-1 h-6 w-6 shrink-0 text-rose-600" />
+                    <div class="min-w-0 space-y-3">
+                        <span class="inline-flex items-center gap-2 rounded-full border border-rose-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-700">
+                            <span class="h-2 w-2 rounded-full bg-rose-500"></span>
+                            {{ __('Cluster unavailable') }}
+                        </span>
+                        <h3 class="text-2xl font-semibold tracking-tight text-rose-900">
+                            {{ __(':provider can\'t find this cluster anymore', ['provider' => $kubernetesError['provider_label']]) }}
+                        </h3>
+                        <p class="text-sm leading-6 text-rose-800">
+                            {{ $kubernetesError['message'] }}
+                        </p>
+                        <dl class="grid gap-3 text-xs text-rose-900 sm:grid-cols-2">
+                            @if ($kubernetesError['cluster_name'] !== '')
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Cluster name') }}</dt>
+                                    <dd class="mt-1 font-mono">{{ $kubernetesError['cluster_name'] }}</dd>
+                                </div>
+                            @endif
+                            @if ($kubernetesError['cluster_id'] !== '')
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Cluster id') }}</dt>
+                                    <dd class="mt-1 break-all font-mono">{{ $kubernetesError['cluster_id'] }}</dd>
+                                </div>
+                            @endif
+                        </dl>
+                        <div class="flex flex-wrap gap-2 pt-2">
+                            <button
+                                type="button"
+                                wire:click="retryClusterPolling"
+                                wire:loading.attr="disabled"
+                                wire:target="retryClusterPolling"
+                                class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-heroicon-o-arrow-path wire:loading.remove wire:target="retryClusterPolling" class="h-4 w-4" />
+                                <x-spinner wire:loading wire:target="retryClusterPolling" variant="white" size="sm" />
+                                {{ __('Re-check now') }}
+                            </button>
+                            <a href="{{ route('servers.cluster', $server) }}" wire:navigate class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-800 transition-colors hover:bg-rose-100">
+                                {{ __('Open cluster page') }}
+                            </a>
+                            <a href="{{ $kubernetesError['provider_console_url'] }}" target="_blank" rel="noopener" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-800 transition-colors hover:bg-rose-100">
+                                {{ __('Open in :provider', ['provider' => $kubernetesError['provider_label']]) }}
+                                <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    @endif
 
     @if ($server->workspace)
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
@@ -144,57 +197,215 @@
                 </div>
             </section>
         @else
-            {{-- Ready-state hero — absorbed the unique bits from the
-                 deprecated "Server snapshot" panel: size, setup-script
-                 name, and full SSH connection string sit alongside the
-                 status / provider / IP chips. --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 p-6 sm:p-7">
-                <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="max-w-3xl space-y-4">
-                        <div class="flex flex-wrap items-center gap-2 text-sm">
-                            <span class="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 font-medium text-brand-ink">
-                                <span class="inline-flex h-2 w-2 rounded-full {{ $healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? 'bg-emerald-500' : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? 'bg-rose-500' : 'bg-brand-gold') }}"></span>
+            {{-- Compact identity strip — name + SSH on the left, the chip rail
+                 on the right. Was a generous two-column hero with a 24-line
+                 H2 + SSH block; collapsed to a single row at lg+ so the
+                 actual overview content (live metrics, tiles, sites preview)
+                 sits above the fold. --}}
+            <section class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-5 py-4">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="min-w-0 space-y-1.5">
+                        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <h2 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ $server->name }}</h2>
+                            <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink">
+                                <span class="h-1.5 w-1.5 rounded-full {{ $healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? 'bg-emerald-500' : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? 'bg-rose-500' : 'bg-brand-gold') }}"></span>
                                 {{ $healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? __('Reachable') : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? __('Needs attention') : __('No health check yet')) }}
                             </span>
-                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-brand-moss">
-                                {{ __('Provider') }}: <span class="ml-2 font-semibold text-brand-ink">{{ $server->provider->label() }}</span>
-                            </span>
-                            @if ($server->region)
-                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-brand-moss">
-                                    {{ __('Region') }}: <span class="ml-2 font-semibold text-brand-ink">{{ $server->region }}</span>
-                                </span>
-                            @endif
-                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-brand-moss">
-                                {{ __('IP') }}: <span class="ml-2 font-mono font-semibold text-brand-ink">{{ $server->ip_address ?? '—' }}</span>
-                            </span>
-                            @if ($server->size)
-                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-brand-moss">
-                                    {{ __('Size') }}: <span class="ml-2 font-mono font-semibold text-brand-ink">{{ $server->size }}</span>
-                                </span>
-                            @endif
                         </div>
-                        <div class="space-y-2">
-                            <h2 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ $server->name }}</h2>
-                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-brand-moss">
-                                <span class="inline-flex items-center gap-2 font-mono text-xs">
-                                    <span class="text-brand-mist uppercase tracking-wider">SSH</span>
-                                    <span class="break-all text-brand-ink">{{ $server->getSshConnectionString() }}</span>
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">
+                            <span class="inline-flex items-center gap-1.5 font-mono">
+                                <span class="text-[10px] uppercase tracking-[0.18em] text-brand-mist">SSH</span>
+                                <span class="break-all text-brand-ink">{{ $server->getSshConnectionString() }}</span>
+                            </span>
+                            @if ($server->setup_script_key)
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="text-[10px] uppercase tracking-[0.18em] text-brand-mist">{{ __('Setup') }}</span>
+                                    <span class="text-brand-ink">{{ config("setup_scripts.scripts.{$server->setup_script_key}.name", $server->setup_script_key) }}</span>
                                 </span>
-                                @if ($server->setup_script_key)
-                                    <span class="inline-flex items-center gap-2 text-xs">
-                                        <span class="text-brand-mist uppercase tracking-wider">{{ __('Setup script') }}</span>
-                                        <span class="text-brand-ink">{{ config("setup_scripts.scripts.{$server->setup_script_key}.name", $server->setup_script_key) }}</span>
-                                    </span>
-                                @endif
-                            </div>
+                            @endif
                             @if ($healthSummary['last_checked_at'])
-                                <p class="text-xs text-brand-mist">
-                                    {{ __('Last health check') }}: {{ $healthSummary['last_checked_at']->diffForHumans() }}
-                                </p>
+                                <span class="text-brand-mist" title="{{ __('Last health check') }}">
+                                    {{ __('Checked :ago', ['ago' => $healthSummary['last_checked_at']->diffForHumans()]) }}
+                                </span>
                             @endif
                         </div>
                     </div>
+                    <div class="flex flex-wrap gap-1.5 text-xs">
+                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-brand-moss">
+                            <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('Provider') }}</span>
+                            <span class="ml-1.5 font-semibold text-brand-ink">{{ $server->provider->label() }}</span>
+                        </span>
+                        @if ($server->region)
+                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-brand-moss">
+                                <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('Region') }}</span>
+                                <span class="ml-1.5 font-semibold text-brand-ink">{{ $server->region }}</span>
+                            </span>
+                        @endif
+                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-brand-moss">
+                            <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('IP') }}</span>
+                            <span class="ml-1.5 font-mono font-semibold text-brand-ink">{{ $server->ip_address ?? '—' }}</span>
+                        </span>
+                        @if ($server->size)
+                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-brand-moss">
+                                <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('Size') }}</span>
+                                <span class="ml-1.5 font-mono font-semibold text-brand-ink">{{ $server->size }}</span>
+                            </span>
+                        @endif
+                    </div>
                 </div>
+            </section>
+
+            {{-- Onboarding checklist. Auto-vanishes once every applicable step
+                 is done, so a long-lived server's overview is unencumbered.
+                 Container hosts get a shorter list (no SSH-key / monitor /
+                 backups items — those don't apply when sites live in a
+                 cluster). Collapsed by default once at least one step is
+                 done so the operator can fold it away. --}}
+            @if (! $onboardingComplete && $onboardingTotal > 0)
+                @php $onboardingPct = max(0, min(100, (int) round(100 * $onboardingDone / $onboardingTotal))); @endphp
+                <section
+                    data-testid="server-onboarding-checklist"
+                    x-data="{ open: @js($onboardingDone === 0) }"
+                    class="mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50/80 via-white to-sky-50/40 shadow-sm"
+                >
+                    <button
+                        type="button"
+                        x-on:click="open = ! open"
+                        class="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left"
+                    >
+                        <div class="flex min-w-0 items-center gap-3">
+                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white shadow-sm">
+                                {{ $onboardingDone }}/{{ $onboardingTotal }}
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-brand-ink">{{ __('Get started') }}</p>
+                                <p class="mt-0.5 text-xs text-brand-moss">
+                                    {{ trans_choice('{1} :n step left to make this server useful|[2,*] :n steps left to make this server useful', $onboardingTotal - $onboardingDone, ['n' => $onboardingTotal - $onboardingDone]) }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="hidden w-32 sm:block">
+                                <div class="h-1.5 w-full overflow-hidden rounded-full bg-brand-ink/5">
+                                    <div class="h-full rounded-full bg-sky-500 transition-[width] duration-500" style="width: {{ $onboardingPct }}%"></div>
+                                </div>
+                            </div>
+                            <x-heroicon-m-chevron-down class="h-5 w-5 text-brand-moss transition-transform" x-bind:class="{ 'rotate-180': open }" />
+                        </div>
+                    </button>
+                    <ul x-show="open" x-collapse class="divide-y divide-sky-100 border-t border-sky-100 bg-white/60">
+                        @foreach ($onboardingSteps as $step)
+                            <li class="flex items-center justify-between gap-3 px-5 py-3">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    @if ($step['done'])
+                                        <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                                            <x-heroicon-m-check class="h-3.5 w-3.5" />
+                                        </span>
+                                    @else
+                                        <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sky-300 bg-white"></span>
+                                    @endif
+                                    <div class="min-w-0">
+                                        <p class="text-sm {{ $step['done'] ? 'text-brand-moss line-through' : 'font-medium text-brand-ink' }}">{{ $step['label'] }}</p>
+                                        @if (! $step['done'])
+                                            <p class="mt-0.5 text-xs text-brand-moss">{{ $step['help'] }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                                @if (! $step['done'])
+                                    <a href="{{ $step['cta_route'] }}" wire:navigate class="shrink-0 inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-sky-600 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sky-700">
+                                        {{ $step['cta_label'] }}
+                                        <x-heroicon-m-arrow-right class="h-3.5 w-3.5" />
+                                    </a>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </section>
+            @endif
+
+            {{-- Live system metrics card. Reads the same ServerMetricSnapshot
+                 the Monitor tab uses, just the latest row — three bars and a
+                 load number so the operator gets a real "is this box ok"
+                 read above the click-through stat tiles. Empty state nudges
+                 toward installing the monitor agent. --}}
+            @php
+                $metricPayload = is_object($latestMetricSnapshot) && is_array($latestMetricSnapshot->payload ?? null)
+                    ? $latestMetricSnapshot->payload
+                    : [];
+                $metricCpu = isset($metricPayload['cpu_pct']) && is_numeric($metricPayload['cpu_pct']) ? (float) $metricPayload['cpu_pct'] : null;
+                $metricMem = isset($metricPayload['mem_pct']) && is_numeric($metricPayload['mem_pct']) ? (float) $metricPayload['mem_pct'] : null;
+                $metricDisk = isset($metricPayload['disk_pct']) && is_numeric($metricPayload['disk_pct']) ? (float) $metricPayload['disk_pct'] : null;
+                $metricLoad1m = isset($metricPayload['load_1m']) && is_numeric($metricPayload['load_1m']) ? (float) $metricPayload['load_1m'] : null;
+                $metricLoadPerCpu = isset($metricPayload['load_per_cpu_1m']) && is_numeric($metricPayload['load_per_cpu_1m']) ? (float) $metricPayload['load_per_cpu_1m'] : null;
+                $metricHasAny = $metricCpu !== null || $metricMem !== null || $metricDisk !== null;
+                $metricCapturedAt = is_object($latestMetricSnapshot) ? $latestMetricSnapshot->captured_at : null;
+                $metricStale = $metricCapturedAt && $metricCapturedAt->lt(now()->subMinutes(10));
+                $metricBar = function (?float $pct): array {
+                    if ($pct === null) {
+                        return ['width' => 0, 'color' => 'bg-brand-mist/40'];
+                    }
+                    $clamped = max(0.0, min(100.0, $pct));
+                    if ($pct >= 95) {
+                        $color = 'bg-rose-500';
+                    } elseif ($pct >= 85) {
+                        $color = 'bg-amber-500';
+                    } else {
+                        $color = 'bg-emerald-500';
+                    }
+
+                    return ['width' => $clamped, 'color' => $color];
+                };
+                $metricRow = function (string $label, ?float $pct) use ($metricBar): string {
+                    $bar = $metricBar($pct);
+                    $val = $pct === null ? '—' : number_format($pct, 0).'%';
+
+                    return view('livewire.servers.partials._overview-metric-row', [
+                        'label' => $label,
+                        'value' => $val,
+                        'barColor' => $bar['color'],
+                        'barWidth' => $bar['width'],
+                    ])->render();
+                };
+            @endphp
+            <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <div class="flex items-baseline gap-2">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Live load') }}</p>
+                        @if ($metricCapturedAt)
+                            <span class="text-[11px] text-brand-mist {{ $metricStale ? 'text-amber-700' : '' }}">
+                                {{ __('Sampled :ago', ['ago' => $metricCapturedAt->diffForHumans()]) }}
+                                @if ($metricStale)
+                                    · <span class="font-semibold uppercase tracking-wide">{{ __('stale') }}</span>
+                                @endif
+                            </span>
+                        @endif
+                    </div>
+                    <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:text-brand-forest">
+                        {{ __('Open Monitor') }} →
+                    </a>
+                </div>
+                @if (! $metricHasAny)
+                    <div class="mt-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-4 py-3 text-sm text-brand-moss">
+                        {{ __('No metric snapshots yet — install the monitor agent from the Monitor tab so this card lights up.') }}
+                    </div>
+                @else
+                    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                        {!! $metricRow(__('CPU'), $metricCpu) !!}
+                        {!! $metricRow(__('Memory'), $metricMem) !!}
+                        {!! $metricRow(__('Disk'), $metricDisk) !!}
+                    </div>
+                    @if ($metricLoad1m !== null)
+                        <p class="mt-3 text-xs text-brand-moss">
+                            {{ __('Load (1m)') }}:
+                            <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoad1m, 2) }}</span>
+                            @if ($metricLoadPerCpu !== null)
+                                <span class="text-brand-mist"> · </span>
+                                {{ __('per CPU') }}:
+                                <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoadPerCpu, 2) }}</span>
+                            @endif
+                        </p>
+                    @endif
+                @endif
             </section>
 
             {{-- SSH-key reminder. Conditional, fires only when the
@@ -227,107 +438,12 @@
                 </section>
             @endif
 
-            {{-- Kubernetes cluster provisioning banner: shown only when dply
-                 provisioned the DOKS cluster on the user's behalf and DO is
-                 still bringing the node pool online (~5–10 min). Polls so the
-                 page flips out of the banner state as soon as a future status
-                 poller marks the server READY. --}}
-            @if (! empty($kubernetesProvisioning))
-                <section wire:poll.10s data-testid="kubernetes-provisioning-banner" class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-sky-50/90 p-6 shadow-sm">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div class="min-w-0 flex-1 space-y-3">
-                            <span class="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
-                                <span class="h-2 w-2 animate-pulse rounded-full bg-sky-500"></span>
-                                {{ __('Cluster provisioning') }}
-                            </span>
-                            <h3 class="text-2xl font-semibold tracking-tight text-brand-ink">
-                                {{ __('DigitalOcean is spinning up your cluster') }}
-                            </h3>
-                            <p class="text-sm leading-6 text-brand-moss">
-                                {{ __('Node pool VMs typically take 5–10 minutes to come online. This page will update automatically once the cluster is ready and you can start adding container sites.') }}
-                            </p>
-                            <dl class="grid gap-3 text-xs text-brand-moss sm:grid-cols-2">
-                                <div>
-                                    <dt class="font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Cluster name') }}</dt>
-                                    <dd class="mt-1 font-mono text-brand-ink">{{ $kubernetesClusterMeta['cluster_name'] ?? '—' }}</dd>
-                                </div>
-                                @if (! empty($kubernetesClusterMeta['region']))
-                                    <div>
-                                        <dt class="font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Region') }}</dt>
-                                        <dd class="mt-1 font-mono text-brand-ink">{{ $kubernetesClusterMeta['region'] }}</dd>
-                                    </div>
-                                @endif
-                            </dl>
-                            <p class="text-xs text-brand-mist">
-                                {{ __('Watch progress directly in the') }}
-                                <a href="https://cloud.digitalocean.com/kubernetes/clusters" target="_blank" rel="noopener" class="font-semibold text-sky-700 underline hover:text-sky-900">{{ __('DigitalOcean console') }}</a>.
-                            </p>
-                        </div>
-                    </div>
-                </section>
-            @endif
-
-            {{-- Container launch progress. Renders only while a container
-                 launch is in flight (status != completed). Polls every 5s
-                 so the operator sees step progression in real time. --}}
-            @if ($containerLaunch)
-                <section wire:poll.5s data-testid="container-launch-progress" class="mt-6 overflow-hidden rounded-[2rem] border {{ $containerLaunch['is_failed'] ? 'border-rose-300 bg-rose-50/90' : 'border-sky-200 bg-sky-50/90' }} p-6 shadow-sm">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div class="min-w-0 flex-1 space-y-3">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="inline-flex items-center gap-2 rounded-full border {{ $containerLaunch['is_failed'] ? 'border-rose-300' : 'border-sky-300' }} bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] {{ $containerLaunch['is_failed'] ? 'text-rose-700' : 'text-sky-700' }}">
-                                    <span class="h-2 w-2 rounded-full {{ $containerLaunch['is_failed'] ? 'bg-rose-500' : 'bg-sky-500 animate-pulse' }}"></span>
-                                    {{ $containerLaunch['is_failed'] ? __('Container launch failed') : __('Container launch') }}
-                                </span>
-                                <span class="inline-flex items-center rounded-full border {{ $containerLaunch['is_failed'] ? 'border-rose-200' : 'border-sky-200' }} bg-white px-3 py-1.5 text-xs font-medium {{ $containerLaunch['is_failed'] ? 'text-rose-700' : 'text-sky-700' }}">
-                                    {{ str($containerLaunch['target_family'])->headline() }}
-                                </span>
-                            </div>
-                            <h3 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ $containerLaunch['current_step_label'] }}</h3>
-                            <p class="text-sm leading-6 text-brand-moss">{{ $containerLaunch['summary'] }}</p>
-                            @if ($containerLaunch['site_route'])
-                                <a href="{{ $containerLaunch['site_route'] }}" wire:navigate class="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-sky-700">
-                                    {{ __('Open container site') }}
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-
-                    <ol class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        @foreach ($containerLaunch['steps'] as $step)
-                            @php
-                                $stateClasses = match ($step['state']) {
-                                    'completed' => 'border-emerald-200 bg-white text-emerald-800',
-                                    'active' => 'border-sky-300 bg-white text-sky-800 ring-2 ring-sky-200',
-                                    default => 'border-slate-200 bg-white/70 text-slate-500',
-                                };
-                            @endphp
-                            <li class="rounded-xl border {{ $stateClasses }} p-3">
-                                <div class="flex items-center gap-2">
-                                    @if ($step['state'] === 'completed')
-                                        <x-heroicon-m-check-circle class="h-4 w-4 text-emerald-600" />
-                                    @elseif ($step['state'] === 'active')
-                                        <span class="inline-flex h-4 w-4 items-center justify-center">
-                                            <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-sky-500"></span>
-                                        </span>
-                                    @else
-                                        <span class="inline-block h-2 w-2 rounded-full bg-slate-300"></span>
-                                    @endif
-                                    <span class="text-xs font-semibold uppercase tracking-wide">{{ __('Step :n', ['n' => $loop->iteration]) }}</span>
-                                </div>
-                                <p class="mt-2 text-sm font-medium text-brand-ink">{{ $step['label'] }}</p>
-                            </li>
-                        @endforeach
-                    </ol>
-
-                    @if ($containerLaunchTranscript !== '')
-                        <div class="mt-6">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide {{ $containerLaunch['is_failed'] ? 'text-rose-700' : 'text-sky-700' }}">{{ __('Recent events') }}</p>
-                            <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border {{ $containerLaunch['is_failed'] ? 'border-rose-200' : 'border-sky-200' }} bg-white px-3 py-3 font-mono text-[11px] leading-5 text-brand-ink">{{ $containerLaunchTranscript }}</pre>
-                        </div>
-                    @endif
-                </section>
-            @endif
+            {{-- Container launch progress (extracted partial — also rendered on
+                 the /cluster page so K8s users see launch progress in their
+                 main destination too). --}}
+            <div class="mt-6">
+                @include('livewire.servers.partials._container-launch-progress')
+            </div>
 
             {{-- Container-host empty state. Only visible when the host is docker/kubernetes,
                  there are no sites yet, and there's no in-flight launch banner above. The
@@ -349,11 +465,10 @@
                 </section>
             @endif
 
-            {{-- 4 click-through stat tiles. Each one lands at its
-                 dedicated workspace sub-page. Single source of truth
-                 for the headline numbers; the dedicated pages own
-                 detail. --}}
-            <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {{-- 5 click-through stat tiles. Each lands at its dedicated
+                 workspace sub-page. xl:grid-cols-5 keeps them on one row
+                 instead of stranding the 5th tile alone underneath. --}}
+            <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 @php
                     $healthValue = match ($healthSummary['status']) {
                         \App\Models\Server::HEALTH_REACHABLE => __('Reachable'),
@@ -434,6 +549,63 @@
                     <p class="mt-3 text-[11px] font-medium text-brand-sage opacity-0 transition group-hover:opacity-100">{{ __('Open Backups →') }}</p>
                 </a>
             </section>
+
+            {{-- Sites preview — top 5 by last-touched, with each site's most
+                 recent deploy status. Lets the operator scan "what is
+                 actually running on this box" without bouncing to the Sites
+                 tab. Empty-state path is handled above (first-container
+                 CTA for K8s/Docker, the existing VM first-site CTA elsewhere). --}}
+            @if ($sitesPreview->isNotEmpty())
+                <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Sites') }}</p>
+                        <a href="{{ route('servers.sites', $server) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:text-brand-forest">
+                            {{ __('Open Sites') }} →
+                        </a>
+                    </div>
+                    <ul class="mt-3 divide-y divide-brand-ink/10">
+                        @foreach ($sitesPreview as $previewSite)
+                            @php
+                                $deploy = $sitesPreviewLatestDeploys[$previewSite->id] ?? null;
+                                $deployStatus = $deploy?->status ? (string) $deploy->status : null;
+                                $deployTime = $deploy ? ($deploy->finished_at ?? $deploy->created_at) : null;
+                                $statusBadge = match ($previewSite->status) {
+                                    'active', 'ready' => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+                                    'deploying', 'queued' => 'bg-sky-50 text-sky-800 ring-sky-200',
+                                    'failed', 'error' => 'bg-rose-50 text-rose-800 ring-rose-200',
+                                    default => 'bg-brand-sand/40 text-brand-moss ring-brand-ink/10',
+                                };
+                            @endphp
+                            <li class="flex items-center justify-between gap-3 py-2.5">
+                                <div class="min-w-0">
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $previewSite]) }}" wire:navigate class="block truncate font-medium text-brand-ink hover:text-brand-sage">
+                                        {{ $previewSite->name }}
+                                    </a>
+                                    @if ($deployTime)
+                                        <p class="mt-0.5 text-[11px] text-brand-mist">
+                                            {{ __('Last deploy :time', ['time' => $deployTime->diffForHumans()]) }}
+                                            @if ($deployStatus)
+                                                <span class="text-brand-mist"> · </span>
+                                                <span class="text-brand-moss">{{ str($deployStatus)->headline() }}</span>
+                                            @endif
+                                        </p>
+                                    @else
+                                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('No deploys yet') }}</p>
+                                    @endif
+                                </div>
+                                <span class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $statusBadge }}">
+                                    {{ $previewSite->status ?? '—' }}
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($siteCount > $sitesPreview->count())
+                        <p class="mt-3 text-xs text-brand-mist">
+                            {{ __('Showing :n of :total — open Sites to see the rest.', ['n' => $sitesPreview->count(), 'total' => $siteCount]) }}
+                        </p>
+                    @endif
+                </section>
+            @endif
 
             {{-- Stack summary card. One line of installed-runtime
                  facts (database engine + version, php, webserver, cache)
@@ -535,10 +707,30 @@
 
     @if (! $setupIncomplete)
         @can('delete', $server)
-            <div class="rounded-2xl border border-red-200/60 bg-white p-5 shadow-sm space-y-2">
-                <p class="text-sm text-brand-moss leading-relaxed">{{ __('You must type the server name to confirm. You can remove the server now or pick a future date (removal runs at the end of that day in your app timezone).') }}</p>
-                <button type="button" wire:click="openRemoveServerModal" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Remove or schedule removal…') }}</button>
-            </div>
+            <section class="overflow-hidden rounded-2xl border-2 border-red-300 bg-red-50/60 shadow-sm">
+                <div class="border-b border-red-200 bg-red-100/60 px-5 py-2.5">
+                    <p class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-red-800">
+                        <x-heroicon-m-exclamation-triangle class="h-4 w-4" />
+                        {{ __('Danger zone') }}
+                    </p>
+                </div>
+                <div class="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="max-w-2xl min-w-0">
+                        <h3 class="text-base font-semibold text-red-900">{{ __('Remove this server') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-red-900/80">
+                            {{ __('Deletes the dply server record, runs any provider teardown, and detaches sites / databases / backups. You\'ll be asked to type the server name to confirm and can schedule removal for a future date (runs at the end of that day in your app timezone).') }}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="openRemoveServerModal"
+                        class="shrink-0 inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700"
+                    >
+                        <x-heroicon-o-trash class="h-4 w-4" />
+                        {{ __('Remove or schedule removal') }}
+                    </button>
+                </div>
+            </section>
         @endcan
     @endif
 

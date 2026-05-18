@@ -9,6 +9,7 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\Server;
 use App\Models\ServerDatabase;
@@ -44,6 +45,7 @@ class WorkspaceDatabases extends Component
     use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RunsAllowlistedManageAction;
     use RunsServerConsoleActions;
     use WithFileUploads;
 
@@ -150,6 +152,19 @@ class WorkspaceDatabases extends Component
         $this->share_max_views = (int) config('server_database.credential_share_max_views', 3);
     }
 
+    /**
+     * Optional bind address Dply uses when reading live database state over SSH
+     * (e.g. SHOW PROCESSLIST via the `mysql_processlist` allowlisted action).
+     * Persisted to `$server->meta['manage_db_bind_host']`. Migrated here from
+     * WorkspaceManage when /manage/data was retired.
+     */
+    public string $manage_db_bind_host = '';
+
+    public ?int $manage_db_port = null;
+
+    /** Write-only field — populated on save, cleared on render. */
+    public string $manage_db_password = '';
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -160,6 +175,45 @@ class WorkspaceDatabases extends Component
             $this->admin_postgres_superuser = $ac->postgres_superuser;
             $this->admin_postgres_use_sudo = $ac->postgres_use_sudo;
         }
+
+        $meta = $server->meta ?? [];
+        $this->manage_db_bind_host = (string) ($meta['manage_db_bind_host'] ?? '');
+        $port = $meta['manage_db_port'] ?? null;
+        $this->manage_db_port = is_numeric($port) ? (int) $port : null;
+    }
+
+    /**
+     * Persist the optional MySQL connection hints into `$server->meta`. The
+     * password is write-only — empty input leaves the stored value untouched
+     * so reloading the page (which never re-shows the password) doesn't wipe it.
+     * Mirrors the pre-retirement Manage→Data form.
+     */
+    public function saveManageDbHints(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change manage settings.'));
+
+            return;
+        }
+
+        $this->validate([
+            'manage_db_bind_host' => ['nullable', 'string', 'max:255'],
+            'manage_db_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+        ]);
+
+        $meta = $this->server->meta ?? [];
+        $meta['manage_db_bind_host'] = $this->manage_db_bind_host !== '' ? $this->manage_db_bind_host : null;
+        $meta['manage_db_port'] = $this->manage_db_port;
+
+        if ($this->manage_db_password !== '') {
+            $meta['manage_internal_db_password'] = $this->manage_db_password;
+        }
+
+        $this->server->update(['meta' => $meta]);
+        $this->manage_db_password = '';
+        $this->server->refresh();
+        $this->toastSuccess(__('Connection hints saved.'));
     }
 
     /**
@@ -1275,6 +1329,18 @@ class WorkspaceDatabases extends Component
         }
         $dbRunsByEngine['sqlite'] = $this->latestConsoleActionFor($this->server, 'db_');
 
+        // Latest non-dismissed manage_action run for this server. Drives the
+        // Show processlist output banner on the MySQL → Info subtab. Picks up
+        // any `manage_*` allowlisted action (also fires from the Caches workspace
+        // for `redis_info`), but the banner is rendered only inside the MySQL tab.
+        $manageActionRun = \App\Models\ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->id)
+            ->where('kind', 'manage_action')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+
         return view('livewire.servers.workspace-databases', [
             'capabilities' => $capabilities,
             'credentialsModalDatabase' => $credentialsModalDatabase,
@@ -1286,6 +1352,11 @@ class WorkspaceDatabases extends Component
             'databaseImportMaxBytes' => $databaseImportMaxBytes,
             'engineRows' => $engineRows,
             'dbRunsByEngine' => array_filter($dbRunsByEngine),
+            // Allowlisted manage actions exposed in the Databases workspace
+            // (currently just `mysql_processlist`). Banner-only — see
+            // RunsAllowlistedManageAction. Migrated here when /manage/data was retired.
+            'serviceActions' => config('server_manage.service_actions', []),
+            'manageActionRun' => $manageActionRun,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

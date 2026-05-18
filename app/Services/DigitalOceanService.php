@@ -226,6 +226,60 @@ class DigitalOceanService
     }
 
     /**
+     * Fetch a single DOKS cluster (status, node_pools with per-node statuses,
+     * ha, version, region). Bypasses the list-cache because the poller needs
+     * fresh data on every call. Returns null when the cluster has been deleted
+     * out from under us (404) so the caller can stop polling cleanly.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getKubernetesCluster(string $clusterId): ?array
+    {
+        $response = $this->request('get', '/kubernetes/clusters/'.$clusterId);
+        if ($response->status() === 404) {
+            return null;
+        }
+        $this->assertSuccess($response, 'get kubernetes cluster');
+        $data = $response->json();
+        $cluster = $data['kubernetes_cluster'] ?? null;
+
+        return is_array($cluster) ? $cluster : null;
+    }
+
+    /**
+     * Pull the YAML kubeconfig for a cluster — bearer-token credentials inside,
+     * caller is responsible for encrypting at rest. Only useful once the cluster
+     * has reached state=running (DO returns 503 / empty during provisioning).
+     */
+    public function getKubernetesClusterKubeconfig(string $clusterId): string
+    {
+        $response = $this->request('get', '/kubernetes/clusters/'.$clusterId.'/kubeconfig');
+        $this->assertSuccess($response, 'get kubernetes cluster kubeconfig');
+
+        return $response->body();
+    }
+
+    /**
+     * Tear down a DOKS cluster the user provisioned through dply. DigitalOcean
+     * deletes the cluster + node pools but NOT attached load balancers / block
+     * storage (per their docs) — those linger on the bill until separately
+     * removed. Returns true on 204, false on 404 (already gone).
+     */
+    public function deleteKubernetesCluster(string $clusterId): bool
+    {
+        $response = $this->request('delete', '/kubernetes/clusters/'.$clusterId);
+        if ($response->status() === 404) {
+            Cache::forget('do_kubernetes_clusters:'.sha1($this->token));
+
+            return false;
+        }
+        $this->assertSuccess($response, 'delete kubernetes cluster');
+        Cache::forget('do_kubernetes_clusters:'.sha1($this->token));
+
+        return true;
+    }
+
+    /**
      * Read DO's published Kubernetes options (supported versions, regions, sizes
      * for DOKS specifically). The "versions" array is what we use to populate
      * the version dropdown on the create-cluster form — DO usually publishes

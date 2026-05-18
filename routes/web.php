@@ -54,6 +54,7 @@ use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceCaches;
+use App\Livewire\Servers\WorkspaceCluster;
 use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDatabases;
@@ -236,6 +237,13 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}', function (Server $server) {
         Gate::authorize('view', $server);
 
+        // Kubernetes hosts have their own dedicated page (cluster lifecycle +
+        // management). Docker / other non-VM hosts still go to the generic
+        // overview.
+        if (($server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES) {
+            return redirect()->route('servers.cluster', $server);
+        }
+
         // Journey page is SSH/VM-shaped — only VM hosts have a provision task
         // and the InteractsWithServerWorkspace boot rejects non-VM hosts from
         // routing through it (which previously caused a redirect loop for
@@ -259,6 +267,21 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         return redirect()->route('servers.overview', $server);
     })->name('servers.show');
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
+    Route::livewire('servers/{server}/cluster', WorkspaceCluster::class)->name('servers.cluster');
+    Route::get('servers/{server}/cluster/kubeconfig', function (Server $server) {
+        Gate::authorize('view', $server);
+        $kubeconfig = (string) ($server->meta['kubernetes']['kubeconfig'] ?? '');
+        if ($kubeconfig === '') {
+            abort(404, 'kubeconfig not available yet');
+        }
+
+        $clusterName = (string) ($server->meta['kubernetes']['cluster_name'] ?? 'cluster');
+
+        return response($kubeconfig, 200, [
+            'Content-Type' => 'application/yaml',
+            'Content-Disposition' => 'attachment; filename="'.preg_replace('/[^A-Za-z0-9_.-]/', '_', $clusterName).'-kubeconfig.yaml"',
+        ]);
+    })->name('servers.cluster.kubeconfig');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
     Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
@@ -326,6 +349,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // runner, and the marketplace import path. Old URLs 404 by
     // design — clean break, no redirect shim.
     Route::livewire('servers/{server}/run', WorkspaceRun::class)->name('servers.run');
+    Route::livewire('servers/{server}/console', \App\Livewire\Servers\WorkspaceConsole::class)->name('servers.console');
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
     Route::livewire('servers/{server}/files', \App\Livewire\Servers\WorkspaceFiles::class)->name('servers.files');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');

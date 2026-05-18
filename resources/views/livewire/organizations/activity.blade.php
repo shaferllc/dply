@@ -7,55 +7,45 @@
                 ['label' => __('Activity'), 'icon' => 'archive-box'],
             ]" />
 
-            <div class="space-y-8">
-                <div class="dply-card overflow-hidden">
-                    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
-                        <div class="lg:col-span-4">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Activity') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                {{ __('Recent audit events for this organization. Admins can review who did what and when.') }}
-                            </p>
-                        </div>
-                        <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
-                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Documentation') }}
-                            </x-outline-link>
+            <x-page-header
+                :title="__('Activity')"
+                :description="__('Recent audit events for this organization. Admins can review who did what and when.')"
+                doc-route="docs.index"
+                toolbar
+            />
 
-                        </div>
+            <div class="dply-card overflow-hidden">
+                @if ($this->auditLogs->isEmpty())
+                    <p class="px-6 py-12 text-center text-sm text-brand-moss">{{ __('No activity yet.') }}</p>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-brand-mist/80 text-sm">
+                            <thead>
+                                <tr class="bg-brand-sand/20 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
+                                    <th scope="col" class="px-4 py-2.5 w-44">{{ __('When') }}</th>
+                                    <th scope="col" class="px-4 py-2.5 w-44">{{ __('User') }}</th>
+                                    <th scope="col" class="px-4 py-2.5 w-56">{{ __('Action') }}</th>
+                                    <th scope="col" class="px-4 py-2.5">{{ __('Subject') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-mist/60 bg-white">
+                                @foreach ($this->auditLogs as $log)
+                                    <tr class="hover:bg-brand-sand/15">
+                                        <td class="px-4 py-2 whitespace-nowrap text-brand-moss tabular-nums" title="{{ $log->created_at->toDayDateTimeString() }}">
+                                            <div>{{ $log->created_at->format('M j, Y') }}</div>
+                                            <div class="text-xs text-brand-mist">{{ $log->created_at->format('g:i A') }}</div>
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap text-brand-ink">{{ $log->user?->name ?? '—' }}</td>
+                                        <td class="px-4 py-2 whitespace-nowrap text-brand-ink">
+                                            <code class="font-mono text-[12.5px] text-brand-ink">{{ $log->action }}</code>
+                                        </td>
+                                        <td class="px-4 py-2 text-brand-moss"><span class="break-all">{{ $log->subject_summary ?? '—' }}</span></td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-
-                <div class="dply-card overflow-hidden">
-                    <div class="p-6 sm:p-8">
-                        @if ($this->auditLogs->isEmpty())
-                            <p class="text-center text-sm text-brand-moss py-8">{{ __('No activity yet.') }}</p>
-                        @else
-                            <div class="overflow-x-auto rounded-xl border border-brand-mist">
-                                <table class="min-w-full divide-y divide-brand-mist/80 text-sm">
-                                    <thead>
-                                        <tr class="bg-brand-sand/20 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
-                                            <th scope="col" class="px-4 py-3">{{ __('Date') }}</th>
-                                            <th scope="col" class="px-4 py-3">{{ __('User') }}</th>
-                                            <th scope="col" class="px-4 py-3">{{ __('Action') }}</th>
-                                            <th scope="col" class="px-4 py-3">{{ __('Subject') }}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-brand-mist/80 bg-white">
-                                        @foreach ($this->auditLogs as $log)
-                                            <tr>
-                                                <td class="px-4 py-3 text-brand-moss whitespace-nowrap">{{ $log->created_at->format('M j, Y g:i A') }}</td>
-                                                <td class="px-4 py-3 text-brand-ink">{{ $log->user?->name ?? '—' }}</td>
-                                                <td class="px-4 py-3 text-brand-ink">{{ $log->action }}</td>
-                                                <td class="px-4 py-3 text-brand-moss">{{ $log->subject_summary ?? '—' }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
-                    </div>
-                </div>
+                @endif
             </div>
         </x-organization-shell>
     </div>

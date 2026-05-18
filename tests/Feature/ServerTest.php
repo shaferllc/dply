@@ -190,6 +190,7 @@ class ServerTest extends TestCase
         Livewire::actingAs($user)
             ->test(ServersIndex::class)
             ->call('openRemoveServerModal', $id)
+            ->set('deleteConfirmName', $server->name)
             ->call('submitRemoveServer');
 
         $this->assertModelMissing($server);
@@ -2311,6 +2312,7 @@ class ServerTest extends TestCase
         Livewire::actingAs($user)
             ->test(WorkspaceSites::class, ['server' => $server])
             ->call('openRemoveServerModal')
+            ->set('deleteConfirmName', $server->name)
             ->call('submitRemoveServer')
             ->assertRedirect(route('servers.index'));
 

@@ -443,9 +443,13 @@ class Create extends Component
             $targetFamily,
         );
 
-        session()->flash('success', __('Container app queued. Watch progress on the server overview.'));
+        $isKubernetes = $this->server->hostKind() === Server::HOST_KIND_KUBERNETES;
+        $destination = $isKubernetes ? 'servers.cluster' : 'servers.overview';
+        session()->flash('success', $isKubernetes
+            ? __('Container app queued. Watch progress on the cluster page.')
+            : __('Container app queued. Watch progress on the server overview.'));
 
-        return $this->redirect(route('servers.overview', $this->server), navigate: true);
+        return $this->redirect(route($destination, $this->server), navigate: true);
     }
 
     public function updatedFormType(string $value): void

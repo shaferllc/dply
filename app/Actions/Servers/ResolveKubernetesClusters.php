@@ -23,11 +23,11 @@ final class ResolveKubernetesClusters
     /**
      * @return list<array{id: string, name: string, region: string}>
      */
-    public function handle(ProviderCredential $credential): array
+    public function handle(ProviderCredential $credential, ?string $regionOverride = null): array
     {
         return match ($credential->provider) {
             'digitalocean' => $this->resolveDigitalOcean($credential),
-            'aws' => $this->resolveAws($credential),
+            'aws' => $this->resolveAws($credential, $regionOverride),
             default => [],
         };
     }
@@ -61,31 +61,31 @@ final class ResolveKubernetesClusters
     }
 
     /**
-     * EKS only returns names from listClusters; the credential's configured
-     * region is the only one we query (multi-region scan is out of scope —
-     * the user picks region-by-credential in the wizard).
+     * EKS only returns names from listClusters; if the wizard's region picker
+     * passed an override, hit that region — otherwise fall back to the
+     * credential's stored region. Cluster IDs in EKS are the cluster name
+     * itself (no separate ARN-as-id is used in the picker UX).
      *
      * @return list<array{id: string, name: string, region: string}>
      */
-    private function resolveAws(ProviderCredential $credential): array
+    private function resolveAws(ProviderCredential $credential, ?string $regionOverride = null): array
     {
+        $region = $regionOverride !== null && $regionOverride !== ''
+            ? $regionOverride
+            : (string) ($credential->credentials['region'] ?? config('services.aws.default_region', 'us-east-1'));
+
         try {
-            $service = new AwsEksService($credential);
+            $service = new AwsEksService($credential, $region);
             $names = $service->listClusterNames();
         } catch (Throwable) {
             return [];
         }
-
-        $region = (string) ($credential->credentials['region'] ?? config('services.aws.default_region', 'us-east-1'));
 
         $out = [];
         foreach ($names as $name) {
             if ($name === '') {
                 continue;
             }
-            // EKS clusters don't have a separate id — name is the canonical
-            // identifier across the API. Mirror the DO shape by using name
-            // for both id and name fields.
             $out[] = ['id' => $name, 'name' => $name, 'region' => $region];
         }
 

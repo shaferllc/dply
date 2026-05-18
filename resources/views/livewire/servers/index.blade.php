@@ -54,7 +54,18 @@
     };
 @endphp
 
-<div wire:key="servers-epoch-{{ $serverListEpoch }}">
+<div
+    wire:key="servers-epoch-{{ $serverListEpoch }}"
+    @if ($provisioningDigests->isNotEmpty())
+        {{-- Refresh the fleet list every 10s while any server is mid-build
+             so the per-row step label + elapsed counter tick live. Polling
+             is conditional so a fleet of all-ready servers doesn't keep
+             hitting the DB for no visual change. The conditional re-rendering
+             also auto-stops polling once the last in-flight server finishes
+             (provisioningDigests goes empty on the next render). --}}
+        wire:poll.10s
+    @endif
+>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <x-dashboard-breadcrumb :current="__('Servers')" current-icon="server-stack" />
 
@@ -126,91 +137,77 @@
             </x-slot>
         </x-page-header>
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                    <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                    {{ __('Servers') }}
-                </div>
-                <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $summary['total'] }}</p>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                    <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                    {{ __('Ready') }}
-                </div>
-                <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $summary['ready'] }}</p>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                    <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                    {{ __('Attention') }}
-                </div>
-                <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $summary['attention'] }}</p>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                    <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                    {{ __('Sites') }}
-                </div>
-                <p class="mt-1 text-2xl font-semibold tabular-nums text-brand-ink">{{ $summary['sites'] }}</p>
-            </div>
-        </div>
+        @php
+            $summaryStats = [
+                ['icon' => 'heroicon-o-server-stack', 'label' => __('Servers'), 'value' => $summary['total'], 'tone' => 'text-brand-sage'],
+                ['icon' => 'heroicon-o-check-circle', 'label' => __('Ready'), 'value' => $summary['ready'], 'tone' => 'text-brand-sage'],
+                ['icon' => 'heroicon-o-exclamation-triangle', 'label' => __('Attention'), 'value' => $summary['attention'], 'tone' => $summary['attention'] > 0 ? 'text-amber-500' : 'text-brand-mist'],
+                ['icon' => 'heroicon-o-globe-alt', 'label' => __('Sites'), 'value' => $summary['sites'], 'tone' => 'text-brand-sage'],
+            ];
+        @endphp
+        <div class="dply-card overflow-hidden">
+            <dl class="grid grid-cols-2 divide-y divide-brand-ink/10 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+                @foreach ($summaryStats as $stat)
+                    <div class="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                        <dt class="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                            <x-dynamic-component :component="$stat['icon']" class="h-4 w-4 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
+                            <span class="truncate">{{ $stat['label'] }}</span>
+                        </dt>
+                        <dd class="text-xl font-semibold tabular-nums leading-none text-brand-ink">{{ $stat['value'] }}</dd>
+                    </div>
+                @endforeach
+            </dl>
 
-        @if ($hasServersInScope)
-            <x-section-card padding="sm">
-                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button type="button" wire:click="resetFilters" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            {{ __('Reset filters') }}
+            @if ($hasServersInScope)
+                <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:px-5">
+                    <div class="min-w-[14rem] flex-1">
+                        <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
+                        <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
+                    </div>
+
+                    <label for="servers_status" class="sr-only">{{ __('Status') }}</label>
+                    <x-select id="servers_status" wire:model.live="statusFilter" class="mt-0 w-auto min-w-[10rem]">
+                        @foreach ($statusOptions as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </x-select>
+
+                    <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
+                    <x-select id="servers_sort" wire:model.live="sort" class="mt-0 w-auto min-w-[10rem]">
+                        @foreach ($sortOptions as $value => $label)
+                            <option value="{{ $value }}">{{ __($label) }}</option>
+                        @endforeach
+                    </x-select>
+
+                    <div class="inline-flex rounded-xl border border-brand-ink/15 bg-white p-0.5" role="group" aria-label="{{ __('View') }}">
+                        <button
+                            type="button"
+                            wire:click="$set('viewMode', 'list')"
+                            class="rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors {{ $viewMode === 'list' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-brand-sand/40' }}"
+                            aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
+                            title="{{ __('List') }}"
+                        >
+                            <span class="sr-only">{{ __('List') }}</span>
+                            <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
                         </button>
-                        <div class="inline-flex rounded-xl border border-brand-ink/15 bg-brand-sand/30 p-0.5" role="group" aria-label="{{ __('View') }}">
-                            <button
-                                type="button"
-                                wire:click="$set('viewMode', 'list')"
-                                class="rounded-lg px-3 py-2 text-sm font-medium transition-colors {{ $viewMode === 'list' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-white/80' }}"
-                                aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
-                            >
-                                <span class="sr-only">{{ __('List') }}</span>
-                                <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="$set('viewMode', 'grid')"
-                                class="rounded-lg px-3 py-2 text-sm font-medium transition-colors {{ $viewMode === 'grid' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-white/80' }}"
-                                aria-pressed="{{ $viewMode === 'grid' ? 'true' : 'false' }}"
-                            >
-                                <span class="sr-only">{{ __('Grid') }}</span>
-                                <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            wire:click="$set('viewMode', 'grid')"
+                            class="rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors {{ $viewMode === 'grid' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-brand-sand/40' }}"
+                            aria-pressed="{{ $viewMode === 'grid' ? 'true' : 'false' }}"
+                            title="{{ __('Grid') }}"
+                        >
+                            <span class="sr-only">{{ __('Grid') }}</span>
+                            <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
+                        </button>
                     </div>
-                </div>
 
-                <div class="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center">
-                    <div class="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
-                        <div class="w-full md:max-w-sm">
-                            <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
-                            <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="block w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <label for="servers_status" class="sr-only">{{ __('Options') }}</label>
-                            <x-select id="servers_status" wire:model.live="statusFilter" class="mt-0">
-                                @foreach ($statusOptions as $value => $label)
-                                    <option value="{{ $value }}">{{ $label }}</option>
-                                @endforeach
-                            </x-select>
-                            <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
-                            <x-select id="servers_sort" wire:model.live="sort" class="mt-0">
-                                @foreach ($sortOptions as $value => $label)
-                                    <option value="{{ $value }}">{{ __($label) }}</option>
-                                @endforeach
-                            </x-select>
-                        </div>
-                    </div>
+                    <button type="button" wire:click="resetFilters" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink">
+                        {{ __('Reset') }}
+                    </button>
                 </div>
-            </x-section-card>
-        @endif
+            @endif
+        </div>
 
         @unless ($hasProviderCredentials)
             <section class="mb-8 rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-5 shadow-sm shadow-amber-100/40 sm:p-6">
@@ -345,10 +342,13 @@
                     <div class="p-4 sm:p-6 space-y-10 bg-white">
                         @foreach ($groupedServers as $groupLabel => $groupServers)
                             <div>
-                                <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-ink mb-4 pb-2 border-b border-brand-ink/10">
-                                    {{ $groupLabel }}
-                                    <span class="text-brand-moss font-normal">({{ $groupServers->count() }})</span>
-                                </h2>
+                                <div class="mb-4 flex items-center justify-between gap-3 border-b border-brand-ink/10 pb-2">
+                                    <h2 class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
+                                        <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                                        {{ $groupLabel }}
+                                    </h2>
+                                    <span class="inline-flex items-center rounded-full bg-brand-sand/30 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $groupServers->count() }}</span>
+                                </div>
                                 <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                     @foreach ($groupServers as $server)
                                         <li wire:key="server-grid-{{ $server->id }}" class="flex rounded-xl border border-brand-ink/10 bg-white overflow-hidden shadow-sm hover:border-brand-ink/20 transition-colors">
@@ -409,11 +409,12 @@
                     <div class="divide-y divide-brand-ink/10 bg-white">
                         @foreach ($groupedServers as $groupLabel => $groupServers)
                             <div wire:key="group-{{ \Illuminate\Support\Str::slug($groupLabel) }}">
-                                <div class="px-4 sm:px-6 py-3 bg-brand-sand/30 border-b border-brand-ink/10">
-                                    <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-ink">
+                                <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-4 sm:px-6 py-2.5">
+                                    <h2 class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
+                                        <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                                         {{ $groupLabel }}
-                                        <span class="text-brand-moss font-normal">({{ $groupServers->count() }})</span>
                                     </h2>
+                                    <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $groupServers->count() }}</span>
                                 </div>
                                 <ul>
                                     @foreach ($groupServers as $server)
@@ -467,6 +468,39 @@
                                                             @endif
                                                         @endif
                                                     </p>
+
+                                                    {{-- Live provisioning detail: phase + current step + elapsed + a
+                                                         thin progress bar. Mirrors the journey page's headline so an
+                                                         operator scanning the fleet sees "where is this in the build"
+                                                         without clicking through. Only renders for in-flight VMs. --}}
+                                                    @php $digest = $provisioningDigests[$server->id] ?? null; @endphp
+                                                    @if ($digest)
+                                                        <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
+                                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-800 ring-1 ring-sky-200">
+                                                                <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500"></span>
+                                                                {{ $digest->phaseLabel }}
+                                                            </span>
+                                                            <span class="font-medium text-brand-ink">{{ $digest->stepLabel }}</span>
+                                                            @if ($digest->stepIndex && $digest->stepTotal)
+                                                                <span class="text-brand-mist">·</span>
+                                                                <span class="tabular-nums">{{ __('Step :i of :t', ['i' => $digest->stepIndex, 't' => $digest->stepTotal]) }}</span>
+                                                            @endif
+                                                            @if ($digest->elapsedHuman())
+                                                                <span class="text-brand-mist">·</span>
+                                                                <span class="tabular-nums">{{ __(':elapsed elapsed', ['elapsed' => $digest->elapsedHuman()]) }}</span>
+                                                            @endif
+                                                            <a href="{{ route('servers.journey', $server) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 hover:text-sky-900">
+                                                                {{ __('Open journey') }}
+                                                                <x-heroicon-m-arrow-right class="h-3 w-3" />
+                                                            </a>
+                                                        </div>
+                                                        @if ($digest->stepIndex && $digest->stepTotal)
+                                                            @php $pct = max(0, min(100, (int) round(100 * $digest->stepIndex / $digest->stepTotal))); @endphp
+                                                            <div class="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-brand-ink/5">
+                                                                <div class="h-full rounded-full bg-sky-500 transition-[width] duration-500" style="width: {{ $pct }}%"></div>
+                                                            </div>
+                                                        @endif
+                                                    @endif
                                                 </div>
                                                 <div class="flex items-center gap-2 shrink-0">
                                                     <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold text-brand-cream hover:bg-brand-forest">

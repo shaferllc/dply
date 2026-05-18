@@ -131,11 +131,23 @@
         />
     @endif
 
+    @php
+        $dismissedCount = $dismissedFindings->count() + $ignoredSuggestions->count();
+    @endphp
     <x-server-workspace-tablist ariaLabel="{{ __('Insights sections') }}">
         <x-server-workspace-tab wire:click="setTab('overview')" :active="$tab === 'overview'">
             <span class="inline-flex items-center gap-2">
                 <x-heroicon-o-list-bullet class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                 {{ __('Overview') }}
+            </span>
+        </x-server-workspace-tab>
+        <x-server-workspace-tab wire:click="setTab('dismissed')" :active="$tab === 'dismissed'">
+            <span class="inline-flex items-center gap-2">
+                <x-heroicon-o-eye-slash class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Dismissed') }}
+                @if ($dismissedCount > 0)
+                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $dismissedCount }}</span>
+                @endif
             </span>
         </x-server-workspace-tab>
         <x-server-workspace-tab wire:click="setTab('notifications')" :active="$tab === 'notifications'">
@@ -163,9 +175,40 @@
             </div>
             <ul class="divide-y divide-red-200/70">
                 @foreach ($bannerFindings as $b)
+                    @php
+                        // Mirror the list-row fix-state derivation so banner items
+                        // show the queued / terminal pill from the same source of
+                        // truth (the finding's meta).
+                        $bMeta = is_array($b->meta) ? $b->meta : [];
+                        $bFixStatus = match (true) {
+                            isset($bMeta['fix_applied_at']) && is_string($bMeta['fix_applied_at']) && $bMeta['fix_applied_at'] !== '' => 'succeeded',
+                            isset($bMeta['fix_failed_at']) && is_string($bMeta['fix_failed_at']) && $bMeta['fix_failed_at'] !== '' => 'failed',
+                            isset($bMeta['fix_refused_at']) && is_string($bMeta['fix_refused_at']) && $bMeta['fix_refused_at'] !== '' => 'refused',
+                            isset($bMeta['fix_run_started_at']) && is_string($bMeta['fix_run_started_at']) && $bMeta['fix_run_started_at'] !== '' => 'queued',
+                            default => 'idle',
+                        };
+                    @endphp
                     <li class="flex flex-wrap items-start justify-between gap-4 px-5 py-3">
                         <div class="min-w-0">
-                            <p class="font-medium text-red-950 break-words [overflow-wrap:anywhere]">{{ $b->title }}</p>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-medium text-red-950 break-words [overflow-wrap:anywhere]">{{ $b->title }}</p>
+                                @if ($bFixStatus === 'queued')
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-300">
+                                        <x-heroicon-o-arrow-path class="h-3 w-3 shrink-0 animate-spin" aria-hidden="true" />
+                                        {{ __('Fix queued…') }}
+                                    </span>
+                                @elseif ($bFixStatus === 'failed')
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-900 ring-1 ring-red-300">
+                                        <x-heroicon-o-x-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {{ __('Fix failed') }}
+                                    </span>
+                                @elseif ($bFixStatus === 'refused')
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-300">
+                                        <x-heroicon-o-no-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {{ __('Fix refused') }}
+                                    </span>
+                                @endif
+                            </div>
                             @if ($b->body)
                                 <p class="mt-1 text-sm leading-snug text-red-900/85 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $b->body }}</p>
                             @endif
@@ -227,7 +270,7 @@
                             };
                             $fixInFlight = $fixRunStatus === 'queued';
                             [$fixRunChip, $fixRunLabel, $fixRunIcon] = match ($fixRunStatus) {
-                                'queued' => ['bg-amber-100 text-amber-900 ring-amber-300', __('Fix running…'), 'heroicon-o-arrow-path'],
+                                'queued' => ['bg-amber-100 text-amber-900 ring-amber-300', __('Fix queued…'), 'heroicon-o-arrow-path'],
                                 'succeeded' => ['bg-emerald-100 text-emerald-900 ring-emerald-300', __('Fix succeeded'), 'heroicon-o-check-circle'],
                                 'failed' => ['bg-red-100 text-red-900 ring-red-300', __('Fix failed'), 'heroicon-o-x-circle'],
                                 'refused' => ['bg-amber-100 text-amber-900 ring-amber-300', __('Fix refused'), 'heroicon-o-no-symbol'],
@@ -245,56 +288,68 @@
                         {{-- Stretched-link card pattern: a transparent absolute-positioned button
                              covers the entire row and triggers the detail modal. Action buttons
                              inside the card get `relative z-10` so they remain interactive on top
-                             of the overlay. Hover state on the `group` (the <li>) drives the bg
-                             tint, accent-bar widening, title color, and chevron slide so the whole
-                             card feels clickable. --}}
-                        <li class="group relative overflow-hidden cursor-pointer transition-colors hover:bg-brand-sand/20">
+                             of the overlay. Hover state on the `group` (the <li>) drives bg tint,
+                             accent-bar widening, and the View details pill so the whole row reads
+                             as clickable. --}}
+                        <li class="group relative cursor-pointer transition-colors hover:bg-brand-sand/25">
                             <span class="absolute inset-y-3 left-0 w-1 rounded-full {{ $accent }} transition-all group-hover:w-1.5" aria-hidden="true"></span>
                             <button
                                 type="button"
                                 wire:click="openFindingDetail({{ $f->id }})"
                                 aria-label="{{ __('Open details for :title', ['title' => $f->title]) }}"
-                                class="absolute inset-0 z-0 rounded-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-forest focus-visible:outline-offset-[-2px]"
+                                class="absolute inset-0 z-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-forest focus-visible:outline-offset-[-2px]"
                             ></button>
-                            <div class="relative pl-5 pr-5 py-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 pointer-events-none">
-                                <div class="min-w-0 flex items-start gap-3">
-                                    <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $iconBg }}">
-                                        <x-dynamic-component :component="$sevIconComponent" class="h-4 w-4 {{ $iconText }}" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide {{ $iconText }}">{{ $sevLabel }}</p>
-                                        <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere] transition-colors group-hover:text-brand-forest">{{ $f->title }}</h4>
-                                        @if ($f->body)
-                                            <p class="mt-1.5 text-sm leading-6 text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
-                                        @endif
-                                        @include('livewire.partials.insight-correlation', ['finding' => $f])
-                                        <div class="mt-3 flex flex-wrap gap-2">
-                                            @if ($canFix && $fixInFlight)
-                                                <span class="pointer-events-auto relative z-10 inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-amber-900">
+
+                            <div class="relative pointer-events-none flex items-start gap-4 px-5 py-4 pl-6">
+                                <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $iconBg }}">
+                                    <x-dynamic-component :component="$sevIconComponent" class="h-4 w-4 {{ $iconText }}" aria-hidden="true" />
+                                </span>
+
+                                <div class="min-w-0 flex-1">
+                                    {{-- Top meta line: severity · time · acknowledged?  with the
+                                         View details affordance pinned to the right so it's
+                                         always visible regardless of body length. --}}
+                                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                                        <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold uppercase tracking-wide leading-none">
+                                            <span class="{{ $iconText }}">{{ $sevLabel }}</span>
+                                            <span class="text-brand-mist">·</span>
+                                            <span class="text-brand-mist whitespace-nowrap normal-case font-normal" title="{{ $fmt($f->detected_at) }}">
+                                                {{ $f->detected_at?->diffForHumans() ?? '—' }}
+                                            </span>
+                                            @if ($f->acknowledged_at !== null)
+                                                <span class="text-brand-mist">·</span>
+                                                <span class="text-brand-mist whitespace-nowrap" title="{{ $fmt($f->acknowledged_at) }}">{{ __('Dismissed') }}</span>
+                                            @endif
+                                        </p>
+                                        <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition-all group-hover:bg-brand-forest group-hover:text-brand-cream group-hover:ring-brand-forest">
+                                            {{ __('View details') }}
+                                            <x-heroicon-o-arrow-right class="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                                        </span>
+                                    </div>
+
+                                    <h4 class="mt-1 text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere] transition-colors group-hover:text-brand-forest">{{ $f->title }}</h4>
+
+                                    @if ($f->body)
+                                        <p class="mt-1.5 max-w-3xl text-sm leading-snug text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
+                                    @endif
+
+                                    @include('livewire.partials.insight-correlation', ['finding' => $f])
+
+                                    @if ($canFix)
+                                        <div class="mt-3">
+                                            @if ($fixInFlight)
+                                                <span class="pointer-events-auto relative z-10 inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
                                                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
-                                                    {{ __('Fix running…') }}
+                                                    {{ __('Fix queued…') }}
                                                 </span>
-                                            @elseif ($canFix)
+                                            @else
                                                 <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10 {{ $btnSecondary }}">
                                                     <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
                                                 </button>
                                             @endif
                                         </div>
-                                    </div>
-                                </div>
-                                <div class="flex shrink-0 items-center gap-3">
-                                    <div class="flex flex-col items-end gap-1 text-right">
-                                        <span class="text-xs text-brand-mist whitespace-nowrap" title="{{ $fmt($f->detected_at) }}">
-                                            {{ $f->detected_at?->diffForHumans() ?? '—' }}
-                                        </span>
-                                        @if ($f->acknowledged_at !== null)
-                                            <span class="text-[10px] uppercase tracking-wide text-brand-mist whitespace-nowrap" title="{{ $fmt($f->acknowledged_at) }}">
-                                                {{ __('Dismissed') }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                    <x-heroicon-o-chevron-right class="h-5 w-5 shrink-0 text-brand-mist transition-all group-hover:text-brand-forest group-hover:translate-x-0.5" aria-hidden="true" />
+                                    @endif
                                 </div>
                             </div>
                         </li>
@@ -332,7 +387,7 @@
                                     </span>
                                     <div class="min-w-0">
                                         <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Suggestion') }}</p>
-                                        <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere] transition-colors group-hover:text-brand-forest">{{ $f->title }}</h4>
+                                        <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere] underline decoration-brand-ink/15 decoration-2 underline-offset-4 transition-colors group-hover:text-brand-forest group-hover:decoration-brand-forest/60">{{ $f->title }}</h4>
                                         @if ($f->body)
                                             <p class="mt-1.5 text-sm leading-6 text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
                                         @endif
@@ -351,43 +406,16 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="flex shrink-0 items-center gap-3">
-                                    <div class="flex flex-col items-end gap-1 text-right">
-                                        <span class="text-xs text-brand-mist whitespace-nowrap" title="{{ $fmt($f->detected_at) }}">
-                                            {{ $f->detected_at?->diffForHumans() ?? '—' }}
-                                        </span>
-                                    </div>
-                                    <x-heroicon-o-chevron-right class="h-5 w-5 shrink-0 text-brand-mist transition-all group-hover:text-brand-forest group-hover:translate-x-0.5" aria-hidden="true" />
+                                <div class="flex shrink-0 flex-col items-end gap-2 text-right">
+                                    <span class="text-xs text-brand-mist whitespace-nowrap" title="{{ $fmt($f->detected_at) }}">
+                                        {{ $f->detected_at?->diffForHumans() ?? '—' }}
+                                    </span>
+                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition-all group-hover:bg-brand-forest group-hover:text-brand-cream group-hover:ring-brand-forest">
+                                        {{ __('View details') }}
+                                        <x-heroicon-o-arrow-right class="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                                    </span>
                                 </div>
                             </div>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
-
-        @if ($ignoredSuggestions->isNotEmpty())
-            <div class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Suggestions you dismissed. Restore one to bring it back into Recommendations on the next scheduled run.') }}</p>
-                </div>
-                <ul class="divide-y divide-brand-ink/10">
-                    @foreach ($ignoredSuggestions as $f)
-                        @php
-                            $fmt = fn ($v) => \App\Support\Servers\ServerDateFormatter::format($v, $server);
-                        @endphp
-                        <li class="px-5 py-3 flex flex-wrap items-center justify-between gap-4">
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium text-brand-ink/80">{{ $f->title }}</p>
-                                <p class="mt-0.5 text-xs text-brand-mist">
-                                    {{ __('Ignored') }}:
-                                    {{ $fmt($f->ignored_at) ?? '—' }}
-                                </p>
-                            </div>
-                            <button type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="{{ $btnSecondary }} shrink-0">
-                                {{ __('Restore') }}
-                            </button>
                         </li>
                     @endforeach
                 </ul>
@@ -438,6 +466,101 @@
                         </li>
                     @endforeach
                 </ul>
+            </div>
+        @endif
+    @endif
+
+    @if ($tab === 'dismissed')
+        @if ($dismissedFindings->isNotEmpty())
+            <div class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 px-5 py-4">
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Dismissed findings') }}</h2>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Findings you acknowledged. Silenced from the banner and Overview. Restore one to bring it back to the open list.') }}</p>
+                </div>
+                <ul class="divide-y divide-brand-ink/10">
+                    @foreach ($dismissedFindings as $f)
+                        @php
+                            $fmt = fn ($v) => \App\Support\Servers\ServerDateFormatter::format($v, $server);
+                            [$accent, $iconBg, $iconText, $sevIconComponent, $sevLabel] = match ($f->severity) {
+                                'critical' => ['bg-red-500', 'bg-red-50', 'text-red-700', 'heroicon-s-exclamation-triangle', __('Critical')],
+                                'warning' => ['bg-amber-500', 'bg-amber-50', 'text-amber-700', 'heroicon-s-exclamation-circle', __('Warning')],
+                                'info' => ['bg-sky-400', 'bg-sky-50', 'text-sky-700', 'heroicon-s-information-circle', __('Info')],
+                                default => ['bg-brand-mist', 'bg-brand-sand/60', 'text-brand-moss', 'heroicon-s-bell', __('Notice')],
+                            };
+                        @endphp
+                        <li class="group relative cursor-pointer transition-colors hover:bg-brand-sand/25">
+                            <span class="absolute inset-y-3 left-0 w-1 rounded-full {{ $accent }} opacity-40" aria-hidden="true"></span>
+                            <button
+                                type="button"
+                                wire:click="openFindingDetail({{ $f->id }})"
+                                aria-label="{{ __('Open details for :title', ['title' => $f->title]) }}"
+                                class="absolute inset-0 z-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-forest focus-visible:outline-offset-[-2px]"
+                            ></button>
+                            <div class="relative pointer-events-none flex items-start gap-4 px-5 py-4 pl-6">
+                                <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $iconBg }} opacity-70">
+                                    <x-dynamic-component :component="$sevIconComponent" class="h-4 w-4 {{ $iconText }}" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                                        <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold uppercase tracking-wide leading-none">
+                                            <span class="{{ $iconText }} opacity-80">{{ $sevLabel }}</span>
+                                            <span class="text-brand-mist">·</span>
+                                            <span class="text-brand-mist normal-case font-normal whitespace-nowrap" title="{{ $fmt($f->acknowledged_at) }}">
+                                                {{ __('Dismissed :time', ['time' => $f->acknowledged_at?->diffForHumans() ?? '—']) }}
+                                            </span>
+                                        </p>
+                                        <button type="button" wire:click="unacknowledgeFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unacknowledgeFinding({{ $f->id }})" class="pointer-events-auto relative z-10 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition hover:bg-brand-forest hover:text-brand-cream hover:ring-brand-forest disabled:cursor-not-allowed disabled:opacity-50">
+                                            <x-heroicon-o-arrow-uturn-left class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                            {{ __('Restore') }}
+                                        </button>
+                                    </div>
+                                    <h4 class="mt-1 text-base font-semibold leading-snug text-brand-ink/80 break-words [overflow-wrap:anywhere]">{{ $f->title }}</h4>
+                                    @if ($f->body)
+                                        <p class="mt-1 max-w-3xl text-sm leading-snug text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
+                                    @endif
+                                </div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if ($ignoredSuggestions->isNotEmpty())
+            <div class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 px-5 py-4">
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Suggestions you dismissed. Restore one to bring it back into Recommendations on the next scheduled run.') }}</p>
+                </div>
+                <ul class="divide-y divide-brand-ink/10">
+                    @foreach ($ignoredSuggestions as $f)
+                        @php
+                            $fmt = fn ($v) => \App\Support\Servers\ServerDateFormatter::format($v, $server);
+                        @endphp
+                        <li class="px-5 py-3 flex flex-wrap items-center justify-between gap-4">
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-brand-ink/80">{{ $f->title }}</p>
+                                <p class="mt-0.5 text-xs text-brand-mist">
+                                    {{ __('Ignored') }}:
+                                    {{ $fmt($f->ignored_at) ?? '—' }}
+                                </p>
+                            </div>
+                            <button type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="{{ $btnSecondary }} shrink-0">
+                                {{ __('Restore') }}
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if ($dismissedFindings->isEmpty() && $ignoredSuggestions->isEmpty())
+            <div class="dply-card overflow-hidden">
+                <div class="px-5 py-12 text-center">
+                    <x-heroicon-o-eye-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
+                    <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('Nothing dismissed.') }}</p>
+                    <p class="mt-2 text-sm text-brand-moss">{{ __('Anything you dismiss from Overview or ignore from Recommendations will show up here.') }}</p>
+                </div>
             </div>
         @endif
     @endif

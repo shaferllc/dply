@@ -94,6 +94,14 @@ class ServerCreateForm extends Form
     public string $do_kubernetes_namespace = 'default';
 
     /**
+     * AWS region for EKS register-existing — clusters are region-scoped and
+     * a single credential can reach any region the user has IAM access to.
+     * Defaults to the credential's stored region (set by StepWhat::mount) but
+     * the picker lets the user override per-cluster.
+     */
+    public string $do_kubernetes_aws_region = '';
+
+    /**
      * 'existing' (register a cluster already in the DO/AWS account) or 'new'
      * (have dply call the provider API to provision a brand-new cluster as part
      * of submit). When 'new', the do_kubernetes_new_* fields below describe the

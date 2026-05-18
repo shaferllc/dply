@@ -528,8 +528,10 @@ trait ServerCreateActions
         $hasAnyProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
-        $hasLinkedCredential = $org
-            ? GetProviderCredentialsForServerType::run($org, $this->form->type)->isNotEmpty()
+        // resolveServerCreateCatalog already ran GetProviderCredentialsForServerType
+        // for this (org, type) — reuse its result instead of repeating the query.
+        $hasLinkedCredential = $catalog['credentials'] instanceof Collection
+            ? $catalog['credentials']->isNotEmpty()
             : false;
         $provisionOptions = FilterServerProvisionOptionsForCreateForm::run(
             $this->form->type,

@@ -61,13 +61,35 @@ final class KubernetesDeployEngine implements DeployEngine
         $deploymentName = $this->manifestBuilder->deploymentName($site);
         $kubeconfigPath = $this->resolveKubeconfigPath($serverMeta, $kubernetesRuntime);
         $contextName = $this->resolveContext($serverMeta, $kubernetesRuntime);
-        $result = $this->kubectlExecutor->deploy(
-            $manifest,
-            $namespace,
-            $deploymentName,
-            $kubeconfigPath,
-            $contextName,
-        );
+
+        // Servers registered/created through dply store the kubeconfig YAML
+        // contents in meta.kubernetes.kubeconfig (the poller writes it). The
+        // kubectl CLI needs a file path, so materialise to a 0600 temp file
+        // scoped to this deploy and delete it after. Falls through to the
+        // resolved path above when meta has no inline kubeconfig (legacy
+        // servers where the operator set kubernetes.kubeconfig_path manually).
+        $materialisedTempPath = null;
+        if ($kubeconfigPath === null) {
+            $inlineYaml = (string) ($serverMeta['kubernetes']['kubeconfig'] ?? '');
+            if (trim($inlineYaml) !== '') {
+                $materialisedTempPath = $this->materialiseKubeconfig($inlineYaml);
+                $kubeconfigPath = $materialisedTempPath;
+            }
+        }
+
+        try {
+            $result = $this->kubectlExecutor->deploy(
+                $manifest,
+                $namespace,
+                $deploymentName,
+                $kubeconfigPath,
+                $contextName,
+            );
+        } finally {
+            if ($materialisedTempPath !== null && is_file($materialisedTempPath)) {
+                @unlink($materialisedTempPath);
+            }
+        }
 
         $siteMeta['kubernetes_runtime'] = array_merge($kubernetesRuntime, [
             'namespace' => $namespace,
@@ -120,5 +142,29 @@ final class KubernetesDeployEngine implements DeployEngine
         $context = trim((string) ($runtime['context'] ?? data_get($serverMeta, 'kubernetes.context', config('kubernetes.context'))));
 
         return $context !== '' ? $context : null;
+    }
+
+    /**
+     * Write the supplied kubeconfig YAML to a 0600 temp file and return its
+     * absolute path. Caller is responsible for unlinking after kubectl runs.
+     * The file lives in sys_get_temp_dir() with a randomised name so two
+     * concurrent deploys can't collide on it.
+     */
+    private function materialiseKubeconfig(string $yaml): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'dply-kubeconfig-');
+        if ($path === false) {
+            throw new \RuntimeException('Could not create a temp file for the kubeconfig.');
+        }
+        // tempnam creates the file with 0600 on POSIX which is what we want —
+        // bearer creds inside. Belt-and-suspenders chmod in case of umask
+        // weirdness on the host.
+        @chmod($path, 0600);
+        if (file_put_contents($path, $yaml) === false) {
+            @unlink($path);
+            throw new \RuntimeException('Could not write the kubeconfig to the temp file.');
+        }
+
+        return $path;
     }
 }

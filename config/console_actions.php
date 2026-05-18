@@ -95,6 +95,16 @@ return [
             'failed' => 'Edge proxy action failed.',
             'stale' => 'Edge proxy action did not finish.',
         ],
+        // Inventory probe streamed into the Manage banner. The probe runs
+        // synchronously from RunsServerInventoryProbe; the seeded row gives
+        // every Manage caller (Tools, Overview, Services) the same console
+        // surface they get for install / restart actions.
+        'inventory_probe' => [
+            'running' => 'Probing :host inventory …',
+            'completed' => 'Inventory refreshed.',
+            'failed' => 'Inventory probe failed.',
+            'stale' => 'Inventory probe did not finish.',
+        ],
     ],
 
     /*

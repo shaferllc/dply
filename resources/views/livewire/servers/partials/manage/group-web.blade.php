@@ -80,11 +80,9 @@
 <section class="space-y-6" aria-labelledby="manage-web-title">
     <h2 id="manage-web-title" class="sr-only">{{ __('Web stack') }}</h2>
 
-    {{-- Active webserver card. Mirrors the MySQL/Redis card pattern in
-         group-data.blade.php: title + version on the left, state pill on the
+    {{-- Active webserver card. Title + version on the left, state pill on the
          right, action buttons below. The switching surface lives in its own
-         card below — same shape as "Database connection hints" follows MySQL
-         on the Data tab. --}}
+         card below. --}}
     @php
         $activeInfo = $webserverCatalog[$activeWebserver] ?? null;
         $activeUnit = $activeInfo !== null ? $unitFor($activeInfo['systemd']) : null;

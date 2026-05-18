@@ -156,6 +156,76 @@ class MiseInstallScriptBuilder
     }
 
     /**
+     * Bash lines that install a runtime version for the deploy user **without**
+     * touching the global default. The Tools → mise card calls this when the
+     * operator clicks "Install version" — they want the version available, but
+     * not necessarily the new default.
+     *
+     * @return list<string>
+     */
+    public function installRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
+    {
+        if (! in_array($runtime, self::SUPPORTED_RUNTIMES, true)) {
+            return [];
+        }
+        $version = trim($version);
+        if ($version === '') {
+            return [];
+        }
+
+        $userArg = escapeshellarg($deployUser);
+        $miseTool = $this->miseToolKey($runtime);
+        $env = $this->preferBinaryEnv();
+        $cmd = escapeshellarg($env."mise install {$miseTool}@{$version}");
+
+        return [
+            "echo \"[dply] installing {$miseTool}@{$version} for {$deployUser} (no change to global default)\"",
+            "sudo -u {$userArg} -H bash -lc {$cmd}",
+        ];
+    }
+
+    /**
+     * Bash lines that uninstall a specific runtime version for the deploy user.
+     * Refuses to uninstall the version that's currently pinned as global default —
+     * that has to go through the Tools card's "Set as default" flow first.
+     *
+     * @return list<string>
+     */
+    public function uninstallRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
+    {
+        if (! in_array($runtime, self::SUPPORTED_RUNTIMES, true)) {
+            return [];
+        }
+        $version = trim($version);
+        if ($version === '') {
+            return [];
+        }
+
+        $userArg = escapeshellarg($deployUser);
+        $miseTool = $this->miseToolKey($runtime);
+        $cmd = escapeshellarg("mise uninstall {$miseTool}@{$version}");
+
+        return [
+            "echo \"[dply] uninstalling {$miseTool}@{$version} for {$deployUser}\"",
+            "sudo -u {$userArg} -H bash -lc {$cmd}",
+        ];
+    }
+
+    /**
+     * Bash lines that set a runtime version as the deploy user's global default.
+     * If the version isn't installed, mise will install it as a side effect —
+     * making this the right surface for "switch default to vX.Y.Z" with a single
+     * click. Same shape as installRuntimeForUserLines() (which is the provision-
+     * time entry point), kept separate so the call site is self-documenting.
+     *
+     * @return list<string>
+     */
+    public function setRuntimeDefaultForUserLines(string $deployUser, string $runtime, string $version): array
+    {
+        return $this->installRuntimeForUserLines($deployUser, $runtime, $version);
+    }
+
+    /**
      * Map our canonical runtime keys onto mise's plugin names. The
      * mapping is mostly identity but Go's plugin is `go` while detection
      * already uses `go` too — kept here so future divergence is one-line.
@@ -169,5 +239,23 @@ class MiseInstallScriptBuilder
             'go' => 'go',
             default => $runtime,
         };
+    }
+
+    /**
+     * Force mise to fetch prebuilt release binaries instead of compiling from
+     * source. Extracted so installRuntimeForUserLines and its install-only
+     * sibling agree without duplication.
+     */
+    private function preferBinaryEnv(): string
+    {
+        try {
+            $preferBinary = (bool) config('server_provision.mise_prefer_binary', true);
+        } catch (\Throwable) {
+            $preferBinary = true;
+        }
+
+        return $preferBinary
+            ? 'MISE_NODE_COMPILE=0 MISE_PYTHON_COMPILE=0 MISE_RUBY_COMPILE=0 PYTHON_BUILD_USE_PREBUILT=1 '
+            : '';
     }
 }

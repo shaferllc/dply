@@ -14,26 +14,23 @@
     ]" />
 @endif
 
-<div class="space-y-8">
-    <div class="dply-card overflow-hidden">
-        <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
-            <div class="lg:col-span-4">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Providers') }}</h2>
-                <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                    {{ __('Store encrypted API keys for the cloud providers your organization uses. Tokens are validated when possible. Use the list on the left to configure one provider at a time.') }}
-                </p>
-            </div>
-            <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
-                <x-outline-link href="{{ route('docs.connect-provider') }}" wire:navigate>
-                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Provider setup guide') }}
-                </x-outline-link>
-            </div>
-        </div>
+<x-page-header
+    :title="__('Providers')"
+    :description="__('Store encrypted API keys for the cloud providers your organization uses. Tokens are validated when possible.')"
+    toolbar
+>
+    <x-slot name="actions">
+        <x-outline-link href="{{ route('docs.connect-provider') }}" wire:navigate>
+            <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Provider setup guide') }}
+        </x-outline-link>
+    </x-slot>
+</x-page-header>
 
-        {{-- Capability tabs — filter the provider sidebar by what each credential is for.
-             Dual-capability providers (DigitalOcean, AWS) appear in both Server and DNS. --}}
-        <nav class="flex flex-wrap gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-6 py-3 sm:px-8" aria-label="{{ __('Capability tabs') }}">
+<div class="space-y-6">
+    {{-- Mobile: capability filter + jump to provider --}}
+    <div class="lg:hidden space-y-3">
+        <nav class="flex flex-wrap gap-2" aria-label="{{ __('Capability tabs') }}">
             @foreach ([
                 ['id' => 'all', 'label' => __('All')],
                 ['id' => 'server', 'label' => __('Server')],
@@ -52,27 +49,47 @@
                 </button>
             @endforeach
         </nav>
+        <div>
+            <x-input-label for="credentials_provider_picker" :value="__('Provider')" />
+            <x-select id="credentials_provider_picker" wire:model.live="active_provider">
+                @foreach ($providerNav as $group)
+                    <optgroup label="{{ $group['label'] }}">
+                        @foreach ($group['items'] as $item)
+                            <option value="{{ $item['id'] }}">{{ $item['label'] }}@if (! empty($item['comingSoon'])) — {{ __('coming soon') }}@endif</option>
+                        @endforeach
+                    </optgroup>
+                @endforeach
+            </x-select>
+        </div>
     </div>
 
-    {{-- Mobile: jump to provider --}}
-    <div class="lg:hidden">
-        <x-input-label for="credentials_provider_picker" :value="__('Provider')" />
-        <x-select id="credentials_provider_picker" wire:model.live="active_provider">
-            @foreach ($providerNav as $group)
-                <optgroup label="{{ $group['label'] }}">
-                    @foreach ($group['items'] as $item)
-                        <option value="{{ $item['id'] }}">{{ $item['label'] }}@if (! empty($item['comingSoon'])) — {{ __('coming soon') }}@endif</option>
-                    @endforeach
-                </optgroup>
-            @endforeach
-        </x-select>
-    </div>
-
-    <div class="lg:grid lg:grid-cols-12 lg:gap-10 items-start">
-        <aside class="hidden lg:block lg:col-span-4 xl:col-span-3">
+    <div class="lg:grid lg:grid-cols-12 lg:gap-6 items-start">
+        <aside class="hidden lg:block lg:col-span-4">
             <div class="sticky top-24 dply-card overflow-hidden max-h-[calc(100vh-8rem)] flex flex-col">
-                <div class="px-3 py-2.5 border-b border-brand-ink/10 bg-brand-sand/30">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Providers') }}</p>
+                {{-- Capability filter lives in the sidebar header because it filters this list.
+                     Dual-capability providers (DigitalOcean, AWS) appear in both Server and DNS. --}}
+                <div class="border-b border-brand-ink/10 bg-brand-sand/30 px-3 py-2.5">
+                    <div role="tablist" aria-label="{{ __('Capability filter') }}" class="inline-flex w-full gap-1 rounded-lg bg-white/70 p-1 ring-1 ring-brand-ink/10">
+                        @foreach ([
+                            ['id' => 'all', 'label' => __('All')],
+                            ['id' => 'server', 'label' => __('Server')],
+                            ['id' => 'dns', 'label' => __('DNS')],
+                        ] as $tabItem)
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected="{{ $tab === $tabItem['id'] ? 'true' : 'false' }}"
+                                wire:click="$set('tab', '{{ $tabItem['id'] }}')"
+                                @class([
+                                    'flex-1 rounded-md px-2 py-1 text-xs font-semibold transition',
+                                    'bg-brand-ink text-brand-cream shadow-sm' => $tab === $tabItem['id'],
+                                    'text-brand-moss hover:bg-brand-sand/60 hover:text-brand-ink' => $tab !== $tabItem['id'],
+                                ])
+                            >
+                                {{ $tabItem['label'] }}
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
                 <nav class="overflow-y-auto px-2 py-2 space-y-1 text-sm" aria-label="{{ __('Cloud providers') }}">
                     @foreach ($providerNav as $group)
@@ -88,6 +105,7 @@
                                         <button
                                             type="button"
                                             wire:click="$set('active_provider', '{{ $item['id'] }}')"
+                                            title="{{ $item['label'] }}"
                                             @class([
                                                 'w-full text-left rounded-lg px-3 py-1.5 transition-colors flex items-center justify-between gap-2',
                                                 'bg-brand-sand/60 text-brand-ink font-medium' => $active_provider === $item['id'],
@@ -114,7 +132,7 @@
             </div>
         </aside>
 
-        <div class="lg:col-span-8 xl:col-span-9 min-w-0 space-y-6">
+        <div class="lg:col-span-8 min-w-0 space-y-6">
             <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-brand-ink">
                 <x-credentials-provider-icon :provider="$active_provider" class="h-5 w-5 opacity-95" />
                 {{ $activeProviderLabel }}

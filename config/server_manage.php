@@ -994,6 +994,88 @@ else
 fi
 BASH,
         ],
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Operator-installable server toolchain — surfaced on Manage → Tools.
+        // Each script is idempotent: a no-op when the tool is already present
+        // at the expected version (early-exit echo), otherwise installs from
+        // the upstream official source. The probe (`TOOLS_BEGIN` in
+        // ServerInventoryProbeScript) populates the version pill on the Tools
+        // tab; `rerun_probe_after_finish` refreshes that pill once the
+        // queued install lands.
+        // ─────────────────────────────────────────────────────────────────────
+        // mise is installed during provisioning via the official apt repo
+        // (see MiseInstallScriptBuilder::installLines). This action repairs /
+        // force-refreshes the apt install — useful when the binary went missing,
+        // the repo entry was clobbered, or the operator wants the latest from
+        // the upstream apt repo without waiting on the next `apt upgrade` cycle.
+        // It assumes the dply-managed apt source is still present (the standard
+        // post-provision state); if not, the action fails loudly in the banner
+        // and re-provisioning is the right next step.
+        'install_mise' => [
+            'label' => 'Reinstall mise',
+            'description' => 'mise (https://mise.jdx.dev). Force-reinstalls the apt package the provisioner laid down — useful for repair / version refresh.',
+            'confirm' => 'Reinstall mise from the apt repo? The current binary is replaced in place; runtime shims and per-user activation hooks are untouched.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+if command -v mise >/dev/null 2>&1; then
+  echo "Current: $(mise --version 2>&1 | head -n 1)"
+fi
+if [ ! -f /etc/apt/sources.list.d/mise.list ]; then
+  echo "/etc/apt/sources.list.d/mise.list is missing — the dply mise apt source was not laid down at provisioning. Re-provision the server to restore it." >&2
+  exit 1
+fi
+(sudo -n apt-get update -y || apt-get update -y) >/dev/null
+(sudo -n apt-get install -y --reinstall --no-install-recommends mise || apt-get install -y --reinstall --no-install-recommends mise)
+echo "Installed: $(mise --version 2>&1 | head -n 1)"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'install_docker' => [
+            'label' => 'Install Docker service',
+            'description' => 'Docker Engine via the upstream get.docker.com convenience script.',
+            'confirm' => 'Install Docker Engine on this server? The official get.docker.com convenience script will run with sudo; it adds the Docker apt repo and installs docker-ce, docker-ce-cli, and containerd.',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+if command -v docker >/dev/null 2>&1; then
+  echo "Docker already installed: $(docker --version 2>&1 | head -n 1)"
+  echo "Skipping reinstall — uninstall first if you need a clean rebuild."
+  exit 0
+fi
+# Official Docker convenience installer — pinned upstream:
+# https://docs.docker.com/engine/install/ubuntu/#install-using-the-convenience-script
+curl --silent --show-error --fail --location --output /tmp/get-docker.sh https://get.docker.com
+sudo -n sh /tmp/get-docker.sh
+rm -f /tmp/get-docker.sh
+sudo -n systemctl enable --now docker 2>/dev/null || true
+docker --version 2>&1 | head -n 1
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'install_wp_cli' => [
+            'label' => 'Install WordPress CLI',
+            'description' => 'wp-cli (https://wp-cli.org) — command-line interface for managing WordPress sites.',
+            'confirm' => 'Install or reinstall wp-cli at /usr/local/bin/wp? Pulls the latest phar from wp-cli.org.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+set -e
+if command -v wp >/dev/null 2>&1; then
+  echo "wp-cli already installed: $(wp --version 2>&1 | head -n 1)"
+  echo "Reinstalling to pick up the latest release …"
+fi
+# Mirrors ScaffoldPrerequisites::ensureWpCli — the scaffold pipeline calls
+# the same install path automatically when scaffolding a WordPress site.
+curl --silent --show-error --location --output /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+chmod +x /tmp/wp-cli.phar
+sudo -n mv /tmp/wp-cli.phar /usr/local/bin/wp
+wp --info --allow-root 2>&1 | head -n 10
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
     ],
 
     'dangerous_actions' => [
@@ -1026,8 +1108,12 @@ BASH
         // the Services page and the Firewall page respectively.
         // 'web' sub-tab retired: promoted to /servers/{id}/webserver as a peer of
         // PHP / Caches / Cron — mount() redirects /manage/web for back-compat.
-        'data' => ['label' => 'Data', 'icon' => 'circle-stack'],
+        // 'data' sub-tab retired: the live Redis INFO snapshot + Show Redis INFO
+        // action moved to the Caches workspace (redis Stats subtab); the MySQL
+        // processlist action + DB connection-hints form moved to the Databases
+        // workspace (MySQL Info subtab). mount() redirects /manage/data for back-compat.
         'updates' => ['label' => 'Updates', 'icon' => 'arrow-path'],
+        'tools' => ['label' => 'Tools', 'icon' => 'wrench-screwdriver'],
         'configuration' => ['label' => 'Configuration', 'icon' => 'document-text'],
         'danger' => ['label' => 'Danger', 'icon' => 'exclamation-triangle'],
     ],

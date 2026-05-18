@@ -13,6 +13,14 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @if ($manageRemoteTaskId)
+        {{-- Polls the cache row written by ServerManageRemoteSshJob so the success
+             toast for Show Redis INFO fires when the queued task finishes. The
+             ConsoleAction banner partial inside the Stats subtab handles the
+             output stream independently via its own wire:poll. --}}
+        <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
+    @endif
+
     {{-- Reverb subscribe context for the live MONITOR tail. JS in bootstrap.js
          picks up the data-attrs and (un)subscribes accordingly. The 1s wire:poll
          fallback inside the monitor card keeps things working when Reverb is off
@@ -1164,6 +1172,110 @@
                             @endif
                         </div>
                         @endif {{-- /configure subtab (auth + memory) --}}
+
+                        {{-- Redis system snapshot — live INFO stats + raw INFO action.
+                             Reads $server->meta['manage_redis']['info_raw'], populated by the
+                             server inventory probe (RunsServerInventoryProbe in Manage). Card
+                             stays gated on $engine === 'redis' because the probe targets the
+                             system Redis package, not Valkey/KeyDB/Dragonfly. Migrated here
+                             from /servers/{id}/manage/data when that tab was retired. --}}
+                        @if ($activeSubtab === 'stats' && $engine === 'redis')
+                            @php
+                                $manageRedis = is_array($server->meta['manage_redis'] ?? null) ? $server->meta['manage_redis'] : [];
+                                $manageRedisInfo = [];
+                                if (! empty($manageRedis['info_raw']) && is_string($manageRedis['info_raw'])) {
+                                    foreach (explode("\n", $manageRedis['info_raw']) as $rline) {
+                                        $rline = trim($rline);
+                                        if ($rline === '' || str_starts_with($rline, '#')) {
+                                            continue;
+                                        }
+                                        if (str_contains($rline, ':')) {
+                                            [$rk, $rv] = explode(':', $rline, 2);
+                                            $manageRedisInfo[trim($rk)] = trim($rv);
+                                        }
+                                    }
+                                }
+                                $manageRedisHitRate = null;
+                                if (isset($manageRedisInfo['keyspace_hits'], $manageRedisInfo['keyspace_misses'])) {
+                                    $hits = (int) $manageRedisInfo['keyspace_hits'];
+                                    $misses = (int) $manageRedisInfo['keyspace_misses'];
+                                    if ($hits + $misses > 0) {
+                                        $manageRedisHitRate = round($hits / ($hits + $misses) * 100, 1);
+                                    }
+                                }
+                                $manageRedisFormatBytes = function ($bytes): string {
+                                    if (! is_numeric($bytes) || $bytes <= 0) {
+                                        return '—';
+                                    }
+                                    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                                    $i = 0;
+                                    $val = (float) $bytes;
+                                    while ($val >= 1024 && $i < count($units) - 1) {
+                                        $val /= 1024;
+                                        $i++;
+                                    }
+
+                                    return rtrim(rtrim(number_format($val, $val < 10 ? 1 : 0), '0'), '.').' '.$units[$i];
+                                };
+                            @endphp
+                            <div class="{{ $card }} p-6 sm:p-8">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="max-w-2xl">
+                                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('System INFO snapshot') }}</h3>
+                                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Last `redis-cli INFO` output captured by the host inventory probe. Refresh the probe from Manage → Overview to update.') }}</p>
+                                    </div>
+                                    @if (! empty($serviceActions['redis_info']) && ! $rowInFlight)
+                                        @php $redisInfoAction = $serviceActions['redis_info']; @endphp
+                                        <button
+                                            type="button"
+                                            wire:click="openConfirmActionModal('runAllowlistedManageAction', ['redis_info'], @js($redisInfoAction['label']), @js($redisInfoAction['confirm']), @js($redisInfoAction['label']), false)"
+                                            class="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                                        >
+                                            <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
+                                            {{ $redisInfoAction['label'] }}
+                                        </button>
+                                    @endif
+                                </div>
+
+                                @if ($manageActionRun)
+                                    <div class="mt-4">
+                                        @include('livewire.partials.console-action-banner-static', [
+                                            'run' => $manageActionRun,
+                                            'kindLabels' => (array) config('console_actions.kinds', []),
+                                        ])
+                                    </div>
+                                @endif
+
+                                @if (! empty($manageRedisInfo))
+                                    <dl class="mt-5 grid gap-4 sm:grid-cols-4">
+                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                                            <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Connected clients') }}</dt>
+                                            <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ $manageRedisInfo['connected_clients'] ?? '—' }}</dd>
+                                        </div>
+                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                                            <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Used memory') }}</dt>
+                                            <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ $manageRedisInfo['used_memory_human'] ?? $manageRedisFormatBytes($manageRedisInfo['used_memory'] ?? 0) }}</dd>
+                                        </div>
+                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                                            <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Hit rate') }}</dt>
+                                            <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ $manageRedisHitRate !== null ? $manageRedisHitRate.'%' : '—' }}</dd>
+                                        </div>
+                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                                            <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Last RDB save') }}</dt>
+                                            <dd class="mt-1 text-xs font-medium text-brand-ink">
+                                                @if (isset($manageRedisInfo['rdb_last_save_time']))
+                                                    {{ \Illuminate\Support\Carbon::createFromTimestamp((int) $manageRedisInfo['rdb_last_save_time'])->diffForHumans() }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                @else
+                                    <p class="mt-4 text-sm text-brand-moss">{{ __('No INFO snapshot yet. Visit Manage → Overview and Refresh state, or run Show Redis INFO above.') }}</p>
+                                @endif
+                            </div>
+                        @endif
 
                         {{-- Connected clients (redis-family only, Stats subtab). --}}
                         @if ($activeSubtab === 'stats')

@@ -15,6 +15,20 @@
         'autoUpdateIntervals' => $autoUpdateIntervals,
         'recentActions' => $recentActions ?? collect(),
     ];
+
+    // Workspace-scoped console-actions banner. Surfaces the in-flight + most-recent
+    // run for any kind Manage dispatches — manage_action (Quick actions / service
+    // controls / config previews / Tools installs / mise runtime ops),
+    // webserver_switch (Web tab cascade), edge_proxy (add/remove traefik|haproxy),
+    // and inventory_probe (Refresh probe). The banner partial self-polls while
+    // in-flight and replaces the legacy "Command output" panel.
+    $manageConsoleRun = \App\Models\ConsoleAction::query()
+        ->where('subject_type', $server->getMorphClass())
+        ->where('subject_id', $server->id)
+        ->whereIn('kind', ['manage_action', 'webserver_switch', 'edge_proxy', 'inventory_probe'])
+        ->whereNull('dismissed_at')
+        ->orderByDesc('created_at')
+        ->first();
 @endphp
 
 <x-server-workspace-layout
@@ -26,7 +40,7 @@
     @if ($manageRemoteTaskId)
         <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
     @endif
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
+    @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <x-explainer class="mb-4" tone="warn">
@@ -35,6 +49,11 @@
     </x-explainer>
 
     <div class="space-y-6">
+        @include('livewire.partials.console-action-banner-static', [
+            'run' => $manageConsoleRun,
+            'kindLabels' => (array) config('console_actions.kinds', []),
+        ])
+
         <x-server-tab-strip
             :tabs="config('server_manage.workspace_tabs', [])"
             :active="$section"
@@ -64,35 +83,16 @@
                  stale ?section=services URLs to the standalone Services
                  page so deep links don't 404. --}}
             @case ('web')
-                @php
-                    // Surface in-flight webserver_switch runs at the top of the
-                    // web tab. The static banner partial self-polls every 4s
-                    // while the run is in_flight, so a queued/running row turns
-                    // into completed/failed without a page refresh.
-                    // The banner surfaces BOTH webserver_switch and edge_proxy
-                    // kinds — they're mutually exclusive in practice (the UI
-                    // gates dispatch on both), and treating them as one banner
-                    // keeps the UX coherent. Picks the most recent non-dismissed
-                    // row across both kinds.
-                    $webserverSwitchRun = \App\Models\ConsoleAction::query()
-                        ->where('subject_type', $server->getMorphClass())
-                        ->where('subject_id', $server->id)
-                        ->whereIn('kind', ['webserver_switch', 'edge_proxy'])
-                        ->whereNull('dismissed_at')
-                        ->orderByDesc('created_at')
-                        ->first();
-                @endphp
-                @include('livewire.partials.console-action-banner-static', [
-                    'run' => $webserverSwitchRun,
-                    'kindLabels' => (array) config('console_actions.kinds', []),
-                ])
+                {{-- Banner for webserver_switch + edge_proxy is hoisted to the top
+                     of the Manage workspace so it surfaces from every tab, not
+                     just /manage/web. See $manageConsoleRun above. --}}
                 @include('livewire.servers.partials.manage.group-web', $manageShare)
-                @break
-            @case ('data')
-                @include('livewire.servers.partials.manage.group-data', $manageShare)
                 @break
             @case ('updates')
                 @include('livewire.servers.partials.manage.group-updates', $manageShare)
+                @break
+            @case ('tools')
+                @include('livewire.servers.partials.manage.group-tools', $manageShare)
                 @break
             @case ('configuration')
                 @include('livewire.servers.partials.manage.group-configuration', $manageShare)

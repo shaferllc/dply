@@ -122,6 +122,41 @@ final class CreateContainerModeTest extends TestCase
         });
     }
 
+    public function test_store_container_redirects_kubernetes_servers_to_cluster_page(): void
+    {
+        // K8s servers' main destination is /cluster (not /overview). The success
+        // redirect after a container launch needs to land them there or the
+        // launch-progress banner is invisible.
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+        $server = $this->kubernetesServer($user);
+        $this->stubInspector(targetKind: 'kubernetes');
+
+        Livewire::actingAs($user)
+            ->test(SiteCreate::class, ['server' => $server])
+            ->set('container_repo_source', 'manual')
+            ->set('container_repository_url', 'https://github.com/org/widget.git')
+            ->call('storeContainer')
+            ->assertRedirect(route('servers.cluster', $server));
+    }
+
+    public function test_store_container_redirects_docker_servers_to_overview(): void
+    {
+        Bus::fake();
+
+        $user = $this->userWithOrganization();
+        $server = $this->dockerServer($user);
+        $this->stubInspector();
+
+        Livewire::actingAs($user)
+            ->test(SiteCreate::class, ['server' => $server])
+            ->set('container_repo_source', 'manual')
+            ->set('container_repository_url', 'https://github.com/org/widget.git')
+            ->call('storeContainer')
+            ->assertRedirect(route('servers.overview', $server));
+    }
+
     public function test_store_container_validates_kubernetes_namespace_format(): void
     {
         Bus::fake();
