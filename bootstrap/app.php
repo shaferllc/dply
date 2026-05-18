@@ -23,6 +23,7 @@ use App\Jobs\CheckSiteUrlHealthJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSiteInsightsJob;
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
+use App\Jobs\ScanServerSshLoginsJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Jobs\UpgradeGuestMetricsScriptJob;
 use App\Models\Server;
@@ -74,6 +75,16 @@ return Application::configure(basePath: dirname(__DIR__))
             SiteUptimeMonitor::query()
                 ->pluck('id')
                 ->each(fn (string $id) => RunSiteUptimeMonitorCheckJob::dispatch($id));
+        })->everyFiveMinutes();
+
+        // SSH login notifications. Dispatches a per-server scan job only for
+        // servers that actually have a `server.ssh_login` subscriber — there's
+        // no point paying the SSH cost when nothing is listening. The job
+        // diffs `last -F` against meta.ssh_login_last_seen_at and publishes
+        // a NotificationEvent per new entry.
+        $schedule->call(function (): void {
+            ScanServerSshLoginsJob::eligibleServers()
+                ->each(fn (Server $server) => ScanServerSshLoginsJob::dispatch((string) $server->id));
         })->everyFiveMinutes();
 
         $schedule->command(FlushDeployDigestCommand::class)

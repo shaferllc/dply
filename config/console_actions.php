@@ -105,6 +105,15 @@ return [
             'failed' => 'Inventory probe failed.',
             'stale' => 'Inventory probe did not finish.',
         ],
+        // Server clone — DigitalOcean droplet snapshot → new droplet. Long
+        // running (3–10 min); the banner mounts on the cloned server's
+        // workspace immediately so the operator can watch progress.
+        'clone_server' => [
+            'running' => 'Cloning to :host …',
+            'completed' => 'Clone ready.',
+            'failed' => 'Clone failed.',
+            'stale' => 'Clone did not finish.',
+        ],
     ],
 
     /*

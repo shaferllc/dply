@@ -6,8 +6,12 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\AuditLog;
+use App\Models\OrganizationInvitation;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployment;
+use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,6 +29,9 @@ class WorkspaceActivity extends Component
     use WithPagination;
 
     public string $tab = 'feed';
+
+    /** Cached site IDs for the server to avoid duplicate queries */
+    private ?array $cachedSiteIds = null;
 
     /**
      * Filter by derived action category. See {@see categorize()} for the
@@ -179,12 +186,24 @@ class WorkspaceActivity extends Component
     }
 
     /**
+     * Get cached site IDs for this server to avoid duplicate queries.
+     */
+    protected function getSiteIds(): array
+    {
+        if ($this->cachedSiteIds === null) {
+            $this->cachedSiteIds = $this->server->sites()->pluck('id')->all();
+        }
+
+        return $this->cachedSiteIds;
+    }
+
+    /**
      * Base query for audit_logs scoped to this server (and its sites),
      * within the active date range. Both feed and trends start from this.
      */
     protected function baseQuery(): Builder
     {
-        $siteIds = $this->server->sites()->pluck('id')->all();
+        $siteIds = $this->getSiteIds();
         $since = Carbon::now()->subDays(self::rangeDays($this->range));
 
         return AuditLog::query()
@@ -209,7 +228,19 @@ class WorkspaceActivity extends Component
      */
     public function getEventsProperty(): LengthAwarePaginator
     {
-        $query = $this->baseQuery()->with('user:id,name,email');
+        $query = $this->baseQuery()
+            ->with('user:id,name,email')
+            ->with(['subject' => function ($morphTo) {
+                $morphTo->morphWith([
+                    Server::class => [],
+                    Site::class => [],
+                    Workspace::class => [],
+                    Team::class => [],
+                    OrganizationInvitation::class => [],
+                    SiteDeployment::class => [],
+                ]);
+            }]);
+
         if ($this->category !== '') {
             $this->applyCategoryFilter($query, $this->category);
         }

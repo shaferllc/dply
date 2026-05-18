@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Servers;
 
+use App\Actions\Servers\CloneServerOnDigitalOcean;
+use App\Enums\ServerProvider;
 use App\Jobs\AddEdgeProxyJob;
 use App\Jobs\RemoveEdgeProxyJob;
 use App\Jobs\RevertServerWebserverSwitchJob;
@@ -53,6 +55,16 @@ class WorkspaceManage extends Component
 
     /** Per-runtime "loading versions" state for the dropdown spinner. */
     public ?string $mise_loading_versions_for = null;
+
+    /**
+     * Clone-server modal state. `clone_open` is the modal-show toggle (driven by
+     * Alpine via dispatch('open-modal', 'clone-server-modal')), and clone_name
+     * is the editable target name. Region + size stay locked to the source's
+     * values for v1; the operator can resize on DO after the clone lands.
+     */
+    public bool $clone_open = false;
+
+    public string $clone_name = '';
 
     /**
      * Cascade preview for a pending webserver switch — set by openSwitchWebserver()
@@ -630,6 +642,97 @@ BASH;
         $active = $entry['active'] ?? null;
 
         return is_string($active) && $active !== '' ? $active : null;
+    }
+
+    /**
+     * Eligibility gate for the Configuration tab's Clone server button.
+     * Mirrors the assertCloneable checks on the action so the UI hides /
+     * disables the affordance instead of relying on a post-click toast.
+     */
+    public function canCloneServer(): bool
+    {
+        if ($this->server->provider !== ServerProvider::DigitalOcean) {
+            return false;
+        }
+        $hostKind = (string) (($this->server->meta ?? [])['host_kind'] ?? Server::HOST_KIND_VM);
+        if ($hostKind !== Server::HOST_KIND_VM) {
+            return false;
+        }
+        if (! $this->server->providerCredential || $this->server->providerCredential->provider !== 'digitalocean') {
+            return false;
+        }
+        if ($this->server->provider_id === null || $this->server->provider_id === '') {
+            return false;
+        }
+
+        return $this->server->status === Server::STATUS_READY;
+    }
+
+    public function openCloneServerModal(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->canCloneServer()) {
+            $this->toastError(__('This server is not currently cloneable.'));
+
+            return;
+        }
+
+        $this->clone_name = $this->server->name.' (clone)';
+        $this->clone_open = true;
+        $this->dispatch('open-modal', 'clone-server-modal');
+    }
+
+    public function cancelCloneServer(): void
+    {
+        $this->clone_open = false;
+        $this->dispatch('close-modal', 'clone-server-modal');
+    }
+
+    public function confirmCloneServer(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->canCloneServer()) {
+            $this->toastError(__('This server is not currently cloneable.'));
+
+            return;
+        }
+
+        $this->validate([
+            'clone_name' => ['required', 'string', 'min:2', 'max:120'],
+        ]);
+
+        $user = auth()->user();
+        $org = $user?->currentOrganization();
+        if ($user === null || $org === null) {
+            $this->toastError(__('No active organization context.'));
+
+            return;
+        }
+
+        try {
+            $clone = app(CloneServerOnDigitalOcean::class)->handle(
+                actor: $user,
+                org: $org,
+                source: $this->server,
+                overrides: ['name' => $this->clone_name],
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $messages = collect($e->errors())->flatten()->all();
+            $this->toastError($messages[0] ?? __('Clone failed.'));
+
+            return;
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->clone_open = false;
+        $this->dispatch('close-modal', 'clone-server-modal');
+        $this->toastSuccess(__('Clone queued. Track progress on the new server\'s page.'));
+        $this->redirect(route('servers.manage', ['server' => $clone, 'section' => 'overview']), navigate: true);
     }
 
     /**

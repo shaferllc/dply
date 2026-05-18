@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesExtendedServerSettings;
@@ -16,11 +17,13 @@ use App\Services\Webhooks\OutboundWebhookDispatcher;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class WorkspaceSettings extends Component
 {
+    use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesExtendedServerSettings;
@@ -57,6 +60,19 @@ class WorkspaceSettings extends Component
     public function canEditServerSettings(): bool
     {
         return ! (bool) auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user());
+    }
+
+    /**
+     * After the inline modal creates a channel, render() naturally re-pulls
+     * AssignableNotificationChannels on the next request — but we also pre-fill
+     * the subscription form's channel select with the new channel so the
+     * operator's next click is `Add subscription` and they're done. The event
+     * payload is `['channelId' => '...']`; see CreatesNotificationChannelInline.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->notifAddChannelId = $channelId;
     }
 
     public function checkHealth(ServerHealthProbe $probe): void

@@ -25,7 +25,7 @@
     $manageConsoleRun = \App\Models\ConsoleAction::query()
         ->where('subject_type', $server->getMorphClass())
         ->where('subject_id', $server->id)
-        ->whereIn('kind', ['manage_action', 'webserver_switch', 'edge_proxy', 'inventory_probe'])
+        ->whereIn('kind', ['manage_action', 'webserver_switch', 'edge_proxy', 'inventory_probe', 'clone_server'])
         ->whereNull('dismissed_at')
         ->orderByDesc('created_at')
         ->first();
@@ -111,5 +111,70 @@
             'serverId' => $server->id,
             'deletionSummary' => $deletionSummary,
         ])
+
+        {{-- Clone server modal. Triggered from Configuration → Clone server. --}}
+        @if ($clone_open)
+            <x-modal
+                name="clone-server-modal"
+                maxWidth="lg"
+                overlayClass="bg-brand-ink/40"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl"
+            >
+                <div class="border-b border-brand-ink/10 px-6 py-5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Clone server') }}</p>
+                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Clone :name?', ['name' => $server->name]) }}</h2>
+                </div>
+
+                <form wire:submit.prevent="confirmCloneServer" class="space-y-5 px-6 py-6">
+                    <div>
+                        <label for="clone-name" class="block text-sm font-medium text-brand-ink">{{ __('New server name') }}</label>
+                        <input
+                            id="clone-name"
+                            type="text"
+                            wire:model="clone_name"
+                            required
+                            minlength="2"
+                            maxlength="120"
+                            class="mt-2 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30"
+                        />
+                        @error('clone_name')
+                            <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <dl class="grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-xs sm:grid-cols-2">
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                            <dd class="mt-1 font-mono text-brand-ink">{{ $server->region ?: '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
+                            <dd class="mt-1 font-mono text-brand-ink">{{ $server->size ?: '—' }}</dd>
+                        </div>
+                    </dl>
+
+                    <p class="text-xs leading-relaxed text-brand-moss">
+                        {{ __('Region and size mirror the source. To change them, edit on DigitalOcean after the clone completes — or resize via the standard server settings.') }}
+                    </p>
+
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <button
+                            type="button"
+                            wire:click="cancelCloneServer"
+                            class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-cream"
+                        >
+                            {{ __('Cancel') }}
+                        </button>
+                        <button
+                            type="submit"
+                            class="{{ $btnPrimary }}"
+                        >
+                            <x-heroicon-o-document-duplicate class="h-4 w-4" />
+                            {{ __('Start clone') }}
+                        </button>
+                    </div>
+                </form>
+            </x-modal>
+        @endif
     </x-slot>
 </x-server-workspace-layout>
