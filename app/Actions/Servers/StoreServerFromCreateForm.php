@@ -22,10 +22,12 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use App\Services\DigitalOceanService;
 use App\Support\ServerProviderGate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Persists a server from the create wizard (cloud API providers or custom SSH).
@@ -248,32 +250,80 @@ final class StoreServerFromCreateForm
 
     private function storeDigitalOceanKubernetes(User $user, Organization $org, ServerCreateForm $form): Server
     {
-        Validator::make(
-            [
-                'name' => $form->name,
-                'provider_credential_id' => $form->provider_credential_id,
-                'do_kubernetes_cluster_name' => $form->do_kubernetes_cluster_name,
-                'do_kubernetes_namespace' => $form->do_kubernetes_namespace,
-            ],
-            [
-                'name' => 'required|string|max:255',
-                'provider_credential_id' => 'required|exists:provider_credentials,id',
-                'do_kubernetes_cluster_name' => 'required|string|max:255',
-                'do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
-            ]
-        )->validate();
+        $isCreatingNew = $form->do_kubernetes_source === 'new';
+
+        $payload = [
+            'name' => $form->name,
+            'provider_credential_id' => $form->provider_credential_id,
+            'do_kubernetes_namespace' => $form->do_kubernetes_namespace,
+        ];
+        $rules = [
+            'name' => 'required|string|max:255',
+            'provider_credential_id' => 'required|exists:provider_credentials,id',
+            'do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+        ];
+        if ($isCreatingNew) {
+            $payload['do_kubernetes_new_name'] = $form->do_kubernetes_new_name;
+            $payload['do_kubernetes_new_region'] = $form->do_kubernetes_new_region;
+            $payload['do_kubernetes_new_node_size'] = $form->do_kubernetes_new_node_size;
+            $payload['do_kubernetes_new_node_count'] = $form->do_kubernetes_new_node_count;
+            $rules['do_kubernetes_new_name'] = ['required', 'string', 'min:3', 'max:63', 'regex:/^[a-z]([-a-z0-9]*[a-z0-9])?$/'];
+            $rules['do_kubernetes_new_region'] = ['required', 'string'];
+            $rules['do_kubernetes_new_node_size'] = ['required', 'string'];
+            $rules['do_kubernetes_new_node_count'] = ['required', 'integer', 'min:1', 'max:20'];
+        } else {
+            $payload['do_kubernetes_cluster_name'] = $form->do_kubernetes_cluster_name;
+            $rules['do_kubernetes_cluster_name'] = 'required|string|max:255';
+        }
+        Validator::make($payload, $rules)->validate();
 
         $credential = ProviderCredential::where('organization_id', $org->id)
             ->where('provider', 'digitalocean')
             ->findOrFail($form->provider_credential_id);
 
+        $clusterName = trim($form->do_kubernetes_cluster_name);
+        $clusterRegion = '';
+        $clusterId = null;
+        $serverStatus = Server::STATUS_READY;
+        $health = Server::HEALTH_REACHABLE;
+
+        if ($isCreatingNew) {
+            try {
+                $created = (new DigitalOceanService($credential))->createKubernetesCluster(
+                    name: trim($form->do_kubernetes_new_name),
+                    region: trim($form->do_kubernetes_new_region),
+                    nodeSize: trim($form->do_kubernetes_new_node_size),
+                    nodeCount: (int) $form->do_kubernetes_new_node_count,
+                    ha: (bool) $form->do_kubernetes_new_ha,
+                    version: $form->do_kubernetes_new_version !== '' ? $form->do_kubernetes_new_version : null,
+                );
+            } catch (Throwable $e) {
+                throw ValidationException::withMessages([
+                    'form.do_kubernetes_new_name' => __('DigitalOcean refused to create the cluster: :detail', ['detail' => $e->getMessage()]),
+                ]);
+            }
+
+            $clusterName = (string) ($created['name'] ?? $form->do_kubernetes_new_name);
+            $clusterRegion = (string) ($created['region'] ?? $form->do_kubernetes_new_region);
+            $clusterId = isset($created['id']) ? (string) $created['id'] : null;
+            // Cluster is "provisioning" at DO until node pool VMs come up; the
+            // server card surfaces that state so the user knows deploys can't
+            // hit it yet. A future poller will flip it to READY when DO reports
+            // status.state == "running".
+            $serverStatus = Server::STATUS_PROVISIONING;
+            $health = Server::HEALTH_UNREACHABLE;
+        }
+
         $meta = [
             'host_kind' => Server::HOST_KIND_KUBERNETES,
-            'kubernetes' => [
+            'kubernetes' => array_filter([
                 'provider' => 'digitalocean',
-                'cluster_name' => trim($form->do_kubernetes_cluster_name),
+                'cluster_name' => $clusterName,
+                'cluster_id' => $clusterId,
+                'region' => $clusterRegion !== '' ? $clusterRegion : null,
                 'namespace' => trim($form->do_kubernetes_namespace) !== '' ? trim($form->do_kubernetes_namespace) : 'default',
-            ],
+                'provisioned_by_dply' => $isCreatingNew ? true : null,
+            ], static fn ($v): bool => $v !== null),
         ];
 
         $server = $user->servers()->create([
@@ -283,12 +333,11 @@ final class StoreServerFromCreateForm
             'provider_credential_id' => $credential->id,
             'ssh_port' => 22,
             'ssh_user' => 'kubernetes',
-            // Cluster already exists in the DO account at register time; no
-            // provisioning phase, no SSH bootstrap. Per the agreed design,
-            // the server lands READY immediately so /servers/{id}/overview
-            // can surface the "Add a container" CTA right away.
-            'status' => Server::STATUS_READY,
-            'health_status' => Server::HEALTH_REACHABLE,
+            // Existing-cluster registrations are READY immediately; created
+            // clusters live in PROVISIONING until DO finishes spinning up the
+            // node pool.
+            'status' => $serverStatus,
+            'health_status' => $health,
             'meta' => $meta,
         ]);
 

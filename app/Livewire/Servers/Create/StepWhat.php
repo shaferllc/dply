@@ -56,6 +56,8 @@ class StepWhat extends Component
             return $this->redirect(route(self::routeNameForStep(4)), navigate: true);
         }
 
+        $this->autoSelectSingletonKubernetesCluster();
+
         return null;
     }
 
@@ -72,13 +74,26 @@ class StepWhat extends Component
 
         // K8s hosts validate cluster + namespace; VM/Docker validate the stack.
         if ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'kubernetes') {
-            $this->validate([
-                'form.do_kubernetes_cluster_name' => ['required', 'string', 'max:255'],
+            $rules = [
                 'form.do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
-            ], attributes: [
-                'form.do_kubernetes_cluster_name' => __('cluster'),
+            ];
+            $attrs = [
                 'form.do_kubernetes_namespace' => __('namespace'),
-            ]);
+            ];
+            if ($this->form->type === 'digitalocean_kubernetes' && $this->form->do_kubernetes_source === 'new') {
+                $rules['form.do_kubernetes_new_name'] = ['required', 'string', 'min:3', 'max:63', 'regex:/^[a-z]([-a-z0-9]*[a-z0-9])?$/'];
+                $rules['form.do_kubernetes_new_region'] = ['required', 'string'];
+                $rules['form.do_kubernetes_new_node_size'] = ['required', 'string'];
+                $rules['form.do_kubernetes_new_node_count'] = ['required', 'integer', 'min:1', 'max:20'];
+                $attrs['form.do_kubernetes_new_name'] = __('cluster name');
+                $attrs['form.do_kubernetes_new_region'] = __('region');
+                $attrs['form.do_kubernetes_new_node_size'] = __('node size');
+                $attrs['form.do_kubernetes_new_node_count'] = __('node count');
+            } else {
+                $rules['form.do_kubernetes_cluster_name'] = ['required', 'string', 'max:255'];
+                $attrs['form.do_kubernetes_cluster_name'] = __('cluster');
+            }
+            $this->validate($rules, attributes: $attrs);
         } else {
             $this->validate([
                 'form.install_profile' => ['required', 'string'],
@@ -170,6 +185,7 @@ class StepWhat extends Component
     {
         $org = auth()->user()?->currentOrganization();
         $context = $this->buildPreflightContext($org);
+        $catalog = $context['catalog'];
 
         return view('livewire.servers.create.step-what', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
@@ -180,7 +196,32 @@ class StepWhat extends Component
             'selectedPreset' => $this->selectedPreset,
             'isKubernetes' => $this->form->mode === 'provider' && $this->form->provider_host_kind === 'kubernetes',
             'kubernetesClusters' => $this->kubernetesClusters(),
+            'kubernetesProvider' => $this->form->type,
+            'kubernetesRegions' => is_array($catalog['regions'] ?? null) ? $catalog['regions'] : [],
+            'kubernetesNodeSizes' => is_array($catalog['sizes'] ?? null) ? $catalog['sizes'] : [],
+            'kubernetesVersions' => is_array($catalog['kubernetes_versions'] ?? null) ? $catalog['kubernetes_versions'] : [],
         ]);
+    }
+
+    /**
+     * If the user has exactly one managed cluster in their account, pre-fill the
+     * cluster name so the cost preview shows the exact estimate immediately and
+     * the user only has to confirm the namespace. No-op when the form already
+     * has a cluster picked (we don't want to clobber an explicit user choice).
+     */
+    private function autoSelectSingletonKubernetesCluster(): void
+    {
+        if ($this->form->do_kubernetes_cluster_name !== '') {
+            return;
+        }
+
+        $clusters = $this->kubernetesClusters();
+        if (count($clusters) !== 1) {
+            return;
+        }
+
+        $this->form->do_kubernetes_cluster_name = $clusters[0]['name'];
+        $this->saveDraftFromForm($this->form);
     }
 
     /**

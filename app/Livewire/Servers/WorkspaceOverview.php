@@ -152,6 +152,16 @@ class WorkspaceOverview extends Component
                     ->count(),
         ];
 
+        // K8s clusters created by dply (do_kubernetes_source=new) land in
+        // STATUS_PROVISIONING and won't have working manifests/deploys until DO
+        // brings the node pool online (~5–10 min). We surface that with a
+        // dedicated banner instead of letting the overview look "empty" while
+        // it's actually still spinning up.
+        $isK8sCluster = ($this->server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES;
+        $kubernetesProvisioning = $isK8sCluster
+            && in_array($this->server->status, [Server::STATUS_PROVISIONING, Server::STATUS_PENDING], true)
+            && ($this->server->meta['kubernetes']['provisioned_by_dply'] ?? false);
+
         return view('livewire.servers.workspace-overview', [
             'siteCount' => $sites->count(),
             'deployingCount' => $deployingCount,
@@ -167,6 +177,10 @@ class WorkspaceOverview extends Component
             'criticalInsightsCount' => $criticalInsightsCount,
             'notificationSummary' => $notificationSummary,
             'backgroundSummary' => $backgroundSummary,
+            'kubernetesProvisioning' => $kubernetesProvisioning,
+            'kubernetesClusterMeta' => $kubernetesProvisioning
+                ? ($this->server->meta['kubernetes'] ?? [])
+                : null,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

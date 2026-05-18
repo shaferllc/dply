@@ -282,14 +282,14 @@ class StepReview extends Component
             return $this->redirect(route($inventoryRoute), navigate: true);
         }
 
-        // Container hosts (docker / kubernetes) land on the workspace overview where
-        // the "Add your first container app" CTA + the container_launch banner live;
-        // VM-shaped hosts go through the provision-journey redirect chain via show.
-        $isContainerHost = ($this->form->mode === 'provider' && in_array($this->form->provider_host_kind, ['docker', 'kubernetes'], true))
-            || ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker');
-        $destinationRoute = $isContainerHost ? 'servers.overview' : 'servers.show';
-
-        return $this->redirect(route($destinationRoute, $server), navigate: true);
+        // Route through servers.show — it inspects status and forwards to the
+        // journey for STATUS_PROVISIONING servers (e.g. a brand-new DOKS
+        // cluster spun up via dply that DO is still bringing online) and to
+        // the workspace overview for READY servers. Container hosts that
+        // land READY immediately (existing-cluster registration, docker host)
+        // get the "Add your first container app" CTA via the overview;
+        // freshly-provisioning ones get progress visibility via the journey.
+        return $this->redirect(route('servers.show', $server), navigate: true);
     }
 
     /**
@@ -524,6 +524,8 @@ class StepReview extends Component
             'reachedStep' => $this->currentDraft()?->step ?? 4,
             'catalog' => $context['catalog'],
             'preflight' => $context['preflight'],
+            'canCreateServer' => $context['canCreateServer'],
+            'billingUrl' => $org ? route('subscription.show', $org) : null,
             'isVmShaped' => $isVmShaped,
             'isKubernetes' => $isKubernetes,
         ]);

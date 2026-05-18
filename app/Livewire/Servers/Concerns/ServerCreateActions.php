@@ -575,6 +575,11 @@ trait ServerCreateActions
                         && $this->customConnectionTestSignature === $this->currentCustomConnectionSignature(),
                 ],
                 $sizeRecommendations,
+                // Components that mix in this trait expose stepNumber(); we use
+                // it to gate "blocking" severity on checks that only matter at
+                // submit (e.g. K8s cluster pick — empty on StepWhere isn't a
+                // bug, the user hasn't reached the picker yet).
+                method_exists($this, 'stepNumber') ? (int) $this->stepNumber() : null,
             ),
             'canCreateServer' => $canCreateServer,
             'hasAnyProviderCredentials' => $hasAnyProviderCredentials,

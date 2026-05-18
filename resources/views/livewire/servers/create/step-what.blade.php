@@ -19,43 +19,156 @@
         </header>
 
         @if ($isKubernetes)
-            {{-- K8s host: pick the cluster + namespace instead of a stack template. --}}
+            @php
+                // DOKS supports both register-existing and create-new. EKS create
+                // needs IAM/VPC/subnet plumbing we don't have yet, so AWS stays
+                // existing-only and the toggle is hidden.
+                $canCreateNew = $kubernetesProvider === 'digitalocean_kubernetes';
+                $isCreatingNew = $canCreateNew && $form->do_kubernetes_source === 'new';
+            @endphp
+
+            {{-- K8s host: pick an existing cluster OR have dply create one. --}}
             <section class="rounded-2xl border-2 border-brand-sage/20 bg-white p-6 shadow-sm space-y-5 sm:p-7">
                 <div class="flex items-start gap-4">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest">
                         <x-heroicon-o-server-stack class="h-5 w-5" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Pick a Kubernetes cluster') }}</h2>
-                        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.') }}</p>
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ $isCreatingNew ? __('Create a new Kubernetes cluster') : __('Pick a Kubernetes cluster') }}</h2>
+                        <p class="mt-0.5 text-sm text-brand-moss">{{ $isCreatingNew
+                            ? __('Dply will provision a new DOKS cluster in your DigitalOcean account on submit. Provisioning takes 5–10 minutes; the server will land in "provisioning" until it\'s ready.')
+                            : __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.') }}</p>
                     </div>
                 </div>
 
-                @if ($kubernetesClusters === [])
+                @if ($canCreateNew)
+                    {{-- Source toggle: use existing vs create new. --}}
+                    <div role="tablist" class="inline-flex rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-1 text-sm">
+                        <button
+                            type="button"
+                            wire:click="$set('form.do_kubernetes_source', 'existing')"
+                            @class([
+                                'inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 font-semibold transition',
+                                'bg-white text-brand-ink shadow-sm' => ! $isCreatingNew,
+                                'text-brand-moss hover:text-brand-ink' => $isCreatingNew,
+                            ])
+                            role="tab"
+                            aria-selected="{{ $isCreatingNew ? 'false' : 'true' }}"
+                        >
+                            <x-heroicon-m-link class="h-4 w-4" />
+                            {{ __('Use existing cluster') }}
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="$set('form.do_kubernetes_source', 'new')"
+                            @class([
+                                'inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 font-semibold transition',
+                                'bg-white text-brand-ink shadow-sm' => $isCreatingNew,
+                                'text-brand-moss hover:text-brand-ink' => ! $isCreatingNew,
+                            ])
+                            role="tab"
+                            aria-selected="{{ $isCreatingNew ? 'true' : 'false' }}"
+                        >
+                            <x-heroicon-m-plus class="h-4 w-4" />
+                            {{ __('Create new') }}
+                        </button>
+                    </div>
+                @endif
+
+                @if ($isCreatingNew)
+                    {{-- Create-new form: name + region + droplet size + count + HA + version. --}}
+                    <div class="space-y-5">
+                        <div>
+                            <x-input-label for="do_kubernetes_new_name" :value="__('Cluster name')" />
+                            <x-text-input
+                                id="do_kubernetes_new_name"
+                                wire:model.live.debounce.500ms="form.do_kubernetes_new_name"
+                                type="text"
+                                class="mt-2 block w-full font-mono text-sm"
+                                placeholder="prod-cluster"
+                            />
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Lowercase letters, numbers, and hyphens. Must start with a letter (DOKS naming rules).') }}</p>
+                            <x-input-error :messages="$errors->get('form.do_kubernetes_new_name')" class="mt-2" />
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            @include('livewire.servers.create._kubernetes-region-picker', [
+                                'regions' => $kubernetesRegions,
+                            ])
+                            @php
+                                $versionOptions = collect($kubernetesVersions)->map(fn (array $v): array => [
+                                    'id' => (string) ($v['value'] ?? ''),
+                                    'label' => (string) ($v['label'] ?? ''),
+                                ])->all();
+                            @endphp
+                            @include('livewire.servers.create._rich-select', [
+                                'id' => 'do_kubernetes_new_version',
+                                'label' => __('Kubernetes version'),
+                                'field' => 'form.do_kubernetes_new_version',
+                                'value' => $form->do_kubernetes_new_version,
+                                'options' => $versionOptions,
+                                'errorKey' => 'form.do_kubernetes_new_version',
+                                'eyebrow' => __('Selected version'),
+                                'placeholder' => __('Latest stable (DigitalOcean default)'),
+                            ])
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                            @include('livewire.servers.create._kubernetes-size-picker', [
+                                'sizes' => $kubernetesNodeSizes,
+                            ])
+                            <div>
+                                <x-input-label for="do_kubernetes_new_node_count" :value="__('Node count')" />
+                                <x-text-input
+                                    id="do_kubernetes_new_node_count"
+                                    wire:model.live.debounce.500ms="form.do_kubernetes_new_node_count"
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    class="mt-2 block w-full text-sm"
+                                />
+                                <x-input-error :messages="$errors->get('form.do_kubernetes_new_node_count')" class="mt-2" />
+                            </div>
+                        </div>
+
+                        <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-4">
+                            <input
+                                type="checkbox"
+                                wire:model.live="form.do_kubernetes_new_ha"
+                                class="mt-0.5 h-4 w-4 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
+                            />
+                            <span class="flex-1">
+                                <span class="block text-sm font-semibold text-brand-ink">{{ __('Highly available control plane') }}</span>
+                                <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Adds $40/mo. DigitalOcean runs three control-plane replicas for resilience. Leave off for staging/dev.') }}</span>
+                            </span>
+                        </label>
+                    </div>
+                @elseif ($kubernetesClusters === [])
                     <div data-testid="no-kubernetes-clusters" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                         <p class="font-semibold">{{ __('No managed clusters found in this account.') }}</p>
-                        <p class="mt-1">{{ __('Create a Kubernetes cluster in the DigitalOcean console first, then come back. Your draft will still be waiting.') }}</p>
+                        <p class="mt-1">{{ __('Switch to "Create new" above to have dply provision one, or create one in the DigitalOcean console and come back. Your draft will still be waiting.') }}</p>
                         <a href="https://cloud.digitalocean.com/kubernetes/clusters" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 font-semibold underline hover:text-amber-700">
                             {{ __('Open DigitalOcean Kubernetes') }} →
                         </a>
                     </div>
                 @else
-                    <div>
-                        <x-input-label for="do_kubernetes_cluster_name" :value="__('Cluster')" />
-                        <select
-                            id="do_kubernetes_cluster_name"
-                            wire:model.live="form.do_kubernetes_cluster_name"
-                            class="mt-2 block w-full rounded-xl border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                        >
-                            <option value="">{{ __('Select a cluster…') }}</option>
-                            @foreach ($kubernetesClusters as $cluster)
-                                <option value="{{ $cluster['name'] }}" data-region="{{ $cluster['region'] }}">
-                                    {{ $cluster['name'] }} — {{ $cluster['region'] }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <x-input-error :messages="$errors->get('form.do_kubernetes_cluster_name')" class="mt-2" />
-                    </div>
+                    @php
+                        $clusterOptions = collect($kubernetesClusters)->map(fn (array $c): array => [
+                            'id' => (string) ($c['name'] ?? ''),
+                            'label' => (string) ($c['name'] ?? ''),
+                            'summary' => (string) ($c['region'] ?? ''),
+                        ])->all();
+                    @endphp
+                    @include('livewire.servers.create._rich-select', [
+                        'id' => 'do_kubernetes_cluster_name',
+                        'label' => __('Cluster'),
+                        'field' => 'form.do_kubernetes_cluster_name',
+                        'value' => $form->do_kubernetes_cluster_name,
+                        'options' => $clusterOptions,
+                        'errorKey' => 'form.do_kubernetes_cluster_name',
+                        'eyebrow' => __('Selected cluster'),
+                        'placeholder' => __('Select a cluster'),
+                    ])
                 @endif
 
                 <div>

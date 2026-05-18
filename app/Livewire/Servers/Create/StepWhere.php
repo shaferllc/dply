@@ -45,8 +45,16 @@ class StepWhere extends Component
         // Default the active provider tile to whatever the form already has,
         // or the first credentialled provider if blank.
         if ($this->form->mode === 'provider') {
+            if ($this->form->provider_host_kind === 'kubernetes' && $this->form->type === '') {
+                // Landed on this step with K8s already picked but no provider — try the
+                // singleton auto-pick first so the cluster fetch + cost preview can run.
+                $this->autoSelectSingletonKubernetesProvider();
+            }
+
             if ($this->form->type === '' || $this->form->type === 'custom') {
-                $this->applyCloudDefaults($this->defaultProvisionProvider());
+                if ($this->form->provider_host_kind !== 'kubernetes') {
+                    $this->applyCloudDefaults($this->defaultProvisionProvider());
+                }
             } else {
                 $this->active_provider = $this->form->type;
             }
@@ -143,6 +151,39 @@ class StepWhere extends Component
             }
             $this->memoServerCreateCatalog = null;
             $this->memoServerCreateCatalogKey = null;
+            $this->autoSelectSingletonKubernetesProvider();
+        }
+    }
+
+    /**
+     * When the user has credentials for exactly one of the K8s-capable providers
+     * (DigitalOcean DOKS or AWS EKS), pick it for them so the cost preview can
+     * resolve immediately instead of stalling on an empty provider tile.
+     */
+    private function autoSelectSingletonKubernetesProvider(): void
+    {
+        if ($this->form->type !== '') {
+            return;
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+
+        $candidates = [];
+        foreach (['digitalocean', 'aws'] as $provider) {
+            $type = $provider.'_kubernetes';
+            if (! ServerProviderGate::enabled($type)) {
+                continue;
+            }
+            if (GetProviderCredentialsForServerType::run($org, $type)->isNotEmpty()) {
+                $candidates[] = $provider;
+            }
+        }
+
+        if (count($candidates) === 1) {
+            $this->chooseProvider($candidates[0]);
         }
     }
 

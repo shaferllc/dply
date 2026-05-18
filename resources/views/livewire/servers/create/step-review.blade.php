@@ -1,6 +1,22 @@
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
     <x-server-create-stepper :current="4" :reached="$reachedStep" :mode="$form->mode" :hostKind="$form->custom_host_kind" :providerHostKind="$form->provider_host_kind" />
 
+    @if (! $canCreateServer && $billingUrl)
+        <div class="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-3">
+                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-6 w-6 shrink-0 text-amber-600" />
+                <div>
+                    <p class="text-base font-semibold">{{ __('Server limit reached for your plan.') }}</p>
+                    <p class="mt-1 text-sm text-amber-800">{{ __('Upgrade to add more servers to this organization.') }}</p>
+                </div>
+            </div>
+            <a href="{{ $billingUrl }}" wire:navigate class="inline-flex shrink-0 items-center justify-center rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-700">
+                {{ __('Upgrade plan') }}
+                <x-heroicon-o-arrow-right class="ml-2 h-4 w-4" />
+            </a>
+        </div>
+    @endif
+
     <form wire:submit.prevent="store" class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
       <div class="space-y-8 min-w-0">
 
@@ -273,6 +289,50 @@
             <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{ $errors->first('org') }}</div>
         @endif
 
+        {{-- StepReview is a summary screen — most form fields aren't rendered here,
+             so any errors attached to "form.*" keys (e.g. a DigitalOcean API call that
+             failed on submit) would otherwise be invisible. Surface them in a banner. --}}
+        @php
+            $formErrors = collect($errors->keys())->filter(fn ($k) => str_starts_with((string) $k, 'form.'));
+        @endphp
+        @if ($formErrors->isNotEmpty())
+            <div data-testid="form-error-banner" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                <p class="font-semibold">{{ __('Server could not be created') }}</p>
+                <ul class="mt-1 list-disc space-y-1 pl-5">
+                    @foreach ($formErrors as $key)
+                        <li>{{ $errors->first($key) }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @php
+            // Surface why the submit button is disabled so users don't click a
+            // grey button thinking it's broken. The preflight already exposes
+            // the blocker list — we just pull the headline issue and how many
+            // remain so the footer can show "Fix N issue(s) to create".
+            $canSubmit = (bool) ($preflight['can_submit'] ?? false);
+            $blockingChecksForFooter = collect($preflight['checks'] ?? [])->where('blocking', true)->values();
+            $firstBlockerLabel = (string) ($blockingChecksForFooter->first()['label'] ?? '');
+            $blockingCountForFooter = $blockingChecksForFooter->count();
+        @endphp
+
+        @if (! $canSubmit && $blockingCountForFooter > 0)
+            <div data-testid="submit-blocked-explainer" class="flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-start gap-2">
+                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                    <div>
+                        <p class="font-semibold">
+                            {{ trans_choice('{1} :count issue blocking :|[2,*] :count issues blocking', $blockingCountForFooter, ['count' => $blockingCountForFooter]) }}
+                        </p>
+                        @if ($firstBlockerLabel !== '')
+                            <p class="text-xs text-amber-800">{{ $firstBlockerLabel }}{{ $blockingCountForFooter > 1 ? ' '.__('(and :n more — see the checklist above)', ['n' => $blockingCountForFooter - 1]) : '' }}</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-6">
             <button
                 type="button"
@@ -295,11 +355,12 @@
                     type="submit"
                     wire:loading.attr="disabled"
                     wire:target="store"
-                    @disabled(! ($preflight['can_submit'] ?? false))
+                    @disabled(! $canSubmit)
+                    title="{{ ! $canSubmit && $firstBlockerLabel !== '' ? $firstBlockerLabel : '' }}"
                     class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-700 px-6 text-sm font-semibold text-white shadow-md shadow-emerald-700/20 transition-all hover:from-emerald-500 hover:to-emerald-600 hover:shadow-lg hover:shadow-emerald-700/25 disabled:cursor-not-allowed disabled:from-slate-400 disabled:to-slate-500 disabled:opacity-60 disabled:shadow-none"
                 >
                     <x-heroicon-o-rocket-launch wire:loading.remove wire:target="store" class="h-4 w-4" />
-                    <span wire:loading.remove wire:target="store">{{ __('Create server') }}</span>
+                    <span wire:loading.remove wire:target="store">{{ $canSubmit ? __('Create server') : __('Fix issues to create') }}</span>
                     <span wire:loading wire:target="store" class="inline-flex items-center gap-2">
                         <x-spinner variant="white" size="sm" />
                         {{ __('Creating…') }}

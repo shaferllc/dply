@@ -236,6 +236,16 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}', function (Server $server) {
         Gate::authorize('view', $server);
 
+        // Journey page is SSH/VM-shaped — only VM hosts have a provision task
+        // and the InteractsWithServerWorkspace boot rejects non-VM hosts from
+        // routing through it (which previously caused a redirect loop for
+        // freshly-provisioning DOKS clusters). Container hosts always go to
+        // the workspace overview, which surfaces a "cluster is provisioning"
+        // banner when status is PENDING/PROVISIONING.
+        if (! $server->isVmHost()) {
+            return redirect()->route('servers.overview', $server);
+        }
+
         if ($server->status === Server::STATUS_PENDING || $server->status === Server::STATUS_PROVISIONING) {
             return redirect()->route('servers.journey', $server);
         }

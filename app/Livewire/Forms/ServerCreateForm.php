@@ -93,6 +93,31 @@ class ServerCreateForm extends Form
 
     public string $do_kubernetes_namespace = 'default';
 
+    /**
+     * 'existing' (register a cluster already in the DO/AWS account) or 'new'
+     * (have dply call the provider API to provision a brand-new cluster as part
+     * of submit). When 'new', the do_kubernetes_new_* fields below describe the
+     * cluster spec. EKS only supports 'existing' for now.
+     */
+    public string $do_kubernetes_source = 'existing';
+
+    public string $do_kubernetes_new_name = '';
+
+    public string $do_kubernetes_new_region = '';
+
+    public string $do_kubernetes_new_node_size = '';
+
+    public int $do_kubernetes_new_node_count = 2;
+
+    public bool $do_kubernetes_new_ha = false;
+
+    /**
+     * Kubernetes version slug ("1.30.1-do.0" etc.). Empty means "let DO pick
+     * the recommended/latest" — we pass nothing in that case so DO assigns
+     * the default; keeps us out of the version-pinning maintenance grind.
+     */
+    public string $do_kubernetes_new_version = '';
+
     public string $do_functions_package = 'default';
 
     public string $do_functions_action_kind = 'nodejs:18';

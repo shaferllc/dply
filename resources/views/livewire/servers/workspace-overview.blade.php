@@ -227,6 +227,46 @@
                 </section>
             @endif
 
+            {{-- Kubernetes cluster provisioning banner: shown only when dply
+                 provisioned the DOKS cluster on the user's behalf and DO is
+                 still bringing the node pool online (~5–10 min). Polls so the
+                 page flips out of the banner state as soon as a future status
+                 poller marks the server READY. --}}
+            @if (! empty($kubernetesProvisioning))
+                <section wire:poll.10s data-testid="kubernetes-provisioning-banner" class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-sky-50/90 p-6 shadow-sm">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="min-w-0 flex-1 space-y-3">
+                            <span class="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+                                <span class="h-2 w-2 animate-pulse rounded-full bg-sky-500"></span>
+                                {{ __('Cluster provisioning') }}
+                            </span>
+                            <h3 class="text-2xl font-semibold tracking-tight text-brand-ink">
+                                {{ __('DigitalOcean is spinning up your cluster') }}
+                            </h3>
+                            <p class="text-sm leading-6 text-brand-moss">
+                                {{ __('Node pool VMs typically take 5–10 minutes to come online. This page will update automatically once the cluster is ready and you can start adding container sites.') }}
+                            </p>
+                            <dl class="grid gap-3 text-xs text-brand-moss sm:grid-cols-2">
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Cluster name') }}</dt>
+                                    <dd class="mt-1 font-mono text-brand-ink">{{ $kubernetesClusterMeta['cluster_name'] ?? '—' }}</dd>
+                                </div>
+                                @if (! empty($kubernetesClusterMeta['region']))
+                                    <div>
+                                        <dt class="font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Region') }}</dt>
+                                        <dd class="mt-1 font-mono text-brand-ink">{{ $kubernetesClusterMeta['region'] }}</dd>
+                                    </div>
+                                @endif
+                            </dl>
+                            <p class="text-xs text-brand-mist">
+                                {{ __('Watch progress directly in the') }}
+                                <a href="https://cloud.digitalocean.com/kubernetes/clusters" target="_blank" rel="noopener" class="font-semibold text-sky-700 underline hover:text-sky-900">{{ __('DigitalOcean console') }}</a>.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+            @endif
+
             {{-- Container launch progress. Renders only while a container
                  launch is in flight (status != completed). Polls every 5s
                  so the operator sees step progression in real time. --}}
