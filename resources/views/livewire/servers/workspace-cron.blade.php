@@ -129,6 +129,47 @@
             </div>
         </section>
 
+        <x-server-workspace-tablist :aria-label="__('Cron workspace sections')">
+            <x-server-workspace-tab id="cron-tab-jobs" :active="$cron_workspace_tab === 'jobs'" wire:click="setCronWorkspaceTab('jobs')">
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-list-bullet class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Jobs') }}
+                </span>
+            </x-server-workspace-tab>
+            <x-server-workspace-tab id="cron-tab-history" :active="$cron_workspace_tab === 'history'" wire:click="setCronWorkspaceTab('history')">
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
+                    {{ __('History') }}
+                </span>
+            </x-server-workspace-tab>
+            <x-server-workspace-tab id="cron-tab-inspect" :active="$cron_workspace_tab === 'inspect'" wire:click="setCronWorkspaceTab('inspect')">
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Inspect') }}
+                </span>
+            </x-server-workspace-tab>
+            <x-server-workspace-tab id="cron-tab-templates" :active="$cron_workspace_tab === 'templates'" wire:click="setCronWorkspaceTab('templates')">
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-document-duplicate class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Templates') }}
+                </span>
+            </x-server-workspace-tab>
+            @if ($canUpdateOrg)
+                <x-server-workspace-tab id="cron-tab-maintenance" :active="$cron_workspace_tab === 'maintenance'" wire:click="setCronWorkspaceTab('maintenance')">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-wrench class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Maintenance') }}
+                    </span>
+                </x-server-workspace-tab>
+            @endif
+        </x-server-workspace-tablist>
+
+        <x-server-workspace-tab-panel
+            id="cron-panel-jobs"
+            labelled-by="cron-tab-jobs"
+            :hidden="$cron_workspace_tab !== 'jobs'"
+            panel-class="space-y-8"
+        >
         {{-- Slim trigger card — primary "Add cron job" + "Sync crontab" actions, status meta-row.
              The big add/edit form is now in a modal triggered by the button below. --}}
         <div class="{{ $card }} overflow-hidden">
@@ -415,6 +456,42 @@
                         </div>
                     </details>
                 </form>
+
+                @if ($canUpdateOrg)
+                    <div class="mt-6 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Save as organization template') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Stores the expression, command, user, and description above as a named template your team can apply from the Templates tab.') }}</p>
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
+                            <div class="min-w-0 flex-1">
+                                <x-input-label for="template_save_name" value="{{ __('Template name') }}" class="sr-only" />
+                                <x-text-input
+                                    id="template_save_name"
+                                    wire:model="template_save_name"
+                                    class="block w-full text-sm"
+                                    placeholder="{{ __('e.g. Laravel scheduler') }}"
+                                    maxlength="120"
+                                />
+                                <x-input-error :messages="$errors->get('template_save_name')" class="mt-1" />
+                            </div>
+                            <button
+                                type="button"
+                                wire:click="saveOrgCronTemplate"
+                                wire:loading.attr="disabled"
+                                wire:target="saveOrgCronTemplate"
+                                class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <span wire:loading.remove wire:target="saveOrgCronTemplate" class="inline-flex items-center gap-1.5">
+                                    <x-heroicon-o-bookmark-square class="h-4 w-4" />
+                                    {{ __('Save as template') }}
+                                </span>
+                                <span wire:loading wire:target="saveOrgCronTemplate" class="inline-flex items-center gap-1.5">
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ __('Saving…') }}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                @endif
             </div>
             <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
                 @if ($editing_job_id)
@@ -434,73 +511,6 @@
                 </x-primary-button>
             </div>
         </x-modal>
-
-        @if (! empty($bundledCronJobs))
-            <details class="{{ $card }} group" @if ($cronJobCount === 0) open @endif>
-                <summary class="flex cursor-pointer select-none items-center justify-between gap-3 px-6 py-4 sm:px-8">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-sparkles class="h-4 w-4" />
-                        </span>
-                        <div class="min-w-0">
-                            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Common cron jobs') }}</h3>
-                            <p class="mt-0.5 text-xs text-brand-moss">
-                                {{ __('One-click starters for things people normally schedule. Each adds rows to the panel — review and edit (paths/domains), then sync the crontab.') }}
-                            </p>
-                        </div>
-                    </div>
-                    <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-180" />
-                </summary>
-                <div class="grid gap-3 border-t border-brand-ink/10 px-6 py-5 sm:grid-cols-2 sm:px-8 lg:grid-cols-3">
-                    @foreach ($bundledCronJobs as $bundleKey => $bundle)
-                        <div class="flex flex-col gap-3 rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-                            <div class="flex min-w-0 items-start justify-between gap-2">
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $bundle['label'] }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-mist">
-                                        {{ trans_choice('{1} :count entry|[2,*] :count entries', $bundle['entry_count'], ['count' => $bundle['entry_count']]) }}
-                                    </p>
-                                </div>
-                                @if ($bundle['applied'])
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">
-                                        <x-heroicon-o-check-circle class="h-3 w-3" />
-                                        {{ __('Added') }}
-                                    </span>
-                                @endif
-                            </div>
-                            <p class="text-xs leading-relaxed text-brand-moss">{{ $bundle['description'] }}</p>
-                            <div class="mt-auto">
-                                <button
-                                    type="button"
-                                    wire:click="applyCronBundle('{{ $bundleKey }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="applyCronBundle('{{ $bundleKey }}')"
-                                    @class([
-                                        'inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $bundle['applied'],
-                                        'bg-brand-forest text-brand-cream hover:bg-brand-forest/90' => ! $bundle['applied'],
-                                    ])
-                                >
-                                    <span wire:loading.remove wire:target="applyCronBundle('{{ $bundleKey }}')" class="inline-flex items-center gap-1.5">
-                                        @if ($bundle['applied'])
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                            {{ __('Add again') }}
-                                        @else
-                                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
-                                            {{ __('Add to panel') }}
-                                        @endif
-                                    </span>
-                                    <span wire:loading wire:target="applyCronBundle('{{ $bundleKey }}')" class="inline-flex items-center gap-1.5">
-                                        <x-spinner variant="cream" size="sm" />
-                                        {{ __('Adding…') }}
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </details>
-        @endif
 
         <div class="{{ $card }}">
             <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
@@ -793,7 +803,14 @@
         @if ($cron_run_id)
             <div wire:poll.1s="syncCronRunFromCache" class="sr-only" aria-hidden="true"></div>
         @endif
+        </x-server-workspace-tab-panel>
 
+        <x-server-workspace-tab-panel
+            id="cron-panel-history"
+            labelled-by="cron-tab-history"
+            :hidden="$cron_workspace_tab !== 'history'"
+            panel-class="space-y-8"
+        >
         <div class="{{ $card }}">
             <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
                 <div class="flex min-w-0 items-start gap-3">
@@ -835,7 +852,14 @@
                 @endif
             </div>
         </div>
+        </x-server-workspace-tab-panel>
 
+        <x-server-workspace-tab-panel
+            id="cron-panel-inspect"
+            labelled-by="cron-tab-inspect"
+            :hidden="$cron_workspace_tab !== 'inspect'"
+            panel-class="space-y-8"
+        >
         <div class="{{ $card }}">
             <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
                 <div class="flex min-w-0 items-start gap-3">
@@ -893,6 +917,36 @@
                 </div>
             </div>
         </div>
+        </x-server-workspace-tab-panel>
+
+        <x-server-workspace-tab-panel
+            id="cron-panel-templates"
+            labelled-by="cron-tab-templates"
+            :hidden="$cron_workspace_tab !== 'templates'"
+            panel-class="space-y-8"
+        >
+            @include('livewire.servers.partials.cron-templates-tab', [
+                'bundledCronJobs' => $bundledCronJobs,
+                'cronJobCount' => $cronJobCount,
+                'card' => $card,
+                'orgCronTemplates' => $orgCronTemplates,
+                'canUpdateOrg' => $canUpdateOrg,
+            ])
+        </x-server-workspace-tab-panel>
+
+        @if ($canUpdateOrg)
+            <x-server-workspace-tab-panel
+                id="cron-panel-maintenance"
+                labelled-by="cron-tab-maintenance"
+                :hidden="$cron_workspace_tab !== 'maintenance'"
+                panel-class="space-y-8"
+            >
+                @include('livewire.servers.partials.cron-maintenance-tab', [
+                    'card' => $card,
+                    'server' => $server,
+                ])
+            </x-server-workspace-tab-panel>
+        @endif
         </div>
     @else
         @include('livewire.servers.partials.workspace-ops-not-ready')

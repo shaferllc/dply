@@ -439,9 +439,15 @@
             x-data
             x-on:keydown.escape.window="$wire.closeDestinationModal()"
         >
+            {{-- Backdrop + click-outside-to-close. Using Alpine for stop-
+                 propagation on the panel (not wire:click.stop) so clicks inside
+                 the panel never touch the network — Livewire's wire:click
+                 modifier still pings the server even with no handler in some
+                 paths, which made every click inside the modal look like a
+                 reload. Pure-JS stopPropagation keeps the modal local. --}}
             <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeDestinationModal"></div>
-            <div class="relative flex min-h-full items-start justify-center px-4 py-10 sm:px-6">
-                <div class="relative w-full max-w-2xl dply-modal-panel" wire:click.stop>
+            <div class="relative flex min-h-full items-start justify-center px-4 py-10 sm:px-6" @click="$wire.closeDestinationModal()">
+                <div class="relative w-full max-w-2xl dply-modal-panel" @click.stop>
                     <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-7">
                         <div class="min-w-0">
                             <h2 id="add-destination-title" class="text-base font-semibold text-brand-ink">{{ __('Add backup destination') }}</h2>

@@ -26,6 +26,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -97,8 +98,17 @@ class WorkspaceCron extends Component
 
     public ?string $viewing_logs_job_id = null;
 
-    /** @var 'jobs'|'run'|'inspect'|'history'|'templates' */
+    /** @var 'jobs'|'history'|'inspect'|'templates'|'maintenance' */
+    #[Url(as: 'tab', except: 'jobs', history: true)]
     public string $cron_workspace_tab = 'jobs';
+
+    /** @var list<string> Tab values accepted by {@see setCronWorkspaceTab()}. */
+    protected array $cronWorkspaceTabs = ['jobs', 'history', 'inspect', 'templates', 'maintenance'];
+
+    public function setCronWorkspaceTab(string $tab): void
+    {
+        $this->cron_workspace_tab = in_array($tab, $this->cronWorkspaceTabs, true) ? $tab : 'jobs';
+    }
 
     public string $inspect_crontab_user = '';
 
@@ -1280,12 +1290,15 @@ class WorkspaceCron extends Component
             ->where('organization_id', $org->id)
             ->whereKey($templateId)
             ->firstOrFail();
+        $this->editing_job_id = null;
         $this->new_cron_expression = $tpl->cron_expression;
         $this->new_cron_command = $tpl->command;
         $this->new_cron_user = $tpl->user;
         $this->new_description = $tpl->description;
+        $this->command_preset = 'custom';
         $this->updatedNewCronExpression();
         $this->cron_workspace_tab = 'jobs';
+        $this->dispatch('open-modal', 'add-cron-job-modal');
         $this->toastSuccess(__('Loaded template into the form — review and save.'));
     }
 
@@ -1413,7 +1426,8 @@ class WorkspaceCron extends Component
         $org = $this->server->organization;
         $canUpdateOrg = $org !== null && auth()->user()?->can('update', $org);
 
-        if (! $canUpdateOrg && $this->cron_workspace_tab === 'maintenance') {
+        if (! in_array($this->cron_workspace_tab, $this->cronWorkspaceTabs, true)
+            || (! $canUpdateOrg && $this->cron_workspace_tab === 'maintenance')) {
             $this->cron_workspace_tab = 'jobs';
         }
 
