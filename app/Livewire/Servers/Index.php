@@ -403,6 +403,14 @@ class Index extends Component
             ->mapWithKeys(static fn (Server $server) => [$server->id => ProvisioningDigest::forServer($server)])
             ->filter();
 
+        // Servers whose provision step flipped to failed. Surfaced as a
+        // page-level banner above the fleet list so a stalled provision is
+        // visible without scrolling — pairs with the per-card "Setup failed"
+        // chip rendered by displayStatus().
+        $failedSetups = $servers
+            ->where('setup_status', Server::SETUP_STATUS_FAILED)
+            ->values();
+
         return view('livewire.servers.index', [
             'hasServersInScope' => $hasServersInScope,
             'servers' => $servers,
@@ -410,6 +418,7 @@ class Index extends Component
             'insightRollup' => $insightRollup,
             'latestSnapshots' => $latestSnapshots,
             'provisioningDigests' => $provisioningDigests,
+            'failedSetups' => $failedSetups,
             'summary' => $summary,
             'openInsights' => $openInsights,
             'hasProviderCredentials' => $hasProviderCredentials,

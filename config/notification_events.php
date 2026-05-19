@@ -19,6 +19,8 @@ return [
                 'server.monitoring' => 'Server monitoring',
                 'server.container_launch.completed' => 'Container app deploy ready',
                 'server.container_launch.failed' => 'Container app deploy failed (action required)',
+                'server.provisioned' => 'Server provisioned',
+                'server.provision_failed' => 'Server provisioning failed (action required)',
             ],
         ],
         'site' => [

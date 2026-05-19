@@ -120,7 +120,15 @@
                         @else
                             <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
                         @endif
-                        {{ $item['label'] }}
+                        <span class="flex-1 truncate">{{ $item['label'] }}</span>
+                        @if (! empty($item['needs_setup']))
+                            <span
+                                class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                                role="img"
+                                aria-label="{{ __('Setup required') }}"
+                                title="{{ __('Supervisor is not installed yet. Open this section to set it up.') }}"
+                            ></span>
+                        @endif
                     </a>
                 @endforeach
             @endforeach

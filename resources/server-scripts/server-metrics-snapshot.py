@@ -140,6 +140,112 @@ def _should_push_throttled(payload: dict) -> bool:
     return must_push
 
 
+def _collect_scheduler_heartbeats() -> list[dict]:
+    """Collect dply-scheduler-tick sidecars + pair each with its cron expression.
+
+    Reads every `*.json` sidecar under `/var/lib/dply/scheduler-heartbeats/`
+    (configurable via DPLY_SCHEDULER_HEARTBEAT_DIR). Parses the current user's
+    crontab to map (site_id, scheduler_kind) → cron expression so the ingest
+    endpoint can store the cadence without dply having to look it up.
+
+    Best-effort: any heartbeat we can't parse is skipped silently — never
+    fails the whole metrics push.
+    """
+    heartbeat_dir = Path(os.environ.get("DPLY_SCHEDULER_HEARTBEAT_DIR", "/var/lib/dply/scheduler-heartbeats"))
+    if not heartbeat_dir.is_dir():
+        return []
+
+    cron_map = _scheduler_cron_expressions()
+    out: list[dict] = []
+
+    for path in sorted(heartbeat_dir.glob("*.json")):
+        try:
+            sidecar = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(sidecar, dict):
+            continue
+
+        site_id = sidecar.get("site_id")
+        kind = sidecar.get("scheduler_kind")
+        if not isinstance(site_id, str) or not isinstance(kind, str):
+            continue
+
+        cron_expression = cron_map.get((site_id, kind), "")
+        if not cron_expression:
+            # No cron line in this user's crontab references the sidecar's
+            # (site_id, kind). Skip — the ingest endpoint requires a non-empty
+            # cron expression, and shipping a stale sidecar with no cadence
+            # would just produce ingest noise.
+            continue
+
+        out.append({
+            "v": sidecar.get("v", 1),
+            "site_id": site_id,
+            "scheduler_kind": kind,
+            "cron_expression": cron_expression,
+            "last_tick_at": sidecar.get("finished_at"),
+            "exit_code": sidecar.get("exit_code"),
+            "duration_ms": sidecar.get("duration_ms"),
+            "memory_peak_kb": sidecar.get("memory_peak_kb"),
+            "circuit_open": bool(sidecar.get("circuit_open", False)),
+        })
+
+    return out
+
+
+def _scheduler_cron_expressions() -> dict[tuple[str, str], str]:
+    """Return {(site_id, kind): cron_expression} parsed from `crontab -l`.
+
+    Wrapper invocation pattern installed by dply:
+        <cron-expr...> /usr/local/bin/dply-scheduler-tick <site-id> <kind> -- <cmd>
+    Empty / missing crontab returns an empty map (no warning — operators
+    without a scheduler have no entries, that's fine).
+    """
+    try:
+        result = subprocess.run(
+            ["crontab", "-l"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return {}
+    if result.returncode != 0:
+        return {}
+
+    out: dict[tuple[str, str], str] = {}
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "dply-scheduler-tick" not in line:
+            continue
+
+        # Split into [cron-expression-tokens..., wrapper-path, site-id, kind, --, rest...]
+        parts = line.split()
+        # Cron expressions are 5 fields (standard) or 6 (with year). Find the
+        # `dply-scheduler-tick` token to know where the cron expression ends.
+        try:
+            wrapper_idx = next(
+                i for i, tok in enumerate(parts)
+                if tok.endswith("/dply-scheduler-tick") or tok == "dply-scheduler-tick"
+            )
+        except StopIteration:
+            continue
+        if wrapper_idx + 3 >= len(parts):
+            continue
+
+        cron_expr = " ".join(parts[:wrapper_idx])
+        site_id = parts[wrapper_idx + 1]
+        kind = parts[wrapper_idx + 2]
+        if not cron_expr or not site_id or not kind:
+            continue
+        out[(site_id, kind)] = cron_expr
+
+    return out
+
+
 def _post_metrics_callback(payload: dict) -> None:
     env = _load_metrics_callback_env()
     url = env.get("DPLY_METRICS_CALLBACK_URL") or os.environ.get("DPLY_METRICS_CALLBACK_URL")
@@ -157,6 +263,16 @@ def _post_metrics_callback(payload: dict) -> None:
         "metrics": payload,
         "captured_at": iso,
     }
+    # Scheduler heartbeats ride alongside metrics — collected best-effort, no
+    # exception escapes. Always include the key if any heartbeats exist so
+    # the ingest endpoint can detect "no schedulers" as different from
+    # "scheduler dir not yet present."
+    try:
+        heartbeats = _collect_scheduler_heartbeats()
+    except Exception:  # noqa: BLE001 — defensive, must never break the metrics push
+        heartbeats = []
+    if heartbeats:
+        body["scheduler_heartbeats"] = heartbeats
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
         url,

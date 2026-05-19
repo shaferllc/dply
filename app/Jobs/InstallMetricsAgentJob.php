@@ -53,6 +53,7 @@ class InstallMetricsAgentJob implements ShouldBeUnique, ShouldQueue
     public function handle(
         ExecuteRemoteTaskOnServer $remote,
         ServerMetricsGuestScript $script,
+        \App\Services\Servers\SchedulerWrapperScript $wrapper,
     ): void {
         if (! (bool) config('server_provision.install_metrics_agent', true)) {
             return;
@@ -74,6 +75,7 @@ class InstallMetricsAgentJob implements ShouldBeUnique, ShouldQueue
 
         try {
             $deployFragment = $script->guestScriptDeployOnlyScript();
+            $wrapperFragment = $wrapper->installBashFragment($deployUser);
         } catch (Throwable $e) {
             Log::warning('server_metrics.install_agent.script_unavailable', [
                 'server_id' => $this->serverId,
@@ -83,9 +85,12 @@ class InstallMetricsAgentJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        // Install python3-minimal as root, then drop the snapshot script
-        // into the deploy user's home — mirrors the inline metricsAgent()
-        // bash from ServerProvisionCommandBuilder line-for-line.
+        // Install python3-minimal as root, drop the snapshot script as the
+        // deploy user (into $HOME/.dply/bin), then install the scheduler
+        // wrapper system-wide as root (writes to /usr/local/bin via sudo
+        // inside the deploy-user heredoc). Both deploy steps are
+        // idempotent — re-running the install job after a wrapper upgrade
+        // just verifies the SHA + replaces the binary atomically.
         $bash = <<<BASH
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -97,6 +102,7 @@ fi
 
 sudo -u {$deployUser} -H bash -s <<'DPLY_METRICS_DEPLOY'
 {$deployFragment}
+{$wrapperFragment}
 DPLY_METRICS_DEPLOY
 BASH;
 
@@ -139,6 +145,13 @@ BASH;
             if ($bundledSha !== null) {
                 $meta['monitoring_guest_script_sha'] = $bundledSha;
                 $meta['monitoring_guest_verify_checked_at'] = now()->toIso8601String();
+            }
+            try {
+                $meta['scheduler_wrapper_sha'] = $wrapper->bundledSha256();
+                $meta['scheduler_wrapper_installed_at'] = now()->toIso8601String();
+            } catch (Throwable) {
+                // Failure to hash here means the wrapper file is missing
+                // locally — already would have failed in the try{} above.
             }
             $server->forceFill(['meta' => $meta])->saveQuietly();
 

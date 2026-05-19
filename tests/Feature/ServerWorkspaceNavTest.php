@@ -27,7 +27,7 @@ class ServerWorkspaceNavTest extends TestCase
         }
     }
 
-    public function test_nav_hides_php_databases_and_daemons_when_stack_excludes_them(): void
+    public function test_nav_hides_php_and_databases_when_stack_excludes_them(): void
     {
         $server = $this->serverWithStack([
             'webserver' => 'haproxy',
@@ -41,7 +41,10 @@ class ServerWorkspaceNavTest extends TestCase
 
         $this->assertNotContains('php', $keys);
         $this->assertNotContains('databases', $keys);
-        $this->assertNotContains('daemons', $keys);
+        // Daemons stays visible even without supervisor installed — the page itself
+        // offers the Install Supervisor CTA, so the nav entry can't be gated on it.
+        $this->assertContains('daemons', $keys);
+        $this->assertContains('queue-workers', $keys);
         // Always-on / non-gated tabs stay.
         $this->assertContains('firewall', $keys);
         $this->assertContains('settings', $keys);
@@ -62,11 +65,29 @@ class ServerWorkspaceNavTest extends TestCase
 
         $this->assertContains('php', $keys);
         $this->assertContains('databases', $keys);
-        // No supervisor tag means daemons stays hidden even with a full LEMP stack.
-        $this->assertNotContains('daemons', $keys);
+        // Daemons and Queue workers ride on the SSH host, not on Supervisor being installed.
+        $this->assertContains('daemons', $keys);
+        $this->assertContains('queue-workers', $keys);
     }
 
-    public function test_nav_shows_daemons_when_supervisor_package_is_installed(): void
+    public function test_nav_flags_daemons_needs_setup_when_supervisor_missing(): void
+    {
+        $server = $this->serverWithStack([
+            'webserver' => 'nginx',
+            'php_version' => 'none',
+            'database' => 'none',
+            'cache_service' => 'none',
+            'expected_services' => ['nginx'],
+        ]);
+        // No supervisor_package_status update — default leaves it null/missing.
+
+        $items = collect(server_workspace_nav_for_server($server))->keyBy('key');
+
+        $this->assertTrue((bool) ($items['daemons']['needs_setup'] ?? false));
+        $this->assertTrue((bool) ($items['queue-workers']['needs_setup'] ?? false));
+    }
+
+    public function test_nav_drops_needs_setup_flag_when_supervisor_installed(): void
     {
         $server = $this->serverWithStack([
             'webserver' => 'nginx',
@@ -77,9 +98,11 @@ class ServerWorkspaceNavTest extends TestCase
         ]);
         $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
 
-        $keys = array_column(server_workspace_nav_for_server($server), 'key');
+        $items = collect(server_workspace_nav_for_server($server->fresh()))->keyBy('key');
 
-        $this->assertContains('daemons', $keys);
+        $this->assertArrayHasKey('daemons', $items);
+        $this->assertFalse((bool) ($items['daemons']['needs_setup'] ?? false));
+        $this->assertFalse((bool) ($items['queue-workers']['needs_setup'] ?? false));
     }
 
     public function test_route_gate_returns_404_for_php_when_php_is_not_installed(): void

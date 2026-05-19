@@ -2,13 +2,16 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
+use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SupervisorProvisioner;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -23,6 +26,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceQueueWorkers extends Component
 {
+    use ChecksSupervisorInstallStatus;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -56,9 +60,20 @@ class WorkspaceQueueWorkers extends Component
         ['key' => 'nodejs', 'label' => 'Node.js worker', 'description' => 'Generic node server.js — bring your own command.', 'framework' => 'node'],
     ];
 
-    public function mount(Server $server): void
+    /** Optional site context (sites.queue-workers route binds the Site). null = server-wide view. */
+    public ?string $context_site_id = null;
+
+    public function mount(Server $server, ?Site $site = null): void
     {
+        if ($site !== null) {
+            abort_unless($site->server_id === $server->id, 404);
+            abort_unless($server->organization_id === auth()->user()?->currentOrganization()?->id, 404);
+            Gate::authorize('view', $site);
+            $this->context_site_id = $site->id;
+        }
+
         $this->bootWorkspace($server);
+        $this->initSupervisorInstallStatus($server);
     }
 
     public function restartWorker(SupervisorProvisioner $provisioner, string $programId): void
@@ -79,16 +94,21 @@ class WorkspaceQueueWorkers extends Component
     /**
      * Shared verb dispatcher — keeps the three public actions thin and ensures
      * every supervisor lifecycle change goes through the same auth + audit path.
+     * When in site context, restrict lookups + audit payload to that site so
+     * the action can't cross site boundaries via crafted IDs.
      */
     private function workerAction(SupervisorProvisioner $provisioner, string $programId, string $verb): void
     {
         $this->authorize('update', $this->server);
 
-        $program = SupervisorProgram::query()
+        $query = SupervisorProgram::query()
             ->where('server_id', $this->server->id)
             ->whereIn('program_type', self::QUEUE_TYPES)
-            ->whereKey($programId)
-            ->firstOrFail();
+            ->whereKey($programId);
+        if ($this->context_site_id !== null) {
+            $query->where('site_id', $this->context_site_id);
+        }
+        $program = $query->firstOrFail();
 
         try {
             match ($verb) {
@@ -97,10 +117,11 @@ class WorkspaceQueueWorkers extends Component
                 'start' => $provisioner->startProgramGroup($this->server->fresh(), $program->id),
             };
             if ($org = $this->server->organization) {
-                audit_log($org, auth()->user(), 'queue_worker.'.$verb, $program, null, [
+                audit_log($org, auth()->user(), 'queue_worker.'.$verb, $program, null, array_filter([
                     'slug' => $program->slug,
                     'program_type' => $program->program_type,
-                ]);
+                    'site_id' => $this->context_site_id,
+                ], static fn ($v) => $v !== null));
             }
             $this->toastSuccess(__(':verb sent to :slug.', ['verb' => ucfirst($verb), 'slug' => $program->slug]));
         } catch (\Throwable $e) {
@@ -112,13 +133,18 @@ class WorkspaceQueueWorkers extends Component
     {
         $this->server->refresh();
 
-        $programs = SupervisorProgram::query()
-            ->where('server_id', $this->server->id)
-            ->whereIn('program_type', self::QUEUE_TYPES)
-            ->orderBy('slug')
-            ->get();
+        $contextSiteModel = $this->context_site_id !== null
+            ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
+            : null;
 
-        // At-a-glance counts surfaced in the page header.
+        $programsQuery = SupervisorProgram::query()
+            ->where('server_id', $this->server->id)
+            ->whereIn('program_type', self::QUEUE_TYPES);
+        if ($contextSiteModel !== null) {
+            $programsQuery->where('site_id', $contextSiteModel->id);
+        }
+        $programs = $programsQuery->orderBy('slug')->get();
+
         $stats = [
             'active' => $programs->where('is_active', true)->count(),
             'inactive' => $programs->where('is_active', false)->count(),
@@ -130,6 +156,7 @@ class WorkspaceQueueWorkers extends Component
             'programs' => $programs,
             'presets' => self::PRESETS,
             'stats' => $stats,
+            'contextSiteModel' => $contextSiteModel,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

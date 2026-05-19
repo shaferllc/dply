@@ -47,13 +47,21 @@ class MiseInstallScriptBuilder
      */
     public function installLines(bool $forceReinstall = false): array
     {
+        // Gate every apt-get behind dply_wait_for_apt_locks (defined in the
+        // provisioner preamble). The previous package step's needrestart
+        // DPkg::Post-Invoke hook frequently spawns its own short apt-get to
+        // check stale services, which races our `apt-get update` for
+        // /var/lib/apt/lists/lock and returns exit 100. Wait before both
+        // apt calls — needrestart can fire again between update and install.
         $aptSteps = [
             'echo "[dply] installing mise via apt"',
             'install -m 0755 -d /etc/apt/keyrings',
             'curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg',
             'chmod a+r /etc/apt/keyrings/mise-archive-keyring.gpg',
             'echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list',
+            'dply_wait_for_apt_locks',
             'apt-get update -y',
+            'dply_wait_for_apt_locks',
             'apt-get install -y --no-install-recommends mise',
         ];
 

@@ -29,6 +29,29 @@ class MiseInstallScriptBuilderTest extends TestCase
         $this->assertStringContainsString('apt-get install -y --no-install-recommends mise', $script);
     }
 
+    public function test_install_lines_wait_for_apt_locks_before_every_apt_call(): void
+    {
+        // Regression: needrestart's DPkg::Post-Invoke hook spawns its own
+        // apt-get after every package install, racing the next step's
+        // /var/lib/apt/lists/lock and returning exit 100. Every apt-get
+        // in installLines() must be immediately preceded by
+        // dply_wait_for_apt_locks (provisioner preamble function).
+        $lines = (new MiseInstallScriptBuilder)->installLines();
+
+        $trimmed = array_values(array_map('trim', $lines));
+        foreach ($trimmed as $i => $line) {
+            if (! preg_match('/^apt-get (update|install)\b/', $line)) {
+                continue;
+            }
+            $prev = $trimmed[$i - 1] ?? '';
+            $this->assertSame(
+                'dply_wait_for_apt_locks',
+                $prev,
+                "Line '{$line}' must be preceded by dply_wait_for_apt_locks; got '{$prev}'"
+            );
+        }
+    }
+
     public function test_install_lines_target_dpkg_architecture_dynamically(): void
     {
         // Hardcoding amd64 would break on arm64 servers (DO premium SKUs,

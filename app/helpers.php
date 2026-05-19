@@ -98,6 +98,18 @@ if (! function_exists('server_workspace_nav_for_server')) {
             return false;
         });
 
+        // Daemons + Queue workers are visible before Supervisor is installed (the
+        // page itself offers the install CTA). Surface a "needs_setup" flag so the
+        // sidebar can render a small indicator until the package is in place.
+        $needsSupervisorSetup = $server->supervisor_package_status !== Server::SUPERVISOR_PACKAGE_INSTALLED;
+        $filtered = array_map(static function (array $item) use ($needsSupervisorSetup): array {
+            if (in_array($item['key'] ?? null, ['daemons', 'queue-workers'], true) && $needsSupervisorSetup) {
+                $item['needs_setup'] = true;
+            }
+
+            return $item;
+        }, $filtered);
+
         return array_values($filtered);
     }
 }

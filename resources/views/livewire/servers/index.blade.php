@@ -8,16 +8,25 @@
         return $server->status === \App\Models\Server::STATUS_READY
             && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE;
     };
-    $displayStatus = function (\App\Models\Server $server) use ($isFullyReady): string {
+    $isSetupFailed = function (\App\Models\Server $server): bool {
+        return $server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED;
+    };
+    $displayStatus = function (\App\Models\Server $server) use ($isFullyReady, $isSetupFailed): string {
+        if ($isSetupFailed($server)) {
+            return __('setup failed');
+        }
         if ($server->status === \App\Models\Server::STATUS_READY && ! $isFullyReady($server)) {
             return 'provisioning';
         }
 
         return (string) $server->status;
     };
-    $stripe = function (\App\Models\Server $server) use ($isFullyReady): string {
+    $stripe = function (\App\Models\Server $server) use ($isFullyReady, $isSetupFailed): string {
         if ($server->scheduled_deletion_at) {
             return 'bg-orange-500';
+        }
+        if ($isSetupFailed($server)) {
+            return 'bg-red-500';
         }
         if ($isFullyReady($server)) {
             if ($server->health_status === \App\Models\Server::HEALTH_REACHABLE) {
@@ -71,6 +80,36 @@
 
         @if (session('success'))
             <x-alert tone="success">{{ session('success') }}</x-alert>
+        @endif
+
+        @if ($failedSetups->isNotEmpty())
+            <div class="rounded-2xl border border-red-200 bg-red-50/70 px-5 py-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                        <p class="flex items-center gap-2 text-sm font-semibold text-red-900">
+                            <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
+                            {{ trans_choice(
+                                '{1} :count server failed to finish setting up.|[2,*] :count servers failed to finish setting up.',
+                                $failedSetups->count(),
+                                ['count' => $failedSetups->count()],
+                            ) }}
+                        </p>
+                        <ul class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-red-800">
+                            @foreach ($failedSetups as $failed)
+                                <li>
+                                    <a href="{{ route('servers.journey', $failed) }}" wire:navigate class="font-medium underline-offset-2 hover:underline">
+                                        {{ $failed->name }}
+                                    </a>
+                                    @if ($failed->ip_address)
+                                        <span class="text-red-700/70">· {{ $failed->ip_address }}</span>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                        <p class="mt-2 text-xs text-red-800/80">{{ __('Open the journey to see the failing step and retry the provision, or remove the server.') }}</p>
+                    </div>
+                </div>
+            </div>
         @endif
 
         @if ($serverCreateDraft)
@@ -477,12 +516,31 @@
                                                         @endif
                                                     </p>
 
+                                                    {{-- Setup-failed detail: red chip + journey link. Shown instead of
+                                                         the live progress block when applyProvisionOutcomeToServer
+                                                         flipped setup_status to failed. Without this branch the card
+                                                         keeps ticking the elapsed counter on a dead provision. --}}
+                                                    @if ($isSetupFailed($server))
+                                                        <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
+                                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-red-700 ring-1 ring-red-200">
+                                                                <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
+                                                                {{ __('Setup failed') }}
+                                                            </span>
+                                                            <span class="text-brand-ink">{{ __('Provisioning did not finish — open the journey to see the failing step.') }}</span>
+                                                            <a href="{{ route('servers.journey', $server) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 hover:text-red-900">
+                                                                {{ __('Open journey') }}
+                                                                <x-heroicon-m-arrow-right class="h-3 w-3" />
+                                                            </a>
+                                                        </div>
+                                                    @endif
+
                                                     {{-- Live provisioning detail: phase + current step + elapsed + a
                                                          thin progress bar. Mirrors the journey page's headline so an
                                                          operator scanning the fleet sees "where is this in the build"
-                                                         without clicking through. Only renders for in-flight VMs. --}}
+                                                         without clicking through. Only renders for in-flight VMs and
+                                                         is suppressed once setup_status hits failed (see above). --}}
                                                     @php $digest = $provisioningDigests[$server->id] ?? null; @endphp
-                                                    @if ($digest)
+                                                    @if ($digest && ! $isSetupFailed($server))
                                                         <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
                                                             <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-800 ring-1 ring-sky-200">
                                                                 <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500"></span>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\ServerMetricIngestEvent;
+use App\Services\Servers\ScheduleHeartbeatIngest;
 use App\Services\Servers\ServerMetricsCollector;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerMetricsRecorder;
@@ -20,12 +21,13 @@ class MetricsController extends Controller
         ServerMetricsGuestPushService $push,
         ServerMetricsCollector $collector,
         ServerMetricsRecorder $recorder,
+        ScheduleHeartbeatIngest $scheduleHeartbeats,
     ): JsonResponse {
         if ($request->bearerToken() !== null || $request->has('snapshot_id')) {
             return $this->storeIngest($request);
         }
 
-        return $this->storeGuestPush($request, $push, $collector, $recorder);
+        return $this->storeGuestPush($request, $push, $collector, $recorder, $scheduleHeartbeats);
     }
 
     protected function storeIngest(Request $request): JsonResponse
@@ -66,6 +68,7 @@ class MetricsController extends Controller
         ServerMetricsGuestPushService $push,
         ServerMetricsCollector $collector,
         ServerMetricsRecorder $recorder,
+        ScheduleHeartbeatIngest $scheduleHeartbeats,
     ): JsonResponse {
         if (! $push->isEnabled()) {
             return response()->json(['message' => 'Guest metrics push is disabled.'], 503);
@@ -76,6 +79,10 @@ class MetricsController extends Controller
             'token' => ['required', 'string'],
             'metrics' => ['required', 'array'],
             'captured_at' => ['nullable', 'date'],
+            // Optional scheduler-tick heartbeats array. Per-entry validation
+            // happens inside ScheduleHeartbeatIngest so a malformed entry
+            // doesn't fail the whole push.
+            'scheduler_heartbeats' => ['sometimes', 'array'],
         ]);
 
         $server = Server::query()->find($data['server_id']);
@@ -93,6 +100,13 @@ class MetricsController extends Controller
 
         $payload = $collector->normalizePayload($data['metrics']);
         $recorder->storeSnapshot($server->fresh(), $payload, $capturedAt);
+
+        // Heartbeats are independent of the metrics snapshot — a server with
+        // no scheduler still pushes metrics; a server with one always pushes
+        // both. Ingest is best-effort: heartbeat-level failures log + skip.
+        if (! empty($data['scheduler_heartbeats'])) {
+            $scheduleHeartbeats->ingest($server->fresh(), $data['scheduler_heartbeats']);
+        }
 
         $meta = $server->meta ?? [];
         $meta['monitoring_guest_push_last_sample_at'] = $capturedAt->toIso8601String();

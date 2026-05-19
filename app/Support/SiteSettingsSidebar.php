@@ -22,7 +22,7 @@ final class SiteSettingsSidebar
         $supportsSsh = $server->hostCapabilities()->supportsSsh();
 
         if ($site->isCustom()) {
-            return self::customItems($site);
+            return self::flagSupervisorSetup(self::customItems($site), $server);
         }
 
         $showWebserverConfigEditor = $supportsSsh
@@ -127,12 +127,15 @@ final class SiteSettingsSidebar
             ? self::insertBackgroundGroup($withWebserver)
             : $withWebserver;
 
-        return collect($withBackground)
-            ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
-            ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
-            ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
-            ->values()
-            ->all();
+        return self::flagSupervisorSetup(
+            collect($withBackground)
+                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
+                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
+                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
+                ->values()
+                ->all(),
+            $server,
+        );
     }
 
     /**
@@ -204,6 +207,30 @@ final class SiteSettingsSidebar
         ];
 
         return $items;
+    }
+
+    /**
+     * Attach `needs_setup => true` to the Daemons / Queue workers items when Supervisor
+     * isn't installed on the host. Mirrors the same flag emitted by
+     * {@see server_workspace_nav_for_server()} so the sidebar partial can render a
+     * "needs install" dot without re-querying the server.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private static function flagSupervisorSetup(array $items, Server $server): array
+    {
+        if ($server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED) {
+            return $items;
+        }
+
+        return array_map(static function (array $item): array {
+            if (in_array($item['id'] ?? null, ['daemons', 'queue-workers'], true)) {
+                $item['needs_setup'] = true;
+            }
+
+            return $item;
+        }, $items);
     }
 
     /**

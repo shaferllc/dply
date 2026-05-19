@@ -2,20 +2,53 @@
     $card = 'dply-card overflow-hidden';
     $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
     $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $daemonsRoute = route('servers.daemons', $server);
+    $daemonsRoute = ($contextSiteModel ?? null) !== null
+        ? route('sites.daemons', ['server' => $server, 'site' => $contextSiteModel])
+        : route('servers.daemons', $server);
+    $daemonsLabel = ($contextSiteModel ?? null) !== null ? __('Open site Daemons') : __('Open Daemons');
+    $description = ($contextSiteModel ?? null) !== null
+        ? __('Supervisor programs scoped to this site that run queue / background workers. The full daemon CRUD lives on the Daemons page — adding from here pre-fills the directory and system user from the site context.')
+        : __('A focused view of the Supervisor programs on this server that run queue / background workers. The full daemon CRUD lives on the Daemons page — this page lists what\'s here and helps you add common worker presets.');
 @endphp
 
 <x-server-workspace-layout
     :server="$server"
     active="queue-workers"
     :title="__('Queue workers')"
-    :description="__('A focused view of the Supervisor programs on this server that run queue / background workers. The full daemon CRUD lives on the Daemons page — this page lists what\'s here and helps you add common worker presets.')"
+    :description="$description"
+    :context-site="$contextSiteModel ?? null"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <div @if ($server->supervisor_package_status === null) wire:init="refreshSupervisorInstallStatus" @endif>
+    @if ($supervisor_installed === null)
+        <p class="mb-4 flex items-center gap-2 text-sm text-brand-moss">
+            <x-spinner variant="forest" />
+            {{ __('Checking Supervisor installation…') }}
+        </p>
+    @elseif ($supervisor_installed === false)
+        <div class="mb-6 rounded-2xl border border-amber-300/80 bg-amber-50/90 px-5 py-4 sm:flex sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div class="min-w-0">
+                <h2 class="text-sm font-semibold text-amber-950">{{ __('Supervisor is not installed') }}</h2>
+                <p class="mt-1 text-sm text-amber-900/90">{{ __('Queue workers are Supervisor programs — install Supervisor on the Daemons page before adding workers here.') }}</p>
+            </div>
+            <a
+                href="{{ $daemonsRoute }}"
+                wire:navigate
+                class="mt-4 inline-flex shrink-0 items-center justify-center rounded-lg bg-amber-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-950 sm:mt-0"
+            >
+                {{ __('Go to Daemons to install') }}
+            </a>
+        </div>
+    @endif
+
     <x-explainer class="mb-4">
-        <p>{{ __('Queue workers are Supervisor programs whose program_type matches a known queue framework (Laravel queue/Horizon/Octane/Reverb, Sidekiq, Solid Queue, Celery, BullMQ, generic Node). Programs added here also appear on the Daemons page since they share the same model.') }}</p>
+        @if (($contextSiteModel ?? null) !== null)
+            <p>{{ __('Filtered to this site — only Supervisor programs whose site_id matches are shown here. Use a preset below to add a site-scoped worker; it lands on the site Daemons page with the directory and system user pre-filled.') }}</p>
+        @else
+            <p>{{ __('Queue workers are Supervisor programs whose program_type matches a known queue framework (Laravel queue/Horizon/Octane/Reverb, Sidekiq, Solid Queue, Celery, BullMQ, generic Node). Programs added here also appear on the Daemons page since they share the same model.') }}</p>
+        @endif
         <p class="mt-2 text-xs"><a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="font-semibold text-brand-ink underline">{{ __('View background activity →') }}</a></p>
     </x-explainer>
 
@@ -41,13 +74,19 @@
             <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-ink">{{ __('Active workers') }}</h2>
             <a href="{{ $daemonsRoute }}" wire:navigate class="{{ $btnSecondary }}">
                 <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
-                {{ __('Open Daemons') }}
+                {{ $daemonsLabel }}
             </a>
         </header>
 
         @if ($programs->isEmpty())
             <div class="px-5 py-10 text-center text-sm text-brand-moss">
-                <p>{{ __('No queue workers configured yet. Use a preset below to add one.') }}</p>
+                <p>
+                    @if (($contextSiteModel ?? null) !== null)
+                        {{ __('No queue workers for this site yet. Use a preset below to add one.') }}
+                    @else
+                        {{ __('No queue workers configured yet. Use a preset below to add one.') }}
+                    @endif
+                </p>
             </div>
         @else
             <ul class="divide-y divide-brand-ink/10">
@@ -60,7 +99,7 @@
                                 <span>{{ $program->program_type }}</span>
                                 <span>·</span>
                                 <span>{{ trans_choice('{1}:count process|[2,*]:count processes', (int) $program->numprocs, ['count' => (int) $program->numprocs]) }}</span>
-                                @if ($program->site_id)
+                                @if ($program->site_id && ($contextSiteModel ?? null) === null)
                                     <span>·</span>
                                     <span>{{ __('site-scoped') }}</span>
                                 @endif
@@ -78,7 +117,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="restartWorker"
                                     class="{{ $btnSecondary }}"
-                                    @disabled(! $opsReady)
+                                    @disabled(! $opsReady || $supervisor_installed !== true)
                                 >
                                     <x-heroicon-o-arrow-path class="h-4 w-4" />
                                     {{ __('Restart') }}
@@ -90,7 +129,7 @@
                                     wire:target="stopWorker"
                                     wire:confirm="{{ __('Stop :slug?', ['slug' => $program->slug]) }}"
                                     class="{{ $btnSecondary }}"
-                                    @disabled(! $opsReady)
+                                    @disabled(! $opsReady || $supervisor_installed !== true)
                                 >
                                     <x-heroicon-o-stop class="h-4 w-4" />
                                     {{ __('Stop') }}
@@ -102,7 +141,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="startWorker"
                                     class="{{ $btnSecondary }}"
-                                    @disabled(! $opsReady)
+                                    @disabled(! $opsReady || $supervisor_installed !== true)
                                 >
                                     <x-heroicon-o-play class="h-4 w-4" />
                                     {{ __('Start') }}
@@ -145,4 +184,5 @@
             @endforeach
         </div>
     </section>
+    </div>{{-- /supervisor-install scope --}}
 </x-server-workspace-layout>

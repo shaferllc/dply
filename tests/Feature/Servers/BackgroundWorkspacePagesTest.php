@@ -10,7 +10,6 @@ use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceSchedule;
-use App\Livewire\Sites\SiteQueueWorkers;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
@@ -86,45 +85,52 @@ class BackgroundWorkspacePagesTest extends TestCase
         $this->assertSame([$queue->id], $programs->pluck('id')->all(), 'Only the queue-type program should appear, not the custom one.');
     }
 
-    public function test_schedule_page_filters_cron_entries_by_command_pattern(): void
+    public function test_schedule_page_renders_detected_unmonitored_card_for_scheduler_shaped_cron(): void
     {
+        // Rewritten for the milestone-2A scheduler control plane: the page no
+        // longer surfaces a raw cron-entries collection — it pivots into
+        // per-site cards with state. A scheduler-shaped cron on a site
+        // without a wrapper-managed heartbeat shows up as
+        // `detected_unmonitored`; an unrelated cron contributes nothing.
         $user = $this->actingOrgUser();
         $server = $this->readyServer($user);
-
-        $schedRunCron = ServerCronJob::create([
+        $site = Site::factory()->create([
             'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+
+        ServerCronJob::create([
+            'server_id' => $server->id,
+            'site_id' => $site->id,
             'cron_expression' => '* * * * *',
             'command' => 'cd /home/dply/app && php artisan schedule:run',
             'user' => 'dply',
             'enabled' => true,
         ]);
-        $unrelatedCron = ServerCronJob::create([
+        ServerCronJob::create([
             'server_id' => $server->id,
+            'site_id' => $site->id,
             'cron_expression' => '0 3 * * *',
             'command' => 'rsync /var/log /backup',
             'user' => 'dply',
             'enabled' => true,
-        ]);
-        $schedDaemon = SupervisorProgram::create([
-            'server_id' => $server->id,
-            'slug' => 'laravel-schedule',
-            'program_type' => 'custom',
-            'command' => 'php artisan schedule:work',
-            'directory' => '/home/dply/app',
-            'user' => 'dply',
-            'numprocs' => 1,
-            'is_active' => true,
         ]);
 
         $component = Livewire::actingAs($user)
             ->test(WorkspaceSchedule::class, ['server' => $server]);
 
         $component->assertOk();
-        $cron = $component->viewData('cronEntries');
-        $daemons = $component->viewData('schedulerDaemons');
-        $this->assertSame([$schedRunCron->id], $cron->pluck('id')->all());
-        $this->assertSame([$schedDaemon->id], $daemons->pluck('id')->all());
-        $this->assertNotContains($unrelatedCron->id, $cron->pluck('id')->all());
+
+        $cards = $component->viewData('cards');
+        $this->assertCount(1, $cards, 'Only the scheduler-shaped cron produces a card; unrelated cron is ignored.');
+        $this->assertSame('detected_unmonitored', $cards[0]['state']);
+        $this->assertSame('laravel', $cards[0]['kind']);
+        $this->assertSame($site->id, $cards[0]['site']->id);
+
+        $stats = $component->viewData('stats');
+        $this->assertSame(1, $stats['unmonitored']);
+        $this->assertSame(0, $stats['tracked_total']);
     }
 
     public function test_backups_page_run_now_dispatches_database_export_job(): void
@@ -215,7 +221,10 @@ class BackgroundWorkspacePagesTest extends TestCase
     {
         $user = $this->actingOrgUser();
         $server = $this->readyServer($user);
-        // Mark supervisor as installed so the `requires_any_tags: ['supervisor']` middleware lets us through.
+        // Supervisor install status is irrelevant for the route gate — the page now
+        // self-handles the not-installed case with an Install CTA. We mark it
+        // installed here so the worker management surface renders (Add a worker,
+        // Active workers panel) rather than the install prompt.
         $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
 
         $this->actingAs($user)
@@ -228,6 +237,10 @@ class BackgroundWorkspacePagesTest extends TestCase
 
     public function test_schedule_route_renders_via_http(): void
     {
+        // Stable markers post milestone-2A rewrite: page heading + the
+        // description copy that ships in every render regardless of whether
+        // any sites exist or any schedulers are configured. Per-site cards
+        // and the Enable form only render when there are sites to act on.
         $user = $this->actingOrgUser();
         $server = $this->readyServer($user);
 
@@ -235,7 +248,7 @@ class BackgroundWorkspacePagesTest extends TestCase
             ->get(route('servers.schedule', $server))
             ->assertOk()
             ->assertSee('Schedule', false)
-            ->assertSee('Cron-driven schedulers', false);
+            ->assertSee('Framework schedulers running on this server', false);
     }
 
     public function test_backups_route_renders_via_http(): void
@@ -297,15 +310,39 @@ class BackgroundWorkspacePagesTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_queue_workers_route_404s_when_supervisor_missing(): void
+    public function test_queue_workers_route_renders_when_supervisor_missing(): void
     {
+        // The supervisor gate was dropped so the page is reachable before install —
+        // the page itself surfaces the Install Supervisor CTA. Verify the route
+        // serves the page (not a 404) and the install banner is present.
         $user = $this->actingOrgUser();
         $server = $this->readyServer($user);
+        $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_MISSING]);
         $this->setExpectedServices($server, ['nginx', 'php-fpm']);
 
         $this->actingAs($user)
             ->get(route('servers.queue-workers', $server))
-            ->assertNotFound();
+            ->assertOk()
+            ->assertSee('Supervisor is not installed', false)
+            ->assertSee('Go to Daemons to install', false);
+    }
+
+    public function test_site_queue_workers_route_shows_install_banner_when_supervisor_missing(): void
+    {
+        $user = $this->actingOrgUser();
+        $server = $this->readyServer($user);
+        $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_MISSING]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $server->organization_id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sites.queue-workers', ['server' => $server, 'site' => $site]))
+            ->assertOk()
+            ->assertSee('Supervisor is not installed', false)
+            ->assertSee('Go to Daemons to install', false);
     }
 
     public function test_backups_route_denied_for_user_outside_organization(): void
@@ -555,8 +592,28 @@ class BackgroundWorkspacePagesTest extends TestCase
         $this->assertGreaterThan(now()->timestamp, $meta[$schedule->id]['next_run_at']->getTimestamp());
     }
 
-    public function test_enable_scheduler_for_site_creates_laravel_cron_entry(): void
+    /** Stub the preflight so Enable doesn't try to SSH to a fake test server. */
+    private function stubAllPreflightChecksPass(): void
     {
+        $allPass = [
+            ['key' => 'site_release_present', 'status' => 'pass', 'message' => 'ok'],
+            ['key' => 'php_binary', 'status' => 'pass', 'message' => 'ok'],
+            ['key' => 'artisan_file', 'status' => 'pass', 'message' => 'ok'],
+            ['key' => 'laravel_boots', 'status' => 'pass', 'message' => 'ok'],
+            ['key' => 'scheduler_has_tasks', 'status' => 'pass', 'message' => 'ok'],
+            ['key' => 'cron_user_access', 'status' => 'pass', 'message' => 'ok'],
+            ['key' => 'no_duplicate_scheduler', 'status' => 'pass', 'message' => 'ok'],
+        ];
+        $stub = \Mockery::mock(\App\Services\Servers\PreflightSchedulerOnSite::class);
+        $stub->shouldReceive('run')->andReturn($allPass);
+        $stub->shouldReceive('structuralFailures')->andReturn([]);
+        $stub->shouldReceive('advisoryWarnings')->andReturn([]);
+        $this->app->instance(\App\Services\Servers\PreflightSchedulerOnSite::class, $stub);
+    }
+
+    public function test_enable_scheduler_for_site_creates_laravel_wrapper_cron_entry(): void
+    {
+        $this->stubAllPreflightChecksPass();
         $user = $this->actingOrgUser();
         $server = $this->readyServer($user);
         $site = Site::factory()->create([
@@ -577,12 +634,17 @@ class BackgroundWorkspacePagesTest extends TestCase
             ->where('site_id', $site->id)
             ->first();
         $this->assertNotNull($entry);
+        // Enable now wraps the bare command in dply-scheduler-tick (Q3 + Q9
+        // wrapper contract). The underlying `php artisan schedule:run` is
+        // preserved as the wrapper's `-- <cmd>` tail.
+        $this->assertStringContainsString('/usr/local/bin/dply-scheduler-tick', $entry->command);
         $this->assertStringContainsString('schedule:run', $entry->command);
         $this->assertSame('* * * * *', $entry->cron_expression);
     }
 
-    public function test_enable_scheduler_for_site_creates_rails_whenever_entry(): void
+    public function test_enable_scheduler_for_site_creates_rails_wrapper_cron_entry(): void
     {
+        $this->stubAllPreflightChecksPass();
         $user = $this->actingOrgUser();
         $server = $this->readyServer($user);
         $site = Site::factory()->create([
@@ -603,6 +665,7 @@ class BackgroundWorkspacePagesTest extends TestCase
             ->where('site_id', $site->id)
             ->first();
         $this->assertNotNull($entry);
+        $this->assertStringContainsString('/usr/local/bin/dply-scheduler-tick', $entry->command);
         $this->assertStringContainsString('whenever', $entry->command);
     }
 
@@ -788,12 +851,15 @@ class BackgroundWorkspacePagesTest extends TestCase
             ->test(WorkspaceQueueWorkers::class, ['server' => $server])
             ->call('stopWorker', $program->id);
 
-        // Audit row emitted.
+        // SupervisorProgram::create above triggers the observer, which writes
+        // a `server.daemons.program_created` row at the same second as the
+        // worker action below — so filter by action rather than ordering by
+        // created_at (which ties at second-precision timestamps).
         $audit = \App\Models\AuditLog::query()
             ->where('organization_id', $server->organization_id)
-            ->latest('created_at')
+            ->where('action', 'queue_worker.stop')
             ->first();
-        $this->assertSame('queue_worker.stop', $audit?->action);
+        $this->assertNotNull($audit, 'Expected a queue_worker.stop audit row.');
     }
 
     public function test_queue_workers_start_action_calls_start_program_group(): void
@@ -823,9 +889,9 @@ class BackgroundWorkspacePagesTest extends TestCase
 
         $audit = \App\Models\AuditLog::query()
             ->where('organization_id', $server->organization_id)
-            ->latest('created_at')
+            ->where('action', 'queue_worker.start')
             ->first();
-        $this->assertSame('queue_worker.start', $audit?->action);
+        $this->assertNotNull($audit, 'Expected a queue_worker.start audit row.');
     }
 
     public function test_queue_workers_stats_count_active_inactive_and_total_processes(): void
@@ -1262,8 +1328,12 @@ class BackgroundWorkspacePagesTest extends TestCase
             ->test(WorkspaceSchedule::class, ['server' => $server]);
 
         $this->assertSame($site->id, $component->get('context_site_id'));
-        $entries = $component->viewData('cronEntries');
-        $this->assertSame([$siteCron->id], $entries->pluck('id')->all());
+        // Cards are filtered to the context site at render time. Both sites
+        // had scheduler-shaped cron entries; only the filtered one shows.
+        $cards = $component->viewData('cards');
+        $this->assertCount(1, $cards, 'Context filter should narrow to the requested site only.');
+        $this->assertSame($site->id, $cards[0]['site']->id);
+        $this->assertSame('detected_unmonitored', $cards[0]['state']);
         $this->assertSame($site->id, $component->get('enable_site_id'), 'Enable scheduler form pre-fills site id.');
     }
 
@@ -1385,14 +1455,15 @@ class BackgroundWorkspacePagesTest extends TestCase
         app()->instance(\App\Services\Servers\SupervisorProvisioner::class, $provisioner);
 
         Livewire::actingAs($user)
-            ->test(SiteQueueWorkers::class, ['server' => $server, 'site' => $site])
+            ->test(WorkspaceQueueWorkers::class, ['server' => $server, 'site' => $site])
             ->call('stopWorker', $program->id);
 
+        // Filter by action to avoid tying with the observer's `program_created` row.
         $audit = \App\Models\AuditLog::query()
             ->where('organization_id', $server->organization_id)
-            ->latest('created_at')
+            ->where('action', 'queue_worker.stop')
             ->first();
-        $this->assertSame('queue_worker.stop', $audit?->action);
+        $this->assertNotNull($audit, 'Expected a queue_worker.stop audit row.');
         $this->assertSame($site->id, $audit?->new_values['site_id'] ?? null);
     }
 
@@ -1430,7 +1501,7 @@ class BackgroundWorkspacePagesTest extends TestCase
         ]);
 
         $component = Livewire::actingAs($user)
-            ->test(SiteQueueWorkers::class, ['server' => $server, 'site' => $siteA]);
+            ->test(WorkspaceQueueWorkers::class, ['server' => $server, 'site' => $siteA]);
         $stats = $component->viewData('stats');
 
         $this->assertSame(1, $stats['active']);
@@ -1477,7 +1548,7 @@ class BackgroundWorkspacePagesTest extends TestCase
         ]);
 
         $component = Livewire::actingAs($user)
-            ->test(SiteQueueWorkers::class, ['server' => $server, 'site' => $siteA]);
+            ->test(WorkspaceQueueWorkers::class, ['server' => $server, 'site' => $siteA]);
         $component->assertOk();
 
         $programs = $component->viewData('programs');

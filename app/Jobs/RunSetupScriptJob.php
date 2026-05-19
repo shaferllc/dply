@@ -198,6 +198,38 @@ class RunSetupScriptJob implements ShouldQueue
                     ->delay(now()->addSeconds(45));
             }
 
+            // Mirror meta['cache_service'] and meta['database'] into the
+            // workspace tables so the Caches / Databases pages have a row
+            // to render. The provision shell scripts already installed the
+            // packages and started the services; this is the missing data
+            // bridge. Idempotent — only inserts when the row is absent.
+            try {
+                app(\App\Actions\Servers\SeedProvisionedEnginesForServer::class)
+                    ->execute($server->fresh() ?? $server);
+            } catch (\Throwable $e) {
+                ProvisionPipelineLog::warning('server.provision.engine_seed_failed', $server, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Fan out provision-success to the org's configured operational
+            // channels (Slack/Discord/Teams/etc) plus publish to the in-app
+            // inbox. Always-send on the channel path — success fan-outs of
+            // "<server> is ready" aren't noisy enough to warrant per-server
+            // opt-in subscriptions. The creator email stays on its existing
+            // `email_server_credentials_enabled` opt-in (handled above) so the
+            // SSH credentials block is still gated.
+            static::dispatchProvisionEvent(
+                $server->fresh() ?? $server,
+                eventKey: 'server.provisioned',
+                channelSubject: sprintf('[dply] Server is ready: %s', $server->name ?: $server->id),
+                inboxTitle: sprintf('Server "%s" is ready', $server->name ?: $server->id),
+                inboxBody: 'Provisioning finished. Open the server overview to start adding sites or connect via SSH.',
+                actionUrl: \Illuminate\Support\Facades\URL::route('servers.overview', $server),
+                actionLabel: 'Open server',
+                bodyLines: static::successBodyLines($server),
+            );
+
             return;
         }
 
@@ -211,6 +243,205 @@ class RunSetupScriptJob implements ShouldQueue
             'setup_status' => Server::SETUP_STATUS_FAILED,
             'meta' => $meta,
         ]);
+
+        // Always alert the creator — silent failures are worse than a few extra
+        // emails. The UI also shows a "Setup failed" chip on the index card
+        // (see resources/views/livewire/servers/index.blade.php), but operators
+        // not actively watching the dashboard need a push.
+        $creator = $server->user;
+        $excerpt = static::extractLastProvisionError($server);
+        if ($creator && filled($creator->email)) {
+            try {
+                $creator->notify(new \App\Notifications\ServerProvisionFailedNotification($server->fresh() ?? $server, $excerpt));
+            } catch (\Throwable $e) {
+                ProvisionPipelineLog::warning('server.provision.failure_email_send_failed', $server, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $failureBodyLines = [
+            sprintf('Provider: %s', $server->provider?->label() ?? '—'),
+            sprintf('Address: %s', $server->ip_address ?: '—'),
+        ];
+        if (is_string($excerpt) && trim($excerpt) !== '') {
+            $failureBodyLines[] = 'Last error: '.\Illuminate\Support\Str::limit(trim($excerpt), 400);
+        }
+
+        static::dispatchProvisionEvent(
+            $server->fresh() ?? $server,
+            eventKey: 'server.provision_failed',
+            channelSubject: sprintf('[dply] Server provisioning failed: %s', $server->name ?: $server->id),
+            inboxTitle: sprintf('Server "%s" failed to provision', $server->name ?: $server->id),
+            inboxBody: 'Provisioning stopped before finishing. Open the journey to see the failing step and retry.',
+            actionUrl: \Illuminate\Support\Facades\URL::route('servers.journey', $server),
+            actionLabel: 'Open journey',
+            bodyLines: $failureBodyLines,
+        );
+    }
+
+    /**
+     * Common path for provision-{success,failure} fan-out. Sends an operational
+     * message to every NotificationChannel attached to the server's organization
+     * (always-on; subscriptions are intentionally bypassed) then publishes a
+     * NotificationEvent so the in-app inbox + any subscribed Slack/Discord
+     * channels also see it. The publisher call passes the just-dispatched channel
+     * IDs as `excludeChannelIds` so subscribed channels don't receive a second
+     * copy via the routing pipe.
+     *
+     * @param  list<string>  $bodyLines  Pre-formatted lines for the chat-channel
+     *                                   body (joined with \n). Inbox uses the
+     *                                   shorter `$inboxBody`.
+     */
+    private static function dispatchProvisionEvent(
+        Server $server,
+        string $eventKey,
+        string $channelSubject,
+        string $inboxTitle,
+        string $inboxBody,
+        string $actionUrl,
+        string $actionLabel,
+        array $bodyLines,
+    ): void {
+        $sentChannelIds = [];
+        try {
+            $organization = $server->organization;
+            if ($organization !== null) {
+                $organization->loadMissing('notificationChannels');
+                $body = implode("\n", $bodyLines);
+                foreach ($organization->notificationChannels as $channel) {
+                    $channel->sendOperationalMessage($channelSubject, $body, $actionUrl, $actionLabel);
+                    $sentChannelIds[] = (string) $channel->id;
+                }
+            }
+        } catch (\Throwable $e) {
+            ProvisionPipelineLog::warning('server.provision.channel_dispatch_failed', $server, [
+                'event_key' => $eventKey,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            app(\App\Services\Notifications\NotificationPublisher::class)->publish(
+                eventKey: $eventKey,
+                subject: $server,
+                title: $inboxTitle,
+                body: $inboxBody,
+                url: $actionUrl,
+                metadata: [
+                    'server_name' => $server->name,
+                    'ip' => $server->ip_address,
+                ],
+                excludeChannelIds: $sentChannelIds,
+            );
+        } catch (\Throwable $e) {
+            ProvisionPipelineLog::warning('server.provision.event_publish_failed', $server, [
+                'event_key' => $eventKey,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Format the wizard's stack choices (php_version, database, cache_service,
+     * webserver) into a short list of "Label: value" lines for the success
+     * channel body. Skips slots the operator left empty or set to 'none'.
+     *
+     * @return list<string>
+     */
+    private static function successBodyLines(Server $server): array
+    {
+        $lines = [
+            sprintf('Provider: %s', $server->provider?->label() ?? '—'),
+            sprintf('Address: %s', $server->ip_address ?: '—'),
+        ];
+
+        $meta = $server->meta ?? [];
+        $stackBits = [];
+        $php = trim((string) ($meta['php_version'] ?? ''));
+        if ($php !== '' && $php !== 'none') {
+            $stackBits[] = 'PHP '.$php;
+        }
+        $db = trim((string) ($meta['database'] ?? ''));
+        if ($db !== '' && $db !== 'none') {
+            $stackBits[] = self::humanizeDatabase($db);
+        }
+        $cache = trim((string) ($meta['cache_service'] ?? ''));
+        if ($cache !== '' && $cache !== 'none') {
+            $stackBits[] = ucfirst($cache);
+        }
+        $webserver = trim((string) ($meta['webserver'] ?? ''));
+        if ($webserver !== '' && $webserver !== 'none') {
+            $stackBits[] = ucfirst($webserver);
+        }
+
+        if ($stackBits !== []) {
+            $lines[] = 'Stack: '.implode(' · ', $stackBits);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Map raw database meta values (postgres18, mariadb1011, sqlite3, ...) to
+     * a more chat-friendly label. Falls back to ucfirst when the pattern isn't
+     * recognised so new engines render legibly without code changes here.
+     */
+    private static function humanizeDatabase(string $engine): string
+    {
+        if (preg_match('/^postgres(\d+)$/', $engine, $m)) {
+            return 'PostgreSQL '.$m[1];
+        }
+        if (preg_match('/^mysql(\d)(\d)$/', $engine, $m)) {
+            return 'MySQL '.$m[1].'.'.$m[2];
+        }
+        if (preg_match('/^mariadb(\d{2,4})$/', $engine, $m)) {
+            $v = $m[1];
+            if (strlen($v) === 2) {
+                return 'MariaDB '.$v[0].'.'.$v[1];
+            }
+            if (strlen($v) === 4) {
+                return 'MariaDB '.substr($v, 0, 2).'.'.substr($v, 2);
+            }
+
+            return 'MariaDB '.$v;
+        }
+        if (preg_match('/^sqlite(\d+)$/', $engine, $m)) {
+            return 'SQLite '.$m[1];
+        }
+
+        return ucfirst($engine);
+    }
+
+    /**
+     * Pull a short snippet of the most recent failure from the provision
+     * step snapshots stored in meta so the failure email can carry context
+     * without making the recipient open the journey to know what broke.
+     * Returns null when no usable error string is available.
+     */
+    private static function extractLastProvisionError(Server $server): ?string
+    {
+        $meta = $server->meta ?? [];
+        $snapshots = $meta['provision_step_snapshots'] ?? null;
+        if (! is_array($snapshots) || $snapshots === []) {
+            return null;
+        }
+
+        // Walk the snapshots in insertion order and keep the last non-empty
+        // output we see — the failing step is normally the most recent one
+        // recorded, and its output contains the apt/ssh error message.
+        $lastOutput = null;
+        foreach ($snapshots as $snap) {
+            if (! is_array($snap)) {
+                continue;
+            }
+            $output = trim((string) ($snap['output'] ?? ''));
+            if ($output !== '') {
+                $lastOutput = $output;
+            }
+        }
+
+        return $lastOutput;
     }
 
     /**

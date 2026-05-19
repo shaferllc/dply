@@ -1759,6 +1759,29 @@ CREATE TABLE public.server_recipes (
 
 
 --
+-- Name: server_scheduler_heartbeats; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.server_scheduler_heartbeats (
+    id character(26) NOT NULL,
+    server_id character(26) NOT NULL,
+    site_id character(26),
+    scheduler_kind character varying(32) NOT NULL,
+    cron_expression character varying(128) NOT NULL,
+    last_tick_at timestamp(0) with time zone,
+    last_exit_code smallint,
+    last_duration_ms integer,
+    last_memory_peak_kb integer,
+    consecutive_misses smallint DEFAULT '0'::smallint NOT NULL,
+    first_seen_at timestamp(0) with time zone NOT NULL,
+    circuit_open boolean DEFAULT false NOT NULL,
+    output_capture_enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp(0) with time zone,
+    updated_at timestamp(0) with time zone
+);
+
+
+--
 -- Name: server_ssh_key_audit_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3972,6 +3995,22 @@ ALTER TABLE ONLY public.server_recipes
 
 
 --
+-- Name: server_scheduler_heartbeats server_scheduler_heartbeats_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.server_scheduler_heartbeats
+    ADD CONSTRAINT server_scheduler_heartbeats_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: server_scheduler_heartbeats server_scheduler_heartbeats_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.server_scheduler_heartbeats
+    ADD CONSTRAINT server_scheduler_heartbeats_unique UNIQUE (server_id, site_id, scheduler_kind);
+
+
+--
 -- Name: server_ssh_key_audit_events server_ssh_key_audit_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5322,6 +5361,13 @@ CREATE INDEX server_provision_step_runs_label_hash_index ON public.server_provis
 
 
 --
+-- Name: server_scheduler_heartbeats_last_tick_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX server_scheduler_heartbeats_last_tick_at_index ON public.server_scheduler_heartbeats USING btree (last_tick_at);
+
+
+--
 -- Name: server_ssh_key_audit_events_server_id_created_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6555,6 +6601,22 @@ ALTER TABLE ONLY public.server_recipes
 
 
 --
+-- Name: server_scheduler_heartbeats server_scheduler_heartbeats_server_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.server_scheduler_heartbeats
+    ADD CONSTRAINT server_scheduler_heartbeats_server_id_foreign FOREIGN KEY (server_id) REFERENCES public.servers(id) ON DELETE CASCADE;
+
+
+--
+-- Name: server_scheduler_heartbeats server_scheduler_heartbeats_site_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.server_scheduler_heartbeats
+    ADD CONSTRAINT server_scheduler_heartbeats_site_id_foreign FOREIGN KEY (site_id) REFERENCES public.sites(id) ON DELETE CASCADE;
+
+
+--
 -- Name: server_ssh_key_audit_events server_ssh_key_audit_events_server_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7486,6 +7548,7 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 174	2026_05_18_203843_add_app_profile_to_server_firewall_rules	8
 175	2026_05_18_204509_add_iface_to_server_firewall_rules	9
 176	2026_05_19_000000_scope_backup_configurations_to_organization	10
+177	2026_05_19_100000_create_server_scheduler_heartbeats_table	11
 \.
 
 
@@ -7493,7 +7556,7 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 -- Name: migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.migrations_id_seq', 176, true);
+SELECT pg_catalog.setval('public.migrations_id_seq', 177, true);
 
 
 --

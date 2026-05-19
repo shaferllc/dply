@@ -177,6 +177,7 @@
                             $icon = $item['icon'];
                             $label = __($item['label']);
                             $navHref = server_workspace_nav_item_url($server, $item);
+                            $needsSetup = (bool) ($item['needs_setup'] ?? false);
                         @endphp
                         <a
                             href="{{ $navHref }}"
@@ -255,7 +256,15 @@
                                     <x-heroicon-o-folder class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
                             @endswitch
-                            {{ $label }}
+                            <span class="flex-1 truncate">{{ $label }}</span>
+                            @if ($needsSetup)
+                                <span
+                                    class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                                    role="img"
+                                    aria-label="{{ __('Setup required') }}"
+                                    title="{{ __('Supervisor is not installed yet. Open this section to set it up.') }}"
+                                ></span>
+                            @endif
                         </a>
                         @endforeach
                     @endforeach

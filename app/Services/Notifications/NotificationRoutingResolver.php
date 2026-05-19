@@ -17,8 +17,12 @@ class NotificationRoutingResolver
 
     /**
      * @param  list<string>  $recipientUserIds
+     * @param  list<string>  $excludeChannelIds  NotificationChannel ULIDs that have already received
+     *                                           this event from a direct fan-out path and should be
+     *                                           skipped here to avoid double-dispatch. Empty list
+     *                                           preserves the original behaviour.
      */
-    public function route(NotificationEvent $event, array $recipientUserIds = []): void
+    public function route(NotificationEvent $event, array $recipientUserIds = [], array $excludeChannelIds = []): void
     {
         if ($event->supports_in_app) {
             foreach (array_values(array_unique($recipientUserIds)) as $userId) {
@@ -44,6 +48,8 @@ class NotificationRoutingResolver
             return;
         }
 
+        $excludeSet = array_flip($excludeChannelIds);
+
         $subs = NotificationSubscription::query()
             ->where('event_key', $event->event_key)
             ->where('subscribable_type', $event->resource_type)
@@ -55,6 +61,12 @@ class NotificationRoutingResolver
         foreach ($subs as $sub) {
             $channel = $sub->channel;
             if (! $channel instanceof NotificationChannel) {
+                continue;
+            }
+            // Caller already dispatched to this channel directly (e.g. provision
+            // failure fan-out hits every org channel always-on); skip the
+            // subscription pipe so the operator doesn't see two copies.
+            if (isset($excludeSet[(string) $channel->id])) {
                 continue;
             }
 

@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -26,6 +27,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceDaemons extends Component
 {
+    use ChecksSupervisorInstallStatus;
     use ConfirmsActionWithModal;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
@@ -140,9 +142,6 @@ class WorkspaceDaemons extends Component
 
     public string $copy_new_slug = '';
 
-    /** null = not checked yet (wire:init), true/false from dpkg on server */
-    public ?bool $supervisor_installed = null;
-
     public function mount(Server $server, ?Site $site = null): void
     {
         if ($site !== null) {
@@ -154,11 +153,7 @@ class WorkspaceDaemons extends Component
         $this->bootWorkspace($server);
         $this->new_sv_user = $this->defaultProgramUser();
         $this->new_sv_directory = $this->defaultProgramDirectory();
-        $this->supervisor_installed = match ($server->supervisor_package_status) {
-            Server::SUPERVISOR_PACKAGE_INSTALLED => true,
-            Server::SUPERVISOR_PACKAGE_MISSING => false,
-            default => null,
-        };
+        $this->initSupervisorInstallStatus($server);
 
         $resolvedSiteId = $site?->id;
         if ($resolvedSiteId === null) {
@@ -959,27 +954,6 @@ class WorkspaceDaemons extends Component
             $this->cancelEditProgram();
         }
         $this->toastSuccess(__('Removed. Sync Supervisor to reload on the server.'));
-    }
-
-    public function refreshSupervisorInstallStatus(SupervisorProvisioner $provisioner): void
-    {
-        $this->authorize('view', $this->server);
-        $this->server->refresh();
-        if ($this->server->supervisor_package_status !== null) {
-            $this->supervisor_installed = $this->server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED;
-
-            return;
-        }
-        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->supervisor_installed = false;
-
-            return;
-        }
-        $installed = $provisioner->isSupervisorPackageInstalled($this->server->fresh());
-        $this->server->update([
-            'supervisor_package_status' => $installed ? Server::SUPERVISOR_PACKAGE_INSTALLED : Server::SUPERVISOR_PACKAGE_MISSING,
-        ]);
-        $this->supervisor_installed = $installed;
     }
 
     public function installSupervisorPackage(SupervisorProvisioner $provisioner): void
