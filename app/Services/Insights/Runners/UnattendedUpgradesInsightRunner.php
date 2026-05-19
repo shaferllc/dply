@@ -60,11 +60,16 @@ else
   echo "unattended_enabled=unknown"
 fi
 
-# Systemd timer presence/active.
+# Systemd timer presence/active. `is-active` prints the state to stdout AND
+# exits non-zero for any non-active state, so capture stdout first and fall
+# back to `unknown` only when stdout is empty (unit missing, systemctl broken).
+# Composing `... || echo unknown` inside the same $() concatenates "inactive"
+# and "unknown" into the captured value — don't do that.
 if command -v systemctl >/dev/null 2>&1; then
   if systemctl list-unit-files apt-daily-upgrade.timer 2>/dev/null | grep -q apt-daily-upgrade.timer; then
     echo "timer_present=yes"
-    state=$(systemctl is-active apt-daily-upgrade.timer 2>/dev/null || echo unknown)
+    state=$(systemctl is-active apt-daily-upgrade.timer 2>/dev/null || true)
+    state=${state:-unknown}
     echo "timer_state=${state}"
   else
     echo "timer_present=no"

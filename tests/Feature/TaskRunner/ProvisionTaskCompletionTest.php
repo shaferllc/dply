@@ -10,6 +10,7 @@ use App\Jobs\InstallMetricsAgentJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\SyncServerSystemdServicesJob;
+use App\Jobs\SyncServerSystemUsersJob;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Enums\TaskStatus;
@@ -37,6 +38,7 @@ class ProvisionTaskCompletionTest extends TestCase
             InstallMetricsAgentJob::class,
             RunServerInsightsJob::class,
             SyncServerSystemdServicesJob::class,
+            SyncServerSystemUsersJob::class,
         ]);
     }
 

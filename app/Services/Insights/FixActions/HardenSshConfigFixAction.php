@@ -79,8 +79,14 @@ fi
 
 mkdir -p /etc/ssh/sshd_config.d
 # Snapshot the prior content (or empty marker) so revert can detect whether
-# we created the file from scratch.
-if [ -f {$pathEscaped} ]; then
+# we created the file from scratch. Only take the snapshot on the *first*
+# apply — re-running with an existing dply-managed snippet must not clobber
+# the .dply-prev backup with our own snippet, or revert would later restore
+# the dply snippet on top of itself and the operator's original content
+# would be lost.
+if [ -f {$pathEscaped}.dply-prev ]; then
+  echo "DPLY_BACKUP: prior backup already present, keeping it"
+elif [ -f {$pathEscaped} ]; then
   cp -p {$pathEscaped} {$pathEscaped}.dply-prev
   echo "DPLY_BACKUP: existing snippet preserved"
 else
@@ -103,13 +109,23 @@ if ! sshd -t 2>&1; then
 fi
 
 # Pick the service name — Debian/Ubuntu use `ssh`, RHEL family uses `sshd`.
-if systemctl list-unit-files ssh.service 2>/dev/null | grep -q '^ssh.service'; then
+# `systemctl cat` actually loads the unit and exits non-zero if it isn't
+# resolvable, which is stricter than grepping list-unit-files output.
+if systemctl cat ssh.service >/dev/null 2>&1; then
   svc=ssh
 else
   svc=sshd
 fi
 
-systemctl reload "\$svc" 2>&1 || systemctl restart "\$svc" 2>&1
+if ! reload_out=\$(systemctl reload "\$svc" 2>&1); then
+  if ! restart_out=\$(systemctl restart "\$svc" 2>&1); then
+    echo "DPLY_ERR: failed to reload or restart \$svc"
+    printf '%s\\n' "\$reload_out"
+    printf '%s\\n' "\$restart_out"
+    systemctl status "\$svc" --no-pager --lines=20 2>&1 | tail -n 30 || true
+    exit 1
+  fi
+fi
 echo "DPLY_OK: reloaded \$svc"
 BASH;
 
@@ -156,12 +172,20 @@ if ! sshd -t 2>&1; then
   exit 1
 fi
 
-if systemctl list-unit-files ssh.service 2>/dev/null | grep -q '^ssh.service'; then
+if systemctl cat ssh.service >/dev/null 2>&1; then
   svc=ssh
 else
   svc=sshd
 fi
-systemctl reload "\$svc" 2>&1 || systemctl restart "\$svc" 2>&1
+if ! reload_out=\$(systemctl reload "\$svc" 2>&1); then
+  if ! restart_out=\$(systemctl restart "\$svc" 2>&1); then
+    echo "DPLY_ERR: failed to reload or restart \$svc"
+    printf '%s\\n' "\$reload_out"
+    printf '%s\\n' "\$restart_out"
+    systemctl status "\$svc" --no-pager --lines=20 2>&1 | tail -n 30 || true
+    exit 1
+  fi
+fi
 echo "DPLY_OK: reloaded \$svc"
 BASH;
 

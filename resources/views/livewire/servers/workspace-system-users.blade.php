@@ -92,13 +92,25 @@
                 </div>
 
                 @if ($remote_rows !== [] && $orphanRows->count() > 0)
-                    <div class="border-b border-amber-200 bg-amber-50/70 px-6 py-3 text-sm text-amber-900 sm:px-8">
-                        <p class="font-semibold">{{ trans_choice('{1} :count orphan account|[2,*] :count orphan accounts', $orphanRows->count(), ['count' => $orphanRows->count()]) }}</p>
-                        <p class="mt-0.5 text-xs text-amber-900/80">
-                            {{ __('Not protected and not assigned to any site:') }}
-                            <span class="font-mono">{{ $orphanRows->pluck('username')->join(', ') }}</span>
-                            — {{ __('expand the row to inspect, then click "Remove" to delete.') }}
-                        </p>
+                    <div class="flex flex-col gap-3 border-b border-amber-200 bg-amber-50/70 px-6 py-3 text-sm text-amber-900 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+                        <div class="min-w-0">
+                            <p class="font-semibold">{{ trans_choice('{1} :count orphan account|[2,*] :count orphan accounts', $orphanRows->count(), ['count' => $orphanRows->count()]) }}</p>
+                            <p class="mt-0.5 text-xs text-amber-900/80">
+                                {{ __('Not protected and not assigned to any site:') }}
+                                <span class="font-mono">{{ $orphanRows->pluck('username')->join(', ') }}</span>
+                                — {{ __('expand a row to inspect, or remove them all in one go.') }}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="openRemoveOrphansConfirm"
+                            wire:loading.attr="disabled"
+                            wire:target="openRemoveOrphansConfirm,queueRemoveOrphans"
+                            class="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:self-center"
+                        >
+                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                            {{ __('Remove all orphans') }}
+                        </button>
                     </div>
                 @endif
 
@@ -394,5 +406,7 @@
                 </x-danger-button>
             </div>
         </x-modal>
+
+        @include('livewire.partials.confirm-action-modal')
     @endif
 </x-server-workspace-layout>

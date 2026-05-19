@@ -159,6 +159,18 @@ class RunSetupScriptJob implements ShouldQueue
                     ->delay(now()->addSeconds(30));
             }
 
+            // Same idea for System users — without this seed, the
+            // Settings → System users page is empty after provision
+            // (no rows in server_system_users) and the operator has to
+            // click "Sync now" before the deploy user (`dply`) even
+            // appears. Sync is unique-keyed against create/remove, so
+            // a manual click later is still safe. Stagger 35s after the
+            // services sync (lighter SSH, lone `getent passwd` exec).
+            if (! empty($server->ip_address) && $server->isVmHost()) {
+                SyncServerSystemUsersJob::dispatch((string) $server->id)
+                    ->delay(now()->addSeconds(35));
+            }
+
             // Capture the full inventory/manage snapshot (package versions,
             // service state, kernel reboot-required, unattended-upgrades
             // status, etc.) so the Manage tab lands populated instead of

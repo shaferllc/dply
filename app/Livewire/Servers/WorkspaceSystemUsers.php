@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\CreateServerSystemUserJob;
+use App\Jobs\DeleteOrphanSystemUsersJob;
 use App\Jobs\DeleteServerSystemUserJob;
 use App\Jobs\SyncServerSystemUsersJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
@@ -225,6 +226,83 @@ class WorkspaceSystemUsers extends Component
 
         $this->closeRemoveModal();
         $this->toastSuccess(__('User removal queued — watch the console banner for progress.'));
+    }
+
+    /**
+     * Opens the shared confirm-action modal pre-wired to {@see queueRemoveOrphans()}.
+     * Re-derives orphans from $remote_rows at click time so the count in the prompt
+     * matches what the operator currently sees, not whatever was on the page when
+     * they first loaded it.
+     */
+    public function openRemoveOrphansConfirm(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $orphans = $this->currentOrphanUsernames();
+        if ($orphans === []) {
+            $this->toastError(__('No orphan accounts to remove.'));
+
+            return;
+        }
+
+        $preview = count($orphans) <= 6
+            ? implode(', ', $orphans)
+            : implode(', ', array_slice($orphans, 0, 6)).', …';
+
+        $this->openConfirmActionModal(
+            'queueRemoveOrphans',
+            [],
+            __('Remove :count orphan accounts?', ['count' => count($orphans)]),
+            __('Dply will run userdel for each of: :list. Protected accounts and any user still owning a site are skipped automatically.', ['list' => $preview]),
+            __('Remove all orphans'),
+            true,
+        );
+    }
+
+    public function queueRemoveOrphans(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
+            $this->toastError(__('The server must be ready with SSH.'));
+
+            return;
+        }
+
+        $orphans = $this->currentOrphanUsernames();
+        if ($orphans === []) {
+            $this->toastError(__('No orphan accounts to remove.'));
+
+            return;
+        }
+
+        $this->seedQueuedSystemUserAction(__('Removing :count orphan accounts from :host …', [
+            'count' => count($orphans),
+            'host' => $this->server->getSshConnectionString(),
+        ]));
+
+        foreach ($orphans as $username) {
+            if (! in_array($username, $this->pending_remove_usernames, true)) {
+                $this->pending_remove_usernames[] = $username;
+            }
+        }
+
+        DeleteOrphanSystemUsersJob::dispatch($this->server->id, $orphans, auth()->id());
+
+        $this->toastSuccess(__('Bulk removal queued — watch the console banner for progress.'));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function currentOrphanUsernames(): array
+    {
+        return collect($this->remote_rows)
+            ->filter(static fn (array $r): bool => ! empty($r['is_orphan']) && empty($r['is_protected']) && (int) ($r['site_count'] ?? 0) === 0)
+            ->pluck('username')
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function render(ServerSystemUserService $service): View

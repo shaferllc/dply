@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Servers;
 
 use App\Jobs\CreateServerSystemUserJob;
+use App\Jobs\DeleteOrphanSystemUsersJob;
 use App\Jobs\DeleteServerSystemUserJob;
 use App\Jobs\SyncServerSystemUsersJob;
 use App\Livewire\Servers\WorkspaceSystemUsers;
@@ -12,6 +13,7 @@ use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerSystemUser;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -235,6 +237,91 @@ class WorkspaceSystemUsersTest extends TestCase
 
         $this->assertNotNull($row);
         $this->assertStringContainsString('app-user', (string) $row->label);
+    }
+
+    public function test_queue_remove_orphans_dispatches_bulk_job_with_orphans_only(): void
+    {
+        Bus::fake();
+        [$user, $server] = $this->userAndServer();
+
+        // Three /etc/passwd rows: one orphan, one protected (matches ssh_user "dply"),
+        // one with an assigned site. Only the orphan should land in the bulk job.
+        $this->seedRemote($server, 'app-user');
+        $this->seedRemote($server, 'dply');
+        $this->seedRemote($server, 'owned-user');
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'php_fpm_user' => 'owned-user',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSystemUsers::class, ['server' => $server])
+            ->call('queueRemoveOrphans')
+            ->assertHasNoErrors();
+
+        Bus::assertDispatched(
+            DeleteOrphanSystemUsersJob::class,
+            fn (DeleteOrphanSystemUsersJob $job): bool => $job->serverId === $server->id
+                && $job->usernames === ['app-user']
+                && $job->userId === $user->id,
+        );
+    }
+
+    public function test_queue_remove_orphans_toasts_and_skips_when_no_orphans(): void
+    {
+        Bus::fake();
+        [$user, $server] = $this->userAndServer();
+
+        // Only protected + in-use users — bulk button should be a no-op.
+        $this->seedRemote($server, 'dply');
+        $this->seedRemote($server, 'owned-user');
+        Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'php_fpm_user' => 'owned-user',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSystemUsers::class, ['server' => $server])
+            ->call('queueRemoveOrphans')
+            ->assertHasNoErrors();
+
+        Bus::assertNotDispatched(DeleteOrphanSystemUsersJob::class);
+    }
+
+    public function test_queue_remove_orphans_marks_users_pending_and_seeds_console_row(): void
+    {
+        Bus::fake();
+        [$user, $server] = $this->userAndServer();
+        $this->seedRemote($server, 'app-user');
+        $this->seedRemote($server, 'queue-runner');
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSystemUsers::class, ['server' => $server])
+            ->call('queueRemoveOrphans')
+            ->assertHasNoErrors()
+            ->assertSet('pending_remove_usernames', ['app-user', 'queue-runner']);
+
+        $this->assertSame(1, ConsoleAction::query()
+            ->where('subject_type', $server->getMorphClass())
+            ->where('subject_id', $server->id)
+            ->where('kind', 'system_user')
+            ->where('status', ConsoleAction::STATUS_QUEUED)
+            ->count());
+    }
+
+    public function test_open_remove_orphans_confirm_arms_the_shared_modal(): void
+    {
+        [$user, $server] = $this->userAndServer();
+        $this->seedRemote($server, 'app-user');
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceSystemUsers::class, ['server' => $server])
+            ->call('openRemoveOrphansConfirm')
+            ->assertSet('showConfirmActionModal', true)
+            ->assertSet('confirmActionModalMethod', 'queueRemoveOrphans')
+            ->assertSet('confirmActionModalDestructive', true);
     }
 
     public function test_unauthorized_user_cannot_render(): void
