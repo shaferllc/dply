@@ -284,6 +284,11 @@ class Organization extends Model
         return $this->hasMany(ProviderCredential::class);
     }
 
+    public function backupConfigurations(): HasMany
+    {
+        return $this->hasMany(BackupConfiguration::class);
+    }
+
     public function invitations(): HasMany
     {
         return $this->hasMany(OrganizationInvitation::class, 'organization_id');

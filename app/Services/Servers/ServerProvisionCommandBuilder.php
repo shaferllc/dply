@@ -266,6 +266,16 @@ final class ServerProvisionCommandBuilder
      * Create the deploy user with the same SSH key as root (from provisioning) so the app can
      * connect as that user after setup; root remains available on the image.
      *
+     * The bootstrap-written authorized_keys also includes the server creator's
+     * profile keys that are flagged `provision_on_new_servers = true`, so the
+     * operator's laptop (etc.) lands on first boot instead of having to wait
+     * for the post-provision authorized_keys sync. The matching panel rows
+     * (ServerAuthorizedKey) are pre-created by
+     * {@see \App\Jobs\RunSetupScriptJob::applyProvisionOutcomeToServer()} so
+     * the workspace SSH Keys page reflects what's on the box from day zero —
+     * a later Sync would otherwise rewrite authorized_keys to whatever the
+     * panel currently knows and silently remove the bootstrap-installed keys.
+     *
      * @return list<string>
      */
     private function dplyDeployUserBootstrap(Server $server): array
@@ -280,7 +290,14 @@ final class ServerProvisionCommandBuilder
             return [];
         }
 
-        $b64 = base64_encode($pub);
+        $lines = [trim($pub)];
+        foreach ($this->creatorProvisionableKeyLines($server) as $line) {
+            $lines[] = $line;
+        }
+        $bundle = implode("\n", $lines)."\n";
+        $b64 = base64_encode($bundle);
+
+        $extraKeyCount = count($lines) - 1;
 
         // Each step inside is paired with a `[dply]` echo so the journey
         // log actually surfaces what happened. Without these, the step
@@ -299,7 +316,7 @@ final class ServerProvisionCommandBuilder
             '  useradd -m -s /bin/bash -G sudo '.$userArg,
             '  echo "[dply] user \"'.$username.'\" created"',
             'fi',
-            'echo "[dply] installing SSH authorized_keys for \"'.$username.'\""',
+            'echo "[dply] installing SSH authorized_keys for \"'.$username.'\" (operational + '.$extraKeyCount.' profile key(s))"',
             'install -d -m 700 -o '.$userArg.' -g '.$userArg.' /home/'.$userArg.'/.ssh',
             'install -m 600 -o '.$userArg.' -g '.$userArg.' /tmp/dply-ssh-bootstrap.pub /home/'.$userArg.'/.ssh/authorized_keys',
             'rm -f /tmp/dply-ssh-bootstrap.pub',
@@ -308,6 +325,38 @@ final class ServerProvisionCommandBuilder
             'chmod 440 /etc/sudoers.d/90-dply-user',
             'echo "[dply] server user \"'.$username.'\" ready (uid=$(id -u '.$userArg.'), groups=$(id -Gn '.$userArg.'))"',
         ]);
+    }
+
+    /**
+     * Returns the cleaned `ssh-… AAAA… [comment]` public-key lines for the
+     * server creator's UserSshKey rows that opt into new-server provisioning.
+     * Silently skips malformed entries — the bootstrap should never write a
+     * line that sshd would reject on first start.
+     *
+     * @return list<string>
+     */
+    private function creatorProvisionableKeyLines(Server $server): array
+    {
+        $creator = $server->user;
+        if ($creator === null) {
+            return [];
+        }
+
+        $rows = $creator->sshKeys()
+            ->where('provision_on_new_servers', true)
+            ->orderBy('name')
+            ->get(['id', 'public_key']);
+
+        $lines = [];
+        foreach ($rows as $row) {
+            $pk = trim((string) $row->public_key);
+            if ($pk === '' || ! \App\Models\UserSshKey::publicKeyLooksValid($pk)) {
+                continue;
+            }
+            $lines[] = $pk;
+        }
+
+        return $lines;
     }
 
     /** @return list<string> */

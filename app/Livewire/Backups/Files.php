@@ -116,9 +116,9 @@ class Files extends Component
             ->groupBy(fn (SiteFileBackup $b) => (string) $b->site_id)
             ->map(fn ($group) => $group->take(5));
 
-        $storageDestinations = $user->backupConfigurations()
-            ->orderBy('name')
-            ->get(['id', 'name', 'provider']);
+        $storageDestinations = $org
+            ? $org->backupConfigurations()->orderBy('name')->get(['id', 'name', 'provider'])
+            : collect();
 
         return view('livewire.backups.files', [
             'organization' => $org,

@@ -15,12 +15,62 @@ trait ManagesFirewallWorkspaceAdvanced
     /** @var list<string> */
     public array $firewall_bulk_ids = [];
 
+    /**
+     * Free-text search applied to the rules table — matches name, port (as string),
+     * source, profile, app_profile, iface, and tag values. Empty means "show all".
+     */
+    public string $rule_filter = '';
+
+    /** Empty string means "all actions"; otherwise one of allow|deny|limit. */
+    public string $rule_filter_action = '';
+
     public string $new_saved_template_name = '';
 
     public ?string $new_saved_template_description = null;
 
     /** org = organization-wide; server = this server only */
     public string $new_saved_template_scope = 'org';
+
+    /**
+     * Apply $rule_filter / $rule_filter_action to a rule collection. Pulled into the trait so
+     * both the view (which paints filtered rows) and any future bulk-on-filtered action share
+     * one matcher. Case-insensitive, treats blank filter as "match anything".
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\ServerFirewallRule>  $rules
+     * @return \Illuminate\Support\Collection<int, \App\Models\ServerFirewallRule>
+     */
+    public function filteredFirewallRules($rules)
+    {
+        $needle = strtolower(trim($this->rule_filter));
+        $actionFilter = strtolower(trim($this->rule_filter_action));
+
+        return $rules->filter(function ($r) use ($needle, $actionFilter): bool {
+            if ($actionFilter !== '' && strtolower((string) $r->action) !== $actionFilter) {
+                return false;
+            }
+            if ($needle === '') {
+                return true;
+            }
+            $haystack = strtolower(implode(' ', array_filter([
+                (string) ($r->name ?? ''),
+                (string) ($r->profile ?? ''),
+                (string) ($r->app_profile ?? ''),
+                (string) ($r->iface ?? ''),
+                (string) ($r->source ?? ''),
+                (string) ($r->port ?? ''),
+                (string) ($r->protocol ?? ''),
+                is_array($r->tags) ? implode(' ', $r->tags) : '',
+            ])));
+
+            return str_contains($haystack, $needle);
+        })->values();
+    }
+
+    public function clearRuleFilter(): void
+    {
+        $this->rule_filter = '';
+        $this->rule_filter_action = '';
+    }
 
     public function applyBundledFirewallTemplate(string $key): void
     {

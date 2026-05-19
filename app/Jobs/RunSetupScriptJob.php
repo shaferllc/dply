@@ -171,6 +171,22 @@ class RunSetupScriptJob implements ShouldQueue
                     ->delay(now()->addSeconds(35));
             }
 
+            // The provision command builder writes the creator's
+            // provision-flagged profile keys directly into
+            // /home/<deploy>/.ssh/authorized_keys at bootstrap time
+            // (see ServerProvisionCommandBuilder::dplyDeployUserBootstrap).
+            // Mirror them into the panel here so the workspace SSH Keys
+            // page reflects reality from day zero — without this, the
+            // first user-initiated Sync would treat the bootstrap-installed
+            // keys as drift and remove them on the next push.
+            try {
+                static::hydrateAuthorizedKeyPanelRowsFromCreator($server);
+            } catch (\Throwable $e) {
+                ProvisionPipelineLog::warning('server.provision.authorized_key_panel_hydration_failed', $server, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             // Capture the full inventory/manage snapshot (package versions,
             // service state, kernel reboot-required, unattended-upgrades
             // status, etc.) so the Manage tab lands populated instead of
@@ -195,6 +211,60 @@ class RunSetupScriptJob implements ShouldQueue
             'setup_status' => Server::SETUP_STATUS_FAILED,
             'meta' => $meta,
         ]);
+    }
+
+    /**
+     * Pre-populate ServerAuthorizedKey panel rows for the creator's profile
+     * keys that opted into new-server provisioning. These keys are written
+     * directly into the deploy user's authorized_keys by the bootstrap script
+     * (see {@see \App\Services\Servers\ServerProvisionCommandBuilder::dplyDeployUserBootstrap()});
+     * mirroring them as panel rows here keeps the workspace SSH Keys page
+     * truthful and prevents the next user-initiated Sync from treating the
+     * bootstrap-installed keys as drift and removing them.
+     *
+     * Idempotent via updateOrCreate — re-applying a provision outcome (manual
+     * retry, etc.) won't duplicate rows.
+     */
+    private static function hydrateAuthorizedKeyPanelRowsFromCreator(Server $server): void
+    {
+        $creator = $server->user;
+        if ($creator === null) {
+            return;
+        }
+
+        $rows = $creator->sshKeys()
+            ->where('provision_on_new_servers', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'public_key']);
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        foreach ($rows as $userKey) {
+            $pk = trim((string) $userKey->public_key);
+            if ($pk === '' || ! \App\Models\UserSshKey::publicKeyLooksValid($pk)) {
+                continue;
+            }
+
+            // target_linux_user = '' means "the server's login user" by the
+            // synchronizer's convention (see ServerAuthorizedKeysSynchronizer).
+            // The deploy user is ssh_user at this point because
+            // applyProvisionOutcomeToServer already flipped it.
+            \App\Models\ServerAuthorizedKey::query()->updateOrCreate(
+                [
+                    'server_id' => $server->id,
+                    'managed_key_type' => \App\Models\UserSshKey::class,
+                    'managed_key_id' => $userKey->id,
+                    'target_linux_user' => '',
+                ],
+                [
+                    'name' => (string) $userKey->name,
+                    'public_key' => $pk,
+                    'synced_at' => now(),
+                ]
+            );
+        }
     }
 
     /**

@@ -27,8 +27,6 @@ class BackupConfiguration extends Model
 
     public const PROVIDER_FTP = 'ftp';
 
-    public const PROVIDER_LOCAL = 'local';
-
     public const PROVIDER_RCLONE = 'rclone';
 
     /** @return list<string> */
@@ -42,7 +40,6 @@ class BackupConfiguration extends Model
             self::PROVIDER_DIGITALOCEAN_SPACES,
             self::PROVIDER_SFTP,
             self::PROVIDER_FTP,
-            self::PROVIDER_LOCAL,
             self::PROVIDER_RCLONE,
         ];
     }
@@ -57,14 +54,14 @@ class BackupConfiguration extends Model
             self::PROVIDER_DIGITALOCEAN_SPACES => 'DigitalOcean Spaces',
             self::PROVIDER_SFTP => 'SFTP',
             self::PROVIDER_FTP => 'FTP',
-            self::PROVIDER_LOCAL => 'Local',
             self::PROVIDER_RCLONE => 'Rclone',
             default => $provider,
         };
     }
 
     protected $fillable = [
-        'user_id',
+        'organization_id',
+        'created_by_user_id',
         'name',
         'provider',
         'config',
@@ -77,8 +74,13 @@ class BackupConfiguration extends Model
         ];
     }
 
-    public function user(): BelongsTo
+    public function organization(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function createdByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

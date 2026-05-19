@@ -27,6 +27,38 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | UFW default chain policies (server-meta keys + allowed values)
+    |--------------------------------------------------------------------------
+    | Mirror UFW's three default chains. We persist the desired policy on the
+    | server's `meta` and emit `ufw default <policy> <chain>` before per-rule
+    | fragments during apply. Defaults match UFW out of the box, so existing
+    | servers — which have no value in meta — behave identically until an
+    | operator changes something.
+    */
+    'meta_default_incoming_key' => 'firewall_default_incoming',
+    'meta_default_outgoing_key' => 'firewall_default_outgoing',
+    'meta_default_routed_key' => 'firewall_default_routed',
+    'default_policies' => ['allow', 'deny', 'reject'],
+    'default_policy_fallbacks' => [
+        'incoming' => 'deny',
+        'outgoing' => 'allow',
+        'routed' => 'deny',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | UFW logging level (server-meta key + allowed values)
+    |--------------------------------------------------------------------------
+    | UFW supports off|low|medium|high|full for the kernel-level log rate.
+    | "low" (the UFW default) logs blocked packets only; the higher levels add
+    | accepted-rule and invalid-conntrack lines that can flood syslog on a
+    | busy host. We treat "unset in meta" as "leave whatever the host has."
+    */
+    'meta_logging_level_key' => 'firewall_logging_level',
+    'logging_levels' => ['off', 'low', 'medium', 'high', 'full'],
+
+    /*
+    |--------------------------------------------------------------------------
     | New rule form defaults
     |--------------------------------------------------------------------------
     |

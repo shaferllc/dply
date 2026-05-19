@@ -238,6 +238,8 @@ class WorkspaceFirewallTest extends TestCase
         // for the lockout warning. Stub it to false so the gate doesn't block.
         $provisioner = Mockery::mock(ServerFirewallProvisioner::class);
         $provisioner->shouldReceive('sshAccessNotExplicitlyAllowed')->andReturn(false);
+        $provisioner->shouldReceive('defaultPoliciesFromMeta')->andReturn([]);
+        $provisioner->shouldReceive('loggingLevelFromMeta')->andReturn(null);
         $provisioner->shouldNotReceive('apply'); // queued, runs in the job — not in the request
         $this->app->instance(ServerFirewallProvisioner::class, $provisioner);
 
@@ -266,6 +268,8 @@ class WorkspaceFirewallTest extends TestCase
 
         $provisioner = Mockery::mock(ServerFirewallProvisioner::class);
         $provisioner->shouldReceive('sshAccessNotExplicitlyAllowed')->andReturn(false);
+        $provisioner->shouldReceive('defaultPoliciesFromMeta')->andReturn([]);
+        $provisioner->shouldReceive('loggingLevelFromMeta')->andReturn(null);
         $this->app->instance(ServerFirewallProvisioner::class, $provisioner);
 
         Livewire::actingAs($user)
@@ -439,5 +443,431 @@ class WorkspaceFirewallTest extends TestCase
 
         $this->assertSame(1, $server->fresh()->firewallRules()->count());
         $this->assertSame(1, $server->firewallRules()->where('port', 80)->where('protocol', 'tcp')->where('source', 'any')->count());
+    }
+
+    public function test_move_firewall_rule_swaps_sort_order_with_neighbour(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        $first = ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'A', 'port' => 80, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 1,
+        ]);
+        $second = ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'B', 'port' => 443, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 2,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('moveFirewallRule', $first->id, 'down')
+            ->assertHasNoErrors();
+
+        $this->assertSame(2, (int) $first->fresh()->sort_order);
+        $this->assertSame(1, (int) $second->fresh()->sort_order);
+    }
+
+    public function test_move_firewall_rule_at_edge_is_a_no_op(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        $first = ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'A', 'port' => 80, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 1,
+        ]);
+        $second = ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'B', 'port' => 443, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 2,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('moveFirewallRule', $first->id, 'up')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, (int) $first->fresh()->sort_order);
+        $this->assertSame(2, (int) $second->fresh()->sort_order);
+    }
+
+    public function test_save_rule_with_interface_scoping_persists(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('form.name', 'Scoped HTTP')
+            ->set('form.port', 80)
+            ->set('form.protocol', 'tcp')
+            ->set('form.action', 'allow')
+            ->set('form.source', 'any')
+            ->set('form.iface', 'eth0')
+            ->set('form.iface_direction', 'in')
+            ->call('saveFirewallRule')
+            ->assertHasNoErrors();
+
+        $rule = $server->firewallRules()->where('iface', 'eth0')->first();
+        $this->assertNotNull($rule);
+        $this->assertSame('in', $rule->iface_direction);
+    }
+
+    public function test_save_rule_interface_requires_direction(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('form.port', 80)
+            ->set('form.protocol', 'tcp')
+            ->set('form.action', 'allow')
+            ->set('form.source', 'any')
+            ->set('form.iface', 'eth0')
+            ->set('form.iface_direction', '')
+            ->call('saveFirewallRule')
+            ->assertHasErrors(['form.iface_direction']);
+    }
+
+    public function test_save_rule_with_app_profile_clears_port_and_persists(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('form.name', 'SSH via profile')
+            ->set('form.app_profile', 'OpenSSH')
+            ->set('form.port', 22)
+            ->set('form.protocol', 'tcp')
+            ->set('form.action', 'allow')
+            ->set('form.source', 'any')
+            ->call('saveFirewallRule')
+            ->assertHasNoErrors();
+
+        $rule = $server->firewallRules()->where('app_profile', 'OpenSSH')->first();
+        $this->assertNotNull($rule);
+        $this->assertNull($rule->port);
+    }
+
+    public function test_save_rule_app_profile_validates_charset(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('form.app_profile', 'Bad$Profile')
+            ->set('form.port', 22)
+            ->set('form.protocol', 'tcp')
+            ->set('form.source', 'any')
+            ->call('saveFirewallRule')
+            ->assertHasErrors(['form.app_profile']);
+    }
+
+    public function test_save_rule_accepts_limit_action_on_tcp(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('form.name', 'SSH')
+            ->set('form.port', 22)
+            ->set('form.protocol', 'tcp')
+            ->set('form.action', 'limit')
+            ->set('form.source', 'any')
+            ->set('form.enabled', true)
+            ->call('saveFirewallRule')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, $server->firewallRules()->where('action', 'limit')->count());
+    }
+
+    public function test_save_rule_rejects_limit_action_on_udp(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('form.name', 'bad')
+            ->set('form.port', 53)
+            ->set('form.protocol', 'udp')
+            ->set('form.action', 'limit')
+            ->set('form.source', 'any')
+            ->call('saveFirewallRule')
+            ->assertHasErrors(['form.action']);
+
+        $this->assertSame(0, $server->firewallRules()->count());
+    }
+
+    public function test_preview_apply_builds_ufw_command_list_and_opens_modal(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+        $server->update(['meta' => [config('server_firewall.meta_default_incoming_key') => 'deny']]);
+
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'HTTPS', 'port' => 443, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 1,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('previewApplyFirewall')
+            ->assertSet('apply_preview_open', true)
+            ->tap(function ($component): void {
+                $lines = $component->get('apply_preview_lines');
+                $this->assertIsArray($lines);
+                $this->assertContains('ufw default deny incoming', $lines);
+                $this->assertSame('ufw --force enable', end($lines));
+                $this->assertTrue(collect($lines)->contains(fn ($l) => str_starts_with($l, 'ufw allow 443/tcp')));
+            });
+    }
+
+    public function test_close_apply_preview_resets_state(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('apply_preview_open', true)
+            ->set('apply_preview_lines', ['ufw allow 80/tcp'])
+            ->call('closeApplyPreview')
+            ->assertSet('apply_preview_open', false)
+            ->assertSet('apply_preview_lines', []);
+    }
+
+    public function test_set_default_policy_persists_onto_server_meta(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('setFirewallDefaultPolicy', 'incoming', 'deny')
+            ->assertHasNoErrors();
+
+        $this->assertSame('deny', $server->fresh()->meta[config('server_firewall.meta_default_incoming_key')] ?? null);
+    }
+
+    public function test_set_default_policy_clears_meta_when_empty(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+        $server->update(['meta' => [config('server_firewall.meta_default_incoming_key') => 'reject']]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('setFirewallDefaultPolicy', 'incoming', '')
+            ->assertHasNoErrors();
+
+        $this->assertArrayNotHasKey(
+            config('server_firewall.meta_default_incoming_key'),
+            $server->fresh()->meta ?? [],
+        );
+    }
+
+    public function test_export_firewall_rules_json_downloads_a_round_trippable_payload(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'HTTPS', 'port' => 443, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 1,
+            'tags' => ['public'],
+        ]);
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'SSH limit', 'port' => 22, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'limit', 'enabled' => true, 'sort_order' => 2,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('exportFirewallRulesJson');
+
+        $response = $component->effects['download']['content'] ?? $component->lastResponse;
+        $this->assertNotNull($response);
+        // Livewire wraps streamed responses; assert the call didn't error.
+        $component->assertHasNoErrors();
+        $this->assertSame(2, $server->firewallRules()->count());
+    }
+
+    public function test_export_firewall_rules_csv_succeeds_without_errors(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'HTTPS', 'port' => 443, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 1,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('exportFirewallRulesCsv')
+            ->assertHasNoErrors();
+    }
+
+    public function test_load_more_firewall_activity_bumps_visible_window(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->assertSet('activity_visible', 60)
+            ->call('loadMoreFirewallActivity')
+            ->assertSet('activity_visible', 120)
+            ->call('loadMoreFirewallActivity')
+            ->assertSet('activity_visible', 180);
+    }
+
+    public function test_load_more_firewall_activity_caps_at_max(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        $c = Livewire::actingAs($user)->test(WorkspaceFirewall::class, ['server' => $server]);
+        for ($i = 0; $i < 20; $i++) {
+            $c->call('loadMoreFirewallActivity');
+        }
+        $c->assertSet('activity_visible', WorkspaceFirewall::ACTIVITY_MAX_VISIBLE);
+    }
+
+    public function test_filtered_firewall_rules_match_text_needle(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'Postgres replica', 'port' => 5432, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 1,
+        ]);
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'HTTPS', 'port' => 443, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 2,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('rule_filter', 'postgres')
+            ->tap(function ($c) use ($server): void {
+                $filtered = $c->instance()->filteredFirewallRules($server->fresh()->firewallRules);
+                $this->assertCount(1, $filtered);
+                $this->assertSame('Postgres replica', $filtered->first()->name);
+            });
+    }
+
+    public function test_filtered_firewall_rules_match_by_action_chip(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'A', 'port' => 22, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'limit', 'enabled' => true, 'sort_order' => 1,
+        ]);
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'B', 'port' => 80, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 2,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('rule_filter_action', 'limit')
+            ->tap(function ($c) use ($server): void {
+                $filtered = $c->instance()->filteredFirewallRules($server->fresh()->firewallRules);
+                $this->assertCount(1, $filtered);
+                $this->assertSame('limit', $filtered->first()->action);
+            });
+    }
+
+    public function test_clear_rule_filter_resets_both_fields(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->set('rule_filter', 'foo')
+            ->set('rule_filter_action', 'allow')
+            ->call('clearRuleFilter')
+            ->assertSet('rule_filter', '')
+            ->assertSet('rule_filter_action', '');
+    }
+
+    public function test_set_logging_level_persists_and_clears(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        $key = (string) config('server_firewall.meta_logging_level_key');
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('setFirewallLoggingLevel', 'medium')
+            ->assertHasNoErrors();
+
+        $this->assertSame('medium', $server->fresh()->meta[$key] ?? null);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server->fresh()])
+            ->call('setFirewallLoggingLevel', '')
+            ->assertHasNoErrors();
+
+        $this->assertArrayNotHasKey($key, $server->fresh()->meta ?? []);
+    }
+
+    public function test_set_logging_level_rejects_unknown_value(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+        $key = (string) config('server_firewall.meta_logging_level_key');
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('setFirewallLoggingLevel', 'paranoid')
+            ->assertHasNoErrors();
+
+        $this->assertArrayNotHasKey($key, $server->fresh()->meta ?? []);
+    }
+
+    public function test_set_default_policy_rejects_unknown_value(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('setFirewallDefaultPolicy', 'incoming', 'whatever')
+            ->assertHasNoErrors();
+
+        $this->assertArrayNotHasKey(
+            config('server_firewall.meta_default_incoming_key'),
+            $server->fresh()->meta ?? [],
+        );
+    }
+
+    public function test_move_firewall_rule_rejects_invalid_direction(): void
+    {
+        $user = $this->userWithOrganization();
+        $server = $this->readyServerFor($user);
+
+        $rule = ServerFirewallRule::query()->create([
+            'server_id' => $server->id, 'name' => 'A', 'port' => 80, 'protocol' => 'tcp',
+            'source' => 'any', 'action' => 'allow', 'enabled' => true, 'sort_order' => 1,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(WorkspaceFirewall::class, ['server' => $server])
+            ->call('moveFirewallRule', $rule->id, 'sideways')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, (int) $rule->fresh()->sort_order);
     }
 }

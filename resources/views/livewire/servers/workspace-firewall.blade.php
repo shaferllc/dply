@@ -13,9 +13,9 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <x-explainer class="mb-4" tone="warn">
-        <p>{{ __('This workspace manages UFW (the Ubuntu firewall) on the server. Dply tracks rules in its own database; "Apply" reconciles them onto the host with ufw allow/deny commands. Anything UFW already had that\'s NOT in the dply rule list will be removed when you apply.') }}</p>
+        <p>{{ __('This workspace manages UFW (the Ubuntu firewall) on the server. Dply tracks rules in its own database; "Apply" pushes every enabled panel rule to the host with ufw allow/deny and turns UFW on. Apply is additive — host rules that aren\'t in the panel are left untouched. To get rid of a host rule, use "Import from host" to pull it into the panel, then click Remove (or toggle it off) — Dply will run the matching ufw delete inline.') }}</p>
         <p>{{ __('Presets are quick-to-apply rule bundles for common app shapes (HTTP only, HTTP+SSH from-anywhere, etc.). Templates are reusable rule sets you save and apply across servers.') }}</p>
-        <p>{{ __('Locking yourself out is a real risk. Always keep an SSH allow rule in place; the workspace warns if you\'re about to apply a rule set that doesn\'t include one.') }}</p>
+        <p>{{ __('Locking yourself out is a real risk. Apply always re-adds an allow rule for the server\'s SSH port as a safety rail, but you should still keep an explicit SSH allow in the panel — the workspace warns if you\'re about to apply a rule set that doesn\'t include one.') }}</p>
     </x-explainer>
 
     @if ($opsReady)
@@ -139,7 +139,86 @@
                 ->where('server_id', $server->id)
                 ->orderByDesc('id')
                 ->first();
+            $defaultPolicyFallbacks = (array) config('server_firewall.default_policy_fallbacks', []);
+            $defaultPolicyChains = [
+                'incoming' => __('Incoming'),
+                'outgoing' => __('Outgoing'),
+                'routed' => __('Routed (forwarded)'),
+            ];
+            $defaultPolicyChoices = (array) config('server_firewall.default_policies', ['allow', 'deny', 'reject']);
         @endphp
+
+        <details class="{{ $card }} overflow-hidden" {{ $defaultPolicies !== [] ? 'open' : '' }}>
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 sm:px-8">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                        <x-heroicon-o-adjustments-horizontal class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Default chain policies') }}</h2>
+                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('What UFW does with traffic that doesn\'t match any rule. "Use UFW default" leaves the host\'s current setting alone; a chosen value is pushed on the next Apply.') }}</p>
+                        @if ($defaultPolicies === [])
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('No overrides set — UFW defaults (deny incoming, allow outgoing, deny routed) apply.') }}</p>
+                        @else
+                            <p class="mt-1 text-[11px] font-mono text-brand-mist">
+                                @foreach ($defaultPolicies as $chain => $policy)
+                                    {{ $chain }}={{ $policy }}@if (! $loop->last)<span class="text-brand-mist/60"> · </span>@endif
+                                @endforeach
+                            </p>
+                        @endif
+                    </div>
+                </div>
+                <span class="text-brand-mist transition-transform group-open:rotate-180">
+                    <x-heroicon-o-chevron-down class="h-4 w-4" />
+                </span>
+            </summary>
+            <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-8">
+                <div class="grid gap-4 sm:grid-cols-3">
+                    @foreach ($defaultPolicyChains as $chain => $label)
+                        @php
+                            $current = $defaultPolicies[$chain] ?? '';
+                            $hostDefault = $defaultPolicyFallbacks[$chain] ?? 'deny';
+                        @endphp
+                        <div>
+                            <x-input-label :for="'fw-default-' . $chain" :value="$label" />
+                            <select
+                                id="fw-default-{{ $chain }}"
+                                wire:change="setFirewallDefaultPolicy('{{ $chain }}', $event.target.value)"
+                                class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm"
+                            >
+                                <option value="" @selected($current === '')>{{ __('Use UFW default (:p)', ['p' => $hostDefault]) }}</option>
+                                @foreach ($defaultPolicyChoices as $choice)
+                                    <option value="{{ $choice }}" @selected($current === $choice)>{{ ucfirst($choice) }}</option>
+                                @endforeach
+                            </select>
+                            @if ($chain === 'incoming' && $current === 'allow')
+                                <p class="mt-1 text-[11px] text-amber-700">{{ __('Allow-incoming defeats the firewall — only use if you\'re managing inbound separately.') }}</p>
+                            @endif
+                            @if ($chain === 'outgoing' && $current === 'deny')
+                                <p class="mt-1 text-[11px] text-amber-700">{{ __('Deny-outgoing breaks DNS, package updates, and most app traffic — add explicit allow rules for everything you need.') }}</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+                <div class="mt-4 grid gap-4 sm:max-w-xs">
+                    <div>
+                        <x-input-label for="fw-logging" :value="__('Logging level')" />
+                        <select
+                            id="fw-logging"
+                            wire:change="setFirewallLoggingLevel($event.target.value)"
+                            class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm"
+                        >
+                            <option value="" @selected(empty($loggingLevel))>{{ __('Leave host setting alone') }}</option>
+                            @foreach ((array) config('server_firewall.logging_levels', []) as $lvl)
+                                <option value="{{ $lvl }}" @selected($loggingLevel === $lvl)>{{ ucfirst($lvl) }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('off · low (UFW default — blocked only) · medium (+ accepted) · high (+ invalid) · full (everything).') }}</p>
+                    </div>
+                </div>
+                <p class="mt-3 text-[11px] text-brand-mist">{{ __('Changes are written to /etc/default/ufw and /etc/ufw/ufw.conf on Apply and take effect on ufw --force enable.') }}</p>
+            </div>
+        </details>
 
         <div class="{{ $card }} overflow-hidden">
                     <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
@@ -188,22 +267,19 @@
                             <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
                             <button
                                 type="button"
-                                wire:click="applyFirewall({{ $applyFirewallConfirmMessage !== '' ? 'true' : 'false' }})"
-                                @if ($applyFirewallConfirmMessage !== '')
-                                    wire:confirm="{{ $applyFirewallConfirmMessage }}"
-                                @endif
+                                wire:click="previewApplyFirewall"
                                 wire:loading.attr="disabled"
-                                wire:target="applyFirewall"
+                                wire:target="previewApplyFirewall,applyFirewall"
                                 @disabled($applyBusy)
-                                title="{{ $applyBusy ? __('A firewall apply is already running. Wait for it to finish.') : '' }}"
+                                title="{{ $applyBusy ? __('A firewall apply is already running. Wait for it to finish.') : __('Preview the ufw commands, then confirm to queue the apply.') }}"
                                 class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                <x-heroicon-o-bolt wire:loading.remove wire:target="applyFirewall" class="h-3.5 w-3.5" />
-                                <span wire:loading wire:target="applyFirewall" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-heroicon-o-bolt wire:loading.remove wire:target="previewApplyFirewall,applyFirewall" class="h-3.5 w-3.5" />
+                                <span wire:loading wire:target="previewApplyFirewall,applyFirewall" class="inline-flex h-3.5 w-3.5 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
                                 </span>
-                                <span wire:loading.remove wire:target="applyFirewall">{{ $applyBusy ? __('Applying…') : __('Apply rules') }}</span>
-                                <span wire:loading wire:target="applyFirewall">{{ __('Queueing…') }}</span>
+                                <span wire:loading.remove wire:target="previewApplyFirewall,applyFirewall">{{ $applyBusy ? __('Applying…') : __('Apply rules…') }}</span>
+                                <span wire:loading wire:target="previewApplyFirewall,applyFirewall">{{ __('Working…') }}</span>
                             </button>
                             <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
                                 <x-slot name="trigger">
@@ -267,6 +343,29 @@
                                             </span>
                                             <span wire:loading.remove wire:target="previewImportHostRules">{{ __('Import from host') }}</span>
                                             <span wire:loading wire:target="previewImportHostRules">{{ __('Reading…') }}</span>
+                                        </span>
+                                    </button>
+                                    <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
+                                    <button
+                                        type="button"
+                                        wire:click="exportFirewallRulesJson"
+                                        title="{{ __('Download all rules as JSON (round-trippable — re-import as a template later).') }}"
+                                        class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                    >
+                                        <span class="inline-flex items-center gap-2">
+                                            <x-heroicon-o-arrow-up-tray class="h-3.5 w-3.5 text-brand-moss" />
+                                            {{ __('Export rules (JSON)') }}
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="exportFirewallRulesCsv"
+                                        title="{{ __('Download all rules as CSV — handy for audits or spreadsheets.') }}"
+                                        class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                    >
+                                        <span class="inline-flex items-center gap-2">
+                                            <x-heroicon-o-table-cells class="h-3.5 w-3.5 text-brand-moss" />
+                                            {{ __('Export rules (CSV)') }}
                                         </span>
                                     </button>
                                 </x-slot>
@@ -413,7 +512,49 @@
                                 </button>
                             </div>
                         @endif
-                        <div class="mx-6 mt-5 mb-6 overflow-x-auto rounded-xl border border-brand-ink/10 sm:mx-8">
+                        @php
+                            $filteredRules = $this->filteredFirewallRules($server->firewallRules);
+                            $filteredCount = $filteredRules->count();
+                            $hasActiveFilter = trim($rule_filter) !== '' || trim($rule_filter_action) !== '';
+                        @endphp
+
+                        <div class="mx-6 mt-5 flex flex-col gap-2 sm:mx-8 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex flex-1 items-center gap-2">
+                                <div class="relative flex-1 sm:max-w-md">
+                                    <span class="pointer-events-none absolute inset-y-0 left-2 inline-flex items-center text-brand-mist">
+                                        <x-heroicon-o-magnifying-glass class="h-4 w-4" />
+                                    </span>
+                                    <input
+                                        type="search"
+                                        wire:model.live.debounce.250ms="rule_filter"
+                                        class="block w-full rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-8 pr-3 text-xs text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:ring-brand-forest"
+                                        placeholder="{{ __('Search rules — name, port, source, profile, iface, tags…') }}"
+                                        autocomplete="off"
+                                    />
+                                </div>
+                                <div class="inline-flex rounded-lg border border-brand-ink/10 bg-white p-0.5 text-[11px] font-semibold" role="group" aria-label="{{ __('Filter by action') }}">
+                                    @foreach (['' => __('All'), 'allow' => __('Allow'), 'deny' => __('Deny'), 'limit' => __('Limit')] as $key => $label)
+                                        <button
+                                            type="button"
+                                            wire:click="$set('rule_filter_action', '{{ $key }}')"
+                                            @class([
+                                                'inline-flex items-center rounded-md px-2 py-1 transition-colors',
+                                                'bg-brand-sand/60 text-brand-ink' => $rule_filter_action === $key,
+                                                'text-brand-moss hover:bg-brand-sand/30' => $rule_filter_action !== $key,
+                                            ])
+                                        >{{ $label }}</button>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @if ($hasActiveFilter)
+                                <button type="button" wire:click="clearRuleFilter" class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest hover:underline">
+                                    <x-heroicon-o-x-circle class="h-3.5 w-3.5" />
+                                    {{ __('Clear · :n / :m matching', ['n' => $filteredCount, 'm' => $server->firewallRules->count()]) }}
+                                </button>
+                            @endif
+                        </div>
+
+                        <div class="mx-6 mt-3 mb-6 overflow-x-auto rounded-xl border border-brand-ink/10 sm:mx-8">
                             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                                 <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
                                     <tr>
@@ -431,7 +572,14 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-brand-ink/10 bg-white">
-                    @foreach ($server->firewallRules as $fr)
+                                    @if ($filteredRules->isEmpty())
+                                        <tr>
+                                            <td colspan="9" class="px-4 py-6 text-center text-xs italic text-brand-mist">
+                                                {{ __('No rules match the filter. Clear it to see all :n rules.', ['n' => $server->firewallRules->count()]) }}
+                                            </td>
+                                        </tr>
+                                    @endif
+                    @foreach ($filteredRules as $fr)
                                         <tr wire:key="fw-{{ $fr->id }}" class="text-brand-ink">
                                             <td class="px-3 py-3 align-top">
                                                 <input
@@ -451,10 +599,29 @@
                                                 @endif
                                             </td>
                                             <td class="px-4 py-3 capitalize">{{ $fr->action }}</td>
-                                            <td class="px-4 py-3">{{ $fr->port ?? '—' }}</td>
-                                            <td class="px-4 py-3">{{ $fr->protocol }}</td>
-                                            <td class="max-w-[12rem] truncate px-4 py-3 font-mono text-xs" title="{{ $fr->source }}">
+                                            <td class="px-4 py-3">
+                                                @if (! empty($fr->app_profile))
+                                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-brand-moss" title="{{ __('UFW application profile') }}">
+                                                        app
+                                                    </span>
+                                                @else
+                                                    {{ $fr->port ?? '—' }}
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                @if (! empty($fr->app_profile))
+                                                    <span class="font-mono text-xs">{{ $fr->app_profile }}</span>
+                                                @else
+                                                    {{ $fr->protocol }}
+                                                @endif
+                                            </td>
+                                            <td class="max-w-[12rem] truncate px-4 py-3 font-mono text-xs" title="{{ $fr->source }}{{ ! empty($fr->iface) ? ' · '.$fr->iface_direction.' on '.$fr->iface : '' }}">
                                                 {{ $fr->source }}
+                                                @if (! empty($fr->iface))
+                                                    <span class="mt-0.5 block text-[10px] uppercase tracking-wide text-brand-mist">
+                                                        {{ $fr->iface_direction ?: 'in' }} on <span class="text-brand-ink/80">{{ $fr->iface }}</span>
+                                                    </span>
+                                                @endif
                                             </td>
                                             <td class="px-4 py-3">
                                                 <button
@@ -474,6 +641,41 @@
                                             </td>
                                             <td class="whitespace-nowrap px-4 py-3 text-right">
                                                 <div class="inline-flex flex-wrap items-center justify-end gap-2">
+                                                    @php
+                                                        // When a filter is active, hide reorder buttons — they'd be confusing
+                                                        // because $loop->first/last are relative to the filtered slice, not the
+                                                        // full rule list that determines actual sort_order.
+                                                        $isFirst = $loop->first;
+                                                        $isLast = $loop->last;
+                                                        $reorderDisabled = $hasActiveFilter;
+                                                    @endphp
+                                                    @if (! $reorderDisabled)
+                                                        <div class="inline-flex items-center rounded-md border border-brand-ink/10 bg-white" role="group" aria-label="{{ __('Reorder rule') }}">
+                                                            <button
+                                                                type="button"
+                                                                wire:click="moveFirewallRule('{{ $fr->id }}', 'up')"
+                                                                wire:loading.attr="disabled"
+                                                                @disabled($isFirst)
+                                                                class="inline-flex h-6 w-6 items-center justify-center text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-30"
+                                                                title="{{ __('Move up — earlier rules match first') }}"
+                                                                aria-label="{{ __('Move rule up') }}"
+                                                            >
+                                                                <x-heroicon-m-chevron-up class="h-3.5 w-3.5" />
+                                                            </button>
+                                                            <span class="block h-4 w-px bg-brand-ink/10" aria-hidden="true"></span>
+                                                            <button
+                                                                type="button"
+                                                                wire:click="moveFirewallRule('{{ $fr->id }}', 'down')"
+                                                                wire:loading.attr="disabled"
+                                                                @disabled($isLast)
+                                                                class="inline-flex h-6 w-6 items-center justify-center text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-30"
+                                                                title="{{ __('Move down — later rules match after this one') }}"
+                                                                aria-label="{{ __('Move rule down') }}"
+                                                            >
+                                                                <x-heroicon-m-chevron-down class="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    @endif
                                                     <button
                                                         type="button"
                                                         wire:click="startEditRule('{{ $fr->id }}')"
@@ -517,7 +719,8 @@
                             || trim((string) ($form->profile ?? '')) !== ''
                             || trim((string) ($form->tags ?? '')) !== ''
                             || trim((string) ($form->runbook_url ?? '')) !== ''
-                            || trim((string) ($form->site_id ?? '')) !== '';
+                            || trim((string) ($form->site_id ?? '')) !== ''
+                            || trim((string) ($form->iface ?? '')) !== '';
                     @endphp
 
                     {{-- Add / Edit rule modal. Triggered by the "Add a rule" button on the trigger
@@ -556,12 +759,28 @@
                             @endif
 
                             <form wire:submit="saveFirewallRule" id="add-firewall-rule-form" class="@if (! $editing_rule_id) mt-5 @endif space-y-4">
-                                {{-- Essentials: Port · Protocol · Action on one row, Source on the next. --}}
-                                <div class="grid gap-3 sm:grid-cols-3">
+                                @php
+                                    $isAppProfile = trim((string) ($form->app_profile ?? '')) !== '';
+                                @endphp
+                                {{-- UFW application-profile shortcut. When set, port + protocol are
+                                     ignored at apply time (UFW reads /etc/ufw/applications.d). --}}
+                                <div>
+                                    <x-input-label for="fw-app-profile" :value="__('UFW application profile (optional)')" />
+                                    <x-text-input id="fw-app-profile" type="text" class="mt-1 block w-full font-mono text-sm" wire:model.live="form.app_profile" placeholder="OpenSSH, Nginx Full, …" maxlength="64" autocomplete="off" />
+                                    <p class="mt-1 text-xs text-brand-moss">
+                                        {{ __('If set, Dply emits `ufw allow <profile>` and ignores port/protocol below. The profile must exist on the host (ufw app list to see what\'s installed).') }}
+                                    </p>
+                                    <x-input-error :messages="$errors->get('form.app_profile')" class="mt-1" />
+                                </div>
+
+                                {{-- Essentials: Port · Protocol · Action on one row, Source on the next.
+                                     Hidden when an app profile is set since UFW pulls those from the
+                                     profile definition. --}}
+                                <div class="grid gap-3 sm:grid-cols-3 @if ($isAppProfile) opacity-50 @endif">
                                     @if (! in_array($form->protocol, ['icmp', 'ipv6-icmp'], true))
                                         <div>
                                             <x-input-label for="fw-port" :value="__('Port')" />
-                                            <x-text-input id="fw-port" type="number" class="mt-1 block w-full" wire:model="form.port" min="1" max="65535" />
+                                            <x-text-input id="fw-port" type="number" class="mt-1 block w-full" wire:model="form.port" min="1" max="65535" :disabled="$isAppProfile" />
                                             <x-input-error :messages="$errors->get('form.port')" class="mt-1" />
                                         </div>
                                     @endif
@@ -582,7 +801,12 @@
                                         <select id="fw-action" wire:model="form.action" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
                                             <option value="allow">{{ __('Allow') }}</option>
                                             <option value="deny">{{ __('Deny') }}</option>
+                                            <option value="limit">{{ __('Limit (rate-limited allow, TCP only)') }}</option>
                                         </select>
+                                        @if ($form->action === 'limit')
+                                            <p class="mt-1 text-xs text-brand-moss">{{ __('UFW will allow connections but reject sources that hit > 6 connection attempts in 30 seconds. Standard SSH brute-force mitigation; TCP only.') }}</p>
+                                        @endif
+                                        <x-input-error :messages="$errors->get('form.action')" class="mt-1" />
                                     </div>
                                 </div>
 
@@ -637,6 +861,21 @@
                                                 @endforeach
                                             </select>
                                             <x-input-error :messages="$errors->get('form.site_id')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="fw-iface" :value="__('Interface (optional)')" />
+                                            <x-text-input id="fw-iface" type="text" class="mt-1 block w-full font-mono text-sm" wire:model="form.iface" placeholder="eth0, wg0, …" maxlength="32" autocomplete="off" />
+                                            <p class="mt-1 text-xs text-brand-moss">{{ __('Limits this rule to traffic on a specific network interface (`ufw allow in on <iface> …`).') }}</p>
+                                            <x-input-error :messages="$errors->get('form.iface')" class="mt-1" />
+                                        </div>
+                                        <div>
+                                            <x-input-label for="fw-iface-dir" :value="__('Interface direction')" />
+                                            <select id="fw-iface-dir" wire:model="form.iface_direction" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
+                                                <option value="">{{ __('— None —') }}</option>
+                                                <option value="in">{{ __('in (inbound on this iface)') }}</option>
+                                                <option value="out">{{ __('out (outbound on this iface)') }}</option>
+                                            </select>
+                                            <x-input-error :messages="$errors->get('form.iface_direction')" class="mt-1" />
                                         </div>
                                     </div>
                                 </details>
@@ -972,6 +1211,29 @@
                                 @endif
                             @endforeach
                         </div>
+
+                        @if (! $activity_exhausted)
+                            <div class="mt-4 flex justify-center">
+                                <button
+                                    type="button"
+                                    wire:click="loadMoreFirewallActivity"
+                                    wire:loading.attr="disabled"
+                                    wire:target="loadMoreFirewallActivity"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <x-heroicon-o-arrow-down class="h-3.5 w-3.5" wire:loading.remove wire:target="loadMoreFirewallActivity" />
+                                    <span wire:loading wire:target="loadMoreFirewallActivity" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                        <x-spinner variant="forest" size="sm" />
+                                    </span>
+                                    <span wire:loading.remove wire:target="loadMoreFirewallActivity">{{ __('Load older activity') }}</span>
+                                    <span wire:loading wire:target="loadMoreFirewallActivity">{{ __('Loading…') }}</span>
+                                </button>
+                            </div>
+                        @elseif ($activity_visible >= \App\Livewire\Servers\WorkspaceFirewall::ACTIVITY_MAX_VISIBLE)
+                            <p class="mt-4 text-center text-[11px] italic text-brand-mist">
+                                {{ __('Showing the most recent :n events. Older history lives in audit logs.', ['n' => \App\Livewire\Servers\WorkspaceFirewall::ACTIVITY_MAX_VISIBLE]) }}
+                            </p>
+                        @endif
                     @else
                         <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
                             <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
@@ -996,5 +1258,66 @@
             'serverId' => $server->id,
             'deletionSummary' => $deletionSummary,
         ])
+
+        {{-- Apply preview: shows the operator the exact `ufw <fragment>` commands the apply job
+             will run, in order, before they confirm. Mirrors ServerFirewallProvisioner::apply()
+             so the operator never reads "what we said we'd do" different from "what we ran". --}}
+        @if ($apply_preview_open)
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/40 px-4 py-8" x-data x-on:keydown.escape.window="$wire.closeApplyPreview()">
+                <div class="dply-modal-panel w-full max-w-2xl overflow-hidden">
+                    <div class="border-b border-brand-ink/10 px-6 py-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Apply preview') }}</p>
+                        <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Review the ufw commands') }}</h2>
+                        <p class="mt-2 text-sm leading-6 text-brand-moss">
+                            {{ __('The apply job will run these commands against :host in this order. The SSH safety rule (allow :port/tcp) is always re-added — confirm and we\'ll queue the job.', [
+                                'host' => $server->getSshConnectionString(),
+                                'port' => (int) ($server->ssh_port ?: 22),
+                            ]) }}
+                        </p>
+                    </div>
+
+                    <div class="max-h-[55vh] overflow-auto bg-brand-ink/95 px-6 py-4 font-mono text-xs leading-relaxed text-emerald-100 sm:px-8">
+                        @foreach ($apply_preview_lines as $line)
+                            <div class="whitespace-pre-wrap break-all">$ {{ $line }}</div>
+                        @endforeach
+                    </div>
+
+                    @if ($sshNotCovered)
+                        <div class="border-t border-amber-200 bg-amber-50/80 px-6 py-4 text-sm text-amber-900 sm:px-8">
+                            <p class="font-semibold">{{ __('No explicit SSH allow rule in the panel') }}</p>
+                            <p class="mt-1 text-xs leading-relaxed">
+                                {{ __('The safety rail above will keep SSH reachable for THIS apply, but you should still add an explicit rule before tightening UFW defaults. Tick the box to acknowledge and continue.') }}
+                            </p>
+                            <label class="mt-2 flex items-start gap-2 text-xs">
+                                <input type="checkbox" wire:model.live="firewall_ack_ssh_risk" class="mt-0.5 rounded border-amber-300 text-amber-700 focus:ring-amber-500" />
+                                <span>{{ __('I understand SSH may be unreachable after this apply.') }}</span>
+                            </label>
+                        </div>
+                    @endif
+
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 px-6 py-4">
+                        <p class="text-[11px] text-brand-mist">
+                            {{ trans_choice('{0} 0 commands|{1} :n command|[2,*] :n commands', count($apply_preview_lines), ['n' => count($apply_preview_lines)]) }}
+                        </p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <x-secondary-button type="button" wire:click="closeApplyPreview">{{ __('Cancel') }}</x-secondary-button>
+                            <x-primary-button
+                                type="button"
+                                wire:click="applyFirewall(true)"
+                                wire:loading.attr="disabled"
+                                wire:target="applyFirewall"
+                                :disabled="$sshNotCovered && ! $firewall_ack_ssh_risk"
+                            >
+                                <span wire:loading.remove wire:target="applyFirewall">{{ __('Run apply') }}</span>
+                                <span wire:loading wire:target="applyFirewall" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="cream" />
+                                    {{ __('Queueing…') }}
+                                </span>
+                            </x-primary-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
     </x-slot>
 </x-server-workspace-layout>

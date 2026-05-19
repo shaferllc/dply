@@ -4,6 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
+use App\Livewire\Concerns\AuthorsBackupDestinations;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\BackupConfiguration;
@@ -18,6 +19,7 @@ use App\Services\Servers\ServerRemovalAdvisor;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -35,6 +37,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 #[Layout('layouts.app')]
 class WorkspaceBackups extends Component
 {
+    use AuthorsBackupDestinations;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -53,12 +56,24 @@ class WorkspaceBackups extends Component
 
     public ?string $new_backup_configuration_id = null;
 
+    /**
+     * "Add backup destination" modal state. Mirrors the settings page form but
+     * scoped to the current server's organization, so a teammate adding an
+     * S3 bucket here for server A immediately makes it available on every
+     * other server in the org too.
+     */
+    public bool $showDestinationModal = false;
+
+    /** @var array<string, mixed> */
+    public array $destinationForm = [];
+
     /** When set (?site=…), all queries on this page narrow to backups/sites for that site only. */
     public ?string $context_site_id = null;
 
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->destinationForm = $this->emptyDestinationForm();
 
         // Site sidebar's "Backups" entry navigates here with ?site={id}; honoring it pre-filters
         // the page so operators don't see noise from other sites on the same server.
@@ -74,6 +89,58 @@ class WorkspaceBackups extends Component
                 $this->new_target_id = $siteId;
             }
         }
+    }
+
+    /**
+     * Opens the inline "Add backup destination" modal. The created destination
+     * belongs to the server's organization and is immediately selected on the
+     * schedule form, so the operator stays on the same page from "no
+     * destinations" to "schedule queued".
+     */
+    public function openDestinationModal(): void
+    {
+        $this->authorize('create', BackupConfiguration::class);
+        $this->resetErrorBag();
+        $this->destinationForm = $this->emptyDestinationForm();
+        $this->showDestinationModal = true;
+    }
+
+    public function closeDestinationModal(): void
+    {
+        $this->showDestinationModal = false;
+        $this->destinationForm = $this->emptyDestinationForm();
+        $this->resetErrorBag();
+    }
+
+    public function saveDestination(): void
+    {
+        $this->authorize('create', BackupConfiguration::class);
+
+        $org = $this->server->organization;
+        if ($org === null) {
+            $this->toastError(__('This server has no organization — refresh the page.'));
+
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->validate($this->destinationFormRules('destinationForm', $this->destinationForm['provider'] ?? ''));
+        $this->validateDestinationFormExtras('destinationForm', $this->destinationForm);
+
+        $row = $org->backupConfigurations()->create([
+            'name' => $this->destinationForm['name'],
+            'provider' => $this->destinationForm['provider'],
+            'config' => $this->extractDestinationConfig($this->destinationForm),
+            'created_by_user_id' => Auth::id(),
+        ]);
+
+        // Auto-select the new destination so the operator's next action is to
+        // submit the schedule, not to scroll-find the entry they just created.
+        $this->new_backup_configuration_id = $row->id;
+
+        $this->showDestinationModal = false;
+        $this->destinationForm = $this->emptyDestinationForm();
+        $this->toastSuccess(__('Backup destination added — selected on this schedule.'));
     }
 
     public function runDatabaseBackup(): void
@@ -690,8 +757,11 @@ class WorkspaceBackups extends Component
             ];
         }
 
-        $backupConfigurations = auth()->user()
-            ? BackupConfiguration::query()->where('user_id', auth()->id())->orderBy('name')->get()
+        // Destinations are org-scoped — every server in the organization shares
+        // the same set, so any teammate's bucket / rclone remote is immediately
+        // pickable here without re-entering credentials.
+        $backupConfigurations = $this->server->organization
+            ? $this->server->organization->backupConfigurations()->orderBy('name')->get()
             : collect();
 
         // 7-day at-a-glance counts to help operators spot drift without scrolling. Pulled

@@ -37,21 +37,45 @@ class ServerFirewallProvisioner
 
     /**
      * UFW fragment after `ufw` (e.g. `allow 80/tcp`, `allow proto ipv6-icmp`, `deny from 10.0.0.0/8 to any port 22 proto tcp`).
+     *
+     * Action `limit` maps to UFW's per-source rate-limit gate — the canonical SSH brute-force
+     * mitigation. UFW only supports `limit` over TCP; the form validates that combination, but
+     * we still narrow the verb here defensively in case a legacy row slipped in.
+     *
+     * When `app_profile` is set on the rule, the fragment is just `<verb> <profile>` — UFW reads
+     * /etc/ufw/applications.d to expand the port/protocol set, so we MUST NOT also emit a port.
      */
     public function ufwRuleFragment(ServerFirewallRule $rule): string
     {
+        // Interface scoping is independent of the protocol/profile branches — UFW's grammar puts
+        // `in on <iface>` / `out on <iface>` between the verb and the rest of the rule. We slot
+        // it in by computing the segment once and threading it through every branch.
+        $ifaceSegment = $this->ufwIfaceSegment($rule);
+
+        $appProfile = trim((string) ($rule->app_profile ?? ''));
+        if ($appProfile !== '') {
+            $verb = $this->ufwVerbFor($rule->action, 'tcp');
+            // UFW app profiles support `from <src>` qualifiers, same as port-form rules.
+            $source = strtolower(trim((string) $rule->source));
+            if ($source === '' || $source === 'any') {
+                return $this->joinUfwSegments([$verb, $ifaceSegment, $appProfile]);
+            }
+
+            return $this->joinUfwSegments([$verb, $ifaceSegment, sprintf('from %s to any app %s', trim((string) $rule->source), $appProfile)]);
+        }
+
         $p = strtolower(trim((string) $rule->protocol));
 
         if (in_array($p, ['icmp', 'ipv6-icmp'], true)) {
-            $verb = $rule->action === 'deny' ? 'deny' : 'allow';
+            $verb = $this->ufwVerbFor($rule->action, $p);
             $ufwProto = $p === 'ipv6-icmp' ? 'ipv6-icmp' : 'icmp';
             $source = strtolower(trim((string) $rule->source));
             if ($source === '' || $source === 'any') {
-                return sprintf('%s proto %s', $verb, $ufwProto);
+                return $this->joinUfwSegments([$verb, $ifaceSegment, sprintf('proto %s', $ufwProto)]);
             }
             $src = trim((string) $rule->source);
 
-            return sprintf('%s from %s proto %s', $verb, $src, $ufwProto);
+            return $this->joinUfwSegments([$verb, $ifaceSegment, sprintf('from %s proto %s', $src, $ufwProto)]);
         }
 
         $proto = in_array($rule->protocol, ['tcp', 'udp'], true) ? $rule->protocol : 'tcp';
@@ -59,16 +83,114 @@ class ServerFirewallProvisioner
             throw new \InvalidArgumentException('TCP/UDP rules require a port.');
         }
         $port = (int) $rule->port;
-        $verb = $rule->action === 'deny' ? 'deny' : 'allow';
+        $verb = $this->ufwVerbFor($rule->action, $proto);
         $source = strtolower(trim((string) $rule->source));
 
         if ($source === '' || $source === 'any') {
-            return sprintf('%s %d/%s', $verb, $port, $proto);
+            return $this->joinUfwSegments([$verb, $ifaceSegment, sprintf('%d/%s', $port, $proto)]);
         }
 
         $src = trim((string) $rule->source);
 
-        return sprintf('%s from %s to any port %d proto %s', $verb, $src, $port, $proto);
+        return $this->joinUfwSegments([$verb, $ifaceSegment, sprintf('from %s to any port %d proto %s', $src, $port, $proto)]);
+    }
+
+    /**
+     * Build the `<direction> on <iface>` segment when the rule is interface-scoped, or empty
+     * string if not. UFW only accepts `in` and `out`; we silently drop unknown directions so a
+     * legacy half-set row (iface present, direction blank) doesn't break apply.
+     */
+    private function ufwIfaceSegment(ServerFirewallRule $rule): string
+    {
+        $iface = trim((string) ($rule->iface ?? ''));
+        if ($iface === '') {
+            return '';
+        }
+        $direction = strtolower(trim((string) ($rule->iface_direction ?? 'in')));
+        if (! in_array($direction, ['in', 'out'], true)) {
+            return '';
+        }
+
+        return sprintf('%s on %s', $direction, $iface);
+    }
+
+    /**
+     * Join non-empty UFW grammar segments with single spaces. Skipping empties lets the iface
+     * branch be optional without sprinkling conditionals through every return path.
+     *
+     * @param  list<string>  $segments
+     */
+    private function joinUfwSegments(array $segments): string
+    {
+        return implode(' ', array_filter(array_map('trim', $segments), static fn ($s) => $s !== ''));
+    }
+
+    /**
+     * Read the server's desired UFW logging level from meta. Returns one of `off|low|medium|high|full`
+     * or `null` to mean "leave the host alone."
+     */
+    public function loggingLevelFromMeta(Server $server): ?string
+    {
+        $meta = $server->meta ?? [];
+        $key = (string) config('server_firewall.meta_logging_level_key', 'firewall_logging_level');
+        $value = $meta[$key] ?? null;
+        if (! is_string($value)) {
+            return null;
+        }
+        $value = strtolower(trim($value));
+        $allowed = (array) config('server_firewall.logging_levels', ['off', 'low', 'medium', 'high', 'full']);
+
+        return in_array($value, $allowed, true) ? $value : null;
+    }
+
+    /**
+     * Read the server's per-chain default policies from meta. Returns an associative array keyed
+     * by chain (`incoming`/`outgoing`/`routed`) → policy (`allow`/`deny`/`reject`). Only chains
+     * that have an explicit value set are returned — chains the operator hasn't touched stay at
+     * UFW's defaults, which is what an existing server expects.
+     *
+     * @return array<string, string>
+     */
+    public function defaultPoliciesFromMeta(Server $server): array
+    {
+        $meta = $server->meta ?? [];
+        $allowed = (array) config('server_firewall.default_policies', ['allow', 'deny', 'reject']);
+        $keys = [
+            'incoming' => (string) config('server_firewall.meta_default_incoming_key', 'firewall_default_incoming'),
+            'outgoing' => (string) config('server_firewall.meta_default_outgoing_key', 'firewall_default_outgoing'),
+            'routed' => (string) config('server_firewall.meta_default_routed_key', 'firewall_default_routed'),
+        ];
+
+        $out = [];
+        foreach ($keys as $chain => $metaKey) {
+            $value = $meta[$metaKey] ?? null;
+            if (! is_string($value)) {
+                continue;
+            }
+            $value = strtolower(trim($value));
+            if (! in_array($value, $allowed, true)) {
+                continue;
+            }
+            $out[$chain] = $value;
+        }
+
+        return $out;
+    }
+
+    /**
+     * UFW only supports `limit` on TCP. For any other protocol it silently downgrades to `allow`
+     * so an operator who manually inserted a bad row doesn't trip the apply transaction.
+     */
+    private function ufwVerbFor(?string $action, string $protocol): string
+    {
+        $a = strtolower(trim((string) $action));
+
+        return match (true) {
+            $a === 'deny' => 'deny',
+            $a === 'limit' && $protocol === 'tcp' => 'limit',
+            $a === 'limit' => 'allow',
+            default => 'allow',
+        };
     }
 
     public function apply(Server $server): string
@@ -78,7 +200,9 @@ class ServerFirewallProvisioner
         }
 
         $rules = $server->firewallRules()->where('enabled', true)->orderBy('sort_order')->get();
-        if ($rules->isEmpty()) {
+        $defaultPolicies = $this->defaultPoliciesFromMeta($server);
+        $loggingLevel = $this->loggingLevelFromMeta($server);
+        if ($rules->isEmpty() && $defaultPolicies === [] && $loggingLevel === null) {
             $this->emitOutput('> No enabled firewall rules to apply.');
 
             return 'No enabled firewall rules to apply.';
@@ -95,12 +219,34 @@ class ServerFirewallProvisioner
 
         $log .= app(ServerSshConnectionRunner::class)->run(
             $server,
-            function ($ssh) use ($rules, $server, $sshPort): string {
+            function ($ssh) use ($rules, $server, $sshPort, $defaultPolicies, $loggingLevel): string {
+                $output = '';
+
+                // Defaults go BEFORE rules so a tightened "default deny incoming" is in place
+                // before per-rule allows reopen specific ports. UFW writes the value to
+                // /etc/default/ufw; the `--force enable` at the bottom reloads with the new
+                // settings.
+                foreach ($defaultPolicies as $chain => $policy) {
+                    $fragment = sprintf('default %s %s', $policy, $chain);
+                    $this->emitOutput('> ufw '.$fragment);
+                    $out = $ssh->exec($this->ufwExecLine($server, $fragment), 30);
+                    $this->emitIndented($out);
+                    $output .= $out;
+                }
+
+                if ($loggingLevel !== null) {
+                    $fragment = sprintf('logging %s', $loggingLevel);
+                    $this->emitOutput('> ufw '.$fragment);
+                    $out = $ssh->exec($this->ufwExecLine($server, $fragment), 30);
+                    $this->emitIndented($out);
+                    $output .= $out;
+                }
+
                 $sshGuardFragment = 'allow '.$sshPort.'/tcp comment '.escapeshellarg('Dply: keep SSH reachable');
                 $this->emitOutput('> ufw '.$sshGuardFragment);
                 $sshGuardOut = $ssh->exec($this->ufwExecLine($server, $sshGuardFragment), 60);
                 $this->emitIndented($sshGuardOut);
-                $output = $sshGuardOut;
+                $output .= $sshGuardOut;
 
                 foreach ($rules as $rule) {
                     $fragment = $this->ufwRuleFragment($rule);
@@ -326,14 +472,15 @@ class ServerFirewallProvisioner
         if (! is_string($stripped) || $stripped === '') {
             return $unknown;
         }
-        // Trailing `comment '...'` and route/log/limit prefixes aren't structured rules — drop
-        // them rather than guessing.
+        // Trailing `comment '...'` and route/log prefixes aren't structured rules — drop them
+        // rather than guessing. `limit` IS structured (it's just a rate-limited allow), so we
+        // let it fall through to the action regex below.
         $stripped = preg_replace('/\s+comment\s+([\'"]).*?\1\s*$/', '', $stripped) ?? $stripped;
-        if (preg_match('/^(route|log|limit)\b/i', $stripped) === 1) {
+        if (preg_match('/^(route|log)\b/i', $stripped) === 1) {
             return $unknown;
         }
 
-        if (! preg_match('/^(allow|deny)\b\s*(.*)$/i', $stripped, $m)) {
+        if (! preg_match('/^(allow|deny|limit)\b\s*(.*)$/i', $stripped, $m)) {
             return $unknown;
         }
         $action = strtolower($m[1]);

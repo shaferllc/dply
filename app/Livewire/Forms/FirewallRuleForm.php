@@ -26,6 +26,24 @@ class FirewallRuleForm extends Form
     /** Optional: web, db, admin, internal, other, or custom (max 32). */
     public ?string $profile = null;
 
+    /**
+     * UFW application-profile name (e.g. "OpenSSH", "Nginx Full"). When set, the apply pipeline
+     * emits `ufw allow <app_profile>` and the port/protocol fields are ignored. Profiles live in
+     * /etc/ufw/applications.d on the host; Dply doesn't manage them — operators pick from what's
+     * already there.
+     */
+    public ?string $app_profile = null;
+
+    /**
+     * Network-interface scoping. When `$iface` is set we emit `ufw <verb> <iface_direction> on
+     * <iface> ...rest`, e.g. `allow in on eth0 to any port 80/tcp`. Direction defaults to "in"
+     * (the common case — restricting WHICH interface accepts traffic). "out" is for outbound
+     * filtering on a specific egress interface.
+     */
+    public ?string $iface = null;
+
+    public ?string $iface_direction = null;
+
     /** Comma-separated tags for filters and exports. */
     public ?string $tags = null;
 
@@ -41,13 +59,36 @@ class FirewallRuleForm extends Form
         return [
             'name' => ['nullable', 'string', 'max:160'],
             'port' => [
-                Rule::requiredIf(fn () => in_array($this->protocol, ['tcp', 'udp'], true)),
+                // Port is only required when there's no app profile AND the rule is on tcp/udp.
+                // App-profile rules omit port (UFW picks it up from the profile definition).
+                Rule::requiredIf(fn () => in_array($this->protocol, ['tcp', 'udp'], true) && trim((string) $this->app_profile) === ''),
                 'nullable',
                 'integer',
                 'min:1',
                 'max:65535',
             ],
             'protocol' => ['required', 'in:tcp,udp,icmp,ipv6-icmp'],
+            'app_profile' => [
+                'nullable',
+                'string',
+                'max:64',
+                // UFW application names are typically alnum + space + dot + dash + underscore.
+                'regex:/^[A-Za-z0-9 ._-]+$/',
+            ],
+            'iface' => [
+                'nullable',
+                'string',
+                'max:32',
+                // Linux interface naming: letters, digits, dot, colon (alias), at-sign (vlan).
+                'regex:/^[A-Za-z0-9._:@-]+$/',
+            ],
+            'iface_direction' => [
+                // Closure rules run only when the field has a value, so we use required_with
+                // to fire the "pick a direction" message when iface is set but direction isn't.
+                'required_with:iface',
+                'nullable',
+                Rule::in(['in', 'out']),
+            ],
             'source' => [
                 'required',
                 'string',
@@ -58,7 +99,15 @@ class FirewallRuleForm extends Form
                     }
                 },
             ],
-            'action' => ['required', 'in:allow,deny'],
+            'action' => [
+                'required',
+                'in:allow,deny,limit',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === 'limit' && $this->protocol !== 'tcp') {
+                        $fail(__('UFW only supports the limit action on TCP rules.'));
+                    }
+                },
+            ],
             'enabled' => ['boolean'],
             'profile' => ['nullable', 'string', 'max:32'],
             'tags' => ['nullable', 'string', 'max:500'],
@@ -123,6 +172,9 @@ class FirewallRuleForm extends Form
         $this->action = $rule->action;
         $this->enabled = (bool) $rule->enabled;
         $this->profile = $rule->profile;
+        $this->app_profile = $rule->app_profile;
+        $this->iface = $rule->iface;
+        $this->iface_direction = $rule->iface_direction;
         $tagList = $rule->tags;
         $this->tags = is_array($tagList) && $tagList !== [] ? implode(', ', $tagList) : null;
         $this->runbook_url = $rule->runbook_url;
@@ -133,7 +185,8 @@ class FirewallRuleForm extends Form
     {
         $this->reset([
             'name', 'port', 'protocol', 'source', 'action', 'enabled',
-            'profile', 'tags', 'runbook_url', 'site_id',
+            'profile', 'app_profile', 'iface', 'iface_direction',
+            'tags', 'runbook_url', 'site_id',
         ]);
         $this->applyNewRuleDefaults();
     }
@@ -156,7 +209,7 @@ class FirewallRuleForm extends Form
         $this->source = is_string($d['source'] ?? null) && $d['source'] !== ''
             ? $d['source']
             : 'any';
-        $this->action = in_array($d['action'] ?? 'allow', ['allow', 'deny'], true)
+        $this->action = in_array($d['action'] ?? 'allow', ['allow', 'deny', 'limit'], true)
             ? $d['action']
             : 'allow';
         $this->enabled = (bool) ($d['enabled'] ?? true);
@@ -183,7 +236,7 @@ class FirewallRuleForm extends Form
         $this->source = is_string($p['source'] ?? null) && $p['source'] !== ''
             ? $p['source']
             : 'any';
-        $this->action = in_array($p['action'] ?? 'allow', ['allow', 'deny'], true)
+        $this->action = in_array($p['action'] ?? 'allow', ['allow', 'deny', 'limit'], true)
             ? $p['action']
             : 'allow';
         $this->enabled = (bool) ($p['enabled'] ?? true);

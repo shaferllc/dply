@@ -381,16 +381,19 @@ class BackgroundWorkspacePagesTest extends TestCase
         $this->assertNull(ServerDatabaseBackup::find($backup->id)->disk_path);
     }
 
-    public function test_empty_state_explainer_links_to_backup_configurations(): void
+    public function test_empty_state_explainer_offers_inline_add_destination(): void
     {
+        // With org-scoped destinations and the inline "Add destination" modal,
+        // the empty-state copy invites the operator to add one without leaving
+        // the page rather than linking back to the profile settings screen.
         $user = $this->actingOrgUser();
         $server = $this->readyServer($user);
 
         $this->actingAs($user)
             ->get(route('servers.backups', $server))
             ->assertOk()
-            ->assertSee('add a backup destination', false)
-            ->assertSee(route('profile.backup-configurations'), false);
+            ->assertSee('add one now', false)
+            ->assertSee('openDestinationModal', false);
     }
 
     public function test_toggle_schedule_pauses_and_resumes_managed_cron(): void

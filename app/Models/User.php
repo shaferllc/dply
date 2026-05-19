@@ -114,11 +114,6 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->hasMany(NotificationInboxItem::class)->latest();
     }
 
-    public function backupConfigurations(): HasMany
-    {
-        return $this->hasMany(BackupConfiguration::class);
-    }
-
     public function referrer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'referred_by_user_id');

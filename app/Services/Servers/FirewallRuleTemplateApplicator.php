@@ -147,7 +147,21 @@ class FirewallRuleTemplateApplicator
             $source = strtolower(trim((string) ($row['source'] ?? 'any'))) === 'any'
                 ? 'any'
                 : trim((string) ($row['source'] ?? 'any'));
-            $action = in_array($row['action'] ?? 'allow', ['allow', 'deny'], true) ? $row['action'] : 'allow';
+            $action = in_array($row['action'] ?? 'allow', ['allow', 'deny', 'limit'], true) ? $row['action'] : 'allow';
+            $appProfile = isset($row['app_profile']) && is_string($row['app_profile']) && trim($row['app_profile']) !== ''
+                ? substr(trim($row['app_profile']), 0, 64)
+                : null;
+            if ($appProfile !== null) {
+                $port = null;
+            }
+            $iface = isset($row['iface']) && is_string($row['iface']) && trim($row['iface']) !== ''
+                ? substr(trim($row['iface']), 0, 32)
+                : null;
+            $ifaceDirection = null;
+            if ($iface !== null) {
+                $dir = strtolower(trim((string) ($row['iface_direction'] ?? 'in')));
+                $ifaceDirection = in_array($dir, ['in', 'out'], true) ? $dir : 'in';
+            }
 
             $duplicateRuleExists = ServerFirewallRule::query()
                 ->where('server_id', $server->id)
@@ -155,6 +169,9 @@ class FirewallRuleTemplateApplicator
                 ->where('protocol', (string) ($row['protocol'] ?? 'tcp'))
                 ->where('source', $source)
                 ->where('action', $action)
+                ->where('app_profile', $appProfile)
+                ->where('iface', $iface)
+                ->where('iface_direction', $ifaceDirection)
                 ->where('site_id', $siteId)
                 ->exists();
 
@@ -167,6 +184,9 @@ class FirewallRuleTemplateApplicator
                 'site_id' => $siteId,
                 'name' => isset($row['name']) ? (string) $row['name'] : null,
                 'profile' => isset($row['profile']) && is_string($row['profile']) ? substr($row['profile'], 0, 32) : null,
+                'app_profile' => $appProfile,
+                'iface' => $iface,
+                'iface_direction' => $ifaceDirection,
                 'tags' => is_array($tags) && $tags !== [] ? array_values($tags) : null,
                 'runbook_url' => isset($row['runbook_url']) && is_string($row['runbook_url']) ? $row['runbook_url'] : null,
                 'port' => $port,

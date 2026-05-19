@@ -48,7 +48,10 @@
     <x-explainer class="mb-4">
         <p>{{ __('“Run now” creates a pending backup row and queues the export job — progress shows up in the lists below as the job completes. Schedules add a managed cron entry that fires the same job on the cadence you set.') }}</p>
         @if ($backupConfigurations->isEmpty())
-            <p class="mt-2">{{ __('Backups currently write to the local disk. To send them to S3 / Dropbox / Google Drive / SFTP, ') }}<a href="{{ route('profile.backup-configurations') }}" wire:navigate class="font-semibold text-brand-ink underline">{{ __('add a backup destination') }}</a>{{ __(' first.') }}</p>
+            <p class="mt-2">
+                {{ __('No backup destinations yet. Add an S3 bucket / Dropbox / Google Drive / SFTP target to send backups somewhere you own — ') }}
+                <button type="button" wire:click="openDestinationModal" class="font-semibold text-brand-ink underline hover:no-underline">{{ __('add one now') }}</button>{{ __('.') }}
+            </p>
         @endif
         <p class="mt-2 text-xs"><a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="font-semibold text-brand-ink underline">{{ __('View background activity →') }}</a></p>
     </x-explainer>
@@ -136,44 +139,72 @@
         </header>
 
         <div class="space-y-4 p-5">
-            {{-- Cadence presets — fill the cron field with one click. --}}
-            <div class="flex flex-wrap items-center gap-2 text-xs">
-                <span class="font-semibold uppercase tracking-wide text-brand-mist">{{ __('Quick presets:') }}</span>
-                <button type="button" wire:click="$set('new_cron_expression', '0 3 * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Nightly 3am') }}</button>
-                <button type="button" wire:click="$set('new_cron_expression', '0 4 * * 0')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Weekly Sun 4am') }}</button>
-                <button type="button" wire:click="$set('new_cron_expression', '0 * * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Hourly') }}</button>
-                <button type="button" wire:click="$set('new_cron_expression', '*/15 * * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Every 15 min') }}</button>
-            </div>
-            <form wire:submit="addSchedule" class="grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:grid-cols-5">
-                <select wire:model.live="new_target_type" class="{{ $input }} sm:col-span-1">
-                    <option value="database">{{ __('Database') }}</option>
-                    <option value="site_files">{{ __('Site files') }}</option>
-                </select>
-                <select wire:model="new_target_id" class="{{ $input }} sm:col-span-2">
-                    <option value="">{{ __('Pick target…') }}</option>
-                    @if ($new_target_type === 'database')
-                        @foreach ($databases as $db)
-                            <option value="{{ $db->id }}">{{ $db->name }}</option>
-                        @endforeach
-                    @else
-                        @foreach ($sites as $site)
-                            <option value="{{ $site->id }}">{{ $site->name }}</option>
-                        @endforeach
-                    @endif
-                </select>
-                <input type="text" wire:model="new_cron_expression" class="{{ $input }} font-mono sm:col-span-1" placeholder="0 3 * * *" />
-                <button type="submit" class="{{ $btnPrimary }} sm:col-span-1" @disabled(! $opsReady)>
-                    {{ __('Add schedule') }}
-                </button>
-                @if ($backupConfigurations->isNotEmpty())
-                    <select wire:model="new_backup_configuration_id" class="{{ $input }} sm:col-span-5">
-                        <option value="">{{ __('Default backup destination') }}</option>
-                        @foreach ($backupConfigurations as $cfg)
-                            <option value="{{ $cfg->id }}">{{ $cfg->name }} ({{ \App\Models\BackupConfiguration::labelForProvider($cfg->provider) }})</option>
-                        @endforeach
+            @if ($backupConfigurations->isEmpty())
+                {{-- No destinations means no schedule can actually push anywhere, so
+                     skip the cadence/target/cron form entirely until the operator
+                     adds a destination. Showing it under "No destinations yet" was
+                     noise — the only meaningful action is "Add destination". --}}
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-6 text-center">
+                    <x-heroicon-o-cloud-arrow-up class="mx-auto h-8 w-8 text-brand-mist" />
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Add a backup destination to start scheduling') }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Schedules push backups to a destination you own (S3, B2, R2, Spaces, SFTP, Dropbox, Google Drive, or rclone). Add one to unlock the recurring-schedule form.') }}</p>
+                    <button
+                        type="button"
+                        wire:click="openDestinationModal"
+                        class="mt-4 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-plus class="h-4 w-4" />
+                        {{ __('Add backup destination') }}
+                    </button>
+                </div>
+            @else
+                {{-- Cadence presets — fill the cron field with one click. --}}
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="font-semibold uppercase tracking-wide text-brand-mist">{{ __('Quick presets:') }}</span>
+                    <button type="button" wire:click="$set('new_cron_expression', '0 3 * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Nightly 3am') }}</button>
+                    <button type="button" wire:click="$set('new_cron_expression', '0 4 * * 0')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Weekly Sun 4am') }}</button>
+                    <button type="button" wire:click="$set('new_cron_expression', '0 * * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Hourly') }}</button>
+                    <button type="button" wire:click="$set('new_cron_expression', '*/15 * * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Every 15 min') }}</button>
+                </div>
+                <form wire:submit="addSchedule" class="grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:grid-cols-5">
+                    <select wire:model.live="new_target_type" class="{{ $input }} sm:col-span-1">
+                        <option value="database">{{ __('Database') }}</option>
+                        <option value="site_files">{{ __('Site files') }}</option>
                     </select>
-                @endif
-            </form>
+                    <select wire:model="new_target_id" class="{{ $input }} sm:col-span-2">
+                        <option value="">{{ __('Pick target…') }}</option>
+                        @if ($new_target_type === 'database')
+                            @foreach ($databases as $db)
+                                <option value="{{ $db->id }}">{{ $db->name }}</option>
+                            @endforeach
+                        @else
+                            @foreach ($sites as $site)
+                                <option value="{{ $site->id }}">{{ $site->name }}</option>
+                            @endforeach
+                        @endif
+                    </select>
+                    <input type="text" wire:model="new_cron_expression" class="{{ $input }} font-mono sm:col-span-1" placeholder="0 3 * * *" />
+                    <button type="submit" class="{{ $btnPrimary }} sm:col-span-1" @disabled(! $opsReady)>
+                        {{ __('Add schedule') }}
+                    </button>
+                    <div class="flex flex-col gap-2 sm:col-span-5 sm:flex-row sm:items-center">
+                        <select wire:model="new_backup_configuration_id" class="{{ $input }} sm:flex-1">
+                            <option value="">{{ __('Pick a backup destination…') }}</option>
+                            @foreach ($backupConfigurations as $cfg)
+                                <option value="{{ $cfg->id }}">{{ $cfg->name }} ({{ \App\Models\BackupConfiguration::labelForProvider($cfg->provider) }})</option>
+                            @endforeach
+                        </select>
+                        <button
+                            type="button"
+                            wire:click="openDestinationModal"
+                            class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        >
+                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            {{ __('Add destination') }}
+                        </button>
+                    </div>
+                </form>
+            @endif
 
             @if ($schedules->isEmpty())
                 <p class="text-center text-sm text-brand-moss">{{ __('No recurring backups scheduled yet.') }}</p>
@@ -394,4 +425,62 @@
         ['label' => __('Prune old backups (dry-run)'), 'command' => 'dply:prune-backups --dry-run'],
         ['label' => __('Prune old backups for real'), 'command' => 'dply:prune-backups'],
     ]" />
+
+    {{-- Add backup destination modal. Reuses the same provider-fields partial
+         as the org-wide settings page so the form shape is identical in both
+         surfaces (matches AuthorsBackupDestinations trait's validation and
+         extract helpers). --}}
+    @if ($showDestinationModal)
+        <div
+            class="fixed inset-0 z-50 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-destination-title"
+            x-data
+            x-on:keydown.escape.window="$wire.closeDestinationModal()"
+        >
+            <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeDestinationModal"></div>
+            <div class="relative flex min-h-full items-start justify-center px-4 py-10 sm:px-6">
+                <div class="relative w-full max-w-2xl dply-modal-panel" wire:click.stop>
+                    <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-7">
+                        <div class="min-w-0">
+                            <h2 id="add-destination-title" class="text-base font-semibold text-brand-ink">{{ __('Add backup destination') }}</h2>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Shared with every server in your organization. Credentials are encrypted at rest.') }}</p>
+                        </div>
+                        <button type="button" wire:click="closeDestinationModal" class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink" aria-label="{{ __('Close') }}">
+                            <x-heroicon-o-x-mark class="h-5 w-5" aria-hidden="true" />
+                        </button>
+                    </div>
+                    <div class="space-y-5 px-6 py-5 sm:px-7">
+                        <div>
+                            <x-input-label for="dest_name" :value="__('Name')" />
+                            <x-text-input id="dest_name" wire:model="destinationForm.name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production S3') }}" autocomplete="off" />
+                            <x-input-error :messages="$errors->get('destinationForm.name')" class="mt-2" />
+                        </div>
+                        <div>
+                            <x-input-label for="dest_provider" :value="__('Storage provider')" />
+                            <select id="dest_provider" wire:model.live="destinationForm.provider" class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage">
+                                @foreach (\App\Models\BackupConfiguration::providers() as $p)
+                                    <option value="{{ $p }}">{{ \App\Models\BackupConfiguration::labelForProvider($p) }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('destinationForm.provider')" class="mt-2" />
+                        </div>
+
+                        @include('livewire.settings.partials.backup-provider-fields', ['formKey' => 'destinationForm', 'form' => $destinationForm])
+                    </div>
+                    <div class="flex flex-col-reverse gap-2 border-t border-brand-ink/10 px-6 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-7">
+                        <x-secondary-button type="button" wire:click="closeDestinationModal">{{ __('Cancel') }}</x-secondary-button>
+                        <x-primary-button type="button" wire:click="saveDestination" wire:loading.attr="disabled" wire:target="saveDestination">
+                            <span wire:loading.remove wire:target="saveDestination">{{ __('Save destination') }}</span>
+                            <span wire:loading wire:target="saveDestination" class="inline-flex items-center gap-2">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Saving…') }}
+                            </span>
+                        </x-primary-button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </x-server-workspace-layout>

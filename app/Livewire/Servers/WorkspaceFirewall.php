@@ -24,6 +24,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -130,6 +131,17 @@ class WorkspaceFirewall extends Component
         $this->lastUfwHostSyncError = null;
 
         $port = in_array($this->form->protocol, ['icmp', 'ipv6-icmp'], true) ? null : $this->form->port;
+        $appProfile = trim((string) ($this->form->app_profile ?? ''));
+        $appProfile = $appProfile !== '' ? $appProfile : null;
+        if ($appProfile !== null) {
+            // App-profile rules let UFW resolve the port/protocol from /etc/ufw/applications.d.
+            // Clearing `port` here mirrors the apply path and keeps the duplicate-check below
+            // tight (two rules with the same app profile and source ARE duplicates).
+            $port = null;
+        }
+        $iface = trim((string) ($this->form->iface ?? ''));
+        $iface = $iface !== '' ? $iface : null;
+        $ifaceDirection = $iface === null ? null : ($this->form->iface_direction ?: 'in');
         $tags = FirewallRuleForm::tagsStringToArray($this->form->tags);
         $profile = $this->form->profile ? trim((string) $this->form->profile) : null;
         $runbook = $this->form->runbook_url ? trim((string) $this->form->runbook_url) : null;
@@ -141,6 +153,9 @@ class WorkspaceFirewall extends Component
             ->where('protocol', $this->form->protocol)
             ->where('source', $source)
             ->where('action', $this->form->action)
+            ->where('app_profile', $appProfile)
+            ->where('iface', $iface)
+            ->where('iface_direction', $ifaceDirection)
             ->where('site_id', $this->form->site_id ?: null);
 
         if ($this->editing_rule_id) {
@@ -164,9 +179,12 @@ class WorkspaceFirewall extends Component
                 'port' => $port,
                 'protocol' => $this->form->protocol,
                 'source' => $source,
+                'iface' => $iface,
+                'iface_direction' => $ifaceDirection,
                 'action' => $this->form->action,
                 'enabled' => $this->form->enabled,
                 'profile' => $profile,
+                'app_profile' => $appProfile,
                 'tags' => $tags !== [] ? $tags : null,
                 'runbook_url' => $runbook !== '' ? $runbook : null,
                 'site_id' => $this->form->site_id ?: null,
@@ -201,10 +219,13 @@ class WorkspaceFirewall extends Component
                 'port' => $port,
                 'protocol' => $this->form->protocol,
                 'source' => $source,
+                'iface' => $iface,
+                'iface_direction' => $ifaceDirection,
                 'action' => $this->form->action,
                 'enabled' => $this->form->enabled,
                 'sort_order' => (int) ($this->server->firewallRules()->max('sort_order') ?? 0) + 1,
                 'profile' => $profile,
+                'app_profile' => $appProfile,
                 'tags' => $tags !== [] ? $tags : null,
                 'runbook_url' => $runbook !== '' ? $runbook : null,
                 'site_id' => $this->form->site_id ?: null,
@@ -375,6 +396,137 @@ class WorkspaceFirewall extends Component
         $this->toastSuccess($removedMsg);
     }
 
+    /**
+     * Swap a rule's sort_order with its immediate neighbour. UFW evaluates rules in numeric
+     * order (first match wins for allow/deny), so the operator-facing knob matches the actual
+     * apply behaviour. No host-side change — order takes effect on the next Apply.
+     */
+    public function moveFirewallRule(string $id, string $direction, ServerFirewallAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! in_array($direction, ['up', 'down'], true)) {
+            return;
+        }
+
+        $rules = $this->server->firewallRules()->orderBy('sort_order')->orderBy('id')->get();
+        $index = $rules->search(fn (ServerFirewallRule $r) => (string) $r->id === $id);
+        if ($index === false) {
+            return;
+        }
+
+        $neighbourIndex = $direction === 'up' ? $index - 1 : $index + 1;
+        if ($neighbourIndex < 0 || $neighbourIndex >= $rules->count()) {
+            return;
+        }
+
+        $current = $rules[$index];
+        $neighbour = $rules[$neighbourIndex];
+
+        DB::transaction(function () use ($current, $neighbour): void {
+            $a = (int) $current->sort_order;
+            $b = (int) $neighbour->sort_order;
+
+            // Equal sort_order values would no-op; bump the neighbour down so the swap still
+            // produces a visible reorder for legacy rows that were inserted with the same key.
+            if ($a === $b) {
+                $b = $a + 1;
+            }
+
+            $current->update(['sort_order' => $b]);
+            $neighbour->update(['sort_order' => $a]);
+        });
+
+        $audit->record($this->server, ServerFirewallAuditEvent::EVENT_RULE_UPDATED, [
+            'rule_id' => $current->id,
+            'change' => 'reorder',
+            'direction' => $direction,
+        ], auth()->user());
+    }
+
+    /**
+     * Bound to the three default-policy selects on the Rules tab. Persists onto server.meta so
+     * the next Apply will emit `ufw default <policy> <chain>` before per-rule fragments. Empty
+     * string means "leave UFW's default in place" — that key is removed from meta entirely so
+     * we don't accidentally pin a default someone deselected.
+     */
+    public function setFirewallDefaultPolicy(string $chain, string $policy, ServerFirewallAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        $keyMap = [
+            'incoming' => (string) config('server_firewall.meta_default_incoming_key', 'firewall_default_incoming'),
+            'outgoing' => (string) config('server_firewall.meta_default_outgoing_key', 'firewall_default_outgoing'),
+            'routed' => (string) config('server_firewall.meta_default_routed_key', 'firewall_default_routed'),
+        ];
+        if (! isset($keyMap[$chain])) {
+            return;
+        }
+
+        $allowed = (array) config('server_firewall.default_policies', ['allow', 'deny', 'reject']);
+        $policy = strtolower(trim($policy));
+        if ($policy !== '' && ! in_array($policy, $allowed, true)) {
+            return;
+        }
+
+        $meta = $this->server->fresh()->meta ?? [];
+        $previous = $meta[$keyMap[$chain]] ?? null;
+        if ($policy === '') {
+            unset($meta[$keyMap[$chain]]);
+        } else {
+            $meta[$keyMap[$chain]] = $policy;
+        }
+        $this->server->fresh()->update(['meta' => $meta]);
+        $this->server->refresh();
+
+        $audit->record($this->server, ServerFirewallAuditEvent::EVENT_RULE_UPDATED, [
+            'change' => 'default_policy',
+            'chain' => $chain,
+            'from' => $previous,
+            'to' => $policy === '' ? null : $policy,
+        ], auth()->user());
+
+        $this->toastSuccess($policy === ''
+            ? __('Default :chain policy cleared — UFW default applies on next Apply.', ['chain' => $chain])
+            : __('Default :chain policy set to :policy — pushed on next Apply.', ['chain' => $chain, 'policy' => $policy]));
+    }
+
+    /**
+     * Persist the desired UFW logging level onto server.meta. Empty string clears the override
+     * so the next Apply leaves the host's current logging setting alone.
+     */
+    public function setFirewallLoggingLevel(string $level, ServerFirewallAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        $key = (string) config('server_firewall.meta_logging_level_key', 'firewall_logging_level');
+        $allowed = (array) config('server_firewall.logging_levels', ['off', 'low', 'medium', 'high', 'full']);
+        $level = strtolower(trim($level));
+        if ($level !== '' && ! in_array($level, $allowed, true)) {
+            return;
+        }
+
+        $meta = $this->server->fresh()->meta ?? [];
+        $previous = $meta[$key] ?? null;
+        if ($level === '') {
+            unset($meta[$key]);
+        } else {
+            $meta[$key] = $level;
+        }
+        $this->server->fresh()->update(['meta' => $meta]);
+        $this->server->refresh();
+
+        $audit->record($this->server, ServerFirewallAuditEvent::EVENT_RULE_UPDATED, [
+            'change' => 'logging_level',
+            'from' => $previous,
+            'to' => $level === '' ? null : $level,
+        ], auth()->user());
+
+        $this->toastSuccess($level === ''
+            ? __('UFW logging override cleared — apply will leave the host setting alone.')
+            : __('UFW logging level set to :level — pushed on next Apply.', ['level' => $level]));
+    }
+
     public function selectAllFirewallRules(): void
     {
         $this->authorize('update', $this->server);
@@ -539,6 +691,64 @@ class WorkspaceFirewall extends Component
         $this->toastSuccess(__('Trimmed :n duplicate rule(s).', ['n' => count($removedRuleIds)]));
     }
 
+    /**
+     * Dry-run preview state. {@see previewApplyFirewall()} fills $apply_preview_lines with the
+     * exact `ufw <fragment>` commands the next apply will run, in the same order the provisioner
+     * emits them, and flips the modal open. {@see applyFirewall()} is reached only after the
+     * operator confirms.
+     *
+     * @var list<string>
+     */
+    public array $apply_preview_lines = [];
+
+    public bool $apply_preview_open = false;
+
+    /**
+     * Build the ordered list of UFW commands the upcoming apply will run, in the same order as
+     * {@see ServerFirewallProvisioner::apply()}: defaults → SSH safety rail → per-rule fragments
+     * → `--force enable`. Then open the preview modal.
+     */
+    public function previewApplyFirewall(ServerFirewallProvisioner $firewall): void
+    {
+        $this->authorize('update', $this->server);
+        $this->server->refresh();
+
+        $lines = [];
+
+        foreach ($firewall->defaultPoliciesFromMeta($this->server) as $chain => $policy) {
+            $lines[] = sprintf('ufw default %s %s', $policy, $chain);
+        }
+
+        $loggingLevel = $firewall->loggingLevelFromMeta($this->server);
+        if ($loggingLevel !== null) {
+            $lines[] = sprintf('ufw logging %s', $loggingLevel);
+        }
+
+        $sshPort = (int) ($this->server->ssh_port ?: 22);
+        $lines[] = sprintf("ufw allow %d/tcp comment 'Dply: keep SSH reachable'", $sshPort);
+
+        $rules = $this->server->firewallRules()->where('enabled', true)->orderBy('sort_order')->get();
+        foreach ($rules as $rule) {
+            try {
+                $fragment = $firewall->ufwRuleFragment($rule);
+            } catch (\Throwable $e) {
+                $fragment = '# skipped: '.$e->getMessage();
+            }
+            $lines[] = 'ufw '.$fragment.($rule->name ? '   # '.$rule->name : '');
+        }
+
+        $lines[] = 'ufw --force enable';
+
+        $this->apply_preview_lines = $lines;
+        $this->apply_preview_open = true;
+    }
+
+    public function closeApplyPreview(): void
+    {
+        $this->apply_preview_open = false;
+        $this->apply_preview_lines = [];
+    }
+
     /** A queued/running apply older than this is treated as stuck so the operator can re-dispatch. */
     public const APPLY_STALE_THRESHOLD_SECONDS = 300;
 
@@ -579,6 +789,8 @@ class WorkspaceFirewall extends Component
         $this->server->refresh();
 
         $this->firewall_ack_ssh_risk = false;
+        $this->apply_preview_open = false;
+        $this->apply_preview_lines = [];
         ApplyFirewallJob::dispatch($this->server->id, $runId, Auth::id());
 
         $this->toastSuccess(__('Firewall apply queued — watch the banner for live output. You can leave this page; the job runs on the queue.'));
@@ -1045,6 +1257,81 @@ class WorkspaceFirewall extends Component
         $this->toastSuccess(__('Added an allow rule for TCP :port from any. Apply when ready to push to UFW.', ['port' => $sshPort]));
     }
 
+    /**
+     * Stream the current rule set as a JSON file shaped exactly like a saved-template payload.
+     * That round-trip makes the export usable as both "audit dump" and "bootstrap another
+     * server" — drop the file into a new server's template upload (or feed it to the template
+     * applicator directly) and you get the same rules without retyping.
+     */
+    public function exportFirewallRulesJson(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorize('update', $this->server);
+        $this->server->load(['firewallRules' => fn ($q) => $q->orderBy('sort_order')]);
+
+        $payload = [
+            'name' => sprintf('%s firewall rules', $this->server->name),
+            'description' => sprintf('Exported from Dply on %s', now()->toDateString()),
+            'rules' => $this->server->firewallRules->map(fn (ServerFirewallRule $r): array => [
+                'name' => $r->name,
+                'port' => $r->port,
+                'protocol' => $r->protocol,
+                'source' => $r->source,
+                'iface' => $r->iface,
+                'iface_direction' => $r->iface_direction,
+                'action' => $r->action,
+                'enabled' => (bool) $r->enabled,
+                'sort_order' => (int) $r->sort_order,
+                'profile' => $r->profile,
+                'app_profile' => $r->app_profile,
+                'tags' => $r->tags,
+                'runbook_url' => $r->runbook_url,
+                // site_id intentionally omitted — IDs don't carry across servers.
+            ])->values()->all(),
+        ];
+
+        $filename = sprintf('firewall-rules-%s-%s.json', \Illuminate\Support\Str::slug($this->server->name), now()->format('Ymd-His'));
+
+        return response()->streamDownload(function () use ($payload): void {
+            echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }, $filename, ['Content-Type' => 'application/json']);
+    }
+
+    /**
+     * CSV export — operator-friendly columns, no app_profile/iface_direction (which CSV-flatten
+     * poorly). Use the JSON export for round-trip imports; CSV is for spreadsheet audits.
+     */
+    public function exportFirewallRulesCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorize('update', $this->server);
+        $this->server->load(['firewallRules' => fn ($q) => $q->orderBy('sort_order')]);
+
+        $rules = $this->server->firewallRules;
+        $filename = sprintf('firewall-rules-%s-%s.csv', \Illuminate\Support\Str::slug($this->server->name), now()->format('Ymd-His'));
+
+        return response()->streamDownload(function () use ($rules): void {
+            $fh = fopen('php://output', 'w');
+            fputcsv($fh, ['name', 'action', 'port', 'protocol', 'source', 'iface', 'iface_direction', 'app_profile', 'profile', 'enabled', 'sort_order', 'tags', 'runbook_url']);
+            foreach ($rules as $r) {
+                fputcsv($fh, [
+                    (string) ($r->name ?? ''),
+                    (string) $r->action,
+                    $r->port === null ? '' : (string) $r->port,
+                    (string) $r->protocol,
+                    (string) $r->source,
+                    (string) ($r->iface ?? ''),
+                    (string) ($r->iface_direction ?? ''),
+                    (string) ($r->app_profile ?? ''),
+                    (string) ($r->profile ?? ''),
+                    $r->enabled ? '1' : '0',
+                    (string) (int) $r->sort_order,
+                    is_array($r->tags) ? implode(',', $r->tags) : '',
+                    (string) ($r->runbook_url ?? ''),
+                ]);
+            }
+            fclose($fh);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
     public function render(): View
     {
         $this->server->loadMissing(['firewallRules', 'organization', 'sites']);
@@ -1099,6 +1386,8 @@ class WorkspaceFirewall extends Component
             'activityItems' => $this->buildActivityItems(),
             'sshNotCovered' => $provisioner->sshAccessNotExplicitlyAllowed($this->server),
             'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
+            'defaultPolicies' => $provisioner->defaultPoliciesFromMeta($this->server),
+            'loggingLevel' => $provisioner->loggingLevelFromMeta($this->server),
         ]);
     }
 
@@ -1111,12 +1400,36 @@ class WorkspaceFirewall extends Component
      *
      * @return list<array{kind: string, at: \Carbon\Carbon|null, key: string, log?: \App\Models\ServerFirewallApplyLog, event?: \App\Models\ServerFirewallAuditEvent}>
      */
+    /**
+     * Activity timeline window size. Grows by {@see ACTIVITY_PAGE_SIZE} each time the operator
+     * clicks "Load older"; capped at {@see ACTIVITY_MAX_VISIBLE} to keep render costs sane.
+     */
+    public int $activity_visible = 60;
+
+    public const ACTIVITY_PAGE_SIZE = 60;
+
+    public const ACTIVITY_MAX_VISIBLE = 600;
+
+    public bool $activity_exhausted = false;
+
+    public function loadMoreFirewallActivity(): void
+    {
+        $this->activity_visible = min(
+            self::ACTIVITY_MAX_VISIBLE,
+            $this->activity_visible + self::ACTIVITY_PAGE_SIZE,
+        );
+    }
+
     protected function buildActivityItems(): array
     {
-        $applyLogs = $this->server->firewallApplyLogs()->limit(40)->get();
+        // Pull a bit more than $activity_visible from each source so the merge has enough rows
+        // to fill the window even after $activity_visible items get cut by sort order. We cap
+        // each source at 2× visible because that's the worst case (all from one source).
+        $sourceLimit = max($this->activity_visible * 2, self::ACTIVITY_PAGE_SIZE * 2);
+        $applyLogs = $this->server->firewallApplyLogs()->limit($sourceLimit)->get();
         $auditEvents = $this->server->firewallAuditEvents()
             ->where('event', '!=', ServerFirewallAuditEvent::EVENT_APPLY)
-            ->limit(80)
+            ->limit($sourceLimit)
             ->get();
 
         // Both rowsets reference the same `users` table; eager-loading via the relations
@@ -1159,7 +1472,12 @@ class WorkspaceFirewall extends Component
             return $bt <=> $at;
         });
 
-        return array_slice($items, 0, 60);
+        // "Exhausted" = we asked for more than we got from both sources, OR the cap is hit. The
+        // view uses this to hide the "Load older" button when there's nothing more to show.
+        $this->activity_exhausted = count($items) <= $this->activity_visible
+            || $this->activity_visible >= self::ACTIVITY_MAX_VISIBLE;
+
+        return array_slice($items, 0, $this->activity_visible);
     }
 
     /**
