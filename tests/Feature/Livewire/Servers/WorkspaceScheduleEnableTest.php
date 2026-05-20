@@ -15,11 +15,15 @@ use App\Services\Servers\PreflightSchedulerOnSite;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class WorkspaceScheduleEnableTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.schedule'];
 
     /** @return array{User, Server, Site} */
     private function setupServerWithSite(): array

@@ -17,6 +17,7 @@ use App\Services\AwsEksService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 /**
@@ -32,6 +33,9 @@ use Tests\TestCase;
 final class EksRegisterFlowTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.cluster', 'provider.aws', 'provider.aws_eks'];
 
     public function test_step_what_lists_aws_supported_regions_in_the_picker(): void
     {

@@ -12,11 +12,15 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class FleetHealthPageTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.fleet'];
 
     public function test_renders_clean_state_when_nothing_wrong(): void
     {

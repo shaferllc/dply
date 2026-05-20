@@ -105,7 +105,7 @@ class ApiKeys extends Component
 
         $this->authorize('update', $org);
 
-        if (config('dply.api_tokens_require_paid_plan', false) && ! $org->onProSubscription()) {
+        if (config('dply.api_tokens_require_paid_plan', false) && ! $org->onAnyPaidPlan()) {
             $this->addError('token_name', __('API tokens require an active Pro plan for this organization.'));
 
             return;
@@ -306,7 +306,7 @@ class ApiKeys extends Component
             'permissionCategories' => config('api_token_permissions.categories', []),
             'isDeployerRole' => $org ? $org->userIsDeployer(Auth::user()) : false,
             'requiresPaidPlan' => (bool) config('dply.api_tokens_require_paid_plan', false),
-            'orgHasProPlan' => $org?->onProSubscription() ?? false,
+            'orgHasProPlan' => $org?->onAnyPaidPlan() ?? false,
         ]);
     }
 }

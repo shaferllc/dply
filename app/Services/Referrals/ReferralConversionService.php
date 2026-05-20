@@ -58,8 +58,9 @@ class ReferralConversionService
     protected function invoiceContainsProPrice(array $invoice): bool
     {
         $proPriceIds = array_values(array_filter([
-            (string) (config('subscription.plans.pro_monthly.price_id') ?? ''),
-            (string) (config('subscription.plans.pro_yearly.price_id') ?? ''),
+            (string) (config('subscription.standard.stripe.base_monthly') ?? ''),
+            (string) (config('subscription.standard.stripe.base_yearly') ?? ''),
+            (string) (config('subscription.enterprise.stripe_price_id') ?? ''),
         ]));
 
         foreach ($invoice['lines']['data'] ?? [] as $line) {

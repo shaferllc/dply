@@ -13,6 +13,7 @@ use App\Support\Console\ConsoleArgspecs;
 use App\Support\Console\ConsoleCatalog;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -27,6 +28,9 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceConsole extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.console';
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RunsServerConsoleCommands;

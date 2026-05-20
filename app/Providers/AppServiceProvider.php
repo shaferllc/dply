@@ -247,8 +247,11 @@ class AppServiceProvider extends ServiceProvider
         $this->mergeServerMonitoringInstallScript();
 
         Cashier::useCustomerModel(Organization::class);
+        Cashier::useSubscriptionModel(\App\Models\Subscription::class);
+        Cashier::useSubscriptionItemModel(\App\Models\SubscriptionItem::class);
 
         Event::listen(WebhookReceived::class, ProcessReferralInvoicePayment::class);
+        Event::listen(WebhookReceived::class, \App\Listeners\SyncBillingOnSubscriptionWebhook::class);
         Event::listen(ServerAuthorizedKeysSynced::class, DispatchServerAuthorizedKeysSyncedWebhook::class);
 
         // Mirror Livewire-dispatched queue jobs into task_runner_tasks so the

@@ -6,6 +6,7 @@ namespace App\Observers;
 
 use App\Events\Servers\ServerStateUpdated;
 use App\Jobs\Imports\RunMigrationStepJob;
+use App\Jobs\SyncOrganizationBillingJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\Server;
@@ -45,6 +46,7 @@ class ServerObserver
 
         $this->broadcast($server, 'updated');
         $this->emitLifecycleWebhooks($server);
+        $this->syncBillingOnReadyTransition($server);
     }
 
     public function deleted(Server $server): void
@@ -54,6 +56,39 @@ class ServerObserver
             'id' => $server->id,
             'name' => $server->name,
         ], 'Server '.$server->name.' deleted');
+        $this->dispatchBillingSync($server->organization_id);
+    }
+
+    /**
+     * Dispatch a billing sync whenever a server enters or leaves status=ready —
+     * the only transitions that change whether a server is *billable* (which
+     * is gated to ready-and-healthy in OrganizationBillingStateComputer).
+     */
+    private function syncBillingOnReadyTransition(Server $server): void
+    {
+        $changes = $server->getChanges();
+        if (! array_key_exists('status', $changes)) {
+            return;
+        }
+
+        $original = $server->getOriginal('status');
+        $current = $server->status;
+
+        $movedIntoReady = $current === Server::STATUS_READY && $original !== Server::STATUS_READY;
+        $movedOutOfReady = $original === Server::STATUS_READY && $current !== Server::STATUS_READY;
+
+        if ($movedIntoReady || $movedOutOfReady) {
+            $this->dispatchBillingSync($server->organization_id);
+        }
+    }
+
+    private function dispatchBillingSync(?string $organizationId): void
+    {
+        if (! is_string($organizationId) || $organizationId === '') {
+            return;
+        }
+
+        SyncOrganizationBillingJob::dispatch($organizationId);
     }
 
     /**

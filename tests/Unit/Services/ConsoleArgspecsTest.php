@@ -3,7 +3,10 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Server;
+use App\Models\ServerProvisionArtifact;
+use App\Models\ServerProvisionRun;
 use App\Support\Console\ConsoleArgspecs;
+use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,6 +18,30 @@ use Tests\TestCase;
 final class ConsoleArgspecsTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Create a Server and seed a stack_summary artifact so ServerInstalledServices
+     * resolves real tags (instead of fail-open 'unknown').
+     */
+    private function serverWithStack(array $summary): Server
+    {
+        $server = Server::factory()->create(['meta' => []]);
+        $run = ServerProvisionRun::create([
+            'server_id' => $server->id,
+            'attempt' => 1,
+            'status' => 'completed',
+        ]);
+        ServerProvisionArtifact::create([
+            'server_provision_run_id' => $run->id,
+            'type' => 'stack_summary',
+            'key' => 'stack_summary',
+            'label' => 'stack summary',
+            'metadata' => $summary,
+        ]);
+        ServerInstalledServices::flushCaches();
+
+        return $server;
+    }
 
     public function test_argspecs_returns_array(): void
     {

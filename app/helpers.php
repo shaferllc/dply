@@ -82,6 +82,11 @@ if (! function_exists('server_workspace_nav_for_server')) {
                 return false;
             }
 
+            $feature = $item['feature'] ?? null;
+            if (is_string($feature) && $feature !== '' && ! \Laravel\Pennant\Feature::active($feature)) {
+                return false;
+            }
+
             $required = $item['requires_any_tags'] ?? null;
             if (! is_array($required) || $required === []) {
                 return true;

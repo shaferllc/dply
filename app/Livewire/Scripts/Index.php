@@ -6,12 +6,16 @@ use App\Models\Script;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'surface.scripts';
     use WithPagination;
 
     public string $search = '';

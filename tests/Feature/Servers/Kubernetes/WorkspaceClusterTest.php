@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 /**
@@ -25,6 +26,9 @@ use Tests\TestCase;
 final class WorkspaceClusterTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.cluster'];
 
     public function test_poller_keeps_polling_while_state_is_provisioning(): void
     {

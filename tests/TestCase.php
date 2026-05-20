@@ -22,5 +22,24 @@ abstract class TestCase extends BaseTestCase
 
         // Avoid blocking Livewire tests on SSH; tests that assert queued manage jobs opt in explicitly.
         config(['server_manage.queue_remote_tasks' => false]);
+
+        foreach (class_uses_recursive(static::class) as $trait) {
+            $hook = 'setUp'.class_basename($trait);
+            if (method_exists($this, $hook)) {
+                $this->{$hook}();
+            }
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        foreach (class_uses_recursive(static::class) as $trait) {
+            $hook = 'tearDown'.class_basename($trait);
+            if (method_exists($this, $hook)) {
+                $this->{$hook}();
+            }
+        }
+
+        parent::tearDown();
     }
 }

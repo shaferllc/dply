@@ -10,11 +10,15 @@ use App\Models\Server;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class WorkspaceServices extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.services';
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;

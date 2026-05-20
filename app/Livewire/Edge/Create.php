@@ -13,6 +13,7 @@ use App\Services\Edge\DigitalOceanAppPlatformBackend;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -105,6 +106,8 @@ class Create extends Component
 
     public function mount(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
+        abort_unless(Feature::active('surface.edge'), 404);
+
         $org = auth()->user()?->currentOrganization();
         if ($org === null) {
             $this->toastError(__('Select or create an organization first.'));

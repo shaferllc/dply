@@ -287,6 +287,7 @@
             'min-w-0',
             'lg:col-span-9' => $showNavigation,
         ])>
+            <x-trial-pause-banner :organization="$server->organization" class="mb-4" />
             {{ $slot }}
         </div>
     </div>

@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Services\DigitalOceanService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 use Throwable;
 
@@ -29,6 +30,9 @@ use Throwable;
 #[Layout('layouts.app')]
 class WorkspaceCluster extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.cluster';
     use BuildsContainerLaunchSummary;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;

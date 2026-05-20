@@ -55,6 +55,27 @@ class RunSiteDeploymentJob implements ShouldQueue
             return;
         }
 
+        $this->site->loadMissing('server.organization');
+        $organization = $this->site->server?->organization;
+        if ($organization !== null && ! $organization->canDeploy()) {
+            $deployment = SiteDeployment::query()->create([
+                'site_id' => $this->site->id,
+                'project_id' => $this->site->project_id,
+                'trigger' => $this->trigger,
+                'status' => SiteDeployment::STATUS_SKIPPED,
+                'exit_code' => null,
+                'log_output' => 'Deploys are paused while this organization\'s trial is expired. Add a payment method on the billing page to resume.',
+                'started_at' => now(),
+                'finished_at' => now(),
+                'idempotency_key' => $this->apiIdempotencyHash,
+            ]);
+            $this->auditDeploy($deployment);
+            $this->clearIdempotencyInflight();
+            $this->notifyStakeholders($deployment, $notificationPublisher);
+
+            return;
+        }
+
         $lock = Cache::lock('site-deploy:'.$this->site->id, $this->timeout);
         $activeKey = 'site-deploy-active:'.$this->site->id;
 

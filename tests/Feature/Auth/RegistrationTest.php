@@ -7,11 +7,15 @@ use App\Livewire\Auth\Register;
 use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['global.signups_open'];
 
     public function test_registration_screen_can_be_rendered(): void
     {

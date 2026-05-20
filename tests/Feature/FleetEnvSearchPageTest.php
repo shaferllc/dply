@@ -9,11 +9,15 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class FleetEnvSearchPageTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.fleet'];
 
     public function test_landing_state_has_no_results_until_query(): void
     {

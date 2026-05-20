@@ -78,7 +78,7 @@ class DplyCliInstaller
     {
         $ssh ??= new SshConnection($server);
 
-        $script = file_get_contents(resource_path('bin/dply'));
+        $script = @file_get_contents(resource_path('bin/dply'));
         if ($script === false) {
             throw new \RuntimeException('Could not read resources/bin/dply.');
         }

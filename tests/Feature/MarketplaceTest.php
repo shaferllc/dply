@@ -12,11 +12,15 @@ use App\Models\WebserverTemplate;
 use Database\Seeders\MarketplaceItemSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class MarketplaceTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.marketplace'];
 
     protected function setUp(): void
     {

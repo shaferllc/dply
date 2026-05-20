@@ -9,11 +9,15 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class FleetDomainsPageTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.fleet'];
 
     public function test_lists_all_domains_for_current_org(): void
     {

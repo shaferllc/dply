@@ -10,11 +10,15 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class EdgeFleetPanelTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.edge', 'surface.fleet'];
 
     public function test_panel_hidden_when_no_edge_sites(): void
     {

@@ -78,7 +78,7 @@ class ConsoleArgspecs
 
         $sudoCommands = array_values(array_unique(array_merge(
             ['systemctl', 'ufw', 'nginx', 'service'],
-            $tags['php'] ? [$phpFpmUnit] : []
+            isset($tags['php']) ? [$phpFpmUnit] : []
         )));
 
         return [

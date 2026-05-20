@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 /**
@@ -30,6 +31,9 @@ use Tests\TestCase;
 final class KubernetesWizardTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.cluster', 'provider.aws', 'provider.aws_eks'];
 
     public function test_choosing_kubernetes_host_kind_clears_type_for_provider_pick(): void
     {

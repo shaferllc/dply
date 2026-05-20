@@ -20,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 /**
@@ -33,6 +34,9 @@ use Tests\TestCase;
 class WorkspaceInsightsBannerTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.insights'];
 
     /**
      * @return array{0: User, 1: Server, 2: Organization}

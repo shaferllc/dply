@@ -12,6 +12,7 @@ use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
+use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
@@ -34,6 +35,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -97,6 +99,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // minute so an active deploy reaches "active" within ~60s
         // of the backend reporting ready.
         $schedule->command(EdgePollStatusCommand::class)->everyMinute();
+
+        $schedule->command(\App\Console\Commands\SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
@@ -200,6 +204,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'fleet.operator' => ValidateFleetOperatorToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
+            'feature' => EnsureFeaturesAreActive::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             'hooks/*',
@@ -208,6 +213,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->appendToGroup('web', [
+            EnforceMaintenanceMode::class,
             CaptureReferralCode::class,
             RedirectGuestsToComingSoon::class,
         ]);

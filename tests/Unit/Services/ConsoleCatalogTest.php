@@ -3,6 +3,8 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Server;
+use App\Models\ServerProvisionArtifact;
+use App\Models\ServerProvisionRun;
 use App\Support\Console\ConsoleCatalog;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,6 +36,24 @@ final class ConsoleCatalogTest extends TestCase
         return $server;
     }
 
+    /** Install a stack_summary artifact so ServerInstalledServices reports a real, gated tag set. */
+    private function setStackSummary(Server $server, array $summary): void
+    {
+        $run = ServerProvisionRun::create([
+            'server_id' => $server->id,
+            'attempt' => 1,
+            'status' => 'completed',
+        ]);
+        ServerProvisionArtifact::create([
+            'server_provision_run_id' => $run->id,
+            'type' => 'stack_summary',
+            'key' => 'stack_summary',
+            'label' => 'stack summary',
+            'metadata' => $summary,
+        ]);
+        ServerInstalledServices::flushCaches();
+    }
+
     public function test_catalog_returns_sections_for_server(): void
     {
         $server = Server::factory()->create([
@@ -63,7 +83,7 @@ final class ConsoleCatalogTest extends TestCase
 
         $systemSection = collect($sections)->firstWhere('id', 'system');
         $this->assertNotNull($systemSection);
-        $this->assertCountGreaterThan(0, $systemSection['entries']);
+        $this->assertGreaterThan(0, count($systemSection['entries']));
     }
 
     public function test_nginx_section_shown_when_nginx_tag_present(): void
@@ -83,11 +103,8 @@ final class ConsoleCatalogTest extends TestCase
 
     public function test_nginx_section_hidden_when_no_nginx(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['apache'],
-            ],
-        ]);
+        $server = Server::factory()->create(['meta' => []]);
+        $this->setStackSummary($server, ['expected_services' => ['apache']]);
 
         $sections = ConsoleCatalog::for($server);
 
@@ -113,11 +130,10 @@ final class ConsoleCatalogTest extends TestCase
 
     public function test_php_section_substitutes_version_placeholder(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['php'],
-                'php_version' => '8.3',
-            ],
+        $server = Server::factory()->create(['meta' => []]);
+        $this->setStackSummary($server, [
+            'expected_services' => ['php'],
+            'php_version' => '8.3',
         ]);
 
         $sections = ConsoleCatalog::for($server);

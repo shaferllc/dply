@@ -15,6 +15,7 @@ use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -33,6 +34,9 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceSchedule extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.schedule';
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 

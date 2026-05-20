@@ -13,11 +13,15 @@ use App\Support\Servers\FileBrowserEntry;
 use App\Support\Servers\FileBrowserListing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class WorkspaceFilesTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.files'];
 
     private function actingOrgUser(string $role = 'owner'): User
     {

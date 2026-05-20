@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\ServerProvider;
+use App\Enums\ServerTier;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
+use App\Services\Billing\ServerTierClassifier;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -259,6 +261,28 @@ class Server extends Model
     public function metricSnapshots(): HasMany
     {
         return $this->hasMany(ServerMetricSnapshot::class)->orderByDesc('captured_at');
+    }
+
+    /**
+     * Billing tier derived from the most recent metric snapshot's cpu_count
+     * and mem_total_kb. Returns ServerTier::XS while specs are unknown so a
+     * freshly-connected server isn't accidentally billed at XL during the
+     * gap between provision and first agent report.
+     */
+    public function billingTier(): ServerTier
+    {
+        $snapshot = $this->metricSnapshots()->first();
+        $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
+
+        $cpuCount = isset($payload['cpu_count']) && is_numeric($payload['cpu_count'])
+            ? (int) $payload['cpu_count']
+            : null;
+
+        $memMb = isset($payload['mem_total_kb']) && is_numeric($payload['mem_total_kb'])
+            ? (int) round((float) $payload['mem_total_kb'] / 1024)
+            : null;
+
+        return app(ServerTierClassifier::class)->classify($cpuCount, $memMb);
     }
 
     public function systemdServiceStates(): HasMany

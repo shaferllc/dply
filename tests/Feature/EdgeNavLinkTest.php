@@ -7,15 +7,16 @@ namespace Tests\Feature;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Tests\TestCase;
 
 class EdgeNavLinkTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_authenticated_dashboard_includes_edge_link_when_backend_enabled(): void
+    public function test_authenticated_dashboard_includes_edge_link_when_surface_edge_active(): void
     {
-        config(['server_providers.enabled.digitalocean_app_platform' => true]);
+        Feature::define('surface.edge', fn () => true);
         $user = $this->ownerWithOrg();
 
         $response = $this->actingAs($user)->get(route('dashboard'));
@@ -25,12 +26,9 @@ class EdgeNavLinkTest extends TestCase
             ->assertSee(route('edge.index'), escape: false);
     }
 
-    public function test_edge_link_hidden_when_no_container_backend_is_gate_enabled(): void
+    public function test_edge_link_hidden_when_surface_edge_inactive(): void
     {
-        config([
-            'server_providers.enabled.digitalocean_app_platform' => false,
-            'server_providers.enabled.aws_app_runner' => false,
-        ]);
+        // Default production state: surface.edge is OFF.
         $user = $this->ownerWithOrg();
 
         $response = $this->actingAs($user)->get(route('dashboard'));

@@ -13,6 +13,10 @@ class CaddySiteConfigBuilder
 {
     public function build(Site $site, ?int $listenPort = null): string
     {
+        if ($site->type === SiteType::Custom) {
+            return '';
+        }
+
         $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
 
         $hostnames = collect($listenPort === null ? $site->webserverHostnames() : [])

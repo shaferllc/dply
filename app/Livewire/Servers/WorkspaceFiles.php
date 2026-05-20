@@ -16,6 +16,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -29,6 +30,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 #[Layout('layouts.app')]
 class WorkspaceFiles extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.files';
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 

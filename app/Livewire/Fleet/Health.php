@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -27,6 +28,9 @@ use Livewire\Component;
  */
 class Health extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'surface.fleet';
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();

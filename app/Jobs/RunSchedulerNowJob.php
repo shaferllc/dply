@@ -62,6 +62,16 @@ class RunSchedulerNowJob implements ShouldQueue
         if (! $server->isReady() || blank($server->ip_address)) {
             return;
         }
+        $organization = $server->organization;
+        if ($organization !== null && ! $organization->canSchedulerRun()) {
+            Log::info('scheduler.run_now.paused_by_trial', [
+                'server_id' => $this->serverId,
+                'organization_id' => $organization->id,
+                'trial_state' => $organization->trialState()->value,
+            ]);
+
+            return;
+        }
 
         // Resolve the site's repository path so the wrapper can `cd` into it.
         // The site relationship gives us the path; missing site = nothing to do.

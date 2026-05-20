@@ -51,7 +51,7 @@ class InsightRunCoordinator
                 continue;
             }
 
-            if (($def['requires_pro'] ?? false) && ! $org->onProSubscription()) {
+            if (($def['requires_pro'] ?? false) && ! $org->onAnyPaidPlan()) {
                 continue;
             }
 
@@ -119,7 +119,7 @@ class InsightRunCoordinator
                 continue;
             }
 
-            if (($def['requires_pro'] ?? false) && ! $org->onProSubscription()) {
+            if (($def['requires_pro'] ?? false) && ! $org->onAnyPaidPlan()) {
                 continue;
             }
 

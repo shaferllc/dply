@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 /**
@@ -33,6 +34,9 @@ use Tests\TestCase;
 class EdgeBuildEnvTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.edge'];
 
     public function test_do_service_create_app_includes_build_time_envs(): void
     {

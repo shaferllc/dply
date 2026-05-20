@@ -23,7 +23,7 @@ class InsightSettingsRepository
                 ? (bool) $def['default_enabled']
                 : true;
             if ($requiresPro) {
-                $map[$key] = $organization->onProSubscription() && $defaultOn;
+                $map[$key] = $organization->onAnyPaidPlan() && $defaultOn;
             } else {
                 $map[$key] = $defaultOn;
             }

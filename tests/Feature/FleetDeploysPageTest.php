@@ -10,11 +10,15 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class FleetDeploysPageTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.fleet'];
 
     public function test_running_tab_shows_in_flight_deploys(): void
     {

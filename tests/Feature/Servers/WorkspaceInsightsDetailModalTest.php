@@ -16,11 +16,15 @@ use App\Services\Insights\FixResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class WorkspaceInsightsDetailModalTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.insights'];
 
     /**
      * @return array{0: User, 1: Server, 2: Organization}

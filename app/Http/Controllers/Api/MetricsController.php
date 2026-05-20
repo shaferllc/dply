@@ -51,6 +51,13 @@ class MetricsController extends Controller
             'metrics' => ['required', 'array'],
         ]);
 
+        $organization = \App\Models\Organization::query()->whereKey($data['organization_id'])->first();
+        if ($organization !== null && ! $organization->acceptsMetrics()) {
+            return response()->json([
+                'message' => 'Organization is paused. Add a payment method to resume metrics ingest.',
+            ], 402);
+        }
+
         ServerMetricIngestEvent::query()->create([
             'source_snapshot_id' => $data['snapshot_id'],
             'organization_id' => $data['organization_id'],
@@ -92,6 +99,13 @@ class MetricsController extends Controller
 
         if (! $push->verifyToken($server, $data['token'])) {
             return response()->json(['message' => 'Invalid token.'], 403);
+        }
+
+        $organization = $server->organization;
+        if ($organization !== null && ! $organization->acceptsMetrics()) {
+            return response()->json([
+                'message' => 'Organization is paused. Add a payment method to resume metrics ingest.',
+            ], 402);
         }
 
         $capturedAt = isset($data['captured_at'])

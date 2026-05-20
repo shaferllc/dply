@@ -10,11 +10,15 @@ use App\Models\ProviderCredential;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class ContainerProviderCredentialsTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['provider.aws_app_runner', 'provider.fly_io'];
 
     public function test_panels_visible_only_when_provider_is_enabled(): void
     {

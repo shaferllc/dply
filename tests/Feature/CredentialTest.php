@@ -9,11 +9,15 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class CredentialTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['provider.fly_io', 'provider.linode', 'provider.vultr', 'provider.upcloud', 'provider.scaleway', 'provider.aws', 'provider.equinix_metal'];
 
     protected function userWithOrganization(): User
     {

@@ -10,6 +10,25 @@ namespace App\Support;
 final class ServerProviderGate
 {
     /**
+     * Provider slug → Pennant flag name. Listed providers are additionally
+     * gated on the org-scoped Pennant flag; absence here means the provider
+     * is governed only by the legacy config gate (and ships in MVP).
+     *
+     * @var array<string, string>
+     */
+    private const PENNANT_FLAGS = [
+        'aws' => 'provider.aws',
+        'aws_app_runner' => 'provider.aws_app_runner',
+        'aws_kubernetes' => 'provider.aws_eks',
+        'linode' => 'provider.linode',
+        'vultr' => 'provider.vultr',
+        'fly_io' => 'provider.fly_io',
+        'upcloud' => 'provider.upcloud',
+        'scaleway' => 'provider.scaleway',
+        'equinix_metal' => 'provider.equinix_metal',
+    ];
+
+    /**
      * @var list<string>
      */
     private const SERVER_CREATE_ORDER = [
@@ -47,10 +66,21 @@ final class ServerProviderGate
 
     public static function enabled(string $provider): bool
     {
-        return filter_var(
+        $configEnabled = filter_var(
             config('server_providers.enabled.'.$provider, false),
             FILTER_VALIDATE_BOOL
         );
+
+        if (! $configEnabled) {
+            return false;
+        }
+
+        $flag = self::PENNANT_FLAGS[$provider] ?? null;
+        if ($flag === null) {
+            return true;
+        }
+
+        return \Laravel\Pennant\Feature::active($flag);
     }
 
     /**

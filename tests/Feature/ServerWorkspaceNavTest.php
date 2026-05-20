@@ -9,11 +9,19 @@ use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class ServerWorkspaceNavTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = [
+        'workspace.cluster', 'workspace.console', 'workspace.files', 'workspace.services',
+        'workspace.system_users', 'workspace.insights', 'workspace.caches', 'workspace.schedule',
+        'workspace.activity', 'workspace.run',
+    ];
 
     public function test_nav_shows_all_items_when_stack_summary_is_missing(): void
     {

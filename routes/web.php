@@ -147,14 +147,18 @@ Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareContro
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
-    Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
-    Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
-    Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
-    Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
+    Route::middleware('feature:surface.fleet')->group(function (): void {
+        Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
+        Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
+        Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
+        Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
+    });
     Route::livewire('/admin', AdminDashboard::class)
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.dashboard');
-    Route::livewire('/marketplace', MarketplaceIndex::class)->name('marketplace.index');
+    Route::middleware('feature:surface.marketplace')->group(function (): void {
+        Route::livewire('/marketplace', MarketplaceIndex::class)->name('marketplace.index');
+    });
 
     Route::get('/docs', [DocsController::class, 'index'])->name('docs.index');
     Route::get('/docs/connect-provider', [DocsController::class, 'connectProvider'])->name('docs.connect-provider');
@@ -201,26 +205,34 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/backups/databases', BackupsDatabases::class)->name('backups.databases');
     Route::livewire('/backups/files', BackupsFiles::class)->name('backups.files');
 
-    Route::livewire('scripts', ScriptsIndex::class)->name('scripts.index');
-    Route::livewire('scripts/marketplace', ScriptsMarketplace::class)->name('scripts.marketplace');
-    Route::livewire('scripts/create', ScriptsCreate::class)->name('scripts.create');
-    Route::livewire('scripts/{script}/edit', ScriptsEdit::class)->name('scripts.edit');
+    Route::middleware('feature:surface.scripts')->group(function (): void {
+        Route::livewire('scripts', ScriptsIndex::class)->name('scripts.index');
+        Route::livewire('scripts/marketplace', ScriptsMarketplace::class)->name('scripts.marketplace');
+        Route::livewire('scripts/create', ScriptsCreate::class)->name('scripts.create');
+        Route::livewire('scripts/{script}/edit', ScriptsEdit::class)->name('scripts.edit');
+    });
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
-    Route::livewire('edge', EdgeIndex::class)->name('edge.index');
-    Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
+    Route::middleware('feature:surface.edge')->group(function (): void {
+        Route::livewire('edge', EdgeIndex::class)->name('edge.index');
+        Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
+    });
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
     Route::livewire('imports/ploi/migrations/{migration}', \App\Livewire\Imports\Ploi\MigrationProgress::class)->name('imports.ploi.migration.progress');
     Route::livewire('imports/forge', \App\Livewire\Imports\Forge\Inventory::class)->name('imports.forge.inventory');
-    Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
-    Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
-    Route::livewire('projects/{workspace}/overview', ProjectsShow::class)->defaults('section', 'overview')->name('projects.overview');
-    Route::livewire('projects/{workspace}/resources', ProjectsShow::class)->defaults('section', 'resources')->name('projects.resources');
-    Route::livewire('projects/{workspace}/access', ProjectsShow::class)->defaults('section', 'access')->name('projects.access');
-    Route::livewire('projects/{workspace}/operations', ProjectsShow::class)->defaults('section', 'operations')->name('projects.operations');
-    Route::livewire('projects/{workspace}/delivery', ProjectsShow::class)->defaults('section', 'delivery')->name('projects.delivery');
-    Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
-    Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
+    Route::middleware('feature:surface.projects')->group(function (): void {
+        Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
+        Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
+        Route::livewire('projects/{workspace}/overview', ProjectsShow::class)->defaults('section', 'overview')->name('projects.overview');
+        Route::livewire('projects/{workspace}/resources', ProjectsShow::class)->defaults('section', 'resources')->name('projects.resources');
+        Route::livewire('projects/{workspace}/access', ProjectsShow::class)->defaults('section', 'access')->name('projects.access');
+        Route::livewire('projects/{workspace}/operations', ProjectsShow::class)->defaults('section', 'operations')->name('projects.operations');
+        Route::livewire('projects/{workspace}/delivery', ProjectsShow::class)->defaults('section', 'delivery')->name('projects.delivery');
+    });
+    Route::middleware('feature:surface.status_pages')->group(function (): void {
+        Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
+        Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
+    });
     Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
     // Container flow inversion (2026-05): the standalone container launcher is gone.
     // Container apps are now created server-first (host via /servers/create wizard,
@@ -272,7 +284,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('servers.show');
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
     Route::post('servers/{server}/cancel-provision', CancelServerProvisionController::class)->name('servers.cancel-provision');
-    Route::livewire('servers/{server}/cluster', WorkspaceCluster::class)->name('servers.cluster');
+    Route::middleware('feature:workspace.cluster')->group(function (): void {
+        Route::livewire('servers/{server}/cluster', WorkspaceCluster::class)->name('servers.cluster');
+    });
     Route::get('servers/{server}/cluster/kubeconfig', function (Server $server) {
         Gate::authorize('view', $server);
         $kubeconfig = (string) ($server->meta['kubernetes']['kubeconfig'] ?? '');
@@ -332,32 +346,50 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->defaults('section', 'general')
         ->name('sites.show');
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
-    Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
+    Route::middleware('feature:workspace.insights')->group(function (): void {
+        Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
+    });
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/deploys', ServerDeploys::class)->name('servers.deploys');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
-    Route::livewire('servers/{server}/activity', WorkspaceActivity::class)->name('servers.activity');
-    Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
+    Route::middleware('feature:workspace.activity')->group(function (): void {
+        Route::livewire('servers/{server}/activity', WorkspaceActivity::class)->name('servers.activity');
+    });
+    Route::middleware('feature:workspace.services')->group(function (): void {
+        Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
+    });
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
     Route::livewire('servers/{server}/webserver', \App\Livewire\Servers\WorkspaceWebserver::class)->name('servers.webserver');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
-    Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');
+    Route::middleware('feature:workspace.caches')->group(function (): void {
+        Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');
+    });
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
     Route::livewire('servers/{server}/queue-workers', \App\Livewire\Servers\WorkspaceQueueWorkers::class)->middleware('server.service.installed')->name('servers.queue-workers');
-    Route::livewire('servers/{server}/schedule', \App\Livewire\Servers\WorkspaceSchedule::class)->name('servers.schedule');
+    Route::middleware('feature:workspace.schedule')->group(function (): void {
+        Route::livewire('servers/{server}/schedule', \App\Livewire\Servers\WorkspaceSchedule::class)->name('servers.schedule');
+    });
     Route::livewire('servers/{server}/backups', \App\Livewire\Servers\WorkspaceBackups::class)->middleware('server.service.installed')->name('servers.backups');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
-    Route::livewire('servers/{server}/system-users', WorkspaceSystemUsers::class)->name('servers.system-users');
+    Route::middleware('feature:workspace.system_users')->group(function (): void {
+        Route::livewire('servers/{server}/system-users', WorkspaceSystemUsers::class)->name('servers.system-users');
+    });
     // /run replaces both /recipes and /deploy. The merged page hosts
     // the saved-command list (CRUD + inline run), an ad-hoc command
     // runner, and the marketplace import path. Old URLs 404 by
     // design — clean break, no redirect shim.
-    Route::livewire('servers/{server}/run', WorkspaceRun::class)->name('servers.run');
-    Route::livewire('servers/{server}/console', \App\Livewire\Servers\WorkspaceConsole::class)->name('servers.console');
+    Route::middleware('feature:workspace.run')->group(function (): void {
+        Route::livewire('servers/{server}/run', WorkspaceRun::class)->name('servers.run');
+    });
+    Route::middleware('feature:workspace.console')->group(function (): void {
+        Route::livewire('servers/{server}/console', \App\Livewire\Servers\WorkspaceConsole::class)->name('servers.console');
+    });
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
-    Route::livewire('servers/{server}/files', \App\Livewire\Servers\WorkspaceFiles::class)->name('servers.files');
+    Route::middleware('feature:workspace.files')->group(function (): void {
+        Route::livewire('servers/{server}/files', \App\Livewire\Servers\WorkspaceFiles::class)->name('servers.files');
+    });
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');

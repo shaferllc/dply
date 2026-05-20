@@ -17,11 +17,15 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class WorkspaceSystemUsers extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.system_users';
     use ConfirmsActionWithModal;
     use DismissesConsoleActionRun;
     use HandlesServerRemovalFlow;

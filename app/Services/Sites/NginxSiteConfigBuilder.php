@@ -22,6 +22,10 @@ class NginxSiteConfigBuilder
      */
     public function build(Site $site, ?SiteWebserverConfigProfile $profile = null, ?int $listenPort = null): string
     {
+        if ($site->type === SiteType::Custom) {
+            return '';
+        }
+
         $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
         $hostnames = collect($site->webserverHostnames());
         if ($hostnames->isEmpty()) {

@@ -11,6 +11,7 @@ use App\Services\SshConnection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 /**
@@ -21,6 +22,9 @@ use Tests\TestCase;
 final class WorkspaceConsoleTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.console'];
 
     protected function userWithOrganization(?string $role = 'owner'): User
     {

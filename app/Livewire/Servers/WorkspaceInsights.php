@@ -20,11 +20,15 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class WorkspaceInsights extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.insights';
     use InteractsWithServerWorkspace;
 
     public string $tab = 'overview';
@@ -102,7 +106,7 @@ class WorkspaceInsights extends Component
     {
         $out = [];
         foreach (config('insights.insights', []) as $key => $def) {
-            if (($def['requires_pro'] ?? false) && ! $org->onProSubscription()) {
+            if (($def['requires_pro'] ?? false) && ! $org->onAnyPaidPlan()) {
                 $out[$key] = false;
             } else {
                 $out[$key] = (bool) ($map[$key] ?? false);
@@ -121,7 +125,7 @@ class WorkspaceInsights extends Component
             if (! in_array($scope, ['server', 'both'], true)) {
                 continue;
             }
-            if (($def['requires_pro'] ?? false) && $org && ! $org->onProSubscription()) {
+            if (($def['requires_pro'] ?? false) && $org && ! $org->onAnyPaidPlan()) {
                 $this->enabled_map[$key] = false;
             } else {
                 $this->enabled_map[$key] = true;
@@ -1000,7 +1004,7 @@ class WorkspaceInsights extends Component
     public function render(): View
     {
         $org = $this->server->organization;
-        $orgHasPro = $org?->onProSubscription() ?? false;
+        $orgHasPro = $org?->onAnyPaidPlan() ?? false;
 
         $catalog = [];
         $enabledChecks = 0;

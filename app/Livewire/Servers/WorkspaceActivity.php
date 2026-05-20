@@ -19,12 +19,16 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 #[Layout('layouts.app')]
 class WorkspaceActivity extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.activity';
     use InteractsWithServerWorkspace;
     use WithPagination;
 

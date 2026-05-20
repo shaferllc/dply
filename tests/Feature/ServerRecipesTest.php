@@ -10,11 +10,15 @@ use App\Models\ServerRecipe;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class ServerRecipesTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.run'];
 
     protected function userWithOrganization(): User
     {

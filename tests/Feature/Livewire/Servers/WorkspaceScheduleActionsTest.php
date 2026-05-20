@@ -16,11 +16,15 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 use Mockery;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class WorkspaceScheduleActionsTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.schedule'];
 
     /** @return array{User, Server, Site, ServerCronJob, ServerSchedulerHeartbeat} */
     private function setupWithScheduler(bool $enabled = true): array

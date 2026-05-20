@@ -8,6 +8,7 @@ use App\Enums\SiteType;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -30,6 +31,11 @@ class Index extends Component
      */
     #[Url]
     public string $filter = 'all';
+
+    public function mount(): void
+    {
+        abort_unless(Feature::active('surface.edge'), 404);
+    }
 
     public function render(): View
     {
