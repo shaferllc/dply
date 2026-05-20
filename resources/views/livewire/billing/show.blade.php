@@ -51,6 +51,23 @@
                 @if (request()->query('checkout') === 'success')
                     <x-alert tone="success">{{ __('Subscription updated successfully.') }}</x-alert>
                 @endif
+                @if (session('billing_status'))
+                    <x-alert tone="success">{{ session('billing_status') }}</x-alert>
+                @endif
+                @if (session('billing_error'))
+                    <x-alert tone="error">{{ session('billing_error') }}</x-alert>
+                @endif
+
+                {{-- Page-level processing banner — visible after a confirmation
+                     modal closes, while the Stripe call is in flight. --}}
+                <div wire:loading.flex wire:target="switchInterval,cancelSubscription,resumeSubscription"
+                     class="hidden items-center gap-3 rounded-xl border border-brand-gold/30 bg-brand-gold/10 px-4 py-3">
+                    <svg class="animate-spin h-5 w-5 text-brand-ink" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-brand-ink">{{ __('Updating your subscription with Stripe…') }}</span>
+                </div>
                 @if (request()->query('checkout') === 'cancelled')
                     <x-alert tone="warning">{{ __('Checkout was cancelled.') }}</x-alert>
                 @endif
@@ -76,7 +93,7 @@
                     <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                         <div class="lg:col-span-4">
                             <h2 class="text-lg font-semibold text-brand-ink">{{ __('Payment method') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Default card on file. Update, cancel, or switch billing interval from the Stripe portal.') }}</p>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Default card on file. Update your card from the Stripe portal.') }}</p>
                         </div>
                         <div class="lg:col-span-8 space-y-4">
                             <p class="text-sm text-brand-ink">{{ $this->paymentSummary }}</p>
@@ -90,6 +107,43 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- Subscription — cancel / resume --}}
+                @if ($this->canManageBilling)
+                    <div class="dply-card overflow-hidden">
+                        <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
+                            <div class="lg:col-span-4">
+                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Subscription') }}</h2>
+                                <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Cancel keeps your data and servers — billing just stops at the end of the period.') }}</p>
+                            </div>
+                            <div class="lg:col-span-8">
+                                @if ($this->onGracePeriod)
+                                    <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                                        <p class="text-sm font-semibold text-amber-950">
+                                            {{ __('Subscription ends :date.', ['date' => $this->subscriptionEndsAt?->toFormattedDateString()]) }}
+                                        </p>
+                                        <p class="mt-0.5 text-sm text-amber-900/80">{{ __('You keep full access until then. Change your mind?') }}</p>
+                                        <button type="button" wire:click="resumeSubscription"
+                                                wire:loading.attr="disabled" wire:target="resumeSubscription"
+                                                class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
+                                            <svg wire:loading wire:target="resumeSubscription" class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path>
+                                            </svg>
+                                            <span wire:loading.remove wire:target="resumeSubscription">{{ __('Resume subscription') }}</span>
+                                            <span wire:loading wire:target="resumeSubscription">{{ __('Resuming…') }}</span>
+                                        </button>
+                                    </div>
+                                @else
+                                    <button type="button" x-on:click="$dispatch('open-modal', 'cancel-subscription')"
+                                            class="text-sm font-semibold text-red-700 hover:text-red-900 underline underline-offset-2">
+                                        {{ __('Cancel subscription') }}
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Invoices --}}
                 @if ($this->canManageBilling)
@@ -129,6 +183,64 @@
                 {{-- How billing works --}}
                 @include('livewire.billing.partials.how-billing-works')
             </div>
+
+            {{-- Confirmation modals --}}
+            @if ($this->subscription)
+                @php $interval = $this->subscriptionInterval; @endphp
+                <x-modal name="switch-interval" maxWidth="md">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-brand-ink">
+                            {{ $interval === 'year' ? __('Switch to monthly billing') : __('Switch to annual billing') }}
+                        </h3>
+                        <p class="mt-3 text-sm text-brand-moss leading-relaxed">
+                            @if ($interval === 'year')
+                                {{ __('You\'ll move to monthly billing. A prorated adjustment for the rest of your current period appears on your next invoice, and you\'ll lose the 20% annual discount.') }}
+                            @else
+                                {{ __('You\'ll be charged a prorated amount for the rest of your current cycle now, then :amount/yr going forward — a 20% saving versus monthly.', ['amount' => '$'.number_format($this->yearlyTotalCents / 100, 2)]) }}
+                            @endif
+                            {{ __('The switch takes effect immediately.') }}
+                        </p>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'switch-interval')">
+                                {{ __('Never mind') }}
+                            </x-secondary-button>
+                            <button type="button"
+                                    wire:click="switchInterval"
+                                    x-on:click="$dispatch('close-modal', 'switch-interval')"
+                                    class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
+                                {{ $interval === 'year' ? __('Switch to monthly') : __('Switch to annual') }}
+                            </button>
+                        </div>
+                    </div>
+                </x-modal>
+
+                <x-modal name="cancel-subscription" maxWidth="md">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Cancel subscription') }}</h3>
+                        <p class="mt-3 text-sm text-brand-moss leading-relaxed">
+                            @if ($this->nextInvoiceAt)
+                                {{ __('You\'ll keep full access until :date — no further charges after that.', ['date' => $this->nextInvoiceAt->toFormattedDateString()]) }}
+                            @else
+                                {{ __('You\'ll keep full access until the end of your current billing period — no further charges after that.') }}
+                            @endif
+                        </p>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+                            {{ __('Your servers, sites, and data stay intact. After the period ends, deploys pause; agents disconnect 30 days later. You can resume anytime before the period ends.') }}
+                        </p>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'cancel-subscription')">
+                                {{ __('Keep subscription') }}
+                            </x-secondary-button>
+                            <button type="button"
+                                    wire:click="cancelSubscription"
+                                    x-on:click="$dispatch('close-modal', 'cancel-subscription')"
+                                    class="inline-flex items-center rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                                {{ __('Cancel subscription') }}
+                            </button>
+                        </div>
+                    </div>
+                </x-modal>
+            @endif
         </x-organization-shell>
     </div>
 </div>

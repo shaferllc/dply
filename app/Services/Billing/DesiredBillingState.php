@@ -6,9 +6,11 @@ use App\Enums\ServerTier;
 
 /**
  * Snapshot of what an organization *should* be billed this cycle, derived
- * purely from its current server fleet. The sync layer reconciles a Stripe
+ * purely from its current fleet. The sync layer reconciles a Stripe
  * subscription against this shape.
  *
+ * Billable units are of two kinds: spec-tiered servers (XS–XL) and
+ * serverless functions (a flat per-function fee — see project_serverless_v1).
  * Always pre-discount and pre-tax; expressed in cents and tier-keyed
  * quantities so it survives JSON-round-trips through queue payloads.
  */
@@ -21,15 +23,24 @@ class DesiredBillingState
         public readonly array $tierQuantities,
         public readonly int $baseCents,
         public readonly int $serverSubtotalCents,
+        public readonly int $serverlessCount,
+        public readonly int $serverlessSubtotalCents,
         public readonly int $appliedCreditCents,
         public readonly int $monthlyTotalCents,
     ) {}
 
     /**
      * @param  array<string, int>  $tierQuantities
+     * @param  array<string, int>  $tierPricesCents
      */
-    public static function fromCounts(array $tierQuantities, int $baseCents, int $creditCents, array $tierPricesCents): self
-    {
+    public static function fromCounts(
+        array $tierQuantities,
+        int $baseCents,
+        int $creditCents,
+        array $tierPricesCents,
+        int $serverlessCount = 0,
+        int $serverlessUnitCents = 0,
+    ): self {
         $normalized = [];
         foreach (ServerTier::ordered() as $tier) {
             $normalized[$tier->value] = max(0, (int) ($tierQuantities[$tier->value] ?? 0));
@@ -40,15 +51,20 @@ class DesiredBillingState
             $subtotal += $qty * (int) ($tierPricesCents[$tierKey] ?? 0);
         }
 
-        // Flat credit never produces a negative bill; it absorbs the server
-        // subtotal first, then leaves the base intact.
-        $applied = min($creditCents, $subtotal);
-        $monthly = max(0, $baseCents + $subtotal - $applied);
+        $serverlessCount = max(0, $serverlessCount);
+        $serverlessSubtotal = $serverlessCount * max(0, $serverlessUnitCents);
+
+        // Flat credit never produces a negative bill; it absorbs the per-unit
+        // subtotal (servers + serverless) first, leaving the base intact.
+        $applied = min($creditCents, $subtotal + $serverlessSubtotal);
+        $monthly = max(0, $baseCents + $subtotal + $serverlessSubtotal - $applied);
 
         return new self(
             tierQuantities: $normalized,
             baseCents: $baseCents,
             serverSubtotalCents: $subtotal,
+            serverlessCount: $serverlessCount,
+            serverlessSubtotalCents: $serverlessSubtotal,
             appliedCreditCents: $applied,
             monthlyTotalCents: $monthly,
         );
@@ -73,6 +89,8 @@ class DesiredBillingState
             'tier_quantities' => $this->tierQuantities,
             'base_cents' => $this->baseCents,
             'server_subtotal_cents' => $this->serverSubtotalCents,
+            'serverless_count' => $this->serverlessCount,
+            'serverless_subtotal_cents' => $this->serverlessSubtotalCents,
             'applied_credit_cents' => $this->appliedCreditCents,
             'monthly_total_cents' => $this->monthlyTotalCents,
         ];

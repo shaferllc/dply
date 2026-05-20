@@ -50,7 +50,8 @@ class Create extends Component
                 'id' => 'serverless',
                 'title' => __('Serverless'),
                 'description' => __('Launch function-based app targets without modeling them as traditional servers.'),
-                'enabled' => false,
+                'enabled' => true,
+                'href' => route('serverless.create'),
                 'icon' => 'sparkles',
             ],
         ];

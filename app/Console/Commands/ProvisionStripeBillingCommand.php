@@ -99,6 +99,15 @@ class ProvisionStripeBillingCommand extends Command
                 number_format($yearlyOf($amount) / 100, 2),
             ));
         }
+        $serverless = (int) ($standard['serverless_cents'] ?? 0);
+        if ($serverless > 0) {
+            $this->line('  Product: dply serverless function');
+            $this->line(sprintf(
+                '    Per function $%s/mo   $%s/yr',
+                number_format($serverless / 100, 2),
+                number_format($yearlyOf($serverless) / 100, 2),
+            ));
+        }
         $this->line('  Product: dply Enterprise (no prices — sales-led)');
         $this->newLine();
         $this->info('Re-run without --dry-run to actually create these in Stripe.');

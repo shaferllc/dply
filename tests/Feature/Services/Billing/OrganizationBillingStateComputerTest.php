@@ -5,6 +5,7 @@ namespace Tests\Feature\Services\Billing;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
+use App\Models\Site;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -160,6 +161,52 @@ class OrganizationBillingStateComputerTest extends TestCase
         $this->assertSame(1, $state->serverCount());
     }
 
+    public function test_serverless_host_is_not_counted_as_a_spec_tier(): void
+    {
+        $org = Organization::factory()->create();
+        // A DO Functions namespace host — ready, but a serverless host.
+        Server::factory()->create([
+            'organization_id' => $org->id,
+            'status' => Server::STATUS_READY,
+            'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
+        ]);
+
+        $state = $this->computer->compute($org->fresh());
+
+        // It would have classified as XS by null-fallback — must not.
+        $this->assertSame(0, $state->serverCount());
+        $this->assertSame(0, $state->tierQuantities['xs']);
+        $this->assertSame(1500, $state->monthlyTotalCents);
+    }
+
+    public function test_active_serverless_functions_bill_per_function(): void
+    {
+        Config::set('subscription.standard.serverless_cents', 200);
+        $org = Organization::factory()->create();
+        $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
+        $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
+        $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
+
+        $state = $this->computer->compute($org->fresh());
+
+        $this->assertSame(3, $state->serverlessCount);
+        $this->assertSame(600, $state->serverlessSubtotalCents);
+        // $15 base + 3 × $2 = $21
+        $this->assertSame(2100, $state->monthlyTotalCents);
+    }
+
+    public function test_non_active_functions_are_not_billed(): void
+    {
+        Config::set('subscription.standard.serverless_cents', 200);
+        $org = Organization::factory()->create();
+        $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_CONFIGURED); // pre-deploy
+        $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
+
+        $state = $this->computer->compute($org->fresh());
+
+        $this->assertSame(1, $state->serverlessCount);
+    }
+
     private function makeServerWithSpecs(Organization $org, string $status, int $cpuCount, int $memMb): Server
     {
         $server = Server::factory()->create([
@@ -177,5 +224,20 @@ class OrganizationBillingStateComputerTest extends TestCase
         ]);
 
         return $server;
+    }
+
+    private function makeFunctionSite(Organization $org, string $status): Site
+    {
+        $server = Server::factory()->create([
+            'organization_id' => $org->id,
+            'status' => Server::STATUS_READY,
+            'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
+        ]);
+
+        return Site::factory()->create([
+            'organization_id' => $org->id,
+            'server_id' => $server->id,
+            'status' => $status,
+        ]);
     }
 }

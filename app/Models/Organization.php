@@ -84,40 +84,103 @@ class Organization extends Model
      */
     public function trialState(): \App\Enums\TrialState
     {
+        // Includes the cancel grace period — Cashier's valid() stays true
+        // until ends_at, so a just-canceled org keeps full access.
         if ($this->onAnyPaidPlan()) {
             return \App\Enums\TrialState::Subscribed;
+        }
+
+        $reference = $this->pauseLadderReference();
+        if ($reference !== null) {
+            $softPauseDays = (int) config('subscription.standard.soft_pause_days', 30);
+
+            return $reference->copy()->addDays($softPauseDays)->isPast()
+                ? \App\Enums\TrialState::ExpiredHard
+                : \App\Enums\TrialState::ExpiredSoft;
         }
 
         if ($this->trial_ends_at === null) {
             return \App\Enums\TrialState::NoTrial;
         }
 
-        if ($this->trial_ends_at->isFuture()) {
-            return \App\Enums\TrialState::ActiveTrial;
-        }
-
-        $softPauseDays = (int) config('subscription.standard.soft_pause_days', 30);
-        $hardPauseStartsAt = $this->trial_ends_at->copy()->addDays($softPauseDays);
-
-        return $hardPauseStartsAt->isPast()
-            ? \App\Enums\TrialState::ExpiredHard
-            : \App\Enums\TrialState::ExpiredSoft;
+        return \App\Enums\TrialState::ActiveTrial;
     }
 
     /**
-     * When the soft-pause window flips to hard-pause. Null when not on a trial
-     * track (subscribed, no trial recorded). Useful for "agent disconnects on
-     * {date}" UI copy.
+     * The date the soft → hard pause ladder is measured from, or null when the
+     * org isn't on a pause track. Two sources, in priority order:
+     *
+     *  1. A subscription that has fully ended (canceled, past its grace period)
+     *     — the org lapsed from a paid plan; measure from the subscription's
+     *     end date.
+     *  2. A trial that's already expired — measure from trial_ends_at.
+     *
+     * A future-dated trial returns null (still an active trial, not paused).
+     */
+    private function pauseLadderReference(): ?\Carbon\CarbonInterface
+    {
+        $subscription = $this->subscription('default');
+        if ($subscription && $subscription->ended() && $subscription->ends_at !== null) {
+            return $subscription->ends_at;
+        }
+
+        if ($this->trial_ends_at !== null && $this->trial_ends_at->isPast()) {
+            return $this->trial_ends_at;
+        }
+
+        return null;
+    }
+
+    /**
+     * True when the org's current pause state stems from a canceled/ended
+     * subscription rather than an expired trial — drives banner copy.
+     */
+    public function lapsedFromSubscription(): bool
+    {
+        $subscription = $this->subscription('default');
+
+        return $subscription !== null && $subscription->ended();
+    }
+
+    /**
+     * True when the subscription is canceled but still inside the period the
+     * customer already paid for — full access continues, billing stops at
+     * {@see subscriptionEndsAt}.
+     */
+    public function onSubscriptionGracePeriod(): bool
+    {
+        $subscription = $this->subscription('default');
+
+        return $subscription !== null && $subscription->onGracePeriod();
+    }
+
+    /**
+     * The date a canceled subscription's access ends. Null when not canceled.
+     */
+    public function subscriptionEndsAt(): ?\Carbon\CarbonInterface
+    {
+        return $this->subscription('default')?->ends_at;
+    }
+
+    /**
+     * When the soft-pause window flips to hard-pause. Null when not on a pause
+     * track (subscribed, active trial, no trial recorded). Useful for "agent
+     * disconnects on {date}" UI copy.
      */
     public function hardPauseStartsAt(): ?\Carbon\CarbonImmutable
     {
-        if ($this->trial_ends_at === null || $this->onAnyPaidPlan()) {
+        if ($this->onAnyPaidPlan()) {
+            return null;
+        }
+
+        $reference = $this->pauseLadderReference();
+        if ($reference === null) {
             return null;
         }
 
         $softPauseDays = (int) config('subscription.standard.soft_pause_days', 30);
 
-        return $this->trial_ends_at->copy()->addDays($softPauseDays)->toImmutable();
+        return $reference->copy()->addDays($softPauseDays)->toImmutable();
     }
 
     /**

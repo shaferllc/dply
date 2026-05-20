@@ -18,6 +18,8 @@ use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Edge\Create as EdgeCreate;
 use App\Livewire\Edge\Index as EdgeIndex;
+use App\Livewire\Serverless\Create as ServerlessCreate;
+use App\Livewire\Serverless\Journey as ServerlessJourney;
 use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
@@ -217,6 +219,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('edge', EdgeIndex::class)->name('edge.index');
         Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
     });
+    Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
+    Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
     Route::livewire('imports/ploi/migrations/{migration}', \App\Livewire\Imports\Ploi\MigrationProgress::class)->name('imports.ploi.migration.progress');
     Route::livewire('imports/forge', \App\Livewire\Imports\Forge\Inventory::class)->name('imports.forge.inventory');

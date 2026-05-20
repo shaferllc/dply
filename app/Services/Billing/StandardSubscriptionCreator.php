@@ -58,7 +58,23 @@ class StandardSubscriptionCreator
             $items[] = ['price' => $priceId, 'quantity' => $qty];
         }
 
+        if ($desired->serverlessCount > 0) {
+            $serverlessPriceId = $this->serverlessPriceIdForInterval($interval);
+            if ($serverlessPriceId !== '') {
+                $items[] = ['price' => $serverlessPriceId, 'quantity' => $desired->serverlessCount];
+            }
+        }
+
         return $items;
+    }
+
+    public function serverlessPriceIdForInterval(string $interval): string
+    {
+        return (string) match ($interval) {
+            self::INTERVAL_MONTH => config('subscription.standard.stripe.serverless') ?? '',
+            self::INTERVAL_YEAR => config('subscription.standard.stripe.serverless_yearly') ?? '',
+            default => throw new InvalidArgumentException("Unknown billing interval: {$interval}"),
+        };
     }
 
     /**

@@ -16,10 +16,43 @@
     }
     // Escalate to amber in the final stretch; calm sand before that.
     $trialUrgent = $trialDaysLeft <= 3;
+
+    // Pause states stem from either an expired trial or a canceled
+    // subscription — the copy should reflect which. Only resolved for the
+    // pause states (it touches the subscriptions relation, which we skip
+    // entirely for active/subscribed orgs).
+    $lapsedFromSub = in_array($state, [TrialState::ExpiredSoft, TrialState::ExpiredHard], true)
+        && ($organization?->lapsedFromSubscription() ?? false);
+
+    // Grace period: canceled but still paid-through. trialState() is still
+    // Subscribed here — checked separately so the reminder shows app-wide.
+    $onGrace = $state === TrialState::Subscribed
+        && ($organization?->onSubscriptionGracePeriod() ?? false);
+    $graceEndsAt = $onGrace ? $organization?->subscriptionEndsAt() : null;
 @endphp
 
-@if ($state === TrialState::ActiveTrial)
-    <div class="rounded-xl border px-4 py-3 text-sm flex flex-wrap items-center justify-between gap-3 {{ $trialUrgent ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-brand-gold/30 bg-brand-gold/10 text-brand-ink' }}" role="status">
+@if ($onGrace)
+    <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-3" role="status">
+        <div>
+            <p class="font-semibold">
+                @if ($graceEndsAt)
+                    {{ __('Your subscription ends :date.', ['date' => $graceEndsAt->toFormattedDateString()]) }}
+                @else
+                    {{ __('Your subscription is set to cancel.') }}
+                @endif
+            </p>
+            <p class="mt-0.5 text-amber-900/80">
+                {{ __('You keep full access until then. Resume anytime to stay on — nothing changes.') }}
+            </p>
+        </div>
+        @if ($billingUrl)
+            <a href="{{ $billingUrl }}" wire:navigate class="inline-flex items-center rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest whitespace-nowrap">
+                {{ __('Resume subscription') }}
+            </a>
+        @endif
+    </div>
+@elseif ($state === TrialState::ActiveTrial)
+    <div class="mb-6 rounded-xl border px-4 py-3 text-sm flex flex-wrap items-center justify-between gap-3 {{ $trialUrgent ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-brand-gold/30 bg-brand-gold/10 text-brand-ink' }}" role="status">
         <div>
             <p class="font-semibold">
                 @if ($trialDaysLeft <= 0)
@@ -39,11 +72,17 @@
         @endif
     </div>
 @elseif ($state === TrialState::ExpiredSoft)
-    <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-3" role="alert">
+    <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-3" role="alert">
         <div>
-            <p class="font-semibold">{{ __('Deploys are paused — your trial has ended.') }}</p>
+            <p class="font-semibold">
+                {{ $lapsedFromSub
+                    ? __('Deploys are paused — your subscription ended.')
+                    : __('Deploys are paused — your trial has ended.') }}
+            </p>
             <p class="mt-0.5 text-amber-900/80">
-                {{ __('Existing servers and sites keep running. Add a payment method to resume deploys and scheduler runs.') }}
+                {{ $lapsedFromSub
+                    ? __('Existing servers and sites keep running. Resume your subscription to restart deploys and scheduler runs.')
+                    : __('Existing servers and sites keep running. Add a payment method to resume deploys and scheduler runs.') }}
                 @if ($hardPauseAt)
                     {{ __('Agents disconnect on :date if no payment method is added.', ['date' => $hardPauseAt->toFormattedDateString()]) }}
                 @endif
@@ -51,16 +90,18 @@
         </div>
         @if ($billingUrl)
             <a href="{{ $billingUrl }}" wire:navigate class="inline-flex items-center rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest whitespace-nowrap">
-                {{ __('Add payment method') }}
+                {{ $lapsedFromSub ? __('Resume subscription') : __('Add payment method') }}
             </a>
         @endif
     </div>
 @elseif ($state === TrialState::ExpiredHard)
-    <div class="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 flex flex-wrap items-center justify-between gap-3" role="alert">
+    <div class="mb-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 flex flex-wrap items-center justify-between gap-3" role="alert">
         <div>
             <p class="font-semibold">{{ __('This organization is fully paused.') }}</p>
             <p class="mt-0.5 text-red-900/80">
-                {{ __('Agents have been disconnected. Your servers and sites are still running on your provider, but dply is not managing them. Add a payment method to reconnect.') }}
+                {{ $lapsedFromSub
+                    ? __('Agents have been disconnected. Your servers and sites are still running on your provider, but dply is not managing them. Resume your subscription to reconnect.')
+                    : __('Agents have been disconnected. Your servers and sites are still running on your provider, but dply is not managing them. Add a payment method to reconnect.') }}
             </p>
         </div>
         @if ($billingUrl)

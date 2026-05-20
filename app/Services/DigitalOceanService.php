@@ -409,6 +409,39 @@ class DigitalOceanService
     }
 
     /**
+     * Create a DigitalOcean Functions (serverless) namespace. The returned
+     * api_host + access_key are the OpenWhisk credentials a function deploy
+     * needs — stored on the serverless host Server's meta.
+     *
+     * @return array{api_host: string, namespace: string, access_key: string, region: string}
+     */
+    public function createFunctionsNamespace(string $region, string $label): array
+    {
+        $response = $this->request('post', '/functions/namespaces', [
+            'region' => $region,
+            'label' => $label,
+        ]);
+        $this->assertSuccess($response, 'create functions namespace');
+
+        $ns = $response->json('namespace');
+        $ns = is_array($ns) ? $ns : [];
+
+        // OpenWhisk (which backs DO Functions) authenticates with a
+        // `uuid:key` pair — the deployer splits the access key on the colon.
+        // DO returns `uuid` and `key` separately, so recombine them here.
+        $uuid = (string) ($ns['uuid'] ?? '');
+        $key = (string) ($ns['key'] ?? '');
+        $accessKey = ($uuid !== '' && $key !== '') ? $uuid.':'.$key : $key;
+
+        return [
+            'api_host' => (string) ($ns['api_host'] ?? ''),
+            'namespace' => (string) ($ns['namespace'] ?? $ns['uuid'] ?? ''),
+            'access_key' => $accessKey,
+            'region' => (string) ($ns['region'] ?? $region),
+        ];
+    }
+
+    /**
      * Validate token with a lightweight account endpoint.
      */
     public function validateToken(): void

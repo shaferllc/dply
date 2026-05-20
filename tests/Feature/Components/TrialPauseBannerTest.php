@@ -64,25 +64,59 @@ class TrialPauseBannerTest extends TestCase
         $html = $this->render($org);
 
         $this->assertStringContainsString('Deploys are paused', $html);
+        $this->assertStringContainsString('your trial has ended', $html);
+    }
+
+    public function test_expired_soft_after_cancellation_says_subscription_ended(): void
+    {
+        $org = Organization::factory()->create(['trial_ends_at' => null]);
+        \App\Models\Subscription::factory()
+            ->withPrice('price_x')
+            ->create([
+                'organization_id' => $org->id,
+                'stripe_status' => 'canceled',
+                'ends_at' => now()->subDays(5),
+            ]);
+
+        $html = $this->render($org);
+
+        $this->assertStringContainsString('Deploys are paused', $html);
+        $this->assertStringContainsString('your subscription ended', $html);
+        $this->assertStringContainsString('Resume', $html);
     }
 
     public function test_subscribed_org_shows_no_banner(): void
     {
-        $org = new class extends Organization
-        {
-            public function onStandardSubscription(): bool
-            {
-                return true;
-            }
-        };
-        $org->forceFill(Organization::factory()->create()->getAttributes());
-        $org->exists = true;
+        \Illuminate\Support\Facades\Config::set('subscription.standard.stripe.base_monthly', 'price_sub_base');
+        $org = Organization::factory()->create(['trial_ends_at' => null]);
+        \App\Models\Subscription::factory()
+            ->withPrice('price_sub_base')
+            ->active()
+            ->create(['organization_id' => $org->id]);
 
-        $html = Blade::render('<x-trial-pause-banner :organization="$organization" />', [
-            'organization' => $org,
-        ]);
+        $html = $this->render($org);
 
         $this->assertStringNotContainsString('trial', strtolower($html));
         $this->assertStringNotContainsString('paused', strtolower($html));
+        $this->assertStringNotContainsString('subscription ends', strtolower($html));
+    }
+
+    public function test_grace_period_shows_resume_banner_with_end_date(): void
+    {
+        \Illuminate\Support\Facades\Config::set('subscription.standard.stripe.base_monthly', 'price_sub_base');
+        $org = Organization::factory()->create(['trial_ends_at' => null]);
+        \App\Models\Subscription::factory()
+            ->withPrice('price_sub_base')
+            ->create([
+                'organization_id' => $org->id,
+                'stripe_status' => 'active',
+                'ends_at' => now()->addDays(12), // canceled, still in grace
+            ]);
+
+        $html = $this->render($org);
+
+        $this->assertStringContainsString('Your subscription ends', $html);
+        $this->assertStringContainsString('Resume subscription', $html);
+        $this->assertStringContainsString('full access until then', $html);
     }
 }

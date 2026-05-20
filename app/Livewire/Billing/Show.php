@@ -158,6 +158,137 @@ class Show extends Component
         return $this->redirect($checkout->url, navigate: false);
     }
 
+    /**
+     * Switch an existing subscription between monthly and yearly billing.
+     * Swaps every line item (base + each tier) to the target interval's price
+     * set and invoices the prorated difference immediately.
+     */
+    public function switchInterval(): mixed
+    {
+        $this->authorize('update', $this->organization);
+
+        $subscription = $this->organization->subscription('default');
+        if (! $subscription || ! $subscription->valid()) {
+            return $this->billingRedirect('billing_error', __('No active subscription to change.'));
+        }
+
+        $current = $this->subscriptionInterval;
+        $target = $current === StandardSubscriptionCreator::INTERVAL_YEAR
+            ? StandardSubscriptionCreator::INTERVAL_MONTH
+            : StandardSubscriptionCreator::INTERVAL_YEAR;
+
+        $computer = app(OrganizationBillingStateComputer::class);
+        $creator = app(StandardSubscriptionCreator::class);
+
+        try {
+            $items = $creator->buildPriceList($computer->compute($this->organization), $target);
+        } catch (RuntimeException $e) {
+            return $this->billingRedirect('billing_error', __('The :interval price set is not configured.', ['interval' => $target]));
+        }
+
+        // Cashier's swap() wants prices keyed by ID, value = options.
+        $swap = [];
+        foreach ($items as $item) {
+            $swap[$item['price']] = ['quantity' => $item['quantity']];
+        }
+
+        audit_log($this->organization, auth()->user(), 'billing.interval_switched', null, null, [
+            'from' => $current,
+            'to' => $target,
+        ]);
+
+        try {
+            $subscription->swapAndInvoice($swap);
+        } catch (Throwable $e) {
+            return $this->billingRedirect('billing_error', __('Could not switch billing interval. Please try again or contact support.'));
+        }
+
+        return $this->billingRedirect('billing_status', __('Billing switched to :interval.', [
+            'interval' => $target === StandardSubscriptionCreator::INTERVAL_YEAR ? __('yearly') : __('monthly'),
+        ]));
+    }
+
+    /**
+     * Cancel the subscription at the end of the current billing period. The
+     * customer keeps full access until then (Cashier grace period) and can
+     * resume before it ends.
+     */
+    public function cancelSubscription(): mixed
+    {
+        $this->authorize('update', $this->organization);
+
+        $subscription = $this->organization->subscription('default');
+        if (! $subscription || ! $subscription->valid()) {
+            return $this->billingRedirect('billing_error', __('No active subscription to cancel.'));
+        }
+        if ($subscription->canceled()) {
+            return $this->billingRedirect('billing_error', __('This subscription is already scheduled to cancel.'));
+        }
+
+        audit_log($this->organization, auth()->user(), 'billing.subscription_canceled');
+
+        try {
+            $subscription->cancel();
+        } catch (Throwable $e) {
+            return $this->billingRedirect('billing_error', __('Could not cancel the subscription. Please try again or contact support.'));
+        }
+
+        $endsAt = $subscription->fresh()?->ends_at;
+
+        return $this->billingRedirect('billing_status', $endsAt
+            ? __('Subscription canceled. You keep full access until :date.', ['date' => $endsAt->toFormattedDateString()])
+            : __('Subscription canceled. You keep access until the end of your billing period.'));
+    }
+
+    /**
+     * Un-cancel a subscription that's still inside its grace period.
+     */
+    public function resumeSubscription(): mixed
+    {
+        $this->authorize('update', $this->organization);
+
+        $subscription = $this->organization->subscription('default');
+        if (! $subscription || ! $subscription->onGracePeriod()) {
+            return $this->billingRedirect('billing_error', __('There\'s no canceled subscription to resume.'));
+        }
+
+        audit_log($this->organization, auth()->user(), 'billing.subscription_resumed');
+
+        try {
+            $subscription->resume();
+        } catch (Throwable $e) {
+            return $this->billingRedirect('billing_error', __('Could not resume the subscription. Please try again or contact support.'));
+        }
+
+        return $this->billingRedirect('billing_status', __('Your subscription has been resumed.'));
+    }
+
+    /**
+     * Flash a message and reload the billing page. Reloading gives a clean
+     * end state for these modal-driven actions: the modal disappears, any
+     * stale subscription state is re-read fresh, and the flashed alert shows.
+     */
+    private function billingRedirect(string $key, string $message): mixed
+    {
+        session()->flash($key, $message);
+
+        return $this->redirect(route('subscription.show', $this->organization));
+    }
+
+    /**
+     * True when the subscription is canceled but still inside the grace period
+     * — the customer has access but billing will stop at period end.
+     */
+    public function getOnGracePeriodProperty(): bool
+    {
+        return $this->subscription?->onGracePeriod() ?? false;
+    }
+
+    public function getSubscriptionEndsAtProperty(): ?\Carbon\CarbonInterface
+    {
+        return $this->subscription?->ends_at;
+    }
+
     public function getOnDplyTrialProperty(): bool
     {
         return $this->organization->onDplyTrial();

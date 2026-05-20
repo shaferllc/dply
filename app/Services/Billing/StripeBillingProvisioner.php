@@ -38,6 +38,12 @@ class StripeBillingProvisioner
 
     public const ROLE_TIER_YEARLY_SUFFIX = '_yearly';
 
+    public const ROLE_SERVERLESS_PRODUCT = 'standard_serverless_product';
+
+    public const ROLE_SERVERLESS_MONTHLY = 'standard_serverless';
+
+    public const ROLE_SERVERLESS_YEARLY = 'standard_serverless_yearly';
+
     public const ROLE_ENTERPRISE_PRODUCT = 'enterprise_product';
 
     private const TIER_PRODUCT_INFO = [
@@ -133,6 +139,34 @@ class StripeBillingProvisioner
             )->id;
         }
 
+        // Serverless — a flat per-function fee. Its own product so the
+        // invoice line reads "dply serverless function", not a server tier.
+        $serverlessCents = (int) ($standardConfig['serverless_cents'] ?? 200);
+        if ($serverlessCents > 0) {
+            $serverlessProduct = $this->upsertProduct(
+                name: 'dply serverless function',
+                description: 'Per-function fee for serverless (FaaS) targets. Covers deploys, config, and console management for each function — billed per function, not per server.',
+                role: self::ROLE_SERVERLESS_PRODUCT,
+            );
+            $result[self::ROLE_SERVERLESS_PRODUCT] = $serverlessProduct->id;
+
+            $result[self::ROLE_SERVERLESS_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $serverlessProduct->id,
+                amount: $serverlessCents,
+                interval: 'month',
+                nickname: 'Serverless function — Monthly',
+                role: self::ROLE_SERVERLESS_MONTHLY,
+            )->id;
+
+            $result[self::ROLE_SERVERLESS_YEARLY] = $this->upsertRecurringPrice(
+                productId: $serverlessProduct->id,
+                amount: $this->annualAmount($serverlessCents, $annualPct),
+                interval: 'year',
+                nickname: 'Serverless function — Yearly',
+                role: self::ROLE_SERVERLESS_YEARLY,
+            )->id;
+        }
+
         $enterpriseProduct = $this->upsertProduct(
             name: 'dply Enterprise',
             description: 'dply for larger fleets and procurement-led rollouts. Includes everything in Standard, plus volume pricing on per-server fees, SSO, audit log access, a custom MSA, dedicated support, and rollout planning. Pricing is negotiated per deal.',
@@ -163,6 +197,8 @@ class StripeBillingProvisioner
             self::ROLE_TIER_PREFIX.'m'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_M_YEARLY',
             self::ROLE_TIER_PREFIX.'l'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_L_YEARLY',
             self::ROLE_TIER_PREFIX.'xl'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_XL_YEARLY',
+            self::ROLE_SERVERLESS_MONTHLY => 'STRIPE_PRICE_STANDARD_SERVERLESS',
+            self::ROLE_SERVERLESS_YEARLY => 'STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY',
         ];
 
         $lines = [];

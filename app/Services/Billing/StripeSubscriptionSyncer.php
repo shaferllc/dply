@@ -50,6 +50,17 @@ class StripeSubscriptionSyncer
             }
         }
 
+        // Serverless functions — a flat per-function line item, reconciled
+        // the same way as a tier.
+        $serverlessPriceId = $this->serverlessPriceIdForSubscription($subscription);
+        if ($serverlessPriceId !== '') {
+            $current = $this->currentQuantity($subscription, $serverlessPriceId);
+            $change = $this->applyDelta($subscription, $serverlessPriceId, $current, $desired->serverlessCount);
+            if ($change !== null) {
+                $changes[] = ['tier' => 'serverless'] + $change;
+            }
+        }
+
         if ($changes !== []) {
             Log::info('billing.stripe.subscription_synced', [
                 'organization_id' => $organization->id,
@@ -123,12 +134,26 @@ class StripeSubscriptionSyncer
      */
     private function tierPriceIdsForSubscription(Subscription $subscription): array
     {
+        return $this->isYearly($subscription)
+            ? (array) config('subscription.standard.stripe.tiers_yearly', [])
+            : (array) config('subscription.standard.stripe.tiers', []);
+    }
+
+    /**
+     * The serverless line-item price ID matching the subscription's interval.
+     * Empty string when serverless pricing isn't configured.
+     */
+    private function serverlessPriceIdForSubscription(Subscription $subscription): string
+    {
+        $key = $this->isYearly($subscription) ? 'serverless_yearly' : 'serverless';
+
+        return (string) (config('subscription.standard.stripe.'.$key) ?? '');
+    }
+
+    private function isYearly(Subscription $subscription): bool
+    {
         $yearlyBase = (string) (config('subscription.standard.stripe.base_yearly') ?? '');
 
-        if ($yearlyBase !== '' && $subscription->hasPrice($yearlyBase)) {
-            return (array) config('subscription.standard.stripe.tiers_yearly', []);
-        }
-
-        return (array) config('subscription.standard.stripe.tiers', []);
+        return $yearlyBase !== '' && $subscription->hasPrice($yearlyBase);
     }
 }

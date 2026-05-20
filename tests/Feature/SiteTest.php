@@ -778,7 +778,6 @@ class SiteTest extends TestCase
                 'runtime_profile' => 'digitalocean_functions_web',
                 'serverless' => [
                     'runtime' => 'nodejs:18',
-                    'entrypoint' => 'index',
                     'build_command' => 'mkdir -p dist && printf "exports.main = true;\n" > dist/index.js',
                     'artifact_output_path' => 'dist',
                 ],
@@ -798,6 +797,22 @@ class SiteTest extends TestCase
         $this->assertSame('7', data_get($site->meta, 'serverless.last_revision_id'));
         $this->assertNotNull(data_get($site->meta, 'serverless.artifact_path'));
         $this->assertStringContainsString('DigitalOcean Functions deploy completed.', (string) $deployment->log_output);
+
+        // The action API uses the `_` namespace placeholder (not the literal
+        // namespace, which 404s) and marks the action web-exported.
+        Http::assertSent(function ($request) {
+            if ($request->method() !== 'PUT') {
+                return false;
+            }
+            $annotations = collect($request['annotations'] ?? []);
+
+            return str_contains($request->url(), '/api/v1/namespaces/_/actions/')
+                && ! str_contains($request->url(), 'fn-namespace/actions')
+                // exec.main is the OpenWhisk handler function name — dply's
+                // runtimes export `main`, never the `index` file basename.
+                && data_get($request->data(), 'exec.main') === 'main'
+                && $annotations->contains(fn ($a) => ($a['key'] ?? null) === 'web-export' && ($a['value'] ?? null) === true);
+        });
     }
 
     public function test_aws_lambda_host_deploy_uses_aws_lambda_engine(): void

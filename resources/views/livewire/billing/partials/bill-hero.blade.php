@@ -68,7 +68,22 @@
                 @if ($interval === 'year')
                     <p class="mt-1 text-sm text-brand-moss">${{ number_format($yearlyDollars / 12, 2) }} {{ __('/mo effective — 20% off monthly') }}</p>
                 @else
-                    <p class="mt-1 text-sm text-brand-moss">${{ number_format($monthlyDollars * 12 * 0.8, 2) }} {{ __('/yr if you switch to annual (save 20%)') }}</p>
+                    <p class="mt-1 text-sm text-brand-moss">${{ number_format($monthlyDollars * 12 * 0.8, 2) }} {{ __('/yr on annual billing (save 20%)') }}</p>
+                @endif
+
+                {{-- Interval switch — only for an existing subscriber. Opens
+                     a confirmation modal (the swap invoices immediately). --}}
+                @if ($this->subscription)
+                    <div class="mt-3">
+                        <button type="button" x-on:click="$dispatch('open-modal', 'switch-interval')"
+                                class="text-sm font-semibold text-brand-sage hover:text-brand-ink underline underline-offset-2">
+                            @if ($interval === 'year')
+                                {{ __('Switch to monthly billing') }}
+                            @else
+                                {{ __('Switch to annual billing — save 20%') }}
+                            @endif
+                        </button>
+                    </div>
                 @endif
 
                 {{-- Usage run-rate — derived from the monthly total, no history. --}}

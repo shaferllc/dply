@@ -29,6 +29,9 @@
  *   STRIPE_PRICE_STANDARD_TIER_L_YEARLY=price_...
  *   STRIPE_PRICE_STANDARD_TIER_XL_YEARLY=price_...
  *
+ *   STRIPE_PRICE_STANDARD_SERVERLESS=price_...         (flat per-function fee, monthly)
+ *   STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY=price_...  (flat per-function fee, yearly)
+ *
  *   STRIPE_PRICE_ENTERPRISE=price_...              (manual Stripe sub for sales-led deals)
  */
 
@@ -56,9 +59,15 @@ return [
             'l' => 2000,
             'xl' => 4000,
         ],
+        // Flat per-function fee for serverless (FaaS) targets. A serverless
+        // function has no vCPU/RAM, so it isn't spec-tiered — it's its own
+        // billable unit. See project_serverless_v1 memo.
+        'serverless_cents' => 200,
         'stripe' => [
             'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),
             'base_yearly' => env('STRIPE_PRICE_STANDARD_BASE_YEARLY', ''),
+            'serverless' => env('STRIPE_PRICE_STANDARD_SERVERLESS', ''),
+            'serverless_yearly' => env('STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY', ''),
             'tiers' => [
                 'xs' => env('STRIPE_PRICE_STANDARD_TIER_XS', ''),
                 's' => env('STRIPE_PRICE_STANDARD_TIER_S', ''),

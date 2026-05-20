@@ -13,6 +13,7 @@ final class DigitalOceanFunctionsActionDeployer
         private readonly ServerlessDeploymentConfigResolver $deploymentConfigResolver,
         private readonly DeploymentContractBuilder $contractBuilder,
         private readonly DeploymentRevisionTracker $revisionTracker,
+        private readonly ServerlessDeployProgress $progress,
     ) {}
 
     /**
@@ -30,14 +31,10 @@ final class DigitalOceanFunctionsActionDeployer
         $serverMeta = is_array($server->meta) ? $server->meta : [];
         $hostConfig = is_array($serverMeta['digitalocean_functions'] ?? null) ? $serverMeta['digitalocean_functions'] : [];
         $siteMeta = is_array($site->meta) ? $site->meta : [];
-        $resolvedConfig = $this->deploymentConfigResolver->resolve($site);
 
         $apiHost = rtrim((string) ($hostConfig['api_host'] ?? ''), '/');
         $namespace = trim((string) ($hostConfig['namespace'] ?? ''));
         $accessKey = trim((string) ($hostConfig['access_key'] ?? ''));
-        $package = trim((string) ($resolvedConfig['package'] ?? 'default'));
-        $kind = trim((string) ($resolvedConfig['runtime'] ?? 'nodejs:18'));
-        $entrypoint = trim((string) ($resolvedConfig['entrypoint'] ?? 'index'));
 
         if ($apiHost === '' || $namespace === '' || $accessKey === '') {
             throw new \RuntimeException('DigitalOcean Functions host metadata is incomplete. Save API host, namespace, and access key first.');
@@ -45,6 +42,15 @@ final class DigitalOceanFunctionsActionDeployer
 
         $buildResult = $this->artifactBuilder->build($site);
         $artifactPath = $buildResult['artifact_path'];
+
+        // Resolve runtime config AFTER the build — the artifact builder
+        // detects the framework and persists the corrected runtime / entry
+        // function (e.g. the Laravel adapter's `main`). Reading it earlier
+        // would use the pre-build placeholder and deploy a wrong `main`.
+        $resolvedConfig = $this->deploymentConfigResolver->resolve($site->fresh() ?? $site);
+        $package = trim((string) ($resolvedConfig['package'] ?? 'default'));
+        $kind = trim((string) ($resolvedConfig['runtime'] ?? 'nodejs:18'));
+        $entrypoint = trim((string) ($resolvedConfig['entrypoint'] ?? 'main')) ?: 'main';
 
         if (! str_ends_with(strtolower($artifactPath), '.zip')) {
             throw new \RuntimeException('DigitalOcean Functions deploy expects a .zip artifact.');
@@ -57,12 +63,13 @@ final class DigitalOceanFunctionsActionDeployer
 
         [$keyId, $keySecret] = $this->splitAccessKey($accessKey);
         $actionName = $this->actionName($site);
-        $url = $this->actionPutUrl($apiHost, $namespace, $package, $actionName);
+        $url = $this->actionPutUrl($apiHost, $package, $actionName);
         $bytes = file_get_contents($realArtifactPath);
         if ($bytes === false || $bytes === '') {
             throw new \RuntimeException('Artifact zip is empty or unreadable.');
         }
 
+        $this->progress->active($site, 'upload', 'Uploading to DigitalOcean Functions', 'Namespace '.$namespace);
         $response = Http::withBasicAuth($keyId, $keySecret)
             ->timeout(300)
             ->acceptJson()
@@ -73,11 +80,24 @@ final class DigitalOceanFunctionsActionDeployer
                     'code' => base64_encode($bytes),
                     'main' => $entrypoint,
                 ],
+                // Without web-export the action exists but is not reachable
+                // over HTTP — the invocation URL would 404.
+                'annotations' => [
+                    ['key' => 'web-export', 'value' => true],
+                ],
+                // A framework cold start (unzip + autoload + boot) needs far
+                // more than the default 3s/256MB — give it headroom.
+                'limits' => [
+                    'timeout' => 60000,
+                    'memory' => 512,
+                ],
             ]);
 
         if (! $response->successful()) {
             throw new \RuntimeException('DigitalOcean Functions deploy failed: HTTP '.$response->status().' '.$response->body());
         }
+
+        $this->progress->done($site, 'upload', 'Uploaded to DigitalOcean Functions');
 
         $json = $response->json();
         $revisionId = is_array($json) && isset($json['version']) ? (string) $json['version'] : null;
@@ -140,7 +160,7 @@ final class DigitalOceanFunctionsActionDeployer
         $response = Http::withBasicAuth($keyId, $keySecret)
             ->timeout(120)
             ->acceptJson()
-            ->delete($this->actionPutUrl($apiHost, $namespace, $package, $actionName));
+            ->delete($this->actionPutUrl($apiHost, $package, $actionName));
 
         if (! $response->successful() && $response->status() !== 404) {
             throw new \RuntimeException('DigitalOcean Functions delete failed: HTTP '.$response->status().' '.$response->body());
@@ -156,25 +176,36 @@ final class DigitalOceanFunctionsActionDeployer
         return $base !== '' ? $base : 'site';
     }
 
-    private function actionPutUrl(string $apiHost, string $namespace, string $package, string $actionName): string
+    /**
+     * The OpenWhisk action-management endpoint. The namespace is resolved
+     * from the auth credentials, so the REST path uses the `_` placeholder —
+     * not the literal namespace name (which 404s). An action with no package
+     * lives in the implicit default package and takes no package segment;
+     * the literal package name "default" is treated the same.
+     */
+    private function actionPutUrl(string $apiHost, string $package, string $actionName): string
     {
-        $namespace = rawurlencode($namespace);
         $actionName = rawurlencode($actionName);
 
-        if ($package === '') {
-            return $apiHost.'/api/v1/namespaces/'.$namespace.'/actions/'.$actionName;
-        }
+        $path = ($package === '' || $package === 'default')
+            ? $actionName
+            : rawurlencode($package).'/'.$actionName;
 
-        return $apiHost.'/api/v1/namespaces/'.$namespace.'/actions/'.rawurlencode($package).'/'.$actionName;
+        return $apiHost.'/api/v1/namespaces/_/actions/'.$path;
     }
 
+    /**
+     * The public web-action invocation URL. Unlike the management endpoint,
+     * this one carries the real namespace and always names a package —
+     * default-package actions sit under the literal "default" segment.
+     */
     private function actionWebUrl(string $apiHost, string $namespace, string $package, string $actionName): string
     {
         $namespace = rawurlencode($namespace);
         $actionName = rawurlencode($actionName);
-        $packagePath = $package !== '' ? rawurlencode($package).'/' : '';
+        $packageSegment = rawurlencode($package !== '' ? $package : 'default');
 
-        return $apiHost.'/api/v1/web/'.$namespace.'/'.$packagePath.$actionName;
+        return $apiHost.'/api/v1/web/'.$namespace.'/'.$packageSegment.'/'.$actionName;
     }
 
     /**

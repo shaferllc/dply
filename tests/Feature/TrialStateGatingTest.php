@@ -122,4 +122,78 @@ class TrialStateGatingTest extends TestCase
         $this->assertSame(TrialState::ExpiredSoft, $softOrg->trialState());
         $this->assertSame(TrialState::ExpiredHard, $hardOrg->trialState());
     }
+
+    public function test_canceled_subscription_within_grace_keeps_org_subscribed(): void
+    {
+        Config::set('subscription.standard.stripe.base_monthly', 'price_grace_base');
+        $org = Organization::factory()->create(['trial_ends_at' => null]);
+        // Canceled but ends_at in the future = Cashier grace period; valid() true.
+        \App\Models\Subscription::factory()
+            ->withPrice('price_grace_base')
+            ->create([
+                'organization_id' => $org->id,
+                'stripe_status' => 'canceled',
+                'ends_at' => now()->addDays(10),
+            ]);
+
+        $this->assertSame(TrialState::Subscribed, $org->fresh()->trialState());
+    }
+
+    public function test_ended_subscription_within_soft_window_is_expired_soft(): void
+    {
+        Config::set('subscription.standard.soft_pause_days', 30);
+        $org = Organization::factory()->create(['trial_ends_at' => null]);
+        \App\Models\Subscription::factory()
+            ->withPrice('price_x')
+            ->create([
+                'organization_id' => $org->id,
+                'stripe_status' => 'canceled',
+                'ends_at' => now()->subDays(5), // grace ended 5 days ago
+            ]);
+
+        $this->assertSame(TrialState::ExpiredSoft, $org->fresh()->trialState());
+        $this->assertTrue($org->fresh()->lapsedFromSubscription());
+    }
+
+    public function test_ended_subscription_past_soft_window_is_expired_hard(): void
+    {
+        Config::set('subscription.standard.soft_pause_days', 30);
+        $org = Organization::factory()->create(['trial_ends_at' => null]);
+        \App\Models\Subscription::factory()
+            ->withPrice('price_x')
+            ->create([
+                'organization_id' => $org->id,
+                'stripe_status' => 'canceled',
+                'ends_at' => now()->subDays(40),
+            ]);
+
+        $this->assertSame(TrialState::ExpiredHard, $org->fresh()->trialState());
+    }
+
+    public function test_ended_subscription_reference_beats_trial_dates(): void
+    {
+        // Org had a long-past trial AND a recently-ended subscription.
+        // The recent subscription end is what should drive the pause ladder.
+        Config::set('subscription.standard.soft_pause_days', 30);
+        $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(400)]);
+        \App\Models\Subscription::factory()
+            ->withPrice('price_x')
+            ->create([
+                'organization_id' => $org->id,
+                'stripe_status' => 'canceled',
+                'ends_at' => now()->subDays(3),
+            ]);
+
+        // Without the subscription branch this would be ExpiredHard (trial 400d
+        // past). With it, the 3-day-old cancellation keeps it in soft pause.
+        $this->assertSame(TrialState::ExpiredSoft, $org->fresh()->trialState());
+    }
+
+    public function test_lapsed_from_subscription_is_false_for_plain_trial_expiry(): void
+    {
+        $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(5)]);
+
+        $this->assertSame(TrialState::ExpiredSoft, $org->trialState());
+        $this->assertFalse($org->lapsedFromSubscription());
+    }
 }

@@ -34,6 +34,8 @@ class StandardSubscriptionCreatorTest extends TestCase
         Config::set('subscription.standard.stripe', [
             'base_monthly' => 'price_base_monthly',
             'base_yearly' => 'price_base_yearly',
+            'serverless' => 'price_serverless',
+            'serverless_yearly' => 'price_serverless_y',
             'tiers' => [
                 'xs' => 'price_tier_xs',
                 's' => 'price_tier_s',
@@ -144,6 +146,36 @@ class StandardSubscriptionCreatorTest extends TestCase
 
         $this->assertSame('price_tier_m', $monthlyIds['m']);
         $this->assertSame('price_tier_m_y', $yearlyIds['m']);
+    }
+
+    public function test_serverless_functions_add_an_interval_aware_line_item(): void
+    {
+        $desired = \App\Services\Billing\DesiredBillingState::fromCounts(
+            tierQuantities: [],
+            baseCents: 1500,
+            creditCents: 0,
+            tierPricesCents: ['xs' => 200],
+            serverlessCount: 3,
+            serverlessUnitCents: 200,
+        );
+
+        $monthly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_MONTH);
+        $this->assertContainsEquals(['price' => 'price_serverless', 'quantity' => 3], $monthly);
+
+        $yearly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_YEAR);
+        $this->assertContainsEquals(['price' => 'price_serverless_y', 'quantity' => 3], $yearly);
+    }
+
+    public function test_no_serverless_line_item_when_count_is_zero(): void
+    {
+        $org = Organization::factory()->create();
+        $items = $this->creator->buildPriceList(
+            app(OrganizationBillingStateComputer::class)->compute($org)
+        );
+
+        foreach ($items as $item) {
+            $this->assertStringNotContainsString('serverless', $item['price']);
+        }
     }
 
     private function server(Organization $org, int $cpu, int $memMb): Server

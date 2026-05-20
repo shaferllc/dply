@@ -51,12 +51,16 @@ final class ServerlessTargetCapabilityResolver
             return [
                 'target' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
                 'supports_runtime_detection' => true,
-                'supports_php_runtime' => false,
+                // DigitalOcean Functions runs PHP natively (no Bref needed —
+                // that's the AWS Lambda path).
+                'supports_php_runtime' => true,
                 'supports_node_runtime' => true,
                 'supports_python_runtime' => false,
                 'default_runtime' => 'nodejs:18',
                 'default_python_runtime' => 'python3.12',
-                'default_entrypoint' => 'index',
+                // OpenWhisk `exec.main` — the handler function name, not a
+                // file. dply's PHP/Node function templates export `main`.
+                'default_entrypoint' => 'main',
                 'default_package' => 'default',
                 'host_label' => 'DigitalOcean Functions',
             ];

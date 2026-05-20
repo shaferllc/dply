@@ -81,11 +81,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_nginx_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['nginx'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['nginx']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -95,11 +91,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_apache_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['apache'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['apache']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -109,11 +101,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_caddy_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['caddy'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['caddy']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -123,11 +111,9 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_php_fpm_when_php_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['php'],
-                'php_version' => '8.3',
-            ],
+        $server = $this->serverWithStack([
+            'expected_services' => ['php'],
+            'php_version' => '8.3',
         ]);
 
         $argspecs = ConsoleArgspecs::for($server);
@@ -138,12 +124,8 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_fallback_php_fpm_when_version_unknown(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['php'],
-                // php_version intentionally missing
-            ],
-        ]);
+        // php_version intentionally missing
+        $server = $this->serverWithStack(['expected_services' => ['php']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -153,11 +135,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_mysql_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['mysql'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['mysql']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -168,11 +146,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_postgres_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['postgres'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['postgres']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -182,11 +156,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_redis_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['redis'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['redis']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -196,11 +166,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_valkey_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['valkey'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['valkey']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -210,11 +176,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_memcached_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['memcached'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['memcached']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -224,11 +186,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_supervisor_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['supervisor'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['supervisor']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -238,11 +196,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_systemctl_units_include_docker_when_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['docker'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['docker']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $units = $argspecs['systemctl']['positional'][2];
@@ -266,11 +220,9 @@ final class ConsoleArgspecsTest extends TestCase
     public function test_systemctl_units_are_unique(): void
     {
         // Test that units don't duplicate when multiple conditions match
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['nginx', 'php', 'mysql'],
-                'php_version' => '8.3',
-            ],
+        $server = $this->serverWithStack([
+            'expected_services' => ['nginx', 'php', 'mysql'],
+            'php_version' => '8.3',
         ]);
 
         $argspecs = ConsoleArgspecs::for($server);
@@ -291,11 +243,9 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_journalctl_argspec_has_after_flag(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['nginx', 'php'],
-                'php_version' => '8.3',
-            ],
+        $server = $this->serverWithStack([
+            'expected_services' => ['nginx', 'php'],
+            'php_version' => '8.3',
         ]);
 
         $argspecs = ConsoleArgspecs::for($server);
@@ -315,11 +265,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_tail_argspec_has_log_paths(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['nginx'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['nginx']]);
 
         $argspecs = ConsoleArgspecs::for($server);
 
@@ -336,11 +282,9 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_less_argspec_matches_tail(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['nginx', 'php'],
-                'php_version' => '8.3',
-            ],
+        $server = $this->serverWithStack([
+            'expected_services' => ['nginx', 'php'],
+            'php_version' => '8.3',
         ]);
 
         $argspecs = ConsoleArgspecs::for($server);
@@ -354,11 +298,9 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_php_log_paths_use_versioned_path(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['php'],
-                'php_version' => '8.2',
-            ],
+        $server = $this->serverWithStack([
+            'expected_services' => ['php'],
+            'php_version' => '8.2',
         ]);
 
         $argspecs = ConsoleArgspecs::for($server);
@@ -369,11 +311,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_php_log_paths_fallback_when_version_unknown(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['php'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['php']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $paths = $argspecs['tail']['positional'][1];
@@ -383,11 +321,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_caddy_log_paths_included_when_caddy_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['caddy'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['caddy']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $paths = $argspecs['tail']['positional'][1];
@@ -397,11 +331,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_mysql_log_paths_included_when_mysql_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['mysql'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['mysql']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $paths = $argspecs['tail']['positional'][1];
@@ -411,11 +341,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_postgres_log_paths_included_when_postgres_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['postgres'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['postgres']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $paths = $argspecs['tail']['positional'][1];
@@ -425,11 +351,7 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_redis_log_paths_included_when_redis_installed(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['redis'],
-            ],
-        ]);
+        $server = $this->serverWithStack(['expected_services' => ['redis']]);
 
         $argspecs = ConsoleArgspecs::for($server);
         $paths = $argspecs['tail']['positional'][1];
@@ -467,11 +389,9 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_log_paths_are_unique(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['nginx', 'php', 'mysql', 'redis', 'ufw'],
-                'php_version' => '8.3',
-            ],
+        $server = $this->serverWithStack([
+            'expected_services' => ['nginx', 'php', 'mysql', 'redis', 'ufw'],
+            'php_version' => '8.3',
         ]);
 
         $argspecs = ConsoleArgspecs::for($server);
@@ -482,11 +402,9 @@ final class ConsoleArgspecsTest extends TestCase
 
     public function test_combined_server_has_all_relevant_units(): void
     {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['nginx', 'php', 'mysql', 'redis', 'supervisor', 'docker'],
-                'php_version' => '8.3',
-            ],
+        $server = $this->serverWithStack([
+            'expected_services' => ['nginx', 'php', 'mysql', 'redis', 'supervisor', 'docker'],
+            'php_version' => '8.3',
         ]);
 
         $argspecs = ConsoleArgspecs::for($server);

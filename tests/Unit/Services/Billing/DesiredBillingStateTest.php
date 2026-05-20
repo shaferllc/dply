@@ -132,6 +132,55 @@ class DesiredBillingStateTest extends TestCase
         $this->assertSame(0, $state->quantityFor(ServerTier::XL));
     }
 
+    public function test_serverless_functions_add_a_flat_per_function_subtotal(): void
+    {
+        // 3 functions × $2 + $15 base = $21 = 2100 cents
+        $state = DesiredBillingState::fromCounts(
+            tierQuantities: [],
+            baseCents: 1500,
+            creditCents: 0,
+            tierPricesCents: self::TIER_PRICES,
+            serverlessCount: 3,
+            serverlessUnitCents: 200,
+        );
+
+        $this->assertSame(3, $state->serverlessCount);
+        $this->assertSame(600, $state->serverlessSubtotalCents);
+        $this->assertSame(2100, $state->monthlyTotalCents);
+    }
+
+    public function test_serverless_and_servers_combine_in_the_total(): void
+    {
+        // 2 M servers ($20) + 4 functions ($8) + $15 base = $43 = 4300 cents
+        $state = DesiredBillingState::fromCounts(
+            tierQuantities: ['m' => 2],
+            baseCents: 1500,
+            creditCents: 0,
+            tierPricesCents: self::TIER_PRICES,
+            serverlessCount: 4,
+            serverlessUnitCents: 200,
+        );
+
+        $this->assertSame(2000, $state->serverSubtotalCents);
+        $this->assertSame(800, $state->serverlessSubtotalCents);
+        $this->assertSame(4300, $state->monthlyTotalCents);
+    }
+
+    public function test_negative_serverless_count_is_clamped(): void
+    {
+        $state = DesiredBillingState::fromCounts(
+            tierQuantities: [],
+            baseCents: 1500,
+            creditCents: 0,
+            tierPricesCents: self::TIER_PRICES,
+            serverlessCount: -5,
+            serverlessUnitCents: 200,
+        );
+
+        $this->assertSame(0, $state->serverlessCount);
+        $this->assertSame(0, $state->serverlessSubtotalCents);
+    }
+
     public function test_to_array_round_trips_for_queue_payloads(): void
     {
         $state = DesiredBillingState::fromCounts(

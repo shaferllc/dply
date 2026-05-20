@@ -282,6 +282,10 @@
                         @include('livewire.sites.partials.container-dashboard')
                     @endif
 
+                    @if ($section === 'general' && $site->usesFunctionsRuntime())
+                        @include('livewire.sites.partials.serverless-dashboard')
+                    @endif
+
                     @if ($section === 'general')
                         {{-- Read-only overview. Edit affordances live elsewhere:
                              primary hostname → Routing > Domains (pencil on the row);

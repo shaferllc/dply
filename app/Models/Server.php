@@ -377,6 +377,16 @@ class Server extends Model
         return $this->hostKind() === self::HOST_KIND_AWS_LAMBDA;
     }
 
+    /**
+     * A FaaS host (DO Functions / AWS Lambda) — a namespace for functions,
+     * not a machine. Billing treats these differently: the host itself is
+     * not a spec-tiered server; its function-Sites bill per-function.
+     */
+    public function isServerlessHost(): bool
+    {
+        return $this->isDigitalOceanFunctionsHost() || $this->isAwsLambdaHost();
+    }
+
     public function isDigitalOceanAppPlatformHost(): bool
     {
         return $this->hostKind() === self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM;

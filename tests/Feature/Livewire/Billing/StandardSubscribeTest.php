@@ -91,4 +91,76 @@ class StandardSubscribeTest extends TestCase
             ->test(BillingShow::class, ['organization' => $this->org])
             ->assertForbidden();
     }
+
+    public function test_switch_interval_rejects_when_no_subscription(): void
+    {
+        Livewire::actingAs($this->admin)
+            ->test(BillingShow::class, ['organization' => $this->org])
+            ->call('switchInterval')
+            ->assertRedirect();
+
+        $this->assertNotNull(session('billing_error'));
+    }
+
+    public function test_switch_interval_rejects_when_target_prices_unconfigured(): void
+    {
+        \App\Models\Subscription::factory()
+            ->withPrice('price_test_base_monthly')
+            ->active()
+            ->create(['organization_id' => $this->org->id]);
+
+        // Current interval resolves to monthly → target is yearly → unconfigure it.
+        Config::set('subscription.standard.stripe.base_yearly', '');
+
+        Livewire::actingAs($this->admin)
+            ->test(BillingShow::class, ['organization' => $this->org])
+            ->call('switchInterval')
+            ->assertRedirect();
+
+        $this->assertNotNull(session('billing_error'));
+    }
+
+    public function test_cancel_rejects_when_no_active_subscription(): void
+    {
+        Livewire::actingAs($this->admin)
+            ->test(BillingShow::class, ['organization' => $this->org])
+            ->call('cancelSubscription')
+            ->assertRedirect();
+
+        $this->assertNotNull(session('billing_error'));
+    }
+
+    public function test_cancel_rejects_when_already_canceled(): void
+    {
+        \App\Models\Subscription::factory()
+            ->withPrice('price_test_base_monthly')
+            ->create([
+                'organization_id' => $this->org->id,
+                'stripe_status' => 'canceled',
+                'ends_at' => now()->addDays(10), // grace period
+            ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(BillingShow::class, ['organization' => $this->org])
+            ->assertSet('onGracePeriod', true)
+            ->call('cancelSubscription')
+            ->assertRedirect();
+
+        $this->assertNotNull(session('billing_error'));
+    }
+
+    public function test_resume_rejects_when_not_in_grace_period(): void
+    {
+        \App\Models\Subscription::factory()
+            ->withPrice('price_test_base_monthly')
+            ->active()
+            ->create(['organization_id' => $this->org->id]);
+
+        Livewire::actingAs($this->admin)
+            ->test(BillingShow::class, ['organization' => $this->org])
+            ->call('resumeSubscription')
+            ->assertRedirect();
+
+        $this->assertNotNull(session('billing_error'));
+    }
 }

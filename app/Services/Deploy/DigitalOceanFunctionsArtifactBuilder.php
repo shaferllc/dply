@@ -17,6 +17,9 @@ class DigitalOceanFunctionsArtifactBuilder
         private readonly ServerlessRuntimeDetector $runtimeDetector,
         private readonly ServerlessTargetCapabilityResolver $capabilityResolver,
         private readonly ServerlessDeploymentConfigResolver $deploymentConfigResolver,
+        private readonly BrefInjector $brefInjector,
+        private readonly DigitalOceanFunctionsLaravelAdapter $laravelAdapter,
+        private readonly ServerlessDeployProgress $progress,
     ) {}
 
     /**
@@ -32,6 +35,8 @@ class DigitalOceanFunctionsArtifactBuilder
         }
 
         $resolvedConfig = $this->deploymentConfigResolver->resolve($site);
+
+        $this->progress->active($site, 'checkout', 'Cloning repository', $repositoryUrl);
         $checkout = $this->repositoryCheckout->checkout(
             'build-'.$site->id,
             $repositoryUrl,
@@ -42,6 +47,18 @@ class DigitalOceanFunctionsArtifactBuilder
                 ? $resolvedConfig['source_control_account_id']
                 : null,
         );
+        $this->progress->done($site, 'checkout', 'Cloned repository');
+
+        // AWS Lambda PHP targets run via Bref — auto-inject it into the
+        // checked-out app so the user's repo carries no serverless boilerplate.
+        // DO Functions has a native PHP runtime and needs no injection.
+        $brefLog = [];
+        if ($site->server?->isAwsLambdaHost()) {
+            $injection = $this->brefInjector->inject($checkout['working_directory']);
+            if ($injection['ran']) {
+                $brefLog[] = $injection['output'];
+            }
+        }
 
         $detected = $this->runtimeDetector->detect(
             $checkout['working_directory'],
@@ -57,6 +74,26 @@ class DigitalOceanFunctionsArtifactBuilder
         $runtime = trim((string) ($resolvedConfig['runtime'] !== '' ? $resolvedConfig['runtime'] : $detected['runtime']));
         $entrypoint = trim((string) ($resolvedConfig['entrypoint'] !== '' ? $resolvedConfig['entrypoint'] : $detected['entrypoint']));
         $package = trim((string) ($resolvedConfig['package'] !== '' ? $resolvedConfig['package'] : $detected['package']));
+
+        // DigitalOcean Functions runs PHP natively but ships no Laravel
+        // bridge — inject the OpenWhisk↔Laravel adapter so the zipped repo
+        // exposes the main() web action the runtime invokes. (AWS Lambda
+        // takes the Bref path above instead.)
+        $laravelAdapterLog = [];
+        if ($detected['framework'] === 'laravel' && $site->server?->isDigitalOceanFunctionsHost()) {
+            $this->progress->active($site, 'adapter', 'Injecting Laravel adapter', 'DigitalOcean Functions ↔ Laravel bridge');
+            $injection = $this->laravelAdapter->inject($checkout['working_directory']);
+            if ($injection['ran']) {
+                $laravelAdapterLog[] = $injection['output'];
+                $entrypoint = DigitalOceanFunctionsLaravelAdapter::HANDLER_FUNCTION;
+                if (! str_starts_with($runtime, 'php')) {
+                    // Laravel 13 needs PHP >= 8.4; default there when the
+                    // form did not already pick a PHP runtime.
+                    $runtime = 'php:8.4';
+                }
+            }
+            $this->progress->done($site, 'adapter', 'Injected Laravel adapter');
+        }
 
         if ($buildCommand === '') {
             throw new \RuntimeException('Dply could not determine a build command for this serverless site. Open Advanced settings and set one manually.');
@@ -74,8 +111,11 @@ class DigitalOceanFunctionsArtifactBuilder
             'artifact_output_path' => $artifactOutputPath,
         ]);
 
-        $log = array_filter([$checkout['output']]);
+        $log = array_filter([$checkout['output'], ...$brefLog, ...$laravelAdapterLog]);
+
+        $this->progress->active($site, 'dependencies', 'Installing dependencies', $buildCommand);
         $log[] = $this->runShell($buildCommand, $checkout['working_directory']);
+        $this->progress->done($site, 'dependencies', 'Installed dependencies');
 
         $sourcePath = $checkout['working_directory'].'/'.ltrim($artifactOutputPath, '/');
         if (! file_exists($sourcePath)) {
@@ -86,11 +126,13 @@ class DigitalOceanFunctionsArtifactBuilder
         File::ensureDirectoryExists($artifactDirectory);
         $artifactPath = $artifactDirectory.'/'.$this->artifactFilename($site);
 
+        $this->progress->active($site, 'package', 'Packaging artifact');
         if (is_file($sourcePath) && str_ends_with(strtolower($sourcePath), '.zip')) {
             File::copy($sourcePath, $artifactPath);
         } else {
             $this->zipPath($sourcePath, $artifactPath);
         }
+        $this->progress->done($site, 'package', 'Packaged artifact');
 
         return [
             'artifact_path' => $artifactPath,
