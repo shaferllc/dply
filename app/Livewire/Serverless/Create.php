@@ -107,15 +107,26 @@ class Create extends Component
         }
         $this->authorize('update', $org);
 
+        // Validate the credential by row, scoped to org + provider. The action
+        // re-checks the same constraint as defense-in-depth (in case a future
+        // caller skips Livewire), but doing it here gives inline form errors
+        // instead of a toast and an aborted create.
         $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'repo' => ['required', 'string', 'max:255'],
             'branch' => ['required', 'string', 'max:255'],
             'runtime' => ['required', 'string', 'max:64'],
             'region' => ['required', 'string', 'max:32'],
-            'provider_credential_id' => ['required', 'string'],
+            'provider_credential_id' => [
+                'required',
+                'string',
+                \Illuminate\Validation\Rule::exists('provider_credentials', 'id')->where(fn ($q) => $q
+                    ->where('organization_id', $org->id)
+                    ->where('provider', 'digitalocean')),
+            ],
         ], [
             'provider_credential_id.required' => __('Choose a DigitalOcean credential — the namespace cannot be provisioned without one.'),
+            'provider_credential_id.exists' => __('That DigitalOcean credential isn\'t available to this organization. Pick one from the list or add a new one under /credentials.'),
         ]);
 
         try {

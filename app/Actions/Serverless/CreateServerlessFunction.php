@@ -46,7 +46,25 @@ class CreateServerlessFunction
         $branch = trim((string) ($payload['branch'] ?? 'main')) ?: 'main';
         $runtime = trim((string) ($payload['runtime'] ?? 'nodejs:18')) ?: 'nodejs:18';
         $region = trim((string) ($payload['region'] ?? ''));
-        $credentialId = $payload['provider_credential_id'] ?? null;
+        $credentialId = trim((string) ($payload['provider_credential_id'] ?? ''));
+
+        // Refuse to create a Functions host without a usable DigitalOcean
+        // credential. The job that creates the OpenWhisk namespace short-
+        // circuits when `providerCredential` is null and the server lands
+        // in STATUS_ERROR with no actionable UX — better to fail loudly at
+        // creation time. Verify the row exists, belongs to this org, and is
+        // for DigitalOcean.
+        if ($credentialId === '') {
+            throw new InvalidArgumentException('A DigitalOcean credential is required to provision a serverless function. Add one at /credentials, then try again.');
+        }
+        $credential = \App\Models\ProviderCredential::query()
+            ->where('id', $credentialId)
+            ->where('organization_id', $organization->id)
+            ->where('provider', 'digitalocean')
+            ->first();
+        if ($credential === null) {
+            throw new InvalidArgumentException('The selected DigitalOcean credential is missing, belongs to another organization, or is not a DigitalOcean credential. Pick one from /credentials.');
+        }
 
         // The serverless "host" — a DO Functions namespace. It starts PENDING;
         // ProvisionServerlessHostJob creates the namespace, fills in its
@@ -54,7 +72,7 @@ class CreateServerlessFunction
         $server = Server::query()->create([
             'user_id' => $user->id,
             'organization_id' => $organization->id,
-            'provider_credential_id' => $credentialId !== '' ? $credentialId : null,
+            'provider_credential_id' => $credential->id,
             'provider' => ServerProvider::DigitalOcean,
             'name' => 'functions-'.$slug,
             'region' => $region,

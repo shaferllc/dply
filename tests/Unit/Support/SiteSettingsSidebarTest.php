@@ -191,26 +191,33 @@ class SiteSettingsSidebarTest extends TestCase
 
         $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
 
-        foreach (['routing', 'dns', 'system-user', 'basic-auth'] as $excluded) {
+        // VM `dns` / `system-user` / `basic-auth` stay excluded for serverless —
+        // those edit nginx and a unix user that don't exist here. `routing`,
+        // however, was reintroduced as the edge-proxy management surface
+        // (custom domains, redirects, headers + CORS).
+        foreach (['dns', 'system-user', 'basic-auth'] as $excluded) {
             $this->assertNotContains($excluded, $ids, $excluded.' should not appear for a serverless function');
         }
         $this->assertContains('environment', $ids);
         $this->assertContains('deploy', $ids);
         $this->assertContains('repository', $ids);
+        $this->assertContains('routing', $ids, 'serverless workspaces expose the edge-proxy routing page');
     }
 
     public function test_docker_workspace_drops_host_only_sections(): void
     {
         // Container apps (docker, kubernetes, serverless) run behind the dply
-        // edge — routing, DNS, the host webserver, system user, basic auth,
-        // and framework-specific stack tabs are all either the edge's job or
-        // the operator's artifact's job, not this workspace's.
+        // edge — DNS, the host webserver, system user, basic auth, and
+        // framework-specific stack tabs are all either the edge's job or
+        // the operator's artifact's job, not this workspace's. `routing`
+        // is now exposed (it manages the edge proxy, distinct from the VM
+        // nginx-server-block routing this sidebar historically excluded).
         $server = $this->makeContainerServer();
         $site = $this->makeSite($server, 'docker');
 
         $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
 
-        foreach (['routing', 'dns', 'certificates', 'system-user', 'basic-auth', 'laravel-stack', 'rails-stack', 'wordpress', 'webserver-config', 'caching'] as $excluded) {
+        foreach (['dns', 'certificates', 'system-user', 'basic-auth', 'laravel-stack', 'rails-stack', 'wordpress', 'webserver-config', 'caching'] as $excluded) {
             $this->assertNotContains($excluded, $ids, $excluded.' should not appear for a container workspace');
         }
         $this->assertContains('environment', $ids);
@@ -245,7 +252,7 @@ class SiteSettingsSidebarTest extends TestCase
             ->all();
 
         $this->assertSame(
-            ['general', 'deploy', 'runtime', 'background', 'observability', 'danger'],
+            ['general', 'networking', 'deploy', 'runtime', 'background', 'observability', 'danger'],
             $groupOrder,
         );
     }

@@ -49,6 +49,28 @@ final class ServerlessFunctionDnsProvisioner
         [$type, $value] = $this->recordTarget($zone);
 
         try {
+            // Short-circuit if a wildcard `*` record in the zone already
+            // covers this name. Most setups in this category run an A or
+            // CNAME wildcard pointed at dply's edge; in that case writing a
+            // specific record is both redundant AND conflicts with DO's
+            // CNAME-exclusivity check at the wildcard's name namespace.
+            $wildcard = $this->wildcardCovering($token, $zone);
+            if ($wildcard !== null) {
+                $this->store($site, [
+                    'status' => 'ready',
+                    'hostname' => $host,
+                    'zone' => $zone,
+                    'record_name' => $recordName,
+                    'record_type' => strtoupper((string) ($wildcard['type'] ?? '')),
+                    'record_data' => (string) ($wildcard['data'] ?? ''),
+                    'covered_by_wildcard' => true,
+                    'wildcard_record_id' => $wildcard['id'] ?? null,
+                    'provisioned_at' => now()->toIso8601String(),
+                ]);
+
+                return 'DNS: covered by *.' .$zone.' '.($wildcard['type'] ?? '').' '.($wildcard['data'] ?? '');
+            }
+
             // DNS allows at most one record-shape per name when CNAME is
             // involved (a name carrying a CNAME cannot also carry any other
             // record, and a CNAME cannot share a name with an A/AAAA/MX/etc.).
@@ -57,6 +79,29 @@ final class ServerlessFunctionDnsProvisioner
             // lets us preserve an exact match so the upsert can no-op rather
             // than delete+recreate.
             $this->purgeConflictingRecords($token, $zone, $recordName, $type, $value);
+
+            // Verify the purge actually cleared the conflict. DO occasionally
+            // serves stale list-records output for a moment after a delete;
+            // when the post-purge list still shows conflicts, log them so
+            // the operator can see why the create is about to fail.
+            $stillThere = $this->dumpRecordsAtName($token, $zone, $recordName);
+            $blocking = array_values(array_filter($stillThere, function (array $r) use ($type, $value): bool {
+                $rt = strtoupper((string) ($r['type'] ?? ''));
+                $rv = strtolower(rtrim((string) ($r['data'] ?? ''), '.'));
+                $sameTargetMatch = $rt === strtoupper($type) && $rv === strtolower(rtrim($value, '.'));
+                if ($sameTargetMatch) {
+                    return false; // exact match — upsert will no-op on this row
+                }
+                // Anything else at the name blocks a CNAME create.
+                return strtoupper($type) === 'CNAME' || $rt === 'CNAME';
+            }));
+            if ($blocking !== []) {
+                Log::warning('Serverless DNS: conflicts remain after purge — create will likely fail.', [
+                    'zone' => $zone,
+                    'record_name' => $recordName,
+                    'still_present' => $blocking,
+                ]);
+            }
 
             $record = SiteDnsProviderFactory::forDigitalOceanAppConfigToken($token)
                 ->upsertRecord($zone, $type, $recordName, $value);
@@ -186,6 +231,40 @@ final class ServerlessFunctionDnsProvisioner
                 $do->deleteDomainRecord($zone, $recordId);
             }
         }
+    }
+
+    /**
+     * If the zone has a `*` wildcard record (A / AAAA / CNAME) that already
+     * resolves arbitrary subdomains to dply's edge, return it. Callers can
+     * skip writing a specific record and treat the function's hostname as
+     * "already provisioned" via the wildcard.
+     *
+     * We accept any wildcard pointing at SOMETHING (A/AAAA → IP, CNAME →
+     * any target) because the dply edge is the only thing this zone is for
+     * in the testing-domain configuration. If you ever multi-tenant the
+     * zone, narrow this match to known edge targets.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function wildcardCovering(string $token, string $zone): ?array
+    {
+        $do = new DigitalOceanService($token);
+        $records = $do->getDomainRecords($zone);
+        foreach ($records as $record) {
+            if (! is_array($record)) {
+                continue;
+            }
+            $name = trim((string) ($record['name'] ?? ''));
+            $type = strtoupper((string) ($record['type'] ?? ''));
+            if ($name !== '*') {
+                continue;
+            }
+            if (in_array($type, ['A', 'AAAA', 'CNAME'], true)) {
+                return $record;
+            }
+        }
+
+        return null;
     }
 
     /**

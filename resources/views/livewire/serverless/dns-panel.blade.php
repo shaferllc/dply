@@ -40,24 +40,35 @@
     </div>
 
     @if ($status === 'ready')
-        <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-4">
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Zone') }}</dt>
-                <dd class="mt-1 font-mono text-brand-ink">{{ $zone ?: '—' }}</dd>
+        @if ($coveredByWildcard)
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+                <p class="font-semibold">{{ __('Covered by wildcard') }}</p>
+                <p class="mt-1">
+                    {{ __('The zone has a `*` wildcard :type record resolving to', ['type' => $recordType]) }}
+                    <span class="font-mono">{{ $recordData }}</span>.
+                    {{ __('Every subdomain — including this function\'s hostname — resolves through it automatically. No per-site record needed.') }}
+                </p>
             </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Record') }}</dt>
-                <dd class="mt-1 font-mono text-brand-ink">{{ $recordName ?: '—' }}</dd>
-            </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Type') }}</dt>
-                <dd class="mt-1 font-mono text-brand-ink">{{ $recordType ?: '—' }}</dd>
-            </div>
-            <div class="sm:col-span-1">
-                <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Target') }}</dt>
-                <dd class="mt-1 break-all font-mono text-brand-ink">{{ $recordData ?: '—' }}</dd>
-            </div>
-        </dl>
+        @else
+            <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-4">
+                <div>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Zone') }}</dt>
+                    <dd class="mt-1 font-mono text-brand-ink">{{ $zone ?: '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Record') }}</dt>
+                    <dd class="mt-1 font-mono text-brand-ink">{{ $recordName ?: '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Type') }}</dt>
+                    <dd class="mt-1 font-mono text-brand-ink">{{ $recordType ?: '—' }}</dd>
+                </div>
+                <div class="sm:col-span-1">
+                    <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Target') }}</dt>
+                    <dd class="mt-1 break-all font-mono text-brand-ink">{{ $recordData ?: '—' }}</dd>
+                </div>
+            </dl>
+        @endif
         @if ($provisionedAt)
             <p class="text-xs text-brand-moss">
                 {{ __('Provisioned :time. DNS changes can take a minute to propagate before the hostname starts resolving.', ['time' => \Illuminate\Support\Carbon::parse($provisionedAt)->diffForHumans()]) }}

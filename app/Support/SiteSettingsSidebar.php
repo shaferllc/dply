@@ -38,16 +38,23 @@ final class SiteSettingsSidebar
         // entirely for them so the heading doesn't render empty.
         $showBackgroundGroup = $supportsSsh && ! $isContainerWorkspace;
 
-        // Container / serverless workspaces run behind the dply edge — routing,
-        // DNS, certificates, the host webserver, system user, basic auth, and
-        // framework-specific stack tabs (Laravel/Rails/WordPress) all belong
-        // either to the edge or to the operator's artifact, not this workspace.
+        // Container / serverless workspaces run behind the dply edge — host
+        // webserver, system user, basic auth, certificates, and framework-
+        // specific stack tabs (Laravel/Rails/WordPress) all belong either
+        // to the edge or to the operator's artifact, not this workspace.
         // BACKGROUND (Schedule / Workers) sits between RUNTIME and OBSERVABILITY
         // so the page reads: configure → run → observe → destroy.
+        //
+        // The `routing` item below is DIFFERENT from the VM `routing` (which
+        // edits nginx server blocks). Here it manages dply's edge proxy:
+        // hostname & DNS, custom domains pointed at the function, path
+        // redirects, response headers + CORS, the invocation URL. Same group
+        // key ("networking"), different surface.
         $base = $isContainerWorkspace
             ? [
                 ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
+                ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking', 'route' => 'sites.routing'],
                 // Deployments is the history list — recipe (URL/branch/pipeline/hooks/etc.) lives on Repository (section=repository), per Q3.
                 ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy', 'route' => 'sites.deployments.index'],
                 ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy'],

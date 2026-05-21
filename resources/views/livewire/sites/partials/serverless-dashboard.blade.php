@@ -12,6 +12,15 @@
     $statusBadgeClass = $isActive ? 'bg-brand-forest/15 text-brand-forest' : 'bg-brand-gold/20 text-brand-ink';
     $statusLabel = $isActive ? __('Live') : __('Configured — deploying');
     $costEstimate = app(\App\Services\Serverless\ServerlessCostEstimator::class)->forSite($site);
+
+    // Status pill summarising the routing surface — links to the full
+    // page so Overview stays a glance, not an editor.
+    $dnsState = is_array($serverless['dns'] ?? null) ? $serverless['dns'] : [];
+    $dnsStatus = (string) ($dnsState['status'] ?? 'pending');
+    $routing = is_array($serverless['routing'] ?? null) ? $serverless['routing'] : [];
+    $customDomainCount = is_array($routing['custom_domains'] ?? null)
+        ? count(array_filter($routing['custom_domains'], fn ($d) => is_array($d) && ($d['dns_status'] ?? null) === 'ready'))
+        : 0;
 @endphp
 
 <section class="dply-card p-6 sm:p-8 space-y-5">
@@ -66,6 +75,30 @@
             <dd class="mt-0.5 text-brand-ink">{{ $revision !== '' ? $revision : '—' }}</dd>
         </div>
     </dl>
+
+    <a href="{{ route('sites.routing', ['server' => $server, 'site' => $site]) }}"
+       wire:navigate
+       class="flex items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm transition-colors hover:border-brand-ink/25 hover:bg-brand-sand/30">
+        <div class="min-w-0">
+            <p class="font-semibold text-brand-ink">{{ __('Routing') }}</p>
+            <p class="mt-0.5 text-xs text-brand-moss">
+                @php
+                    $dnsBadge = match ($dnsStatus) {
+                        'ready' => 'bg-emerald-100 text-emerald-900',
+                        'failed' => 'bg-rose-100 text-rose-900',
+                        default => 'bg-amber-100 text-amber-900',
+                    };
+                @endphp
+                <span class="inline-flex items-center rounded-full {{ $dnsBadge }} px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]">{{ $dnsStatus }}</span>
+                <span class="ml-1">{{ __('DNS') }}</span>
+                @if ($customDomainCount > 0)
+                    <span class="mx-1.5 text-brand-mist">·</span>
+                    <span>{{ trans_choice('{1} :count custom domain|[2,*] :count custom domains', $customDomainCount, ['count' => $customDomainCount]) }}</span>
+                @endif
+            </p>
+        </div>
+        <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0 text-brand-moss" />
+    </a>
 
     <div class="flex flex-wrap items-center gap-3 pt-1">
         <button type="button"
