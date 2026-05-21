@@ -82,8 +82,8 @@ final class ServerlessFunctionDnsProvisioner
 
             // Verify the purge actually cleared the conflict. DO occasionally
             // serves stale list-records output for a moment after a delete;
-            // when the post-purge list still shows conflicts, log them so
-            // the operator can see why the create is about to fail.
+            // when the post-purge list still shows conflicts, delete them
+            // directly by ID rather than logging and letting the create fail.
             $stillThere = $this->dumpRecordsAtName($token, $zone, $recordName);
             $blocking = array_values(array_filter($stillThere, function (array $r) use ($type, $value): bool {
                 $rt = strtoupper((string) ($r['type'] ?? ''));
@@ -96,11 +96,18 @@ final class ServerlessFunctionDnsProvisioner
                 return strtoupper($type) === 'CNAME' || $rt === 'CNAME';
             }));
             if ($blocking !== []) {
-                Log::warning('Serverless DNS: conflicts remain after purge — create will likely fail.', [
+                Log::warning('Serverless DNS: conflicts remain after purge — force-deleting by ID.', [
                     'zone' => $zone,
                     'record_name' => $recordName,
                     'still_present' => $blocking,
                 ]);
+                $do = new DigitalOceanService($token);
+                foreach ($blocking as $r) {
+                    $recordId = (int) ($r['id'] ?? 0);
+                    if ($recordId > 0) {
+                        $do->deleteDomainRecord($zone, $recordId);
+                    }
+                }
             }
 
             $record = SiteDnsProviderFactory::forDigitalOceanAppConfigToken($token)

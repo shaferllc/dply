@@ -64,20 +64,27 @@ class DigitalOceanServiceDnsTest extends TestCase
 
     public function test_it_falls_back_to_local_filtering_when_api_name_filter_misses_existing_record(): void
     {
+        // The API's name filter "misses" — the filtered call (type/name in the
+        // query) returns nothing, so findDomainRecord falls back to the full,
+        // unfiltered listing. Match on the query rather than the exact URL so
+        // pagination params (per_page/page) don't break the fake.
         Http::fake([
-            'https://api.digitalocean.com/v2/domains/dply.cc/records?type=A&name=preview-app' => Http::response([
-                'domain_records' => [],
-            ], 200),
-            'https://api.digitalocean.com/v2/domains/dply.cc/records' => Http::response([
-                'domain_records' => [
-                    [
-                        'id' => 77,
-                        'type' => 'A',
-                        'name' => 'preview-app',
-                        'data' => '203.0.113.10',
+            'https://api.digitalocean.com/v2/domains/dply.cc/records*' => function ($request) {
+                if (str_contains($request->url(), 'name=preview-app')) {
+                    return Http::response(['domain_records' => []], 200);
+                }
+
+                return Http::response([
+                    'domain_records' => [
+                        [
+                            'id' => 77,
+                            'type' => 'A',
+                            'name' => 'preview-app',
+                            'data' => '203.0.113.10',
+                        ],
                     ],
-                ],
-            ], 200),
+                ], 200);
+            },
         ]);
 
         $record = (new DigitalOceanService('dop_v1_test'))
@@ -85,6 +92,36 @@ class DigitalOceanServiceDnsTest extends TestCase
 
         $this->assertNotNull($record);
         $this->assertSame(77, $record['id']);
+    }
+
+    public function test_it_follows_pagination_when_listing_domain_records(): void
+    {
+        // DO returns DNS records in pages. getDomainRecords must walk
+        // links.pages.next — a zone truncated to page 1 would hide records
+        // that conflict-purge logic needs to see before a CNAME create.
+        Http::fake([
+            'https://api.digitalocean.com/v2/domains/dply.cc/records*' => function ($request) {
+                if ((int) ($request['page'] ?? 1) === 2) {
+                    return Http::response([
+                        'domain_records' => [
+                            ['id' => 2, 'type' => 'A', 'name' => 'second', 'data' => '203.0.113.2'],
+                        ],
+                    ], 200);
+                }
+
+                return Http::response([
+                    'domain_records' => [
+                        ['id' => 1, 'type' => 'A', 'name' => 'first', 'data' => '203.0.113.1'],
+                    ],
+                    'links' => ['pages' => ['next' => 'https://api.digitalocean.com/v2/domains/dply.cc/records?page=2']],
+                ], 200);
+            },
+        ]);
+
+        $records = (new DigitalOceanService('dop_v1_test'))->getDomainRecords('dply.cc');
+
+        $this->assertCount(2, $records);
+        $this->assertSame([1, 2], array_map(static fn ($r) => $r['id'], $records));
     }
 
     public function test_it_can_create_a_domain_record(): void

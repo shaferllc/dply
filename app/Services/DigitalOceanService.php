@@ -637,16 +637,45 @@ class DigitalOceanService
     }
 
     /**
+     * List every DNS record in a zone, following DO's pagination.
+     *
+     * DO paginates record lists (20 per page by default). Returning only the
+     * first page silently truncates large zones — and callers that purge
+     * conflicting records before a CNAME write MUST see every record, or DO
+     * rejects the create with "CNAME records cannot share a name with other
+     * records". So we request the max page size and walk `links.pages.next`
+     * until the zone is exhausted.
+     *
      * @return array<int, array<string, mixed>>
      */
     public function getDomainRecords(string $domain, array $query = []): array
     {
-        $response = $this->request('get', '/domains/'.$domain.'/records', $query);
-        $this->assertSuccess($response, 'list domain records');
-        $data = $response->json();
-        $records = $data['domain_records'] ?? $data['data'] ?? [];
+        $all = [];
+        $page = 1;
 
-        return is_array($records) ? $records : [];
+        // Hard cap at 50 pages (× 200 = 10k records) so a malformed
+        // pagination response can never spin this loop forever.
+        do {
+            $response = $this->request('get', '/domains/'.$domain.'/records', array_merge($query, [
+                'per_page' => 200,
+                'page' => $page,
+            ]));
+            $this->assertSuccess($response, 'list domain records');
+            $data = $response->json();
+            $records = $data['domain_records'] ?? $data['data'] ?? [];
+
+            if (is_array($records)) {
+                foreach ($records as $record) {
+                    $all[] = $record;
+                }
+            }
+
+            $hasNext = is_array($records) && $records !== []
+                && is_string(data_get($data, 'links.pages.next'));
+            $page++;
+        } while ($hasNext && $page <= 50);
+
+        return $all;
     }
 
     /**

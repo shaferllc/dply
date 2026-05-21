@@ -15,6 +15,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\ManagesServerlessRuntime;
 use App\Models\ConsoleAction;
 use App\Models\InsightFinding;
 use App\Models\Server;
@@ -64,6 +65,7 @@ class Show extends Component
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ManagesServerlessRuntime;
 
     public Server $server;
 
@@ -352,6 +354,7 @@ class Show extends Component
         $this->functions_entrypoint = (string) ($functionsConfig['entrypoint'] ?? '');
         $this->functions_build_command = (string) ($functionsConfig['build_command'] ?? '');
         $this->functions_artifact_output_path = (string) ($functionsConfig['artifact_output_path'] ?? '');
+        $this->syncServerlessRuntimeFromSite();
         $this->functionsDetection = is_array($functionsConfig['detected_runtime'] ?? null)
             ? $functionsConfig['detected_runtime']
             : [];

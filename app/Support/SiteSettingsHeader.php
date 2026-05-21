@@ -57,7 +57,9 @@ final class SiteSettingsHeader
             ],
             'runtime' => [
                 'title' => __('Runtime'),
-                'description' => __('What this :resource runs and how — language, processes, detection, and container lifecycle.', ['resource' => $resourceNoun]),
+                'description' => $site->usesFunctionsRuntime()
+                    ? __('How this function executes — runtime, entrypoint, and the memory, timeout, and concurrency limits applied to the action.')
+                    : __('What this :resource runs and how — language, processes, detection, and container lifecycle.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-cube-transparent',
             ],
             'runtime-php' => [

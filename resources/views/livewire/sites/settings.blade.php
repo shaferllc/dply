@@ -1046,7 +1046,11 @@
                          (both render the chronological recipe). The old standalone
                          partials/repository.blade.php is now orphaned. --}}
                     @elseif ($section === 'runtime')
-                        @include('livewire.sites.settings.partials.runtime')
+                        @if ($site->usesFunctionsRuntime())
+                            @include('livewire.sites.settings.partials.runtime-serverless')
+                        @else
+                            @include('livewire.sites.settings.partials.runtime')
+                        @endif
                     @elseif ($section === 'runtime-php')
                         @include('livewire.sites.settings.partials.runtime.php')
                     @elseif ($section === 'runtime-ruby')

@@ -27,11 +27,14 @@ class ServerlessFunctionDnsProvisionerTest extends TestCase
 
     public function test_it_creates_a_cname_to_the_zone_apex_when_the_record_is_missing(): void
     {
+        // Count-agnostic fake: the provisioner lists records several times
+        // (wildcard check, purge, post-purge verify, upsert lookup) before
+        // the create. Branch on HTTP method instead of a fixed sequence so
+        // the test doesn't break when the listing call count changes.
         Http::fake([
-            'https://api.digitalocean.com/v2/domains/dply.host/records*' => Http::sequence()
-                ->push(['domain_records' => []], 200)
-                ->push(['domain_records' => []], 200)
-                ->push(['domain_record' => ['id' => 99, 'type' => 'CNAME', 'name' => 'laravel-demo', 'data' => 'dply.host.']], 201),
+            'https://api.digitalocean.com/v2/domains/dply.host/records*' => fn ($request) => $request->method() === 'POST'
+                ? Http::response(['domain_record' => ['id' => 99, 'type' => 'CNAME', 'name' => 'laravel-demo', 'data' => 'dply.host.']], 201)
+                : Http::response(['domain_records' => []], 200),
         ]);
 
         $site = Site::factory()->create(['name' => 'Laravel demo']);
@@ -77,10 +80,9 @@ class ServerlessFunctionDnsProvisionerTest extends TestCase
         config(['services.digitalocean.serverless_function_dns_target' => '203.0.113.10']);
 
         Http::fake([
-            'https://api.digitalocean.com/v2/domains/dply.host/records*' => Http::sequence()
-                ->push(['domain_records' => []], 200)
-                ->push(['domain_records' => []], 200)
-                ->push(['domain_record' => ['id' => 11, 'type' => 'A', 'name' => 'laravel-demo', 'data' => '203.0.113.10']], 201),
+            'https://api.digitalocean.com/v2/domains/dply.host/records*' => fn ($request) => $request->method() === 'POST'
+                ? Http::response(['domain_record' => ['id' => 11, 'type' => 'A', 'name' => 'laravel-demo', 'data' => '203.0.113.10']], 201)
+                : Http::response(['domain_records' => []], 200),
         ]);
 
         $site = Site::factory()->create(['name' => 'Laravel demo']);

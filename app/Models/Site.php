@@ -58,6 +58,27 @@ class Site extends Model
     public const STATUS_CONTAINER_FAILED = 'container_failed';
 
     /**
+     * Serverless function resource limits. These map onto the OpenWhisk
+     * action `limits` block DigitalOcean Functions is built on, and are
+     * applied to the action on the next deploy.
+     *
+     * @var array<int, int>
+     */
+    public const SERVERLESS_MEMORY_OPTIONS_MB = [128, 256, 512, 1024];
+
+    public const SERVERLESS_DEFAULT_MEMORY_MB = 512;
+
+    public const SERVERLESS_DEFAULT_TIMEOUT_MS = 60000;
+
+    public const SERVERLESS_MIN_TIMEOUT_MS = 1000;
+
+    public const SERVERLESS_MAX_TIMEOUT_MS = 900000;
+
+    public const SERVERLESS_DEFAULT_CONCURRENCY = 1;
+
+    public const SERVERLESS_MAX_CONCURRENCY = 50;
+
+    /**
      * Site row exists, scaffold pipeline (PR 5/6) is in flight.
      * Distinct from container_provisioning so Container vs Scaffold
      * journeys don't share states or audit shapes.
@@ -1581,6 +1602,37 @@ class Site extends Model
         $config = $meta['serverless'] ?? $meta['digitalocean_functions'] ?? [];
 
         return is_array($config) ? $config : [];
+    }
+
+    /**
+     * Normalised serverless resource limits — memory (MB), timeout (ms), and
+     * per-container concurrency — with platform defaults filled in. The
+     * DigitalOcean Functions deployer reads these straight onto the
+     * OpenWhisk action's `limits` block at deploy time.
+     *
+     * @return array{memory: int, timeout: int, concurrency: int}
+     */
+    public function serverlessLimits(): array
+    {
+        $limits = $this->serverlessConfig()['limits'] ?? [];
+        $limits = is_array($limits) ? $limits : [];
+
+        $memory = (int) ($limits['memory'] ?? self::SERVERLESS_DEFAULT_MEMORY_MB);
+        if (! in_array($memory, self::SERVERLESS_MEMORY_OPTIONS_MB, true)) {
+            $memory = self::SERVERLESS_DEFAULT_MEMORY_MB;
+        }
+
+        $timeout = (int) ($limits['timeout'] ?? self::SERVERLESS_DEFAULT_TIMEOUT_MS);
+        $timeout = max(self::SERVERLESS_MIN_TIMEOUT_MS, min(self::SERVERLESS_MAX_TIMEOUT_MS, $timeout));
+
+        $concurrency = (int) ($limits['concurrency'] ?? self::SERVERLESS_DEFAULT_CONCURRENCY);
+        $concurrency = max(1, min(self::SERVERLESS_MAX_CONCURRENCY, $concurrency));
+
+        return [
+            'memory' => $memory,
+            'timeout' => $timeout,
+            'concurrency' => $concurrency,
+        ];
     }
 
     /**

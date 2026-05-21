@@ -99,6 +99,12 @@ final class DigitalOceanFunctionsActionDeployer
             throw new \RuntimeException('Artifact zip is empty or unreadable.');
         }
 
+        // Resource limits are operator-controlled on the Runtime tab and
+        // stored in meta.serverless.limits. serverlessLimits() fills in the
+        // platform defaults (512MB / 60s / concurrency 1) when unset — a
+        // framework cold start needs far more than OpenWhisk's stock 3s/256MB.
+        $limits = $site->serverlessLimits();
+
         $this->progress->active($site, 'upload', 'Uploading to DigitalOcean Functions', 'Namespace '.$namespace);
         $response = Http::withBasicAuth($keyId, $keySecret)
             ->timeout(300)
@@ -115,11 +121,10 @@ final class DigitalOceanFunctionsActionDeployer
                 'annotations' => [
                     ['key' => 'web-export', 'value' => true],
                 ],
-                // A framework cold start (unzip + autoload + boot) needs far
-                // more than the default 3s/256MB — give it headroom.
                 'limits' => [
-                    'timeout' => 60000,
-                    'memory' => 512,
+                    'timeout' => $limits['timeout'],
+                    'memory' => $limits['memory'],
+                    'concurrency' => $limits['concurrency'],
                 ],
             ]);
 
@@ -155,6 +160,9 @@ final class DigitalOceanFunctionsActionDeployer
             'last_revision_id' => $revisionId,
             'action_url' => $this->actionWebUrl($apiHost, $namespace, $package, $actionName),
             'artifact_history' => $history,
+            // Snapshot the limits actually pushed to OpenWhisk so the Runtime
+            // tab can show when saved limits are pending a redeploy.
+            'deployed_limits' => $limits,
         ]);
 
         $site->forceFill(['meta' => $siteMeta])->save();
