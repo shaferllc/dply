@@ -699,6 +699,73 @@
         </details>
     @endif
 
+    {{-- Bindings — managed-resource attachments that auto-inject connection
+         env vars (DATABASE_URL, REDIS_URL, etc.). v1 surfaces what the
+         deployment contract sees today (mostly VM-derived) as a read-only
+         list so operators can confirm what the deploy job will read from
+         the resource graph. Attach / provision / detach UI lands in a
+         follow-up alongside per-site binding records. --}}
+    @php
+        $siteBindings = app(\App\Services\Deploy\SiteResourceBindingResolver::class)->forSite($site);
+        $bindingStatusBadge = [
+            'configured' => 'bg-emerald-100 text-emerald-800',
+            'pending' => 'bg-amber-100 text-amber-900',
+        ];
+        $bindingTypeLabels = [
+            'database' => __('Database'),
+            'redis' => __('Redis'),
+            'queue' => __('Queue'),
+            'storage' => __('Object storage'),
+            'scheduler' => __('Scheduler'),
+            'workers' => __('Workers'),
+            'publication' => __('Publication'),
+        ];
+    @endphp
+    <section class="dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8 sm:py-6">
+            <div class="flex items-start gap-3">
+                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                    <x-heroicon-o-link class="h-5 w-5" />
+                </span>
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Bindings') }}</h3>
+                    <p class="mt-1 text-sm text-brand-moss">
+                        {{ __('Managed resources attached to this app. Each attachment auto-injects its connection variables (e.g. DATABASE_URL) so plain Variables above don\'t have to duplicate them.') }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <ul class="divide-y divide-brand-ink/10">
+            @foreach ($siteBindings as $binding)
+                <li class="flex flex-col gap-2 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-brand-ink">
+                            {{ $bindingTypeLabels[$binding->type] ?? str($binding->type)->replace('_', ' ')->title() }}
+                            @if ($binding->required)
+                                <span class="ml-2 inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Required') }}</span>
+                            @endif
+                        </p>
+                        <p class="mt-1 text-xs text-brand-moss">
+                            @if ($binding->name)
+                                <span class="font-mono">{{ $binding->name }}</span> · {{ __('source:') }} <span class="font-mono">{{ $binding->source }}</span>
+                            @else
+                                {{ __('Not attached — derived from') }} <span class="font-mono">{{ $binding->source }}</span>
+                            @endif
+                        </p>
+                    </div>
+                    <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] {{ $bindingStatusBadge[$binding->status] ?? 'bg-slate-100 text-slate-700' }}">
+                        {{ $binding->status }}
+                    </span>
+                </li>
+            @endforeach
+        </ul>
+
+        <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8 text-xs text-brand-moss">
+            {{ __('Attach / provision new / detach actions land in a follow-up. For now, set connection strings as plain Variables above when a binding shows "pending".') }}
+        </div>
+    </section>
+
     <x-cli-snippet
         :intro="__('Manage env via CLI when you have many keys at once:')"
         :commands="[

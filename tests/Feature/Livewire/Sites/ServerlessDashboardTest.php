@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Livewire\Sites;
 
+use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -68,5 +70,21 @@ class ServerlessDashboardTest extends TestCase
             ->test(SiteSettings::class, ['server' => $server, 'site' => $site->fresh(), 'section' => 'general'])
             ->assertOk()
             ->assertSee('appears here once the first deploy completes');
+    }
+
+    public function test_deploy_redeploy_button_dispatches_a_deployment_and_redirects_to_the_journey(): void
+    {
+        Bus::fake();
+        [$user, $server, $site] = $this->functionSite([
+            'runtime' => 'php:8.4',
+            'action_url' => 'https://faas-nyc1.doserverless.co/api/v1/web/fn-abc/default/api',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('redeployServerlessFunction')
+            ->assertRedirect(route('serverless.journey', ['server' => $server, 'site' => $site]));
+
+        Bus::assertDispatched(RunSiteDeploymentJob::class);
     }
 }

@@ -7,6 +7,7 @@ namespace App\Livewire\Sites;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -93,10 +94,21 @@ class DeploymentsList extends Component
             ->pluck('trigger')
             ->all();
 
+        $runtimeMode = $this->site->runtimeTargetMode();
+
         return view('livewire.sites.deployments-list', [
             'deployments' => $deployments,
             'triggers' => $triggers,
             'statuses' => self::ALLOWED_STATUSES,
+            // Sidebar context — keeps the workspace nav visible so operators
+            // can pivot from history back to Repository / Commits / Logs etc.
+            // without losing the site context.
+            'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
+            'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
+            'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
+            'routingTab' => 'domains',
+            'laravel_tab' => 'commands',
+            'section' => 'deploy',
         ])->layout('layouts.app');
     }
 }

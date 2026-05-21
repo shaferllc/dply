@@ -38,25 +38,27 @@ final class SiteSettingsSidebar
         // entirely for them so the heading doesn't render empty.
         $showBackgroundGroup = $supportsSsh && ! $isContainerWorkspace;
 
+        // Container / serverless workspaces run behind the dply edge — routing,
+        // DNS, certificates, the host webserver, system user, basic auth, and
+        // framework-specific stack tabs (Laravel/Rails/WordPress) all belong
+        // either to the edge or to the operator's artifact, not this workspace.
+        // BACKGROUND (Schedule / Workers) sits between RUNTIME and OBSERVABILITY
+        // so the page reads: configure → run → observe → destroy.
         $base = $isContainerWorkspace
             ? [
                 ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
-                ['id' => 'routing', 'label' => __('Networking'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'networking'],
-                ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-signal', 'group' => 'networking'],
-                ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
+                // Deployments is the history list — recipe (URL/branch/pipeline/hooks/etc.) lives on Repository (section=repository), per Q3.
+                ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy', 'route' => 'sites.deployments.index'],
                 ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy'],
                 ['id' => 'commits', 'label' => __('Commits'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'deploy', 'route' => 'sites.commits'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],
-                ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user', 'group' => 'runtime'],
-                ['id' => 'laravel-stack', 'label' => __('Laravel'), 'icon' => 'heroicon-o-bolt', 'group' => 'runtime'],
-                ['id' => 'rails-stack', 'label' => __('Rails'), 'icon' => 'heroicon-o-bolt', 'group' => 'runtime'],
-                ['id' => 'wordpress', 'label' => __('WordPress'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'runtime'],
                 ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],
+                ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule'],
+                ['id' => 'workers', 'label' => __('Workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.workers'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability'],
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor'],
-                ['id' => 'basic-auth', 'label' => __('Authentication'), 'icon' => 'heroicon-o-lock-closed', 'group' => 'access'],
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ]
             : [
@@ -81,18 +83,23 @@ final class SiteSettingsSidebar
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ];
 
-        $withRuntimeChild = collect($base)
-            ->flatMap(function (array $item) use ($site): array {
-                if ($item['id'] !== 'runtime') {
-                    return [$item];
-                }
+        // Runtime sub-tabs (runtime-php / runtime-ruby / runtime-static) are
+        // VM-only — they expose engine knobs that, for container/serverless
+        // workspaces, live in the artifact (Dockerfile / function manifest).
+        $withRuntimeChild = $isContainerWorkspace
+            ? $base
+            : collect($base)
+                ->flatMap(function (array $item) use ($site): array {
+                    if ($item['id'] !== 'runtime') {
+                        return [$item];
+                    }
 
-                $child = self::runtimeChildFor($site);
+                    $child = self::runtimeChildFor($site);
 
-                return $child === null ? [$item] : [$item, $child];
-            })
-            ->values()
-            ->all();
+                    return $child === null ? [$item] : [$item, $child];
+                })
+                ->values()
+                ->all();
 
         $withWebserver = $showWebserverConfigEditor
             ? collect($withRuntimeChild)
@@ -127,20 +134,14 @@ final class SiteSettingsSidebar
             ? self::insertBackgroundGroup($withWebserver)
             : $withWebserver;
 
-        // A serverless function has no host to manage — there is no web
-        // server to route, no DNS zone, no system user, and no dply-managed
-        // proxy to enforce basic auth. Drop those sections (functions only;
-        // docker / kubernetes workspaces keep them).
-        $serverlessExcluded = $site->usesFunctionsRuntime()
-            ? ['routing', 'dns', 'system-user', 'basic-auth']
-            : [];
-
+        // Framework-specific stack tabs (Laravel/Rails/WordPress) only apply to
+        // VM workspaces where dply manages the stack directly. Container/
+        // serverless workspaces never include these items in the base.
         return self::flagSupervisorSetup(
             collect($withBackground)
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
-                ->reject(fn (array $item): bool => in_array($item['id'] ?? null, $serverlessExcluded, true))
                 ->values()
                 ->all(),
             $server,

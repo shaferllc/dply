@@ -68,10 +68,14 @@
     </dl>
 
     <div class="flex flex-wrap items-center gap-3 pt-1">
-        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}"
-           class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
-            {{ __('Deploy / redeploy') }}
-        </a>
+        <button type="button"
+                wire:click="redeployServerlessFunction"
+                wire:loading.attr="disabled"
+                wire:target="redeployServerlessFunction"
+                class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60">
+            <span wire:loading.remove wire:target="redeployServerlessFunction">{{ __('Deploy / redeploy') }}</span>
+            <span wire:loading wire:target="redeployServerlessFunction">{{ __('Starting deploy…') }}</span>
+        </button>
         <a href="{{ route('serverless.journey', ['server' => $server, 'site' => $site]) }}"
            class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
             {{ __('Deploy journey') }}

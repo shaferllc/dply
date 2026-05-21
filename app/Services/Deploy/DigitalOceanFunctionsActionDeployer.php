@@ -4,6 +4,7 @@ namespace App\Services\Deploy;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Serverless\ServerlessFunctionDnsProvisioner;
 use Illuminate\Support\Facades\Http;
 
 final class DigitalOceanFunctionsActionDeployer
@@ -14,6 +15,7 @@ final class DigitalOceanFunctionsActionDeployer
         private readonly DeploymentContractBuilder $contractBuilder,
         private readonly DeploymentRevisionTracker $revisionTracker,
         private readonly ServerlessDeployProgress $progress,
+        private readonly ServerlessFunctionDnsProvisioner $dnsProvisioner,
     ) {}
 
     /**
@@ -158,6 +160,11 @@ final class DigitalOceanFunctionsActionDeployer
         $site->forceFill(['meta' => $siteMeta])->save();
         $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
+        // Point the function's friendly hostname ({slug}.{testing-domain}) at
+        // the dply app so it resolves. The app proxies through to the raw DO
+        // Functions URL — DO Functions itself has no custom-domain support.
+        $dnsStatus = $this->dnsProvisioner->provision($site);
+
         // Smoke-test the freshly deployed function so a broken runtime is
         // caught here — and shown on the deploy journey — instead of by the
         // operator hitting the URL. The deploy itself still succeeds: the
@@ -173,6 +180,7 @@ final class DigitalOceanFunctionsActionDeployer
                 'Action: '.$actionName,
                 'Runtime: '.$kind,
                 $revisionId ? 'Revision: '.$revisionId : null,
+                $dnsStatus,
                 'Health check: '.$health,
             ])),
             'revision_id' => $revisionId,

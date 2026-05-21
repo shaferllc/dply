@@ -661,6 +661,10 @@ class SiteTest extends TestCase
 
     public function test_functions_host_site_settings_deploy_hides_server_only_controls(): void
     {
+        // The deploy *config* tab for a functions site only exposes the
+        // recipe (repo URL / branch / build command / pipeline / hooks);
+        // serverless invocation metadata (target, function URL, runtime,
+        // ARN) lives on the Overview / serverless dashboard, not here.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -690,16 +694,24 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
-            ->assertSee('Serverless deploy target')
-            ->assertSee('DigitalOcean Functions')
+            // Positive: confirm we're on the functions-flavored deploy config tab.
+            // The "Deploy command" label and "Repository subdirectory" field
+            // only render when the site is a functions host.
+            ->assertSee('Deploy command')
+            ->assertSee('Repository subdirectory')
+            // Negative: server-only controls must not appear.
             ->assertDontSee('Install / update Nginx site')
             ->assertDontSee('Issue / renew SSL')
             ->assertDontSee('Push .env to server')
             ->assertDontSee('Generate deploy key');
     }
 
-    public function test_aws_lambda_site_settings_deploy_shows_lambda_details(): void
+    public function test_aws_lambda_site_settings_deploy_renders_recipe_only(): void
     {
+        // Lambda-specific invocation metadata (target = AWS Lambda, function
+        // ARN, runtime) now lives on the Overview / serverless dashboard.
+        // The deploy config tab is recipe-only and should render cleanly for
+        // a Lambda site without breaking on missing host concepts.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -732,10 +744,11 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
-            ->assertSee('Serverless deploy target')
-            ->assertSee('AWS Lambda')
-            ->assertSee('Function ARN')
-            ->assertSee('provided.al2023');
+            ->assertSee('Deploy command')
+            ->assertSee('Repository subdirectory')
+            // Invocation metadata moved to Overview — must not leak back here.
+            ->assertDontSee('Function ARN')
+            ->assertDontSee('Latest managed artifact');
     }
 
     public function test_functions_host_deploy_uses_digitalocean_functions_engine(): void
@@ -1951,8 +1964,14 @@ class SiteTest extends TestCase
             ->assertSee('laravel.repo');
     }
 
-    public function test_site_settings_general_section_uses_app_language_for_cloud_runtime_paths(): void
+    public function test_site_settings_general_section_renders_container_dashboard_for_cloud_app(): void
     {
+        // Container workspaces (docker / k8s) get the dedicated container-dashboard
+        // partial on Overview — backend / region / port / instances / size / live URL
+        // — instead of the VM-shaped overview. The VM-shaped read-only overview,
+        // Status, project context, and Networking group are deliberately absent:
+        // those concepts belong to the dply edge or the operator's artifact, not
+        // to this workspace.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -1982,12 +2001,18 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
 
         $response->assertOk()
-            ->assertSee('Cloud app workspace')
-            ->assertSee('Primary hostname')
+            // Container-dashboard labels (the new Overview shape).
+            ->assertSee('Container deployment')
+            ->assertSee('Backend')
+            ->assertSee('Live URL')
+            // The Overview sidebar item still labels itself "Overview" for container sites.
             ->assertSee('Overview')
-            ->assertSee('Networking')
-            ->assertSee('App project settings')
-            ->assertSee('App details');
+            // VM-shaped overview content stays hidden for container workspaces.
+            ->assertDontSee('Primary hostname')
+            ->assertDontSee('App details')
+            // Networking is no longer a sidebar group for container workspaces —
+            // routing/DNS/certificates belong to the dply edge, not this workspace.
+            ->assertDontSee('>Networking<', false);
     }
 
     public function test_refresh_docker_details_persists_discovered_runtime_metadata(): void

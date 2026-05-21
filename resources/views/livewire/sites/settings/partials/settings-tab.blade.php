@@ -45,9 +45,11 @@
     </form>
 </section>
 
-{{-- Web directory — document_root. Editing the primary domain happens in Routing
-     because the cascade (cert / backend / dns_zone) belongs to the domain change,
-     not to the path. --}}
+{{-- Web directory — document_root. VM-only: container/serverless apps don't
+     have an on-disk document root (no host webserver, no nginx vhost). Editing
+     the primary domain itself happens in Routing because the cascade (cert /
+     backend / dns_zone) belongs to the domain change, not to the path. --}}
+@if (! $isContainerWorkspace)
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveWebDirectory">
         <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
@@ -79,6 +81,7 @@
         </div>
     </form>
 </section>
+@endif
 
 {{-- Project / workspace assignment — moved from General. --}}
 <section class="dply-card mt-6 overflow-hidden">

@@ -1,16 +1,31 @@
-<div class="mx-auto max-w-6xl px-6 py-10">
-    <nav class="mb-4 text-sm text-slate-500">
-        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site]) }}" wire:navigate class="hover:text-slate-700">{{ $site->name }}</a>
-        <span class="mx-2 text-slate-400">/</span>
-        <span class="text-slate-700">{{ __('Deployments') }}</span>
+<div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    <nav class="mb-6 text-sm text-brand-moss" aria-label="{{ __('Breadcrumb') }}">
+        <ol class="flex flex-wrap items-center gap-2">
+            <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('servers.index') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Servers') }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[12rem]" title="{{ $server->name }}">{{ $server->name }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[12rem]" title="{{ $site->name }}">{{ $site->name }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li class="font-medium text-brand-ink">{{ __('Deployments') }}</li>
+        </ol>
     </nav>
 
-    <header class="mb-6 border-b border-slate-200 pb-4">
-        <h1 class="text-2xl font-semibold text-slate-900">{{ __('Deployments') }}</h1>
-        <p class="mt-1 text-sm text-slate-600">{{ __('Every deployment recorded for this site, newest first. Click a row to drill into per-step output.') }}</p>
-    </header>
+    <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+        @include('livewire.sites.settings.partials.sidebar')
 
-    <div class="mb-4 flex flex-wrap items-end gap-3">
+        <main class="min-w-0 space-y-6 lg:col-span-9">
+            <x-page-header
+                :title="__('Deployments')"
+                :description="__('Every deployment recorded for this site, newest first. Click a row to drill into per-step output.')"
+                doc-route="docs.index"
+                flush
+                compact
+            />
+
+            <div class="flex flex-wrap items-end gap-3">
         <div>
             <label for="status_filter" class="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Status') }}</label>
             <select id="status_filter" wire:model.live="statusFilter" class="mt-1 rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500">
@@ -110,5 +125,7 @@
         </div>
     @endif
 
-    <x-cli-snippet class="mt-6" :command="'dply:site:deploy-history '.$site->slug" />
+            <x-cli-snippet class="mt-6" :command="'dply:site:deploy-history '.$site->slug" />
+        </main>
+    </div>
 </div>

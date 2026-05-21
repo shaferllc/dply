@@ -212,14 +212,14 @@
                  Container / etc.) with the resource noun and lives ABOVE the per-section
                  page header so operators reading top-to-bottom see "Site workspace · General"
                  rather than landing on a bare "General" with no orientation. --}}
-            <p class="mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
+            <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
 
             @if ($headerRoleLabel !== null)
                 {{-- Role badge sits above the page-header title so a viewer/deployer
                      sees the access level before they look for save actions that
                      aren't there. Admins/owners get no badge — full power is the
                      default reading. --}}
-                <div class="mb-2 flex items-center gap-2">
+                <div class="mt-3 flex items-center gap-2">
                     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
                           title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
                         @if ($headerIsDeployer)
@@ -240,6 +240,7 @@
                 doc-route="docs.index"
                 toolbar
                 flush
+                class="mt-3"
             >
                 <x-slot name="leading">
                     {{-- Section icon: the same icon family the sidebar uses, so the title
@@ -278,7 +279,11 @@
                 @endif
 
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
-                    @if ($section === 'general' && $site->usesContainerRuntime())
+                    {{-- Container workspace = docker / kubernetes (managed or VM-hosted).
+                         The dashboard partial uses container_backend to pick its labels;
+                         when the site hasn't been bound to a backend yet it still gets
+                         the same container-shaped Overview so the page isn't blank. --}}
+                    @if ($section === 'general' && $isContainerWorkspace && ! $site->usesFunctionsRuntime())
                         @include('livewire.sites.partials.container-dashboard')
                     @endif
 
@@ -287,6 +292,13 @@
                     @endif
 
                     @if ($section === 'general')
+                        {{-- Container / serverless Overview = dashboard partial (rendered
+                             above) + Recent deployments (below). The VM-shaped read-only
+                             overview, Status, etc. surface concepts that don't apply
+                             here (host webserver, document root, system user, certificate
+                             status) — gated on `! $isContainerWorkspace` so the page
+                             stays tight for the container/serverless workspaces. --}}
+                        @if (! $isContainerWorkspace)
                         {{-- Read-only overview. Edit affordances live elsewhere:
                              primary hostname → Routing > Domains (pencil on the row);
                              everything else → Settings tab. --}}
@@ -524,7 +536,9 @@
                                 </div>
                             </section>
                         @endif
+                        @endif {{-- /! $isContainerWorkspace --}}
 
+                        @if (! $isContainerWorkspace)
                         <x-cli-snippet :commands="[
                             ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
                             ['label' => __('Diagnose site'), 'command' => 'dply:site:doctor '.$site->slug],
@@ -533,6 +547,7 @@
                             ['label' => __('Export deploy manifest'), 'command' => 'dply:site:export-manifest '.$site->slug.' --to=manifest.json'],
                             ['label' => __('List all sites'), 'command' => 'dply:site:list'],
                         ]" />
+                        @endif
 
                         @php
                             // Recent deployments with structured phase_results (set by the deploy
@@ -557,14 +572,20 @@
                         @include('livewire.sites.settings.partials.dns')
                     @elseif ($section === 'certificates')
                         @include('livewire.sites.settings.partials.certificates')
-                    @elseif ($section === 'deploy')
+                    @elseif (in_array($section, ['deploy', 'repository'], true))
+                        {{-- Repository = the *recipe* (Q3/Q11): Source → Build → Pipeline →
+                             Hooks → Activate/Rollout → less-touched runtime artifacts.
+                             `section=deploy` is kept as a backward-compat alias so old
+                             bookmarks don't 404; the sidebar's "Deployments" item now
+                             routes to sites.deployments.index (the history list). --}}
                         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
                             <div class="flex flex-wrap items-start justify-between gap-4">
                                 <div>
-                                    <h2 class="text-lg font-semibold text-slate-900">{{ __('Deploy') }}</h2>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Repository, rollout strategy, pipeline steps, and hooks. Deploy execution lives on the site overview.') }}</p>
+                                    <h2 class="text-lg font-semibold text-slate-900">{{ __('Repository') }}</h2>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('Repository source, rollout strategy, pipeline steps, and hooks — the deploy recipe top to bottom. Deploy execution itself lives on the site overview.') }}</p>
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-sm">
+                                    <a href="{{ route('sites.deployments.index', [$server, $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Deployments') }}</a>
                                     <a href="{{ route('sites.commits', [$server, $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Commits') }}</a>
                                     <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Site logs') }}</a>
                                     <a href="{{ route('servers.logs', $server) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Server logs') }}</a>
@@ -704,128 +725,9 @@
                                 </div>
                             @endif
 
-                            @if (! $functionsHost)
-                                <form wire:submit="saveZeroDowntimeDeployment" class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                                    <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
-                                        <div class="min-w-0 flex-1">
-                                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Zero downtime deployment') }}</h3>
-                                            <p class="mt-1 text-sm text-brand-moss">{{ __('When enabled, each deploy goes to a new release directory, then traffic switches to it in one step so the app stays up during builds. Disable to run simple git-based deploys in the deploy path.') }}</p>
-                                            <x-input-error :messages="$errors->get('zero_downtime_enabled')" class="mt-2" />
-                                        </div>
-                                        <label class="flex shrink-0 items-center gap-2 text-sm font-medium text-brand-ink">
-                                            <input type="checkbox" wire:model="zero_downtime_enabled" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
-                                            {{ __('Enable') }}
-                                        </label>
-                                    </div>
-                                    <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/30 px-5 py-3">
-                                        <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
-                                    </div>
-                                </form>
-
-                                <form wire:submit="saveDeploymentSettings" class="mt-6 space-y-4 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                                    @if ($zero_downtime_enabled)
-                                        <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-                                            <div>
-                                                <h3 class="text-base font-semibold text-brand-ink">{{ __('After deploy verification') }}</h3>
-                                                <p class="mt-1 text-sm text-brand-moss">{{ __('Optional HTTP(S) check from the server to a local address with your primary hostname as the Host header after the new release is active. Defaults to http://127.0.0.1. Requires a primary domain and a route that returns the expected status (for example Laravel /up).') }}</p>
-                                            </div>
-                                            <label class="flex items-center gap-2 text-sm font-medium text-brand-ink">
-                                                <input type="checkbox" wire:model="deploy_health_enabled" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
-                                                {{ __('Run health check after each atomic deploy') }}
-                                            </label>
-                                            <label class="flex items-center gap-2 text-sm font-medium text-brand-ink">
-                                                <input type="checkbox" wire:model="deploy_health_auto_rollback" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest" @disabled(! $deploy_health_enabled)>
-                                                {{ __('Automatically point current back at the previous release if the check fails') }}
-                                            </label>
-                                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                <div>
-                                                    <x-input-label for="deploy_health_scheme" value="{{ __('URL scheme') }}" />
-                                                    <select id="deploy_health_scheme" wire:model="deploy_health_scheme" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" @disabled(! $deploy_health_enabled)>
-                                                        <option value="http">http</option>
-                                                        <option value="https">https</option>
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('deploy_health_scheme')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="deploy_health_host" value="{{ __('Target host') }}" />
-                                                    <x-text-input id="deploy_health_host" wire:model="deploy_health_host" class="font-mono text-sm" placeholder="127.0.0.1" :disabled="! $deploy_health_enabled" />
-                                                    <x-input-error :messages="$errors->get('deploy_health_host')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="deploy_health_port" value="{{ __('Target port (optional)') }}" />
-                                                    <x-text-input id="deploy_health_port" type="number" wire:model="deploy_health_port" class="font-mono text-sm" placeholder="80 / 443 / custom" min="1" max="65535" :disabled="! $deploy_health_enabled" />
-                                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Leave empty to use the default port for the scheme (80 or 443).') }}</p>
-                                                    <x-input-error :messages="$errors->get('deploy_health_port')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="deploy_health_path" value="{{ __('Health path') }}" />
-                                                    <x-text-input id="deploy_health_path" wire:model="deploy_health_path" class="font-mono text-sm" placeholder="/health" :disabled="! $deploy_health_enabled" />
-                                                    <x-input-error :messages="$errors->get('deploy_health_path')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="deploy_health_expect_status" value="{{ __('Expected HTTP status') }}" />
-                                                    <x-text-input id="deploy_health_expect_status" type="number" wire:model="deploy_health_expect_status" class="w-24" min="100" max="599" :disabled="! $deploy_health_enabled" />
-                                                    <x-input-error :messages="$errors->get('deploy_health_expect_status')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="deploy_health_attempts" value="{{ __('Attempts') }}" />
-                                                    <x-text-input id="deploy_health_attempts" type="number" wire:model="deploy_health_attempts" class="w-24" min="1" max="30" :disabled="! $deploy_health_enabled" />
-                                                    <x-input-error :messages="$errors->get('deploy_health_attempts')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="deploy_health_delay_ms" value="{{ __('Delay between attempts (ms)') }}" />
-                                                    <x-text-input id="deploy_health_delay_ms" type="number" wire:model="deploy_health_delay_ms" class="w-28" min="0" max="10000" step="50" :disabled="! $deploy_health_enabled" />
-                                                    <x-input-error :messages="$errors->get('deploy_health_delay_ms')" class="mt-1" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endif
-
-                                    <div>
-                                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Rollout and web server') }}</h3>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Releases to keep, environment group, scheduler, Supervisor, and extra Nginx directives. Runtime ports and users live on Runtime / Stack / System user.') }}</p>
-                                    </div>
-
-                                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                                        <div>
-                                            <x-input-label for="releases_to_keep" value="Releases to keep" />
-                                            <x-text-input id="releases_to_keep" type="number" wire:model="releases_to_keep" class="mt-1 w-28" min="1" max="50" />
-                                            <p class="mt-2 text-sm text-brand-moss">{{ __('Applies when zero downtime deployment is enabled.') }}</p>
-                                        </div>
-                                        <div>
-                                            <x-input-label for="deployment_environment" value="Environment group" />
-                                            <x-text-input id="deployment_environment" wire:model="deployment_environment" class="mt-1 block w-full text-sm" />
-                                            <p class="mt-2 text-sm text-brand-moss">{{ __('Used when resolving key/value environment variables for deploys.') }}</p>
-                                        </div>
-                                    </div>
-
-                                    <div class="grid gap-3">
-                                        <div>
-                                            <label class="flex items-center gap-2 text-sm text-brand-ink">
-                                                <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-slate-300">
-                                                {{ $site->runtimeSchedulerRolloutFormLabel() }}
-                                            </label>
-                                            @if ($site->runtimeSchedulerCheckboxHelp())
-                                                <p class="mt-1 pl-6 text-xs text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</p>
-                                            @endif
-                                        </div>
-                                        <label class="flex items-center gap-2 text-sm text-brand-ink">
-                                            <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="rounded border-slate-300">
-                                            {{ __('Restart Supervisor programs after successful deploy') }}
-                                        </label>
-                                        <div>
-                                            <x-input-label for="nginx_extra_raw" value="Extra Nginx inside server block (advanced)" />
-                                            <textarea id="nginx_extra_raw" wire:model="nginx_extra_raw" rows="4" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="# location /foo { ... }"></textarea>
-                                        </div>
-                                    </div>
-
-                                    <x-primary-button type="submit">{{ __('Save rollout settings') }}</x-primary-button>
-                                </form>
-                            @endif
-
                             <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
                                 <div>
-                                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Scripts') }}</h3>
+                                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Pipeline') }}</h3>
                                     <p class="mt-1 text-sm text-brand-moss">{{ __('Lay out the deploy as pre, main, and post stages so custom steps stay visible around the core checkout and activation flow.') }}</p>
                                 </div>
 
@@ -994,6 +896,129 @@
                                 </details>
                             </section>
 
+                            {{-- Zero downtime + post-activate health check + the broader rollout
+                                 form (releases, env, scheduler, supervisor, extra Nginx) sit
+                                 after Pipeline + Hooks so the page reads chronologically:
+                                 Source → Build → Pipeline → Hooks → Activate → Rollout. --}}
+                            @if (! $functionsHost)
+                                <form wire:submit="saveZeroDowntimeDeployment" class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                                    <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0 flex-1">
+                                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Zero downtime deployment') }}</h3>
+                                            <p class="mt-1 text-sm text-brand-moss">{{ __('When enabled, each deploy goes to a new release directory, then traffic switches to it in one step so the app stays up during builds. Disable to run simple git-based deploys in the deploy path.') }}</p>
+                                            <x-input-error :messages="$errors->get('zero_downtime_enabled')" class="mt-2" />
+                                        </div>
+                                        <label class="flex shrink-0 items-center gap-2 text-sm font-medium text-brand-ink">
+                                            <input type="checkbox" wire:model="zero_downtime_enabled" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
+                                            {{ __('Enable') }}
+                                        </label>
+                                    </div>
+                                    <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/30 px-5 py-3">
+                                        <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+                                    </div>
+                                </form>
+
+                                <form wire:submit="saveDeploymentSettings" class="mt-6 space-y-4 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                                    @if ($zero_downtime_enabled)
+                                        <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                            <div>
+                                                <h3 class="text-base font-semibold text-brand-ink">{{ __('After deploy verification') }}</h3>
+                                                <p class="mt-1 text-sm text-brand-moss">{{ __('Optional HTTP(S) check from the server to a local address with your primary hostname as the Host header after the new release is active. Defaults to http://127.0.0.1. Requires a primary domain and a route that returns the expected status (for example Laravel /up).') }}</p>
+                                            </div>
+                                            <label class="flex items-center gap-2 text-sm font-medium text-brand-ink">
+                                                <input type="checkbox" wire:model="deploy_health_enabled" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
+                                                {{ __('Run health check after each atomic deploy') }}
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm font-medium text-brand-ink">
+                                                <input type="checkbox" wire:model="deploy_health_auto_rollback" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest" @disabled(! $deploy_health_enabled)>
+                                                {{ __('Automatically point current back at the previous release if the check fails') }}
+                                            </label>
+                                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                                <div>
+                                                    <x-input-label for="deploy_health_scheme" value="{{ __('URL scheme') }}" />
+                                                    <select id="deploy_health_scheme" wire:model="deploy_health_scheme" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" @disabled(! $deploy_health_enabled)>
+                                                        <option value="http">http</option>
+                                                        <option value="https">https</option>
+                                                    </select>
+                                                    <x-input-error :messages="$errors->get('deploy_health_scheme')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_host" value="{{ __('Target host') }}" />
+                                                    <x-text-input id="deploy_health_host" wire:model="deploy_health_host" class="font-mono text-sm" placeholder="127.0.0.1" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_host')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_port" value="{{ __('Target port (optional)') }}" />
+                                                    <x-text-input id="deploy_health_port" type="number" wire:model="deploy_health_port" class="font-mono text-sm" placeholder="80 / 443 / custom" min="1" max="65535" :disabled="! $deploy_health_enabled" />
+                                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Leave empty to use the default port for the scheme (80 or 443).') }}</p>
+                                                    <x-input-error :messages="$errors->get('deploy_health_port')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_path" value="{{ __('Health path') }}" />
+                                                    <x-text-input id="deploy_health_path" wire:model="deploy_health_path" class="font-mono text-sm" placeholder="/health" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_path')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_expect_status" value="{{ __('Expected HTTP status') }}" />
+                                                    <x-text-input id="deploy_health_expect_status" type="number" wire:model="deploy_health_expect_status" class="w-24" min="100" max="599" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_expect_status')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_attempts" value="{{ __('Attempts') }}" />
+                                                    <x-text-input id="deploy_health_attempts" type="number" wire:model="deploy_health_attempts" class="w-24" min="1" max="30" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_attempts')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="deploy_health_delay_ms" value="{{ __('Delay between attempts (ms)') }}" />
+                                                    <x-text-input id="deploy_health_delay_ms" type="number" wire:model="deploy_health_delay_ms" class="w-28" min="0" max="10000" step="50" :disabled="! $deploy_health_enabled" />
+                                                    <x-input-error :messages="$errors->get('deploy_health_delay_ms')" class="mt-1" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <div>
+                                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Rollout and web server') }}</h3>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Releases to keep, environment group, scheduler, Supervisor, and extra Nginx directives. Runtime ports and users live on Runtime / Stack / System user.') }}</p>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                        <div>
+                                            <x-input-label for="releases_to_keep" value="Releases to keep" />
+                                            <x-text-input id="releases_to_keep" type="number" wire:model="releases_to_keep" class="mt-1 w-28" min="1" max="50" />
+                                            <p class="mt-2 text-sm text-brand-moss">{{ __('Applies when zero downtime deployment is enabled.') }}</p>
+                                        </div>
+                                        <div>
+                                            <x-input-label for="deployment_environment" value="Environment group" />
+                                            <x-text-input id="deployment_environment" wire:model="deployment_environment" class="mt-1 block w-full text-sm" />
+                                            <p class="mt-2 text-sm text-brand-moss">{{ __('Used when resolving key/value environment variables for deploys.') }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid gap-3">
+                                        <div>
+                                            <label class="flex items-center gap-2 text-sm text-brand-ink">
+                                                <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-slate-300">
+                                                {{ $site->runtimeSchedulerRolloutFormLabel() }}
+                                            </label>
+                                            @if ($site->runtimeSchedulerCheckboxHelp())
+                                                <p class="mt-1 pl-6 text-xs text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</p>
+                                            @endif
+                                        </div>
+                                        <label class="flex items-center gap-2 text-sm text-brand-ink">
+                                            <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="rounded border-slate-300">
+                                            {{ __('Restart Supervisor programs after successful deploy') }}
+                                        </label>
+                                        <div>
+                                            <x-input-label for="nginx_extra_raw" value="Extra Nginx inside server block (advanced)" />
+                                            <textarea id="nginx_extra_raw" wire:model="nginx_extra_raw" rows="4" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="# location /foo { ... }"></textarea>
+                                        </div>
+                                    </div>
+
+                                    <x-primary-button type="submit">{{ __('Save rollout settings') }}</x-primary-button>
+                                </form>
+                            @endif
+
                             <details class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
                                 <summary class="cursor-pointer list-none">
                                     <h3 class="inline text-base font-semibold text-brand-ink">{{ __('Deploy script variables') }}</h3>
@@ -1017,8 +1042,9 @@
                             ['label' => __('Recent deploy history'), 'command' => 'dply:site:deploy-history '.$site->slug],
                             ['label' => __('Inspect a deploy'), 'command' => 'dply:site:show-deploy DEPLOYMENT_ID --output'],
                         ]" />
-                    @elseif ($section === 'repository')
-                        @include('livewire.sites.settings.partials.repository')
+                    {{-- section=repository is handled above alongside section=deploy
+                         (both render the chronological recipe). The old standalone
+                         partials/repository.blade.php is now orphaned. --}}
                     @elseif ($section === 'runtime')
                         @include('livewire.sites.settings.partials.runtime')
                     @elseif ($section === 'runtime-php')

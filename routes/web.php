@@ -357,6 +357,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/queue-workers', \App\Livewire\Servers\WorkspaceQueueWorkers::class)->name('sites.queue-workers');
+    // BACKGROUND group for container/serverless workspaces — engine-level
+    // schedule + workers (one minute-cadence tick today, list-of-rules in
+    // future iterations).
+    Route::livewire('servers/{server}/sites/{site}/schedule', \App\Livewire\Sites\Schedule::class)->name('sites.schedule');
+    Route::livewire('servers/{server}/sites/{site}/workers', \App\Livewire\Sites\Workers::class)->name('sites.workers');
     Route::livewire('servers/{server}/sites/{site}/caching', \App\Livewire\Sites\Caching::class)->name('sites.caching');
     Route::livewire('servers/{server}/sites/{site}/files', \App\Livewire\Sites\Files::class)->name('sites.files');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The

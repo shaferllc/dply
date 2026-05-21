@@ -6,6 +6,7 @@ use App\Enums\SiteType;
 use App\Jobs\AssignSystemUserToSiteJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
+use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SyncBasicAuthFromServerJob;
 use App\Jobs\TearDownSiteSystemdUnitJob;
@@ -20,6 +21,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
+use App\Models\SiteDeployment;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
@@ -495,6 +497,28 @@ class Settings extends Show
         $manager->removeSite($this->site->fresh());
         $this->toastSuccess(__('Removed from sync group.'));
         $this->syncRepositorySyncUiState();
+    }
+
+    /**
+     * Trigger a (re)deploy of a serverless function from the General-section
+     * dashboard, then send the operator to the journey page to watch it run.
+     */
+    public function redeployServerlessFunction(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! ($this->site->server?->isDigitalOceanFunctionsHost() ?? false)) {
+            $this->toastError(__('This site is not a serverless function.'));
+
+            return;
+        }
+
+        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
+
+        $this->redirect(route('serverless.journey', [
+            'server' => $this->server,
+            'site' => $this->site,
+        ]), navigate: true);
     }
 
     protected function loadSiteNotificationPreferences(): void

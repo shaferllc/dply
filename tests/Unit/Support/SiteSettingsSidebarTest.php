@@ -75,15 +75,39 @@ class SiteSettingsSidebarTest extends TestCase
         $this->assertLessThan($accessIdx, $backgroundIdx);
     }
 
-    public function test_container_site_has_no_background_group(): void
+    public function test_container_site_background_group_has_engine_level_schedule_and_workers(): void
+    {
+        // Container / serverless workspaces get a tight BACKGROUND group with
+        // engine-level Schedule + Workers (NOT the VM-host cron / daemons /
+        // queue-workers / backups items). v1 surfaces a single tick toggle
+        // behind each; future iterations expand into lists of named rules.
+        $server = $this->makeContainerServer();
+        $site = $this->makeSite($server, 'docker');
+
+        $items = collect(SiteSettingsSidebar::items($site, $server));
+
+        $background = $items->where('group', 'background');
+        $this->assertCount(2, $background, 'BACKGROUND should have exactly Schedule + Workers');
+
+        $ids = $background->pluck('id')->all();
+        $this->assertContains('schedule', $ids);
+        $this->assertContains('workers', $ids);
+
+        // The VM-host items must NOT leak into a container/serverless sidebar.
+        foreach (['cron', 'daemons', 'queue-workers', 'backups'] as $vmOnly) {
+            $this->assertNotContains($vmOnly, $items->pluck('id')->all(), $vmOnly.' is VM-only and should be absent from container workspaces');
+        }
+    }
+
+    public function test_container_background_items_point_to_dedicated_site_routes(): void
     {
         $server = $this->makeContainerServer();
         $site = $this->makeSite($server, 'docker');
 
-        $items = SiteSettingsSidebar::items($site, $server);
+        $items = collect(SiteSettingsSidebar::items($site, $server))->keyBy('id');
 
-        $groups = collect($items)->pluck('group')->unique()->all();
-        $this->assertNotContains('background', $groups);
+        $this->assertSame('sites.schedule', $items['schedule']['route'] ?? null);
+        $this->assertSame('sites.workers', $items['workers']['route'] ?? null);
     }
 
     public function test_every_item_has_a_group_key(): void
@@ -175,14 +199,54 @@ class SiteSettingsSidebarTest extends TestCase
         $this->assertContains('repository', $ids);
     }
 
-    public function test_docker_workspace_keeps_host_sections(): void
+    public function test_docker_workspace_drops_host_only_sections(): void
     {
+        // Container apps (docker, kubernetes, serverless) run behind the dply
+        // edge — routing, DNS, the host webserver, system user, basic auth,
+        // and framework-specific stack tabs are all either the edge's job or
+        // the operator's artifact's job, not this workspace's.
         $server = $this->makeContainerServer();
-        $site = $this->makeSite($server);
+        $site = $this->makeSite($server, 'docker');
 
         $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
 
-        $this->assertContains('routing', $ids);
-        $this->assertContains('system-user', $ids);
+        foreach (['routing', 'dns', 'certificates', 'system-user', 'basic-auth', 'laravel-stack', 'rails-stack', 'wordpress', 'webserver-config', 'caching'] as $excluded) {
+            $this->assertNotContains($excluded, $ids, $excluded.' should not appear for a container workspace');
+        }
+        $this->assertContains('environment', $ids);
+        $this->assertContains('deploy', $ids);
+        $this->assertContains('repository', $ids);
+        $this->assertContains('runtime', $ids);
+    }
+
+    public function test_container_workspace_has_no_runtime_subtab(): void
+    {
+        // Runtime sub-tabs (runtime-php / runtime-ruby / runtime-static) are
+        // VM-only — for container/serverless, engine knobs live on Runtime
+        // itself (Engine + Limits clusters) and runtime-version is set there.
+        $server = $this->makeContainerServer();
+
+        foreach (['php', 'ruby', 'static'] as $runtime) {
+            $site = $this->makeSite($server, $runtime);
+            $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+            $this->assertNotContains('runtime-'.$runtime, $ids, 'runtime-'.$runtime.' should not appear for a container workspace');
+        }
+    }
+
+    public function test_container_workspace_group_order(): void
+    {
+        $server = $this->makeContainerServer();
+        $site = $this->makeSite($server, 'docker');
+
+        $groupOrder = collect(SiteSettingsSidebar::items($site, $server))
+            ->pluck('group')
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->assertSame(
+            ['general', 'deploy', 'runtime', 'background', 'observability', 'danger'],
+            $groupOrder,
+        );
     }
 }
