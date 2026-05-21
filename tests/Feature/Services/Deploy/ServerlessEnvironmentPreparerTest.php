@@ -54,6 +54,22 @@ class ServerlessEnvironmentPreparerTest extends TestCase
         $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$site->webhook_secret, $managed);
     }
 
+    public function test_it_overwrites_a_stale_command_secret(): void
+    {
+        // A stale DPLY_COMMAND_SECRET — rotated, or committed in the repo
+        // .env — must be forced to the site's current webhook_secret, not
+        // kept; otherwise every background tick fails the handler's check.
+        $site = Site::factory()->create([
+            'env_file_content' => "APP_ENV=production\nDPLY_COMMAND_SECRET=stale-old-value\n",
+        ]);
+
+        (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+        $managed = (string) $site->fresh()->env_file_content;
+        $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$site->webhook_secret, $managed);
+        $this->assertStringNotContainsString('stale-old-value', $managed);
+    }
+
     public function test_it_injects_a_stable_log_ingest_secret(): void
     {
         $site = Site::factory()->create(['env_file_content' => null]);

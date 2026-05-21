@@ -44,7 +44,14 @@ class CreateServerlessFunction
         }
 
         $branch = trim((string) ($payload['branch'] ?? 'main')) ?: 'main';
-        $runtime = trim((string) ($payload['runtime'] ?? 'nodejs:18')) ?: 'nodejs:18';
+
+        // `auto` (or an empty value) leaves the runtime unset so the
+        // deploy-time ServerlessRuntimeDetector picks it from the repo. An
+        // explicit value is stored verbatim and overrides detection.
+        $runtime = trim((string) ($payload['runtime'] ?? ''));
+        if ($runtime === 'auto') {
+            $runtime = '';
+        }
         $region = trim((string) ($payload['region'] ?? ''));
         $credentialId = trim((string) ($payload['provider_credential_id'] ?? ''));
 

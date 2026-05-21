@@ -5,6 +5,7 @@ namespace Tests\Feature\Actions\Serverless;
 use App\Actions\Serverless\CreateServerlessFunction;
 use App\Jobs\ProvisionServerlessHostJob;
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
@@ -23,12 +24,21 @@ class CreateServerlessFunctionTest extends TestCase
         $org = Organization::factory()->create();
         $org->users()->attach($user->id, ['role' => 'owner']);
 
+        $credential = ProviderCredential::query()->create([
+            'organization_id' => $org->id,
+            'user_id' => $user->id,
+            'provider' => 'digitalocean',
+            'name' => 'DO main',
+            'credentials' => ['token' => 'dop_v1_test'],
+        ]);
+
         return app(CreateServerlessFunction::class)->handle($user, $org, array_merge([
             'name' => 'My API',
             'repo' => 'acme/api',
             'branch' => 'main',
             'runtime' => 'nodejs:20',
             'region' => 'nyc1',
+            'provider_credential_id' => $credential->id,
         ], $overrides));
     }
 
@@ -89,5 +99,15 @@ class CreateServerlessFunctionTest extends TestCase
         $site = $this->handle();
 
         $this->assertNotSame(Site::STATUS_FUNCTIONS_ACTIVE, $site->status);
+    }
+
+    public function test_auto_runtime_is_stored_unset_for_deploy_time_detection(): void
+    {
+        Bus::fake();
+        // `auto` leaves the runtime empty so ServerlessRuntimeDetector picks
+        // it from the repo at deploy time; an explicit value is kept verbatim.
+        $site = $this->handle(['runtime' => 'auto']);
+
+        $this->assertSame('', $site->meta['serverless']['runtime']);
     }
 }

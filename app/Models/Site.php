@@ -427,6 +427,18 @@ class Site extends Model
         return $this->hasMany(SiteDomain::class);
     }
 
+    /**
+     * The OpenWhisk actions on this serverless function-Site. A Site is an
+     * OpenWhisk package: one `kind=code` action for a plain function, more
+     * once the package model lands. Code actions sort before sequences.
+     */
+    public function functionActions(): HasMany
+    {
+        return $this->hasMany(FunctionAction::class)
+            ->orderByRaw("CASE WHEN kind = 'code' THEN 0 ELSE 1 END")
+            ->orderBy('name');
+    }
+
     public function previewDomains(): HasMany
     {
         return $this->hasMany(SitePreviewDomain::class)->orderByDesc('is_primary')->orderBy('hostname');

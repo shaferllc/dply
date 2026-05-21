@@ -70,6 +70,8 @@
                                     <option value="{{ $value }}">{{ $label }}</option>
                                 @endforeach
                             </select>
+                            <p class="mt-1 text-xs text-brand-ink/50">{{ __('Auto-detect picks the runtime from your repository at deploy time.') }}</p>
+                            @error('runtime') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-brand-ink">{{ __('Region') }}</label>

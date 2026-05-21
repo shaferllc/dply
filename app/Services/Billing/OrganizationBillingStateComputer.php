@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Enums\ServerTier;
+use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -13,8 +14,9 @@ use App\Models\Site;
  *
  * - **Spec-tiered servers** — ready VM/container hosts, classified XS–XL via
  *   the server's billingTier() accessor.
- * - **Serverless functions** — active function-Sites on FaaS hosts, billed at
- *   a flat per-function fee (see project_serverless_v1).
+ * - **Serverless functions** — code actions on active function-Sites (FaaS
+ *   hosts), billed at a flat per-action fee. A Site is an OpenWhisk package
+ *   that may hold several code actions; sequences and triggers bill nothing.
  *
  * Two filters apply on top of fleet-membership, to both kinds:
  *
@@ -55,10 +57,20 @@ class OrganizationBillingStateComputer
                 $tierQuantities[$tier] = ($tierQuantities[$tier] ?? 0) + 1;
             });
 
-        $serverlessCount = $organization->sites()
+        // Serverless billing is metered per *code* action. A function-Site
+        // is an OpenWhisk package that may hold several actions; sequences
+        // (kind != code) and triggers bill nothing. A billable function-Site
+        // always counts at least once, even before its actions have been
+        // enumerated into `function_actions`, so the meter never regresses.
+        $serverlessCount = 0;
+        $organization->sites()
             ->where('status', Site::STATUS_FUNCTIONS_ACTIVE)
             ->where('created_at', '<=', $ageCutoff)
-            ->count();
+            ->withCount(['functionActions as code_action_count' => fn ($query) => $query->where('kind', FunctionAction::KIND_CODE)])
+            ->get()
+            ->each(function (Site $site) use (&$serverlessCount): void {
+                $serverlessCount += max(1, (int) $site->code_action_count);
+            });
 
         return DesiredBillingState::fromCounts(
             tierQuantities: $tierQuantities,

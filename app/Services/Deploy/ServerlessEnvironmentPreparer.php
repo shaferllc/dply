@@ -50,10 +50,14 @@ class ServerlessEnvironmentPreparer
         }
 
         // The command secret authenticates dply's background ticks
-        // (scheduler / queue worker) against the deployed function.
-        if ($isLaravel && ! $this->envHasKey($managed, 'DPLY_COMMAND_SECRET')
-            && trim((string) $site->webhook_secret) !== '') {
-            $managed = ltrim(rtrim($managed, "\r\n")."\nDPLY_COMMAND_SECRET=".trim((string) $site->webhook_secret)."\n", "\n");
+        // (scheduler / queue worker) against the deployed function. It is
+        // dply-managed, so force it to the site's current webhook_secret on
+        // every deploy: injecting it only-when-absent left a rotated secret
+        // — or a stale DPLY_COMMAND_SECRET committed in the repo .env —
+        // baked into the function, and every tick then failed the handler's
+        // check with "invalid command secret".
+        if ($isLaravel && trim((string) $site->webhook_secret) !== '') {
+            $managed = $this->setEnvKey($managed, 'DPLY_COMMAND_SECRET', trim((string) $site->webhook_secret));
         }
 
         // Log shipping — the function's handler POSTs each request it serves

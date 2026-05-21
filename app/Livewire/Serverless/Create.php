@@ -56,7 +56,12 @@ class Create extends Component
 
     public string $branch = 'main';
 
-    public string $runtime = 'nodejs:18';
+    /**
+     * Runtime selection. Defaults to `auto` — the deploy-time
+     * {@see \App\Services\Deploy\ServerlessRuntimeDetector} picks the runtime
+     * from the repository. An explicit value overrides detection.
+     */
+    public string $runtime = 'auto';
 
     /** The shaferllc demo repo behind the one-click PHP demo. */
     public const PHP_DEMO_REPO = 'shaferllc/dply-demo-php-function';
@@ -115,7 +120,7 @@ class Create extends Component
             'name' => ['required', 'string', 'max:255'],
             'repo' => ['required', 'string', 'max:255'],
             'branch' => ['required', 'string', 'max:255'],
-            'runtime' => ['required', 'string', 'max:64'],
+            'runtime' => ['required', 'string', \Illuminate\Validation\Rule::in(array_keys($this->runtimeOptions()))],
             'region' => ['required', 'string', 'max:32'],
             'provider_credential_id' => [
                 'required',
@@ -149,6 +154,26 @@ class Create extends Component
         return $this->redirect(route('serverless.journey', [$site->server_id, $site->id]), navigate: true);
     }
 
+    /**
+     * Runtime choices for the create form. `auto` defers to the deploy-time
+     * detector; the rest pin a specific DigitalOcean Functions runtime.
+     *
+     * @return array<string, string>
+     */
+    private function runtimeOptions(): array
+    {
+        return [
+            'auto' => __('Auto-detect (recommended)'),
+            'nodejs:18' => 'Node.js 18',
+            'nodejs:20' => 'Node.js 20',
+            'php:8.3' => 'PHP 8.3',
+            'php:8.4' => 'PHP 8.4',
+            'php:8.5' => 'PHP 8.5',
+            'python:3.11' => 'Python 3.11',
+            'go:1.22' => 'Go 1.22',
+        ];
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -161,15 +186,7 @@ class Create extends Component
         return view('livewire.serverless.create', [
             'credentials' => $credentials,
             'functionFee' => app(\App\Services\Serverless\ServerlessCostEstimator::class)->functionFee(),
-            'runtimes' => [
-                'nodejs:18' => 'Node.js 18',
-                'nodejs:20' => 'Node.js 20',
-                'php:8.3' => 'PHP 8.3',
-                'php:8.4' => 'PHP 8.4',
-                'php:8.5' => 'PHP 8.5',
-                'python:3.11' => 'Python 3.11',
-                'go:1.22' => 'Go 1.22',
-            ],
+            'runtimes' => $this->runtimeOptions(),
             'regions' => [
                 'nyc1' => 'New York',
                 'sfo3' => 'San Francisco',

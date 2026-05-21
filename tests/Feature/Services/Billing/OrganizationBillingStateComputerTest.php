@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Services\Billing;
 
+use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
@@ -200,6 +201,45 @@ class OrganizationBillingStateComputerTest extends TestCase
         Config::set('subscription.standard.serverless_cents', 200);
         $org = Organization::factory()->create();
         $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_CONFIGURED); // pre-deploy
+        $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
+
+        $state = $this->computer->compute($org->fresh());
+
+        $this->assertSame(1, $state->serverlessCount);
+    }
+
+    public function test_each_code_action_in_a_package_is_billed_and_sequences_are_not(): void
+    {
+        Config::set('subscription.standard.serverless_cents', 200);
+        $org = Organization::factory()->create();
+        $site = $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
+
+        foreach (['a', 'b', 'c'] as $name) {
+            FunctionAction::query()->create([
+                'site_id' => $site->id,
+                'name' => $name,
+                'kind' => FunctionAction::KIND_CODE,
+            ]);
+        }
+        // A codeless sequence — composition is free, it must not be metered.
+        FunctionAction::query()->create([
+            'site_id' => $site->id,
+            'name' => 'pipeline',
+            'kind' => FunctionAction::KIND_SEQUENCE,
+        ]);
+
+        $state = $this->computer->compute($org->fresh());
+
+        $this->assertSame(3, $state->serverlessCount);
+        $this->assertSame(600, $state->serverlessSubtotalCents);
+    }
+
+    public function test_an_active_function_site_with_no_enumerated_actions_still_bills_once(): void
+    {
+        Config::set('subscription.standard.serverless_cents', 200);
+        $org = Organization::factory()->create();
+        // No function_actions rows — the per-action meter must floor at one
+        // so the bill never regresses below the per-Site model.
         $this->makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
 
         $state = $this->computer->compute($org->fresh());

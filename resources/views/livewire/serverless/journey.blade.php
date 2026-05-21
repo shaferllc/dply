@@ -1,5 +1,11 @@
 <div @if ($shouldPoll) wire:poll.3s @endif>
-    <div @class(['max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8' => ! $embedded])>
+    {{-- Standalone page centres a readable column; embedded on the
+         Deployments tab it keeps the same readable cap, just without the
+         page padding/centring so it sits inside the tab. --}}
+    <div @class([
+        'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8' => ! $embedded,
+        'max-w-3xl' => $embedded,
+    ])>
         @unless ($embedded)
             <x-breadcrumb-trail :items="[
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],

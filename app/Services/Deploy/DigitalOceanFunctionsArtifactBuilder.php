@@ -20,6 +20,7 @@ class DigitalOceanFunctionsArtifactBuilder
         private readonly ServerlessDeploymentConfigResolver $deploymentConfigResolver,
         private readonly BrefInjector $brefInjector,
         private readonly DigitalOceanFunctionsLaravelAdapter $laravelAdapter,
+        private readonly ServerlessLoggingShimInjector $shimInjector,
         private readonly ServerlessDeployProgress $progress,
         private readonly ServerlessEnvironmentPreparer $environmentPreparer,
         private readonly ServerlessDeployHookRunner $hookRunner,
@@ -84,6 +85,14 @@ class DigitalOceanFunctionsArtifactBuilder
         $entrypoint = trim((string) ($resolvedConfig['entrypoint'] !== '' ? $resolvedConfig['entrypoint'] : $detected['entrypoint']));
         $package = trim((string) ($resolvedConfig['package'] !== '' ? $resolvedConfig['package'] : $detected['package']));
 
+        // A raw OpenWhisk action — a bare main() detected at the repo root,
+        // with no framework. It gets a logging shim rather than a framework
+        // adapter, and (unlike a framework build) may legitimately have no
+        // build step at all.
+        $isRawAction = ($detected['deploy_kind'] ?? '') === 'raw'
+            && trim((string) ($detected['entry_file'] ?? '')) !== ''
+            && in_array($detected['language'], ['node', 'python', 'php', 'go'], true);
+
         // DigitalOcean Functions runs PHP natively but ships no Laravel
         // bridge — inject the OpenWhisk↔Laravel adapter so the zipped repo
         // exposes the main() web action the runtime invokes. (AWS Lambda
@@ -104,6 +113,25 @@ class DigitalOceanFunctionsArtifactBuilder
             $this->progress->done($site, 'adapter', 'Injected Laravel adapter');
         }
 
+        // A raw action has no dply-injected handler, so organic invocations
+        // would be invisible (the DO activations list API is empty). Inject
+        // the per-language logging shim: it becomes the OpenWhisk entry,
+        // wraps the repo's own action, and reports each call to dply.
+        $shimLog = [];
+        if ($isRawAction && $site->server?->isDigitalOceanFunctionsHost()) {
+            $this->progress->active($site, 'adapter', 'Injecting logging shim', 'dply ↔ OpenWhisk raw-action bridge');
+            $injection = $this->shimInjector->inject(
+                $checkout['working_directory'],
+                (string) $detected['language'],
+                (string) ($detected['entry_file'] ?? ''),
+            );
+            if ($injection['ran']) {
+                $shimLog[] = $injection['output'];
+                $entrypoint = $injection['function'];
+            }
+            $this->progress->done($site, 'adapter', 'Injected logging shim');
+        }
+
         // Bundle dply's managed environment into the artifact (and mint a
         // stable APP_KEY for Laravel) — the function has no other way to
         // receive configuration.
@@ -113,7 +141,9 @@ class DigitalOceanFunctionsArtifactBuilder
             $detected['framework'] === 'laravel',
         );
 
-        if ($buildCommand === '') {
+        // A raw action with no dependency manifest needs no build step; for
+        // anything else an empty build command is a misconfiguration.
+        if ($buildCommand === '' && ! $isRawAction) {
             throw new \RuntimeException('Dply could not determine a build command for this serverless site. Open Advanced settings and set one manually.');
         }
 
@@ -129,11 +159,13 @@ class DigitalOceanFunctionsArtifactBuilder
             'artifact_output_path' => $artifactOutputPath,
         ]);
 
-        $log = array_filter([$checkout['output'], $beforeBuildHookLog, ...$brefLog, ...$laravelAdapterLog, $envLog]);
+        $log = array_filter([$checkout['output'], $beforeBuildHookLog, ...$brefLog, ...$laravelAdapterLog, ...$shimLog, $envLog]);
 
-        $this->progress->active($site, 'dependencies', 'Installing dependencies', $buildCommand);
-        $log[] = $this->runShell($buildCommand, $checkout['working_directory']);
-        $this->progress->done($site, 'dependencies', 'Installed dependencies');
+        if ($buildCommand !== '') {
+            $this->progress->active($site, 'dependencies', 'Installing dependencies', $buildCommand);
+            $log[] = $this->runShell($buildCommand, $checkout['working_directory']);
+            $this->progress->done($site, 'dependencies', 'Installed dependencies');
+        }
 
         // after_clone hooks — operator shell that runs once dependencies are
         // installed but before the artifact is packaged.

@@ -116,4 +116,47 @@ class CreateTest extends TestCase
         $server = Server::find($site->server_id);
         $this->assertTrue($server->isServerlessHost());
     }
+
+    public function test_runtime_defaults_to_auto_detect(): void
+    {
+        $this->withCredential();
+
+        Livewire::actingAs($this->user)
+            ->test(ServerlessCreate::class)
+            ->assertSet('runtime', 'auto')
+            ->assertSee('Auto-detect');
+    }
+
+    public function test_auto_detect_creates_a_function_with_an_unset_runtime(): void
+    {
+        Bus::fake();
+        $this->withCredential();
+
+        Livewire::actingAs($this->user)
+            ->test(ServerlessCreate::class)
+            ->set('name', 'Detected Fn')
+            ->set('repo', 'acme/detected')
+            ->set('branch', 'main')
+            ->set('runtime', 'auto')
+            ->set('region', 'nyc1')
+            ->call('create')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $site = Site::query()->where('organization_id', $this->org->id)->firstOrFail();
+        $this->assertSame('', $site->meta['serverless']['runtime']);
+    }
+
+    public function test_validation_rejects_an_unknown_runtime(): void
+    {
+        $this->withCredential();
+
+        Livewire::actingAs($this->user)
+            ->test(ServerlessCreate::class)
+            ->set('name', 'Bad Runtime')
+            ->set('repo', 'acme/api')
+            ->set('runtime', 'cobol:74')
+            ->call('create')
+            ->assertHasErrors(['runtime']);
+    }
 }
